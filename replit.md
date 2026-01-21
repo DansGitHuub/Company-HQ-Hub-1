@@ -176,3 +176,14 @@ Preferred communication style: Simple, everyday language.
 - Database tables: customer_resources, saved_resources
 - API routes: /api/resources (CRUD), /api/saved-resources (favorites)
 - Access control: Non-admin users only see published resources
+
+### Company Branding
+- Located in Admin Panel > Company tab
+- Upload custom company logo (stored via Replit Object Storage)
+- Logo shape options: square, rectangle (wide), circle
+- Corner rounding slider: 0-20px (hidden for circle shape)
+- Set custom company name
+- Live preview shows how logo will appear in sidebar
+- Settings stored in company_settings table
+- Logo and company name display in sidebar navigation
+- API routes: GET/PATCH /api/company-settings (admin-only for updates)
