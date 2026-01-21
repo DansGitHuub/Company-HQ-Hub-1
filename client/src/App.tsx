@@ -26,6 +26,7 @@ import JobPipeline from "@/pages/JobPipeline";
 import Assistant from "@/pages/Assistant";
 import Help from "@/pages/Help";
 import Profile from "@/pages/Profile";
+import AdminSetup from "@/pages/AdminSetup";
 import NotFound from "@/pages/not-found";
 
 function AppRoutes() {
@@ -72,6 +73,7 @@ function AppRoutes() {
         <Route path="/jobs" component={JobPipeline} />
         <Route path="/assistant" component={Assistant} />
         <Route path="/help" component={Help} />
+        <Route path="/admin-setup" component={AdminSetup} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>
