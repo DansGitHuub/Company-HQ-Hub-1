@@ -40,7 +40,7 @@ export default function JobPipeline() {
           const stageJobs = PROJECTS.filter(p => p.stage === stage);
           
           return (
-            <div key={stage} className="w-72 shrink-0 flex flex-col bg-secondary/20 rounded-xl p-3">
+            <div key={stage} className="w-72 shrink-0 flex flex-col bg-stone-200/70 dark:bg-secondary/40 rounded-xl p-3">
               <div className="flex items-center justify-between mb-3 px-1">
                 <h3 className="font-semibold text-xs uppercase tracking-widest text-muted-foreground">
                   {stage}
