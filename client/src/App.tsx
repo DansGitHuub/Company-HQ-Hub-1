@@ -67,6 +67,7 @@ function AppRoutes() {
         <Route path="/education" component={Education} />
         <Route path="/profile" component={Profile} />
         <Route path="/employee" component={EmployeePortal} />
+        <Route path="/employee-portal" component={EmployeePortal} />
         <Route path="/hq" component={HQOverview} />
         <Route path="/jobs" component={JobPipeline} />
         <Route path="/assistant" component={Assistant} />

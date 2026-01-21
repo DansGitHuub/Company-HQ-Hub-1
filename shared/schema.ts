@@ -300,3 +300,21 @@ export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).pi
 
 export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
 export type FormSubmission = typeof formSubmissions.$inferSelect;
+
+export const conversations = pgTable("conversations", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  title: text("title").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const chatMessages = pgTable("chat_messages", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  conversationId: integer("conversation_id").notNull().references(() => conversations.id),
+  role: text("role").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type Conversation = typeof conversations.$inferSelect;
+export type ChatMessage = typeof chatMessages.$inferSelect;

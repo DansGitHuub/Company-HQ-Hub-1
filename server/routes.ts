@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, hashPassword } from "./auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { registerChatRoutes } from "./replit_integrations/chat/routes";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -522,6 +523,7 @@ export async function registerRoutes(
   });
 
   registerObjectStorageRoutes(app, requireAuth);
+  registerChatRoutes(app);
 
   return httpServer;
 }
