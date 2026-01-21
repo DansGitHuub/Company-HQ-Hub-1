@@ -564,6 +564,7 @@ export default function AdminPanel() {
                             logoShape === "rectangle" ? "h-10 w-16" : "h-10 w-10"
                           } ${
                             logoShape === "circle" ? "rounded-full" : 
+                            logoCornerRadius === 0 ? "rounded-none" :
                             logoCornerRadius <= 4 ? "rounded" :
                             logoCornerRadius <= 8 ? "rounded-md" :
                             logoCornerRadius <= 12 ? "rounded-lg" : "rounded-xl"
