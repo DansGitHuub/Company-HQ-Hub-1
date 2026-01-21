@@ -28,7 +28,9 @@ import {
   AlertCircle,
   Camera,
   Calendar,
-  MapPin
+  MapPin,
+  UserPlus,
+  Shield
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -55,11 +57,20 @@ type WorkRequest = {
   createdAt: string;
 };
 
+type AccessRequest = {
+  id: string;
+  requestedRole: string;
+  reason?: string;
+  status: string;
+  createdAt: string;
+};
+
 export default function CustomerPortal() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [messageOpen, setMessageOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages"],
@@ -68,6 +79,12 @@ export default function CustomerPortal() {
   const { data: workRequests = [], isLoading: requestsLoading } = useQuery<WorkRequest[]>({
     queryKey: ["/api/work-requests"],
   });
+
+  const { data: accessRequests = [] } = useQuery<AccessRequest[]>({
+    queryKey: ["/api/access-requests"],
+  });
+
+  const pendingAccessRequest = accessRequests.find(r => r.status === "pending");
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
@@ -236,6 +253,35 @@ export default function CustomerPortal() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Card className="border-dashed">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" /> Account Access
+          </CardTitle>
+          <CardDescription>Need team member access? Request an account upgrade</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {pendingAccessRequest ? (
+            <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-lg">
+              <Clock className="h-5 w-5 text-amber-600" />
+              <div>
+                <p className="font-medium">Upgrade Request Pending</p>
+                <p className="text-sm text-muted-foreground">
+                  Your request for <Badge variant="outline">{pendingAccessRequest.requestedRole}</Badge> access is being reviewed
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                If you're a team member, you can request upgraded access to view operational features.
+              </p>
+              <RequestUpgradeDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -450,6 +496,81 @@ function NewWorkRequestDialog({ open, onOpenChange }: { open: boolean; onOpenCha
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Submit Request
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RequestUpgradeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const [requestedRole, setRequestedRole] = useState("");
+  const [reason, setReason] = useState("");
+  const { toast } = useToast();
+
+  const mutation = useMutation({
+    mutationFn: async (data: { requestedRole: string; reason: string }) => {
+      const res = await apiRequest("POST", "/api/access-requests", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/access-requests"] });
+      toast({ title: "Request submitted", description: "An admin will review your request" });
+      onOpenChange(false);
+      setRequestedRole("");
+      setReason("");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to submit request", variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    mutation.mutate({ requestedRole, reason });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="gap-2">
+          <UserPlus className="h-4 w-4" /> Request Upgrade
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Request Account Upgrade</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          <div className="space-y-2">
+            <Label>Requested Access Level</Label>
+            <Select value={requestedRole} onValueChange={setRequestedRole}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select access level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Crew">Crew Member</SelectItem>
+                <SelectItem value="Manager">Manager</SelectItem>
+                <SelectItem value="Admin">Administrator</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="reason">Reason for Request</Label>
+            <Textarea
+              id="reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Please explain why you need this access level..."
+              rows={4}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={mutation.isPending || !requestedRole}>
               {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Submit Request
             </Button>

@@ -8,7 +8,8 @@ import {
   integrations,
   featureRequests, type FeatureRequest, type InsertFeatureRequest,
   customerMessages, type CustomerMessage, type InsertCustomerMessage,
-  workRequests, type WorkRequest, type InsertWorkRequest
+  workRequests, type WorkRequest, type InsertWorkRequest,
+  accessRequests, type AccessRequest, type InsertAccessRequest
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or } from "drizzle-orm";
@@ -68,6 +69,11 @@ export interface IStorage {
   getWorkRequests(): Promise<WorkRequest[]>;
   getWorkRequestsByUser(userId: string): Promise<WorkRequest[]>;
   updateWorkRequest(id: string, updates: Partial<WorkRequest>): Promise<WorkRequest | undefined>;
+  
+  createAccessRequest(request: InsertAccessRequest): Promise<AccessRequest>;
+  getAccessRequests(): Promise<AccessRequest[]>;
+  getAccessRequestsByUser(userId: string): Promise<AccessRequest[]>;
+  updateAccessRequest(id: string, updates: Partial<AccessRequest>): Promise<AccessRequest | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -265,6 +271,24 @@ export class DatabaseStorage implements IStorage {
 
   async updateWorkRequest(id: string, updates: Partial<WorkRequest>): Promise<WorkRequest | undefined> {
     const [request] = await db.update(workRequests).set({ ...updates, updatedAt: new Date() }).where(eq(workRequests.id, id)).returning();
+    return request || undefined;
+  }
+
+  async createAccessRequest(request: InsertAccessRequest): Promise<AccessRequest> {
+    const [newRequest] = await db.insert(accessRequests).values(request).returning();
+    return newRequest;
+  }
+
+  async getAccessRequests(): Promise<AccessRequest[]> {
+    return db.select().from(accessRequests);
+  }
+
+  async getAccessRequestsByUser(userId: string): Promise<AccessRequest[]> {
+    return db.select().from(accessRequests).where(eq(accessRequests.userId, userId));
+  }
+
+  async updateAccessRequest(id: string, updates: Partial<AccessRequest>): Promise<AccessRequest | undefined> {
+    const [request] = await db.update(accessRequests).set(updates).where(eq(accessRequests.id, id)).returning();
     return request || undefined;
   }
 }

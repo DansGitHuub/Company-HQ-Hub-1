@@ -11,8 +11,9 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
-  role: text("role").notNull().default("Crew"),
+  role: text("role").notNull().default("Customer"),
   isActive: boolean("is_active").notNull().default(true),
+  isMasterAdmin: boolean("is_master_admin").notNull().default(false),
   recoveryToken: text("recovery_token"),
   recoveryExpires: timestamp("recovery_expires"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -219,3 +220,24 @@ export const insertWorkRequestSchema = createInsertSchema(workRequests).pick({
 
 export type InsertWorkRequest = z.infer<typeof insertWorkRequestSchema>;
 export type WorkRequest = typeof workRequests.$inferSelect;
+
+export const accessRequests = pgTable("access_requests", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id).notNull(),
+  requestedRole: text("requested_role").notNull(),
+  reason: text("reason"),
+  status: text("status").notNull().default("pending"),
+  reviewedBy: varchar("reviewed_by", { length: 36 }).references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAccessRequestSchema = createInsertSchema(accessRequests).pick({
+  userId: true,
+  requestedRole: true,
+  reason: true,
+});
+
+export type InsertAccessRequest = z.infer<typeof insertAccessRequestSchema>;
+export type AccessRequest = typeof accessRequests.$inferSelect;

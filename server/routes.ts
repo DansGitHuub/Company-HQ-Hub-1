@@ -330,5 +330,58 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/access-requests", requireAuth, async (req, res) => {
+    try {
+      const request = await storage.createAccessRequest({
+        userId: req.user!.id,
+        requestedRole: req.body.requestedRole,
+        reason: req.body.reason,
+      });
+      res.status(201).json(request);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating access request" });
+    }
+  });
+
+  app.get("/api/access-requests", requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role === "Admin") {
+        const requests = await storage.getAccessRequests();
+        res.json(requests);
+      } else {
+        const requests = await storage.getAccessRequestsByUser(req.user!.id);
+        res.json(requests);
+      }
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching access requests" });
+    }
+  });
+
+  app.patch("/api/access-requests/:id", requireAdmin, async (req, res) => {
+    try {
+      const { status, reviewNotes } = req.body;
+      const request = await storage.updateAccessRequest(req.params.id as string, {
+        status,
+        reviewNotes,
+        reviewedBy: req.user!.id,
+        reviewedAt: new Date(),
+      });
+      if (!request) return res.status(404).json({ message: "Access request not found" });
+      
+      if (status === "approved") {
+        const targetUser = await storage.getUser(request.userId);
+        if (targetUser) {
+          if (request.requestedRole === "Admin" && !req.user?.isMasterAdmin) {
+            return res.status(403).json({ message: "Only the master admin can grant Admin access" });
+          }
+          await storage.updateUser(request.userId, { role: request.requestedRole });
+        }
+      }
+      res.json(request);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating access request" });
+    }
+  });
+
   return httpServer;
 }
