@@ -251,8 +251,9 @@ export const customForms = pgTable("custom_forms", {
   description: text("description"),
   category: text("category").default("General"),
   fields: jsonb("fields").notNull().default([]),
-  accessLevel: text("access_level").default("Crew"),
+  accessLevel: text("access_level").default("All"),
   isPublished: boolean("is_published").notNull().default(false),
+  styling: jsonb("styling"),
   createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -265,15 +266,23 @@ export const insertCustomFormSchema = createInsertSchema(customForms).pick({
   fields: true,
   accessLevel: true,
   isPublished: true,
+  styling: true,
   createdBy: true,
 });
 
 export type InsertCustomForm = z.infer<typeof insertCustomFormSchema>;
 export type CustomForm = typeof customForms.$inferSelect;
 
+export type FormStyling = {
+  fontFamily: string;
+  fontSize: string;
+  showBorder: boolean;
+  borderStyle: string;
+};
+
 export type FormField = {
   id: string;
-  type: "text" | "textarea" | "number" | "email" | "date" | "select" | "checkbox" | "radio" | "file" | "signature";
+  type: "text" | "textarea" | "number" | "email" | "date" | "select" | "checkbox" | "radio" | "file" | "signature" | "separator";
   label: string;
   placeholder?: string;
   required?: boolean;

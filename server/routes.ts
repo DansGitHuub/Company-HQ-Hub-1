@@ -195,6 +195,49 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/ai/generate-form", requireAuth, async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ message: "Prompt is required" });
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert at creating form fields for business applications.
+            When given a description, create appropriate form fields.
+            Format your response as JSON with these fields:
+            - title: A clear title for the form (optional, only if relevant)
+            - description: A brief description (optional)
+            - fields: An array of field objects, each with:
+              - type: One of [text, textarea, number, email, date, select, checkbox, radio]
+              - label: The field label
+              - placeholder: Placeholder text
+              - required: boolean
+              - options: Array of strings (only for select/radio types)
+            
+            Create practical, professional fields. Use appropriate field types for the data being collected.`
+          },
+          {
+            role: "user",
+            content: `Create form fields for: ${prompt}`
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 1024,
+      });
+
+      const result = JSON.parse(completion.choices[0]?.message?.content || "{}");
+      res.json(result);
+    } catch (err: any) {
+      console.error("AI form generation error:", err);
+      res.status(500).json({ message: "AI generation failed", error: err.message });
+    }
+  });
+
   app.get("/api/materials", requireAuth, async (req, res) => {
     try {
       const materials = await storage.getMaterials();

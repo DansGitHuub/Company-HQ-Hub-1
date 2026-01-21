@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { 
   Plus, 
   Settings, 
@@ -32,18 +33,29 @@ import {
   AlignLeft,
   Save,
   X,
-  Copy
+  Copy,
+  Sparkles,
+  Palette,
+  Minus,
+  MoreHorizontal
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
 type FormField = {
   id: string;
-  type: "text" | "textarea" | "number" | "email" | "date" | "select" | "checkbox" | "radio";
+  type: "text" | "textarea" | "number" | "email" | "date" | "select" | "checkbox" | "radio" | "separator";
   label: string;
   placeholder?: string;
   required?: boolean;
   options?: string[];
+};
+
+type FormStyling = {
+  fontFamily: string;
+  fontSize: string;
+  showBorder: boolean;
+  borderStyle: string;
 };
 
 type CustomForm = {
@@ -55,7 +67,40 @@ type CustomForm = {
   accessLevel: string;
   isPublished: boolean;
   createdAt: string;
+  styling?: FormStyling;
 };
+
+const FONT_OPTIONS = [
+  { value: "system-ui, sans-serif", label: "System Default" },
+  { value: "'Inter', sans-serif", label: "Inter" },
+  { value: "'Georgia', serif", label: "Georgia" },
+  { value: "'Times New Roman', serif", label: "Times New Roman" },
+  { value: "'Arial', sans-serif", label: "Arial" },
+  { value: "'Helvetica Neue', sans-serif", label: "Helvetica" },
+  { value: "'Roboto', sans-serif", label: "Roboto" },
+  { value: "'Open Sans', sans-serif", label: "Open Sans" },
+];
+
+const FONT_SIZES = [
+  { value: "text-sm", label: "Small" },
+  { value: "text-base", label: "Medium" },
+  { value: "text-lg", label: "Large" },
+];
+
+const BORDER_STYLES = [
+  { value: "none", label: "None" },
+  { value: "simple", label: "Simple Line" },
+  { value: "rounded", label: "Rounded" },
+  { value: "shadow", label: "Shadow" },
+];
+
+const ACCESS_LEVELS = [
+  { value: "All", label: "All Users", description: "Anyone can fill out this form" },
+  { value: "Customer", label: "Customers Only", description: "Only customer accounts" },
+  { value: "Crew", label: "Crew & Above", description: "Crew, Managers, and Admins" },
+  { value: "Manager", label: "Managers & Admins", description: "Managers and Admin only" },
+  { value: "Admin", label: "Admins Only", description: "Only Admin users" },
+];
 
 type FormSubmission = {
   id: string;
@@ -75,6 +120,7 @@ const fieldTypes = [
   { type: "select", label: "Dropdown", icon: ChevronDown },
   { type: "checkbox", label: "Checkbox", icon: CheckSquare },
   { type: "radio", label: "Radio Buttons", icon: ListOrdered },
+  { type: "separator", label: "Section Divider", icon: Minus },
 ];
 
 export default function Forms() {
@@ -348,8 +394,18 @@ function FormBuilderDialog({ form, open, onOpenChange }: { form: CustomForm; ope
   const [fields, setFields] = useState<FormField[]>(form.fields as FormField[] || []);
   const [title, setTitle] = useState(form.title);
   const [description, setDescription] = useState(form.description || "");
-  const [accessLevel, setAccessLevel] = useState(form.accessLevel);
-  const [selectedField, setSelectedField] = useState<FormField | null>(null);
+  const [accessLevel, setAccessLevel] = useState(form.accessLevel || "All");
+  const [styling, setStyling] = useState<FormStyling>(form.styling || {
+    fontFamily: "system-ui, sans-serif",
+    fontSize: "text-base",
+    showBorder: true,
+    borderStyle: "rounded",
+  });
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [showAiDialog, setShowAiDialog] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [activeTab, setActiveTab] = useState<"fields" | "style" | "settings">("fields");
 
   const mutation = useMutation({
     mutationFn: async (data: any) => {
@@ -364,7 +420,7 @@ function FormBuilderDialog({ form, open, onOpenChange }: { form: CustomForm; ope
 
   const publishMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("PATCH", `/api/forms/${form.id}`, { isPublished: true });
+      const res = await apiRequest("PATCH", `/api/forms/${form.id}`, { isPublished: true, fields, title, description, accessLevel, styling });
       return res.json();
     },
     onSuccess: () => {
@@ -378,217 +434,411 @@ function FormBuilderDialog({ form, open, onOpenChange }: { form: CustomForm; ope
     const newField: FormField = {
       id: crypto.randomUUID(),
       type: type as FormField["type"],
-      label: `New ${type} field`,
+      label: type === "separator" ? "" : `New ${type} field`,
       required: false,
+      placeholder: type === "separator" ? "" : `Enter ${type}...`,
       options: type === "select" || type === "radio" ? ["Option 1", "Option 2"] : undefined,
     };
     setFields([...fields, newField]);
-    setSelectedField(newField);
+    if (type !== "separator") {
+      setEditingFieldId(newField.id);
+    }
   };
 
   const updateField = (id: string, updates: Partial<FormField>) => {
     setFields(fields.map(f => f.id === id ? { ...f, ...updates } : f));
-    if (selectedField?.id === id) {
-      setSelectedField({ ...selectedField, ...updates });
-    }
   };
 
   const removeField = (id: string) => {
     setFields(fields.filter(f => f.id !== id));
-    if (selectedField?.id === id) setSelectedField(null);
+    if (editingFieldId === id) setEditingFieldId(null);
   };
 
   const handleSave = () => {
-    mutation.mutate({ title, description, fields, accessLevel });
+    mutation.mutate({ title, description, fields, accessLevel, styling });
+  };
+
+  const generateWithAI = async () => {
+    if (!aiPrompt.trim()) return;
+    setAiGenerating(true);
+    try {
+      const res = await fetch("/api/ai/generate-form", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ prompt: aiPrompt }),
+      });
+      if (!res.ok) throw new Error("AI generation failed");
+      const data = await res.json();
+      if (data.fields && Array.isArray(data.fields)) {
+        const newFields: FormField[] = data.fields.map((f: any) => ({
+          id: crypto.randomUUID(),
+          type: f.type || "text",
+          label: f.label || "Field",
+          placeholder: f.placeholder || "",
+          required: f.required || false,
+          options: f.options,
+        }));
+        setFields([...fields, ...newFields]);
+        if (data.title) setTitle(data.title);
+        if (data.description) setDescription(data.description);
+        toast({ title: "AI generated fields added!" });
+      }
+      setShowAiDialog(false);
+      setAiPrompt("");
+    } catch (err) {
+      toast({ title: "AI generation failed", variant: "destructive" });
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const getBorderClass = () => {
+    switch (styling.borderStyle) {
+      case "none": return "";
+      case "simple": return "border";
+      case "rounded": return "border rounded-lg";
+      case "shadow": return "border rounded-lg shadow-md";
+      default: return "border rounded-lg";
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl h-[80vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Form Builder - {title}</DialogTitle>
-        </DialogHeader>
-        <div className="flex-1 grid grid-cols-4 gap-4 overflow-hidden">
-          <div className="col-span-1 space-y-4 overflow-y-auto">
-            <Card>
-              <CardHeader className="py-3">
-                <CardTitle className="text-sm">Add Field</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
+      <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0">
+        <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+          <div className="flex items-center gap-3">
+            <FileText className="h-5 w-5 text-primary" />
+            <span className="font-semibold">Form Builder</span>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowAiDialog(true)}>
+              <Sparkles className="w-4 h-4 mr-2" /> Generate with AI
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleSave} disabled={mutation.isPending}>
+              {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            </Button>
+            <Button size="sm" onClick={() => publishMutation.mutate()} disabled={publishMutation.isPending || fields.length === 0}>
+              {publishMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Publish
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 flex overflow-hidden">
+          <div className="w-56 border-r bg-muted/20 p-3 overflow-y-auto">
+            <div className="space-y-1 mb-4">
+              <button
+                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${activeTab === "fields" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                onClick={() => setActiveTab("fields")}
+              >
+                <Plus className="w-4 h-4 inline mr-2" /> Add Fields
+              </button>
+              <button
+                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${activeTab === "style" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                onClick={() => setActiveTab("style")}
+              >
+                <Palette className="w-4 h-4 inline mr-2" /> Style
+              </button>
+              <button
+                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${activeTab === "settings" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                onClick={() => setActiveTab("settings")}
+              >
+                <Settings className="w-4 h-4 inline mr-2" /> Settings
+              </button>
+            </div>
+
+            {activeTab === "fields" && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground px-2 mb-2">Click to add field</p>
                 {fieldTypes.map(({ type, label, icon: Icon }) => (
-                  <Button
+                  <button
                     key={type}
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-start gap-2"
+                    className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors flex items-center gap-2"
                     onClick={() => addField(type)}
                   >
-                    <Icon className="w-4 h-4" /> {label}
-                  </Button>
+                    <Icon className="w-4 h-4 text-muted-foreground" /> {label}
+                  </button>
                 ))}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="col-span-2 overflow-y-auto">
-            <Card className="h-full">
-              <CardHeader className="py-3 flex flex-row items-center justify-between">
-                <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="font-bold text-lg border-0 p-0 h-auto focus-visible:ring-0"
-                  placeholder="Form Title"
-                />
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Form description..."
-                  className="text-sm resize-none"
-                  rows={2}
-                />
-                {fields.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
-                    <p>Add fields from the left panel</p>
-                  </div>
-                ) : (
-                  fields.map((field) => (
-                    <div
-                      key={field.id}
-                      className={`group flex gap-2 items-start p-3 rounded-lg border cursor-pointer transition-colors ${
-                        selectedField?.id === field.id ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "hover:bg-muted/50"
-                      }`}
-                      onClick={() => setSelectedField(field)}
-                    >
-                      <GripVertical className="w-4 h-4 text-muted-foreground cursor-move mt-2" />
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Label className="font-medium">{field.label}</Label>
-                          {field.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
-                          {selectedField?.id !== field.id && (
-                            <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100">(click to edit)</span>
-                          )}
-                        </div>
-                        <FieldPreview field={field} />
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="opacity-0 group-hover:opacity-100"
-                        onClick={(e) => { e.stopPropagation(); removeField(field.id); }}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="col-span-1 space-y-4 overflow-y-auto">
-            {selectedField ? (
-              <Card className="border-primary">
-                <CardHeader className="py-3 bg-primary/5">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Edit className="w-4 h-4" />
-                    Edit Field
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 pt-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium">Field Label</Label>
-                    <Input
-                      value={selectedField.label}
-                      onChange={(e) => updateField(selectedField.id, { label: e.target.value })}
-                      placeholder="Enter the field label..."
-                      data-testid="input-field-label"
-                    />
-                    <p className="text-xs text-muted-foreground">This is what users will see</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium">Placeholder Text</Label>
-                    <Input
-                      value={selectedField.placeholder || ""}
-                      onChange={(e) => updateField(selectedField.id, { placeholder: e.target.value })}
-                      placeholder="Hint text shown in the field..."
-                      data-testid="input-field-placeholder"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
-                    <Checkbox
-                      checked={selectedField.required}
-                      onCheckedChange={(checked) => updateField(selectedField.id, { required: !!checked })}
-                      data-testid="checkbox-field-required"
-                    />
-                    <Label className="text-sm">Make this field required</Label>
-                  </div>
-                  {(selectedField.type === "select" || selectedField.type === "radio") && (
-                    <div className="space-y-1">
-                      <Label className="text-xs font-medium">Options (one per line)</Label>
-                      <Textarea
-                        value={(selectedField.options || []).join("\n")}
-                        onChange={(e) => updateField(selectedField.id, { options: e.target.value.split("\n").filter(Boolean) })}
-                        rows={4}
-                        placeholder="Option 1&#10;Option 2&#10;Option 3"
-                        data-testid="textarea-field-options"
-                      />
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="border-dashed">
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  <Settings className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm font-medium">No Field Selected</p>
-                  <p className="text-xs mt-1">Click on a field in the form preview to edit its label, placeholder, and settings</p>
-                </CardContent>
-              </Card>
+              </div>
             )}
 
-            <Card>
-              <CardHeader className="py-3">
-                <CardTitle className="text-sm">Form Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Access Level</Label>
-                  <Select value={accessLevel} onValueChange={setAccessLevel}>
-                    <SelectTrigger>
+            {activeTab === "style" && (
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Font Family</Label>
+                  <Select value={styling.fontFamily} onValueChange={(v) => setStyling({...styling, fontFamily: v})}>
+                    <SelectTrigger className="mt-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Customer">Customer</SelectItem>
-                      <SelectItem value="Crew">Crew</SelectItem>
-                      <SelectItem value="Manager">Manager</SelectItem>
-                      <SelectItem value="Admin">Admin Only</SelectItem>
+                      {FONT_OPTIONS.map(f => (
+                        <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-              </CardContent>
-            </Card>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Font Size</Label>
+                  <Select value={styling.fontSize} onValueChange={(v) => setStyling({...styling, fontSize: v})}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FONT_SIZES.map(f => (
+                        <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Border Style</Label>
+                  <Select value={styling.borderStyle} onValueChange={(v) => setStyling({...styling, borderStyle: v})}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BORDER_STYLES.map(b => (
+                        <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "settings" && (
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Intended For</Label>
+                  <Select value={accessLevel} onValueChange={setAccessLevel}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ACCESS_LEVELS.map(a => (
+                        <SelectItem key={a.value} value={a.value}>
+                          <div>
+                            <div className="font-medium">{a.label}</div>
+                            <div className="text-xs text-muted-foreground">{a.description}</div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 bg-muted/10">
+            <div 
+              className={`max-w-2xl mx-auto bg-background p-6 ${getBorderClass()}`}
+              style={{ fontFamily: styling.fontFamily }}
+            >
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="text-2xl font-bold border-0 border-b rounded-none px-0 h-auto pb-2 focus-visible:ring-0 bg-transparent"
+                placeholder="Form Title - click to edit"
+              />
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Add a description for this form..."
+                className="mt-2 border-0 px-0 resize-none focus-visible:ring-0 bg-transparent text-muted-foreground"
+                rows={2}
+              />
+
+              <Separator className="my-4" />
+
+              {fields.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground border-2 border-dashed rounded-lg">
+                  <Plus className="w-8 h-8 mx-auto mb-3 opacity-50" />
+                  <p className="font-medium">Start building your form</p>
+                  <p className="text-sm mt-1">Add fields from the sidebar, or use AI to generate</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {fields.map((field) => (
+                    <InlineEditableField
+                      key={field.id}
+                      field={field}
+                      isEditing={editingFieldId === field.id}
+                      onStartEdit={() => setEditingFieldId(field.id)}
+                      onStopEdit={() => setEditingFieldId(null)}
+                      onUpdate={(updates) => updateField(field.id, updates)}
+                      onDelete={() => removeField(field.id)}
+                      fontSize={styling.fontSize}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="flex justify-between pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            <X className="w-4 h-4 mr-2" /> Close
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleSave} disabled={mutation.isPending}>
-              {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-              Save Draft
-            </Button>
-            <Button onClick={() => { handleSave(); publishMutation.mutate(); }} disabled={publishMutation.isPending || fields.length === 0}>
-              {publishMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Publish Form
-            </Button>
-          </div>
-        </div>
+        <Dialog open={showAiDialog} onOpenChange={setShowAiDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
+                Generate Form with AI
+              </DialogTitle>
+              <DialogDescription>
+                Describe the form you need and AI will create the fields for you
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              placeholder="e.g., Create a job application form with name, email, phone, resume upload, and work experience..."
+              rows={4}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAiDialog(false)}>Cancel</Button>
+              <Button onClick={generateWithAI} disabled={aiGenerating || !aiPrompt.trim()}>
+                {aiGenerating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Generate Fields
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function InlineEditableField({
+  field,
+  isEditing,
+  onStartEdit,
+  onStopEdit,
+  onUpdate,
+  onDelete,
+  fontSize,
+}: {
+  field: FormField;
+  isEditing: boolean;
+  onStartEdit: () => void;
+  onStopEdit: () => void;
+  onUpdate: (updates: Partial<FormField>) => void;
+  onDelete: () => void;
+  fontSize: string;
+}) {
+  if (field.type === "separator") {
+    return (
+      <div className="group relative py-2">
+        <Separator className="my-2" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 h-6 w-6"
+          onClick={onDelete}
+        >
+          <Trash2 className="w-3 h-3 text-destructive" />
+        </Button>
+      </div>
+    );
+  }
+
+  if (isEditing) {
+    return (
+      <div className={`p-4 border-2 border-primary rounded-lg bg-primary/5 space-y-3 ${fontSize}`}>
+        <div className="flex items-start justify-between">
+          <div className="flex-1 space-y-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Field Label</Label>
+              <Input
+                value={field.label}
+                onChange={(e) => onUpdate({ label: e.target.value })}
+                className="mt-1 font-medium"
+                placeholder="Enter label..."
+                autoFocus
+              />
+            </div>
+            {field.type !== "checkbox" && (
+              <div>
+                <Label className="text-xs text-muted-foreground">Placeholder</Label>
+                <Input
+                  value={field.placeholder || ""}
+                  onChange={(e) => onUpdate({ placeholder: e.target.value })}
+                  className="mt-1"
+                  placeholder="Hint text..."
+                />
+              </div>
+            )}
+            {(field.type === "select" || field.type === "radio") && (
+              <div>
+                <Label className="text-xs text-muted-foreground">Options (one per line)</Label>
+                <Textarea
+                  value={(field.options || []).join("\n")}
+                  onChange={(e) => onUpdate({ options: e.target.value.split("\n").filter(Boolean) })}
+                  rows={3}
+                  className="mt-1"
+                  placeholder="Option 1&#10;Option 2"
+                />
+              </div>
+            )}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={field.required}
+                  onCheckedChange={(checked) => onUpdate({ required: !!checked })}
+                />
+                <Label className="text-sm">Required</Label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2 border-t">
+          <Button variant="ghost" size="sm" onClick={onDelete} className="text-destructive">
+            <Trash2 className="w-4 h-4 mr-1" /> Delete
+          </Button>
+          <Button size="sm" onClick={onStopEdit}>
+            Done
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`group p-3 rounded-lg border hover:border-primary/50 cursor-pointer transition-all hover:bg-muted/30 ${fontSize}`}
+      onClick={onStartEdit}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <Label className="font-medium flex items-center gap-2">
+          {field.label}
+          {field.required && <span className="text-destructive text-xs">*</span>}
+        </Label>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Badge variant="secondary" className="text-xs">{field.type}</Badge>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          >
+            <Trash2 className="w-3 h-3 text-destructive" />
+          </Button>
+        </div>
+      </div>
+      <FieldPreview field={field} />
+      <p className="text-xs text-muted-foreground mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        Click to edit this field
+      </p>
+    </div>
   );
 }
 
@@ -626,6 +876,8 @@ function FieldPreview({ field }: { field: FormField }) {
           ))}
         </div>
       );
+    case "separator":
+      return <Separator className="my-2" />;
     default:
       return null;
   }
