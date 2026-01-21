@@ -466,3 +466,56 @@ export const insertEquipmentUploadSchema = createInsertSchema(equipmentUploads).
 
 export type InsertEquipmentUpload = z.infer<typeof insertEquipmentUploadSchema>;
 export type EquipmentUpload = typeof equipmentUploads.$inferSelect;
+
+// Customer Resources (Care Guides, Instructions, Documents)
+export type ResourceType = "guide" | "instruction" | "document" | "faq";
+
+export const customerResources = pgTable("customer_resources", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default("guide"), // guide, instruction, document, faq
+  category: text("category").notNull().default("General"),
+  content: text("content"), // Rich text content for guides
+  fileUrl: text("file_url"), // URL for uploaded documents (PDF, Word)
+  fileName: text("file_name"), // Original file name
+  coverImage: text("cover_image"), // Cover/thumbnail image
+  isPublished: boolean("is_published").notNull().default(false),
+  sortOrder: integer("sort_order").default(0),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCustomerResourceSchema = createInsertSchema(customerResources).pick({
+  title: true,
+  description: true,
+  type: true,
+  category: true,
+  content: true,
+  fileUrl: true,
+  fileName: true,
+  coverImage: true,
+  isPublished: true,
+  sortOrder: true,
+  createdBy: true,
+});
+
+export type InsertCustomerResource = z.infer<typeof insertCustomerResourceSchema>;
+export type CustomerResource = typeof customerResources.$inferSelect;
+
+// Customer Saved Resources (bookmarks/favorites)
+export const savedResources = pgTable("saved_resources", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id).notNull(),
+  resourceId: varchar("resource_id", { length: 36 }).references(() => customerResources.id).notNull(),
+  savedAt: timestamp("saved_at").defaultNow(),
+});
+
+export const insertSavedResourceSchema = createInsertSchema(savedResources).pick({
+  userId: true,
+  resourceId: true,
+});
+
+export type InsertSavedResource = z.infer<typeof insertSavedResourceSchema>;
+export type SavedResource = typeof savedResources.$inferSelect;

@@ -15,10 +15,12 @@ import {
   equipment, type Equipment, type InsertEquipment,
   maintenanceSchedules, type MaintenanceSchedule, type InsertMaintenanceSchedule,
   maintenanceLogs, type MaintenanceLog, type InsertMaintenanceLog,
-  equipmentUploads, type EquipmentUpload, type InsertEquipmentUpload
+  equipmentUploads, type EquipmentUpload, type InsertEquipmentUpload,
+  customerResources, type CustomerResource, type InsertCustomerResource,
+  savedResources, type SavedResource, type InsertSavedResource
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, ilike, or } from "drizzle-orm";
+import { eq, ilike, or, and } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -115,6 +117,19 @@ export interface IStorage {
   getEquipmentUploads(equipmentId: string): Promise<EquipmentUpload[]>;
   createEquipmentUpload(upload: InsertEquipmentUpload): Promise<EquipmentUpload>;
   deleteEquipmentUpload(id: string): Promise<boolean>;
+  
+  // Customer Resources
+  getCustomerResources(type?: string): Promise<CustomerResource[]>;
+  getCustomerResource(id: string): Promise<CustomerResource | undefined>;
+  createCustomerResource(resource: InsertCustomerResource): Promise<CustomerResource>;
+  updateCustomerResource(id: string, updates: Partial<CustomerResource>): Promise<CustomerResource | undefined>;
+  deleteCustomerResource(id: string): Promise<boolean>;
+  
+  // Saved Resources (favorites/bookmarks)
+  getSavedResources(userId: string): Promise<SavedResource[]>;
+  saveResource(userId: string, resourceId: string): Promise<SavedResource>;
+  unsaveResource(userId: string, resourceId: string): Promise<boolean>;
+  isResourceSaved(userId: string, resourceId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -471,6 +486,57 @@ export class DatabaseStorage implements IStorage {
   async deleteEquipmentUpload(id: string): Promise<boolean> {
     const result = await db.delete(equipmentUploads).where(eq(equipmentUploads.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  // Customer Resources methods
+  async getCustomerResources(type?: string): Promise<CustomerResource[]> {
+    if (type) {
+      return await db.select().from(customerResources).where(eq(customerResources.type, type));
+    }
+    return await db.select().from(customerResources);
+  }
+
+  async getCustomerResource(id: string): Promise<CustomerResource | undefined> {
+    const [resource] = await db.select().from(customerResources).where(eq(customerResources.id, id));
+    return resource || undefined;
+  }
+
+  async createCustomerResource(resource: InsertCustomerResource): Promise<CustomerResource> {
+    const [newResource] = await db.insert(customerResources).values(resource).returning();
+    return newResource;
+  }
+
+  async updateCustomerResource(id: string, updates: Partial<CustomerResource>): Promise<CustomerResource | undefined> {
+    const [resource] = await db.update(customerResources).set({ ...updates, updatedAt: new Date() }).where(eq(customerResources.id, id)).returning();
+    return resource || undefined;
+  }
+
+  async deleteCustomerResource(id: string): Promise<boolean> {
+    await db.delete(savedResources).where(eq(savedResources.resourceId, id));
+    const result = await db.delete(customerResources).where(eq(customerResources.id, id));
+    return true;
+  }
+
+  // Saved Resources methods
+  async getSavedResources(userId: string): Promise<SavedResource[]> {
+    return await db.select().from(savedResources).where(eq(savedResources.userId, userId));
+  }
+
+  async saveResource(userId: string, resourceId: string): Promise<SavedResource> {
+    const [saved] = await db.insert(savedResources).values({ userId, resourceId }).returning();
+    return saved;
+  }
+
+  async unsaveResource(userId: string, resourceId: string): Promise<boolean> {
+    await db.delete(savedResources)
+      .where(and(eq(savedResources.userId, userId), eq(savedResources.resourceId, resourceId)));
+    return true;
+  }
+
+  async isResourceSaved(userId: string, resourceId: string): Promise<boolean> {
+    const [saved] = await db.select().from(savedResources)
+      .where(and(eq(savedResources.userId, userId), eq(savedResources.resourceId, resourceId)));
+    return !!saved;
   }
 }
 
