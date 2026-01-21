@@ -18,7 +18,8 @@ import {
   Sparkles,
   Shield,
   MessageSquare,
-  Inbox
+  Inbox,
+  HelpCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { icon: LayoutDashboard, label: "My Portal", href: "/customer" },
     { icon: GraduationCap, label: "Resources", href: "/education" },
     { icon: User, label: "My Account", href: "/profile" },
+    { icon: HelpCircle, label: "Help", href: "/help" },
   ];
 
   const teamNav = [
@@ -57,6 +59,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { icon: GraduationCap, label: "Customer Hub", href: "/education" },
     { icon: User, label: "My Profile", href: "/profile" },
     { icon: Sparkles, label: "Assistant", href: "/assistant" },
+    { icon: HelpCircle, label: "Help", href: "/help" },
   ];
 
   const adminNav = [
