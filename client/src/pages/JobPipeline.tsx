@@ -92,6 +92,7 @@ export default function JobPipeline() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
       toast({ title: "Job updated" });
+      setIsModalOpen(false);
     },
   });
 
@@ -192,7 +193,8 @@ export default function JobPipeline() {
     if (isNewJob) {
       createMutation.mutate(editForm);
     } else if (selectedJob) {
-      updateMutation.mutate({ id: selectedJob.id, data: editForm });
+      const { id, createdAt, updatedAt, ...updateData } = editForm as any;
+      updateMutation.mutate({ id: selectedJob.id, data: updateData });
     }
   };
 

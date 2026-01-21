@@ -187,3 +187,30 @@ Preferred communication style: Simple, everyday language.
 - Settings stored in company_settings table
 - Logo and company name display in sidebar navigation
 - API routes: GET/PATCH /api/company-settings (admin-only for updates)
+
+### Enhanced Hiring Pipeline
+- Clickable candidate cards open a detail modal
+- Job type dropdown: Crew Member, Crew Lead, Manager, Office, Sales
+- Work type dropdown (for Crew Member/Lead): Maintenance, Project
+- 3-dot rating system: green (good), yellow (maybe), red (no)
+- Full contact info: email, phone, address, city, state, zip
+- Notes field for general comments
+- Document uploads with acknowledgment tracking (read & sign)
+- Document types: driver's license, W-4, handbooks, forms, etc.
+- Database tables: candidates (enhanced), candidate_documents
+- API routes: /api/candidates (CRUD), /api/candidates/:id/documents, /api/candidate-documents/:id
+
+### Enhanced Job Pipeline
+- Tabbed interface for organizing by job category (Project, Maintenance, custom tabs)
+- Custom tabs can be added, renamed, and deleted (double-click to edit)
+- Clickable job cards open a detail modal
+- Full location info with Google Maps link
+- Mandatory completion date flag with visual indicator
+- Estimated hours and days for job duration
+- Contact info for job site
+- Document uploads: permits, OUPS, contracts, designs, sketches
+- Database tables: jobs (enhanced), job_documents, job_pipeline_tabs
+- API routes: /api/jobs (CRUD), /api/jobs/:id/documents, /api/job-documents/:id, /api/job-pipeline-tabs
+
+### Future Features (Pending Setup)
+- **SMS to Customers**: Requires Twilio integration setup. User declined initial setup - can be configured later via Integrations Hub or by providing Twilio credentials (Account SID, Auth Token, Phone Number).

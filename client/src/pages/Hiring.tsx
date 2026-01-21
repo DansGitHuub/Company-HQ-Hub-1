@@ -120,6 +120,7 @@ export default function Hiring() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
       toast({ title: "Candidate updated" });
+      setIsModalOpen(false);
     },
   });
 
@@ -190,7 +191,8 @@ export default function Hiring() {
     if (isNewCandidate) {
       createMutation.mutate(editForm);
     } else if (selectedCandidate) {
-      updateMutation.mutate({ id: selectedCandidate.id, data: editForm });
+      const { id, appliedDate, updatedAt, ...updateData } = editForm as any;
+      updateMutation.mutate({ id: selectedCandidate.id, data: updateData });
     }
   };
 
