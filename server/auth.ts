@@ -29,7 +29,11 @@ export async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
-  const sessionSecret = process.env.SESSION_SECRET || randomBytes(32).toString("hex");
+  let sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) {
+    console.warn("WARNING: SESSION_SECRET not set. Sessions will not persist across restarts.");
+    sessionSecret = randomBytes(32).toString("hex");
+  }
   
   const sessionSettings: session.SessionOptions = {
     secret: sessionSecret,

@@ -241,3 +241,59 @@ export const insertAccessRequestSchema = createInsertSchema(accessRequests).pick
 
 export type InsertAccessRequest = z.infer<typeof insertAccessRequestSchema>;
 export type AccessRequest = typeof accessRequests.$inferSelect;
+
+export const customForms = pgTable("custom_forms", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category").default("General"),
+  fields: jsonb("fields").notNull().default([]),
+  accessLevel: text("access_level").default("Crew"),
+  isPublished: boolean("is_published").notNull().default(false),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCustomFormSchema = createInsertSchema(customForms).pick({
+  title: true,
+  description: true,
+  category: true,
+  fields: true,
+  accessLevel: true,
+  isPublished: true,
+  createdBy: true,
+});
+
+export type InsertCustomForm = z.infer<typeof insertCustomFormSchema>;
+export type CustomForm = typeof customForms.$inferSelect;
+
+export type FormField = {
+  id: string;
+  type: "text" | "textarea" | "number" | "email" | "date" | "select" | "checkbox" | "radio" | "file" | "signature";
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+  options?: string[];
+  validation?: string;
+};
+
+export const formSubmissions = pgTable("form_submissions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  formId: varchar("form_id", { length: 36 }).references(() => customForms.id).notNull(),
+  submittedBy: varchar("submitted_by", { length: 36 }).references(() => users.id),
+  data: jsonb("data").notNull(),
+  status: text("status").default("submitted"),
+  reviewedBy: varchar("reviewed_by", { length: 36 }).references(() => users.id),
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).pick({
+  formId: true,
+  submittedBy: true,
+  data: true,
+});
+
+export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
+export type FormSubmission = typeof formSubmissions.$inferSelect;

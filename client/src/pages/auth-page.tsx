@@ -155,6 +155,8 @@ export default function AuthPage() {
                       className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                       onClick={() => setShowNewPassword(!showNewPassword)}
                       tabIndex={-1}
+                      data-testid="button-toggle-new-password"
+                      aria-label={showNewPassword ? "Hide password" : "Show password"}
                     >
                       {showNewPassword ? (
                         <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -206,6 +208,8 @@ export default function AuthPage() {
                           className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                           onClick={() => setShowLoginPassword(!showLoginPassword)}
                           tabIndex={-1}
+                          data-testid="button-toggle-login-password"
+                          aria-label={showLoginPassword ? "Hide password" : "Show password"}
                         >
                           {showLoginPassword ? (
                             <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -358,6 +362,8 @@ export default function AuthPage() {
                           className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                           onClick={() => setShowRegisterPassword(!showRegisterPassword)}
                           tabIndex={-1}
+                          data-testid="button-toggle-register-password"
+                          aria-label={showRegisterPassword ? "Hide password" : "Show password"}
                         >
                           {showRegisterPassword ? (
                             <EyeOff className="h-4 w-4 text-muted-foreground" />

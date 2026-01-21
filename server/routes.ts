@@ -405,5 +405,90 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/forms", requireAuth, async (req, res) => {
+    try {
+      const forms = await storage.getCustomForms();
+      res.json(forms);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching forms" });
+    }
+  });
+
+  app.get("/api/forms/:id", requireAuth, async (req, res) => {
+    try {
+      const form = await storage.getCustomForm(req.params.id as string);
+      if (!form) return res.status(404).json({ message: "Form not found" });
+      res.json(form);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching form" });
+    }
+  });
+
+  app.post("/api/forms", requireAdmin, async (req, res) => {
+    try {
+      const form = await storage.createCustomForm({
+        ...req.body,
+        createdBy: req.user!.id,
+      });
+      res.status(201).json(form);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating form" });
+    }
+  });
+
+  app.patch("/api/forms/:id", requireAdmin, async (req, res) => {
+    try {
+      const form = await storage.updateCustomForm(req.params.id as string, req.body);
+      if (!form) return res.status(404).json({ message: "Form not found" });
+      res.json(form);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating form" });
+    }
+  });
+
+  app.delete("/api/forms/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteCustomForm(req.params.id as string);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting form" });
+    }
+  });
+
+  app.get("/api/forms/:id/submissions", requireAdmin, async (req, res) => {
+    try {
+      const submissions = await storage.getFormSubmissions(req.params.id as string);
+      res.json(submissions);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching submissions" });
+    }
+  });
+
+  app.post("/api/forms/:id/submissions", requireAuth, async (req, res) => {
+    try {
+      const submission = await storage.createFormSubmission({
+        formId: req.params.id as string,
+        submittedBy: req.user!.id,
+        data: req.body.data,
+      });
+      res.status(201).json(submission);
+    } catch (err) {
+      res.status(500).json({ message: "Error submitting form" });
+    }
+  });
+
+  app.patch("/api/submissions/:id", requireAdmin, async (req, res) => {
+    try {
+      const submission = await storage.updateFormSubmission(req.params.id as string, {
+        ...req.body,
+        reviewedBy: req.user!.id,
+      });
+      if (!submission) return res.status(404).json({ message: "Submission not found" });
+      res.json(submission);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating submission" });
+    }
+  });
+
   return httpServer;
 }

@@ -9,7 +9,9 @@ import {
   featureRequests, type FeatureRequest, type InsertFeatureRequest,
   customerMessages, type CustomerMessage, type InsertCustomerMessage,
   workRequests, type WorkRequest, type InsertWorkRequest,
-  accessRequests, type AccessRequest, type InsertAccessRequest
+  accessRequests, type AccessRequest, type InsertAccessRequest,
+  customForms, type CustomForm, type InsertCustomForm,
+  formSubmissions, type FormSubmission, type InsertFormSubmission
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or } from "drizzle-orm";
@@ -74,6 +76,17 @@ export interface IStorage {
   getAccessRequests(): Promise<AccessRequest[]>;
   getAccessRequestsByUser(userId: string): Promise<AccessRequest[]>;
   updateAccessRequest(id: string, updates: Partial<AccessRequest>): Promise<AccessRequest | undefined>;
+  
+  getCustomForms(): Promise<CustomForm[]>;
+  getCustomForm(id: string): Promise<CustomForm | undefined>;
+  createCustomForm(form: InsertCustomForm): Promise<CustomForm>;
+  updateCustomForm(id: string, updates: Partial<CustomForm>): Promise<CustomForm | undefined>;
+  deleteCustomForm(id: string): Promise<boolean>;
+  
+  getFormSubmissions(formId?: string): Promise<FormSubmission[]>;
+  getFormSubmission(id: string): Promise<FormSubmission | undefined>;
+  createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
+  updateFormSubmission(id: string, updates: Partial<FormSubmission>): Promise<FormSubmission | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -290,6 +303,52 @@ export class DatabaseStorage implements IStorage {
   async updateAccessRequest(id: string, updates: Partial<AccessRequest>): Promise<AccessRequest | undefined> {
     const [request] = await db.update(accessRequests).set(updates).where(eq(accessRequests.id, id)).returning();
     return request || undefined;
+  }
+
+  async getCustomForms(): Promise<CustomForm[]> {
+    return db.select().from(customForms);
+  }
+
+  async getCustomForm(id: string): Promise<CustomForm | undefined> {
+    const [form] = await db.select().from(customForms).where(eq(customForms.id, id));
+    return form || undefined;
+  }
+
+  async createCustomForm(form: InsertCustomForm): Promise<CustomForm> {
+    const [newForm] = await db.insert(customForms).values(form).returning();
+    return newForm;
+  }
+
+  async updateCustomForm(id: string, updates: Partial<CustomForm>): Promise<CustomForm | undefined> {
+    const [form] = await db.update(customForms).set({ ...updates, updatedAt: new Date() }).where(eq(customForms.id, id)).returning();
+    return form || undefined;
+  }
+
+  async deleteCustomForm(id: string): Promise<boolean> {
+    const result = await db.delete(customForms).where(eq(customForms.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getFormSubmissions(formId?: string): Promise<FormSubmission[]> {
+    if (formId) {
+      return db.select().from(formSubmissions).where(eq(formSubmissions.formId, formId));
+    }
+    return db.select().from(formSubmissions);
+  }
+
+  async getFormSubmission(id: string): Promise<FormSubmission | undefined> {
+    const [submission] = await db.select().from(formSubmissions).where(eq(formSubmissions.id, id));
+    return submission || undefined;
+  }
+
+  async createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission> {
+    const [newSubmission] = await db.insert(formSubmissions).values(submission).returning();
+    return newSubmission;
+  }
+
+  async updateFormSubmission(id: string, updates: Partial<FormSubmission>): Promise<FormSubmission | undefined> {
+    const [submission] = await db.update(formSubmissions).set(updates).where(eq(formSubmissions.id, id)).returning();
+    return submission || undefined;
   }
 }
 
