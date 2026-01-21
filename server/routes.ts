@@ -522,6 +522,142 @@ export async function registerRoutes(
     }
   });
 
+  // Equipment routes
+  app.get("/api/equipment", requireAuth, async (req, res) => {
+    try {
+      const items = await storage.getEquipment();
+      res.json(items);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching equipment" });
+    }
+  });
+
+  app.get("/api/equipment/:id", requireAuth, async (req, res) => {
+    try {
+      const item = await storage.getEquipmentById(req.params.id);
+      if (!item) return res.status(404).json({ message: "Equipment not found" });
+      res.json(item);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching equipment" });
+    }
+  });
+
+  app.post("/api/equipment", requireAuth, async (req, res) => {
+    try {
+      const item = await storage.createEquipment(req.body);
+      res.status(201).json(item);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating equipment" });
+    }
+  });
+
+  app.put("/api/equipment/:id", requireAuth, async (req, res) => {
+    try {
+      const item = await storage.updateEquipment(req.params.id, req.body);
+      if (!item) return res.status(404).json({ message: "Equipment not found" });
+      res.json(item);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating equipment" });
+    }
+  });
+
+  app.delete("/api/equipment/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteEquipment(req.params.id);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting equipment" });
+    }
+  });
+
+  // Maintenance Schedule routes
+  app.get("/api/maintenance-schedules", requireAuth, async (req, res) => {
+    try {
+      const equipmentId = req.query.equipmentId as string | undefined;
+      const schedules = await storage.getMaintenanceSchedules(equipmentId);
+      res.json(schedules);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching maintenance schedules" });
+    }
+  });
+
+  app.post("/api/maintenance-schedules", requireAuth, async (req, res) => {
+    try {
+      const schedule = await storage.createMaintenanceSchedule(req.body);
+      res.status(201).json(schedule);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating maintenance schedule" });
+    }
+  });
+
+  app.put("/api/maintenance-schedules/:id", requireAuth, async (req, res) => {
+    try {
+      const schedule = await storage.updateMaintenanceSchedule(req.params.id, req.body);
+      if (!schedule) return res.status(404).json({ message: "Schedule not found" });
+      res.json(schedule);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating maintenance schedule" });
+    }
+  });
+
+  app.delete("/api/maintenance-schedules/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteMaintenanceSchedule(req.params.id);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting maintenance schedule" });
+    }
+  });
+
+  // Maintenance Log routes
+  app.get("/api/maintenance-logs", requireAuth, async (req, res) => {
+    try {
+      const equipmentId = req.query.equipmentId as string | undefined;
+      const logs = await storage.getMaintenanceLogs(equipmentId);
+      res.json(logs);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching maintenance logs" });
+    }
+  });
+
+  app.post("/api/maintenance-logs", requireAuth, async (req, res) => {
+    try {
+      const log = await storage.createMaintenanceLog({
+        ...req.body,
+        performedBy: req.user!.id,
+      });
+      
+      // If this log is for a scheduled maintenance, update the schedule
+      if (req.body.scheduleId) {
+        const schedule = await storage.getMaintenanceSchedule(req.body.scheduleId);
+        if (schedule) {
+          const updates: any = {
+            lastCompletedDate: log.completedDate,
+            lastCompletedMileage: log.mileageAtService,
+            lastCompletedHours: log.hoursAtService,
+          };
+          
+          // Calculate next due date/mileage/hours based on interval
+          if (schedule.intervalType === "days" && log.completedDate) {
+            const nextDate = new Date(log.completedDate);
+            nextDate.setDate(nextDate.getDate() + schedule.intervalValue);
+            updates.nextDueDate = nextDate;
+          } else if (schedule.intervalType === "miles" && log.mileageAtService) {
+            updates.nextDueMileage = log.mileageAtService + schedule.intervalValue;
+          } else if (schedule.intervalType === "hours" && log.hoursAtService) {
+            updates.nextDueHours = log.hoursAtService + schedule.intervalValue;
+          }
+          
+          await storage.updateMaintenanceSchedule(req.body.scheduleId, updates);
+        }
+      }
+      
+      res.status(201).json(log);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating maintenance log" });
+    }
+  });
+
   // One-time master admin setup endpoint
   app.post("/api/setup-master-admin", requireAuth, async (req, res) => {
     try {

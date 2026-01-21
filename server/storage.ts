@@ -11,7 +11,10 @@ import {
   workRequests, type WorkRequest, type InsertWorkRequest,
   accessRequests, type AccessRequest, type InsertAccessRequest,
   customForms, type CustomForm, type InsertCustomForm,
-  formSubmissions, type FormSubmission, type InsertFormSubmission
+  formSubmissions, type FormSubmission, type InsertFormSubmission,
+  equipment, type Equipment, type InsertEquipment,
+  maintenanceSchedules, type MaintenanceSchedule, type InsertMaintenanceSchedule,
+  maintenanceLogs, type MaintenanceLog, type InsertMaintenanceLog
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or } from "drizzle-orm";
@@ -87,6 +90,25 @@ export interface IStorage {
   getFormSubmission(id: string): Promise<FormSubmission | undefined>;
   createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
   updateFormSubmission(id: string, updates: Partial<FormSubmission>): Promise<FormSubmission | undefined>;
+  
+  // Equipment
+  getEquipment(): Promise<Equipment[]>;
+  getEquipmentById(id: string): Promise<Equipment | undefined>;
+  createEquipment(item: InsertEquipment): Promise<Equipment>;
+  updateEquipment(id: string, updates: Partial<Equipment>): Promise<Equipment | undefined>;
+  deleteEquipment(id: string): Promise<boolean>;
+  
+  // Maintenance Schedules
+  getMaintenanceSchedules(equipmentId?: string): Promise<MaintenanceSchedule[]>;
+  getMaintenanceSchedule(id: string): Promise<MaintenanceSchedule | undefined>;
+  createMaintenanceSchedule(schedule: InsertMaintenanceSchedule): Promise<MaintenanceSchedule>;
+  updateMaintenanceSchedule(id: string, updates: Partial<MaintenanceSchedule>): Promise<MaintenanceSchedule | undefined>;
+  deleteMaintenanceSchedule(id: string): Promise<boolean>;
+  getDueMaintenanceSchedules(): Promise<MaintenanceSchedule[]>;
+  
+  // Maintenance Logs
+  getMaintenanceLogs(equipmentId?: string): Promise<MaintenanceLog[]>;
+  createMaintenanceLog(log: InsertMaintenanceLog): Promise<MaintenanceLog>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -349,6 +371,85 @@ export class DatabaseStorage implements IStorage {
   async updateFormSubmission(id: string, updates: Partial<FormSubmission>): Promise<FormSubmission | undefined> {
     const [submission] = await db.update(formSubmissions).set(updates).where(eq(formSubmissions.id, id)).returning();
     return submission || undefined;
+  }
+
+  // Equipment methods
+  async getEquipment(): Promise<Equipment[]> {
+    return await db.select().from(equipment);
+  }
+
+  async getEquipmentById(id: string): Promise<Equipment | undefined> {
+    const [item] = await db.select().from(equipment).where(eq(equipment.id, id));
+    return item || undefined;
+  }
+
+  async createEquipment(item: InsertEquipment): Promise<Equipment> {
+    const [newItem] = await db.insert(equipment).values(item).returning();
+    return newItem;
+  }
+
+  async updateEquipment(id: string, updates: Partial<Equipment>): Promise<Equipment | undefined> {
+    const [item] = await db.update(equipment).set({ ...updates, updatedAt: new Date() }).where(eq(equipment.id, id)).returning();
+    return item || undefined;
+  }
+
+  async deleteEquipment(id: string): Promise<boolean> {
+    const result = await db.delete(equipment).where(eq(equipment.id, id));
+    return true;
+  }
+
+  // Maintenance Schedule methods
+  async getMaintenanceSchedules(equipmentId?: string): Promise<MaintenanceSchedule[]> {
+    if (equipmentId) {
+      return await db.select().from(maintenanceSchedules).where(eq(maintenanceSchedules.equipmentId, equipmentId));
+    }
+    return await db.select().from(maintenanceSchedules);
+  }
+
+  async getMaintenanceSchedule(id: string): Promise<MaintenanceSchedule | undefined> {
+    const [schedule] = await db.select().from(maintenanceSchedules).where(eq(maintenanceSchedules.id, id));
+    return schedule || undefined;
+  }
+
+  async createMaintenanceSchedule(schedule: InsertMaintenanceSchedule): Promise<MaintenanceSchedule> {
+    const [newSchedule] = await db.insert(maintenanceSchedules).values(schedule).returning();
+    return newSchedule;
+  }
+
+  async updateMaintenanceSchedule(id: string, updates: Partial<MaintenanceSchedule>): Promise<MaintenanceSchedule | undefined> {
+    const [schedule] = await db.update(maintenanceSchedules).set(updates).where(eq(maintenanceSchedules.id, id)).returning();
+    return schedule || undefined;
+  }
+
+  async deleteMaintenanceSchedule(id: string): Promise<boolean> {
+    await db.delete(maintenanceSchedules).where(eq(maintenanceSchedules.id, id));
+    return true;
+  }
+
+  async getDueMaintenanceSchedules(): Promise<MaintenanceSchedule[]> {
+    const now = new Date();
+    const schedules = await db.select().from(maintenanceSchedules).where(eq(maintenanceSchedules.isActive, true));
+    return schedules.filter(s => {
+      if (s.nextDueDate && s.reminderDays) {
+        const reminderDate = new Date(s.nextDueDate);
+        reminderDate.setDate(reminderDate.getDate() - s.reminderDays);
+        return now >= reminderDate;
+      }
+      return false;
+    });
+  }
+
+  // Maintenance Log methods
+  async getMaintenanceLogs(equipmentId?: string): Promise<MaintenanceLog[]> {
+    if (equipmentId) {
+      return await db.select().from(maintenanceLogs).where(eq(maintenanceLogs.equipmentId, equipmentId));
+    }
+    return await db.select().from(maintenanceLogs);
+  }
+
+  async createMaintenanceLog(log: InsertMaintenanceLog): Promise<MaintenanceLog> {
+    const [newLog] = await db.insert(maintenanceLogs).values(log).returning();
+    return newLog;
   }
 }
 
