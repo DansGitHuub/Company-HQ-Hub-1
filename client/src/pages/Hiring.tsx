@@ -570,7 +570,7 @@ export default function Hiring() {
               Cancel
             </Button>
             <Button onClick={handleSave} data-testid="button-save-candidate">
-              {isNewCandidate ? "Create" : "Save Changes"}
+              {isNewCandidate ? "Create & Upload Docs" : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
