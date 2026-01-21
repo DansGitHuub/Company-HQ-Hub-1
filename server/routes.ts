@@ -6,7 +6,7 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { sendMaintenanceReminderEmail } from "./email";
 import OpenAI from "openai";
-import { insertSopTemplateSchema, insertSopExampleSchema } from "@shared/schema";
+import { insertSopTemplateSchema, insertSopExampleSchema, insertFormFolderSchema, insertFormTemplateSchema } from "@shared/schema";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -889,6 +889,151 @@ export async function registerRoutes(
       res.json(submission);
     } catch (err) {
       res.status(500).json({ message: "Error updating submission" });
+    }
+  });
+
+  // Form Folders
+  app.get("/api/form-folders", requireAuth, async (req, res) => {
+    try {
+      const folders = await storage.getFormFolders();
+      res.json(folders);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching folders" });
+    }
+  });
+
+  app.post("/api/form-folders", requireAdmin, async (req, res) => {
+    try {
+      const parsed = insertFormFolderSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid folder data", errors: parsed.error.flatten() });
+      }
+      const folder = await storage.createFormFolder(parsed.data);
+      res.status(201).json(folder);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating folder" });
+    }
+  });
+
+  app.patch("/api/form-folders/:id", requireAdmin, async (req, res) => {
+    try {
+      const parsed = insertFormFolderSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid folder data", errors: parsed.error.flatten() });
+      }
+      const folder = await storage.updateFormFolder(req.params.id as string, parsed.data);
+      if (!folder) return res.status(404).json({ message: "Folder not found" });
+      res.json(folder);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating folder" });
+    }
+  });
+
+  app.delete("/api/form-folders/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteFormFolder(req.params.id as string);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting folder" });
+    }
+  });
+
+  // Form Templates
+  app.get("/api/form-templates", requireAuth, async (req, res) => {
+    try {
+      const templates = await storage.getFormTemplates();
+      res.json(templates);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching templates" });
+    }
+  });
+
+  app.post("/api/form-templates", requireAdmin, async (req, res) => {
+    try {
+      const parsed = insertFormTemplateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid template data", errors: parsed.error.flatten() });
+      }
+      const template = await storage.createFormTemplate(parsed.data);
+      res.status(201).json(template);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating template" });
+    }
+  });
+
+  app.patch("/api/form-templates/:id", requireAdmin, async (req, res) => {
+    try {
+      const parsed = insertFormTemplateSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid template data", errors: parsed.error.flatten() });
+      }
+      const template = await storage.updateFormTemplate(req.params.id as string, parsed.data);
+      if (!template) return res.status(404).json({ message: "Template not found" });
+      res.json(template);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating template" });
+    }
+  });
+
+  app.delete("/api/form-templates/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteFormTemplate(req.params.id as string);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting template" });
+    }
+  });
+
+  // AI Form Builder
+  app.post("/api/ai/generate-form", requireAdmin, async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ message: "Prompt is required" });
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert at creating digital forms for business operations.
+            When given a description, create form fields for a professional form.
+            
+            Available field types: text, textarea, number, email, date, select, checkbox, radio, separator
+            
+            Format your response as JSON with these fields:
+            - title: A clear title for the form
+            - description: A brief description of what the form is for
+            - category: One of [Hiring, Compliance, Operations, HR, Customer Service, General]
+            - fields: An array of field objects with:
+              - id: unique identifier (lowercase, no spaces)
+              - type: one of the available types
+              - label: display label for the field
+              - placeholder: optional placeholder text
+              - required: boolean
+              - options: array of strings (only for select/radio/checkbox)
+            
+            Make the form practical and comprehensive for business use.`
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const content = completion.choices[0].message.content;
+      if (!content) {
+        return res.status(500).json({ message: "AI generation failed" });
+      }
+
+      const formData = JSON.parse(content);
+      res.json(formData);
+    } catch (err) {
+      console.error("AI form generation error:", err);
+      res.status(500).json({ message: "Error generating form with AI" });
     }
   });
 

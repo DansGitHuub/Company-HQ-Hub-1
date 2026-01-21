@@ -18,6 +18,8 @@ import {
   accessRequests, type AccessRequest, type InsertAccessRequest,
   customForms, type CustomForm, type InsertCustomForm,
   formSubmissions, type FormSubmission, type InsertFormSubmission,
+  formFolders, type FormFolder, type InsertFormFolder,
+  formTemplates, type FormTemplate, type InsertFormTemplate,
   equipment, type Equipment, type InsertEquipment,
   maintenanceSchedules, type MaintenanceSchedule, type InsertMaintenanceSchedule,
   maintenanceLogs, type MaintenanceLog, type InsertMaintenanceLog,
@@ -137,6 +139,19 @@ export interface IStorage {
   getFormSubmission(id: string): Promise<FormSubmission | undefined>;
   createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
   updateFormSubmission(id: string, updates: Partial<FormSubmission>): Promise<FormSubmission | undefined>;
+  
+  // Form Folders
+  getFormFolders(): Promise<FormFolder[]>;
+  createFormFolder(folder: InsertFormFolder): Promise<FormFolder>;
+  updateFormFolder(id: string, updates: Partial<FormFolder>): Promise<FormFolder | undefined>;
+  deleteFormFolder(id: string): Promise<boolean>;
+  
+  // Form Templates
+  getFormTemplates(): Promise<FormTemplate[]>;
+  getFormTemplate(id: string): Promise<FormTemplate | undefined>;
+  createFormTemplate(template: InsertFormTemplate): Promise<FormTemplate>;
+  updateFormTemplate(id: string, updates: Partial<FormTemplate>): Promise<FormTemplate | undefined>;
+  deleteFormTemplate(id: string): Promise<boolean>;
   
   // Equipment
   getEquipment(): Promise<Equipment[]>;
@@ -590,6 +605,51 @@ export class DatabaseStorage implements IStorage {
   async updateFormSubmission(id: string, updates: Partial<FormSubmission>): Promise<FormSubmission | undefined> {
     const [submission] = await db.update(formSubmissions).set(updates).where(eq(formSubmissions.id, id)).returning();
     return submission || undefined;
+  }
+
+  // Form Folders
+  async getFormFolders(): Promise<FormFolder[]> {
+    return db.select().from(formFolders);
+  }
+
+  async createFormFolder(folder: InsertFormFolder): Promise<FormFolder> {
+    const [newFolder] = await db.insert(formFolders).values(folder).returning();
+    return newFolder;
+  }
+
+  async updateFormFolder(id: string, updates: Partial<FormFolder>): Promise<FormFolder | undefined> {
+    const [folder] = await db.update(formFolders).set(updates).where(eq(formFolders.id, id)).returning();
+    return folder || undefined;
+  }
+
+  async deleteFormFolder(id: string): Promise<boolean> {
+    await db.delete(formFolders).where(eq(formFolders.id, id));
+    return true;
+  }
+
+  // Form Templates
+  async getFormTemplates(): Promise<FormTemplate[]> {
+    return db.select().from(formTemplates);
+  }
+
+  async getFormTemplate(id: string): Promise<FormTemplate | undefined> {
+    const [template] = await db.select().from(formTemplates).where(eq(formTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createFormTemplate(template: InsertFormTemplate): Promise<FormTemplate> {
+    const [newTemplate] = await db.insert(formTemplates).values(template).returning();
+    return newTemplate;
+  }
+
+  async updateFormTemplate(id: string, updates: Partial<FormTemplate>): Promise<FormTemplate | undefined> {
+    const [template] = await db.update(formTemplates).set(updates).where(eq(formTemplates.id, id)).returning();
+    return template || undefined;
+  }
+
+  async deleteFormTemplate(id: string): Promise<boolean> {
+    await db.delete(formTemplates).where(eq(formTemplates.id, id));
+    return true;
   }
 
   // Equipment methods
