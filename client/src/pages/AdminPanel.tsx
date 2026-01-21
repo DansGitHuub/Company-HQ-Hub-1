@@ -22,7 +22,10 @@ import {
   Crown,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Upload,
+  Image,
+  Building2
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -40,7 +43,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import type { User, AccessRequest } from "@shared/schema";
+import type { User, AccessRequest, CompanySettings } from "@shared/schema";
+import { Slider } from "@/components/ui/slider";
 
 type SafeUser = Omit<User, "password">;
 
@@ -61,6 +65,74 @@ export default function AdminPanel() {
   });
 
   const pendingRequests = accessRequests.filter(r => r.status === "pending");
+
+  const { data: companySettings } = useQuery<CompanySettings>({
+    queryKey: ["/api/company-settings"],
+    enabled: user?.role === "Admin",
+  });
+
+  const [logoUrl, setLogoUrl] = useState("");
+  const [logoShape, setLogoShape] = useState<string>("square");
+  const [logoCornerRadius, setLogoCornerRadius] = useState(0);
+  const [companyName, setCompanyName] = useState("Company HQ");
+  const [isUploading, setIsUploading] = useState(false);
+
+  React.useEffect(() => {
+    if (companySettings) {
+      setLogoUrl(companySettings.logoUrl || "");
+      setLogoShape(companySettings.logoShape || "square");
+      setLogoCornerRadius(companySettings.logoCornerRadius || 0);
+      setCompanyName(companySettings.companyName || "Company HQ");
+    }
+  }, [companySettings]);
+
+  const updateCompanySettingsMutation = useMutation({
+    mutationFn: async (updates: Partial<CompanySettings>) => {
+      const res = await apiRequest("PATCH", "/api/company-settings", updates);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/company-settings"] });
+      toast({ title: "Company settings updated" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update settings", variant: "destructive" });
+    },
+  });
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      setLogoUrl(url);
+      await updateCompanySettingsMutation.mutateAsync({ logoUrl: url });
+    } catch (err) {
+      toast({ title: "Failed to upload logo", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const saveLogoSettings = () => {
+    updateCompanySettingsMutation.mutate({
+      logoUrl,
+      logoShape,
+      logoCornerRadius,
+      companyName,
+    });
+  };
 
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<User> }) => {
@@ -170,10 +242,13 @@ export default function AdminPanel() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+        <TabsList className="grid w-full grid-cols-3 max-w-lg">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="requests" className="gap-2">
-            Access Requests {pendingRequests.length > 0 && <Badge variant="destructive" className="ml-1">{pendingRequests.length}</Badge>}
+            Requests {pendingRequests.length > 0 && <Badge variant="destructive" className="ml-1">{pendingRequests.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="company" className="gap-2">
+            <Building2 className="h-4 w-4" /> Company
           </TabsTrigger>
         </TabsList>
 
@@ -383,6 +458,135 @@ export default function AdminPanel() {
                   })}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="company" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Company Branding</CardTitle>
+              <CardDescription>Upload your logo and customize how it appears in the sidebar</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label>Company Name</Label>
+                    <Input
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      placeholder="Company HQ"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Company Logo</Label>
+                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                      {logoUrl ? (
+                        <div className="space-y-3">
+                          <img 
+                            src={logoUrl} 
+                            alt="Company Logo" 
+                            className="max-h-24 mx-auto object-contain"
+                          />
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setLogoUrl("")}
+                          >
+                            Remove Logo
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground mb-2">Upload your company logo</p>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoUpload}
+                            disabled={isUploading}
+                            className="max-w-xs mx-auto"
+                          />
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Logo Shape</Label>
+                    <Select value={logoShape} onValueChange={setLogoShape}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="square">Square</SelectItem>
+                        <SelectItem value="rectangle">Rectangle (Wide)</SelectItem>
+                        <SelectItem value="circle">Circle</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {logoShape !== "circle" && (
+                    <div className="space-y-2">
+                      <Label>Corner Rounding: {logoCornerRadius}px</Label>
+                      <Slider
+                        value={[logoCornerRadius]}
+                        onValueChange={(v) => setLogoCornerRadius(v[0])}
+                        max={20}
+                        step={1}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        0 = Sharp corners, 20 = Very rounded
+                      </p>
+                    </div>
+                  )}
+
+                  <Button onClick={saveLogoSettings} disabled={updateCompanySettingsMutation.isPending} className="w-full">
+                    {updateCompanySettingsMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : null}
+                    Save Changes
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  <Label>Preview</Label>
+                  <div className="bg-sidebar p-6 rounded-lg border">
+                    <div className="flex items-center gap-3">
+                      {logoUrl ? (
+                        <img 
+                          src={logoUrl} 
+                          alt="Logo Preview"
+                          className={`object-cover shrink-0 ${
+                            logoShape === "rectangle" ? "h-10 w-16" : "h-10 w-10"
+                          } ${
+                            logoShape === "circle" ? "rounded-full" : 
+                            logoCornerRadius <= 4 ? "rounded" :
+                            logoCornerRadius <= 8 ? "rounded-md" :
+                            logoCornerRadius <= 12 ? "rounded-lg" : "rounded-xl"
+                          }`}
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                          <span className="font-heading font-bold text-xl text-primary-foreground">HQ</span>
+                        </div>
+                      )}
+                      <div>
+                        <h1 className="font-heading font-semibold text-lg leading-none text-sidebar-foreground">
+                          {companyName || "Company HQ"}
+                        </h1>
+                        <p className="text-xs text-sidebar-accent-foreground/70 mt-1">Landscape Management</p>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    This is how your logo will appear in the sidebar navigation.
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

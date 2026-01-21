@@ -519,3 +519,25 @@ export const insertSavedResourceSchema = createInsertSchema(savedResources).pick
 
 export type InsertSavedResource = z.infer<typeof insertSavedResourceSchema>;
 export type SavedResource = typeof savedResources.$inferSelect;
+
+// Company Settings (logo, branding, etc.)
+export type LogoShape = "square" | "rectangle" | "circle";
+
+export const companySettings = pgTable("company_settings", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  logoUrl: text("logo_url"),
+  logoShape: text("logo_shape").default("square"),
+  logoCornerRadius: integer("logo_corner_radius").default(0),
+  companyName: text("company_name").default("Company HQ"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCompanySettingsSchema = createInsertSchema(companySettings).pick({
+  logoUrl: true,
+  logoShape: true,
+  logoCornerRadius: true,
+  companyName: true,
+});
+
+export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
+export type CompanySettings = typeof companySettings.$inferSelect;

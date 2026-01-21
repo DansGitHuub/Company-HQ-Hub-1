@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import type { CompanySettings } from "@shared/schema";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -53,6 +54,30 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     refetchInterval: 30000,
   });
 
+  const { data: companySettings } = useQuery<CompanySettings>({
+    queryKey: ["/api/company-settings"],
+    staleTime: 60000,
+  });
+
+  const getLogoClasses = () => {
+    const shape = companySettings?.logoShape || "square";
+    const cornerRadius = companySettings?.logoCornerRadius || 0;
+    
+    let shapeClass = "";
+    if (shape === "circle") {
+      shapeClass = "rounded-full";
+    } else if (cornerRadius > 0) {
+      if (cornerRadius <= 4) shapeClass = "rounded";
+      else if (cornerRadius <= 8) shapeClass = "rounded-md";
+      else if (cornerRadius <= 12) shapeClass = "rounded-lg";
+      else shapeClass = "rounded-xl";
+    }
+    
+    const sizeClass = shape === "rectangle" ? "h-10 w-16" : "h-10 w-10";
+    
+    return { shapeClass, sizeClass };
+  };
+
   const customerNav = [
     { icon: LayoutDashboard, label: "My Portal", href: "/customer" },
     { icon: GraduationCap, label: "Resources", href: "/education" },
@@ -97,15 +122,29 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const displayNav = getNavItems();
 
-  const NavContent = () => (
+  const NavContent = () => {
+    const { shapeClass, sizeClass } = getLogoClasses();
+    const hasLogo = !!companySettings?.logoUrl;
+    
+    return (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
       <div className="p-6 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
-            <span className="font-heading font-bold text-xl text-primary-foreground">HQ</span>
-          </div>
-          <div>
-            <h1 className="font-heading font-semibold text-lg leading-none">Company HQ</h1>
+          {hasLogo ? (
+            <img 
+              src={companySettings.logoUrl!} 
+              alt="Company Logo"
+              className={cn("object-cover shrink-0", sizeClass, shapeClass)}
+            />
+          ) : (
+            <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
+              <span className="font-heading font-bold text-xl text-primary-foreground">HQ</span>
+            </div>
+          )}
+          <div className="min-w-0">
+            <h1 className="font-heading font-semibold text-lg leading-none truncate">
+              {companySettings?.companyName || "Company HQ"}
+            </h1>
             <p className="text-xs text-sidebar-accent-foreground/70 mt-1">Landscape Management</p>
           </div>
         </div>
@@ -170,6 +209,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
     </div>
   );
+  };
 
   return (
     <div className="flex min-h-screen bg-background">

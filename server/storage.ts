@@ -17,7 +17,8 @@ import {
   maintenanceLogs, type MaintenanceLog, type InsertMaintenanceLog,
   equipmentUploads, type EquipmentUpload, type InsertEquipmentUpload,
   customerResources, type CustomerResource, type InsertCustomerResource,
-  savedResources, type SavedResource, type InsertSavedResource
+  savedResources, type SavedResource, type InsertSavedResource,
+  companySettings, type CompanySettings, type InsertCompanySettings
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and } from "drizzle-orm";
@@ -130,6 +131,10 @@ export interface IStorage {
   saveResource(userId: string, resourceId: string): Promise<SavedResource>;
   unsaveResource(userId: string, resourceId: string): Promise<boolean>;
   isResourceSaved(userId: string, resourceId: string): Promise<boolean>;
+  
+  // Company Settings
+  getCompanySettings(): Promise<CompanySettings | undefined>;
+  updateCompanySettings(updates: Partial<CompanySettings>): Promise<CompanySettings | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -537,6 +542,26 @@ export class DatabaseStorage implements IStorage {
     const [saved] = await db.select().from(savedResources)
       .where(and(eq(savedResources.userId, userId), eq(savedResources.resourceId, resourceId)));
     return !!saved;
+  }
+
+  // Company Settings methods
+  async getCompanySettings(): Promise<CompanySettings | undefined> {
+    const [settings] = await db.select().from(companySettings);
+    return settings || undefined;
+  }
+
+  async updateCompanySettings(updates: Partial<CompanySettings>): Promise<CompanySettings | undefined> {
+    const existing = await this.getCompanySettings();
+    if (existing) {
+      const [updated] = await db.update(companySettings)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(companySettings.id, existing.id))
+        .returning();
+      return updated || undefined;
+    } else {
+      const [created] = await db.insert(companySettings).values(updates).returning();
+      return created;
+    }
   }
 }
 

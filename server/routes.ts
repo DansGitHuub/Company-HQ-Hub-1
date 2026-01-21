@@ -953,6 +953,25 @@ export async function registerRoutes(
     }
   });
 
+  // Company Settings routes
+  app.get("/api/company-settings", async (req, res) => {
+    try {
+      const settings = await storage.getCompanySettings();
+      res.json(settings || { companyName: "Company HQ" });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching company settings" });
+    }
+  });
+
+  app.patch("/api/company-settings", requireAdmin, async (req, res) => {
+    try {
+      const settings = await storage.updateCompanySettings(req.body);
+      res.json(settings);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating company settings" });
+    }
+  });
+
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 
