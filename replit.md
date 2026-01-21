@@ -130,3 +130,23 @@ Preferred communication style: Simple, everyday language.
 - Profile fields: name, email, phone, bio
 - Profile picture upload with cloud storage (Replit Object Storage)
 - Accessible from navigation sidebar for all user roles
+
+### AI Assistant
+- Powered by Replit AI Integrations (OpenAI)
+- Conversation history stored per user in database
+- Streaming responses via Server-Sent Events (SSE)
+- Routes: /api/conversations (list, create, delete), /api/conversations/:id/messages (send)
+- Chat storage: conversations and chat_messages tables with userId association
+
+### Employee Portal
+- Personal Profile: contact info, department, emergency contact
+- Address & Contact: mailing address management
+- Payroll & Taxes: direct deposit, W-4 withholding settings
+- Health Insurance: benefits overview with enrollment status
+- Vacation & Time Off: PTO balances and request form
+- Route: /employee or /employee-portal
+
+### Integrations Hub
+- Status: Work in Progress (Coming Soon overlay)
+- Planned integrations: QuickBooks, CompanyCam, Jobber
+- Route: /integrations
