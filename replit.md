@@ -150,3 +150,14 @@ Preferred communication style: Simple, everyday language.
 - Status: Work in Progress (Coming Soon overlay)
 - Planned integrations: QuickBooks, CompanyCam, Jobber
 - Route: /integrations
+
+### Equipment Tracker
+- Manage vehicles, trailers, mowers, and other equipment
+- Track year, make, model, VIN, license plate, mileage, and hours
+- Create recurring maintenance schedules (interval by days, miles, or hours)
+- Log maintenance when completed with cost tracking
+- Automatic next-due-date calculation after maintenance is logged
+- Email reminders for upcoming maintenance (via Resend)
+- Route: /equipment
+- Database tables: equipment, maintenance_schedules, maintenance_logs
+- Maintenance reminder API: POST /api/maintenance/send-reminders (Admin only)
