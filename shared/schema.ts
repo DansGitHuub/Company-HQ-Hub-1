@@ -529,6 +529,7 @@ export const companySettings = pgTable("company_settings", {
   logoShape: text("logo_shape").default("square"),
   logoCornerRadius: integer("logo_corner_radius").default(0),
   companyName: text("company_name").default("Company HQ"),
+  sidebarOrder: jsonb("sidebar_order").$type<string[]>(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -537,6 +538,7 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).p
   logoShape: true,
   logoCornerRadius: true,
   companyName: true,
+  sidebarOrder: true,
 });
 
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
