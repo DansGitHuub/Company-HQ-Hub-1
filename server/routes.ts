@@ -230,5 +230,105 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/messages", requireAuth, async (req, res) => {
+    try {
+      const message = await storage.createCustomerMessage({
+        customerId: req.user!.id,
+        subject: req.body.subject,
+        message: req.body.message,
+      });
+      res.status(201).json(message);
+    } catch (err) {
+      res.status(500).json({ message: "Error sending message" });
+    }
+  });
+
+  app.get("/api/messages", requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role === "Admin" || req.user?.role === "Manager") {
+        const messages = await storage.getCustomerMessages();
+        res.json(messages);
+      } else {
+        const messages = await storage.getCustomerMessagesByUser(req.user!.id);
+        res.json(messages);
+      }
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching messages" });
+    }
+  });
+
+  app.patch("/api/messages/:id", requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== "Admin" && req.user?.role !== "Manager") {
+        return res.status(403).json({ message: "Not authorized to update messages" });
+      }
+      const { status, adminReply } = req.body;
+      const updates: any = {};
+      if (status) updates.status = status;
+      if (adminReply) {
+        updates.adminReply = adminReply;
+        updates.repliedAt = new Date();
+        updates.repliedBy = req.user!.id;
+      }
+      const message = await storage.updateCustomerMessage(req.params.id as string, updates);
+      if (!message) return res.status(404).json({ message: "Message not found" });
+      res.json(message);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating message" });
+    }
+  });
+
+  app.post("/api/work-requests", requireAuth, async (req, res) => {
+    try {
+      const request = await storage.createWorkRequest({
+        customerId: req.user!.id,
+        title: req.body.title,
+        description: req.body.description,
+        serviceType: req.body.serviceType,
+        propertyAddress: req.body.propertyAddress,
+        preferredDate: req.body.preferredDate ? new Date(req.body.preferredDate) : undefined,
+        urgency: req.body.urgency,
+        photos: req.body.photos || [],
+      });
+      res.status(201).json(request);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating work request" });
+    }
+  });
+
+  app.get("/api/work-requests", requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role === "Admin" || req.user?.role === "Manager") {
+        const requests = await storage.getWorkRequests();
+        res.json(requests);
+      } else {
+        const requests = await storage.getWorkRequestsByUser(req.user!.id);
+        res.json(requests);
+      }
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching work requests" });
+    }
+  });
+
+  app.patch("/api/work-requests/:id", requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== "Admin" && req.user?.role !== "Manager") {
+        return res.status(403).json({ message: "Not authorized to update work requests" });
+      }
+      const { status, assignedTo, estimatedValue, notes } = req.body;
+      const updates: any = {};
+      if (status) updates.status = status;
+      if (assignedTo !== undefined) updates.assignedTo = assignedTo;
+      if (estimatedValue !== undefined) updates.estimatedValue = estimatedValue;
+      if (notes !== undefined) updates.notes = notes;
+      
+      const request = await storage.updateWorkRequest(req.params.id as string, updates);
+      if (!request) return res.status(404).json({ message: "Work request not found" });
+      res.json(request);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating work request" });
+    }
+  });
+
   return httpServer;
 }

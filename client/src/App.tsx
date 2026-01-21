@@ -11,6 +11,8 @@ import { Loader2 } from "lucide-react";
 import Home from "@/pages/Home";
 import AuthPage from "@/pages/auth-page";
 import AdminPanel from "@/pages/AdminPanel";
+import AdminInbox from "@/pages/AdminInbox";
+import CustomerPortal from "@/pages/CustomerPortal";
 import SOPs from "@/pages/SOPs";
 import Materials from "@/pages/Materials";
 import Hiring from "@/pages/Hiring";
@@ -39,14 +41,21 @@ function AppRoutes() {
     return <AuthPage />;
   }
 
+  const isCustomer = user?.role === "Customer";
+  const defaultPath = isCustomer ? "/customer" : "/";
+
   return (
     <AppShell>
       <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/auth">
-          <Redirect to="/" />
+        <Route path="/">
+          {isCustomer ? <Redirect to="/customer" /> : <Home />}
         </Route>
+        <Route path="/auth">
+          <Redirect to={defaultPath} />
+        </Route>
+        <Route path="/customer" component={CustomerPortal} />
         <Route path="/admin" component={AdminPanel} />
+        <Route path="/inbox" component={AdminInbox} />
         <Route path="/sops" component={SOPs} />
         <Route path="/materials" component={Materials} />
         <Route path="/hiring" component={Hiring} />

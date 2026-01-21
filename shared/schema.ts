@@ -166,3 +166,56 @@ export const insertFeatureRequestSchema = createInsertSchema(featureRequests).pi
 
 export type InsertFeatureRequest = z.infer<typeof insertFeatureRequestSchema>;
 export type FeatureRequest = typeof featureRequests.$inferSelect;
+
+export const customerMessages = pgTable("customer_messages", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id", { length: 36 }).references(() => users.id).notNull(),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  status: text("status").notNull().default("unread"),
+  adminReply: text("admin_reply"),
+  repliedAt: timestamp("replied_at"),
+  repliedBy: varchar("replied_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCustomerMessageSchema = createInsertSchema(customerMessages).pick({
+  customerId: true,
+  subject: true,
+  message: true,
+});
+
+export type InsertCustomerMessage = z.infer<typeof insertCustomerMessageSchema>;
+export type CustomerMessage = typeof customerMessages.$inferSelect;
+
+export const workRequests = pgTable("work_requests", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id", { length: 36 }).references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  serviceType: text("service_type").notNull(),
+  propertyAddress: text("property_address"),
+  preferredDate: timestamp("preferred_date"),
+  urgency: text("urgency").default("normal"),
+  photos: text("photos").array(),
+  status: text("status").notNull().default("pending"),
+  assignedTo: varchar("assigned_to", { length: 36 }).references(() => users.id),
+  estimatedValue: integer("estimated_value"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertWorkRequestSchema = createInsertSchema(workRequests).pick({
+  customerId: true,
+  title: true,
+  description: true,
+  serviceType: true,
+  propertyAddress: true,
+  preferredDate: true,
+  urgency: true,
+  photos: true,
+});
+
+export type InsertWorkRequest = z.infer<typeof insertWorkRequestSchema>;
+export type WorkRequest = typeof workRequests.$inferSelect;

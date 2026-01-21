@@ -16,7 +16,9 @@ import {
   Building2,
   User,
   Sparkles,
-  Shield
+  Shield,
+  MessageSquare,
+  Inbox
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -40,7 +42,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = React.useState(false);
 
-  const navItems = [
+  const customerNav = [
+    { icon: LayoutDashboard, label: "My Portal", href: "/customer" },
+    { icon: GraduationCap, label: "Resources", href: "/education" },
+    { icon: User, label: "My Account", href: "/profile" },
+  ];
+
+  const teamNav = [
     { icon: LayoutDashboard, label: "Home", href: "/" },
     { icon: BookOpen, label: "SOP Library", href: "/sops" },
     { icon: Hammer, label: "Materials", href: "/materials" },
@@ -48,20 +56,32 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
     { icon: GraduationCap, label: "Customer Hub", href: "/education" },
     { icon: User, label: "My Profile", href: "/profile" },
-    { icon: Building2, label: "Company HQ", href: "/hq" },
     { icon: Sparkles, label: "Assistant", href: "/assistant" },
-    { icon: Megaphone, label: "Marketing", href: "/marketing" },
-    { icon: FileText, label: "Forms", href: "/forms" },
-    { icon: Settings, label: "Integrations", href: "/integrations" },
   ];
 
-  const adminItems = user?.role === "Admin" ? [
-    { icon: Shield, label: "Admin Panel", href: "/admin" }
-  ] : [];
+  const adminNav = [
+    { icon: Building2, label: "Company HQ", href: "/hq" },
+    { icon: Megaphone, label: "Marketing", href: "/marketing" },
+    { icon: FileText, label: "Forms", href: "/forms" },
+    { icon: Inbox, label: "Messages", href: "/inbox" },
+    { icon: Settings, label: "Integrations", href: "/integrations" },
+    { icon: Shield, label: "Admin Panel", href: "/admin" },
+  ];
 
-  const displayNav = user?.role === "Customer" 
-    ? navItems.filter(item => ["Home", "SOP Library", "Forms"].includes(item.label))
-    : [...navItems, ...adminItems];
+  const getNavItems = () => {
+    if (user?.role === "Customer") {
+      return customerNav;
+    }
+    if (user?.role === "Admin") {
+      return [...teamNav, ...adminNav];
+    }
+    if (user?.role === "Manager") {
+      return [...teamNav, { icon: Inbox, label: "Messages", href: "/inbox" }];
+    }
+    return teamNav;
+  };
+
+  const displayNav = getNavItems();
 
   const NavContent = () => (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">

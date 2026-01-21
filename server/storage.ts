@@ -6,7 +6,9 @@ import {
   campaigns, type Campaign, type InsertCampaign,
   jobs, type Job, type InsertJob,
   integrations,
-  featureRequests, type FeatureRequest, type InsertFeatureRequest
+  featureRequests, type FeatureRequest, type InsertFeatureRequest,
+  customerMessages, type CustomerMessage, type InsertCustomerMessage,
+  workRequests, type WorkRequest, type InsertWorkRequest
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or } from "drizzle-orm";
@@ -56,6 +58,16 @@ export interface IStorage {
   
   createFeatureRequest(request: InsertFeatureRequest): Promise<FeatureRequest>;
   getFeatureRequests(): Promise<FeatureRequest[]>;
+  
+  createCustomerMessage(message: InsertCustomerMessage): Promise<CustomerMessage>;
+  getCustomerMessages(): Promise<CustomerMessage[]>;
+  getCustomerMessagesByUser(userId: string): Promise<CustomerMessage[]>;
+  updateCustomerMessage(id: string, updates: Partial<CustomerMessage>): Promise<CustomerMessage | undefined>;
+  
+  createWorkRequest(request: InsertWorkRequest): Promise<WorkRequest>;
+  getWorkRequests(): Promise<WorkRequest[]>;
+  getWorkRequestsByUser(userId: string): Promise<WorkRequest[]>;
+  updateWorkRequest(id: string, updates: Partial<WorkRequest>): Promise<WorkRequest | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -218,6 +230,42 @@ export class DatabaseStorage implements IStorage {
 
   async getFeatureRequests(): Promise<FeatureRequest[]> {
     return db.select().from(featureRequests);
+  }
+
+  async createCustomerMessage(message: InsertCustomerMessage): Promise<CustomerMessage> {
+    const [newMessage] = await db.insert(customerMessages).values(message).returning();
+    return newMessage;
+  }
+
+  async getCustomerMessages(): Promise<CustomerMessage[]> {
+    return db.select().from(customerMessages);
+  }
+
+  async getCustomerMessagesByUser(userId: string): Promise<CustomerMessage[]> {
+    return db.select().from(customerMessages).where(eq(customerMessages.customerId, userId));
+  }
+
+  async updateCustomerMessage(id: string, updates: Partial<CustomerMessage>): Promise<CustomerMessage | undefined> {
+    const [message] = await db.update(customerMessages).set(updates).where(eq(customerMessages.id, id)).returning();
+    return message || undefined;
+  }
+
+  async createWorkRequest(request: InsertWorkRequest): Promise<WorkRequest> {
+    const [newRequest] = await db.insert(workRequests).values(request).returning();
+    return newRequest;
+  }
+
+  async getWorkRequests(): Promise<WorkRequest[]> {
+    return db.select().from(workRequests);
+  }
+
+  async getWorkRequestsByUser(userId: string): Promise<WorkRequest[]> {
+    return db.select().from(workRequests).where(eq(workRequests.customerId, userId));
+  }
+
+  async updateWorkRequest(id: string, updates: Partial<WorkRequest>): Promise<WorkRequest | undefined> {
+    const [request] = await db.update(workRequests).set({ ...updates, updatedAt: new Date() }).where(eq(workRequests.id, id)).returning();
+    return request || undefined;
   }
 }
 
