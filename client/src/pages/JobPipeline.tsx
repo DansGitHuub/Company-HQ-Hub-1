@@ -748,7 +748,7 @@ export default function JobPipeline() {
               Cancel
             </Button>
             <Button onClick={handleSave} data-testid="button-save-job">
-              {isNewJob ? "Create" : "Save Changes"}
+              {isNewJob ? "Create & Upload Docs" : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
