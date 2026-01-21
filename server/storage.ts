@@ -1,38 +1,224 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { 
+  users, type User, type InsertUser,
+  sops, type Sop, type InsertSop,
+  materials, type Material, type InsertMaterial,
+  candidates, type Candidate, type InsertCandidate,
+  campaigns, type Campaign, type InsertCampaign,
+  jobs, type Job, type InsertJob,
+  integrations,
+  featureRequests, type FeatureRequest, type InsertFeatureRequest
+} from "@shared/schema";
+import { db, pool } from "./db";
+import { eq, ilike, or } from "drizzle-orm";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
 
-// modify the interface with any CRUD methods
-// you might need
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
+  sessionStore: session.Store;
+  
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
+  deleteUser(id: string): Promise<boolean>;
+  setRecoveryToken(userId: string, token: string, expires: Date): Promise<void>;
+  getUserByRecoveryToken(token: string): Promise<User | undefined>;
+  
+  getSops(): Promise<Sop[]>;
+  getSop(id: string): Promise<Sop | undefined>;
+  createSop(sop: InsertSop): Promise<Sop>;
+  updateSop(id: string, updates: Partial<Sop>): Promise<Sop | undefined>;
+  deleteSop(id: string): Promise<boolean>;
+  
+  getMaterials(): Promise<Material[]>;
+  getMaterial(id: string): Promise<Material | undefined>;
+  createMaterial(material: InsertMaterial): Promise<Material>;
+  updateMaterial(id: string, updates: Partial<Material>): Promise<Material | undefined>;
+  deleteMaterial(id: string): Promise<boolean>;
+  
+  getCandidates(): Promise<Candidate[]>;
+  getCandidate(id: string): Promise<Candidate | undefined>;
+  createCandidate(candidate: InsertCandidate): Promise<Candidate>;
+  updateCandidate(id: string, updates: Partial<Candidate>): Promise<Candidate | undefined>;
+  deleteCandidate(id: string): Promise<boolean>;
+  
+  getCampaigns(): Promise<Campaign[]>;
+  createCampaign(campaign: InsertCampaign): Promise<Campaign>;
+  
+  getJobs(): Promise<Job[]>;
+  getJob(id: string): Promise<Job | undefined>;
+  createJob(job: InsertJob): Promise<Job>;
+  updateJob(id: string, updates: Partial<Job>): Promise<Job | undefined>;
+  
+  createFeatureRequest(request: InsertFeatureRequest): Promise<FeatureRequest>;
+  getFeatureRequests(): Promise<FeatureRequest[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
+export class DatabaseStorage implements IStorage {
+  sessionStore: session.Store;
 
   constructor() {
-    this.users = new Map();
+    this.sessionStore = new PostgresSessionStore({ 
+      pool, 
+      createTableIfMissing: true 
+    });
   }
 
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const [user] = await db.update(users).set({ ...updates, updatedAt: new Date() }).where(eq(users.id, id)).returning();
+    return user || undefined;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users);
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id));
+    return true;
+  }
+
+  async setRecoveryToken(userId: string, token: string, expires: Date): Promise<void> {
+    await db.update(users).set({ recoveryToken: token, recoveryExpires: expires }).where(eq(users.id, userId));
+  }
+
+  async getUserByRecoveryToken(token: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.recoveryToken, token));
+    return user || undefined;
+  }
+
+  async getSops(): Promise<Sop[]> {
+    return db.select().from(sops);
+  }
+
+  async getSop(id: string): Promise<Sop | undefined> {
+    const [sop] = await db.select().from(sops).where(eq(sops.id, id));
+    return sop || undefined;
+  }
+
+  async createSop(sop: InsertSop): Promise<Sop> {
+    const [newSop] = await db.insert(sops).values(sop).returning();
+    return newSop;
+  }
+
+  async updateSop(id: string, updates: Partial<Sop>): Promise<Sop | undefined> {
+    const [sop] = await db.update(sops).set({ ...updates, lastUpdated: new Date() }).where(eq(sops.id, id)).returning();
+    return sop || undefined;
+  }
+
+  async deleteSop(id: string): Promise<boolean> {
+    await db.delete(sops).where(eq(sops.id, id));
+    return true;
+  }
+
+  async getMaterials(): Promise<Material[]> {
+    return db.select().from(materials);
+  }
+
+  async getMaterial(id: string): Promise<Material | undefined> {
+    const [material] = await db.select().from(materials).where(eq(materials.id, id));
+    return material || undefined;
+  }
+
+  async createMaterial(material: InsertMaterial): Promise<Material> {
+    const [newMaterial] = await db.insert(materials).values(material).returning();
+    return newMaterial;
+  }
+
+  async updateMaterial(id: string, updates: Partial<Material>): Promise<Material | undefined> {
+    const [material] = await db.update(materials).set(updates).where(eq(materials.id, id)).returning();
+    return material || undefined;
+  }
+
+  async deleteMaterial(id: string): Promise<boolean> {
+    await db.delete(materials).where(eq(materials.id, id));
+    return true;
+  }
+
+  async getCandidates(): Promise<Candidate[]> {
+    return db.select().from(candidates);
+  }
+
+  async getCandidate(id: string): Promise<Candidate | undefined> {
+    const [candidate] = await db.select().from(candidates).where(eq(candidates.id, id));
+    return candidate || undefined;
+  }
+
+  async createCandidate(candidate: InsertCandidate): Promise<Candidate> {
+    const [newCandidate] = await db.insert(candidates).values(candidate).returning();
+    return newCandidate;
+  }
+
+  async updateCandidate(id: string, updates: Partial<Candidate>): Promise<Candidate | undefined> {
+    const [candidate] = await db.update(candidates).set(updates).where(eq(candidates.id, id)).returning();
+    return candidate || undefined;
+  }
+
+  async deleteCandidate(id: string): Promise<boolean> {
+    await db.delete(candidates).where(eq(candidates.id, id));
+    return true;
+  }
+
+  async getCampaigns(): Promise<Campaign[]> {
+    return db.select().from(campaigns);
+  }
+
+  async createCampaign(campaign: InsertCampaign): Promise<Campaign> {
+    const [newCampaign] = await db.insert(campaigns).values(campaign).returning();
+    return newCampaign;
+  }
+
+  async getJobs(): Promise<Job[]> {
+    return db.select().from(jobs);
+  }
+
+  async getJob(id: string): Promise<Job | undefined> {
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, id));
+    return job || undefined;
+  }
+
+  async createJob(job: InsertJob): Promise<Job> {
+    const [newJob] = await db.insert(jobs).values(job).returning();
+    return newJob;
+  }
+
+  async updateJob(id: string, updates: Partial<Job>): Promise<Job | undefined> {
+    const [job] = await db.update(jobs).set(updates).where(eq(jobs.id, id)).returning();
+    return job || undefined;
+  }
+
+  async createFeatureRequest(request: InsertFeatureRequest): Promise<FeatureRequest> {
+    const [newRequest] = await db.insert(featureRequests).values(request).returning();
+    return newRequest;
+  }
+
+  async getFeatureRequests(): Promise<FeatureRequest[]> {
+    return db.select().from(featureRequests);
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
