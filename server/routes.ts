@@ -282,6 +282,22 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/messages/unread-count", requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role === "Admin" || req.user?.role === "Manager") {
+        const messages = await storage.getCustomerMessages();
+        const unreadCount = messages.filter(m => m.status === "unread").length;
+        res.json({ count: unreadCount });
+      } else {
+        const messages = await storage.getCustomerMessagesByUser(req.user!.id);
+        const hasReply = messages.filter(m => m.adminReply && m.status === "replied").length;
+        res.json({ count: hasReply });
+      }
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching unread count" });
+    }
+  });
+
   app.patch("/api/messages/:id", requireAuth, async (req, res) => {
     try {
       if (req.user?.role !== "Admin" && req.user?.role !== "Manager") {

@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { 
   LayoutDashboard, 
@@ -20,7 +21,8 @@ import {
   MessageSquare,
   Inbox,
   HelpCircle,
-  Truck
+  Truck,
+  Bell
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -38,11 +40,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = React.useState(false);
+  const [, navigate] = useLocation();
+
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/messages/unread-count"],
+    refetchInterval: 30000,
+  });
 
   const customerNav = [
     { icon: LayoutDashboard, label: "My Portal", href: "/customer" },
@@ -192,6 +201,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
              />
            </div>
            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative"
+                onClick={() => navigate(user?.role === "Customer" ? "/customer" : "/inbox")}
+                data-testid="button-messages-notification"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadData && unreadData.count > 0 && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-medium animate-pulse">
+                    {unreadData.count > 9 ? "9+" : unreadData.count}
+                  </span>
+                )}
+              </Button>
               <span className="text-sm font-medium text-muted-foreground hidden sm:inline-block">
                 {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
               </span>
