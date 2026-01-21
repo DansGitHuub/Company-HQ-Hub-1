@@ -23,6 +23,7 @@ export default function EquipmentTracker() {
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null);
   const [logDialogOpen, setLogDialogOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<MaintenanceSchedule | null>(null);
+  const [scheduleIntervalType, setScheduleIntervalType] = useState("days");
 
   const { data: equipment = [], isLoading } = useQuery<Equipment[]>({
     queryKey: ["/api/equipment"],
@@ -100,6 +101,7 @@ export default function EquipmentTracker() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/maintenance-schedules"] });
       setScheduleDialogOpen(false);
+      setScheduleIntervalType("days");
       toast({ title: "Maintenance schedule created" });
     },
   });
@@ -189,7 +191,7 @@ export default function EquipmentTracker() {
     e.preventDefault();
     if (!selectedEquipmentId) return;
     const formData = new FormData(e.currentTarget);
-    const intervalType = formData.get("intervalType") as string;
+    const intervalType = scheduleIntervalType;
     const intervalValue = parseInt(formData.get("intervalValue") as string);
     
     let nextDueDate: Date | undefined;
@@ -632,7 +634,7 @@ export default function EquipmentTracker() {
               </div>
               <div>
                 <Label htmlFor="intervalType">Interval Type *</Label>
-                <Select name="intervalType" defaultValue="days" required>
+                <Select value={scheduleIntervalType} onValueChange={setScheduleIntervalType}>
                   <SelectTrigger data-testid="select-interval-type">
                     <SelectValue />
                   </SelectTrigger>
