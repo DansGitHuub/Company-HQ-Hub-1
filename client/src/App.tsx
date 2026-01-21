@@ -13,6 +13,10 @@ import Hiring from "@/pages/Hiring";
 import Marketing from "@/pages/Marketing";
 import Forms from "@/pages/Forms";
 import Integrations from "@/pages/Integrations";
+import Education from "@/pages/Education";
+import EmployeePortal from "@/pages/EmployeePortal";
+import HQOverview from "@/pages/HQOverview";
+import JobPipeline from "@/pages/JobPipeline";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -26,6 +30,10 @@ function Router() {
         <Route path="/marketing" component={Marketing} />
         <Route path="/forms" component={Forms} />
         <Route path="/integrations" component={Integrations} />
+        <Route path="/education" component={Education} />
+        <Route path="/profile" component={EmployeePortal} />
+        <Route path="/hq" component={HQOverview} />
+        <Route path="/jobs" component={JobPipeline} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>

@@ -12,7 +12,10 @@ import {
   LogOut,
   Menu,
   X,
-  Search
+  Search,
+  GraduationCap,
+  Building2,
+  User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -41,6 +44,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { icon: BookOpen, label: "SOP Library", href: "/sops" },
     { icon: Hammer, label: "Materials", href: "/materials" },
     { icon: Users, label: "Hiring", href: "/hiring" },
+    { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
+    { icon: GraduationCap, label: "Customer Hub", href: "/education" },
+    { icon: User, label: "My Profile", href: "/profile" },
+    { icon: Building2, label: "Company HQ", href: "/hq" },
     { icon: Megaphone, label: "Marketing", href: "/marketing" },
     { icon: FileText, label: "Forms", href: "/forms" },
     { icon: Settings, label: "Integrations", href: "/integrations" },
