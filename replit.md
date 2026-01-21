@@ -46,6 +46,14 @@ Preferred communication style: Simple, everyday language.
 - **Jobs**: Project pipeline from Lead to Completed
 - **Feature Requests**: User feedback and feature suggestions
 - **Integrations**: Third-party service connection states
+- **Customer Messages**: Customer-to-company messaging with status tracking (unread/read/replied)
+- **Work Requests**: Customer service requests with service type, urgency, and status workflow
+
+### Role-Based Access Control
+- **Admin**: Full access to all features including user management, company settings, inbox, and admin panel
+- **Manager**: Team features plus access to customer inbox
+- **Crew**: Basic operational features (SOPs, Materials, Jobs, Hiring)
+- **Customer**: Dedicated portal for messaging, work requests, and customer resources
 
 ### Build System
 - **Dev Server**: Vite for frontend with HMR
