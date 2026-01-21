@@ -16,6 +16,9 @@ export const users = pgTable("users", {
   isMasterAdmin: boolean("is_master_admin").notNull().default(false),
   recoveryToken: text("recovery_token"),
   recoveryExpires: timestamp("recovery_expires"),
+  bio: text("bio"),
+  phone: text("phone"),
+  profilePicture: text("profile_picture"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
