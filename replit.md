@@ -39,7 +39,8 @@ Preferred communication style: Simple, everyday language.
 
 ### Key Data Models
 - **Users**: Role-based (Admin, Manager, Crew, Customer) with password recovery tokens
-- **SOPs**: Standard operating procedures with categories and ownership
+- **SOP Categories**: Organized topics (Onboarding & Basics, Vehicles & Equipment, Softscape, Hardscape, Lawn Maintenance, Chemicals & Applications, Water Features, Snow & Ice)
+- **SOPs**: Standard operating procedures with category assignment, archive status, and rich content
 - **Materials**: Inventory items with categories, pricing, and stock levels
 - **Candidates**: Hiring pipeline stages from Applied to Hired/Rejected
 - **Campaigns**: Marketing campaigns with platform, spend, and lead tracking

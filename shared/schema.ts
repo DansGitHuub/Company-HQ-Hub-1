@@ -34,18 +34,36 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+export const sopCategories = pgTable("sop_categories", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSopCategorySchema = createInsertSchema(sopCategories).pick({
+  name: true,
+  sortOrder: true,
+});
+
+export type InsertSopCategory = z.infer<typeof insertSopCategorySchema>;
+export type SopCategory = typeof sopCategories.$inferSelect;
+
 export const sops = pgTable("sops", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   category: text("category").notNull(),
+  categoryId: varchar("category_id", { length: 36 }).references(() => sopCategories.id),
   content: text("content").notNull(),
   ownerId: varchar("owner_id", { length: 36 }).references(() => users.id),
+  isArchived: boolean("is_archived").notNull().default(false),
   lastUpdated: timestamp("last_updated").defaultNow(),
 });
 
 export const insertSopSchema = createInsertSchema(sops).pick({
   title: true,
   category: true,
+  categoryId: true,
   content: true,
   ownerId: true,
 });

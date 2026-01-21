@@ -1,5 +1,6 @@
 import { 
   users, type User, type InsertUser,
+  sopCategories, type SopCategory, type InsertSopCategory,
   sops, type Sop, type InsertSop,
   materials, type Material, type InsertMaterial,
   candidates, type Candidate, type InsertCandidate,
@@ -43,11 +44,18 @@ export interface IStorage {
   setRecoveryToken(userId: string, token: string, expires: Date): Promise<void>;
   getUserByRecoveryToken(token: string): Promise<User | undefined>;
   
+  getSopCategories(): Promise<SopCategory[]>;
+  getSopCategory(id: string): Promise<SopCategory | undefined>;
+  createSopCategory(category: InsertSopCategory): Promise<SopCategory>;
+  updateSopCategory(id: string, updates: Partial<SopCategory>): Promise<SopCategory | undefined>;
+  deleteSopCategory(id: string): Promise<boolean>;
+  
   getSops(): Promise<Sop[]>;
   getSop(id: string): Promise<Sop | undefined>;
   createSop(sop: InsertSop): Promise<Sop>;
   updateSop(id: string, updates: Partial<Sop>): Promise<Sop | undefined>;
   deleteSop(id: string): Promise<boolean>;
+  copySop(id: string): Promise<Sop | undefined>;
   
   getMaterials(): Promise<Material[]>;
   getMaterial(id: string): Promise<Material | undefined>;
@@ -209,6 +217,30 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getSopCategories(): Promise<SopCategory[]> {
+    return db.select().from(sopCategories).orderBy(sopCategories.sortOrder);
+  }
+
+  async getSopCategory(id: string): Promise<SopCategory | undefined> {
+    const [cat] = await db.select().from(sopCategories).where(eq(sopCategories.id, id));
+    return cat || undefined;
+  }
+
+  async createSopCategory(category: InsertSopCategory): Promise<SopCategory> {
+    const [newCat] = await db.insert(sopCategories).values(category).returning();
+    return newCat;
+  }
+
+  async updateSopCategory(id: string, updates: Partial<SopCategory>): Promise<SopCategory | undefined> {
+    const [cat] = await db.update(sopCategories).set(updates).where(eq(sopCategories.id, id)).returning();
+    return cat || undefined;
+  }
+
+  async deleteSopCategory(id: string): Promise<boolean> {
+    await db.delete(sopCategories).where(eq(sopCategories.id, id));
+    return true;
+  }
+
   async getSops(): Promise<Sop[]> {
     return db.select().from(sops);
   }
@@ -231,6 +263,19 @@ export class DatabaseStorage implements IStorage {
   async deleteSop(id: string): Promise<boolean> {
     await db.delete(sops).where(eq(sops.id, id));
     return true;
+  }
+
+  async copySop(id: string): Promise<Sop | undefined> {
+    const originalSop = await this.getSop(id);
+    if (!originalSop) return undefined;
+    const [newSop] = await db.insert(sops).values({
+      title: `${originalSop.title} (Copy)`,
+      category: originalSop.category,
+      categoryId: originalSop.categoryId,
+      content: originalSop.content,
+      ownerId: originalSop.ownerId,
+    }).returning();
+    return newSop;
   }
 
   async getMaterials(): Promise<Material[]> {

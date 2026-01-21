@@ -157,6 +157,64 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/sops/:id/copy", requireAuth, async (req, res) => {
+    try {
+      const sop = await storage.copySop(req.params.id as string);
+      if (!sop) return res.status(404).json({ message: "SOP not found" });
+      res.status(201).json(sop);
+    } catch (err) {
+      res.status(500).json({ message: "Error copying SOP" });
+    }
+  });
+
+  // SOP Categories
+  app.get("/api/sop-categories", requireAuth, async (req, res) => {
+    try {
+      const categories = await storage.getSopCategories();
+      res.json(categories);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching SOP categories" });
+    }
+  });
+
+  app.post("/api/sop-categories", requireAuth, async (req, res) => {
+    try {
+      const category = await storage.createSopCategory(req.body);
+      res.status(201).json(category);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating SOP category" });
+    }
+  });
+
+  app.patch("/api/sop-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const category = await storage.updateSopCategory(req.params.id as string, req.body);
+      if (!category) return res.status(404).json({ message: "Category not found" });
+      
+      // Update all SOPs in this category to have the new category name
+      if (req.body.name) {
+        const allSops = await storage.getSops();
+        const sopsInCategory = allSops.filter(sop => sop.categoryId === req.params.id);
+        for (const sop of sopsInCategory) {
+          await storage.updateSop(sop.id, { category: req.body.name });
+        }
+      }
+      
+      res.json(category);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating SOP category" });
+    }
+  });
+
+  app.delete("/api/sop-categories/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteSopCategory(req.params.id as string);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting SOP category" });
+    }
+  });
+
   app.post("/api/ai/generate-sop", requireAuth, async (req, res) => {
     try {
       const { prompt } = req.body;
