@@ -201,8 +201,10 @@ Preferred communication style: Simple, everyday language.
 - API routes: /api/candidates (CRUD), /api/candidates/:id/documents, /api/candidate-documents/:id
 
 ### Enhanced Job Pipeline
-- Tabbed interface for organizing by job category (Project, Maintenance, custom tabs)
-- Custom tabs can be added, renamed, and deleted (double-click to edit)
+- Tabbed interface for organizing by work type (Install, Maintenance, plus custom tabs)
+- Built-in tabs: Install (default), Maintenance - cannot be renamed or deleted
+- Custom tabs can be added with "+" button, renamed (double-click), and deleted
+- Only one job type visible at a time - tabs filter by category
 - Clickable job cards open a detail modal
 - Full location info with Google Maps link
 - Mandatory completion date flag with visual indicator

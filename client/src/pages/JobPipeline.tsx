@@ -47,7 +47,7 @@ export default function JobPipeline() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewJob, setIsNewJob] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Job>>({});
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState("Install");
   const [newDocType, setNewDocType] = useState("permit");
   const [editingTab, setEditingTab] = useState<string | null>(null);
   const [newTabName, setNewTabName] = useState("");
@@ -158,7 +158,7 @@ export default function JobPipeline() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/job-pipeline-tabs"] });
-      if (activeTab === editingTab) setActiveTab("all");
+      if (activeTab === editingTab) setActiveTab("Install");
       toast({ title: "Tab deleted" });
     },
   });
@@ -183,7 +183,7 @@ export default function JobPipeline() {
       client: "", 
       type: "Full Install", 
       stage: "Lead", 
-      category: activeTab !== "all" ? (activeTab as JobCategory) : "Project" 
+      category: activeTab as JobCategory 
     });
     setIsNewJob(true);
     setIsModalOpen(true);
@@ -220,11 +220,19 @@ export default function JobPipeline() {
     e.target.value = "";
   };
 
-  const filteredJobs = activeTab === "all" 
-    ? jobs 
-    : jobs.filter(j => j.category === activeTab);
+  // Filter jobs by the active tab category
+  const filteredJobs = jobs.filter(j => j.category === activeTab);
 
-  const allTabs = [{ id: "all", name: "All Jobs" }, ...pipelineTabs.map(t => ({ id: t.name, name: t.name }))];
+  // Built-in tabs plus any custom tabs from database (filter out duplicates)
+  const builtInTabs = [
+    { id: "Install", name: "Install", isBuiltIn: true },
+    { id: "Maintenance", name: "Maintenance", isBuiltIn: true },
+  ];
+  const builtInNames = builtInTabs.map(t => t.name);
+  const customTabs = pipelineTabs
+    .filter(t => !builtInNames.includes(t.name))
+    .map(t => ({ id: t.name, name: t.name, isBuiltIn: false }));
+  const allTabs = [...builtInTabs, ...customTabs];
 
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col space-y-4">
@@ -241,7 +249,7 @@ export default function JobPipeline() {
       <div className="flex items-center gap-2 border-b pb-2">
         {allTabs.map((tab) => (
           <div key={tab.id} className="relative">
-            {editingTab === tab.id && tab.id !== "all" ? (
+            {editingTab === tab.id && !tab.isBuiltIn ? (
               <div className="flex items-center gap-1">
                 <Input
                   value={newTabName}
@@ -288,7 +296,8 @@ export default function JobPipeline() {
                 size="sm"
                 onClick={() => setActiveTab(tab.id)}
                 onDoubleClick={() => {
-                  if (tab.id !== "all") {
+                  // Only allow editing custom tabs, not built-in ones
+                  if (!tab.isBuiltIn) {
                     setEditingTab(tab.id);
                     setNewTabName(tab.name);
                   }

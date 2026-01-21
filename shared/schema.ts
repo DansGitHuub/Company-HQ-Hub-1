@@ -164,13 +164,13 @@ export const insertCampaignSchema = createInsertSchema(campaigns).pick({
 export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
 export type Campaign = typeof campaigns.$inferSelect;
 
-export type JobCategory = "Project" | "Maintenance";
+export type JobCategory = "Install" | "Maintenance" | string;
 
 export const jobs = pgTable("jobs", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   client: text("client").notNull(),
   type: text("type").notNull(),
-  category: text("category").$type<JobCategory>().default("Project"),
+  category: text("category").$type<JobCategory>().default("Install"),
   stage: text("stage").notNull().default("Lead"),
   value: integer("value").default(0),
   scheduledDate: timestamp("scheduled_date"),
