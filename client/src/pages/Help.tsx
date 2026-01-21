@@ -20,15 +20,18 @@ import {
   BookOpen,
   MessageSquare,
   Shield,
-  ArrowRight
+  ArrowRight,
+  ExternalLink
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 
 type WalkthroughStep = {
   title: string;
   description: string;
   icon: React.ReactNode;
   tips: string[];
+  path?: string;
 };
 
 const adminWalkthrough: WalkthroughStep[] = [
@@ -36,6 +39,7 @@ const adminWalkthrough: WalkthroughStep[] = [
     title: "Dashboard Overview",
     description: "Your home base shows quick access tiles to all major features. Each tile takes you directly to that section. The dashboard gives you a bird's-eye view of your entire operation.",
     icon: <Home className="h-8 w-8" />,
+    path: "/",
     tips: [
       "Click any tile to navigate to that section",
       "The dashboard adapts based on your role",
@@ -46,6 +50,7 @@ const adminWalkthrough: WalkthroughStep[] = [
     title: "SOP Library",
     description: "Store and organize your Standard Operating Procedures. Create step-by-step guides for any process - from equipment operation to customer service protocols.",
     icon: <FileText className="h-8 w-8" />,
+    path: "/sops",
     tips: [
       "Organize SOPs by category (Safety, Equipment, Customer Service)",
       "Add detailed steps with descriptions",
@@ -56,6 +61,7 @@ const adminWalkthrough: WalkthroughStep[] = [
     title: "Materials Catalog",
     description: "Track your inventory of materials, equipment, and supplies. Monitor stock levels, pricing, and supplier information all in one place.",
     icon: <Package className="h-8 w-8" />,
+    path: "/materials",
     tips: [
       "Set minimum stock levels for alerts",
       "Track costs and pricing for estimates",
@@ -66,6 +72,7 @@ const adminWalkthrough: WalkthroughStep[] = [
     title: "Hiring Pipeline",
     description: "Manage your recruitment process from application to hire. Drag candidates through stages as they progress.",
     icon: <Users className="h-8 w-8" />,
+    path: "/hiring",
     tips: [
       "Drag and drop candidates between stages",
       "Add notes and track interview progress",
@@ -76,6 +83,7 @@ const adminWalkthrough: WalkthroughStep[] = [
     title: "Job Tracking",
     description: "Monitor all your projects from lead to completion. Track status, assign crews, and manage timelines.",
     icon: <Briefcase className="h-8 w-8" />,
+    path: "/jobs",
     tips: [
       "Create jobs from customer requests",
       "Assign team members to jobs",
@@ -86,6 +94,7 @@ const adminWalkthrough: WalkthroughStep[] = [
     title: "Admin Panel",
     description: "Manage users, review access requests, and configure system settings. Only admins can access this area.",
     icon: <Shield className="h-8 w-8" />,
+    path: "/admin",
     tips: [
       "Create and manage user accounts",
       "Review and approve access requests",
@@ -99,6 +108,7 @@ const customerWalkthrough: WalkthroughStep[] = [
     title: "Your Customer Portal",
     description: "Welcome to your dedicated customer area! Here you can communicate with our team and request services.",
     icon: <Home className="h-8 w-8" />,
+    path: "/customer",
     tips: [
       "View all your messages and requests in one place",
       "Track the status of your service requests",
@@ -109,6 +119,7 @@ const customerWalkthrough: WalkthroughStep[] = [
     title: "Send Messages",
     description: "Communicate directly with our team. Ask questions, provide feedback, or discuss your projects.",
     icon: <MessageSquare className="h-8 w-8" />,
+    path: "/customer",
     tips: [
       "Click 'New Message' to start a conversation",
       "Track message status (sent, read, replied)",
@@ -119,6 +130,7 @@ const customerWalkthrough: WalkthroughStep[] = [
     title: "Work Requests",
     description: "Request landscaping services easily. Describe what you need and we'll get back to you.",
     icon: <ClipboardList className="h-8 w-8" />,
+    path: "/customer",
     tips: [
       "Choose from service types like Lawn Maintenance or Landscape Design",
       "Set urgency level for your request",
@@ -129,6 +141,7 @@ const customerWalkthrough: WalkthroughStep[] = [
     title: "Account Access",
     description: "If you're a team member, request upgraded access to see operational features.",
     icon: <Shield className="h-8 w-8" />,
+    path: "/customer",
     tips: [
       "Request Crew, Manager, or Admin access",
       "Provide a reason for your request",
@@ -215,6 +228,7 @@ function WalkthroughDialog({ steps, triggerText }: { steps: WalkthroughStep[]; t
 
 export default function Help() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
   const isAdmin = user?.role === "Admin" || user?.role === "Manager";
   const isCustomer = user?.role === "Customer";
   
@@ -257,13 +271,23 @@ export default function Help() {
         <TabsContent value="features" className="mt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {(isCustomer ? customerWalkthrough : adminWalkthrough).map((item, i) => (
-              <Card key={i} className="hover:shadow-md transition-shadow">
+              <Card 
+                key={i} 
+                className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 group"
+                onClick={() => item.path && navigate(item.path)}
+                data-testid={`help-card-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+              >
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                    <div className="p-2 bg-primary/10 rounded-lg text-primary group-hover:bg-primary/20 transition-colors">
                       {item.icon}
                     </div>
-                    <CardTitle className="text-lg">{item.title}</CardTitle>
+                    <div className="flex-1">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        {item.title}
+                        <ExternalLink className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
+                      </CardTitle>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -276,6 +300,11 @@ export default function Help() {
                       </li>
                     ))}
                   </ul>
+                  <div className="mt-3 pt-3 border-t">
+                    <span className="text-xs text-primary font-medium group-hover:underline">
+                      Go to {item.title} →
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
             ))}
