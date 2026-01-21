@@ -19,7 +19,8 @@ import {
   Shield,
   MessageSquare,
   Inbox,
-  HelpCircle
+  HelpCircle,
+  Truck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { icon: LayoutDashboard, label: "Home", href: "/" },
     { icon: BookOpen, label: "SOP Library", href: "/sops" },
     { icon: Hammer, label: "Materials", href: "/materials" },
+    { icon: Truck, label: "Equipment", href: "/equipment" },
     { icon: Users, label: "Hiring", href: "/hiring" },
     { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
     { icon: GraduationCap, label: "Customer Hub", href: "/education" },

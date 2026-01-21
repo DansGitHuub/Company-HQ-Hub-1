@@ -534,7 +534,7 @@ export async function registerRoutes(
 
   app.get("/api/equipment/:id", requireAuth, async (req, res) => {
     try {
-      const item = await storage.getEquipmentById(req.params.id);
+      const item = await storage.getEquipmentById(req.params.id as string);
       if (!item) return res.status(404).json({ message: "Equipment not found" });
       res.json(item);
     } catch (err) {
@@ -553,7 +553,7 @@ export async function registerRoutes(
 
   app.put("/api/equipment/:id", requireAuth, async (req, res) => {
     try {
-      const item = await storage.updateEquipment(req.params.id, req.body);
+      const item = await storage.updateEquipment(req.params.id as string, req.body);
       if (!item) return res.status(404).json({ message: "Equipment not found" });
       res.json(item);
     } catch (err) {
@@ -563,7 +563,7 @@ export async function registerRoutes(
 
   app.delete("/api/equipment/:id", requireAdmin, async (req, res) => {
     try {
-      await storage.deleteEquipment(req.params.id);
+      await storage.deleteEquipment(req.params.id as string);
       res.sendStatus(204);
     } catch (err) {
       res.status(500).json({ message: "Error deleting equipment" });
@@ -592,7 +592,7 @@ export async function registerRoutes(
 
   app.put("/api/maintenance-schedules/:id", requireAuth, async (req, res) => {
     try {
-      const schedule = await storage.updateMaintenanceSchedule(req.params.id, req.body);
+      const schedule = await storage.updateMaintenanceSchedule(req.params.id as string, req.body);
       if (!schedule) return res.status(404).json({ message: "Schedule not found" });
       res.json(schedule);
     } catch (err) {
@@ -602,7 +602,7 @@ export async function registerRoutes(
 
   app.delete("/api/maintenance-schedules/:id", requireAuth, async (req, res) => {
     try {
-      await storage.deleteMaintenanceSchedule(req.params.id);
+      await storage.deleteMaintenanceSchedule(req.params.id as string);
       res.sendStatus(204);
     } catch (err) {
       res.status(500).json({ message: "Error deleting maintenance schedule" });
