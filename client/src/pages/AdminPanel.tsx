@@ -105,19 +105,33 @@ export default function AdminPanel() {
     if (!file) return;
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
 
     try {
-      const res = await fetch("/api/upload", {
+      // Step 1: Request a presigned upload URL
+      const urlRes = await fetch("/api/uploads/request-url", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: formData,
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type || "image/jpeg",
+        }),
       });
-      if (!res.ok) throw new Error("Upload failed");
-      const { url } = await res.json();
-      setLogoUrl(url);
-      await updateCompanySettingsMutation.mutateAsync({ logoUrl: url });
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+
+      // Step 2: Upload file directly to presigned URL
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type || "image/jpeg" },
+      });
+      if (!uploadRes.ok) throw new Error("Upload failed");
+
+      // Use the object path as the logo URL
+      setLogoUrl(objectPath);
+      await updateCompanySettingsMutation.mutateAsync({ logoUrl: objectPath });
     } catch (err) {
       toast({ title: "Failed to upload logo", variant: "destructive" });
     } finally {
