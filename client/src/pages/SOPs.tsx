@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +48,13 @@ export default function SOPs() {
   const { data: sops = [], isLoading: sopsLoading } = useQuery<Sop[]>({
     queryKey: ["/api/sops"],
   });
+
+  // Expand all categories by default when they load
+  useEffect(() => {
+    if (categories.length > 0 && expandedCategories.size === 0) {
+      setExpandedCategories(new Set(categories.map(c => c.id)));
+    }
+  }, [categories]);
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Sop>) => {
