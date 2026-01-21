@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, hashPassword } from "./auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
+import { sendMaintenanceReminderEmail } from "./email";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -655,6 +656,47 @@ export async function registerRoutes(
       res.status(201).json(log);
     } catch (err) {
       res.status(500).json({ message: "Error creating maintenance log" });
+    }
+  });
+
+  // Maintenance reminder check - sends emails for due maintenance
+  app.post("/api/maintenance/send-reminders", requireAdmin, async (req, res) => {
+    try {
+      const dueSchedules = await storage.getDueMaintenanceSchedules();
+      const allEquipment = await storage.getEquipment();
+      
+      let sentCount = 0;
+      const errors: string[] = [];
+      
+      for (const schedule of dueSchedules) {
+        if (!schedule.reminderEmail) continue;
+        
+        const equip = allEquipment.find(e => e.id === schedule.equipmentId);
+        if (!equip) continue;
+        
+        try {
+          await sendMaintenanceReminderEmail(
+            schedule.reminderEmail,
+            equip.name,
+            schedule.name,
+            schedule.nextDueDate || undefined,
+            schedule.nextDueMileage || undefined,
+            schedule.nextDueHours || undefined
+          );
+          sentCount++;
+        } catch (err: any) {
+          errors.push(`Failed to send reminder for ${schedule.name}: ${err.message}`);
+        }
+      }
+      
+      res.json({ 
+        message: `Sent ${sentCount} reminder emails`,
+        dueSchedules: dueSchedules.length,
+        sentCount,
+        errors 
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Error sending maintenance reminders" });
     }
   });
 

@@ -79,3 +79,59 @@ export async function sendPasswordRecoveryEmail(toEmail: string, recoveryToken: 
 
   return data;
 }
+
+export async function sendMaintenanceReminderEmail(
+  toEmail: string, 
+  equipmentName: string, 
+  taskName: string, 
+  dueDate?: Date,
+  dueMileage?: number,
+  dueHours?: number
+) {
+  const { client, fromEmail } = await getResendClient();
+  
+  let dueInfo = '';
+  if (dueDate) {
+    dueInfo = `Due on ${dueDate.toLocaleDateString()}`;
+  } else if (dueMileage) {
+    dueInfo = `Due at ${dueMileage.toLocaleString()} miles`;
+  } else if (dueHours) {
+    dueInfo = `Due at ${dueHours.toLocaleString()} hours`;
+  }
+
+  const { data, error } = await client.emails.send({
+    from: fromEmail || 'Company HQ <noreply@resend.dev>',
+    to: toEmail,
+    subject: `Maintenance Reminder: ${taskName} for ${equipmentName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #166534; padding: 20px; text-align: center;">
+          <h1 style="color: white; margin: 0;">Company HQ</h1>
+        </div>
+        <div style="padding: 30px; background-color: #f9fafb;">
+          <h2 style="color: #1f2937;">Maintenance Reminder</h2>
+          <p style="color: #4b5563;">A scheduled maintenance task is coming up:</p>
+          <div style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #92400e; margin: 0 0 10px 0;">${taskName}</h3>
+            <p style="color: #92400e; margin: 0;"><strong>Equipment:</strong> ${equipmentName}</p>
+            <p style="color: #92400e; margin: 5px 0 0 0;"><strong>${dueInfo}</strong></p>
+          </div>
+          <p style="color: #4b5563;">Please schedule this maintenance to keep your equipment in top condition.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.REPLIT_DEV_DOMAIN ? 'https://' + process.env.REPLIT_DEV_DOMAIN : 'http://localhost:5000'}/equipment" style="background-color: #166534; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Equipment Tracker</a>
+          </div>
+        </div>
+        <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+          <p>Company HQ - Landscape Management</p>
+        </div>
+      </div>
+    `
+  });
+
+  if (error) {
+    console.error('Error sending maintenance reminder email:', error);
+    throw new Error('Failed to send maintenance reminder email');
+  }
+
+  return data;
+}
