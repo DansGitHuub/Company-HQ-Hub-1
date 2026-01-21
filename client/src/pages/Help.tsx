@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
   HelpCircle, 
@@ -11,20 +10,16 @@ import {
   Package, 
   Users, 
   Briefcase, 
-  Megaphone,
   ClipboardList,
-  Settings,
   ChevronRight,
   ChevronLeft,
   Play,
   BookOpen,
   MessageSquare,
   Shield,
-  ArrowRight,
-  ExternalLink
+  ArrowRight
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useLocation } from "wouter";
 
 type WalkthroughStep = {
   title: string;
@@ -228,8 +223,6 @@ function WalkthroughDialog({ steps, triggerText }: { steps: WalkthroughStep[]; t
 
 export default function Help() {
   const { user } = useAuth();
-  const [, navigate] = useLocation();
-  const isAdmin = user?.role === "Admin" || user?.role === "Manager";
   const isCustomer = user?.role === "Customer";
   
   return (
@@ -262,56 +255,24 @@ export default function Help() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="features" className="w-full">
-        <TabsList>
-          <TabsTrigger value="features">Features Guide</TabsTrigger>
-          <TabsTrigger value="faq">Common Questions</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="features" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(isCustomer ? customerWalkthrough : adminWalkthrough).map((item, i) => (
-              <Card 
-                key={i} 
-                className="hover:shadow-md transition-all cursor-pointer hover:border-primary/50 group"
-                onClick={() => item.path && navigate(item.path)}
-                data-testid={`help-card-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg text-primary group-hover:bg-primary/20 transition-colors">
-                      {item.icon}
-                    </div>
-                    <div className="flex-1">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        {item.title}
-                        <ExternalLink className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
-                      </CardTitle>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="mb-3">{item.description}</CardDescription>
-                  <ul className="space-y-1">
-                    {item.tips.slice(0, 2).map((tip, j) => (
-                      <li key={j} className="flex items-start gap-2 text-xs text-muted-foreground">
-                        <ChevronRight className="h-3 w-3 mt-0.5 text-primary shrink-0" />
-                        {tip}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-3 pt-3 border-t">
-                    <span className="text-xs text-primary font-medium group-hover:underline">
-                      Go to {item.title} →
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      <Card className="bg-muted/30">
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-primary/10 rounded-lg">
+              <HelpCircle className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold mb-1">Quick Tip: Info Icons</h3>
+              <p className="text-sm text-muted-foreground">
+                Hover over any menu item in the sidebar to see an info icon. Click it for a quick description and tips about that feature.
+              </p>
+            </div>
           </div>
-        </TabsContent>
+        </CardContent>
+      </Card>
 
-        <TabsContent value="faq" className="mt-6">
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Common Questions</h2>
           <div className="space-y-4">
             <Card>
               <CardHeader>
@@ -367,8 +328,7 @@ export default function Help() {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-      </Tabs>
+      </div>
     </div>
   );
 }
