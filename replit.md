@@ -41,6 +41,8 @@ Preferred communication style: Simple, everyday language.
 - **Users**: Role-based (Admin, Manager, Crew, Customer) with password recovery tokens
 - **SOP Categories**: Organized topics (Onboarding & Basics, Vehicles & Equipment, Softscape, Hardscape, Lawn Maintenance, Chemicals & Applications, Water Features, Snow & Ice)
 - **SOPs**: Standard operating procedures with category assignment, archive status, and rich content
+- **SOP Templates**: Reusable templates for quick SOP creation with pre-filled content
+- **SOP Examples**: External SOP references/examples for training with URLs and file uploads
 - **Materials**: Inventory items with categories, pricing, and stock levels
 - **Candidates**: Hiring pipeline stages from Applied to Hired/Rejected
 - **Campaigns**: Marketing campaigns with platform, spend, and lead tracking

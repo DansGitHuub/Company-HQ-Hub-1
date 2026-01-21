@@ -2,6 +2,8 @@ import {
   users, type User, type InsertUser,
   sopCategories, type SopCategory, type InsertSopCategory,
   sops, type Sop, type InsertSop,
+  sopTemplates, type SopTemplate, type InsertSopTemplate,
+  sopExamples, type SopExample, type InsertSopExample,
   materials, type Material, type InsertMaterial,
   candidates, type Candidate, type InsertCandidate,
   candidateDocuments, type CandidateDocument, type InsertCandidateDocument,
@@ -56,6 +58,20 @@ export interface IStorage {
   updateSop(id: string, updates: Partial<Sop>): Promise<Sop | undefined>;
   deleteSop(id: string): Promise<boolean>;
   copySop(id: string): Promise<Sop | undefined>;
+  
+  // SOP Templates
+  getSopTemplates(): Promise<SopTemplate[]>;
+  getSopTemplate(id: string): Promise<SopTemplate | undefined>;
+  createSopTemplate(template: InsertSopTemplate): Promise<SopTemplate>;
+  updateSopTemplate(id: string, updates: Partial<SopTemplate>): Promise<SopTemplate | undefined>;
+  deleteSopTemplate(id: string): Promise<boolean>;
+  
+  // SOP Examples
+  getSopExamples(): Promise<SopExample[]>;
+  getSopExample(id: string): Promise<SopExample | undefined>;
+  createSopExample(example: InsertSopExample): Promise<SopExample>;
+  updateSopExample(id: string, updates: Partial<SopExample>): Promise<SopExample | undefined>;
+  deleteSopExample(id: string): Promise<boolean>;
   
   getMaterials(): Promise<Material[]>;
   getMaterial(id: string): Promise<Material | undefined>;
@@ -276,6 +292,56 @@ export class DatabaseStorage implements IStorage {
       ownerId: originalSop.ownerId,
     }).returning();
     return newSop;
+  }
+
+  // SOP Templates
+  async getSopTemplates(): Promise<SopTemplate[]> {
+    return db.select().from(sopTemplates);
+  }
+
+  async getSopTemplate(id: string): Promise<SopTemplate | undefined> {
+    const [template] = await db.select().from(sopTemplates).where(eq(sopTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createSopTemplate(template: InsertSopTemplate): Promise<SopTemplate> {
+    const [newTemplate] = await db.insert(sopTemplates).values(template).returning();
+    return newTemplate;
+  }
+
+  async updateSopTemplate(id: string, updates: Partial<SopTemplate>): Promise<SopTemplate | undefined> {
+    const [template] = await db.update(sopTemplates).set(updates).where(eq(sopTemplates.id, id)).returning();
+    return template || undefined;
+  }
+
+  async deleteSopTemplate(id: string): Promise<boolean> {
+    await db.delete(sopTemplates).where(eq(sopTemplates.id, id));
+    return true;
+  }
+
+  // SOP Examples
+  async getSopExamples(): Promise<SopExample[]> {
+    return db.select().from(sopExamples);
+  }
+
+  async getSopExample(id: string): Promise<SopExample | undefined> {
+    const [example] = await db.select().from(sopExamples).where(eq(sopExamples.id, id));
+    return example || undefined;
+  }
+
+  async createSopExample(example: InsertSopExample): Promise<SopExample> {
+    const [newExample] = await db.insert(sopExamples).values(example).returning();
+    return newExample;
+  }
+
+  async updateSopExample(id: string, updates: Partial<SopExample>): Promise<SopExample | undefined> {
+    const [example] = await db.update(sopExamples).set(updates).where(eq(sopExamples.id, id)).returning();
+    return example || undefined;
+  }
+
+  async deleteSopExample(id: string): Promise<boolean> {
+    await db.delete(sopExamples).where(eq(sopExamples.id, id));
+    return true;
   }
 
   async getMaterials(): Promise<Material[]> {

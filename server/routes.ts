@@ -6,6 +6,7 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { sendMaintenanceReminderEmail } from "./email";
 import OpenAI from "openai";
+import { insertSopTemplateSchema, insertSopExampleSchema } from "@shared/schema";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -212,6 +213,98 @@ export async function registerRoutes(
       res.sendStatus(204);
     } catch (err) {
       res.status(500).json({ message: "Error deleting SOP category" });
+    }
+  });
+
+  // SOP Templates
+  app.get("/api/sop-templates", requireAuth, async (req, res) => {
+    try {
+      const templates = await storage.getSopTemplates();
+      res.json(templates);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching templates" });
+    }
+  });
+
+  app.post("/api/sop-templates", requireAuth, async (req, res) => {
+    try {
+      const parsed = insertSopTemplateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid template data", errors: parsed.error.flatten() });
+      }
+      const template = await storage.createSopTemplate(parsed.data);
+      res.status(201).json(template);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating template" });
+    }
+  });
+
+  app.patch("/api/sop-templates/:id", requireAuth, async (req, res) => {
+    try {
+      const parsed = insertSopTemplateSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid template data", errors: parsed.error.flatten() });
+      }
+      const template = await storage.updateSopTemplate(req.params.id as string, parsed.data);
+      if (!template) return res.status(404).json({ message: "Template not found" });
+      res.json(template);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating template" });
+    }
+  });
+
+  app.delete("/api/sop-templates/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteSopTemplate(req.params.id as string);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting template" });
+    }
+  });
+
+  // SOP Examples (external references)
+  app.get("/api/sop-examples", requireAuth, async (req, res) => {
+    try {
+      const examples = await storage.getSopExamples();
+      res.json(examples);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching examples" });
+    }
+  });
+
+  app.post("/api/sop-examples", requireAuth, async (req, res) => {
+    try {
+      const parsed = insertSopExampleSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid example data", errors: parsed.error.flatten() });
+      }
+      const example = await storage.createSopExample(parsed.data);
+      res.status(201).json(example);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating example" });
+    }
+  });
+
+  app.patch("/api/sop-examples/:id", requireAuth, async (req, res) => {
+    try {
+      const parsed = insertSopExampleSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid example data", errors: parsed.error.flatten() });
+      }
+      const example = await storage.updateSopExample(req.params.id as string, parsed.data);
+      if (!example) return res.status(404).json({ message: "Example not found" });
+      res.json(example);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating example" });
+    }
+  });
+
+  app.delete("/api/sop-examples/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteSopExample(req.params.id as string);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting example" });
     }
   });
 

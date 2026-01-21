@@ -2,12 +2,14 @@ import React, { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Search, Plus, ArrowLeft, Edit, Trash2, Sparkles, Upload, FileText, 
   Link2, Loader2, Save, X, ChevronRight, ChevronDown, Archive, Copy, 
-  Move, MoreVertical, FolderPlus, Pencil, Check
+  Move, MoreVertical, FolderPlus, Pencil, Check, ExternalLink, FileUp,
+  LayoutTemplate, BookMarked, Image, File
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,12 +19,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import type { Sop, SopCategory } from "@shared/schema";
+import type { Sop, SopCategory, SopTemplate, SopExample } from "@shared/schema";
 
 export default function SOPs() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState("topics");
   const [search, setSearch] = useState("");
   const [selectedSOP, setSelectedSOP] = useState<Sop | null>(null);
   const [editingSOP, setEditingSOP] = useState<Sop | null>(null);
@@ -40,6 +43,11 @@ export default function SOPs() {
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [movingSopId, setMovingSopId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  
+  // Templates & Examples state
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [exampleDialogOpen, setExampleDialogOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<SopTemplate | null>(null);
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<SopCategory[]>({
     queryKey: ["/api/sop-categories"],
@@ -49,6 +57,13 @@ export default function SOPs() {
     queryKey: ["/api/sops"],
   });
 
+  const { data: templates = [] } = useQuery<SopTemplate[]>({
+    queryKey: ["/api/sop-templates"],
+  });
+
+  const { data: examples = [] } = useQuery<SopExample[]>({
+    queryKey: ["/api/sop-examples"],
+  });
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Sop>) => {
@@ -133,7 +148,7 @@ export default function SOPs() {
       queryClient.invalidateQueries({ queryKey: ["/api/sop-categories"] });
       setNewCategoryOpen(false);
       setNewCategoryName("");
-      toast({ title: "Category created" });
+      toast({ title: "Topic created" });
     },
   });
 
@@ -152,8 +167,8 @@ export default function SOPs() {
       queryClient.invalidateQueries({ queryKey: ["/api/sop-categories"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sops"] });
       setEditingCategoryId(null);
-      setSelectedSOP(null); // Clear selected SOP to ensure it shows fresh data
-      toast({ title: "Category renamed" });
+      setSelectedSOP(null);
+      toast({ title: "Topic renamed" });
     },
   });
 
@@ -167,7 +182,71 @@ export default function SOPs() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sop-categories"] });
-      toast({ title: "Category deleted" });
+      toast({ title: "Topic deleted" });
+    },
+  });
+
+  const createTemplateMutation = useMutation({
+    mutationFn: async (data: Partial<SopTemplate>) => {
+      const res = await fetch("/api/sop-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create template");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sop-templates"] });
+      setTemplateDialogOpen(false);
+      toast({ title: "Template created" });
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/sop-templates/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete template");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sop-templates"] });
+      toast({ title: "Template deleted" });
+    },
+  });
+
+  const createExampleMutation = useMutation({
+    mutationFn: async (data: Partial<SopExample>) => {
+      const res = await fetch("/api/sop-examples", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to save example");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sop-examples"] });
+      setExampleDialogOpen(false);
+      toast({ title: "Example saved" });
+    },
+  });
+
+  const deleteExampleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/sop-examples/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete example");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sop-examples"] });
+      toast({ title: "Example deleted" });
     },
   });
 
@@ -221,6 +300,17 @@ export default function SOPs() {
     setMoveDialogOpen(false);
     setMovingSopId(null);
     toast({ title: "SOP moved" });
+  };
+
+  const handleCreateFromTemplate = (template: SopTemplate) => {
+    const category = categories.find(c => c.id === template.categoryId);
+    createMutation.mutate({
+      title: template.name,
+      content: template.content,
+      category: category?.name || "General",
+      categoryId: template.categoryId || undefined,
+      ownerId: user?.id,
+    });
   };
 
   const handleAIGenerate = async () => {
@@ -332,103 +422,275 @@ export default function SOPs() {
           <p className="text-muted-foreground">Standard Operating Procedures & Knowledge Base</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button 
-            variant={showArchived ? "secondary" : "outline"} 
-            onClick={() => setShowArchived(!showArchived)}
-            size="sm"
-          >
-            <Archive className="w-4 h-4 mr-2" /> {showArchived ? "Showing Archived" : "Show Archived"}
-          </Button>
           <Button variant="outline" onClick={() => setAiGenerateOpen(true)} className="gap-2" data-testid="button-ai-generate-sop">
             <Sparkles className="w-4 h-4" /> Generate with AI
           </Button>
-          <Button variant="outline" onClick={() => setNewCategoryOpen(true)} className="gap-2">
-            <FolderPlus className="w-4 h-4" /> New Topic
+          <Button className="gap-2" onClick={() => setCreateOpen(true)} data-testid="button-new-sop">
+            <Plus className="w-4 h-4" /> New SOP
           </Button>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {categories.map(category => (
-            <CategoryDropdown
-              key={category.id}
-              category={category}
-              sops={getSopsForCategory(category.id)}
-              isExpanded={expandedCategories.has(category.id)}
-              onToggle={() => toggleCategory(category.id)}
-              search={categorySearch[category.id] || ""}
-              onSearchChange={(value) => setCategorySearch(prev => ({ ...prev, [category.id]: value }))}
-              onCreateSop={() => { setCreateCategoryId(category.id); setCreateOpen(true); }}
-              onSelectSop={setSelectedSOP}
-              onCopySop={(id) => copyMutation.mutate(id)}
-              onMoveSop={(id) => { setMovingSopId(id); setMoveDialogOpen(true); }}
-              onArchiveSop={handleArchive}
-              onDeleteSop={(id) => {
-                if (confirm("Are you sure you want to delete this SOP?")) {
-                  deleteMutation.mutate(id);
-                }
-              }}
-              isEditingName={editingCategoryId === category.id}
-              editingName={editingCategoryName}
-              onStartRename={() => { setEditingCategoryId(category.id); setEditingCategoryName(category.name); }}
-              onSaveRename={() => updateCategoryMutation.mutate({ id: category.id, name: editingCategoryName })}
-              onCancelRename={() => setEditingCategoryId(null)}
-              onNameChange={setEditingCategoryName}
-              onDeleteCategory={() => {
-                if (confirm("Delete this topic? SOPs within will become uncategorized.")) {
-                  deleteCategoryMutation.mutate(category.id);
-                }
-              }}
-            />
-          ))}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsTrigger value="topics" className="gap-2">
+            <FolderPlus className="w-4 h-4" /> Topics
+          </TabsTrigger>
+          <TabsTrigger value="templates" className="gap-2">
+            <LayoutTemplate className="w-4 h-4" /> Templates
+          </TabsTrigger>
+          <TabsTrigger value="examples" className="gap-2">
+            <BookMarked className="w-4 h-4" /> Examples
+          </TabsTrigger>
+        </TabsList>
 
-          {/* Uncategorized SOPs */}
-          {getUncategorizedSops().length > 0 && (
-            <Card className="border-dashed">
-              <CardHeader className="py-3">
-                <CardTitle className="text-sm text-muted-foreground">Uncategorized</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-2">
-                {getUncategorizedSops().map(sop => (
-                  <SopListItem
-                    key={sop.id}
-                    sop={sop}
-                    onSelect={() => setSelectedSOP(sop)}
-                    onCopy={() => copyMutation.mutate(sop.id)}
-                    onMove={() => { setMovingSopId(sop.id); setMoveDialogOpen(true); }}
-                    onArchive={() => handleArchive(sop)}
-                    onDelete={() => {
-                      if (confirm("Are you sure you want to delete this SOP?")) {
-                        deleteMutation.mutate(sop.id);
-                      }
-                    }}
-                  />
-                ))}
-              </CardContent>
-            </Card>
+        <TabsContent value="topics" className="space-y-4 mt-6">
+          <div className="flex gap-2 items-center justify-between">
+            <Button 
+              variant={showArchived ? "secondary" : "outline"} 
+              onClick={() => setShowArchived(!showArchived)}
+              size="sm"
+            >
+              <Archive className="w-4 h-4 mr-2" /> {showArchived ? "Showing Archived" : "Show Archived"}
+            </Button>
+            <Button variant="outline" onClick={() => setNewCategoryOpen(true)} size="sm" className="gap-2">
+              <FolderPlus className="w-4 h-4" /> New Topic
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {categories.map(category => (
+                <CategoryDropdown
+                  key={category.id}
+                  category={category}
+                  sops={getSopsForCategory(category.id)}
+                  isExpanded={expandedCategories.has(category.id)}
+                  onToggle={() => toggleCategory(category.id)}
+                  search={categorySearch[category.id] || ""}
+                  onSearchChange={(value) => setCategorySearch(prev => ({ ...prev, [category.id]: value }))}
+                  onCreateSop={() => { setCreateCategoryId(category.id); setCreateOpen(true); }}
+                  onSelectSop={setSelectedSOP}
+                  onCopySop={(id) => copyMutation.mutate(id)}
+                  onMoveSop={(id) => { setMovingSopId(id); setMoveDialogOpen(true); }}
+                  onArchiveSop={handleArchive}
+                  onDeleteSop={(id) => {
+                    if (confirm("Are you sure you want to delete this SOP?")) {
+                      deleteMutation.mutate(id);
+                    }
+                  }}
+                  isEditingName={editingCategoryId === category.id}
+                  editingName={editingCategoryName}
+                  onStartRename={() => { setEditingCategoryId(category.id); setEditingCategoryName(category.name); }}
+                  onSaveRename={() => updateCategoryMutation.mutate({ id: category.id, name: editingCategoryName })}
+                  onCancelRename={() => setEditingCategoryId(null)}
+                  onNameChange={setEditingCategoryName}
+                  onDeleteCategory={() => {
+                    if (confirm("Delete this topic? SOPs within will become uncategorized.")) {
+                      deleteCategoryMutation.mutate(category.id);
+                    }
+                  }}
+                />
+              ))}
+
+              {getUncategorizedSops().length > 0 && (
+                <Card className="border-dashed">
+                  <CardHeader className="py-3">
+                    <CardTitle className="text-sm text-muted-foreground">Uncategorized</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-2">
+                    {getUncategorizedSops().map(sop => (
+                      <SopListItem
+                        key={sop.id}
+                        sop={sop}
+                        onSelect={() => setSelectedSOP(sop)}
+                        onCopy={() => copyMutation.mutate(sop.id)}
+                        onMove={() => { setMovingSopId(sop.id); setMoveDialogOpen(true); }}
+                        onArchive={() => handleArchive(sop)}
+                        onDelete={() => {
+                          if (confirm("Are you sure you want to delete this SOP?")) {
+                            deleteMutation.mutate(sop.id);
+                          }
+                        }}
+                      />
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {categories.length === 0 && sops.length === 0 && (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No SOPs Yet</h3>
+                    <p className="text-muted-foreground mb-4 text-center">
+                      Create your first topic and start adding procedures.
+                    </p>
+                    <Button onClick={() => setNewCategoryOpen(true)}>
+                      <FolderPlus className="h-4 w-4 mr-2" /> Create Topic
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
+        </TabsContent>
 
-          {categories.length === 0 && sops.length === 0 && (
+        <TabsContent value="templates" className="space-y-4 mt-6">
+          <div className="flex justify-between items-center">
+            <p className="text-muted-foreground text-sm">
+              Create templates to quickly build SOPs with pre-filled content
+            </p>
+            <Button onClick={() => setTemplateDialogOpen(true)} size="sm" className="gap-2">
+              <Plus className="w-4 h-4" /> New Template
+            </Button>
+          </div>
+
+          {templates.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">No SOPs Yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Create your first topic and start adding procedures.
+                <LayoutTemplate className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Templates Yet</h3>
+                <p className="text-muted-foreground mb-4 text-center">
+                  Create templates to quickly generate SOPs with pre-filled sections.
                 </p>
-                <Button onClick={() => setNewCategoryOpen(true)}>
-                  <FolderPlus className="h-4 w-4 mr-2" /> Create Topic
+                <Button onClick={() => setTemplateDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" /> Create Template
                 </Button>
               </CardContent>
             </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {templates.map(template => (
+                <Card key={template.id} className="group hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-lg">{template.name}</CardTitle>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 h-8 w-8 p-0">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleCreateFromTemplate(template)}>
+                            <FileText className="h-4 w-4 mr-2" /> Create SOP from Template
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              if (confirm("Delete this template?")) {
+                                deleteTemplateMutation.mutate(template.id);
+                              }
+                            }}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    {template.description && (
+                      <CardDescription>{template.description}</CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    <Button 
+                      variant="outline" 
+                      className="w-full" 
+                      onClick={() => handleCreateFromTemplate(template)}
+                    >
+                      <FileText className="h-4 w-4 mr-2" /> Use Template
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
-        </div>
-      )}
+        </TabsContent>
+
+        <TabsContent value="examples" className="space-y-4 mt-6">
+          <div className="flex justify-between items-center">
+            <p className="text-muted-foreground text-sm">
+              Save external SOP examples for reference and training
+            </p>
+            <Button onClick={() => setExampleDialogOpen(true)} size="sm" className="gap-2">
+              <Plus className="w-4 h-4" /> Save Example
+            </Button>
+          </div>
+
+          {examples.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <BookMarked className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Examples Saved</h3>
+                <p className="text-muted-foreground mb-4 text-center">
+                  Save SOPs you find online for employees to reference as examples.
+                </p>
+                <Button onClick={() => setExampleDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" /> Save Example
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {examples.map(example => (
+                <Card key={example.id} className="group">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-lg">{example.title}</CardTitle>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="opacity-0 group-hover:opacity-100 h-8 w-8 p-0 text-destructive"
+                        onClick={() => {
+                          if (confirm("Delete this example?")) {
+                            deleteExampleMutation.mutate(example.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {example.description && (
+                      <CardDescription>{example.description}</CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {example.sourceUrl && (
+                      <a 
+                        href={example.sourceUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-primary hover:underline"
+                      >
+                        <ExternalLink className="h-4 w-4" /> View Source
+                      </a>
+                    )}
+                    {example.sourceFile && (
+                      <a 
+                        href={example.sourceFile} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-primary hover:underline"
+                      >
+                        <File className="h-4 w-4" /> View Document
+                      </a>
+                    )}
+                    {example.notes && (
+                      <p className="text-sm text-muted-foreground">{example.notes}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Create SOP Dialog */}
       <CreateSOPDialog 
@@ -471,6 +733,24 @@ export default function SOPs() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Template Dialog */}
+      <CreateTemplateDialog 
+        open={templateDialogOpen}
+        onOpenChange={setTemplateDialogOpen}
+        onSubmit={(data) => createTemplateMutation.mutate(data)}
+        isPending={createTemplateMutation.isPending}
+        categories={categories}
+      />
+
+      {/* Example Dialog */}
+      <CreateExampleDialog 
+        open={exampleDialogOpen}
+        onOpenChange={setExampleDialogOpen}
+        onSubmit={(data) => createExampleMutation.mutate(data)}
+        isPending={createExampleMutation.isPending}
+        categories={categories}
+      />
 
       {/* Move SOP Dialog */}
       <Dialog open={moveDialogOpen} onOpenChange={setMoveDialogOpen}>
@@ -768,12 +1048,56 @@ function CreateSOPDialog({
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState(defaultCategoryId || "");
   const [content, setContent] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
 
   React.useEffect(() => {
     if (defaultCategoryId) {
       setCategoryId(defaultCategoryId);
     }
   }, [defaultCategoryId]);
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const urlRes = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type,
+        }),
+        credentials: "include",
+      });
+      
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+      
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      
+      if (!uploadRes.ok) throw new Error("Upload failed");
+      
+      let insertHtml: string;
+      if (file.type.startsWith("image/")) {
+        insertHtml = `<img src="${objectPath}" alt="${file.name}" style="max-width: 100%; height: auto; margin: 1rem 0;" />\n`;
+      } else {
+        insertHtml = `<p><a href="${objectPath}" target="_blank" rel="noopener">📄 ${file.name}</a></p>\n`;
+      }
+      
+      setContent(prev => prev + insertHtml);
+      toast({ title: "File uploaded successfully" });
+    } catch (err) {
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -791,23 +1115,146 @@ function CreateSOPDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[700px]">
         <DialogHeader>
           <DialogTitle>Create New SOP</DialogTitle>
+          <DialogDescription>
+            Create a new standard operating procedure with text, images, documents, and links.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="title">Title</Label>
+              <Input 
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Morning Safety Check" 
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="category">Topic</Label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a topic" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="grid gap-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="content">Content</Label>
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileUp className="h-4 w-4 mr-1" />}
+                  Upload
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                  className="hidden"
+                  accept="image/*,.pdf,.doc,.docx,.txt"
+                />
+              </div>
+            </div>
+            <Textarea 
+              id="content"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="h-48" 
+              placeholder="Enter procedure steps, or upload documents and images..." 
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Upload documents, images, or paste content. You can edit and format after creating.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Create SOP
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreateTemplateDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+  isPending,
+  categories,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: Partial<SopTemplate>) => void;
+  isPending: boolean;
+  categories: SopCategory[];
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [content, setContent] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({ name, description, content, categoryId: categoryId || undefined });
+    setName("");
+    setDescription("");
+    setContent("");
+    setCategoryId("");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Create SOP Template</DialogTitle>
+          <DialogDescription>
+            Create a reusable template with pre-filled sections for quick SOP creation.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="grid gap-2">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="templateName">Template Name</Label>
             <Input 
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Morning Safety Check" 
+              id="templateName"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Equipment Inspection Template" 
               required
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="category">Topic</Label>
+            <Label htmlFor="templateDesc">Description (optional)</Label>
+            <Input 
+              id="templateDesc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Brief description of when to use this template" 
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="templateCategory">Default Topic (optional)</Label>
             <Select value={categoryId} onValueChange={setCategoryId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a topic" />
@@ -820,22 +1267,196 @@ function CreateSOPDialog({
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="content">Content</Label>
+            <Label htmlFor="templateContent">Template Content</Label>
             <Textarea 
-              id="content"
+              id="templateContent"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              className="h-40" 
-              placeholder="Step 1: ..." 
+              className="h-48" 
+              placeholder="<h2>Purpose</h2>&#10;[Describe the purpose of this procedure]&#10;&#10;<h2>Steps</h2>&#10;<ol>&#10;<li>Step 1</li>&#10;<li>Step 2</li>&#10;</ol>" 
               required
             />
-            <p className="text-xs text-muted-foreground">You can edit and format this content after creating the SOP.</p>
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={isPending}>
               {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Create SOP
+              Create Template
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreateExampleDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+  isPending,
+  categories,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: Partial<SopExample>) => void;
+  isPending: boolean;
+  categories: SopCategory[];
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [sourceFile, setSourceFile] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [notes, setNotes] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const urlRes = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type,
+        }),
+        credentials: "include",
+      });
+      
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+      
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      
+      if (!uploadRes.ok) throw new Error("Upload failed");
+      
+      setSourceFile(objectPath);
+      toast({ title: "Document uploaded successfully" });
+    } catch (err) {
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({ 
+      title, 
+      description, 
+      sourceUrl: sourceUrl || undefined, 
+      sourceFile: sourceFile || undefined,
+      categoryId: categoryId || undefined,
+      notes: notes || undefined,
+    });
+    setTitle("");
+    setDescription("");
+    setSourceUrl("");
+    setSourceFile("");
+    setCategoryId("");
+    setNotes("");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Save Example SOP</DialogTitle>
+          <DialogDescription>
+            Save an external SOP example for employees to reference and learn from.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          <div className="grid gap-2">
+            <Label htmlFor="exampleTitle">Title</Label>
+            <Input 
+              id="exampleTitle"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. OSHA Safety Checklist Example" 
+              required
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="exampleDesc">Description (optional)</Label>
+            <Input 
+              id="exampleDesc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Brief description of this example" 
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="exampleUrl">Source URL (optional)</Label>
+            <Input 
+              id="exampleUrl"
+              value={sourceUrl}
+              onChange={(e) => setSourceUrl(e.target.value)}
+              placeholder="https://example.com/sop-document" 
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Or Upload Document</Label>
+            <div className="flex gap-2">
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="flex-1"
+              >
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <FileUp className="h-4 w-4 mr-2" />
+                )}
+                {sourceFile ? "Document Uploaded" : "Upload Document"}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                className="hidden"
+                accept=".pdf,.doc,.docx,.txt,.xlsx,.xls"
+              />
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="exampleCategory">Related Topic (optional)</Label>
+            <Select value={categoryId} onValueChange={setCategoryId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a topic" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map(cat => (
+                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="exampleNotes">Notes (optional)</Label>
+            <Textarea 
+              id="exampleNotes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Any notes about this example..." 
+              rows={3}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Save Example
             </Button>
           </div>
         </form>

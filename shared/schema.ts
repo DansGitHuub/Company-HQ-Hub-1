@@ -71,6 +71,50 @@ export const insertSopSchema = createInsertSchema(sops).pick({
 export type InsertSop = z.infer<typeof insertSopSchema>;
 export type Sop = typeof sops.$inferSelect;
 
+// SOP Templates for quick creation
+export const sopTemplates = pgTable("sop_templates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  content: text("content").notNull(),
+  categoryId: varchar("category_id", { length: 36 }).references(() => sopCategories.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSopTemplateSchema = createInsertSchema(sopTemplates).pick({
+  name: true,
+  description: true,
+  content: true,
+  categoryId: true,
+});
+
+export type InsertSopTemplate = z.infer<typeof insertSopTemplateSchema>;
+export type SopTemplate = typeof sopTemplates.$inferSelect;
+
+// Example SOPs from external sources for reference
+export const sopExamples = pgTable("sop_examples", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  sourceUrl: text("source_url"),
+  sourceFile: text("source_file"),
+  categoryId: varchar("category_id", { length: 36 }).references(() => sopCategories.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSopExampleSchema = createInsertSchema(sopExamples).pick({
+  title: true,
+  description: true,
+  sourceUrl: true,
+  sourceFile: true,
+  categoryId: true,
+  notes: true,
+});
+
+export type InsertSopExample = z.infer<typeof insertSopExampleSchema>;
+export type SopExample = typeof sopExamples.$inferSelect;
+
 export const materials = pgTable("materials", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
