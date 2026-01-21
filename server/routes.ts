@@ -23,6 +23,10 @@ export async function registerRoutes(
     try {
       const { username, password, email, name, role } = req.body;
       
+      if (role === "Admin" && !req.user?.isMasterAdmin) {
+        return res.status(403).json({ message: "Only the master admin can create Admin users" });
+      }
+      
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
@@ -48,6 +52,19 @@ export async function registerRoutes(
       const id = req.params.id as string;
       const { name, email, role, isActive, password } = req.body;
       
+      const targetUser = await storage.getUser(id);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      if (targetUser.isMasterAdmin && req.user?.id !== id) {
+        return res.status(403).json({ message: "Cannot modify the master admin account" });
+      }
+      
+      if (role === "Admin" && !req.user?.isMasterAdmin) {
+        return res.status(403).json({ message: "Only the master admin can grant Admin access" });
+      }
+      
       const updates: Record<string, any> = {};
       if (name !== undefined) updates.name = name;
       if (email !== undefined) updates.email = email;
@@ -60,11 +77,7 @@ export async function registerRoutes(
       }
       
       const user = await storage.updateUser(id, updates);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      const { password: _, ...safeUser } = user;
+      const { password: _, ...safeUser } = user!;
       res.json(safeUser);
     } catch (err) {
       res.status(500).json({ message: "Error updating user" });
@@ -77,6 +90,15 @@ export async function registerRoutes(
       
       if (req.user?.id === id) {
         return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+      
+      const targetUser = await storage.getUser(id);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      if (targetUser.isMasterAdmin) {
+        return res.status(403).json({ message: "Cannot delete the master admin account" });
       }
       
       await storage.deleteUser(id);

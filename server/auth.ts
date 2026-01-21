@@ -101,7 +101,7 @@ export function setupAuth(app: Express) {
         password: await hashPassword(password),
         email,
         name,
-        role: role || "Crew",
+        role: "Customer",
       });
 
       req.login(user, (err) => {
