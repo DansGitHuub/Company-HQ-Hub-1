@@ -14,7 +14,8 @@ import {
   formSubmissions, type FormSubmission, type InsertFormSubmission,
   equipment, type Equipment, type InsertEquipment,
   maintenanceSchedules, type MaintenanceSchedule, type InsertMaintenanceSchedule,
-  maintenanceLogs, type MaintenanceLog, type InsertMaintenanceLog
+  maintenanceLogs, type MaintenanceLog, type InsertMaintenanceLog,
+  equipmentUploads, type EquipmentUpload, type InsertEquipmentUpload
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or } from "drizzle-orm";
@@ -109,6 +110,11 @@ export interface IStorage {
   // Maintenance Logs
   getMaintenanceLogs(equipmentId?: string): Promise<MaintenanceLog[]>;
   createMaintenanceLog(log: InsertMaintenanceLog): Promise<MaintenanceLog>;
+  
+  // Equipment Uploads
+  getEquipmentUploads(equipmentId: string): Promise<EquipmentUpload[]>;
+  createEquipmentUpload(upload: InsertEquipmentUpload): Promise<EquipmentUpload>;
+  deleteEquipmentUpload(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -450,6 +456,21 @@ export class DatabaseStorage implements IStorage {
   async createMaintenanceLog(log: InsertMaintenanceLog): Promise<MaintenanceLog> {
     const [newLog] = await db.insert(maintenanceLogs).values(log).returning();
     return newLog;
+  }
+
+  // Equipment Uploads methods
+  async getEquipmentUploads(equipmentId: string): Promise<EquipmentUpload[]> {
+    return await db.select().from(equipmentUploads).where(eq(equipmentUploads.equipmentId, equipmentId));
+  }
+
+  async createEquipmentUpload(upload: InsertEquipmentUpload): Promise<EquipmentUpload> {
+    const [newUpload] = await db.insert(equipmentUploads).values(upload).returning();
+    return newUpload;
+  }
+
+  async deleteEquipmentUpload(id: string): Promise<boolean> {
+    const result = await db.delete(equipmentUploads).where(eq(equipmentUploads.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 }
 

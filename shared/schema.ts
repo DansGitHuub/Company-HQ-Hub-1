@@ -431,3 +431,29 @@ export const insertMaintenanceLogSchema = createInsertSchema(maintenanceLogs).pi
 
 export type InsertMaintenanceLog = z.infer<typeof insertMaintenanceLogSchema>;
 export type MaintenanceLog = typeof maintenanceLogs.$inferSelect;
+
+// Equipment Uploads (receipts, photos, documents)
+export const equipmentUploads = pgTable("equipment_uploads", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  equipmentId: varchar("equipment_id", { length: 36 }).references(() => equipment.id).notNull(),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: text("file_type").notNull(), // image, document, receipt
+  workType: text("work_type"), // e.g., "Oil Change", "Tire Replacement", "Repair"
+  description: text("description"),
+  uploadedBy: varchar("uploaded_by", { length: 36 }).references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+export const insertEquipmentUploadSchema = createInsertSchema(equipmentUploads).pick({
+  equipmentId: true,
+  fileName: true,
+  fileUrl: true,
+  fileType: true,
+  workType: true,
+  description: true,
+  uploadedBy: true,
+});
+
+export type InsertEquipmentUpload = z.infer<typeof insertEquipmentUploadSchema>;
+export type EquipmentUpload = typeof equipmentUploads.$inferSelect;

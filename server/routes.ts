@@ -5,6 +5,12 @@ import { setupAuth, requireAuth, requireAdmin, hashPassword } from "./auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { sendMaintenanceReminderEmail } from "./email";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -148,6 +154,44 @@ export async function registerRoutes(
       res.sendStatus(204);
     } catch (err) {
       res.status(500).json({ message: "Error deleting SOP" });
+    }
+  });
+
+  app.post("/api/ai/generate-sop", requireAuth, async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ message: "Prompt is required" });
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert at creating Standard Operating Procedures (SOPs) for landscape installation and maintenance businesses. 
+            When given a topic, create a comprehensive, well-structured SOP.
+            Format your response as JSON with these fields:
+            - title: A clear, concise title for the SOP
+            - category: One of [Operations, Sales, Installation, Equipment, Safety, HR, Customer Service, General]
+            - content: The full SOP content formatted in HTML with proper headings (h2, h3), numbered/bulleted lists, and clear sections
+            
+            Make the content practical, detailed, and professional. Include safety considerations where relevant.`
+          },
+          {
+            role: "user",
+            content: `Create an SOP for: ${prompt}`
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 2048,
+      });
+
+      const result = JSON.parse(completion.choices[0]?.message?.content || "{}");
+      res.json(result);
+    } catch (err: any) {
+      console.error("AI SOP generation error:", err);
+      res.status(500).json({ message: "AI generation failed", error: err.message });
     }
   });
 
@@ -713,6 +757,38 @@ export async function registerRoutes(
       });
     } catch (err) {
       res.status(500).json({ message: "Error sending maintenance reminders" });
+    }
+  });
+
+  // Equipment Uploads routes
+  app.get("/api/equipment/:equipmentId/uploads", requireAuth, async (req, res) => {
+    try {
+      const uploads = await storage.getEquipmentUploads(req.params.equipmentId as string);
+      res.json(uploads);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching equipment uploads" });
+    }
+  });
+
+  app.post("/api/equipment/:equipmentId/uploads", requireAuth, async (req, res) => {
+    try {
+      const upload = await storage.createEquipmentUpload({
+        ...req.body,
+        equipmentId: req.params.equipmentId as string,
+        uploadedBy: req.user!.id,
+      });
+      res.status(201).json(upload);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating equipment upload" });
+    }
+  });
+
+  app.delete("/api/equipment-uploads/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteEquipmentUpload(req.params.id as string);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting equipment upload" });
     }
   });
 

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Wrench, Truck, Settings, Calendar, AlertTriangle, ChevronDown, ChevronUp, Trash2, Edit2 } from "lucide-react";
+import { Plus, Wrench, Truck, Settings, Calendar, AlertTriangle, ChevronDown, ChevronUp, Trash2, Edit2, Upload, FileText, Image, Receipt, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import type { Equipment, MaintenanceSchedule, MaintenanceLog } from "@shared/schema";
+import type { Equipment, MaintenanceSchedule, MaintenanceLog, EquipmentUpload } from "@shared/schema";
 
 export default function EquipmentTracker() {
   const queryClient = useQueryClient();
@@ -414,6 +414,10 @@ export default function EquipmentTracker() {
                       <TabsTrigger value="details">Details</TabsTrigger>
                       <TabsTrigger value="schedules">Maintenance ({getEquipmentSchedules(item.id).length})</TabsTrigger>
                       <TabsTrigger value="history">History ({getEquipmentLogs(item.id).length})</TabsTrigger>
+                      <TabsTrigger value="uploads">
+                        <Upload className="h-4 w-4 mr-1" />
+                        Documents
+                      </TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="details" className="mt-4">
@@ -521,6 +525,10 @@ export default function EquipmentTracker() {
                           ))
                         )}
                       </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="uploads" className="mt-4">
+                      <EquipmentUploadsTab equipmentId={item.id} />
                     </TabsContent>
                   </Tabs>
                 </CardContent>
@@ -702,6 +710,263 @@ export default function EquipmentTracker() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function EquipmentUploadsTab({ equipmentId }: { equipmentId: string }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [workType, setWorkType] = useState("");
+  const [description, setDescription] = useState("");
+
+  const { data: uploads = [], isLoading } = useQuery<EquipmentUpload[]>({
+    queryKey: [`/api/equipment/${equipmentId}/uploads`],
+  });
+
+  const createUpload = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch(`/api/equipment/${equipmentId}/uploads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create upload");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/equipment/${equipmentId}/uploads`] });
+      setUploadDialogOpen(false);
+      setSelectedFile(null);
+      setWorkType("");
+      setDescription("");
+      toast({ title: "Document uploaded successfully" });
+    },
+  });
+
+  const deleteUpload = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/equipment-uploads/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete upload");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/equipment/${equipmentId}/uploads`] });
+      toast({ title: "Document deleted" });
+    },
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    
+    setUploading(true);
+    try {
+      const urlRes = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: selectedFile.name,
+          size: selectedFile.size,
+          contentType: selectedFile.type,
+        }),
+        credentials: "include",
+      });
+      
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+      
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: selectedFile,
+        headers: { "Content-Type": selectedFile.type },
+      });
+      
+      if (!uploadRes.ok) throw new Error("Upload failed");
+      
+      const fileType = selectedFile.type.startsWith("image/") ? "image" : 
+                       selectedFile.name.toLowerCase().includes("receipt") ? "receipt" : "document";
+      
+      await createUpload.mutateAsync({
+        fileName: selectedFile.name,
+        fileUrl: objectPath,
+        fileType,
+        workType: workType || null,
+        description: description || null,
+      });
+    } catch (err) {
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const getFileIcon = (fileType: string) => {
+    switch (fileType) {
+      case "image": return <Image className="h-5 w-5 text-blue-500" />;
+      case "receipt": return <Receipt className="h-5 w-5 text-green-500" />;
+      default: return <FileText className="h-5 w-5 text-gray-500" />;
+    }
+  };
+
+  const sortedUploads = [...uploads].sort((a, b) => 
+    new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime()
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-muted-foreground">
+          Upload receipts, photos, and documents for this equipment
+        </p>
+        <Button onClick={() => setUploadDialogOpen(true)} size="sm" data-testid="button-upload-document">
+          <Upload className="h-4 w-4 mr-2" />
+          Upload Document
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      ) : sortedUploads.length === 0 ? (
+        <div className="text-center py-8 border-2 border-dashed rounded-lg">
+          <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+          <p className="text-muted-foreground">No documents uploaded yet</p>
+          <p className="text-sm text-muted-foreground">Upload receipts, maintenance records, or photos</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {sortedUploads.map((upload) => (
+            <div key={upload.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+              <div className="flex items-center gap-3">
+                {getFileIcon(upload.fileType)}
+                <div>
+                  <a 
+                    href={upload.fileUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="font-medium hover:underline"
+                  >
+                    {upload.fileName}
+                  </a>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>{new Date(upload.uploadedAt || 0).toLocaleDateString()}</span>
+                    {upload.workType && (
+                      <>
+                        <span>•</span>
+                        <Badge variant="outline" className="text-xs">{upload.workType}</Badge>
+                      </>
+                    )}
+                    {upload.description && (
+                      <>
+                        <span>•</span>
+                        <span className="truncate max-w-[200px]">{upload.description}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => deleteUpload.mutate(upload.id)}
+                disabled={deleteUpload.isPending}
+              >
+                <X className="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+            <DialogDescription>
+              Upload a receipt, photo, or document for this equipment
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>File</Label>
+              <div className="mt-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept="image/*,.pdf,.doc,.docx"
+                />
+                <Button 
+                  variant="outline" 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full"
+                >
+                  {selectedFile ? selectedFile.name : "Choose file..."}
+                </Button>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="workType">Work/Repair Type</Label>
+              <Select value={workType} onValueChange={setWorkType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Oil Change">Oil Change</SelectItem>
+                  <SelectItem value="Tire Replacement">Tire Replacement</SelectItem>
+                  <SelectItem value="Brake Service">Brake Service</SelectItem>
+                  <SelectItem value="Engine Repair">Engine Repair</SelectItem>
+                  <SelectItem value="Transmission">Transmission</SelectItem>
+                  <SelectItem value="Inspection">Inspection</SelectItem>
+                  <SelectItem value="Insurance">Insurance</SelectItem>
+                  <SelectItem value="Registration">Registration</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="uploadDescription">Description</Label>
+              <Textarea 
+                id="uploadDescription"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Brief description of this document..."
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleUpload} disabled={!selectedFile || uploading}>
+                {uploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
