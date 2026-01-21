@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { 
   Plus, 
   Settings, 
@@ -37,10 +39,35 @@ import {
   Sparkles,
   Palette,
   Minus,
-  MoreHorizontal
+  MoreHorizontal,
+  FolderPlus,
+  Folder,
+  LayoutTemplate,
+  ChevronRight,
+  Pencil
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+
+type FormFolder = {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  sortOrder: number;
+  createdAt: string;
+};
+
+type FormTemplate = {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  fields: FormField[];
+  styling?: FormStyling;
+  folderId?: string;
+  createdAt: string;
+};
 
 type FormField = {
   id: string;
@@ -130,10 +157,26 @@ export default function Forms() {
   const [editingForm, setEditingForm] = useState<CustomForm | null>(null);
   const [previewForm, setPreviewForm] = useState<CustomForm | null>(null);
   const [fillForm, setFillForm] = useState<CustomForm | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [newFolderColor, setNewFolderColor] = useState("#6366f1");
   const isAdmin = user?.role === "Admin";
 
   const { data: forms = [], isLoading } = useQuery<CustomForm[]>({
     queryKey: ["/api/forms"],
+  });
+
+  const { data: folders = [] } = useQuery<FormFolder[]>({
+    queryKey: ["/api/form-folders"],
+  });
+
+  const { data: templates = [] } = useQuery<FormTemplate[]>({
+    queryKey: ["/api/form-templates"],
   });
 
   const { data: allSubmissions = [] } = useQuery<FormSubmission[]>({
@@ -151,22 +194,237 @@ export default function Forms() {
     },
   });
 
+  const createFolderMutation = useMutation({
+    mutationFn: async (data: { name: string; color: string }) => {
+      const res = await apiRequest("POST", "/api/form-folders", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/form-folders"] });
+      setFolderDialogOpen(false);
+      setNewFolderName("");
+      toast({ title: "Folder created" });
+    },
+  });
+
+  const deleteFolderMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/form-folders/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/form-folders"] });
+      if (selectedFolderId) setSelectedFolderId(null);
+      toast({ title: "Folder deleted" });
+    },
+  });
+
+  const createTemplateMutation = useMutation({
+    mutationFn: async (data: Partial<FormTemplate>) => {
+      const res = await apiRequest("POST", "/api/form-templates", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/form-templates"] });
+      setTemplateDialogOpen(false);
+      toast({ title: "Template saved" });
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/form-templates/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/form-templates"] });
+      toast({ title: "Template deleted" });
+    },
+  });
+
+  const createFormFromTemplateMutation = useMutation({
+    mutationFn: async (template: FormTemplate) => {
+      const res = await apiRequest("POST", "/api/forms", {
+        title: template.name,
+        description: template.description,
+        category: template.category,
+        fields: template.fields,
+        styling: template.styling,
+        folderId: template.folderId,
+        isPublished: false,
+      });
+      return res.json();
+    },
+    onSuccess: (form) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
+      setEditingForm(form);
+      toast({ title: "Form created from template" });
+    },
+  });
+
+  const createFormFromAIMutation = useMutation({
+    mutationFn: async (formData: any) => {
+      const res = await apiRequest("POST", "/api/forms", {
+        title: formData.title || "AI Generated Form",
+        description: formData.description,
+        category: formData.category || "General",
+        fields: formData.fields.map((f: any) => ({
+          id: crypto.randomUUID(),
+          type: f.type || "text",
+          label: f.label || "Field",
+          placeholder: f.placeholder || "",
+          required: f.required || false,
+          options: f.options,
+        })),
+        isPublished: false,
+      });
+      return res.json();
+    },
+    onSuccess: (form) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
+      setEditingForm(form);
+      setAiDialogOpen(false);
+      setAiPrompt("");
+      toast({ title: "Form created with AI" });
+    },
+  });
+
+  const generateFormWithAI = async () => {
+    if (!aiPrompt.trim()) return;
+    setAiGenerating(true);
+    try {
+      const res = await fetch("/api/ai/generate-form", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ prompt: aiPrompt }),
+      });
+      if (!res.ok) throw new Error("AI generation failed");
+      const formData = await res.json();
+      await createFormFromAIMutation.mutateAsync(formData);
+    } catch (err) {
+      toast({ title: "AI generation failed", variant: "destructive" });
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   const publishedForms = forms.filter(f => f.isPublished);
   const draftForms = forms.filter(f => !f.isPublished);
+  
+  const getFormsForFolder = (folderId: string | null) => {
+    if (folderId === null) return publishedForms;
+    return publishedForms.filter(f => (f as any).folderId === folderId);
+  };
+
+  const getDraftsForFolder = (folderId: string | null) => {
+    if (folderId === null) return draftForms;
+    return draftForms.filter(f => (f as any).folderId === folderId);
+  };
+
+  const displayedForms = getFormsForFolder(selectedFolderId);
+  const displayedDrafts = getDraftsForFolder(selectedFolderId);
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Forms Library</h1>
-          <p className="text-muted-foreground">Create and manage digital forms for hiring, compliance, and operations</p>
+    <div className="flex gap-6">
+      {/* Folder Sidebar */}
+      {isAdmin && (
+        <div className="w-56 flex-shrink-0">
+          <Card className="sticky top-4">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm">Folders</CardTitle>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setFolderDialogOpen(true)}>
+                  <FolderPlus className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-1">
+                <button
+                  onClick={() => setSelectedFolderId(null)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${selectedFolderId === null ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'}`}
+                >
+                  <FileText className="h-4 w-4" />
+                  All Forms
+                  <Badge variant="secondary" className="ml-auto text-xs">{publishedForms.length}</Badge>
+                </button>
+                {folders.map(folder => (
+                  <div key={folder.id} className="group flex items-center">
+                    <button
+                      onClick={() => setSelectedFolderId(folder.id)}
+                      className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${selectedFolderId === folder.id ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'}`}
+                    >
+                      <Folder className="h-4 w-4" style={{ color: folder.color }} />
+                      <span className="truncate">{folder.name}</span>
+                      <Badge variant="secondary" className="ml-auto text-xs">{getFormsForFolder(folder.id).length}</Badge>
+                    </button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100">
+                          <MoreHorizontal className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="text-destructive" onClick={() => {
+                          if (confirm("Delete this folder? Forms inside will be moved to 'All Forms'.")) {
+                            deleteFolderMutation.mutate(folder.id);
+                          }
+                        }}>
+                          <Trash2 className="h-4 w-4 mr-2" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ))}
+              </div>
+
+              <Separator className="my-3" />
+
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground px-2 mb-1">Quick Actions</p>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="w-full justify-start gap-2 h-8"
+                  onClick={() => setTemplateDialogOpen(true)}
+                >
+                  <LayoutTemplate className="h-4 w-4" /> Templates
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="w-full justify-start gap-2 h-8"
+                  onClick={() => setAiDialogOpen(true)}
+                >
+                  <Sparkles className="h-4 w-4" /> AI Builder
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-        {isAdmin && (
-          <Button className="gap-2" onClick={() => setCreateOpen(true)} data-testid="button-new-form">
-            <Plus className="w-4 h-4"/> New Form
-          </Button>
-        )}
-      </div>
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-heading font-bold text-foreground">Forms Library</h1>
+            <p className="text-muted-foreground">
+              {selectedFolderId ? folders.find(f => f.id === selectedFolderId)?.name : "Create and manage digital forms for hiring, compliance, and operations"}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {isAdmin && (
+              <>
+                <Button variant="outline" className="gap-2" onClick={() => setAiDialogOpen(true)}>
+                  <Sparkles className="w-4 h-4"/> AI Builder
+                </Button>
+                <Button className="gap-2" onClick={() => setCreateOpen(true)} data-testid="button-new-form">
+                  <Plus className="w-4 h-4"/> New Form
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
 
       <Tabs defaultValue="library" className="w-full">
         <TabsList>
@@ -305,6 +563,149 @@ export default function Forms() {
           onOpenChange={(open) => !open && setFillForm(null)}
         />
       )}
+
+      {/* Folder Dialog */}
+      <Dialog open={folderDialogOpen} onOpenChange={setFolderDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Folder</DialogTitle>
+            <DialogDescription>Organize your forms into folders by category.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="folderName">Folder Name</Label>
+              <Input
+                id="folderName"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="e.g., Hiring Forms"
+              />
+            </div>
+            <div>
+              <Label>Color</Label>
+              <div className="flex gap-2 mt-2">
+                {["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"].map(color => (
+                  <button
+                    key={color}
+                    className={`w-8 h-8 rounded-full border-2 ${newFolderColor === color ? 'border-foreground' : 'border-transparent'}`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setNewFolderColor(color)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFolderDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => createFolderMutation.mutate({ name: newFolderName, color: newFolderColor })}
+              disabled={!newFolderName.trim() || createFolderMutation.isPending}
+            >
+              {createFolderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Create Folder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template Dialog */}
+      <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Form Templates</DialogTitle>
+            <DialogDescription>Use templates to quickly create forms with pre-built fields.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {templates.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <LayoutTemplate className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No templates saved yet</p>
+                <p className="text-sm">Save forms as templates for quick reuse</p>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {templates.map(template => (
+                  <Card key={template.id} className="group hover:shadow-sm transition-shadow">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium">{template.name}</h4>
+                        <p className="text-sm text-muted-foreground">{template.description || `${(template.fields as FormField[]).length} fields`}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          onClick={() => createFormFromTemplateMutation.mutate(template)}
+                          disabled={createFormFromTemplateMutation.isPending}
+                        >
+                          Use Template
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            if (confirm("Delete this template?")) {
+                              deleteTemplateMutation.mutate(template.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTemplateDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Builder Dialog */}
+      <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              AI Form Builder
+            </DialogTitle>
+            <DialogDescription>
+              Describe the form you need and AI will create it for you.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="aiPrompt">What form do you need?</Label>
+              <Textarea
+                id="aiPrompt"
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="e.g., A job application form for landscape crew members with contact info, experience, and references"
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAiDialogOpen(false)}>Cancel</Button>
+            <Button onClick={generateFormWithAI} disabled={aiGenerating || !aiPrompt.trim()}>
+              {aiGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate Form
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      </div>
     </div>
   );
 }

@@ -122,6 +122,11 @@ Preferred communication style: Simple, everyday language.
 - 8 field types: text, textarea, number, email, date, select, checkbox, radio
 - Draft/published workflow with access level controls
 - Admin-only submission viewing
+- **Folder Organization**: Admins can create colored folders to categorize forms
+- **Form Templates**: Save and reuse form structures with pre-built fields
+- **AI Form Builder**: Generate forms from natural language descriptions using OpenAI GPT-4o-mini
+- Database tables: custom_forms, form_submissions, form_folders, form_templates
+- API routes: /api/forms, /api/form-submissions, /api/form-folders, /api/form-templates, /api/ai/generate-form
 
 ### Help System
 - Interactive walkthroughs for new users with role-specific paths
