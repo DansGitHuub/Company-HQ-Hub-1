@@ -50,10 +50,21 @@ Preferred communication style: Simple, everyday language.
 - **Work Requests**: Customer service requests with service type, urgency, and status workflow
 
 ### Role-Based Access Control
-- **Admin**: Full access to all features including user management, company settings, inbox, and admin panel
+- **Master Admin**: Designated via `isMasterAdmin` flag; only master admin can grant Admin role or delete/modify protected accounts
+- **Admin**: Full access to all features including user management, company settings, inbox, and admin panel (except cannot modify master admin)
 - **Manager**: Team features plus access to customer inbox
 - **Crew**: Basic operational features (SOPs, Materials, Jobs, Hiring)
-- **Customer**: Dedicated portal for messaging, work requests, and customer resources
+- **Customer**: Dedicated portal for messaging, work requests, and customer resources; can request role upgrades
+
+### Access Request System
+- Users can request role upgrades through the Customer Portal "Account Access" card
+- Access requests go to Admin Panel "Access Requests" tab for review
+- Only master admin can approve requests for Admin role
+- Approved requests automatically update the user's role
+
+### Registration Security
+- All new public registrations default to Customer role (hardcoded)
+- Admins can manually create users with other roles via Admin Panel
 
 ### Build System
 - **Dev Server**: Vite for frontend with HMR
