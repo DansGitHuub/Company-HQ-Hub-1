@@ -522,6 +522,32 @@ export async function registerRoutes(
     }
   });
 
+  // One-time master admin setup endpoint
+  app.post("/api/setup-master-admin", requireAuth, async (req, res) => {
+    try {
+      const { setupCode } = req.body;
+      const expectedCode = process.env.ADMIN_SETUP_CODE;
+      
+      if (!expectedCode) {
+        return res.status(403).json({ message: "Setup not available" });
+      }
+      
+      if (setupCode !== expectedCode) {
+        return res.status(403).json({ message: "Invalid setup code" });
+      }
+      
+      // Promote current user to master admin
+      await storage.updateUser(req.user!.id, {
+        role: "Admin",
+        isMasterAdmin: true,
+      });
+      
+      res.json({ message: "You are now the master admin!" });
+    } catch (err) {
+      res.status(500).json({ message: "Error during setup" });
+    }
+  });
+
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 
