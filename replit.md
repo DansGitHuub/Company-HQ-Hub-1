@@ -124,3 +124,9 @@ Preferred communication style: Simple, everyday language.
 - Interactive walkthroughs for new users with role-specific paths
 - FAQ section with expandable answers
 - Step-by-step dialogs guiding users through features
+
+### User Profiles
+- All users can create and edit their own profile
+- Profile fields: name, email, phone, bio
+- Profile picture upload with cloud storage (Replit Object Storage)
+- Accessible from navigation sidebar for all user roles
