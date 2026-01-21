@@ -284,6 +284,65 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/candidates/:id", requireAuth, async (req, res) => {
+    try {
+      const candidate = await storage.getCandidate(req.params.id as string);
+      if (!candidate) return res.status(404).json({ message: "Candidate not found" });
+      res.json(candidate);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching candidate" });
+    }
+  });
+
+  app.delete("/api/candidates/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteCandidate(req.params.id as string);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting candidate" });
+    }
+  });
+
+  app.get("/api/candidates/:id/documents", requireAuth, async (req, res) => {
+    try {
+      const documents = await storage.getCandidateDocuments(req.params.id as string);
+      res.json(documents);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching candidate documents" });
+    }
+  });
+
+  app.post("/api/candidates/:id/documents", requireAuth, async (req, res) => {
+    try {
+      const doc = await storage.createCandidateDocument({
+        candidateId: req.params.id as string,
+        ...req.body,
+      });
+      res.status(201).json(doc);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating candidate document" });
+    }
+  });
+
+  app.patch("/api/candidate-documents/:id", requireAuth, async (req, res) => {
+    try {
+      const doc = await storage.updateCandidateDocument(req.params.id as string, req.body);
+      if (!doc) return res.status(404).json({ message: "Document not found" });
+      res.json(doc);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating candidate document" });
+    }
+  });
+
+  app.delete("/api/candidate-documents/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteCandidateDocument(req.params.id as string);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting candidate document" });
+    }
+  });
+
   app.get("/api/campaigns", requireAuth, async (req, res) => {
     try {
       const campaigns = await storage.getCampaigns();
@@ -318,6 +377,92 @@ export async function registerRoutes(
       res.json(job);
     } catch (err) {
       res.status(500).json({ message: "Error updating job" });
+    }
+  });
+
+  app.get("/api/jobs/:id", requireAuth, async (req, res) => {
+    try {
+      const job = await storage.getJob(req.params.id as string);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+      res.json(job);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching job" });
+    }
+  });
+
+  app.delete("/api/jobs/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteJob(req.params.id as string);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting job" });
+    }
+  });
+
+  app.get("/api/jobs/:id/documents", requireAuth, async (req, res) => {
+    try {
+      const documents = await storage.getJobDocuments(req.params.id as string);
+      res.json(documents);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching job documents" });
+    }
+  });
+
+  app.post("/api/jobs/:id/documents", requireAuth, async (req, res) => {
+    try {
+      const doc = await storage.createJobDocument({
+        jobId: req.params.id as string,
+        ...req.body,
+      });
+      res.status(201).json(doc);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating job document" });
+    }
+  });
+
+  app.delete("/api/job-documents/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteJobDocument(req.params.id as string);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting job document" });
+    }
+  });
+
+  app.get("/api/job-pipeline-tabs", requireAuth, async (req, res) => {
+    try {
+      const tabs = await storage.getJobPipelineTabs();
+      res.json(tabs);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching job pipeline tabs" });
+    }
+  });
+
+  app.post("/api/job-pipeline-tabs", requireAuth, async (req, res) => {
+    try {
+      const tab = await storage.createJobPipelineTab(req.body);
+      res.status(201).json(tab);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating job pipeline tab" });
+    }
+  });
+
+  app.patch("/api/job-pipeline-tabs/:id", requireAuth, async (req, res) => {
+    try {
+      const tab = await storage.updateJobPipelineTab(req.params.id as string, req.body);
+      if (!tab) return res.status(404).json({ message: "Tab not found" });
+      res.json(tab);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating job pipeline tab" });
+    }
+  });
+
+  app.delete("/api/job-pipeline-tabs/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteJobPipelineTab(req.params.id as string);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting job pipeline tab" });
     }
   });
 

@@ -77,16 +77,27 @@ export const insertMaterialSchema = createInsertSchema(materials).pick({
 export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
 export type Material = typeof materials.$inferSelect;
 
+export type CandidateJobType = "Crew Member" | "Crew Lead" | "Manager" | "Office" | "Sales";
+export type CandidateWorkType = "Maintenance" | "Project";
+export type CandidateRating = "green" | "yellow" | "red" | null;
+
 export const candidates = pgTable("candidates", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   role: text("role").notNull(),
   stage: text("stage").notNull().default("Applied"),
   appliedDate: timestamp("applied_date").defaultNow(),
-  rating: integer("rating").default(0),
+  rating: text("rating").$type<CandidateRating>(),
   email: text("email"),
   phone: text("phone"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
+  jobType: text("job_type").$type<CandidateJobType>(),
+  workType: text("work_type").$type<CandidateWorkType>(),
   notes: text("notes"),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertCandidateSchema = createInsertSchema(candidates).pick({
@@ -95,11 +106,42 @@ export const insertCandidateSchema = createInsertSchema(candidates).pick({
   stage: true,
   email: true,
   phone: true,
+  address: true,
+  city: true,
+  state: true,
+  zip: true,
+  jobType: true,
+  workType: true,
   notes: true,
+  rating: true,
 });
 
 export type InsertCandidate = z.infer<typeof insertCandidateSchema>;
 export type Candidate = typeof candidates.$inferSelect;
+
+// Candidate Documents (uploaded files like license, W-4, etc.)
+export const candidateDocuments = pgTable("candidate_documents", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  candidateId: varchar("candidate_id", { length: 36 }).references(() => candidates.id).notNull(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // license, application, w4, handbook, etc.
+  url: text("url").notNull(),
+  requiresAcknowledgment: boolean("requires_acknowledgment").default(false),
+  acknowledged: boolean("acknowledged").default(false),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+export const insertCandidateDocumentSchema = createInsertSchema(candidateDocuments).pick({
+  candidateId: true,
+  name: true,
+  type: true,
+  url: true,
+  requiresAcknowledgment: true,
+});
+
+export type InsertCandidateDocument = z.infer<typeof insertCandidateDocumentSchema>;
+export type CandidateDocument = typeof candidateDocuments.$inferSelect;
 
 export const campaigns = pgTable("campaigns", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -122,30 +164,93 @@ export const insertCampaignSchema = createInsertSchema(campaigns).pick({
 export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
 export type Campaign = typeof campaigns.$inferSelect;
 
+export type JobCategory = "Project" | "Maintenance";
+
 export const jobs = pgTable("jobs", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   client: text("client").notNull(),
   type: text("type").notNull(),
+  category: text("category").$type<JobCategory>().default("Project"),
   stage: text("stage").notNull().default("Lead"),
   value: integer("value").default(0),
   scheduledDate: timestamp("scheduled_date"),
+  completionDate: timestamp("completion_date"),
+  isMandatoryDate: boolean("is_mandatory_date").default(false),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
+  estimatedHours: integer("estimated_hours"),
+  estimatedDays: integer("estimated_days"),
+  contactName: text("contact_name"),
+  contactPhone: text("contact_phone"),
+  contactEmail: text("contact_email"),
   zone: text("zone"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertJobSchema = createInsertSchema(jobs).pick({
   client: true,
   type: true,
+  category: true,
   stage: true,
   value: true,
   scheduledDate: true,
+  completionDate: true,
+  isMandatoryDate: true,
+  address: true,
+  city: true,
+  state: true,
+  zip: true,
+  estimatedHours: true,
+  estimatedDays: true,
+  contactName: true,
+  contactPhone: true,
+  contactEmail: true,
   zone: true,
   notes: true,
 });
 
 export type InsertJob = z.infer<typeof insertJobSchema>;
 export type Job = typeof jobs.$inferSelect;
+
+// Job Documents (permits, OUPS, contracts, designs, etc.)
+export const jobDocuments = pgTable("job_documents", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id).notNull(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // permit, oups, contract, design, sketch, other
+  url: text("url").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+export const insertJobDocumentSchema = createInsertSchema(jobDocuments).pick({
+  jobId: true,
+  name: true,
+  type: true,
+  url: true,
+});
+
+export type InsertJobDocument = z.infer<typeof insertJobDocumentSchema>;
+export type JobDocument = typeof jobDocuments.$inferSelect;
+
+// Job Pipeline Tabs (for organizing jobs by custom categories)
+export const jobPipelineTabs = pgTable("job_pipeline_tabs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertJobPipelineTabSchema = createInsertSchema(jobPipelineTabs).pick({
+  name: true,
+  sortOrder: true,
+});
+
+export type InsertJobPipelineTab = z.infer<typeof insertJobPipelineTabSchema>;
+export type JobPipelineTab = typeof jobPipelineTabs.$inferSelect;
 
 export const integrations = pgTable("integrations", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),

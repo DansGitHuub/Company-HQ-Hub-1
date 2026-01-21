@@ -3,8 +3,11 @@ import {
   sops, type Sop, type InsertSop,
   materials, type Material, type InsertMaterial,
   candidates, type Candidate, type InsertCandidate,
+  candidateDocuments, type CandidateDocument, type InsertCandidateDocument,
   campaigns, type Campaign, type InsertCampaign,
   jobs, type Job, type InsertJob,
+  jobDocuments, type JobDocument, type InsertJobDocument,
+  jobPipelineTabs, type JobPipelineTab, type InsertJobPipelineTab,
   integrations,
   featureRequests, type FeatureRequest, type InsertFeatureRequest,
   customerMessages, type CustomerMessage, type InsertCustomerMessage,
@@ -58,13 +61,29 @@ export interface IStorage {
   updateCandidate(id: string, updates: Partial<Candidate>): Promise<Candidate | undefined>;
   deleteCandidate(id: string): Promise<boolean>;
   
+  getCandidateDocuments(candidateId: string): Promise<CandidateDocument[]>;
+  createCandidateDocument(doc: InsertCandidateDocument): Promise<CandidateDocument>;
+  updateCandidateDocument(id: string, updates: Partial<CandidateDocument>): Promise<CandidateDocument | undefined>;
+  deleteCandidateDocument(id: string): Promise<boolean>;
+  
   getCampaigns(): Promise<Campaign[]>;
   createCampaign(campaign: InsertCampaign): Promise<Campaign>;
   
   getJobs(): Promise<Job[]>;
+  getJobsByCategory(category: string): Promise<Job[]>;
   getJob(id: string): Promise<Job | undefined>;
   createJob(job: InsertJob): Promise<Job>;
   updateJob(id: string, updates: Partial<Job>): Promise<Job | undefined>;
+  deleteJob(id: string): Promise<boolean>;
+  
+  getJobDocuments(jobId: string): Promise<JobDocument[]>;
+  createJobDocument(doc: InsertJobDocument): Promise<JobDocument>;
+  deleteJobDocument(id: string): Promise<boolean>;
+  
+  getJobPipelineTabs(): Promise<JobPipelineTab[]>;
+  createJobPipelineTab(tab: InsertJobPipelineTab): Promise<JobPipelineTab>;
+  updateJobPipelineTab(id: string, updates: Partial<JobPipelineTab>): Promise<JobPipelineTab | undefined>;
+  deleteJobPipelineTab(id: string): Promise<boolean>;
   
   createFeatureRequest(request: InsertFeatureRequest): Promise<FeatureRequest>;
   getFeatureRequests(): Promise<FeatureRequest[]>;
@@ -248,7 +267,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCandidate(candidate: InsertCandidate): Promise<Candidate> {
-    const [newCandidate] = await db.insert(candidates).values(candidate).returning();
+    const [newCandidate] = await db.insert(candidates).values(candidate as any).returning();
     return newCandidate;
   }
 
@@ -258,7 +277,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteCandidate(id: string): Promise<boolean> {
+    await db.delete(candidateDocuments).where(eq(candidateDocuments.candidateId, id));
     await db.delete(candidates).where(eq(candidates.id, id));
+    return true;
+  }
+
+  async getCandidateDocuments(candidateId: string): Promise<CandidateDocument[]> {
+    return db.select().from(candidateDocuments).where(eq(candidateDocuments.candidateId, candidateId));
+  }
+
+  async createCandidateDocument(doc: InsertCandidateDocument): Promise<CandidateDocument> {
+    const [newDoc] = await db.insert(candidateDocuments).values(doc).returning();
+    return newDoc;
+  }
+
+  async updateCandidateDocument(id: string, updates: Partial<CandidateDocument>): Promise<CandidateDocument | undefined> {
+    const [doc] = await db.update(candidateDocuments).set(updates).where(eq(candidateDocuments.id, id)).returning();
+    return doc || undefined;
+  }
+
+  async deleteCandidateDocument(id: string): Promise<boolean> {
+    await db.delete(candidateDocuments).where(eq(candidateDocuments.id, id));
     return true;
   }
 
@@ -281,13 +320,56 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createJob(job: InsertJob): Promise<Job> {
-    const [newJob] = await db.insert(jobs).values(job).returning();
+    const [newJob] = await db.insert(jobs).values(job as any).returning();
     return newJob;
   }
 
   async updateJob(id: string, updates: Partial<Job>): Promise<Job | undefined> {
     const [job] = await db.update(jobs).set(updates).where(eq(jobs.id, id)).returning();
     return job || undefined;
+  }
+
+  async deleteJob(id: string): Promise<boolean> {
+    await db.delete(jobDocuments).where(eq(jobDocuments.jobId, id));
+    await db.delete(jobs).where(eq(jobs.id, id));
+    return true;
+  }
+
+  async getJobsByCategory(category: string): Promise<Job[]> {
+    return db.select().from(jobs).where(eq(jobs.category, category as any));
+  }
+
+  async getJobDocuments(jobId: string): Promise<JobDocument[]> {
+    return db.select().from(jobDocuments).where(eq(jobDocuments.jobId, jobId));
+  }
+
+  async createJobDocument(doc: InsertJobDocument): Promise<JobDocument> {
+    const [newDoc] = await db.insert(jobDocuments).values(doc).returning();
+    return newDoc;
+  }
+
+  async deleteJobDocument(id: string): Promise<boolean> {
+    await db.delete(jobDocuments).where(eq(jobDocuments.id, id));
+    return true;
+  }
+
+  async getJobPipelineTabs(): Promise<JobPipelineTab[]> {
+    return db.select().from(jobPipelineTabs);
+  }
+
+  async createJobPipelineTab(tab: InsertJobPipelineTab): Promise<JobPipelineTab> {
+    const [newTab] = await db.insert(jobPipelineTabs).values(tab).returning();
+    return newTab;
+  }
+
+  async updateJobPipelineTab(id: string, updates: Partial<JobPipelineTab>): Promise<JobPipelineTab | undefined> {
+    const [tab] = await db.update(jobPipelineTabs).set(updates).where(eq(jobPipelineTabs.id, id)).returning();
+    return tab || undefined;
+  }
+
+  async deleteJobPipelineTab(id: string): Promise<boolean> {
+    await db.delete(jobPipelineTabs).where(eq(jobPipelineTabs.id, id));
+    return true;
   }
 
   async createFeatureRequest(request: InsertFeatureRequest): Promise<FeatureRequest> {
