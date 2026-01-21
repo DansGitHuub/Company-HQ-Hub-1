@@ -48,6 +48,8 @@ Preferred communication style: Simple, everyday language.
 - **Integrations**: Third-party service connection states
 - **Customer Messages**: Customer-to-company messaging with status tracking (unread/read/replied)
 - **Work Requests**: Customer service requests with service type, urgency, and status workflow
+- **Custom Forms**: Dynamic form builder with flexible JSONB field definitions (job applications, W-9, etc.)
+- **Form Submissions**: User responses to custom forms with admin review workflow
 
 ### Role-Based Access Control
 - **Master Admin**: Designated via `isMasterAdmin` flag; only master admin can grant Admin role or delete/modify protected accounts
@@ -110,4 +112,15 @@ Preferred communication style: Simple, everyday language.
 
 ### Environment Variables Required
 - `DATABASE_URL`: PostgreSQL connection string
-- `SESSION_SECRET`: (Optional) Secret for session encryption, auto-generated if not provided
+- `SESSION_SECRET`: (Recommended for production) Secret for session encryption. Sessions will NOT persist across server restarts without this
+
+### Form Builder
+- Admin-only form creation with drag-and-drop field builder
+- 8 field types: text, textarea, number, email, date, select, checkbox, radio
+- Draft/published workflow with access level controls
+- Admin-only submission viewing
+
+### Help System
+- Interactive walkthroughs for new users with role-specific paths
+- FAQ section with expandable answers
+- Step-by-step dialogs guiding users through features
