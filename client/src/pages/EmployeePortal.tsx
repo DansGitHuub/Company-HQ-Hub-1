@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useApp } from "@/lib/store";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 export default function EmployeePortal() {
-  const { currentUser } = useApp();
+  const { user } = useAuth();
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
@@ -62,15 +62,15 @@ export default function EmployeePortal() {
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" defaultValue={currentUser?.name.split(" ")[0]} />
+                  <Input id="firstName" defaultValue={user?.name?.split(" ")[0]} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" defaultValue={currentUser?.name.split(" ")[1]} />
+                  <Input id="lastName" defaultValue={user?.name?.split(" ")[1]} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="email">Work Email</Label>
-                  <Input id="email" defaultValue={`${currentUser?.name.toLowerCase().replace(" ", ".")}@companyhq.com`} />
+                  <Input id="email" defaultValue={user?.email || ""} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="address">Home Address</Label>

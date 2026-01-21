@@ -13,7 +13,7 @@ import {
   CalendarDays,
   ArrowRight
 } from "lucide-react";
-import { useApp } from "@/lib/store";
+import { useAuth } from "@/hooks/use-auth";
 
 // Import generated assets
 import imgPlanning from "@assets/generated_images/landscape_architecture_plans_and_tools.png";
@@ -37,7 +37,7 @@ const item = {
 };
 
 export default function Home() {
-  const { currentUser } = useApp();
+  const { user } = useAuth();
 
   const tiles = [
     { 
@@ -127,7 +127,7 @@ export default function Home() {
     <div className="space-y-8">
       <div>
         <h1 className="text-4xl font-heading font-bold text-foreground">
-          Welcome back, {currentUser?.name.split(" ")[0]}
+          Welcome back, {user?.name?.split(" ")[0]}
         </h1>
         <p className="text-lg text-muted-foreground mt-2">
           Here's what's happening at Company HQ today.

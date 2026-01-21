@@ -46,10 +46,17 @@ export async function registerRoutes(
   app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
     try {
       const id = req.params.id as string;
-      const updates = { ...req.body };
+      const { name, email, role, isActive, password } = req.body;
       
-      if (updates.password) {
-        updates.password = await hashPassword(updates.password);
+      const updates: Record<string, any> = {};
+      if (name !== undefined) updates.name = name;
+      if (email !== undefined) updates.email = email;
+      if (role !== undefined && ["Admin", "Manager", "Crew", "Customer"].includes(role)) {
+        updates.role = role;
+      }
+      if (isActive !== undefined) updates.isActive = Boolean(isActive);
+      if (password) {
+        updates.password = await hashPassword(password);
       }
       
       const user = await storage.updateUser(id, updates);
