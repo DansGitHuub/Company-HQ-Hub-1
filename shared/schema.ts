@@ -423,6 +423,7 @@ export const customForms = pgTable("custom_forms", {
   accessLevel: text("access_level").default("All"),
   isPublished: boolean("is_published").notNull().default(false),
   styling: jsonb("styling"),
+  folderId: varchar("folder_id", { length: 36 }),
   createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -436,6 +437,7 @@ export const insertCustomFormSchema = createInsertSchema(customForms).pick({
   accessLevel: true,
   isPublished: true,
   styling: true,
+  folderId: true,
   createdBy: true,
 });
 
@@ -478,6 +480,50 @@ export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).pi
 
 export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
 export type FormSubmission = typeof formSubmissions.$inferSelect;
+
+// Form Folders for organizing forms
+export const formFolders = pgTable("form_folders", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color").default("#6366f1"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFormFolderSchema = createInsertSchema(formFolders).pick({
+  name: true,
+  description: true,
+  color: true,
+  sortOrder: true,
+});
+
+export type InsertFormFolder = z.infer<typeof insertFormFolderSchema>;
+export type FormFolder = typeof formFolders.$inferSelect;
+
+// Form Templates for quick form creation
+export const formTemplates = pgTable("form_templates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").default("General"),
+  fields: jsonb("fields").notNull().default([]),
+  styling: jsonb("styling"),
+  folderId: varchar("folder_id", { length: 36 }).references(() => formFolders.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFormTemplateSchema = createInsertSchema(formTemplates).pick({
+  name: true,
+  description: true,
+  category: true,
+  fields: true,
+  styling: true,
+  folderId: true,
+});
+
+export type InsertFormTemplate = z.infer<typeof insertFormTemplateSchema>;
+export type FormTemplate = typeof formTemplates.$inferSelect;
 
 export const conversations = pgTable("conversations", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
