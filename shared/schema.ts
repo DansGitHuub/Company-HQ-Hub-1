@@ -318,3 +318,116 @@ export const chatMessages = pgTable("chat_messages", {
 
 export type Conversation = typeof conversations.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+
+// Equipment Tracker
+export type EquipmentType = "Vehicle" | "Equipment";
+
+export const equipment = pgTable("equipment", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // Vehicle or Equipment
+  name: text("name").notNull(),
+  year: integer("year"),
+  make: text("make"),
+  model: text("model"),
+  vin: text("vin"),
+  licensePlate: text("license_plate"),
+  mileage: integer("mileage"),
+  hours: integer("hours"), // For equipment that tracks hours instead of mileage
+  status: text("status").notNull().default("Active"), // Active, In Service, Retired
+  notes: text("notes"),
+  image: text("image"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEquipmentSchema = createInsertSchema(equipment).pick({
+  type: true,
+  name: true,
+  year: true,
+  make: true,
+  model: true,
+  vin: true,
+  licensePlate: true,
+  mileage: true,
+  hours: true,
+  status: true,
+  notes: true,
+  image: true,
+});
+
+export type InsertEquipment = z.infer<typeof insertEquipmentSchema>;
+export type Equipment = typeof equipment.$inferSelect;
+
+// Maintenance Schedules (recurring maintenance)
+export const maintenanceSchedules = pgTable("maintenance_schedules", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  equipmentId: varchar("equipment_id", { length: 36 }).references(() => equipment.id).notNull(),
+  name: text("name").notNull(), // e.g., "Oil Change", "Tire Rotation"
+  description: text("description"),
+  intervalType: text("interval_type").notNull(), // "days", "miles", "hours"
+  intervalValue: integer("interval_value").notNull(), // e.g., 90 (days) or 5000 (miles)
+  lastCompletedDate: timestamp("last_completed_date"),
+  lastCompletedMileage: integer("last_completed_mileage"),
+  lastCompletedHours: integer("last_completed_hours"),
+  nextDueDate: timestamp("next_due_date"),
+  nextDueMileage: integer("next_due_mileage"),
+  nextDueHours: integer("next_due_hours"),
+  reminderDays: integer("reminder_days").default(7), // Days before due date to send reminder
+  reminderEmail: text("reminder_email"), // Email to send reminders to
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMaintenanceScheduleSchema = createInsertSchema(maintenanceSchedules).pick({
+  equipmentId: true,
+  name: true,
+  description: true,
+  intervalType: true,
+  intervalValue: true,
+  lastCompletedDate: true,
+  lastCompletedMileage: true,
+  lastCompletedHours: true,
+  nextDueDate: true,
+  nextDueMileage: true,
+  nextDueHours: true,
+  reminderDays: true,
+  reminderEmail: true,
+  isActive: true,
+});
+
+export type InsertMaintenanceSchedule = z.infer<typeof insertMaintenanceScheduleSchema>;
+export type MaintenanceSchedule = typeof maintenanceSchedules.$inferSelect;
+
+// Maintenance Logs (completed maintenance records)
+export const maintenanceLogs = pgTable("maintenance_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  equipmentId: varchar("equipment_id", { length: 36 }).references(() => equipment.id).notNull(),
+  scheduleId: varchar("schedule_id", { length: 36 }).references(() => maintenanceSchedules.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  completedDate: timestamp("completed_date").notNull().defaultNow(),
+  mileageAtService: integer("mileage_at_service"),
+  hoursAtService: integer("hours_at_service"),
+  cost: integer("cost"), // Cost in cents
+  vendor: text("vendor"),
+  notes: text("notes"),
+  performedBy: varchar("performed_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMaintenanceLogSchema = createInsertSchema(maintenanceLogs).pick({
+  equipmentId: true,
+  scheduleId: true,
+  name: true,
+  description: true,
+  completedDate: true,
+  mileageAtService: true,
+  hoursAtService: true,
+  cost: true,
+  vendor: true,
+  notes: true,
+  performedBy: true,
+});
+
+export type InsertMaintenanceLog = z.infer<typeof insertMaintenanceLogSchema>;
+export type MaintenanceLog = typeof maintenanceLogs.$inferSelect;
