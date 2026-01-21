@@ -23,7 +23,8 @@ import {
   Inbox,
   HelpCircle,
   Truck,
-  Bell
+  Bell,
+  Info
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -40,8 +41,112 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+
+const menuHelpContent: Record<string, { title: string; description: string; tips: string[] }> = {
+  dashboard: {
+    title: "Dashboard",
+    description: "Your home base with quick access tiles to all major features.",
+    tips: ["Click any tile to navigate", "Dashboard adapts to your role", "Use sidebar for quick navigation"]
+  },
+  sops: {
+    title: "SOP Library",
+    description: "Store and organize Standard Operating Procedures for any process.",
+    tips: ["Organize by category", "Add detailed steps", "Team can reference anytime"]
+  },
+  materials: {
+    title: "Materials Catalog",
+    description: "Track inventory, stock levels, pricing, and supplier info.",
+    tips: ["Set minimum stock levels", "Track costs for estimates", "Categorize for easy search"]
+  },
+  equipment: {
+    title: "Equipment Tracker",
+    description: "Manage vehicles, mowers, trailers and schedule maintenance.",
+    tips: ["Track mileage and hours", "Set maintenance schedules", "Log completed maintenance"]
+  },
+  hiring: {
+    title: "Hiring Pipeline",
+    description: "Manage recruitment from application to hire with drag-and-drop stages.",
+    tips: ["Drag candidates between stages", "Upload documents", "Rate candidates with colored dots"]
+  },
+  jobs: {
+    title: "Job Pipeline",
+    description: "Track all projects from lead to completion with customizable tabs.",
+    tips: ["Use tabs for job types", "Upload permits and contracts", "Track with Google Maps"]
+  },
+  education: {
+    title: "Customer Hub",
+    description: "Resource library with care guides, instructions, and documents for customers.",
+    tips: ["Create guides and instructions", "Upload manufacturer documents", "Customers can bookmark favorites"]
+  },
+  profile: {
+    title: "My Profile",
+    description: "Update your personal info and profile picture.",
+    tips: ["Add contact details", "Upload a profile photo", "Keep info current"]
+  },
+  assistant: {
+    title: "AI Assistant",
+    description: "Chat with an AI assistant for help with landscaping questions.",
+    tips: ["Ask business questions", "Get landscaping advice", "Conversation history is saved"]
+  },
+  help: {
+    title: "Help Center",
+    description: "Access guides, walkthroughs, and FAQs for using Company HQ.",
+    tips: ["Start interactive walkthrough", "Browse FAQs", "Role-specific guidance"]
+  },
+  hq: {
+    title: "Company HQ",
+    description: "Overview of your company's central hub and settings.",
+    tips: ["View company stats", "Access key metrics", "Central information hub"]
+  },
+  marketing: {
+    title: "Marketing",
+    description: "Track marketing campaigns, spend, and lead generation.",
+    tips: ["Log campaign details", "Track ROI", "Monitor lead sources"]
+  },
+  forms: {
+    title: "Forms",
+    description: "Build custom forms for applications, surveys, and data collection.",
+    tips: ["Drag-and-drop builder", "Multiple field types", "Review submissions"]
+  },
+  inbox: {
+    title: "Messages",
+    description: "View and respond to customer messages and inquiries.",
+    tips: ["Track message status", "Reply to customers", "Mark as read/replied"]
+  },
+  integrations: {
+    title: "Integrations",
+    description: "Connect third-party tools like QuickBooks, CompanyCam, and more.",
+    tips: ["Coming soon", "Connect business tools", "Sync data automatically"]
+  },
+  admin: {
+    title: "Admin Panel",
+    description: "Manage users, approve access requests, and configure settings.",
+    tips: ["Create user accounts", "Approve role requests", "Company branding"]
+  },
+  customer_portal: {
+    title: "Customer Portal",
+    description: "Your dedicated area to communicate and request services.",
+    tips: ["Send messages", "Request work", "Track request status"]
+  },
+  customer_messages: {
+    title: "Messages",
+    description: "Communicate directly with our team.",
+    tips: ["Start conversations", "Track message status", "Get notified of replies"]
+  },
+  customer_account: {
+    title: "My Account",
+    description: "View and update your account information.",
+    tips: ["Update contact info", "Request role upgrades", "Manage preferences"]
+  },
+  customer_help: {
+    title: "Help",
+    description: "Get assistance with using the customer portal.",
+    tips: ["View guides", "Contact support", "FAQ answers"]
+  }
+};
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -189,21 +294,53 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
         {displayNav.map((item) => {
           const isActive = location === item.href;
+          const helpContent = menuHelpContent[item.id];
           return (
-            <Link key={item.href} href={item.href}>
-              <div
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer",
-                  isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                    : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/80"
-                )}
-                onClick={() => setIsMobileOpen(false)}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </div>
-            </Link>
+            <div key={item.href} className="flex items-center group">
+              <Link href={item.href} className="flex-1">
+                <div
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer",
+                    isActive
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                      : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/80"
+                  )}
+                  onClick={() => setIsMobileOpen(false)}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </div>
+              </Link>
+              {helpContent && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button 
+                      className="p-1 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="right" className="w-72 p-4">
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-sm">{helpContent.title}</h4>
+                      <p className="text-sm text-muted-foreground">{helpContent.description}</p>
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">Tips:</p>
+                        <ul className="space-y-1">
+                          {helpContent.tips.map((tip, i) => (
+                            <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                              <span className="text-primary mt-0.5">•</span>
+                              {tip}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
           );
         })}
       </div>
