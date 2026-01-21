@@ -78,46 +78,74 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return { shapeClass, sizeClass };
   };
 
+  // Customer navigation is completely separate and not reorderable
   const customerNav = [
-    { icon: LayoutDashboard, label: "My Portal", href: "/customer" },
-    { icon: GraduationCap, label: "Resources", href: "/education" },
-    { icon: User, label: "My Account", href: "/profile" },
-    { icon: HelpCircle, label: "Help", href: "/help" },
+    { id: "customer_portal", icon: LayoutDashboard, label: "My Portal", href: "/customer" },
+    { id: "customer_resources", icon: GraduationCap, label: "Resources", href: "/education" },
+    { id: "customer_account", icon: User, label: "My Account", href: "/profile" },
+    { id: "customer_help", icon: HelpCircle, label: "Help", href: "/help" },
   ];
 
-  const teamNav = [
-    { icon: LayoutDashboard, label: "Dashboard", href: "/" },
-    { icon: BookOpen, label: "SOP Library", href: "/sops" },
-    { icon: Hammer, label: "Materials", href: "/materials" },
-    { icon: Truck, label: "Equipment", href: "/equipment" },
-    { icon: Users, label: "Hiring", href: "/hiring" },
-    { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
-    { icon: GraduationCap, label: "Customer Hub", href: "/education" },
-    { icon: User, label: "My Profile", href: "/profile" },
-    { icon: Sparkles, label: "Assistant", href: "/assistant" },
-    { icon: HelpCircle, label: "Help", href: "/help" },
-  ];
+  // Internal navigation items (for Crew, Manager, Admin) - these can be reordered
+  const internalNavItems: Record<string, { icon: any; label: string; href: string }> = {
+    dashboard: { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+    sops: { icon: BookOpen, label: "SOP Library", href: "/sops" },
+    materials: { icon: Hammer, label: "Materials", href: "/materials" },
+    equipment: { icon: Truck, label: "Equipment", href: "/equipment" },
+    hiring: { icon: Users, label: "Hiring", href: "/hiring" },
+    jobs: { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
+    education: { icon: GraduationCap, label: "Customer Hub", href: "/education" },
+    profile: { icon: User, label: "My Profile", href: "/profile" },
+    assistant: { icon: Sparkles, label: "Assistant", href: "/assistant" },
+    help: { icon: HelpCircle, label: "Help", href: "/help" },
+    hq: { icon: Building2, label: "Company HQ", href: "/hq" },
+    marketing: { icon: Megaphone, label: "Marketing", href: "/marketing" },
+    forms: { icon: FileText, label: "Forms", href: "/forms" },
+    inbox: { icon: Inbox, label: "Messages", href: "/inbox" },
+    integrations: { icon: Settings, label: "Integrations", href: "/integrations" },
+    admin: { icon: Shield, label: "Admin Panel", href: "/admin" },
+  };
 
-  const adminNav = [
-    { icon: Building2, label: "Company HQ", href: "/hq" },
-    { icon: Megaphone, label: "Marketing", href: "/marketing" },
-    { icon: FileText, label: "Forms", href: "/forms" },
-    { icon: Inbox, label: "Messages", href: "/inbox" },
-    { icon: Settings, label: "Integrations", href: "/integrations" },
-    { icon: Shield, label: "Admin Panel", href: "/admin" },
-  ];
+  // Default order for internal roles
+  const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "hiring", "jobs", "education", "profile", "assistant", "help"];
+  const adminExtraIds = ["hq", "marketing", "forms", "inbox", "integrations", "admin"];
 
   const getNavItems = () => {
+    // Customer role uses fixed navigation - not affected by sidebar order settings
     if (user?.role === "Customer") {
       return customerNav;
     }
+    
+    // Get the saved order from company settings (only applies to internal roles)
+    const savedOrder = companySettings?.sidebarOrder as string[] | undefined;
+    
+    // Determine which items this role can access
+    let allowedIds: string[];
     if (user?.role === "Admin") {
-      return [...teamNav, ...adminNav];
+      allowedIds = [...teamDefaultIds, ...adminExtraIds];
+    } else if (user?.role === "Manager") {
+      allowedIds = [...teamDefaultIds, "inbox"];
+    } else {
+      // Crew role
+      allowedIds = teamDefaultIds;
     }
-    if (user?.role === "Manager") {
-      return [...teamNav, { icon: Inbox, label: "Messages", href: "/inbox" }];
+    
+    // If there's a saved order, use it but filter to only allowed items for this role
+    if (savedOrder && savedOrder.length > 0) {
+      const orderedItems = savedOrder
+        .filter(id => allowedIds.includes(id) && internalNavItems[id])
+        .map(id => ({ id, ...internalNavItems[id] }));
+      
+      // Add any missing allowed items at the end (in case new items were added)
+      const missingItems = allowedIds
+        .filter(id => !savedOrder.includes(id) && internalNavItems[id])
+        .map(id => ({ id, ...internalNavItems[id] }));
+      
+      return [...orderedItems, ...missingItems];
     }
-    return teamNav;
+    
+    // No saved order, use default order for this role
+    return allowedIds.map(id => ({ id, ...internalNavItems[id] }));
   };
 
   const displayNav = getNavItems();

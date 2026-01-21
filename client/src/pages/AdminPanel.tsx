@@ -25,8 +25,23 @@ import {
   Clock,
   Upload,
   Image,
-  Building2
+  Building2,
+  GripVertical,
+  LayoutDashboard,
+  BookOpen,
+  Hammer,
+  Users,
+  Megaphone,
+  FileText,
+  Settings,
+  GraduationCap,
+  User as UserIcon,
+  Sparkles,
+  HelpCircle,
+  Inbox,
+  Truck
 } from "lucide-react";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,12 +92,38 @@ export default function AdminPanel() {
   const [companyName, setCompanyName] = useState("Company HQ");
   const [isUploading, setIsUploading] = useState(false);
 
+  // All sidebar items that can be reordered
+  const allSidebarItems = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "sops", label: "SOP Library", icon: BookOpen },
+    { id: "materials", label: "Materials", icon: Hammer },
+    { id: "equipment", label: "Equipment", icon: Truck },
+    { id: "hiring", label: "Hiring", icon: Users },
+    { id: "jobs", label: "Jobs", icon: LayoutDashboard },
+    { id: "education", label: "Customer Hub", icon: GraduationCap },
+    { id: "profile", label: "My Profile", icon: UserIcon },
+    { id: "assistant", label: "Assistant", icon: Sparkles },
+    { id: "help", label: "Help", icon: HelpCircle },
+    { id: "hq", label: "Company HQ", icon: Building2 },
+    { id: "marketing", label: "Marketing", icon: Megaphone },
+    { id: "forms", label: "Forms", icon: FileText },
+    { id: "inbox", label: "Messages", icon: Inbox },
+    { id: "integrations", label: "Integrations", icon: Settings },
+    { id: "admin", label: "Admin Panel", icon: Shield },
+  ];
+
+  const defaultOrder = allSidebarItems.map(item => item.id);
+  const [sidebarOrder, setSidebarOrder] = useState<string[]>(defaultOrder);
+
   React.useEffect(() => {
     if (companySettings) {
       setLogoUrl(companySettings.logoUrl || "");
       setLogoShape(companySettings.logoShape || "square");
       setLogoCornerRadius(companySettings.logoCornerRadius || 0);
       setCompanyName(companySettings.companyName || "Company HQ");
+      if (companySettings.sidebarOrder && Array.isArray(companySettings.sidebarOrder)) {
+        setSidebarOrder(companySettings.sidebarOrder as string[]);
+      }
     }
   }, [companySettings]);
 
@@ -147,6 +188,26 @@ export default function AdminPanel() {
       companyName,
     });
   };
+
+  const handleSidebarDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    const items = Array.from(sidebarOrder);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    setSidebarOrder(items);
+  };
+
+  const saveSidebarOrder = () => {
+    updateCompanySettingsMutation.mutate({ sidebarOrder });
+  };
+
+  const resetSidebarOrder = () => {
+    setSidebarOrder(defaultOrder);
+  };
+
+  const orderedSidebarItems = sidebarOrder
+    .map(id => allSidebarItems.find(item => item.id === id))
+    .filter(Boolean) as typeof allSidebarItems;
 
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<User> }) => {
@@ -601,6 +662,58 @@ export default function AdminPanel() {
                     This is how your logo will appear in the sidebar navigation.
                   </p>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Sidebar Menu Order</CardTitle>
+              <CardDescription>Drag and drop to reorder the sidebar menu items for all users</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DragDropContext onDragEnd={handleSidebarDragEnd}>
+                <Droppable droppableId="sidebar-items">
+                  {(provided) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className="space-y-2"
+                    >
+                      {orderedSidebarItems.map((item, index) => (
+                        <Draggable key={item.id} draggableId={item.id} index={index}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className={`flex items-center gap-3 p-3 bg-card border rounded-lg ${
+                                snapshot.isDragging ? "shadow-lg ring-2 ring-primary" : ""
+                              }`}
+                            >
+                              <div {...provided.dragHandleProps} className="cursor-grab">
+                                <GripVertical className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                              <item.icon className="h-5 w-5 text-muted-foreground" />
+                              <span className="font-medium">{item.label}</span>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+              <div className="flex gap-2 mt-4">
+                <Button onClick={saveSidebarOrder} disabled={updateCompanySettingsMutation.isPending}>
+                  {updateCompanySettingsMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : null}
+                  Save Order
+                </Button>
+                <Button variant="outline" onClick={resetSidebarOrder}>
+                  Reset to Default
+                </Button>
               </div>
             </CardContent>
           </Card>
