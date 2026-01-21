@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, hashPassword } from "./auth";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -489,6 +490,38 @@ export async function registerRoutes(
       res.status(500).json({ message: "Error updating submission" });
     }
   });
+
+  app.get("/api/profile", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      const { password, recoveryToken, recoveryExpires, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching profile" });
+    }
+  });
+
+  app.patch("/api/profile", requireAuth, async (req, res) => {
+    try {
+      const { name, email, bio, phone, profilePicture } = req.body;
+      const updates: any = { updatedAt: new Date() };
+      if (name !== undefined) updates.name = name;
+      if (email !== undefined) updates.email = email;
+      if (bio !== undefined) updates.bio = bio;
+      if (phone !== undefined) updates.phone = phone;
+      if (profilePicture !== undefined) updates.profilePicture = profilePicture;
+      
+      const user = await storage.updateUser(req.user!.id, updates);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      const { password, recoveryToken, recoveryExpires, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating profile" });
+    }
+  });
+
+  registerObjectStorageRoutes(app);
 
   return httpServer;
 }
