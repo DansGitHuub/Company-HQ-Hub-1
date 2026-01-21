@@ -621,6 +621,14 @@ export default function JobPipeline() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label>Phone 2</Label>
+                  <Input
+                    value={editForm.contactPhone2 || ""}
+                    onChange={e => setEditForm({ ...editForm, contactPhone2: e.target.value })}
+                    placeholder="Additional phone"
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label>Contact Email</Label>
                   <Input
                     type="email"
