@@ -457,7 +457,7 @@ function FormBuilderDialog({ form, open, onOpenChange }: { form: CustomForm; ope
                     <div
                       key={field.id}
                       className={`group flex gap-2 items-start p-3 rounded-lg border cursor-pointer transition-colors ${
-                        selectedField?.id === field.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                        selectedField?.id === field.id ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "hover:bg-muted/50"
                       }`}
                       onClick={() => setSelectedField(field)}
                     >
@@ -466,6 +466,9 @@ function FormBuilderDialog({ form, open, onOpenChange }: { form: CustomForm; ope
                         <div className="flex items-center gap-2">
                           <Label className="font-medium">{field.label}</Label>
                           {field.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
+                          {selectedField?.id !== field.id && (
+                            <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100">(click to edit)</span>
+                          )}
                         </div>
                         <FieldPreview field={field} />
                       </div>
@@ -486,48 +489,61 @@ function FormBuilderDialog({ form, open, onOpenChange }: { form: CustomForm; ope
 
           <div className="col-span-1 space-y-4 overflow-y-auto">
             {selectedField ? (
-              <Card>
-                <CardHeader className="py-3">
-                  <CardTitle className="text-sm">Field Properties</CardTitle>
+              <Card className="border-primary">
+                <CardHeader className="py-3 bg-primary/5">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Edit className="w-4 h-4" />
+                    Edit Field
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-3 pt-4">
                   <div className="space-y-1">
-                    <Label className="text-xs">Label</Label>
+                    <Label className="text-xs font-medium">Field Label</Label>
                     <Input
                       value={selectedField.label}
                       onChange={(e) => updateField(selectedField.id, { label: e.target.value })}
+                      placeholder="Enter the field label..."
+                      data-testid="input-field-label"
                     />
+                    <p className="text-xs text-muted-foreground">This is what users will see</p>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Placeholder</Label>
+                    <Label className="text-xs font-medium">Placeholder Text</Label>
                     <Input
                       value={selectedField.placeholder || ""}
                       onChange={(e) => updateField(selectedField.id, { placeholder: e.target.value })}
+                      placeholder="Hint text shown in the field..."
+                      data-testid="input-field-placeholder"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
                     <Checkbox
                       checked={selectedField.required}
                       onCheckedChange={(checked) => updateField(selectedField.id, { required: !!checked })}
+                      data-testid="checkbox-field-required"
                     />
-                    <Label className="text-sm">Required field</Label>
+                    <Label className="text-sm">Make this field required</Label>
                   </div>
                   {(selectedField.type === "select" || selectedField.type === "radio") && (
                     <div className="space-y-1">
-                      <Label className="text-xs">Options (one per line)</Label>
+                      <Label className="text-xs font-medium">Options (one per line)</Label>
                       <Textarea
                         value={(selectedField.options || []).join("\n")}
                         onChange={(e) => updateField(selectedField.id, { options: e.target.value.split("\n").filter(Boolean) })}
                         rows={4}
+                        placeholder="Option 1&#10;Option 2&#10;Option 3"
+                        data-testid="textarea-field-options"
                       />
                     </div>
                   )}
                 </CardContent>
               </Card>
             ) : (
-              <Card>
-                <CardContent className="py-6 text-center text-muted-foreground">
-                  <p className="text-sm">Select a field to edit its properties</p>
+              <Card className="border-dashed">
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  <Settings className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm font-medium">No Field Selected</p>
+                  <p className="text-xs mt-1">Click on a field in the form preview to edit its label, placeholder, and settings</p>
                 </CardContent>
               </Card>
             )}
