@@ -161,3 +161,18 @@ Preferred communication style: Simple, everyday language.
 - Route: /equipment
 - Database tables: equipment, maintenance_schedules, maintenance_logs
 - Maintenance reminder API: POST /api/maintenance/send-reminders (Admin only)
+
+### Customer Hub / Resource Library
+- Route: /education
+- Tabs: Our Process, Care Guides, Instructions, Documents, Saved
+- Resource types: guide (care guides), instruction (how-to pages), document (uploaded files)
+- Categories: Lawn Care, Pruning, Irrigation, Hardscaping, Seasonal, Equipment, General
+- Admins/Managers can create, edit, and delete resources
+- Resources support rich text content with markdown-style formatting
+- Document upload: Upload PDFs, Word docs from manufacturers instead of creating content
+- Draft/published workflow - only admins see unpublished resources
+- Bookmarking: Any user can save resources to their profile for quick access
+- Saved tab shows all bookmarked resources
+- Database tables: customer_resources, saved_resources
+- API routes: /api/resources (CRUD), /api/saved-resources (favorites)
+- Access control: Non-admin users only see published resources

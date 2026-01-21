@@ -866,7 +866,9 @@ export async function registerRoutes(
     try {
       const type = req.query.type as string | undefined;
       const resources = await storage.getCustomerResources(type);
-      res.json(resources);
+      const isAdmin = req.user!.role === "Admin" || req.user!.role === "Manager";
+      const filteredResources = isAdmin ? resources : resources.filter(r => r.isPublished);
+      res.json(filteredResources);
     } catch (err) {
       res.status(500).json({ message: "Error fetching resources" });
     }
@@ -876,6 +878,10 @@ export async function registerRoutes(
     try {
       const resource = await storage.getCustomerResource(req.params.id as string);
       if (!resource) return res.status(404).json({ message: "Resource not found" });
+      const isAdmin = req.user!.role === "Admin" || req.user!.role === "Manager";
+      if (!resource.isPublished && !isAdmin) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
       res.json(resource);
     } catch (err) {
       res.status(500).json({ message: "Error fetching resource" });
@@ -925,6 +931,12 @@ export async function registerRoutes(
 
   app.post("/api/saved-resources/:resourceId", requireAuth, async (req, res) => {
     try {
+      const resource = await storage.getCustomerResource(req.params.resourceId as string);
+      if (!resource) return res.status(404).json({ message: "Resource not found" });
+      const isAdmin = req.user!.role === "Admin" || req.user!.role === "Manager";
+      if (!resource.isPublished && !isAdmin) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
       const saved = await storage.saveResource(req.user!.id, req.params.resourceId as string);
       res.status(201).json(saved);
     } catch (err) {
