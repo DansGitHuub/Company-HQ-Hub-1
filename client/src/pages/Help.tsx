@@ -36,7 +36,7 @@ type WalkthroughStep = {
 
 const adminWalkthrough: WalkthroughStep[] = [
   {
-    title: "Dashboard Overview",
+    title: "Dashboard",
     description: "Your home base shows quick access tiles to all major features. Each tile takes you directly to that section. The dashboard gives you a bird's-eye view of your entire operation.",
     icon: <Home className="h-8 w-8" />,
     path: "/",

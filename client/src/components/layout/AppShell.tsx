@@ -61,7 +61,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   ];
 
   const teamNav = [
-    { icon: LayoutDashboard, label: "Home", href: "/" },
+    { icon: LayoutDashboard, label: "Dashboard", href: "/" },
     { icon: BookOpen, label: "SOP Library", href: "/sops" },
     { icon: Hammer, label: "Materials", href: "/materials" },
     { icon: Truck, label: "Equipment", href: "/equipment" },
