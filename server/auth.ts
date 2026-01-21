@@ -6,6 +6,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
+import { sendPasswordRecoveryEmail } from "./email";
 
 declare global {
   namespace Express {
@@ -158,7 +159,12 @@ export function setupAuth(app: Express) {
       const expires = new Date(Date.now() + 60 * 60 * 1000);
       await storage.setRecoveryToken(user.id, token, expires);
       
-      console.log(`Recovery token for ${email}: ${token}`);
+      try {
+        await sendPasswordRecoveryEmail(user.email!, token, user.name || user.username);
+        console.log(`Recovery email sent to ${email}`);
+      } catch (emailErr) {
+        console.error("Failed to send recovery email:", emailErr);
+      }
       
       res.json({ message: "If the email exists, a recovery link will be sent." });
     } catch (err) {
