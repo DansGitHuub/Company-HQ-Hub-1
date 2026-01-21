@@ -268,7 +268,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const hasLogo = !!companySettings?.logoUrl;
     
     return (
-    <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
+    <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground bg-gradient-to-b from-white/[0.03] to-transparent">
       <div className="p-6 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
           {hasLogo ? (
@@ -283,10 +283,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="font-heading font-semibold text-lg leading-none truncate">
+            <h1 className="font-heading font-bold text-xl leading-none truncate text-sidebar-foreground">
               {companySettings?.companyName || "Company HQ"}
             </h1>
-            <p className="text-xs text-sidebar-accent-foreground/70 mt-1">Landscape Management</p>
+            <p className="text-sm text-sidebar-foreground/60 mt-1">Landscape Management</p>
           </div>
         </div>
       </div>
@@ -300,14 +300,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Link href={item.href} className="flex-1">
                 <div
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer",
+                    "flex items-center gap-3 px-4 py-2.5 rounded-lg text-base font-semibold transition-all cursor-pointer",
+                    "border border-white/5 shadow-sm",
+                    "bg-gradient-to-b from-white/[0.08] to-transparent",
                     isActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                      : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/80"
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_2px_4px_rgba(0,0,0,0.3)] border-sidebar-primary/50"
+                      : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_2px_4px_rgba(0,0,0,0.2)] hover:border-white/10"
                   )}
                   onClick={() => setIsMobileOpen(false)}
                 >
-                  <item.icon className="h-4 w-4" />
+                  <item.icon className="h-5 w-5" />
                   {item.label}
                 </div>
               </Link>
