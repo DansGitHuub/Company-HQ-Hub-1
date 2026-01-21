@@ -861,6 +861,86 @@ export async function registerRoutes(
     }
   });
 
+  // Customer Resources routes
+  app.get("/api/resources", requireAuth, async (req, res) => {
+    try {
+      const type = req.query.type as string | undefined;
+      const resources = await storage.getCustomerResources(type);
+      res.json(resources);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching resources" });
+    }
+  });
+
+  app.get("/api/resources/:id", requireAuth, async (req, res) => {
+    try {
+      const resource = await storage.getCustomerResource(req.params.id as string);
+      if (!resource) return res.status(404).json({ message: "Resource not found" });
+      res.json(resource);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching resource" });
+    }
+  });
+
+  app.post("/api/resources", requireAdmin, async (req, res) => {
+    try {
+      const resource = await storage.createCustomerResource({
+        ...req.body,
+        createdBy: req.user!.id,
+      });
+      res.status(201).json(resource);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating resource" });
+    }
+  });
+
+  app.patch("/api/resources/:id", requireAdmin, async (req, res) => {
+    try {
+      const resource = await storage.updateCustomerResource(req.params.id as string, req.body);
+      if (!resource) return res.status(404).json({ message: "Resource not found" });
+      res.json(resource);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating resource" });
+    }
+  });
+
+  app.delete("/api/resources/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteCustomerResource(req.params.id as string);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting resource" });
+    }
+  });
+
+  // Saved Resources (favorites) routes
+  app.get("/api/saved-resources", requireAuth, async (req, res) => {
+    try {
+      const saved = await storage.getSavedResources(req.user!.id);
+      res.json(saved);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching saved resources" });
+    }
+  });
+
+  app.post("/api/saved-resources/:resourceId", requireAuth, async (req, res) => {
+    try {
+      const saved = await storage.saveResource(req.user!.id, req.params.resourceId as string);
+      res.status(201).json(saved);
+    } catch (err) {
+      res.status(500).json({ message: "Error saving resource" });
+    }
+  });
+
+  app.delete("/api/saved-resources/:resourceId", requireAuth, async (req, res) => {
+    try {
+      await storage.unsaveResource(req.user!.id, req.params.resourceId as string);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error removing saved resource" });
+    }
+  });
+
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 
