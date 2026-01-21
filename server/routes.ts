@@ -521,7 +521,7 @@ export async function registerRoutes(
     }
   });
 
-  registerObjectStorageRoutes(app);
+  registerObjectStorageRoutes(app, requireAuth);
 
   return httpServer;
 }
