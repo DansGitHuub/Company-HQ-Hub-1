@@ -15,7 +15,8 @@ import {
   Search,
   GraduationCap,
   Building2,
-  User
+  User,
+  Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { icon: GraduationCap, label: "Customer Hub", href: "/education" },
     { icon: User, label: "My Profile", href: "/profile" },
     { icon: Building2, label: "Company HQ", href: "/hq" },
+    { icon: Sparkles, label: "Assistant", href: "/assistant" },
     { icon: Megaphone, label: "Marketing", href: "/marketing" },
     { icon: FileText, label: "Forms", href: "/forms" },
     { icon: Settings, label: "Integrations", href: "/integrations" },

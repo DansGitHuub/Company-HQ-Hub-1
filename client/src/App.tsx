@@ -17,6 +17,7 @@ import Education from "@/pages/Education";
 import EmployeePortal from "@/pages/EmployeePortal";
 import HQOverview from "@/pages/HQOverview";
 import JobPipeline from "@/pages/JobPipeline";
+import Assistant from "@/pages/Assistant";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -34,6 +35,7 @@ function Router() {
         <Route path="/profile" component={EmployeePortal} />
         <Route path="/hq" component={HQOverview} />
         <Route path="/jobs" component={JobPipeline} />
+        <Route path="/assistant" component={Assistant} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>
