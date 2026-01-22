@@ -48,7 +48,7 @@ export default function Education() {
   const queryClient = useQueryClient();
   const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Manager";
 
-  const [activeTab, setActiveTab] = useState("guides");
+  const [activeTab, setActiveTab] = useState("process");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<CustomerResource | null>(null);
