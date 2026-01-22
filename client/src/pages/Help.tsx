@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   HelpCircle, 
   Home, 
@@ -17,7 +18,15 @@ import {
   BookOpen,
   MessageSquare,
   Shield,
-  ArrowRight
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Leaf,
+  Wrench,
+  Phone,
+  Calendar,
+  Star,
+  Settings
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -221,114 +230,303 @@ function WalkthroughDialog({ steps, triggerText }: { steps: WalkthroughStep[]; t
   );
 }
 
+const customerFAQs = [
+  {
+    question: "How do I contact the team?",
+    answer: "Go to your Customer Portal and click 'New Message'. You can send us questions, feedback, or discuss your projects. We'll respond as quickly as possible."
+  },
+  {
+    question: "How do I request a service?",
+    answer: "In your Customer Portal, click 'New Work Request'. Describe what you need, select a service type (like Lawn Maintenance or Landscape Design), and set the urgency level. We'll review it and get back to you."
+  },
+  {
+    question: "Where can I find care guides for my landscaping?",
+    answer: "Visit the Customer Hub from the sidebar. You'll find care guides, instructions, and helpful documents about maintaining your lawn, plants, irrigation, and more."
+  },
+  {
+    question: "How do I save helpful resources?",
+    answer: "When viewing any resource in the Customer Hub, click the bookmark icon to save it to your personal 'Saved' tab for quick access later."
+  },
+  {
+    question: "How do I check the status of my request?",
+    answer: "In your Customer Portal, you can see all your work requests and their current status. We'll also send updates when there are changes."
+  },
+  {
+    question: "How do I update my contact information?",
+    answer: "Click on 'Profile' in the sidebar to update your name, email, phone number, and other details."
+  }
+];
+
+const staffFAQs = [
+  {
+    question: "How do I change my password?",
+    answer: "Go to your Profile page by clicking your name in the sidebar. From there you can update your password and other account settings."
+  },
+  {
+    question: "How do I request different access?",
+    answer: "If you're a Customer, look for the 'Account Access' card at the bottom of your portal. Click 'Request Upgrade' and select the access level you need. An admin will review your request."
+  },
+  {
+    question: "Who can create new SOPs?",
+    answer: "Any team member (Crew, Manager, or Admin) can create and edit SOPs. This helps everyone contribute to building your company's knowledge base."
+  },
+  {
+    question: "How do work requests work?",
+    answer: "Customers can submit work requests through their portal. These requests appear in the Admin Inbox where managers and admins can review them, update status, and convert them to jobs."
+  },
+  {
+    question: "What are the different user roles?",
+    answer: "Customer: Access to customer portal for messaging and work requests. Crew: Access to SOPs, materials, hiring, and jobs. Manager: All crew features plus customer inbox access. Admin: Full access including user management and settings."
+  }
+];
+
+function RolePreviewPanel() {
+  const { user, previewRole, setPreviewRole, effectiveRole } = useAuth();
+  const [open, setOpen] = useState(false);
+  const isAdmin = user?.role === "Admin";
+  
+  if (!isAdmin) return null;
+  
+  const roles = ["Admin", "Manager", "Crew", "Customer"] as const;
+  
+  return (
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button 
+            variant={previewRole ? "default" : "outline"} 
+            className="gap-2"
+            data-testid="button-test-software"
+          >
+            {previewRole ? <Eye className="h-4 w-4" /> : <Settings className="h-4 w-4" />}
+            {previewRole ? `Viewing as ${previewRole}` : "Test My Software"}
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5 text-primary" />
+              Test My Software
+            </DialogTitle>
+            <DialogDescription>
+              Preview the app as different access levels to see what each role sees. This only changes your view, not your actual permissions.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-3">
+              {roles.map(role => (
+                <Button
+                  key={role}
+                  variant={effectiveRole === role ? "default" : "outline"}
+                  className="h-16 flex-col gap-1"
+                  onClick={() => {
+                    setPreviewRole(role === user?.role ? null : role);
+                    if (role !== user?.role) setOpen(false);
+                  }}
+                >
+                  {role === "Admin" && <Shield className="h-5 w-5" />}
+                  {role === "Manager" && <Users className="h-5 w-5" />}
+                  {role === "Crew" && <Wrench className="h-5 w-5" />}
+                  {role === "Customer" && <Star className="h-5 w-5" />}
+                  <span>{role}</span>
+                  {role === user?.role && <Badge variant="secondary" className="text-xs">Your Role</Badge>}
+                </Button>
+              ))}
+            </div>
+            {previewRole && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p className="text-sm text-amber-800">
+                  <strong>Preview Mode Active:</strong> You're viewing the app as a {previewRole}. Click your actual role ({user?.role}) to return to normal view.
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            {previewRole && (
+              <Button variant="outline" onClick={() => { setPreviewRole(null); setOpen(false); }}>
+                <EyeOff className="h-4 w-4 mr-2" /> Exit Preview Mode
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export default function Help() {
-  const { user } = useAuth();
-  const isCustomer = user?.role === "Customer";
+  const { user, effectiveRole, previewRole } = useAuth();
+  const isActualAdmin = user?.role === "Admin";
+  const isCustomer = effectiveRole === "Customer";
   
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-heading font-bold text-foreground flex items-center gap-3">
-          <HelpCircle className="h-8 w-8 text-primary" />
-          Help Center
-        </h1>
-        <p className="text-muted-foreground mt-2">Learn how to use Company HQ effectively</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-heading font-bold text-foreground flex items-center gap-3">
+            <HelpCircle className="h-8 w-8 text-primary" />
+            {isCustomer ? "Customer Help" : "Help Center"}
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            {isCustomer ? "Everything you need to know as a valued customer" : "Learn how to use Company HQ effectively"}
+          </p>
+        </div>
+        {isActualAdmin && <RolePreviewPanel />}
       </div>
+
+      {previewRole && (
+        <div className="bg-amber-100 border border-amber-300 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Eye className="h-5 w-5 text-amber-600" />
+            <span className="font-medium text-amber-800">
+              Preview Mode: Viewing as {previewRole}
+            </span>
+          </div>
+          <Badge variant="outline" className="text-amber-700 border-amber-400">Test Mode</Badge>
+        </div>
+      )}
 
       <Card className="bg-gradient-to-r from-primary/5 to-primary/10">
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="flex-1">
-              <h2 className="text-2xl font-heading font-bold mb-2">New Here?</h2>
+              <h2 className="text-2xl font-heading font-bold mb-2">
+                {isCustomer ? "Welcome to Your Customer Portal" : "New Here?"}
+              </h2>
               <p className="text-muted-foreground mb-4">
-                Take a quick walkthrough to learn the basics of Company HQ. We'll show you where everything is and how to get started.
+                {isCustomer 
+                  ? "Learn how to communicate with our team, request services, and access helpful resources for your landscaping."
+                  : "Take a quick walkthrough to learn the basics of Company HQ. We'll show you where everything is and how to get started."}
               </p>
               <WalkthroughDialog 
                 steps={isCustomer ? customerWalkthrough : adminWalkthrough} 
-                triggerText="Start Walkthrough" 
+                triggerText={isCustomer ? "Take the Tour" : "Start Walkthrough"} 
               />
             </div>
             <div className="p-6 bg-background rounded-xl shadow-sm">
-              <BookOpen className="h-16 w-16 text-primary/50" />
+              {isCustomer ? <Leaf className="h-16 w-16 text-primary/50" /> : <BookOpen className="h-16 w-16 text-primary/50" />}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="bg-muted/30">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-primary/10 rounded-lg">
-              <HelpCircle className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-semibold mb-1">Quick Tip: Info Icons</h3>
-              <p className="text-sm text-muted-foreground">
-                Hover over any menu item in the sidebar to see an info icon. Click it for a quick description and tips about that feature.
-              </p>
-            </div>
+      {isCustomer ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="bg-muted/30">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-blue-500/10 rounded-lg">
+                    <MessageSquare className="h-6 w-6 text-blue-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">Send a Message</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Questions? Reach out anytime through your portal.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-muted/30">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-green-500/10 rounded-lg">
+                    <Calendar className="h-6 w-6 text-green-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">Request Service</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Need work done? Submit a request and we'll follow up.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-muted/30">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-purple-500/10 rounded-lg">
+                    <Leaf className="h-6 w-6 text-purple-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">Care Guides</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Find tips for maintaining your beautiful landscape.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Common Questions</h2>
           <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">How do I change my password?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Go to your Profile page by clicking your name in the sidebar. From there you can update your password and other account settings.
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">How do I request different access?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  If you're a Customer, look for the "Account Access" card at the bottom of your portal. Click "Request Upgrade" and select the access level you need. An admin will review your request.
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Who can create new SOPs?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Any team member (Crew, Manager, or Admin) can create and edit SOPs. This helps everyone contribute to building your company's knowledge base.
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">How do work requests work?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Customers can submit work requests through their portal. These requests appear in the Admin Inbox where managers and admins can review them, update status, and convert them to jobs.
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">What are the different user roles?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  <strong>Customer:</strong> Access to customer portal for messaging and work requests.<br/>
-                  <strong>Crew:</strong> Access to SOPs, materials, hiring, and jobs.<br/>
-                  <strong>Manager:</strong> All crew features plus customer inbox access.<br/>
-                  <strong>Admin:</strong> Full access including user management and settings.
-                </p>
-              </CardContent>
-            </Card>
+            <h2 className="text-xl font-semibold">Frequently Asked Questions</h2>
+            <div className="space-y-4">
+              {customerFAQs.map((faq, i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <CardTitle className="text-base">{faq.question}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">{faq.answer}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
-      </div>
+
+          <Card className="bg-muted/30">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-primary/10 rounded-lg">
+                  <Phone className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">Need More Help?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    If you can't find what you're looking for, send us a message through your Customer Portal. We're here to help!
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <>
+          <Card className="bg-muted/30">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-primary/10 rounded-lg">
+                  <HelpCircle className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">Quick Tip: Info Icons</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Hover over any menu item in the sidebar to see an info icon. Click it for a quick description and tips about that feature.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Common Questions</h2>
+            <div className="space-y-4">
+              {staffFAQs.map((faq, i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <CardTitle className="text-base">{faq.question}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">{faq.answer}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -149,7 +149,7 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
 };
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, logoutMutation } = useAuth();
+  const { user, logoutMutation, effectiveRole, previewRole } = useAuth();
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = React.useState(false);
   const [, navigate] = useLocation();
@@ -218,7 +218,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const getNavItems = () => {
     // Customer role uses fixed navigation - not affected by sidebar order settings
-    if (user?.role === "Customer") {
+    if (effectiveRole === "Customer") {
       return customerNav;
     }
     
@@ -227,9 +227,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     
     // Determine which items this role can access (excluding bottom items which are added last)
     let allowedIds: string[];
-    if (user?.role === "Admin") {
+    if (effectiveRole === "Admin") {
       allowedIds = [...teamDefaultIds, ...adminExtraIds];
-    } else if (user?.role === "Manager") {
+    } else if (effectiveRole === "Manager") {
       allowedIds = [...teamDefaultIds, "inbox"];
     } else {
       // Crew role
@@ -358,7 +358,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </Avatar>
               <div className="flex flex-col items-start text-xs">
                 <span className="font-medium">{user?.name || "User"}</span>
-                <span className="opacity-70">{user?.role || "N/A"}</span>
+                <span className="opacity-70">
+                  {previewRole ? `Viewing: ${previewRole}` : (user?.role || "N/A")}
+                </span>
               </div>
             </Button>
           </DropdownMenuTrigger>
@@ -420,7 +422,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 variant="ghost"
                 size="icon"
                 className="relative"
-                onClick={() => navigate(user?.role === "Customer" ? "/customer" : "/inbox")}
+                onClick={() => navigate(effectiveRole === "Customer" ? "/customer" : "/inbox")}
                 data-testid="button-messages-notification"
               >
                 <Bell className="h-5 w-5" />

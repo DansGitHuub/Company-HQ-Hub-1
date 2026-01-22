@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext } from "react";
+import { createContext, ReactNode, useContext, useState } from "react";
 import {
   useQuery,
   useMutation,
@@ -8,6 +8,8 @@ import { User as SelectUser, InsertUser } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+type Role = "Admin" | "Manager" | "Crew" | "Customer";
+
 type AuthContextType = {
   user: SelectUser | null;
   isLoading: boolean;
@@ -15,6 +17,9 @@ type AuthContextType = {
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<SelectUser, Error, RegisterData>;
+  previewRole: Role | null;
+  setPreviewRole: (role: Role | null) => void;
+  effectiveRole: Role | null;
 };
 
 type LoginData = { username: string; password: string };
@@ -24,6 +29,8 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+  const [previewRole, setPreviewRole] = useState<Role | null>(null);
+  
   const {
     data: user,
     error,
@@ -32,6 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
+  
+  const isAdmin = user?.role === "Admin";
+  const effectiveRole = (isAdmin && previewRole) ? previewRole : (user?.role as Role | null);
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
@@ -92,6 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginMutation,
         logoutMutation,
         registerMutation,
+        previewRole,
+        setPreviewRole: isAdmin ? setPreviewRole : () => {},
+        effectiveRole,
       }}
     >
       {children}
