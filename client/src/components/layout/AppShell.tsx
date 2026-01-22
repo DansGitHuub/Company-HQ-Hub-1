@@ -178,7 +178,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       else shapeClass = "rounded-xl";
     }
     
-    const sizeClass = shape === "rectangle" ? "h-10 w-16" : "h-10 w-10";
+    const sizeClass = shape === "rectangle" ? "h-16 w-28" : "h-16 w-16";
     
     return { shapeClass, sizeClass };
   };
@@ -269,8 +269,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     
     return (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground bg-gradient-to-b from-white/[0.03] to-transparent">
-      <div className="p-6 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
+      <div className="p-6 pb-8 border-b border-sidebar-border">
+        <div className="flex flex-col items-center gap-4">
           {hasLogo ? (
             <img 
               src={companySettings.logoUrl!} 
@@ -278,15 +278,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               className={cn("object-cover shrink-0", sizeClass, shapeClass)}
             />
           ) : (
-            <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
-              <span className="font-heading font-bold text-xl text-primary-foreground">HQ</span>
+            <div className="h-16 w-16 rounded-lg bg-primary flex items-center justify-center shrink-0">
+              <span className="font-heading font-bold text-2xl text-primary-foreground">HQ</span>
             </div>
           )}
-          <div className="min-w-0">
-            <h1 className="font-heading font-bold text-xl leading-none truncate text-sidebar-foreground">
+          <div className="text-center">
+            <h1 className="font-heading font-bold text-lg leading-tight text-sidebar-foreground">
               {companySettings?.companyName || "Company HQ"}
             </h1>
-            <p className="text-sm text-sidebar-foreground/60 mt-1">Landscape Management</p>
+            <p className="text-xs text-sidebar-foreground/60 mt-1">Landscape Management</p>
           </div>
         </div>
       </div>
