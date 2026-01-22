@@ -33,7 +33,7 @@ export async function registerRoutes(
       // Search SOPs (accessible to all internal roles)
       if (userRole !== "Customer") {
         const sops = await storage.getSops();
-        sops.filter((s: any) => !s.archived && (
+        sops.filter((s: any) => !s.isArchived && (
           s.title.toLowerCase().includes(query) ||
           (s.content && s.content.toLowerCase().includes(query))
         )).slice(0, 5).forEach((s: any) => {
@@ -93,29 +93,11 @@ export async function registerRoutes(
     }
   });
 
-  // Temporary debug endpoint to check seed status
-  app.get("/api/debug/seed-status", async (req, res) => {
+  app.get("/api/admin/users", requireAuth, async (req, res) => {
     try {
-      const seedUsernames = ["Chapin123", "tester1", "tester2", "tester3"];
-      const status: any[] = [];
-      for (const username of seedUsernames) {
-        const user = await storage.getUserByUsername(username);
-        status.push({
-          username,
-          exists: !!user,
-          isActive: user?.isActive ?? null,
-          isMasterAdmin: user?.isMasterAdmin ?? null,
-          role: user?.role ?? null,
-        });
+      if (req.user?.role !== "Admin" && req.user?.role !== "Manager") {
+        return res.status(403).json({ message: "Access denied" });
       }
-      res.json({ seedStatus: status, timestamp: new Date().toISOString() });
-    } catch (err) {
-      res.status(500).json({ error: "Failed to check seed status" });
-    }
-  });
-
-  app.get("/api/admin/users", requireAdmin, async (req, res) => {
-    try {
       const users = await storage.getAllUsers();
       const safeUsers = users.map(({ password, ...u }) => u);
       res.json(safeUsers);
@@ -760,9 +742,23 @@ export async function registerRoutes(
 
   app.post("/api/messages", requireAuth, async (req, res) => {
     try {
+      let targetEmployeeId = req.body.targetEmployeeId || null;
+      
+      // Validate targetEmployeeId if provided
+      if (targetEmployeeId) {
+        const targetUser = await storage.getUser(targetEmployeeId);
+        if (!targetUser) {
+          return res.status(400).json({ message: "Invalid target employee" });
+        }
+        // Ensure target is an internal employee (not a Customer)
+        if (targetUser.role === "Customer") {
+          return res.status(400).json({ message: "Cannot send messages to other customers" });
+        }
+      }
+      
       const message = await storage.createCustomerMessage({
         customerId: req.user!.id,
-        targetEmployeeId: req.body.targetEmployeeId || null,
+        targetEmployeeId,
         subject: req.body.subject,
         message: req.body.message,
       });

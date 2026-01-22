@@ -81,8 +81,8 @@ export default function AdminInbox() {
   });
 
   const { data: allUsers = [] } = useQuery<User[]>({
-    queryKey: ["/api/users"],
-    enabled: user?.role === "Admin",
+    queryKey: ["/api/admin/users"],
+    enabled: user?.role === "Admin" || user?.role === "Manager",
   });
 
   const getUserName = (userId?: string) => {
