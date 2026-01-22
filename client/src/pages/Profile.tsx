@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -8,15 +8,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Camera, Save, User, Mail, Phone, FileText } from "lucide-react";
+import { Loader2, Camera, Save, User, Mail, Phone, FileText, Palette, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { themes, getTheme, applyTheme, type ThemeId } from "@/lib/themes";
 
 export default function Profile() {
   const { user } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState<ThemeId>("forest");
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["/api/profile"],
@@ -36,7 +38,7 @@ export default function Profile() {
 
   const [hasChanges, setHasChanges] = useState(false);
 
-  useState(() => {
+  useEffect(() => {
     if (profile) {
       setFormData({
         name: profile.name || "",
@@ -44,8 +46,29 @@ export default function Profile() {
         bio: profile.bio || "",
         phone: profile.phone || "",
       });
+      if (profile.theme) {
+        setSelectedTheme(profile.theme as ThemeId);
+      }
     }
+  }, [profile]);
+
+  const themeMutation = useMutation({
+    mutationFn: async (theme: ThemeId) => {
+      const res = await apiRequest("PATCH", "/api/profile", { theme });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    },
   });
+
+  const handleThemeChange = (themeId: ThemeId) => {
+    setSelectedTheme(themeId);
+    const theme = getTheme(themeId);
+    applyTheme(theme);
+    themeMutation.mutate(themeId);
+  };
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -286,6 +309,65 @@ export default function Profile() {
                 : "Unknown"}
             </span>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Theme Preferences
+          </CardTitle>
+          <CardDescription>Choose a color theme inspired by the outdoors</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {themes.map((theme) => (
+              <button
+                key={theme.id}
+                onClick={() => handleThemeChange(theme.id)}
+                data-testid={`theme-${theme.id}`}
+                className={`
+                  relative p-4 rounded-xl border-2 transition-all duration-300 
+                  hover:scale-105 hover:shadow-lg group
+                  ${selectedTheme === theme.id 
+                    ? 'border-primary ring-2 ring-primary/20 shadow-md' 
+                    : 'border-border hover:border-primary/50'}
+                `}
+                style={{
+                  background: `linear-gradient(135deg, hsl(${theme.colors.gradientFrom}) 0%, hsl(${theme.colors.gradientTo}) 100%)`
+                }}
+              >
+                {selectedTheme === theme.id && (
+                  <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
+                    <Check className="h-3 w-3" />
+                  </div>
+                )}
+                <div className="text-center space-y-2">
+                  <span className="text-2xl block">{theme.icon}</span>
+                  <span className="text-sm font-medium text-white drop-shadow-md block">
+                    {theme.name}
+                  </span>
+                </div>
+                <div className="mt-2 flex justify-center gap-1">
+                  <div 
+                    className="w-4 h-4 rounded-full border border-white/30"
+                    style={{ backgroundColor: `hsl(${theme.colors.primary})` }}
+                  />
+                  <div 
+                    className="w-4 h-4 rounded-full border border-white/30"
+                    style={{ backgroundColor: `hsl(${theme.colors.accent})` }}
+                  />
+                </div>
+              </button>
+            ))}
+          </div>
+          {themeMutation.isPending && (
+            <p className="text-sm text-muted-foreground mt-4 flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving theme preference...
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

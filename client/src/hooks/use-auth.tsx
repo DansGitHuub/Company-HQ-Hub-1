@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useState } from "react";
+import { createContext, ReactNode, useContext, useState, useEffect } from "react";
 import {
   useQuery,
   useMutation,
@@ -7,6 +7,7 @@ import {
 import { User as SelectUser, InsertUser } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getTheme, applyTheme } from "@/lib/themes";
 
 type Role = "Admin" | "Manager" | "Crew" | "Customer";
 
@@ -39,6 +40,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
+  
+  useEffect(() => {
+    if (user?.theme) {
+      const theme = getTheme(user.theme);
+      applyTheme(theme);
+    } else {
+      const defaultTheme = getTheme("forest");
+      applyTheme(defaultTheme);
+    }
+  }, [user?.theme]);
   
   const isAdmin = user?.role === "Admin";
   const effectiveRole = (isAdmin && previewRole) ? previewRole : (user?.role as Role | null);
