@@ -30,8 +30,11 @@ import {
   Calendar,
   MapPin,
   UserPlus,
-  Shield
+  Shield,
+  ClipboardCheck,
+  ArrowRight
 } from "lucide-react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
 type Message = {
@@ -134,6 +137,29 @@ export default function CustomerPortal() {
           </CardContent>
         </Card>
       </div>
+
+      {user?.isApplicant && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-lg">
+                  <ClipboardCheck className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">Job Application</h3>
+                  <p className="text-sm text-muted-foreground">Track your hiring progress and submit required documents</p>
+                </div>
+              </div>
+              <Link href="/applicant">
+                <Button className="gap-2" data-testid="button-view-application">
+                  View Application <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="messages" className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-md">

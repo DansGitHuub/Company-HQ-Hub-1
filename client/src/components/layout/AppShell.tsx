@@ -24,7 +24,8 @@ import {
   HelpCircle,
   Truck,
   Bell,
-  Info
+  Info,
+  ClipboardCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -145,6 +146,11 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
     title: "Help",
     description: "Get assistance with using the customer portal.",
     tips: ["View guides", "Contact support", "FAQ answers"]
+  },
+  applicant_portal: {
+    title: "My Application",
+    description: "Track your job application status and required documents.",
+    tips: ["View hiring progress", "Upload required documents", "See next steps"]
   }
 };
 
@@ -186,6 +192,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Customer navigation is completely separate and not reorderable
   const customerNav = [
     { id: "customer_portal", icon: LayoutDashboard, label: "My Portal", href: "/customer" },
+    ...(user?.isApplicant ? [{ id: "applicant_portal", icon: ClipboardCheck, label: "My Application", href: "/applicant" }] : []),
     { id: "customer_resources", icon: GraduationCap, label: "Resources", href: "/education" },
     { id: "customer_account", icon: User, label: "My Account", href: "/profile" },
     { id: "customer_help", icon: HelpCircle, label: "Help", href: "/help" },
@@ -194,6 +201,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Internal navigation items (for Crew, Manager, Admin) - these can be reordered
   const internalNavItems: Record<string, { icon: any; label: string; href: string }> = {
     dashboard: { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+    applicant_portal: { icon: ClipboardCheck, label: "My Application", href: "/applicant" },
     sops: { icon: BookOpen, label: "SOP Library", href: "/sops" },
     materials: { icon: Hammer, label: "Materials", href: "/materials" },
     equipment: { icon: Truck, label: "Equipment", href: "/equipment" },
@@ -234,6 +242,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     } else {
       // Crew role
       allowedIds = teamDefaultIds;
+    }
+    
+    // Add applicant portal if user is an applicant
+    if (user?.isApplicant) {
+      allowedIds = ["applicant_portal", ...allowedIds];
     }
     
     // If there's a saved order, use it but filter to only allowed items for this role
