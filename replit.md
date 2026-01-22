@@ -235,5 +235,22 @@ Preferred communication style: Simple, everyday language.
 - Database tables: jobs (enhanced), job_documents, job_pipeline_tabs
 - API routes: /api/jobs (CRUD), /api/jobs/:id/documents, /api/job-documents/:id, /api/job-pipeline-tabs
 
+### Global Search
+- Search bar in header accessible to all logged-in users
+- Press Enter to navigate to full search results page
+- Role-based search results:
+  - Admin: SOPs, Materials, Jobs, Candidates, Users
+  - Manager/Crew: SOPs, Materials, Jobs, Candidates
+  - Customer: No internal search access
+- API route: GET /api/search?q={query}
+
+### Direct Employee Messaging
+- Customers can send messages directly to specific employees
+- Employee search with name filtering in message dialog
+- Messages can be sent to general inbox or targeted to specific team member
+- Server-side validation ensures target is a valid employee (not a Customer)
+- Admin/Manager inbox displays "To:" and "From:" labels on messages
+- Database field: customer_messages.target_employee_id (optional)
+
 ### Future Features (Pending Setup)
 - **SMS to Customers**: Requires Twilio integration setup. User declined initial setup - can be configured later via Integrations Hub or by providing Twilio credentials (Account SID, Auth Token, Phone Number).
