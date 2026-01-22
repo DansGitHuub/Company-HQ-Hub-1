@@ -19,6 +19,27 @@ export async function registerRoutes(
 ): Promise<Server> {
   setupAuth(app);
 
+  // Temporary debug endpoint to check seed status
+  app.get("/api/debug/seed-status", async (req, res) => {
+    try {
+      const seedUsernames = ["Chapin123", "tester1", "tester2", "tester3"];
+      const status: any[] = [];
+      for (const username of seedUsernames) {
+        const user = await storage.getUserByUsername(username);
+        status.push({
+          username,
+          exists: !!user,
+          isActive: user?.isActive ?? null,
+          isMasterAdmin: user?.isMasterAdmin ?? null,
+          role: user?.role ?? null,
+        });
+      }
+      res.json({ seedStatus: status, timestamp: new Date().toISOString() });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to check seed status" });
+    }
+  });
+
   app.get("/api/admin/users", requireAdmin, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
