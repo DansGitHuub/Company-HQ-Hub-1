@@ -32,12 +32,21 @@ import { useToast } from "@/hooks/use-toast";
 type Message = {
   id: string;
   customerId: string;
+  targetEmployeeId?: string;
   subject: string;
   message: string;
   status: string;
   adminReply?: string;
   repliedAt?: string;
+  repliedBy?: string;
   createdAt: string;
+};
+
+type User = {
+  id: string;
+  username: string;
+  name?: string;
+  role: string;
 };
 
 type WorkRequest = {
@@ -70,6 +79,17 @@ export default function AdminInbox() {
   const { data: workRequests = [], isLoading: requestsLoading } = useQuery<WorkRequest[]>({
     queryKey: ["/api/work-requests"],
   });
+
+  const { data: allUsers = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+    enabled: user?.role === "Admin",
+  });
+
+  const getUserName = (userId?: string) => {
+    if (!userId) return null;
+    const found = allUsers.find(u => u.id === userId);
+    return found?.name || found?.username || null;
+  };
 
   const replyMutation = useMutation({
     mutationFn: async ({ id, adminReply }: { id: string; adminReply: string }) => {
@@ -174,26 +194,40 @@ export default function AdminInbox() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {messages.map((msg) => (
+                  {messages.map((msg) => {
+                    const targetName = getUserName(msg.targetEmployeeId);
+                    const customerName = getUserName(msg.customerId);
+                    return (
                     <div
                       key={msg.id}
                       className={`border rounded-lg p-4 cursor-pointer transition-colors hover:bg-secondary/50 ${msg.status === "unread" ? "border-primary/50 bg-primary/5" : ""}`}
                       onClick={() => setSelectedMessage(msg)}
+                      data-testid={`message-card-${msg.id}`}
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="font-medium">{msg.subject}</h4>
                             <StatusBadge status={msg.status} />
+                            {targetName && (
+                              <Badge variant="outline" className="text-xs bg-blue-50">
+                                To: {targetName}
+                              </Badge>
+                            )}
+                            {customerName && (
+                              <span className="text-xs text-muted-foreground">
+                                From: {customerName}
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{msg.message}</p>
                         </div>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
                           {new Date(msg.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
-                  ))}
+                  );})}
                 </div>
               )}
             </CardContent>
