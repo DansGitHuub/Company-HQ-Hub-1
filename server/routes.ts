@@ -416,6 +416,31 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/my-application", requireAuth, async (req, res) => {
+    try {
+      const candidate = await storage.getCandidateByUserId(req.user!.id);
+      if (!candidate) {
+        return res.status(404).json({ message: "No application found" });
+      }
+      res.json(candidate);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching application" });
+    }
+  });
+
+  app.get("/api/my-application/documents", requireAuth, async (req, res) => {
+    try {
+      const candidate = await storage.getCandidateByUserId(req.user!.id);
+      if (!candidate) {
+        return res.status(404).json({ message: "No application found" });
+      }
+      const documents = await storage.getCandidateDocuments(candidate.id);
+      res.json(documents);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching documents" });
+    }
+  });
+
   app.post("/api/candidates", requireAuth, async (req, res) => {
     try {
       const candidate = await storage.createCandidate(req.body);

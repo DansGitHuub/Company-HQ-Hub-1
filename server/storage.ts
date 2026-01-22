@@ -83,6 +83,7 @@ export interface IStorage {
   
   getCandidates(): Promise<Candidate[]>;
   getCandidate(id: string): Promise<Candidate | undefined>;
+  getCandidateByUserId(userId: string): Promise<Candidate | undefined>;
   createCandidate(candidate: InsertCandidate): Promise<Candidate>;
   updateCandidate(id: string, updates: Partial<Candidate>): Promise<Candidate | undefined>;
   deleteCandidate(id: string): Promise<boolean>;
@@ -389,6 +390,11 @@ export class DatabaseStorage implements IStorage {
 
   async getCandidate(id: string): Promise<Candidate | undefined> {
     const [candidate] = await db.select().from(candidates).where(eq(candidates.id, id));
+    return candidate || undefined;
+  }
+
+  async getCandidateByUserId(userId: string): Promise<Candidate | undefined> {
+    const [candidate] = await db.select().from(candidates).where(eq(candidates.userId, userId));
     return candidate || undefined;
   }
 

@@ -13,6 +13,7 @@ import AuthPage from "@/pages/auth-page";
 import AdminPanel from "@/pages/AdminPanel";
 import AdminInbox from "@/pages/AdminInbox";
 import CustomerPortal from "@/pages/CustomerPortal";
+import ApplicantPortal from "@/pages/ApplicantPortal";
 import SOPs from "@/pages/SOPs";
 import Materials from "@/pages/Materials";
 import Hiring from "@/pages/Hiring";
@@ -58,6 +59,7 @@ function AppRoutes() {
           <Redirect to={defaultPath} />
         </Route>
         <Route path="/customer" component={CustomerPortal} />
+        <Route path="/applicant" component={ApplicantPortal} />
         <Route path="/admin" component={AdminPanel} />
         <Route path="/inbox" component={AdminInbox} />
         <Route path="/sops" component={SOPs} />
