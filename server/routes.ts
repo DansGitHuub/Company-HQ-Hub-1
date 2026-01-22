@@ -762,12 +762,31 @@ export async function registerRoutes(
     try {
       const message = await storage.createCustomerMessage({
         customerId: req.user!.id,
+        targetEmployeeId: req.body.targetEmployeeId || null,
         subject: req.body.subject,
         message: req.body.message,
       });
       res.status(201).json(message);
     } catch (err) {
       res.status(500).json({ message: "Error sending message" });
+    }
+  });
+
+  // List employees that customers can message directly
+  app.get("/api/employees/contactable", requireAuth, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const employees = allUsers.filter(u => 
+        (u.role === "Admin" || u.role === "Manager" || u.role === "Crew") && 
+        u.isActive !== false
+      ).map(u => ({
+        id: u.id,
+        name: u.name || u.username,
+        role: u.role,
+      }));
+      res.json(employees);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching employees" });
     }
   });
 

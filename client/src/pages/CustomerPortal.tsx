@@ -330,13 +330,32 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+type ContactableEmployee = {
+  id: string;
+  name: string;
+  role: string;
+};
+
 function NewMessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [targetEmployeeId, setTargetEmployeeId] = useState<string>("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
   const { toast } = useToast();
 
+  const { data: employees = [] } = useQuery<ContactableEmployee[]>({
+    queryKey: ["/api/employees/contactable"],
+  });
+
+  const filteredEmployees = employees.filter(e => 
+    e.name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+    e.role.toLowerCase().includes(employeeSearch.toLowerCase())
+  );
+
+  const selectedEmployee = employees.find(e => e.id === targetEmployeeId);
+
   const mutation = useMutation({
-    mutationFn: async (data: { subject: string; message: string }) => {
+    mutationFn: async (data: { subject: string; message: string; targetEmployeeId?: string }) => {
       const res = await apiRequest("POST", "/api/messages", data);
       return res.json();
     },
@@ -346,6 +365,8 @@ function NewMessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
       onOpenChange(false);
       setSubject("");
       setMessage("");
+      setTargetEmployeeId("");
+      setEmployeeSearch("");
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
@@ -354,13 +375,17 @@ function NewMessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    mutation.mutate({ subject, message });
+    mutation.mutate({ 
+      subject, 
+      message, 
+      targetEmployeeId: targetEmployeeId || undefined 
+    });
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
+        <Button className="gap-2" data-testid="button-new-message">
           <Plus className="h-4 w-4" /> New Message
         </Button>
       </DialogTrigger>
@@ -370,6 +395,56 @@ function NewMessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
+            <Label>Send to (optional)</Label>
+            <div className="space-y-2">
+              <Input
+                placeholder="Search for a team member..."
+                value={employeeSearch}
+                onChange={(e) => setEmployeeSearch(e.target.value)}
+                data-testid="input-employee-search"
+              />
+              {employeeSearch && filteredEmployees.length > 0 && (
+                <div className="border rounded-md max-h-32 overflow-y-auto">
+                  {filteredEmployees.slice(0, 5).map(e => (
+                    <button
+                      key={e.id}
+                      type="button"
+                      className={`w-full text-left px-3 py-2 hover:bg-muted flex justify-between items-center ${
+                        targetEmployeeId === e.id ? "bg-primary/10" : ""
+                      }`}
+                      onClick={() => {
+                        setTargetEmployeeId(e.id);
+                        setEmployeeSearch("");
+                      }}
+                      data-testid={`button-select-employee-${e.id}`}
+                    >
+                      <span>{e.name}</span>
+                      <Badge variant="outline" className="text-xs">{e.role}</Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {selectedEmployee && (
+                <div className="flex items-center gap-2 p-2 bg-primary/5 rounded-md">
+                  <span className="text-sm">To: <strong>{selectedEmployee.name}</strong></span>
+                  <Badge variant="outline" className="text-xs">{selectedEmployee.role}</Badge>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    className="ml-auto h-6 px-2"
+                    onClick={() => setTargetEmployeeId("")}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              )}
+              {!selectedEmployee && (
+                <p className="text-xs text-muted-foreground">Leave empty to send to the general inbox</p>
+              )}
+            </div>
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="subject">Subject</Label>
             <Input
               id="subject"
@@ -377,6 +452,7 @@ function NewMessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
               onChange={(e) => setSubject(e.target.value)}
               placeholder="What's this about?"
               required
+              data-testid="input-message-subject"
             />
           </div>
           <div className="space-y-2">
@@ -388,11 +464,12 @@ function NewMessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
               placeholder="Tell us how we can help..."
               rows={5}
               required
+              data-testid="input-message-body"
             />
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={mutation.isPending} className="gap-2">
+            <Button type="submit" disabled={mutation.isPending} className="gap-2" data-testid="button-send-message">
               {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               Send
             </Button>

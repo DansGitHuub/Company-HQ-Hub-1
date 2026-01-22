@@ -348,6 +348,7 @@ export type FeatureRequest = typeof featureRequests.$inferSelect;
 export const customerMessages = pgTable("customer_messages", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id", { length: 36 }).references(() => users.id).notNull(),
+  targetEmployeeId: varchar("target_employee_id", { length: 36 }).references(() => users.id),
   subject: text("subject").notNull(),
   message: text("message").notNull(),
   status: text("status").notNull().default("unread"),
@@ -359,6 +360,7 @@ export const customerMessages = pgTable("customer_messages", {
 
 export const insertCustomerMessageSchema = createInsertSchema(customerMessages).pick({
   customerId: true,
+  targetEmployeeId: true,
   subject: true,
   message: true,
 });
