@@ -119,7 +119,7 @@ export default function ApplicantPortal() {
               You don't have an active job application. Check out our open positions!
             </p>
             <Link href="/careers">
-              <Button className="btn-glow">
+              <Button className="btn-glow" data-testid="button-view-open-positions">
                 <Briefcase className="mr-2 h-4 w-4" />
                 View Open Positions
               </Button>
@@ -172,9 +172,9 @@ export default function ApplicantPortal() {
           <div>
             <div className="flex justify-between text-sm mb-2">
               <span className="text-muted-foreground">Application Progress</span>
-              <span className="font-medium">{progress}%</span>
+              <span className="font-medium" data-testid="text-progress-percent">{progress}%</span>
             </div>
-            <Progress value={progress} className="h-2" />
+            <Progress value={progress} className="h-2" data-testid="progress-application" />
           </div>
 
           <div className="space-y-3">
@@ -252,7 +252,7 @@ export default function ApplicantPortal() {
                     <p className="text-xs text-muted-foreground">{doc.description}</p>
                   </div>
                   {!uploaded && (
-                    <Button size="sm" variant="outline" className="gap-1">
+                    <Button size="sm" variant="outline" className="gap-1" data-testid={`button-upload-${doc.type}`}>
                       <Upload className="h-3 w-3" />
                       Upload
                     </Button>
@@ -323,8 +323,8 @@ export default function ApplicantPortal() {
 
             <div className="pt-2">
               <h4 className="font-medium mb-2">Have Questions?</h4>
-              <Link href="/customer-portal">
-                <Button variant="outline" className="w-full gap-2">
+              <Link href="/customer">
+                <Button variant="outline" className="w-full gap-2" data-testid="button-contact-team">
                   <MessageSquare className="h-4 w-4" />
                   Contact Our Team
                 </Button>
