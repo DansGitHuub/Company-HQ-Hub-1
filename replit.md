@@ -132,6 +132,8 @@ Preferred communication style: Simple, everyday language.
 - Interactive walkthroughs for new users with role-specific paths
 - FAQ section with expandable answers
 - Step-by-step dialogs guiding users through features
+- **Customer-specific Help**: Customers see a dedicated "Customer Help" page with different FAQs, quick action cards, and customer-focused walkthrough
+- **Test My Software (Admin)**: Admins can preview the app as any role (Manager, Crew, Customer) to see exactly what each access level sees without creating test accounts. Preview mode shows a banner indicator and changes sidebar navigation accordingly.
 
 ### User Profiles
 - All users can create and edit their own profile
