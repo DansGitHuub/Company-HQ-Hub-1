@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("Customer"),
   isActive: boolean("is_active").notNull().default(true),
   isMasterAdmin: boolean("is_master_admin").notNull().default(false),
+  isApplicant: boolean("is_applicant").notNull().default(false),
   recoveryToken: text("recovery_token"),
   recoveryExpires: timestamp("recovery_expires"),
   bio: text("bio"),
@@ -146,6 +147,7 @@ export type CandidateRating = "green" | "yellow" | "red" | null;
 
 export const candidates = pgTable("candidates", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id),
   name: text("name").notNull(),
   role: text("role").notNull(),
   stage: text("stage").notNull().default("Applied"),
@@ -160,10 +162,12 @@ export const candidates = pgTable("candidates", {
   jobType: text("job_type").$type<CandidateJobType>(),
   workType: text("work_type").$type<CandidateWorkType>(),
   notes: text("notes"),
+  lastNotifiedAt: timestamp("last_notified_at"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertCandidateSchema = createInsertSchema(candidates).pick({
+  userId: true,
   name: true,
   role: true,
   stage: true,
