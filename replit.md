@@ -141,6 +141,17 @@ Preferred communication style: Simple, everyday language.
 - Profile picture upload with cloud storage (Replit Object Storage)
 - Accessible from navigation sidebar for all user roles
 
+### Theme System
+- 8 outdoor/landscape-inspired color themes: Forest (default), Ocean, Sunset, Mountain, Meadow, Autumn, Winter, Desert
+- Theme picker available in user Profile page under "Theme Preferences" section
+- Auto-saves when user clicks a theme (no save button needed)
+- Themes persist across sessions (stored in users.theme column)
+- Theme applies globally on login via AuthProvider
+- Each theme includes primary, accent, sidebar, and glow color variations
+- CSS classes for interactive effects: card-interactive, tile-dash, btn-glow, shimmer-border
+- Theme definitions: client/src/lib/themes.ts
+- Theme styles: client/src/index.css (under @layer components)
+
 ### AI Assistant
 - Powered by Replit AI Integrations (OpenAI)
 - Conversation history stored per user in database
