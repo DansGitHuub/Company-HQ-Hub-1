@@ -29,6 +29,7 @@ import Help from "@/pages/Help";
 import Profile from "@/pages/Profile";
 import AdminSetup from "@/pages/AdminSetup";
 import EquipmentTracker from "@/pages/EquipmentTracker";
+import SearchPage from "@/pages/Search";
 import NotFound from "@/pages/not-found";
 
 function AppRoutes() {
@@ -78,6 +79,7 @@ function AppRoutes() {
         <Route path="/help" component={Help} />
         <Route path="/admin-setup" component={AdminSetup} />
         <Route path="/equipment" component={EquipmentTracker} />
+        <Route path="/search" component={SearchPage} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>

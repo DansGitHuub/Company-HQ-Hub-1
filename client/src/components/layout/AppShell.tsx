@@ -159,6 +159,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = React.useState(false);
   const [, navigate] = useLocation();
+  const [searchQuery, setSearchQuery] = React.useState("");
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
 
   const { data: unreadData } = useQuery<{ count: number }>({
     queryKey: ["/api/messages/unread-count"],
@@ -422,23 +430,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-16 border-b bg-card px-8 flex items-center justify-between sticky top-0 z-10">
-           <div className="relative w-full max-w-md">
+           <form onSubmit={handleSearch} className="relative w-full max-w-md">
              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
              <input 
                 type="text" 
                 placeholder="Search everything..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-secondary/50 h-9 rounded-md pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                data-testid="input-global-search"
              />
-           </div>
+           </form>
            <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
-                size="icon"
-                className="relative"
+                size="lg"
+                className="relative h-12 w-12"
                 onClick={() => navigate(effectiveRole === "Customer" ? "/customer" : "/inbox")}
                 data-testid="button-messages-notification"
               >
-                <Bell className="h-5 w-5" />
+                <Bell className="h-7 w-7" />
                 {unreadData && unreadData.count > 0 && (
                   <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-medium animate-pulse">
                     {unreadData.count > 9 ? "9+" : unreadData.count}

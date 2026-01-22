@@ -19,6 +19,80 @@ export async function registerRoutes(
 ): Promise<Server> {
   setupAuth(app);
 
+  // Global search endpoint
+  app.get("/api/search", requireAuth, async (req, res) => {
+    try {
+      const query = (req.query.q as string || "").toLowerCase().trim();
+      if (!query) {
+        return res.json([]);
+      }
+
+      const results: any[] = [];
+      const userRole = req.user?.role;
+
+      // Search SOPs (accessible to all internal roles)
+      if (userRole !== "Customer") {
+        const sops = await storage.getSops();
+        sops.filter((s: any) => !s.archived && (
+          s.title.toLowerCase().includes(query) ||
+          (s.content && s.content.toLowerCase().includes(query))
+        )).slice(0, 5).forEach((s: any) => {
+          results.push({ type: "sop", id: s.id, title: s.title, category: s.category });
+        });
+      }
+
+      // Search Materials (accessible to all internal roles)
+      if (userRole !== "Customer") {
+        const materials = await storage.getMaterials();
+        materials.filter(m => 
+          m.name.toLowerCase().includes(query)
+        ).slice(0, 5).forEach(m => {
+          results.push({ type: "material", id: m.id, title: m.name, category: m.category });
+        });
+      }
+
+      // Search Jobs (accessible to all internal roles)
+      if (userRole !== "Customer") {
+        const jobs = await storage.getJobs();
+        jobs.filter(j => 
+          j.client.toLowerCase().includes(query) ||
+          (j.notes && j.notes.toLowerCase().includes(query)) ||
+          (j.address && j.address.toLowerCase().includes(query))
+        ).slice(0, 5).forEach(j => {
+          results.push({ type: "job", id: j.id, title: j.client, description: j.notes || undefined });
+        });
+      }
+
+      // Search Candidates (accessible to all internal roles)
+      if (userRole !== "Customer") {
+        const candidates = await storage.getCandidates();
+        candidates.filter(c => 
+          c.name.toLowerCase().includes(query) ||
+          (c.email && c.email.toLowerCase().includes(query))
+        ).slice(0, 5).forEach(c => {
+          results.push({ type: "candidate", id: c.id, title: c.name, description: c.role });
+        });
+      }
+
+      // Search Users (admin only)
+      if (userRole === "Admin") {
+        const users = await storage.getAllUsers();
+        users.filter(u => 
+          u.username.toLowerCase().includes(query) ||
+          (u.name && u.name.toLowerCase().includes(query)) ||
+          (u.email && u.email.toLowerCase().includes(query))
+        ).slice(0, 5).forEach(u => {
+          results.push({ type: "user", id: u.id, title: u.name || u.username, description: u.role });
+        });
+      }
+
+      res.json(results.slice(0, 20));
+    } catch (err) {
+      console.error("Search error:", err);
+      res.status(500).json({ message: "Search failed" });
+    }
+  });
+
   // Temporary debug endpoint to check seed status
   app.get("/api/debug/seed-status", async (req, res) => {
     try {
