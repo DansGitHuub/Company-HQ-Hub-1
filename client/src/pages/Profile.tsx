@@ -60,10 +60,22 @@ export default function Profile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      toast({ title: "Theme updated" });
+    },
+    onError: (error: Error, themeId: ThemeId) => {
+      const previousTheme = profile?.theme as ThemeId || "forest";
+      setSelectedTheme(previousTheme);
+      applyTheme(getTheme(previousTheme));
+      toast({ 
+        title: "Failed to save theme", 
+        description: "Your theme preference couldn't be saved. Please try again.",
+        variant: "destructive" 
+      });
     },
   });
 
   const handleThemeChange = (themeId: ThemeId) => {
+    const previousTheme = selectedTheme;
     setSelectedTheme(themeId);
     const theme = getTheme(themeId);
     applyTheme(theme);

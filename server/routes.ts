@@ -1050,13 +1050,14 @@ export async function registerRoutes(
 
   app.patch("/api/profile", requireAuth, async (req, res) => {
     try {
-      const { name, email, bio, phone, profilePicture } = req.body;
+      const { name, email, bio, phone, profilePicture, theme } = req.body;
       const updates: any = { updatedAt: new Date() };
       if (name !== undefined) updates.name = name;
       if (email !== undefined) updates.email = email;
       if (bio !== undefined) updates.bio = bio;
       if (phone !== undefined) updates.phone = phone;
       if (profilePicture !== undefined) updates.profilePicture = profilePicture;
+      if (theme !== undefined) updates.theme = theme;
       
       const user = await storage.updateUser(req.user!.id, updates);
       if (!user) return res.status(404).json({ message: "User not found" });

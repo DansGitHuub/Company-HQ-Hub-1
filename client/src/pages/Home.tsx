@@ -147,30 +147,34 @@ export default function Home() {
             className={tile.colSpan}
           >
             <Link href={tile.href}>
-              <div className="group relative h-64 w-full rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-xl transition-all duration-300 border border-border bg-card">
-                
+              <div 
+                className="tile-dash group relative h-64 w-full cursor-pointer"
+                data-testid={`tile-${tile.title.toLowerCase().replace(/\s+/g, '-')}`}
+              >
                 {tile.image && (
-                  <div className="absolute inset-0 z-0">
+                  <div className="absolute inset-0 z-0 rounded-xl overflow-hidden">
                     <img 
                       src={tile.image} 
                       alt={tile.title} 
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                     />
-                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/30 transition-colors" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/20 group-hover:from-black/60 group-hover:via-black/30 transition-colors duration-300" />
                   </div>
                 )}
 
-                <div className={`relative z-10 h-full p-6 flex flex-col justify-between ${tile.image ? 'text-white' : ''}`}>
+                <div className={`relative z-10 h-full flex flex-col justify-between ${tile.image ? 'text-white' : ''}`}>
                   <div className="flex justify-between items-start">
-                    <div className={`p-3 rounded-lg ${tile.image ? 'bg-white/20 backdrop-blur-md text-white' : tile.color}`}>
+                    <div className={`p-3 rounded-lg transition-all duration-300 group-hover:scale-110 ${tile.image ? 'bg-white/20 backdrop-blur-md text-white group-hover:bg-white/30' : tile.color}`}>
                       <tile.icon className="w-6 h-6" />
                     </div>
-                    <ArrowRight className={`w-5 h-5 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all ${tile.image ? 'text-white' : 'text-muted-foreground'}`} />
+                    <div className="p-2 rounded-full bg-primary/10 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+                      <ArrowRight className={`w-5 h-5 ${tile.image ? 'text-white' : 'text-primary'}`} />
+                    </div>
                   </div>
                   
-                  <div>
-                    <h3 className="text-2xl font-heading font-bold mb-1">{tile.title}</h3>
-                    <p className={`text-sm ${tile.image ? 'text-white/80' : 'text-muted-foreground'}`}>
+                  <div className="transform transition-transform duration-300 group-hover:translate-x-1">
+                    <h3 className="text-2xl font-heading font-bold mb-1 drop-shadow-md">{tile.title}</h3>
+                    <p className={`text-sm ${tile.image ? 'text-white/90' : 'text-muted-foreground'}`}>
                       {tile.desc}
                     </p>
                   </div>
