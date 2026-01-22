@@ -69,12 +69,15 @@ export async function seedUsers(): Promise<void> {
         
         console.log(`[seed] Created account: ${seedUser.username} (${seedUser.role})${seedUser.isMasterAdmin ? ' [MASTER ADMIN]' : ''}`);
       } else {
-        if (seedUser.isMasterAdmin && !existingUser.isMasterAdmin) {
-          await storage.updateUser(existingUser.id, { isMasterAdmin: true });
-          console.log(`[seed] Updated ${seedUser.username} to Master Admin`);
-        } else {
-          console.log(`[seed] Account exists: ${seedUser.username}`);
+        const hashedPassword = await hashPassword(seedUser.password);
+        const updates: any = { password: hashedPassword };
+        
+        if (seedUser.isMasterAdmin) {
+          updates.isMasterAdmin = true;
         }
+        
+        await storage.updateUser(existingUser.id, updates);
+        console.log(`[seed] Reset password for: ${seedUser.username}${seedUser.isMasterAdmin ? ' [MASTER ADMIN]' : ''}`);
       }
     } catch (error) {
       console.error(`[seed] Error with account ${seedUser.username}:`, error);
