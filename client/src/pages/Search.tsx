@@ -1,6 +1,5 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Search as SearchIcon, FileText, Users, Hammer, BookOpen, Briefcase, User } from "lucide-react";
@@ -15,9 +14,22 @@ type SearchResult = {
 };
 
 export default function SearchPage() {
-  const [location] = useLocation();
-  const params = new URLSearchParams(location.split("?")[1] || "");
-  const query = params.get("q") || "";
+  const [query, setQuery] = useState("");
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setQuery(params.get("q") || "");
+  }, []);
+  
+  // Also update when URL changes
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setQuery(params.get("q") || "");
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const { data: results, isLoading } = useQuery<SearchResult[]>({
     queryKey: ["/api/search", query],
