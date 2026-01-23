@@ -152,6 +152,18 @@ Preferred communication style: Simple, everyday language.
 - Theme definitions: client/src/lib/themes.ts
 - Theme styles: client/src/index.css (under @layer components)
 
+### Tile View Navigation
+- Alternative navigation mode accessible via "Tiles" button in header
+- Toggle between traditional sidebar and tile-based navigation
+- Three layout options when in tile view:
+  - **Grid**: Responsive grid of colorful tiles with icons and labels
+  - **Radial**: Circular arrangement of tiles around a central "HQ" hub
+  - **Dock**: macOS-style dock bar at bottom with hover animation effects
+- Layout toggle buttons appear in header when tile view is active
+- Clicking a tile navigates to that page and automatically switches back to sidebar view
+- Fully accessible with aria-labels and keyboard focus styles
+- Implementation: TileNavigation component in client/src/components/layout/AppShell.tsx
+
 ### AI Assistant
 - Powered by Replit AI Integrations (OpenAI)
 - Conversation history stored per user in database
