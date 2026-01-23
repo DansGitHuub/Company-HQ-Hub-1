@@ -192,7 +192,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     e.preventDefault();
     if (searchQuery.trim()) {
       setShowSuggestions(false);
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      // Use window.location for reliable navigation with query params
+      window.location.href = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
     }
   };
 
