@@ -124,18 +124,27 @@ export const materials = pgTable("materials", {
   sku: text("sku").notNull().unique(),
   stock: integer("stock").notNull().default(0),
   unit: text("unit").notNull(),
-  price: integer("price").notNull(),
+  price: integer("price"),
   image: text("image"),
+  materialType: text("material_type"),
+  description: text("description"),
+  weight: integer("weight"),
+  weightUnit: text("weight_unit"),
+  coverageArea: integer("coverage_area"),
+  coverageUnit: text("coverage_unit"),
+  supplier: text("supplier"),
+  supplierContact: text("supplier_contact"),
+  supplierUrl: text("supplier_url"),
+  calculationFormula: text("calculation_formula"),
+  crewNotes: text("crew_notes"),
+  customerNotes: text("customer_notes"),
+  aiGenerated: boolean("ai_generated").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertMaterialSchema = createInsertSchema(materials).pick({
-  name: true,
-  category: true,
-  sku: true,
-  stock: true,
-  unit: true,
-  price: true,
-  image: true,
+export const insertMaterialSchema = createInsertSchema(materials).omit({
+  id: true,
+  createdAt: true,
 });
 
 export type InsertMaterial = z.infer<typeof insertMaterialSchema>;

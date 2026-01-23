@@ -550,6 +550,182 @@ export async function registerRoutes(
     }
   });
 
+  // AI-powered smart material draft - generates questions and auto-fills data
+  app.post("/api/materials/ai-draft", requireAuth, async (req, res) => {
+    try {
+      const { materialType, name, partialData } = req.body;
+      
+      const systemPrompt = `You are an expert in landscaping materials. Generate helpful information about a material based on its type and name.
+      
+For the given material, provide:
+1. A clear description suitable for customers
+2. Typical weight per unit (in lbs)
+3. Coverage area if applicable (in sq ft per unit - e.g., "1 bag covers 4 sq ft at 3 inches deep")
+4. A calculation formula crews can use (e.g., "Sq ft needed ÷ 4 = number of bags at 3 inch depth")
+5. Notes helpful for crew members about handling/application
+6. Suggested category from: Aggregates, Mulch, Plants, Hardscape, Soil, Fertilizer, Tools, Miscellaneous
+7. Suggested unit of measurement (bags, cubic yards, each, pallets, tons, etc.)
+
+Respond in JSON format:
+{
+  "description": "Customer-friendly description",
+  "weight": number or null,
+  "weightUnit": "lbs" or "tons",
+  "coverageArea": number or null,
+  "coverageUnit": "sq ft per bag" or similar,
+  "calculationFormula": "Formula for calculating quantity needed",
+  "crewNotes": "Notes for crew about handling",
+  "customerNotes": "Simple tips for customers",
+  "suggestedCategory": "Category name",
+  "suggestedUnit": "bags" or other unit,
+  "suggestedSku": "Short alphanumeric SKU"
+}`;
+
+      const userPrompt = `Material Type: ${materialType || 'General'}
+Material Name: ${name}
+${partialData ? `Additional info provided: ${JSON.stringify(partialData)}` : ''}
+
+Generate detailed information for this landscaping material.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 1000
+      });
+
+      const content = response.choices[0]?.message?.content || "{}";
+      const aiData = JSON.parse(content);
+      
+      res.json({
+        success: true,
+        data: aiData
+      });
+    } catch (err: any) {
+      console.error("AI material draft error:", err);
+      res.status(500).json({ message: "AI generation failed", error: err.message });
+    }
+  });
+
+  // AI image generation for materials
+  app.post("/api/materials/ai-image", requireAuth, async (req, res) => {
+    try {
+      const { name, materialType, description } = req.body;
+      
+      const prompt = `A professional product photo of ${name}, a ${materialType || 'landscaping'} material. ${description || ''}. Clean white background, studio lighting, professional quality, no text or labels.`;
+      
+      const response = await openai.images.generate({
+        model: "gpt-image-1",
+        prompt,
+        size: "512x512"
+      });
+      
+      const base64 = response.data?.[0]?.b64_json;
+      if (!base64) {
+        return res.status(500).json({ message: "No image generated" });
+      }
+      
+      // Return as data URL for immediate use
+      res.json({
+        success: true,
+        imageUrl: `data:image/png;base64,${base64}`
+      });
+    } catch (err: any) {
+      console.error("AI image generation error:", err);
+      res.status(500).json({ message: "Image generation failed", error: err.message });
+    }
+  });
+
+  // Bulk import materials from Excel/CSV data
+  app.post("/api/materials/bulk-import", requireAuth, async (req, res) => {
+    try {
+      const { materials: importData } = req.body;
+      
+      if (!Array.isArray(importData) || importData.length === 0) {
+        return res.status(400).json({ message: "No materials data provided" });
+      }
+      
+      const results = {
+        imported: 0,
+        errors: [] as { row: number; error: string }[]
+      };
+      
+      for (let i = 0; i < importData.length; i++) {
+        const row = importData[i];
+        try {
+          // Validate required fields
+          if (!row.name || !row.category || !row.sku || !row.unit) {
+            results.errors.push({ 
+              row: i + 1, 
+              error: "Missing required fields (name, category, sku, unit)" 
+            });
+            continue;
+          }
+          
+          await storage.createMaterial({
+            name: row.name,
+            category: row.category,
+            sku: row.sku,
+            unit: row.unit,
+            stock: row.stock || 0,
+            description: row.description,
+            materialType: row.materialType,
+            weight: row.weight ? parseInt(row.weight) : undefined,
+            weightUnit: row.weightUnit,
+            coverageArea: row.coverageArea ? parseInt(row.coverageArea) : undefined,
+            coverageUnit: row.coverageUnit,
+            supplier: row.supplier,
+            supplierContact: row.supplierContact,
+            supplierUrl: row.supplierUrl,
+            crewNotes: row.crewNotes,
+            customerNotes: row.customerNotes
+          });
+          results.imported++;
+        } catch (err: any) {
+          results.errors.push({ row: i + 1, error: err.message || "Unknown error" });
+        }
+      }
+      
+      res.json(results);
+    } catch (err: any) {
+      console.error("Bulk import error:", err);
+      res.status(500).json({ message: "Bulk import failed", error: err.message });
+    }
+  });
+
+  // Get material template download format
+  app.get("/api/materials/template", requireAuth, async (req, res) => {
+    const template = {
+      headers: [
+        "name", "category", "sku", "unit", "stock", "materialType", 
+        "description", "weight", "weightUnit", "coverageArea", "coverageUnit",
+        "supplier", "supplierContact", "supplierUrl", "crewNotes", "customerNotes"
+      ],
+      example: {
+        name: "Premium Brown Mulch",
+        category: "Mulch",
+        sku: "MUL-BRN-001",
+        unit: "bags",
+        stock: 100,
+        materialType: "Mulch",
+        description: "High-quality brown mulch for landscaping beds",
+        weight: 40,
+        weightUnit: "lbs",
+        coverageArea: 8,
+        coverageUnit: "sq ft per bag at 3 inch depth",
+        supplier: "ABC Landscape Supply",
+        supplierContact: "555-1234",
+        supplierUrl: "https://supplier.example.com",
+        crewNotes: "Store in dry area. Break up clumps before spreading.",
+        customerNotes: "Apply 2-3 inches deep for best weed suppression."
+      }
+    };
+    res.json(template);
+  });
+
   app.get("/api/candidates", requireAuth, async (req, res) => {
     try {
       const candidates = await storage.getCandidates();
