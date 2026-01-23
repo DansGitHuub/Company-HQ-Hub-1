@@ -160,13 +160,52 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = React.useState(false);
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const searchRef = React.useRef<HTMLDivElement>(null);
+
+  // Role-based search suggestions
+  const getSuggestions = () => {
+    const suggestions: { label: string; example: string }[] = [];
+    const role = effectiveRole;
+    
+    if (role !== "Customer") {
+      suggestions.push(
+        { label: "SOPs", example: "safety procedures" },
+        { label: "Materials", example: "mulch, pavers" },
+        { label: "Jobs", example: "client name or address" },
+        { label: "Candidates", example: "applicant name" }
+      );
+    }
+    if (role === "Admin") {
+      suggestions.push({ label: "Users", example: "team member name" });
+    }
+    if (role === "Customer") {
+      suggestions.push(
+        { label: "Resources", example: "lawn care guides" },
+        { label: "Your Messages", example: "message subject" }
+      );
+    }
+    return suggestions;
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
+      setShowSuggestions(false);
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
+
+  // Close suggestions when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const { data: unreadData } = useQuery<{ count: number }>({
     queryKey: ["/api/messages/unread-count"],
@@ -430,17 +469,36 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-16 border-b bg-card px-8 flex items-center justify-between sticky top-0 z-10">
-           <form onSubmit={handleSearch} className="relative w-full max-w-md">
-             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-             <input 
-                type="text" 
-                placeholder="Search everything..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-secondary/50 h-9 rounded-md pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                data-testid="input-global-search"
-             />
-           </form>
+           <div ref={searchRef} className="relative w-full max-w-md">
+             <form onSubmit={handleSearch} className="relative">
+               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+               <input 
+                  type="text" 
+                  placeholder="Search everything..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setShowSuggestions(true)}
+                  className="w-full bg-secondary/50 h-9 rounded-md pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  data-testid="input-global-search"
+               />
+             </form>
+             {showSuggestions && !searchQuery && (
+               <div className="absolute top-full left-0 right-0 mt-1 bg-card border rounded-md shadow-lg z-50 p-3">
+                 <p className="text-xs text-muted-foreground mb-2 font-medium">You can search for:</p>
+                 <div className="space-y-1.5">
+                   {getSuggestions().map((s, i) => (
+                     <div key={i} className="flex items-center gap-2 text-sm">
+                       <span className="font-medium text-primary">{s.label}</span>
+                       <span className="text-muted-foreground text-xs">e.g. "{s.example}"</span>
+                     </div>
+                   ))}
+                 </div>
+                 <p className="text-xs text-muted-foreground mt-3 pt-2 border-t">
+                   Type to search, press Enter to see results
+                 </p>
+               </div>
+             )}
+           </div>
            <div className="flex items-center gap-4">
               <Button
                 variant="ghost"

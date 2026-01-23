@@ -14,22 +14,33 @@ type SearchResult = {
 };
 
 export default function SearchPage() {
-  const [query, setQuery] = useState("");
-  
-  useEffect(() => {
+  const [query, setQuery] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    setQuery(params.get("q") || "");
-  }, []);
+    return params.get("q") || "";
+  });
   
-  // Also update when URL changes
+  // Update query when URL changes - use polling to catch navigation
   useEffect(() => {
-    const handlePopState = () => {
+    const checkUrl = () => {
       const params = new URLSearchParams(window.location.search);
-      setQuery(params.get("q") || "");
+      const urlQuery = params.get("q") || "";
+      if (urlQuery !== query) {
+        setQuery(urlQuery);
+      }
     };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+    
+    // Check immediately and on popstate
+    checkUrl();
+    window.addEventListener("popstate", checkUrl);
+    
+    // Also poll for changes (catches programmatic navigation)
+    const interval = setInterval(checkUrl, 200);
+    
+    return () => {
+      window.removeEventListener("popstate", checkUrl);
+      clearInterval(interval);
+    };
+  }, [query]);
 
   const { data: results, isLoading } = useQuery<SearchResult[]>({
     queryKey: ["/api/search", query],
