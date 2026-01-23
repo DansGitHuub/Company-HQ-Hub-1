@@ -180,7 +180,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [location]);
 
-  // Role-based search suggestions
+  // Role-based search suggestions - comprehensive list
   const getSuggestions = () => {
     const suggestions: { label: string; example: string }[] = [];
     const role = effectiveRole;
@@ -188,19 +188,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (role !== "Customer") {
       suggestions.push(
         { label: "SOPs", example: "safety procedures" },
-        { label: "Materials", example: "mulch, pavers" },
+        { label: "Materials", example: "mulch, pavers, SKU" },
+        { label: "Equipment", example: "truck, mower, VIN" },
         { label: "Jobs", example: "client name or address" },
         { label: "Candidates", example: "applicant name" }
       );
     }
-    if (role === "Admin") {
-      suggestions.push({ label: "Users", example: "team member name" });
+    if (role === "Admin" || role === "Manager") {
+      suggestions.push({ label: "Campaigns", example: "marketing campaign" });
     }
-    if (role === "Customer") {
+    if (role === "Admin") {
       suggestions.push(
-        { label: "Resources", example: "lawn care guides" },
-        { label: "Your Messages", example: "message subject" }
+        { label: "Users", example: "team member name" },
+        { label: "Forms", example: "form title" }
       );
+    }
+    // Resources searchable by all users including customers
+    suggestions.push({ label: "Resources", example: "lawn care guides" });
+    
+    if (role === "Customer") {
+      suggestions.push({ label: "Your Messages", example: "message subject" });
     }
     return suggestions;
   };

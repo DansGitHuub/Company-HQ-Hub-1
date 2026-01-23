@@ -2,11 +2,11 @@ import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search as SearchIcon, FileText, Users, Hammer, BookOpen, Briefcase, User } from "lucide-react";
+import { Loader2, Search as SearchIcon, FileText, Users, Hammer, BookOpen, Briefcase, User, Truck, Megaphone, GraduationCap } from "lucide-react";
 import { Link } from "wouter";
 
 type SearchResult = {
-  type: "sop" | "material" | "candidate" | "job" | "user" | "form";
+  type: "sop" | "material" | "candidate" | "job" | "user" | "form" | "equipment" | "campaign" | "resource";
   id: string;
   title: string;
   description?: string;
@@ -61,6 +61,9 @@ export default function SearchPage() {
       case "job": return Briefcase;
       case "user": return User;
       case "form": return FileText;
+      case "equipment": return Truck;
+      case "campaign": return Megaphone;
+      case "resource": return GraduationCap;
       default: return FileText;
     }
   };
@@ -73,6 +76,9 @@ export default function SearchPage() {
       case "job": return `/jobs`;
       case "user": return `/admin`;
       case "form": return `/forms`;
+      case "equipment": return `/equipment`;
+      case "campaign": return `/marketing`;
+      case "resource": return `/education`;
       default: return "/";
     }
   };
@@ -85,6 +91,9 @@ export default function SearchPage() {
       case "job": return "Job";
       case "user": return "User";
       case "form": return "Form";
+      case "equipment": return "Equipment";
+      case "campaign": return "Campaign";
+      case "resource": return "Resource";
       default: return type;
     }
   };

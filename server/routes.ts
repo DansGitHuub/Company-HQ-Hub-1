@@ -19,7 +19,7 @@ export async function registerRoutes(
 ): Promise<Server> {
   setupAuth(app);
 
-  // Global search endpoint
+  // Global search endpoint - searches everything based on user role
   app.get("/api/search", requireAuth, async (req, res) => {
     try {
       const query = (req.query.q as string || "").toLowerCase().trim();
@@ -35,58 +35,124 @@ export async function registerRoutes(
         const sops = await storage.getSops();
         sops.filter((s: any) => !s.isArchived && (
           s.title.toLowerCase().includes(query) ||
-          (s.content && s.content.toLowerCase().includes(query))
+          (s.content && s.content.toLowerCase().includes(query)) ||
+          (s.category && s.category.toLowerCase().includes(query))
         )).slice(0, 5).forEach((s: any) => {
           results.push({ type: "sop", id: s.id, title: s.title, category: s.category });
         });
       }
 
-      // Search Materials (accessible to all internal roles)
+      // Search Materials (accessible to all internal roles) - expanded fields
       if (userRole !== "Customer") {
         const materials = await storage.getMaterials();
-        materials.filter(m => 
-          m.name.toLowerCase().includes(query)
-        ).slice(0, 5).forEach(m => {
-          results.push({ type: "material", id: m.id, title: m.name, category: m.category });
+        materials.filter((m: any) => 
+          m.name.toLowerCase().includes(query) ||
+          (m.category && m.category.toLowerCase().includes(query)) ||
+          (m.description && m.description.toLowerCase().includes(query)) ||
+          (m.sku && m.sku.toLowerCase().includes(query))
+        ).slice(0, 5).forEach((m: any) => {
+          results.push({ type: "material", id: m.id, title: m.name, category: m.category, description: m.description });
         });
       }
 
-      // Search Jobs (accessible to all internal roles)
+      // Search Equipment (accessible to all internal roles) - NEW
+      if (userRole !== "Customer") {
+        const equipment = await storage.getEquipment();
+        equipment.filter((e: any) => 
+          e.name.toLowerCase().includes(query) ||
+          (e.type && e.type.toLowerCase().includes(query)) ||
+          (e.make && e.make.toLowerCase().includes(query)) ||
+          (e.model && e.model.toLowerCase().includes(query)) ||
+          (e.vin && e.vin.toLowerCase().includes(query)) ||
+          (e.licensePlate && e.licensePlate.toLowerCase().includes(query)) ||
+          (e.notes && e.notes.toLowerCase().includes(query)) ||
+          (e.status && e.status.toLowerCase().includes(query))
+        ).slice(0, 5).forEach((e: any) => {
+          const desc = [e.year, e.make, e.model].filter(Boolean).join(" ");
+          results.push({ type: "equipment", id: e.id, title: e.name, description: desc || e.type, category: e.type });
+        });
+      }
+
+      // Search Jobs (accessible to all internal roles) - expanded fields
       if (userRole !== "Customer") {
         const jobs = await storage.getJobs();
-        jobs.filter(j => 
+        jobs.filter((j: any) => 
           j.client.toLowerCase().includes(query) ||
           (j.notes && j.notes.toLowerCase().includes(query)) ||
-          (j.address && j.address.toLowerCase().includes(query))
-        ).slice(0, 5).forEach(j => {
-          results.push({ type: "job", id: j.id, title: j.client, description: j.notes || undefined });
+          (j.address && j.address.toLowerCase().includes(query)) ||
+          (j.stage && j.stage.toLowerCase().includes(query)) ||
+          (j.jobType && j.jobType.toLowerCase().includes(query))
+        ).slice(0, 5).forEach((j: any) => {
+          results.push({ type: "job", id: j.id, title: j.client, description: j.address || j.notes || undefined, category: j.jobType });
         });
       }
 
-      // Search Candidates (accessible to all internal roles)
+      // Search Candidates (accessible to all internal roles) - expanded fields
       if (userRole !== "Customer") {
         const candidates = await storage.getCandidates();
-        candidates.filter(c => 
+        candidates.filter((c: any) => 
           c.name.toLowerCase().includes(query) ||
-          (c.email && c.email.toLowerCase().includes(query))
-        ).slice(0, 5).forEach(c => {
-          results.push({ type: "candidate", id: c.id, title: c.name, description: c.role });
+          (c.email && c.email.toLowerCase().includes(query)) ||
+          (c.role && c.role.toLowerCase().includes(query)) ||
+          (c.phone && c.phone.toLowerCase().includes(query)) ||
+          (c.notes && c.notes.toLowerCase().includes(query))
+        ).slice(0, 5).forEach((c: any) => {
+          results.push({ type: "candidate", id: c.id, title: c.name, description: c.role, category: c.stage });
         });
       }
+
+      // Search Forms (Admin only) - NEW
+      if (userRole === "Admin") {
+        const forms = await storage.getCustomForms();
+        forms.filter((f: any) => 
+          f.title.toLowerCase().includes(query) ||
+          (f.description && f.description.toLowerCase().includes(query)) ||
+          (f.category && f.category.toLowerCase().includes(query))
+        ).slice(0, 5).forEach((f: any) => {
+          results.push({ type: "form", id: f.id, title: f.title, description: f.description, category: f.category });
+        });
+      }
+
+      // Search Campaigns (Admin/Manager only) - NEW
+      if (userRole === "Admin" || userRole === "Manager") {
+        const campaigns = await storage.getCampaigns();
+        campaigns.filter((c: any) => 
+          c.name.toLowerCase().includes(query) ||
+          (c.platform && c.platform.toLowerCase().includes(query)) ||
+          (c.status && c.status.toLowerCase().includes(query))
+        ).slice(0, 5).forEach((c: any) => {
+          results.push({ type: "campaign", id: c.id, title: c.name, description: c.platform, category: c.status });
+        });
+      }
+
+      // Search Customer Resources (accessible to all including Customers) - NEW
+      const resources = await storage.getCustomerResources();
+      resources.filter((r: any) => 
+        r.isPublished && (
+          r.title.toLowerCase().includes(query) ||
+          (r.description && r.description.toLowerCase().includes(query)) ||
+          (r.content && r.content.toLowerCase().includes(query)) ||
+          (r.category && r.category.toLowerCase().includes(query)) ||
+          (r.type && r.type.toLowerCase().includes(query))
+        )
+      ).slice(0, 5).forEach((r: any) => {
+        results.push({ type: "resource", id: r.id, title: r.title, description: r.description, category: r.category });
+      });
 
       // Search Users (admin only)
       if (userRole === "Admin") {
         const users = await storage.getAllUsers();
-        users.filter(u => 
+        users.filter((u: any) => 
           u.username.toLowerCase().includes(query) ||
           (u.name && u.name.toLowerCase().includes(query)) ||
-          (u.email && u.email.toLowerCase().includes(query))
-        ).slice(0, 5).forEach(u => {
+          (u.email && u.email.toLowerCase().includes(query)) ||
+          (u.role && u.role.toLowerCase().includes(query))
+        ).slice(0, 5).forEach((u: any) => {
           results.push({ type: "user", id: u.id, title: u.name || u.username, description: u.role });
         });
       }
 
-      res.json(results.slice(0, 20));
+      res.json(results.slice(0, 30));
     } catch (err) {
       console.error("Search error:", err);
       res.status(500).json({ message: "Search failed" });
