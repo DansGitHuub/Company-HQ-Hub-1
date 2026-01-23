@@ -331,11 +331,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground bg-gradient-to-b from-white/[0.03] to-transparent">
       <div className="p-6 pb-8 border-b border-sidebar-border">
-        <div className="flex flex-col items-center gap-4">
+        <a 
+          href="/" 
+          className="flex flex-col items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
+          data-testid="link-logo-home"
+        >
           {hasLogo ? (
             <img 
               src={companySettings.logoUrl!} 
-              alt="Company Logo"
+              alt="Company Logo - Click to go home"
               className={cn("object-cover shrink-0", sizeClass, shapeClass)}
             />
           ) : (
@@ -349,7 +353,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </h1>
             <p className="text-xs text-sidebar-foreground/60 mt-1">Landscape Management</p>
           </div>
-        </div>
+        </a>
       </div>
 
       <div className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
@@ -504,13 +508,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Button
                 variant="ghost"
                 size="lg"
-                className="relative h-12 w-12"
+                className="relative h-14 w-14 hover:bg-primary/10"
                 onClick={() => navigate(effectiveRole === "Customer" ? "/customer" : "/inbox")}
                 data-testid="button-messages-notification"
               >
-                <Bell className="h-7 w-7" />
+                <Bell className="h-8 w-8 text-primary" />
                 {unreadData && unreadData.count > 0 && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-medium animate-pulse">
+                  <span className="absolute top-0 right-0 h-6 w-6 rounded-full bg-destructive text-destructive-foreground text-sm flex items-center justify-center font-bold animate-pulse shadow-lg">
                     {unreadData.count > 9 ? "9+" : unreadData.count}
                   </span>
                 )}
