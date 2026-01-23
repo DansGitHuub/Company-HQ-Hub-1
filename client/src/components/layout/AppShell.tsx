@@ -25,7 +25,12 @@ import {
   Truck,
   Bell,
   Info,
-  ClipboardCheck
+  ClipboardCheck,
+  LayoutGrid,
+  PanelLeft,
+  Circle,
+  Grip,
+  Minus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -154,6 +159,8 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
   }
 };
 
+type TileLayout = "grid" | "radial" | "dock";
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation, effectiveRole, previewRole } = useAuth();
   const [location] = useLocation();
@@ -163,6 +170,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [showSuggestions, setShowSuggestions] = React.useState(false);
   const searchRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
+  const [isTileView, setIsTileView] = React.useState(false);
+  const [tileLayout, setTileLayout] = React.useState<TileLayout>("grid");
 
   // Reset scroll to top when navigating between pages
   React.useEffect(() => {
@@ -461,24 +470,159 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
   };
 
+  const TileNavigation = () => {
+    const tiles = displayNav.filter(item => item.id !== "help");
+    
+    const tileColors = [
+      "from-emerald-500 to-green-600",
+      "from-blue-500 to-cyan-600", 
+      "from-purple-500 to-violet-600",
+      "from-amber-500 to-orange-600",
+      "from-pink-500 to-rose-600",
+      "from-teal-500 to-emerald-600",
+      "from-indigo-500 to-blue-600",
+      "from-red-500 to-pink-600",
+      "from-lime-500 to-green-600",
+      "from-sky-500 to-blue-600",
+      "from-fuchsia-500 to-purple-600",
+      "from-yellow-500 to-amber-600",
+    ];
+
+    if (tileLayout === "grid") {
+      return (
+        <div className="flex items-center justify-center h-full p-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-w-5xl">
+            {tiles.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={cn(
+                    "group flex flex-col items-center justify-center gap-3 p-6 rounded-2xl",
+                    "bg-gradient-to-br shadow-lg hover:shadow-xl transition-all duration-300",
+                    "hover:scale-105 hover:-translate-y-1 cursor-pointer",
+                    "focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-transparent",
+                    tileColors[index % tileColors.length]
+                  )}
+                  aria-label={`Navigate to ${item.label}`}
+                  data-testid={`tile-${item.id}`}
+                  onClick={() => setIsTileView(false)}
+                >
+                  <Icon className="h-10 w-10 text-white drop-shadow-md" />
+                  <span className="text-white font-semibold text-sm text-center drop-shadow-sm">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    if (tileLayout === "radial") {
+      const radius = 180;
+      const angleStep = (2 * Math.PI) / tiles.length;
+      
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="relative" style={{ width: radius * 2 + 120, height: radius * 2 + 120 }}>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-2xl">
+                <span className="text-white font-bold text-lg">HQ</span>
+              </div>
+            </div>
+            {tiles.map((item, index) => {
+              const Icon = item.icon;
+              const angle = angleStep * index - Math.PI / 2;
+              const x = Math.cos(angle) * radius;
+              const y = Math.sin(angle) * radius;
+              
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={cn(
+                    "absolute flex flex-col items-center justify-center gap-1 p-3 rounded-xl",
+                    "bg-gradient-to-br shadow-lg hover:shadow-xl transition-all duration-300",
+                    "hover:scale-110 cursor-pointer w-20 h-20",
+                    "focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-transparent",
+                    tileColors[index % tileColors.length]
+                  )}
+                  style={{
+                    left: `calc(50% + ${x}px - 40px)`,
+                    top: `calc(50% + ${y}px - 40px)`,
+                  }}
+                  aria-label={`Navigate to ${item.label}`}
+                  data-testid={`tile-${item.id}`}
+                  onClick={() => setIsTileView(false)}
+                >
+                  <Icon className="h-7 w-7 text-white drop-shadow-md" />
+                  <span className="text-white font-medium text-xs text-center drop-shadow-sm truncate w-full">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    if (tileLayout === "dock") {
+      return (
+        <div className="flex flex-col items-center justify-end h-full pb-12">
+          <div className="flex items-end justify-center gap-2 p-4 bg-card/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-border">
+            {tiles.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={cn(
+                    "group flex flex-col items-center justify-center gap-1 p-3 rounded-xl relative",
+                    "bg-gradient-to-br shadow-md transition-all duration-200",
+                    "hover:scale-125 hover:-translate-y-3 cursor-pointer",
+                    "focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-transparent",
+                    tileColors[index % tileColors.length]
+                  )}
+                  aria-label={`Navigate to ${item.label}`}
+                  data-testid={`tile-${item.id}`}
+                  onClick={() => setIsTileView(false)}
+                >
+                  <Icon className="h-7 w-7 text-white drop-shadow-md" />
+                  <span className="text-white font-medium text-[10px] text-center drop-shadow-sm opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6 whitespace-nowrap">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+          <p className="text-muted-foreground text-sm mt-4">Click a tile to navigate</p>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <div className="hidden md:block w-64 shrink-0 border-r border-border bg-sidebar overflow-y-auto">
-        <NavContent />
-      </div>
+      {!isTileView && (
+        <div className="hidden md:block w-64 shrink-0 border-r border-border bg-sidebar overflow-y-auto">
+          <NavContent />
+        </div>
+      )}
 
-      <div className="md:hidden">
-        <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50 md:hidden">
-              <Menu className="h-6 w-6" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64 border-r border-sidebar-border bg-sidebar">
-            <NavContent />
-          </SheetContent>
-        </Sheet>
-      </div>
+      {!isTileView && (
+        <div className="md:hidden">
+          <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50 md:hidden">
+                <Menu className="h-6 w-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 w-64 border-r border-sidebar-border bg-sidebar">
+              <NavContent />
+            </SheetContent>
+          </Sheet>
+        </div>
+      )}
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-16 border-b bg-card px-8 flex items-center justify-between sticky top-0 z-10">
@@ -513,6 +657,61 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
              )}
            </div>
            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 mr-2 border-r pr-3">
+                <Button
+                  variant={isTileView ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setIsTileView(!isTileView)}
+                  className={cn(
+                    "gap-2 transition-colors",
+                    isTileView && "bg-primary text-primary-foreground"
+                  )}
+                  data-testid="button-tile-view-toggle"
+                >
+                  {isTileView ? <PanelLeft className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+                  <span className="hidden sm:inline">{isTileView ? "Menu" : "Tiles"}</span>
+                </Button>
+                {isTileView && (
+                  <div className="flex items-center gap-0.5 ml-1" role="group" aria-label="Tile layout options">
+                    <Button
+                      variant={tileLayout === "grid" ? "secondary" : "ghost"}
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setTileLayout("grid")}
+                      title="Grid Layout"
+                      aria-label="Switch to grid layout"
+                      aria-pressed={tileLayout === "grid"}
+                      data-testid="button-layout-grid"
+                    >
+                      <Grip className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={tileLayout === "radial" ? "secondary" : "ghost"}
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setTileLayout("radial")}
+                      title="Radial Layout"
+                      aria-label="Switch to radial layout"
+                      aria-pressed={tileLayout === "radial"}
+                      data-testid="button-layout-radial"
+                    >
+                      <Circle className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={tileLayout === "dock" ? "secondary" : "ghost"}
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setTileLayout("dock")}
+                      title="Dock Layout"
+                      aria-label="Switch to dock layout"
+                      aria-pressed={tileLayout === "dock"}
+                      data-testid="button-layout-dock"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
               <Button
                 variant="ghost"
                 size="lg"
@@ -542,8 +741,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
            </div>
         </header>
 
-        <div ref={contentRef} className="flex-1 overflow-y-auto p-4 md:p-8">
-          {children}
+        <div ref={contentRef} className={cn(
+          "flex-1 overflow-y-auto",
+          isTileView ? "p-0" : "p-4 md:p-8"
+        )}>
+          {isTileView ? <TileNavigation /> : children}
         </div>
       </main>
     </div>
