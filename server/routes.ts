@@ -535,6 +535,18 @@ export async function registerRoutes(
   app.get("/api/materials", requireAuth, async (req, res) => {
     try {
       const materials = await storage.getMaterials();
+      // Filter sensitive fields for Customer role
+      const user = req.user as any;
+      if (user?.role === "Customer") {
+        const filteredMaterials = materials.map(m => ({
+          ...m,
+          supplier: null,
+          supplierContact: null,
+          supplierUrl: null,
+          crewNotes: null,
+        }));
+        return res.json(filteredMaterials);
+      }
       res.json(materials);
     } catch (err) {
       res.status(500).json({ message: "Error fetching materials" });
