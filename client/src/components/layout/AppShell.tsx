@@ -473,47 +473,45 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const TileNavigation = () => {
     const tiles = displayNav.filter(item => item.id !== "help");
     
-    const tileColors = [
-      "from-emerald-500 to-green-600",
-      "from-blue-500 to-cyan-600", 
-      "from-purple-500 to-violet-600",
-      "from-amber-500 to-orange-600",
-      "from-pink-500 to-rose-600",
-      "from-teal-500 to-emerald-600",
-      "from-indigo-500 to-blue-600",
-      "from-red-500 to-pink-600",
-      "from-lime-500 to-green-600",
-      "from-sky-500 to-blue-600",
-      "from-fuchsia-500 to-purple-600",
-      "from-yellow-500 to-amber-600",
-    ];
+    const handleTileClick = (href: string) => {
+      navigate(href);
+    };
+
+    const TileHint = () => (
+      <p className="text-muted-foreground text-sm mt-4 text-center">Click a tile to navigate</p>
+    );
 
     if (tileLayout === "grid") {
       return (
-        <div className="flex items-center justify-center h-full p-8">
+        <div className="flex flex-col items-center justify-center h-full p-8">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-w-5xl">
-            {tiles.map((item, index) => {
+            {tiles.map((item) => {
               const Icon = item.icon;
               return (
-                <Link
+                <button
+                  type="button"
                   key={item.id}
-                  href={item.href}
+                  onClick={() => handleTileClick(item.href)}
                   className={cn(
                     "group flex flex-col items-center justify-center gap-3 p-6 rounded-2xl",
-                    "bg-gradient-to-br shadow-lg hover:shadow-xl transition-all duration-300",
+                    "bg-primary/90 hover:bg-primary shadow-lg hover:shadow-xl transition-all duration-300",
                     "hover:scale-105 hover:-translate-y-1 cursor-pointer",
-                    "focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-transparent",
-                    tileColors[index % tileColors.length]
+                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background",
+                    "border border-primary/20"
                   )}
+                  style={{ 
+                    background: `linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.7) 100%)`,
+                  }}
                   aria-label={`Navigate to ${item.label}`}
                   data-testid={`tile-${item.id}`}
                 >
-                  <Icon className="h-10 w-10 text-white drop-shadow-md" />
-                  <span className="text-white font-semibold text-sm text-center drop-shadow-sm">{item.label}</span>
-                </Link>
+                  <Icon className="h-10 w-10 text-primary-foreground drop-shadow-md" />
+                  <span className="text-primary-foreground font-semibold text-sm text-center drop-shadow-sm">{item.label}</span>
+                </button>
               );
             })}
           </div>
+          <TileHint />
         </div>
       );
     }
@@ -523,11 +521,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       const angleStep = (2 * Math.PI) / tiles.length;
       
       return (
-        <div className="flex items-center justify-center h-full">
+        <div className="flex flex-col items-center justify-center h-full">
           <div className="relative" style={{ width: radius * 2 + 120, height: radius * 2 + 120 }}>
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-2xl">
-                <span className="text-white font-bold text-lg">HQ</span>
+              <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center shadow-2xl border-2 border-primary-foreground/20">
+                <span className="text-primary-foreground font-bold text-lg">HQ</span>
               </div>
             </div>
             {tiles.map((item, index) => {
@@ -537,15 +535,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               const y = Math.sin(angle) * radius;
               
               return (
-                <Link
+                <button
+                  type="button"
                   key={item.id}
-                  href={item.href}
+                  onClick={() => handleTileClick(item.href)}
                   className={cn(
                     "absolute flex flex-col items-center justify-center gap-1 p-3 rounded-xl",
-                    "bg-gradient-to-br shadow-lg hover:shadow-xl transition-all duration-300",
+                    "bg-primary shadow-lg hover:shadow-xl transition-all duration-300",
                     "hover:scale-110 cursor-pointer w-20 h-20",
-                    "focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-transparent",
-                    tileColors[index % tileColors.length]
+                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background",
+                    "border border-primary-foreground/20"
                   )}
                   style={{
                     left: `calc(50% + ${x}px - 40px)`,
@@ -554,12 +553,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   aria-label={`Navigate to ${item.label}`}
                   data-testid={`tile-${item.id}`}
                 >
-                  <Icon className="h-7 w-7 text-white drop-shadow-md" />
-                  <span className="text-white font-medium text-xs text-center drop-shadow-sm truncate w-full">{item.label}</span>
-                </Link>
+                  <Icon className="h-7 w-7 text-primary-foreground drop-shadow-md" />
+                  <span className="text-primary-foreground font-medium text-xs text-center drop-shadow-sm truncate w-full">{item.label}</span>
+                </button>
               );
             })}
           </div>
+          <TileHint />
         </div>
       );
     }
@@ -568,29 +568,30 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       return (
         <div className="flex flex-col items-center justify-end h-full pb-12">
           <div className="flex items-end justify-center gap-2 p-4 bg-card/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-border">
-            {tiles.map((item, index) => {
+            {tiles.map((item) => {
               const Icon = item.icon;
               return (
-                <Link
+                <button
+                  type="button"
                   key={item.id}
-                  href={item.href}
+                  onClick={() => handleTileClick(item.href)}
                   className={cn(
                     "group flex flex-col items-center justify-center gap-1 p-3 rounded-xl relative",
-                    "bg-gradient-to-br shadow-md transition-all duration-200",
+                    "bg-primary shadow-md transition-all duration-200",
                     "hover:scale-125 hover:-translate-y-3 cursor-pointer",
-                    "focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-transparent",
-                    tileColors[index % tileColors.length]
+                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background",
+                    "border border-primary-foreground/20"
                   )}
                   aria-label={`Navigate to ${item.label}`}
                   data-testid={`tile-${item.id}`}
                 >
-                  <Icon className="h-7 w-7 text-white drop-shadow-md" />
-                  <span className="text-white font-medium text-[10px] text-center drop-shadow-sm opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6 whitespace-nowrap">{item.label}</span>
-                </Link>
+                  <Icon className="h-7 w-7 text-primary-foreground drop-shadow-md" />
+                  <span className="text-primary-foreground font-medium text-[10px] text-center drop-shadow-sm opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6 whitespace-nowrap">{item.label}</span>
+                </button>
               );
             })}
           </div>
-          <p className="text-muted-foreground text-sm mt-4">Click a tile to navigate</p>
+          <TileHint />
         </div>
       );
     }
