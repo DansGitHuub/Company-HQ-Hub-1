@@ -162,6 +162,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [showSuggestions, setShowSuggestions] = React.useState(false);
   const searchRef = React.useRef<HTMLDivElement>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+
+  // Reset scroll to top when navigating between pages
+  React.useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [location]);
 
   // Role-based search suggestions
   const getSuggestions = () => {
@@ -534,7 +542,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
            </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div ref={contentRef} className="flex-1 overflow-y-auto p-4 md:p-8">
           {children}
         </div>
       </main>
