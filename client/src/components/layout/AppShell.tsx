@@ -481,6 +481,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const tiles = displayNav.filter(item => item.id !== "help");
     
     const handleTileClick = (href: string) => {
+      setIsTileView(false);
       navigate(href);
     };
 
