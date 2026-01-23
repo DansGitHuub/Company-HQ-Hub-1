@@ -507,7 +507,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   )}
                   aria-label={`Navigate to ${item.label}`}
                   data-testid={`tile-${item.id}`}
-                  onClick={() => setIsTileView(false)}
                 >
                   <Icon className="h-10 w-10 text-white drop-shadow-md" />
                   <span className="text-white font-semibold text-sm text-center drop-shadow-sm">{item.label}</span>
@@ -554,7 +553,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   }}
                   aria-label={`Navigate to ${item.label}`}
                   data-testid={`tile-${item.id}`}
-                  onClick={() => setIsTileView(false)}
                 >
                   <Icon className="h-7 w-7 text-white drop-shadow-md" />
                   <span className="text-white font-medium text-xs text-center drop-shadow-sm truncate w-full">{item.label}</span>
@@ -585,7 +583,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   )}
                   aria-label={`Navigate to ${item.label}`}
                   data-testid={`tile-${item.id}`}
-                  onClick={() => setIsTileView(false)}
                 >
                   <Icon className="h-7 w-7 text-white drop-shadow-md" />
                   <span className="text-white font-medium text-[10px] text-center drop-shadow-sm opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6 whitespace-nowrap">{item.label}</span>
