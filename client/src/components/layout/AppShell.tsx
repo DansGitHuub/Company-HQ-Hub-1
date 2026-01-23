@@ -269,7 +269,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Default order for internal roles (help always at very bottom for all roles)
   const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "hiring", "jobs", "education", "profile", "assistant"];
-  const adminExtraIds = ["hq", "marketing", "forms", "inbox", "integrations", "admin"];
+  const adminExtraIds = ["hq", "marketing", "forms", "integrations", "admin"];
   const bottomIds = ["help"]; // Always shown at bottom for all roles
 
   const getNavItems = () => {
@@ -286,7 +286,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (effectiveRole === "Admin") {
       allowedIds = [...teamDefaultIds, ...adminExtraIds];
     } else if (effectiveRole === "Manager") {
-      allowedIds = [...teamDefaultIds, "inbox"];
+      allowedIds = [...teamDefaultIds];
     } else {
       // Crew role
       allowedIds = teamDefaultIds;
@@ -454,8 +454,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <div className="hidden md:block w-64 shrink-0 border-r border-border bg-sidebar">
+    <div className="flex h-screen bg-background overflow-hidden">
+      <div className="hidden md:block w-64 shrink-0 border-r border-border bg-sidebar overflow-y-auto">
         <NavContent />
       </div>
 
@@ -504,22 +504,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                </div>
              )}
            </div>
-           <div className="flex items-center gap-4">
+           <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="lg"
-                className="relative h-14 w-14 hover:bg-primary/10"
+                className="relative h-14 w-14 hover:bg-primary/10 flex items-center justify-center"
                 onClick={() => navigate(effectiveRole === "Customer" ? "/customer" : "/inbox")}
-                data-testid="button-messages-notification"
+                data-testid="button-messages"
               >
-                <Bell className="h-8 w-8 text-primary" />
+                <Inbox className="h-9 w-9 text-primary" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="lg"
+                className="relative h-14 w-14 hover:bg-primary/10 flex items-center justify-center"
+                onClick={() => navigate(effectiveRole === "Customer" ? "/customer" : "/inbox")}
+                data-testid="button-notifications"
+              >
+                <Bell className="h-10 w-10 text-primary" />
                 {unreadData && unreadData.count > 0 && (
-                  <span className="absolute top-0 right-0 h-6 w-6 rounded-full bg-destructive text-destructive-foreground text-sm flex items-center justify-center font-bold animate-pulse shadow-lg">
+                  <span className="absolute top-1 right-1 h-6 w-6 rounded-full bg-destructive text-destructive-foreground text-sm flex items-center justify-center font-bold animate-pulse shadow-lg">
                     {unreadData.count > 9 ? "9+" : unreadData.count}
                   </span>
                 )}
               </Button>
-              <span className="text-sm font-medium text-muted-foreground hidden sm:inline-block">
+              <span className="text-sm font-medium text-muted-foreground hidden md:inline-block ml-2">
                 {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
               </span>
            </div>
