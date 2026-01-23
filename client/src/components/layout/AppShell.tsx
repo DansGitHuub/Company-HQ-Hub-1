@@ -654,57 +654,61 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
              )}
            </div>
            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 mr-2 border-r pr-3">
-                <Button
-                  variant={isTileView ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setIsTileView(!isTileView)}
-                  className={cn(
-                    "gap-2 transition-colors",
-                    isTileView && "bg-primary text-primary-foreground"
-                  )}
-                  data-testid="button-tile-view-toggle"
-                >
-                  {isTileView ? <PanelLeft className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
-                  <span className="hidden sm:inline">{isTileView ? "Menu" : "Tiles"}</span>
-                </Button>
+              <div className="flex items-center gap-2 mr-2 border-r pr-3">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground hidden md:inline">View:</span>
+                  <Button
+                    variant={isTileView ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setIsTileView(!isTileView)}
+                    className={cn(
+                      "gap-2 transition-colors",
+                      isTileView && "bg-primary text-primary-foreground"
+                    )}
+                    data-testid="button-tile-view-toggle"
+                  >
+                    {isTileView ? <PanelLeft className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+                    <span>{isTileView ? "Back to Menu" : "Tile View"}</span>
+                  </Button>
+                </div>
                 {isTileView && (
-                  <div className="flex items-center gap-0.5 ml-1" role="group" aria-label="Tile layout options">
+                  <div className="flex items-center gap-1 pl-2 border-l" role="group" aria-label="Tile layout options">
+                    <span className="text-xs text-muted-foreground hidden md:inline mr-1">Layout:</span>
                     <Button
                       variant={tileLayout === "grid" ? "secondary" : "ghost"}
-                      size="icon"
-                      className="h-8 w-8"
+                      size="sm"
+                      className="gap-1 h-8 px-2"
                       onClick={() => setTileLayout("grid")}
-                      title="Grid Layout"
                       aria-label="Switch to grid layout"
                       aria-pressed={tileLayout === "grid"}
                       data-testid="button-layout-grid"
                     >
                       <Grip className="h-4 w-4" />
+                      <span className="hidden lg:inline text-xs">Grid</span>
                     </Button>
                     <Button
                       variant={tileLayout === "radial" ? "secondary" : "ghost"}
-                      size="icon"
-                      className="h-8 w-8"
+                      size="sm"
+                      className="gap-1 h-8 px-2"
                       onClick={() => setTileLayout("radial")}
-                      title="Radial Layout"
                       aria-label="Switch to radial layout"
                       aria-pressed={tileLayout === "radial"}
                       data-testid="button-layout-radial"
                     >
                       <Circle className="h-4 w-4" />
+                      <span className="hidden lg:inline text-xs">Radial</span>
                     </Button>
                     <Button
                       variant={tileLayout === "dock" ? "secondary" : "ghost"}
-                      size="icon"
-                      className="h-8 w-8"
+                      size="sm"
+                      className="gap-1 h-8 px-2"
                       onClick={() => setTileLayout("dock")}
-                      title="Dock Layout"
                       aria-label="Switch to dock layout"
                       aria-pressed={tileLayout === "dock"}
                       data-testid="button-layout-dock"
                     >
                       <Minus className="h-4 w-4" />
+                      <span className="hidden lg:inline text-xs">Dock</span>
                     </Button>
                   </div>
                 )}
@@ -721,13 +725,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Button
                 variant="ghost"
                 size="lg"
-                className="relative h-14 w-14 hover:bg-primary/10 flex items-center justify-center"
+                className="relative h-16 w-16 hover:bg-primary/10 flex items-center justify-center"
                 onClick={() => navigate(effectiveRole === "Customer" ? "/customer" : "/inbox")}
                 data-testid="button-notifications"
               >
-                <Bell className="h-10 w-10 text-primary" />
+                <Bell className="h-12 w-12 text-primary" />
                 {unreadData && unreadData.count > 0 && (
-                  <span className="absolute top-1 right-1 h-6 w-6 rounded-full bg-destructive text-destructive-foreground text-sm flex items-center justify-center font-bold animate-pulse shadow-lg">
+                  <span className="absolute top-0 right-0 h-7 w-7 rounded-full bg-destructive text-destructive-foreground text-sm flex items-center justify-center font-bold animate-pulse shadow-lg border-2 border-background">
                     {unreadData.count > 9 ? "9+" : unreadData.count}
                   </span>
                 )}
