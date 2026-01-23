@@ -724,20 +724,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Button
                 variant="ghost"
                 size="lg"
-                className="relative h-14 w-14 hover:bg-primary/10 flex items-center justify-center"
-                onClick={() => navigate(effectiveRole === "Customer" ? "/customer" : "/inbox")}
-                data-testid="button-messages"
-              >
-                <Inbox className="h-9 w-9 text-primary" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="lg"
                 className="relative h-16 w-16 hover:bg-primary/10 flex items-center justify-center"
                 onClick={() => navigate(effectiveRole === "Customer" ? "/customer" : "/inbox")}
                 data-testid="button-notifications"
               >
-                <Bell className="h-12 w-12 text-primary" />
+                <Bell className="h-10 w-10 text-primary" />
                 {unreadData && unreadData.count > 0 && (
                   <span className="absolute top-0 right-0 h-7 w-7 rounded-full bg-destructive text-destructive-foreground text-sm flex items-center justify-center font-bold animate-pulse shadow-lg border-2 border-background">
                     {unreadData.count > 9 ? "9+" : unreadData.count}
