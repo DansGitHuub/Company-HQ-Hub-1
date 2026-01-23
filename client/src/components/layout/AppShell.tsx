@@ -481,125 +481,115 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const tiles = displayNav.filter(item => item.id !== "help");
     
     const handleTileClick = (href: string) => {
-      setIsTileView(false);
       navigate(href);
     };
 
-    const TileHint = () => (
-      <p className="text-muted-foreground text-sm mt-4 text-center">Click a tile to navigate</p>
-    );
-
     if (tileLayout === "grid") {
       return (
-        <div className="flex flex-col items-center justify-center h-full p-8">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-w-5xl">
+        <div className="flex items-center justify-center p-3">
+          <div className="flex flex-wrap justify-center gap-2">
             {tiles.map((item) => {
               const Icon = item.icon;
+              const isActive = location === item.href;
               return (
                 <button
                   type="button"
                   key={item.id}
                   onClick={() => handleTileClick(item.href)}
                   className={cn(
-                    "group flex flex-col items-center justify-center gap-3 p-6 rounded-2xl",
-                    "bg-primary/90 hover:bg-primary shadow-lg hover:shadow-xl transition-all duration-300",
-                    "hover:scale-105 hover:-translate-y-1 cursor-pointer",
-                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background",
-                    "border border-primary/20"
+                    "group flex items-center gap-2 px-3 py-2 rounded-lg",
+                    "shadow hover:shadow-md transition-all duration-200",
+                    "hover:scale-105 cursor-pointer",
+                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
+                    isActive 
+                      ? "bg-primary text-primary-foreground ring-2 ring-primary/50" 
+                      : "bg-primary/80 hover:bg-primary text-primary-foreground"
                   )}
-                  style={{ 
-                    background: `linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.7) 100%)`,
-                  }}
                   aria-label={`Navigate to ${item.label}`}
                   data-testid={`tile-${item.id}`}
                 >
-                  <Icon className="h-10 w-10 text-primary-foreground drop-shadow-md" />
-                  <span className="text-primary-foreground font-semibold text-sm text-center drop-shadow-sm">{item.label}</span>
+                  <Icon className="h-5 w-5" />
+                  <span className="font-medium text-sm hidden sm:inline">{item.label}</span>
                 </button>
               );
             })}
           </div>
-          <TileHint />
         </div>
       );
     }
 
     if (tileLayout === "radial") {
-      const radius = 180;
-      const angleStep = (2 * Math.PI) / tiles.length;
-      
       return (
-        <div className="flex flex-col items-center justify-center h-full">
-          <div className="relative" style={{ width: radius * 2 + 120, height: radius * 2 + 120 }}>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center shadow-2xl border-2 border-primary-foreground/20">
-                <span className="text-primary-foreground font-bold text-lg">HQ</span>
-              </div>
+        <div className="flex items-center justify-center p-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg">
+              <span className="text-primary-foreground font-bold text-sm">HQ</span>
             </div>
-            {tiles.map((item, index) => {
-              const Icon = item.icon;
-              const angle = angleStep * index - Math.PI / 2;
-              const x = Math.cos(angle) * radius;
-              const y = Math.sin(angle) * radius;
-              
-              return (
-                <button
-                  type="button"
-                  key={item.id}
-                  onClick={() => handleTileClick(item.href)}
-                  className={cn(
-                    "absolute flex flex-col items-center justify-center gap-1 p-3 rounded-xl",
-                    "bg-primary shadow-lg hover:shadow-xl transition-all duration-300",
-                    "hover:scale-110 cursor-pointer w-20 h-20",
-                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background",
-                    "border border-primary-foreground/20"
-                  )}
-                  style={{
-                    left: `calc(50% + ${x}px - 40px)`,
-                    top: `calc(50% + ${y}px - 40px)`,
-                  }}
-                  aria-label={`Navigate to ${item.label}`}
-                  data-testid={`tile-${item.id}`}
-                >
-                  <Icon className="h-7 w-7 text-primary-foreground drop-shadow-md" />
-                  <span className="text-primary-foreground font-medium text-xs text-center drop-shadow-sm truncate w-full">{item.label}</span>
-                </button>
-              );
-            })}
+            <div className="flex flex-wrap justify-center gap-2">
+              {tiles.map((item) => {
+                const Icon = item.icon;
+                const isActive = location === item.href;
+                return (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onClick={() => handleTileClick(item.href)}
+                    className={cn(
+                      "flex items-center justify-center p-2 rounded-full",
+                      "shadow hover:shadow-md transition-all duration-200",
+                      "hover:scale-110 cursor-pointer",
+                      "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
+                      isActive 
+                        ? "bg-primary text-primary-foreground ring-2 ring-primary/50" 
+                        : "bg-primary/80 hover:bg-primary text-primary-foreground"
+                    )}
+                    aria-label={`Navigate to ${item.label}`}
+                    title={item.label}
+                    data-testid={`tile-${item.id}`}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <TileHint />
         </div>
       );
     }
 
     if (tileLayout === "dock") {
       return (
-        <div className="flex flex-col items-center justify-end h-full pb-12">
-          <div className="flex items-end justify-center gap-2 p-4 bg-card/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-border">
+        <div className="flex items-center justify-center p-2">
+          <div className="flex items-center gap-1 px-3 py-2 bg-card/80 backdrop-blur-sm rounded-full shadow-lg border border-border">
             {tiles.map((item) => {
               const Icon = item.icon;
+              const isActive = location === item.href;
               return (
                 <button
                   type="button"
                   key={item.id}
                   onClick={() => handleTileClick(item.href)}
                   className={cn(
-                    "group flex flex-col items-center justify-center gap-1 p-3 rounded-xl relative",
-                    "bg-primary shadow-md transition-all duration-200",
-                    "hover:scale-125 hover:-translate-y-3 cursor-pointer",
-                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background",
-                    "border border-primary-foreground/20"
+                    "group flex items-center gap-1.5 px-3 py-1.5 rounded-full relative",
+                    "transition-all duration-200",
+                    "hover:scale-105 cursor-pointer",
+                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
+                    isActive 
+                      ? "bg-primary text-primary-foreground" 
+                      : "hover:bg-primary/20 text-foreground"
                   )}
                   aria-label={`Navigate to ${item.label}`}
                   data-testid={`tile-${item.id}`}
                 >
-                  <Icon className="h-7 w-7 text-primary-foreground drop-shadow-md" />
-                  <span className="text-primary-foreground font-medium text-[10px] text-center drop-shadow-sm opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6 whitespace-nowrap">{item.label}</span>
+                  <Icon className={cn("h-4 w-4", isActive ? "" : "text-primary")} />
+                  <span className={cn(
+                    "font-medium text-xs hidden sm:inline",
+                    isActive ? "" : "text-muted-foreground group-hover:text-foreground"
+                  )}>{item.label}</span>
                 </button>
               );
             })}
           </div>
-          <TileHint />
         </div>
       );
     }
@@ -742,11 +732,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
            </div>
         </header>
 
-        <div ref={contentRef} className={cn(
-          "flex-1 overflow-y-auto",
-          isTileView ? "p-0" : "p-4 md:p-8"
-        )}>
-          {isTileView ? <TileNavigation /> : children}
+        <div ref={contentRef} className="flex-1 overflow-y-auto">
+          {isTileView && (
+            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b">
+              <TileNavigation />
+            </div>
+          )}
+          <div className={cn("p-4 md:p-8", isTileView && "pt-4")}>
+            {children}
+          </div>
         </div>
       </main>
     </div>
