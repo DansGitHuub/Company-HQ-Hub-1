@@ -532,6 +532,223 @@ export async function registerRoutes(
     }
   });
 
+  // ============= MATERIAL CATEGORIES =============
+  
+  // Get all material categories (sorted alphabetically)
+  app.get("/api/material-categories", requireAuth, async (req, res) => {
+    try {
+      const categories = await storage.getMaterialCategories();
+      res.json(categories);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching material categories" });
+    }
+  });
+
+  // Create a new material category (Admin only)
+  app.post("/api/material-categories", requireAdmin, async (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name || typeof name !== "string") {
+        return res.status(400).json({ message: "Category name is required" });
+      }
+      const existing = await storage.getMaterialCategoryByName(name.trim());
+      if (existing) {
+        return res.status(400).json({ message: "Category already exists" });
+      }
+      const category = await storage.createMaterialCategory({ name: name.trim() });
+      res.status(201).json(category);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating category" });
+    }
+  });
+
+  // Update a material category (Admin only)
+  app.patch("/api/material-categories/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = req.params.id as string;
+      const { name } = req.body;
+      if (!name || typeof name !== "string") {
+        return res.status(400).json({ message: "Category name is required" });
+      }
+      const category = await storage.updateMaterialCategory(id, { name: name.trim() });
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json(category);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating category" });
+    }
+  });
+
+  // Delete a material category (Admin only)
+  app.delete("/api/material-categories/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = req.params.id as string;
+      const moveTo = req.query.moveTo as string | undefined;
+      const deleteWithMaterials = req.query.deleteWithMaterials as string | undefined;
+      
+      // Check if category has materials
+      const materials = await storage.getMaterialsByCategory(id);
+      
+      if (materials.length > 0) {
+        if (moveTo) {
+          // Move materials to another category
+          await storage.bulkMoveMaterials(materials.map(m => m.id), moveTo);
+        } else if (deleteWithMaterials === "true") {
+          // Delete all materials in this category
+          for (const m of materials) {
+            await storage.deleteMaterialFieldValues(m.id);
+            await storage.deleteMaterial(m.id);
+          }
+        } else {
+          return res.status(400).json({ 
+            message: "Category has materials. Provide moveTo or deleteWithMaterials=true",
+            materialCount: materials.length
+          });
+        }
+      }
+      
+      await storage.deleteMaterialCategory(id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting category" });
+    }
+  });
+
+  // Bulk move materials between categories (Admin only)
+  app.post("/api/material-categories/bulk-move", requireAdmin, async (req, res) => {
+    try {
+      const { materialIds, targetCategoryId } = req.body;
+      if (!Array.isArray(materialIds) || !targetCategoryId) {
+        return res.status(400).json({ message: "materialIds array and targetCategoryId required" });
+      }
+      const count = await storage.bulkMoveMaterials(materialIds, targetCategoryId);
+      res.json({ success: true, movedCount: count });
+    } catch (err) {
+      res.status(500).json({ message: "Error moving materials" });
+    }
+  });
+
+  // ============= CATEGORY FIELDS =============
+  
+  // Get fields for a category
+  app.get("/api/material-categories/:categoryId/fields", requireAuth, async (req, res) => {
+    try {
+      const categoryId = req.params.categoryId as string;
+      const fields = await storage.getCategoryFields(categoryId);
+      res.json(fields);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching category fields" });
+    }
+  });
+
+  // Create a field for one or more categories (Admin only)
+  app.post("/api/category-fields", requireAdmin, async (req, res) => {
+    try {
+      const { categoryIds, field } = req.body;
+      
+      if (!categoryIds || !Array.isArray(categoryIds) || categoryIds.length === 0) {
+        return res.status(400).json({ message: "categoryIds array is required" });
+      }
+      if (!field || !field.fieldName || !field.fieldType) {
+        return res.status(400).json({ message: "field object with fieldName and fieldType required" });
+      }
+      
+      const createdFields = [];
+      for (const categoryId of categoryIds) {
+        const newField = await storage.createCategoryField({
+          categoryId,
+          fieldName: field.fieldName,
+          fieldType: field.fieldType,
+          required: field.required || false,
+          defaultValue: field.defaultValue || null,
+          helpText: field.helpText || null,
+          options: field.options || null,
+          showInPublicCatalog: field.showInPublicCatalog !== false,
+          sortOrder: field.sortOrder || 0,
+          isHidden: field.isHidden || false,
+        });
+        createdFields.push(newField);
+      }
+      
+      res.status(201).json(createdFields);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating category field" });
+    }
+  });
+
+  // Update a category field (Admin only)
+  app.patch("/api/category-fields/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = req.params.id as string;
+      const updates = req.body;
+      const field = await storage.updateCategoryField(id, updates);
+      if (!field) {
+        return res.status(404).json({ message: "Field not found" });
+      }
+      res.json(field);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating category field" });
+    }
+  });
+
+  // Delete a category field (Admin only)
+  app.delete("/api/category-fields/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = req.params.id as string;
+      const hideOnly = req.query.hideOnly as string | undefined;
+      
+      if (hideOnly === "true") {
+        // Just hide the field, keep existing data
+        const field = await storage.updateCategoryField(id, { isHidden: true });
+        return res.json({ success: true, hidden: true, field });
+      }
+      
+      // Permanently delete field and all associated values
+      await storage.deleteCategoryField(id);
+      res.json({ success: true, deleted: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting category field" });
+    }
+  });
+
+  // ============= MATERIAL FIELD VALUES =============
+  
+  // Get field values for a material
+  app.get("/api/materials/:id/field-values", requireAuth, async (req, res) => {
+    try {
+      const id = req.params.id as string;
+      const values = await storage.getMaterialFieldValues(id);
+      res.json(values);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching field values" });
+    }
+  });
+
+  // Set field values for a material
+  app.post("/api/materials/:id/field-values", requireAuth, async (req, res) => {
+    try {
+      const id = req.params.id as string;
+      const { fieldValues } = req.body; // { [fieldId]: value }
+      
+      if (!fieldValues || typeof fieldValues !== "object") {
+        return res.status(400).json({ message: "fieldValues object required" });
+      }
+      
+      const results = [];
+      for (const [fieldId, value] of Object.entries(fieldValues)) {
+        const fieldValue = await storage.setMaterialFieldValue(id, fieldId, value as string | null);
+        results.push(fieldValue);
+      }
+      
+      res.json(results);
+    } catch (err) {
+      res.status(500).json({ message: "Error setting field values" });
+    }
+  });
+
+  // ============= MATERIALS =============
+
   app.get("/api/materials", requireAuth, async (req, res) => {
     try {
       const materials = await storage.getMaterials();
