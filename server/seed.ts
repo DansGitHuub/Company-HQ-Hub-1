@@ -109,8 +109,201 @@ const SAMPLE_SOPS = [
   { title: 'Customer Communication Standards', content: 'Always greet customers professionally. Explain work being done. Address concerns promptly. Leave property cleaner than you found it.', category: 'Onboarding & Basics' },
 ];
 
+const DEFAULT_MATERIAL_CATEGORIES = [
+  'Aggregates',
+  'Hardscape',
+  'Mulch',
+  'Plants',
+  'Soil & Amendments',
+  'Stone',
+  'Supplies',
+  'Grass & Sod',
+  'Fertilizer',
+  'Tools',
+];
+
+interface FieldTemplate {
+  fieldName: string;
+  fieldType: 'text' | 'textarea' | 'number' | 'dropdown' | 'multiselect' | 'boolean' | 'date' | 'url';
+  required?: boolean;
+  options?: string[];
+  helpText?: string;
+  showInPublicCatalog?: boolean;
+  categories: string[];
+}
+
+const DEFAULT_FIELD_TEMPLATES: FieldTemplate[] = [
+  {
+    fieldName: 'Size/Grade',
+    fieldType: 'dropdown',
+    options: ['Fine', 'Medium', 'Coarse', '#57', '#67', '#8', '#3', '#4'],
+    categories: ['Aggregates', 'Stone'],
+    showInPublicCatalog: true,
+  },
+  {
+    fieldName: 'Color',
+    fieldType: 'text',
+    categories: ['Aggregates', 'Mulch', 'Stone', 'Hardscape'],
+    showInPublicCatalog: true,
+  },
+  {
+    fieldName: 'Material Type',
+    fieldType: 'dropdown',
+    options: ['Limestone', 'Granite', 'River Rock', 'Pea Gravel', 'Crushed Concrete'],
+    categories: ['Aggregates'],
+  },
+  {
+    fieldName: 'Coverage Rate',
+    fieldType: 'text',
+    helpText: 'e.g., 100 sq ft per cubic yard at 3" depth',
+    categories: ['Aggregates', 'Mulch', 'Soil & Amendments', 'Stone'],
+    showInPublicCatalog: true,
+  },
+  {
+    fieldName: 'Mulch Type',
+    fieldType: 'dropdown',
+    options: ['Hardwood', 'Pine Bark', 'Cedar', 'Cypress', 'Rubber', 'Dyed'],
+    categories: ['Mulch'],
+    showInPublicCatalog: true,
+  },
+  {
+    fieldName: 'Sun Exposure',
+    fieldType: 'dropdown',
+    options: ['Full Sun', 'Partial Sun', 'Partial Shade', 'Full Shade'],
+    categories: ['Plants', 'Grass & Sod'],
+    showInPublicCatalog: true,
+  },
+  {
+    fieldName: 'Mature Height',
+    fieldType: 'text',
+    helpText: 'Expected height at maturity',
+    categories: ['Plants'],
+    showInPublicCatalog: true,
+  },
+  {
+    fieldName: 'Hardiness Zone',
+    fieldType: 'text',
+    helpText: 'USDA Hardiness Zone range (e.g., 5-9)',
+    categories: ['Plants', 'Grass & Sod'],
+    showInPublicCatalog: true,
+  },
+  {
+    fieldName: 'Native',
+    fieldType: 'boolean',
+    helpText: 'Is this a native species?',
+    categories: ['Plants'],
+    showInPublicCatalog: true,
+  },
+  {
+    fieldName: 'Drought Tolerant',
+    fieldType: 'boolean',
+    categories: ['Plants', 'Grass & Sod'],
+    showInPublicCatalog: true,
+  },
+  {
+    fieldName: 'Thickness',
+    fieldType: 'dropdown',
+    options: ['1"', '1.5"', '2"', '2.5"', '3"', '4"'],
+    categories: ['Hardscape', 'Stone'],
+  },
+  {
+    fieldName: 'Paver Style',
+    fieldType: 'dropdown',
+    options: ['Brick', 'Flagstone', 'Cobblestone', 'Slab', 'Interlocking'],
+    categories: ['Hardscape'],
+    showInPublicCatalog: true,
+  },
+  {
+    fieldName: 'NPK Ratio',
+    fieldType: 'text',
+    helpText: 'Nitrogen-Phosphorus-Potassium ratio',
+    categories: ['Fertilizer'],
+    showInPublicCatalog: true,
+  },
+  {
+    fieldName: 'Application Rate',
+    fieldType: 'text',
+    helpText: 'Recommended application rate',
+    categories: ['Fertilizer', 'Soil & Amendments'],
+  },
+  {
+    fieldName: 'Organic',
+    fieldType: 'boolean',
+    categories: ['Fertilizer', 'Soil & Amendments', 'Mulch'],
+    showInPublicCatalog: true,
+  },
+  {
+    fieldName: 'Grass Type',
+    fieldType: 'dropdown',
+    options: ['Kentucky Bluegrass', 'Bermuda', 'Fescue', 'Zoysia', 'St. Augustine', 'Buffalo'],
+    categories: ['Grass & Sod'],
+    showInPublicCatalog: true,
+  },
+  {
+    fieldName: 'pH Level',
+    fieldType: 'text',
+    helpText: 'Soil pH level or range',
+    categories: ['Soil & Amendments'],
+  },
+  {
+    fieldName: 'Brand',
+    fieldType: 'text',
+    categories: ['Tools', 'Supplies', 'Fertilizer'],
+  },
+  {
+    fieldName: 'Weight Capacity',
+    fieldType: 'text',
+    helpText: 'Maximum weight capacity',
+    categories: ['Tools', 'Supplies'],
+  },
+];
+
+export async function seedMaterialCategories(): Promise<void> {
+  try {
+    const existingCategories = await storage.getMaterialCategories();
+    if (existingCategories.length === 0) {
+      console.log("[seed] Adding default material categories...");
+      
+      const categoryMap: Record<string, string> = {};
+      
+      for (const categoryName of DEFAULT_MATERIAL_CATEGORIES) {
+        const category = await storage.createMaterialCategory({ name: categoryName });
+        categoryMap[categoryName] = category.id;
+      }
+      console.log(`[seed] Added ${DEFAULT_MATERIAL_CATEGORIES.length} material categories`);
+      
+      console.log("[seed] Adding default category fields...");
+      let fieldCount = 0;
+      
+      for (const template of DEFAULT_FIELD_TEMPLATES) {
+        const categoryIds = template.categories
+          .map(name => categoryMap[name])
+          .filter(Boolean);
+        
+        for (const categoryId of categoryIds) {
+          await storage.createCategoryField({
+            categoryId,
+            fieldName: template.fieldName,
+            fieldType: template.fieldType,
+            required: template.required || false,
+            options: template.options || null,
+            helpText: template.helpText || null,
+            showInPublicCatalog: template.showInPublicCatalog ?? true,
+          });
+          fieldCount++;
+        }
+      }
+      console.log(`[seed] Added ${fieldCount} category field templates`);
+    }
+  } catch (error) {
+    console.error("[seed] Error seeding material categories:", error);
+  }
+}
+
 export async function seedSampleData(): Promise<void> {
   try {
+    await seedMaterialCategories();
+    
     const existingMaterials = await storage.getMaterials();
     if (existingMaterials.length === 0) {
       console.log("[seed] Adding sample materials...");
