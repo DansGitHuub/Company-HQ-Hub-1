@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,700 +9,1068 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Plus, Upload, Sparkles, Loader2, Image as ImageIcon, Calculator, FileSpreadsheet, X, Package, Truck, Scale, Ruler } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Search, Plus, Settings, Trash2, Edit, Package, ChevronRight, ChevronLeft, Image as ImageIcon, FolderPlus, X, Check, ArrowRight, Upload, Eye } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Material } from "@shared/schema";
+import type { Material, MaterialCategory, CategoryField } from "@shared/schema";
 
-const MATERIAL_TYPES = [
-  "Aggregates",
-  "Mulch", 
-  "Plants",
-  "Hardscape",
-  "Soil",
-  "Fertilizer",
-  "Tools",
-  "Miscellaneous"
-];
+type WizardStep = "name" | "category" | "fields" | "images" | "preview";
 
 export default function Materials() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showBulkImport, setShowBulkImport] = useState(false);
-  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const { toast } = useToast();
+  const isAdmin = user?.role === "Admin";
+  
+  // State
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<string>("materials");
+  
+  // Dialogs
+  const [showAddWizard, setShowAddWizard] = useState(false);
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [showFieldDialog, setShowFieldDialog] = useState(false);
+  const [showMaterialDetail, setShowMaterialDetail] = useState<Material | null>(null);
+  const [editingCategory, setEditingCategory] = useState<MaterialCategory | null>(null);
+  const [editingField, setEditingField] = useState<CategoryField | null>(null);
+  
+  // Wizard state
+  const [wizardStep, setWizardStep] = useState<WizardStep>("name");
+  const [wizardData, setWizardData] = useState({
+    name: "",
+    categoryId: "",
+    status: "Active",
+    description: "",
+    vendor: "",
+    unitOfMeasure: "",
+    primaryImage: "",
+    galleryImages: [] as string[],
+    tags: [] as string[],
+    fieldValues: {} as Record<string, string>,
+  });
+
+  // Queries
+  const { data: categories = [] } = useQuery<MaterialCategory[]>({
+    queryKey: ["/api/material-categories"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
 
   const { data: materials = [] } = useQuery<Material[]>({
     queryKey: ["/api/materials"],
     queryFn: getQueryFn({ on401: "throw" }),
   });
 
-  const refreshMaterials = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+  const selectedCategory = categories.find(c => c.id === wizardData.categoryId);
+
+  const { data: categoryFields = [] } = useQuery<CategoryField[]>({
+    queryKey: ["/api/material-categories", wizardData.categoryId, "fields"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!wizardData.categoryId,
+  });
+
+  // Sorted categories (alphabetically)
+  const sortedCategories = useMemo(() => 
+    [...categories].sort((a, b) => a.name.localeCompare(b.name)),
+    [categories]
+  );
+
+  // Filtered materials
+  const filteredMaterials = useMemo(() => {
+    return materials.filter(m => {
+      const matchesSearch = search === "" || 
+        m.name.toLowerCase().includes(search.toLowerCase()) ||
+        (m.vendor && m.vendor.toLowerCase().includes(search.toLowerCase())) ||
+        (m.tags && m.tags.some(t => t.toLowerCase().includes(search.toLowerCase())));
+      
+      const matchesCategory = categoryFilter === "all" || m.categoryId === categoryFilter;
+      const matchesStatus = statusFilter === "all" || m.status === statusFilter;
+      
+      return matchesSearch && matchesCategory && matchesStatus;
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [materials, search, categoryFilter, statusFilter]);
+
+  // Mutations
+  const createCategoryMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await apiRequest("POST", "/api/material-categories", { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/material-categories"] });
+      toast({ title: "Category created successfully" });
+      setShowCategoryDialog(false);
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const res = await apiRequest("PATCH", `/api/material-categories/${id}`, { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/material-categories"] });
+      toast({ title: "Category updated successfully" });
+      setEditingCategory(null);
+      setShowCategoryDialog(false);
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async ({ id, deleteWithMaterials }: { id: string; deleteWithMaterials: boolean }) => {
+      const params = deleteWithMaterials ? "?deleteWithMaterials=true" : "";
+      const res = await apiRequest("DELETE", `/api/material-categories/${id}${params}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/material-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      toast({ title: "Category deleted successfully" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const createMaterialMutation = useMutation({
+    mutationFn: async (data: typeof wizardData) => {
+      const res = await apiRequest("POST", "/api/materials", {
+        name: data.name,
+        categoryId: data.categoryId,
+        status: data.status,
+        description: data.description,
+        vendor: data.vendor,
+        unitOfMeasure: data.unitOfMeasure,
+        primaryImage: data.primaryImage || null,
+        galleryImages: data.galleryImages,
+        tags: data.tags,
+      });
+      const material = await res.json();
+      
+      // Save field values
+      if (Object.keys(data.fieldValues).length > 0) {
+        await apiRequest("POST", `/api/materials/${material.id}/field-values`, {
+          fieldValues: data.fieldValues,
+        });
+      }
+      
+      return material;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      toast({ title: "Material created successfully" });
+      setShowAddWizard(false);
+      resetWizard();
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const createFieldMutation = useMutation({
+    mutationFn: async (data: { categoryIds: string[]; field: Partial<CategoryField> }) => {
+      const res = await apiRequest("POST", "/api/category-fields", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/material-categories"] });
+      toast({ title: "Field created successfully" });
+      setShowFieldDialog(false);
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const resetWizard = () => {
+    setWizardStep("name");
+    setWizardData({
+      name: "",
+      categoryId: "",
+      status: "Active",
+      description: "",
+      vendor: "",
+      unitOfMeasure: "",
+      primaryImage: "",
+      galleryImages: [],
+      tags: [],
+      fieldValues: {},
+    });
   };
 
-  const isInternal = user?.role !== "Customer";
+  const canProceed = (step: WizardStep) => {
+    switch (step) {
+      case "name": return wizardData.name.trim().length > 0;
+      case "category": return wizardData.categoryId !== "";
+      case "fields": {
+        const requiredFields = categoryFields.filter(f => f.required && !f.isHidden);
+        return requiredFields.every(f => wizardData.fieldValues[f.id]?.trim());
+      }
+      case "images": return true;
+      case "preview": return true;
+      default: return false;
+    }
+  };
 
-  const filtered = materials.filter(m => 
-    m.name.toLowerCase().includes(search.toLowerCase()) || 
-    m.category.toLowerCase().includes(search.toLowerCase()) ||
-    (m.sku && m.sku.toLowerCase().includes(search.toLowerCase()))
-  );
+  const nextStep = () => {
+    const steps: WizardStep[] = ["name", "category", "fields", "images", "preview"];
+    const currentIndex = steps.indexOf(wizardStep);
+    if (currentIndex < steps.length - 1) {
+      setWizardStep(steps[currentIndex + 1]);
+    }
+  };
+
+  const prevStep = () => {
+    const steps: WizardStep[] = ["name", "category", "fields", "images", "preview"];
+    const currentIndex = steps.indexOf(wizardStep);
+    if (currentIndex > 0) {
+      setWizardStep(steps[currentIndex - 1]);
+    }
+  };
+
+  const getCategoryMaterialCount = (categoryId: string) => {
+    return materials.filter(m => m.categoryId === categoryId).length;
+  };
+
+  // Render field input based on type
+  const renderFieldInput = (field: CategoryField) => {
+    const value = wizardData.fieldValues[field.id] || field.defaultValue || "";
+    
+    switch (field.fieldType) {
+      case "textarea":
+        return (
+          <Textarea
+            value={value}
+            onChange={(e) => setWizardData(prev => ({
+              ...prev,
+              fieldValues: { ...prev.fieldValues, [field.id]: e.target.value }
+            }))}
+            placeholder={field.helpText || ""}
+            data-testid={`input-field-${field.id}`}
+          />
+        );
+      case "dropdown":
+        return (
+          <Select
+            value={value}
+            onValueChange={(v) => setWizardData(prev => ({
+              ...prev,
+              fieldValues: { ...prev.fieldValues, [field.id]: v }
+            }))}
+          >
+            <SelectTrigger data-testid={`select-field-${field.id}`}>
+              <SelectValue placeholder="Select..." />
+            </SelectTrigger>
+            <SelectContent>
+              {field.options?.map(opt => (
+                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      case "boolean":
+        return (
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={value === "true"}
+              onCheckedChange={(checked) => setWizardData(prev => ({
+                ...prev,
+                fieldValues: { ...prev.fieldValues, [field.id]: checked ? "true" : "false" }
+              }))}
+              data-testid={`checkbox-field-${field.id}`}
+            />
+            <span className="text-sm">{field.helpText || "Yes"}</span>
+          </div>
+        );
+      case "number":
+        return (
+          <Input
+            type="number"
+            value={value}
+            onChange={(e) => setWizardData(prev => ({
+              ...prev,
+              fieldValues: { ...prev.fieldValues, [field.id]: e.target.value }
+            }))}
+            placeholder={field.helpText || ""}
+            data-testid={`input-field-${field.id}`}
+          />
+        );
+      default:
+        return (
+          <Input
+            value={value}
+            onChange={(e) => setWizardData(prev => ({
+              ...prev,
+              fieldValues: { ...prev.fieldValues, [field.id]: e.target.value }
+            }))}
+            placeholder={field.helpText || ""}
+            data-testid={`input-field-${field.id}`}
+          />
+        );
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
         <div>
           <h1 className="text-3xl font-heading font-bold text-foreground">Materials Catalog</h1>
           <p className="text-muted-foreground">
-            {isInternal ? "Inventory, Suppliers & Specifications" : "Available Materials & Info"}
+            {isAdmin ? "Manage materials, categories, and custom fields" : "Browse available materials"}
           </p>
         </div>
-        {isInternal && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowBulkImport(true)} data-testid="button-bulk-import">
-              <FileSpreadsheet className="w-4 h-4 mr-2"/> Bulk Import
-            </Button>
-            <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-material">
-              <Sparkles className="w-4 h-4 mr-2"/> Smart Add Material
-            </Button>
-          </div>
+        {isAdmin && (
+          <Button onClick={() => setShowAddWizard(true)} data-testid="button-add-material">
+            <Plus className="w-4 h-4 mr-2" /> Add Material
+          </Button>
         )}
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-        <Input 
-          placeholder="Search materials by name, category, or SKU..." 
-          className="pl-9 max-w-md bg-card"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          data-testid="input-material-search"
-        />
-      </div>
+      {/* Admin Tabs */}
+      {isAdmin && (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="materials" data-testid="tab-materials">Materials</TabsTrigger>
+            <TabsTrigger value="categories" data-testid="tab-categories">Categories</TabsTrigger>
+            <TabsTrigger value="fields" data-testid="tab-fields">Category Fields</TabsTrigger>
+          </TabsList>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {filtered.map(item => (
-          <Card 
-            key={item.id} 
-            className="overflow-hidden group hover:shadow-lg transition-all cursor-pointer"
-            onClick={() => setSelectedMaterial(item)}
-            data-testid={`card-material-${item.id}`}
-          >
-            <div className="h-40 bg-secondary relative">
-              {item.image && <img src={item.image} className="w-full h-full object-cover" alt={item.name}/>}
-              {!item.image && (
-                <div className="w-full h-full flex items-center justify-center bg-secondary/50 text-muted-foreground">
-                  <Package className="h-12 w-12 opacity-30" />
-                </div>
-              )}
-              <div className="absolute top-2 right-2">
-                <Badge variant={item.stock < 10 ? "destructive" : "secondary"}>
-                  {item.stock} {item.unit}
-                </Badge>
+          {/* Categories Tab */}
+          <TabsContent value="categories" className="mt-4">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold">Material Categories</h2>
+                <Button onClick={() => { setEditingCategory(null); setShowCategoryDialog(true); }} data-testid="button-add-category">
+                  <FolderPlus className="w-4 h-4 mr-2" /> Add Category
+                </Button>
+              </div>
+              
+              <div className="grid gap-2">
+                {sortedCategories.map(cat => (
+                  <Card key={cat.id} className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-medium">{cat.name}</span>
+                        <Badge variant="secondary" className="ml-2">
+                          {getCategoryMaterialCount(cat.id)} materials
+                        </Badge>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => { setEditingCategory(cat); setShowCategoryDialog(true); }}
+                          data-testid={`button-edit-category-${cat.id}`}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" data-testid={`button-delete-category-${cat.id}`}>
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Category: {cat.name}?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                {getCategoryMaterialCount(cat.id) > 0 
+                                  ? `This category has ${getCategoryMaterialCount(cat.id)} materials. They will also be deleted.`
+                                  : "This action cannot be undone."
+                                }
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteCategoryMutation.mutate({ id: cat.id, deleteWithMaterials: true })}
+                                className="bg-destructive text-destructive-foreground"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+                {sortedCategories.length === 0 && (
+                  <p className="text-muted-foreground text-center py-8">No categories yet. Add one to get started!</p>
+                )}
               </div>
             </div>
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-start">
-                <Badge variant="outline" className="mb-2">{item.category}</Badge>
-                <span className="text-xs font-mono text-muted-foreground">{item.sku}</span>
-              </div>
-              <CardTitle className="text-lg">{item.name}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {item.description && (
-                <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{item.description}</p>
-              )}
-              <div className="flex gap-4 text-xs text-muted-foreground">
-                {item.weight && (
-                  <span className="flex items-center gap-1">
-                    <Scale className="h-3 w-3" /> {item.weight} {item.weightUnit || 'lbs'}
-                  </span>
-                )}
-                {item.coverageArea && (
-                  <span className="flex items-center gap-1">
-                    <Ruler className="h-3 w-3" /> {item.coverageArea} {item.coverageUnit || 'sq ft'}
-                  </span>
-                )}
-              </div>
-            </CardContent>
-            <CardFooter className="bg-secondary/20 p-3">
-              <Button variant="ghost" size="sm" className="w-full" data-testid={`button-view-material-${item.id}`}>
-                View Details
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
+          </TabsContent>
 
-      {filtered.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          <Package className="h-16 w-16 mx-auto mb-4 opacity-30" />
-          <p>No materials found</p>
-        </div>
+          {/* Fields Tab */}
+          <TabsContent value="fields" className="mt-4">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold">Category-Specific Fields</h2>
+                <Button onClick={() => { setEditingField(null); setShowFieldDialog(true); }} data-testid="button-add-field">
+                  <Plus className="w-4 h-4 mr-2" /> Add Field
+                </Button>
+              </div>
+              
+              {sortedCategories.map(cat => (
+                <FieldsForCategory key={cat.id} category={cat} />
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* Materials Tab */}
+          <TabsContent value="materials" className="mt-4">
+            <MaterialsGrid 
+              materials={filteredMaterials}
+              categories={sortedCategories}
+              search={search}
+              setSearch={setSearch}
+              categoryFilter={categoryFilter}
+              setCategoryFilter={setCategoryFilter}
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              onSelectMaterial={setShowMaterialDetail}
+            />
+          </TabsContent>
+        </Tabs>
       )}
 
-      {/* Smart Add Material Dialog */}
-      <SmartAddMaterialDialog 
-        open={showAddDialog} 
-        onOpenChange={setShowAddDialog}
-        onSuccess={() => {
-          refreshMaterials();
-          setShowAddDialog(false);
-        }}
-      />
+      {/* Non-admin view */}
+      {!isAdmin && (
+        <MaterialsGrid 
+          materials={filteredMaterials}
+          categories={sortedCategories}
+          search={search}
+          setSearch={setSearch}
+          categoryFilter={categoryFilter}
+          setCategoryFilter={setCategoryFilter}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          onSelectMaterial={setShowMaterialDetail}
+        />
+      )}
 
-      {/* Bulk Import Dialog */}
-      <BulkImportDialog
-        open={showBulkImport}
-        onOpenChange={setShowBulkImport}
-        onSuccess={() => {
-          refreshMaterials();
-          setShowBulkImport(false);
-        }}
-      />
+      {/* Category Add/Edit Dialog */}
+      <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingCategory ? "Edit Category" : "Add Category"}</DialogTitle>
+          </DialogHeader>
+          <CategoryForm 
+            initial={editingCategory}
+            onSubmit={(name) => {
+              if (editingCategory) {
+                updateCategoryMutation.mutate({ id: editingCategory.id, name });
+              } else {
+                createCategoryMutation.mutate(name);
+              }
+            }}
+            isPending={createCategoryMutation.isPending || updateCategoryMutation.isPending}
+          />
+        </DialogContent>
+      </Dialog>
 
-      {/* Material Details Dialog */}
-      <MaterialDetailsDialog
-        material={selectedMaterial}
-        open={!!selectedMaterial}
-        onOpenChange={(open) => !open && setSelectedMaterial(null)}
-        isInternal={isInternal}
-      />
+      {/* Field Add Dialog */}
+      <Dialog open={showFieldDialog} onOpenChange={setShowFieldDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Category Field</DialogTitle>
+            <DialogDescription>Define a field that will appear for materials in selected categories.</DialogDescription>
+          </DialogHeader>
+          <FieldForm 
+            categories={sortedCategories}
+            onSubmit={(data) => createFieldMutation.mutate(data)}
+            isPending={createFieldMutation.isPending}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Smart Add Material Wizard */}
+      <Dialog open={showAddWizard} onOpenChange={(open) => { if (!open) resetWizard(); setShowAddWizard(open); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add New Material</DialogTitle>
+            <DialogDescription>
+              Step {["name", "category", "fields", "images", "preview"].indexOf(wizardStep) + 1} of 5: {
+                wizardStep === "name" ? "Material Name" :
+                wizardStep === "category" ? "Select Category" :
+                wizardStep === "fields" ? "Category Fields" :
+                wizardStep === "images" ? "Upload Images" :
+                "Preview & Confirm"
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            {/* Step 1: Name */}
+            {wizardStep === "name" && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="material-name">Material Name *</Label>
+                  <Input
+                    id="material-name"
+                    value={wizardData.name}
+                    onChange={(e) => setWizardData(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., #57 Limestone Gravel"
+                    data-testid="input-material-name"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Category */}
+            {wizardStep === "category" && (
+              <div className="space-y-4">
+                <Label>Select Category *</Label>
+                <Select
+                  value={wizardData.categoryId}
+                  onValueChange={(v) => setWizardData(prev => ({ ...prev, categoryId: v, fieldValues: {} }))}
+                >
+                  <SelectTrigger data-testid="select-category">
+                    <SelectValue placeholder="Choose a category..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sortedCategories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Step 3: Fields */}
+            {wizardStep === "fields" && (
+              <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                <p className="text-sm text-muted-foreground">
+                  Fill in the fields for {selectedCategory?.name}
+                </p>
+                {categoryFields.filter(f => !f.isHidden).map(field => (
+                  <div key={field.id} className="space-y-1">
+                    <Label>
+                      {field.fieldName}
+                      {field.required && <span className="text-destructive ml-1">*</span>}
+                    </Label>
+                    {renderFieldInput(field)}
+                    {field.helpText && (
+                      <p className="text-xs text-muted-foreground">{field.helpText}</p>
+                    )}
+                  </div>
+                ))}
+                {categoryFields.filter(f => !f.isHidden).length === 0 && (
+                  <p className="text-muted-foreground text-center py-4">
+                    No custom fields defined for this category.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Step 4: Images */}
+            {wizardStep === "images" && (
+              <div className="space-y-4">
+                <div>
+                  <Label>Primary Image URL (optional)</Label>
+                  <Input
+                    value={wizardData.primaryImage}
+                    onChange={(e) => setWizardData(prev => ({ ...prev, primaryImage: e.target.value }))}
+                    placeholder="https://..."
+                    data-testid="input-primary-image"
+                  />
+                </div>
+                <div>
+                  <Label>Description (optional)</Label>
+                  <Textarea
+                    value={wizardData.description}
+                    onChange={(e) => setWizardData(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Material description..."
+                    data-testid="input-description"
+                  />
+                </div>
+                <div>
+                  <Label>Vendor/Supplier (optional)</Label>
+                  <Input
+                    value={wizardData.vendor}
+                    onChange={(e) => setWizardData(prev => ({ ...prev, vendor: e.target.value }))}
+                    placeholder="Supplier name"
+                    data-testid="input-vendor"
+                  />
+                </div>
+                <div>
+                  <Label>Unit of Measure (optional)</Label>
+                  <Input
+                    value={wizardData.unitOfMeasure}
+                    onChange={(e) => setWizardData(prev => ({ ...prev, unitOfMeasure: e.target.value }))}
+                    placeholder="e.g., yard, bag, each"
+                    data-testid="input-unit"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Step 5: Preview */}
+            {wizardStep === "preview" && (
+              <div className="space-y-4">
+                <Card className="p-4">
+                  <div className="flex gap-4">
+                    {wizardData.primaryImage ? (
+                      <img src={wizardData.primaryImage} className="w-24 h-24 object-cover rounded" alt="Preview" />
+                    ) : (
+                      <div className="w-24 h-24 bg-secondary rounded flex items-center justify-center">
+                        <Package className="w-8 h-8 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="font-semibold text-lg">{wizardData.name}</h3>
+                      <p className="text-sm text-muted-foreground">{selectedCategory?.name}</p>
+                      {wizardData.vendor && <p className="text-sm">Vendor: {wizardData.vendor}</p>}
+                      {wizardData.unitOfMeasure && <p className="text-sm">Unit: {wizardData.unitOfMeasure}</p>}
+                    </div>
+                  </div>
+                  {wizardData.description && (
+                    <p className="mt-2 text-sm">{wizardData.description}</p>
+                  )}
+                  {Object.keys(wizardData.fieldValues).length > 0 && (
+                    <div className="mt-4 space-y-1">
+                      <p className="font-medium text-sm">Custom Fields:</p>
+                      {categoryFields.filter(f => wizardData.fieldValues[f.id]).map(field => (
+                        <p key={field.id} className="text-sm">
+                          <span className="text-muted-foreground">{field.fieldName}:</span> {wizardData.fieldValues[field.id]}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex justify-between">
+            <div>
+              {wizardStep !== "name" && (
+                <Button variant="outline" onClick={prevStep}>
+                  <ChevronLeft className="w-4 h-4 mr-1" /> Back
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setShowAddWizard(false)}>Cancel</Button>
+              {wizardStep !== "preview" ? (
+                <Button onClick={nextStep} disabled={!canProceed(wizardStep)} data-testid="button-next-step">
+                  Next <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              ) : (
+                <Button 
+                  onClick={() => createMaterialMutation.mutate(wizardData)} 
+                  disabled={createMaterialMutation.isPending}
+                  data-testid="button-confirm-save"
+                >
+                  <Check className="w-4 h-4 mr-1" /> Confirm & Save
+                </Button>
+              )}
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Material Detail Dialog */}
+      <Dialog open={!!showMaterialDetail} onOpenChange={() => setShowMaterialDetail(null)}>
+        <DialogContent className="max-w-lg">
+          {showMaterialDetail && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{showMaterialDetail.name}</DialogTitle>
+              </DialogHeader>
+              <MaterialDetailView material={showMaterialDetail} categories={categories} />
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function SmartAddMaterialDialog({ open, onOpenChange, onSuccess }: { open: boolean; onOpenChange: (open: boolean) => void; onSuccess: () => void }) {
-  const [step, setStep] = useState(1);
-  const [materialType, setMaterialType] = useState("");
-  const [name, setName] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [formData, setFormData] = useState<any>({});
-  const { toast } = useToast();
+// Sub-components
 
-  const resetForm = () => {
-    setStep(1);
-    setMaterialType("");
-    setName("");
-    setFormData({});
-    setIsGenerating(false);
-    setIsGeneratingImage(false);
-  };
+function CategoryForm({ 
+  initial, 
+  onSubmit, 
+  isPending 
+}: { 
+  initial: MaterialCategory | null; 
+  onSubmit: (name: string) => void;
+  isPending: boolean;
+}) {
+  const [name, setName] = useState(initial?.name || "");
 
-  const handleGenerateAI = async () => {
-    if (!name.trim()) {
-      toast({ title: "Please enter a material name", variant: "destructive" });
-      return;
-    }
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label htmlFor="cat-name">Category Name</Label>
+        <Input
+          id="cat-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g., Trees & Shrubs"
+          data-testid="input-category-name"
+        />
+      </div>
+      <DialogFooter>
+        <Button onClick={() => onSubmit(name)} disabled={!name.trim() || isPending} data-testid="button-save-category">
+          {isPending ? "Saving..." : initial ? "Update" : "Create"}
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+function FieldForm({
+  categories,
+  onSubmit,
+  isPending,
+}: {
+  categories: MaterialCategory[];
+  onSubmit: (data: { categoryIds: string[]; field: any }) => void;
+  isPending: boolean;
+}) {
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [fieldName, setFieldName] = useState("");
+  const [fieldType, setFieldType] = useState<string>("text");
+  const [required, setRequired] = useState(false);
+  const [options, setOptions] = useState("");
+  const [helpText, setHelpText] = useState("");
+  const [showInPublic, setShowInPublic] = useState(true);
+
+  const handleSubmit = () => {
+    const optionsArray = fieldType === "dropdown" || fieldType === "multiselect" 
+      ? options.split("\n").map(o => o.trim()).filter(Boolean)
+      : null;
     
-    setIsGenerating(true);
-    try {
-      const response = await apiRequest("POST", "/api/materials/ai-draft", {
-        materialType,
-        name: name.trim()
-      });
-      const data = await response.json();
-      
-      if (data.success && data.data) {
-        setFormData({
-          name: name.trim(),
-          materialType: materialType || data.data.suggestedCategory,
-          category: data.data.suggestedCategory || materialType || "Miscellaneous",
-          sku: data.data.suggestedSku || generateSku(name, materialType),
-          unit: data.data.suggestedUnit || "each",
-          stock: 0,
-          description: data.data.description,
-          weight: data.data.weight,
-          weightUnit: data.data.weightUnit || "lbs",
-          coverageArea: data.data.coverageArea,
-          coverageUnit: data.data.coverageUnit,
-          calculationFormula: data.data.calculationFormula,
-          crewNotes: data.data.crewNotes,
-          customerNotes: data.data.customerNotes
-        });
-        setStep(2);
-        toast({ title: "AI generated material info!", description: "Review and adjust the details below." });
-      }
-    } catch (err) {
-      toast({ title: "AI generation failed", description: "Please try again or enter details manually.", variant: "destructive" });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleGenerateImage = async () => {
-    setIsGeneratingImage(true);
-    try {
-      const response = await apiRequest("POST", "/api/materials/ai-image", {
-        name: formData.name,
-        materialType: formData.materialType,
-        description: formData.description
-      });
-      const data = await response.json();
-      
-      if (data.success && data.imageUrl) {
-        setFormData({ ...formData, image: data.imageUrl });
-        toast({ title: "Image generated!" });
-      }
-    } catch (err) {
-      toast({ title: "Image generation failed", variant: "destructive" });
-    } finally {
-      setIsGeneratingImage(false);
-    }
-  };
-
-  const handleSave = async () => {
-    try {
-      await apiRequest("POST", "/api/materials", {
-        ...formData,
-        aiGenerated: true
-      });
-      toast({ title: "Material added successfully!" });
-      resetForm();
-      onSuccess();
-    } catch (err) {
-      toast({ title: "Failed to save material", variant: "destructive" });
-    }
-  };
-
-  const generateSku = (name: string, type: string) => {
-    const prefix = (type || "MAT").substring(0, 3).toUpperCase();
-    const suffix = name.substring(0, 3).toUpperCase();
-    const num = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `${prefix}-${suffix}-${num}`;
+    onSubmit({
+      categoryIds: selectedCategories,
+      field: {
+        fieldName,
+        fieldType,
+        required,
+        options: optionsArray,
+        helpText: helpText || null,
+        showInPublicCatalog: showInPublic,
+      },
+    });
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) resetForm(); onOpenChange(o); }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Smart Add Material
-          </DialogTitle>
-          <DialogDescription>
-            {step === 1 ? "Enter the material type and name - AI will help fill in the details." : "Review and adjust the generated information."}
-          </DialogDescription>
-        </DialogHeader>
-
-        {step === 1 && (
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Material Type</Label>
-              <Select value={materialType} onValueChange={setMaterialType}>
-                <SelectTrigger data-testid="select-material-type">
-                  <SelectValue placeholder="Select type..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {MATERIAL_TYPES.map(type => (
-                    <SelectItem key={type} value={type}>{type}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Material Name *</Label>
-              <Input 
-                placeholder="e.g., Premium Brown Mulch, River Rock 3/4 inch, Tall Fescue Sod"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                data-testid="input-material-name"
+    <div className="space-y-4 max-h-[500px] overflow-y-auto">
+      <div>
+        <Label>Apply to Categories</Label>
+        <div className="grid grid-cols-2 gap-2 mt-2 max-h-32 overflow-y-auto border rounded p-2">
+          {categories.map(cat => (
+            <div key={cat.id} className="flex items-center gap-2">
+              <Checkbox
+                checked={selectedCategories.includes(cat.id)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSelectedCategories(prev => [...prev, cat.id]);
+                  } else {
+                    setSelectedCategories(prev => prev.filter(id => id !== cat.id));
+                  }
+                }}
               />
+              <span className="text-sm">{cat.name}</span>
             </div>
-            <div className="bg-muted/50 p-4 rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                <Sparkles className="h-4 w-4 inline mr-1" />
-                AI will automatically generate: description, weight, coverage calculations, crew notes, and more based on the material type and name.
+          ))}
+        </div>
+        <Button 
+          variant="link" 
+          size="sm" 
+          className="p-0 h-auto" 
+          onClick={() => setSelectedCategories(categories.map(c => c.id))}
+        >
+          Select All
+        </Button>
+      </div>
+
+      <div>
+        <Label htmlFor="field-name">Field Name</Label>
+        <Input
+          id="field-name"
+          value={fieldName}
+          onChange={(e) => setFieldName(e.target.value)}
+          placeholder="e.g., Material Type"
+          data-testid="input-field-name"
+        />
+      </div>
+
+      <div>
+        <Label>Field Type</Label>
+        <Select value={fieldType} onValueChange={setFieldType}>
+          <SelectTrigger data-testid="select-field-type">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="text">Text</SelectItem>
+            <SelectItem value="textarea">Text Area</SelectItem>
+            <SelectItem value="number">Number</SelectItem>
+            <SelectItem value="dropdown">Dropdown</SelectItem>
+            <SelectItem value="multiselect">Multi-select</SelectItem>
+            <SelectItem value="boolean">Yes/No</SelectItem>
+            <SelectItem value="date">Date</SelectItem>
+            <SelectItem value="url">URL</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {(fieldType === "dropdown" || fieldType === "multiselect") && (
+        <div>
+          <Label>Options (one per line)</Label>
+          <Textarea
+            value={options}
+            onChange={(e) => setOptions(e.target.value)}
+            placeholder="Option 1&#10;Option 2&#10;Option 3"
+            rows={4}
+          />
+        </div>
+      )}
+
+      <div>
+        <Label>Help Text (optional)</Label>
+        <Input
+          value={helpText}
+          onChange={(e) => setHelpText(e.target.value)}
+          placeholder="Helpful hint for users"
+        />
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Checkbox checked={required} onCheckedChange={(c) => setRequired(!!c)} />
+          <span className="text-sm">Required</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox checked={showInPublic} onCheckedChange={(c) => setShowInPublic(!!c)} />
+          <span className="text-sm">Show in public catalog</span>
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button 
+          onClick={handleSubmit} 
+          disabled={!fieldName.trim() || selectedCategories.length === 0 || isPending}
+          data-testid="button-save-field"
+        >
+          {isPending ? "Creating..." : "Create Field"}
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+function FieldsForCategory({ category }: { category: MaterialCategory }) {
+  const { data: fields = [] } = useQuery<CategoryField[]>({
+    queryKey: ["/api/material-categories", category.id, "fields"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  const visibleFields = fields.filter(f => !f.isHidden);
+
+  if (visibleFields.length === 0) {
+    return (
+      <Card className="p-4">
+        <h3 className="font-medium">{category.name}</h3>
+        <p className="text-sm text-muted-foreground">No fields defined</p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="p-4">
+      <h3 className="font-medium mb-2">{category.name}</h3>
+      <div className="space-y-1">
+        {visibleFields.map(field => (
+          <div key={field.id} className="flex items-center gap-2 text-sm">
+            <Badge variant="outline">{field.fieldType}</Badge>
+            <span>{field.fieldName}</span>
+            {field.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function MaterialsGrid({
+  materials,
+  categories,
+  search,
+  setSearch,
+  categoryFilter,
+  setCategoryFilter,
+  statusFilter,
+  setStatusFilter,
+  onSelectMaterial,
+}: {
+  materials: Material[];
+  categories: MaterialCategory[];
+  search: string;
+  setSearch: (s: string) => void;
+  categoryFilter: string;
+  setCategoryFilter: (s: string) => void;
+  statusFilter: string;
+  setStatusFilter: (s: string) => void;
+  onSelectMaterial: (m: Material) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4 items-center">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search materials..." 
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            data-testid="input-search-materials"
+          />
+        </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[180px]" data-testid="select-filter-category">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories.map(cat => (
+              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[140px]" data-testid="select-filter-status">
+            <SelectValue placeholder="All Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="Active">Active</SelectItem>
+            <SelectItem value="Inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {materials.map(material => (
+          <Card 
+            key={material.id} 
+            className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => onSelectMaterial(material)}
+            data-testid={`card-material-${material.id}`}
+          >
+            <div className="h-32 bg-secondary relative">
+              {material.primaryImage ? (
+                <img src={material.primaryImage} className="w-full h-full object-cover" alt={material.name} />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Package className="w-10 h-10 text-muted-foreground opacity-30" />
+                </div>
+              )}
+              <Badge 
+                className="absolute top-2 right-2"
+                variant={material.status === "Active" ? "default" : "secondary"}
+              >
+                {material.status}
+              </Badge>
+            </div>
+            <CardContent className="p-3">
+              <h3 className="font-semibold truncate">{material.name}</h3>
+              <p className="text-sm text-muted-foreground truncate">
+                {categories.find(c => c.id === material.categoryId)?.name || "Uncategorized"}
               </p>
-            </div>
-          </div>
-        )}
+              {material.unitOfMeasure && (
+                <p className="text-xs text-muted-foreground mt-1">Unit: {material.unitOfMeasure}</p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-        {step === 2 && (
-          <div className="space-y-4 py-4">
-            <Tabs defaultValue="basic">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="basic">Basic</TabsTrigger>
-                <TabsTrigger value="specs">Specs</TabsTrigger>
-                <TabsTrigger value="supplier">Supplier</TabsTrigger>
-                <TabsTrigger value="notes">Notes</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="basic" className="space-y-4 mt-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Name *</Label>
-                    <Input value={formData.name || ""} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Category</Label>
-                    <Input value={formData.category || ""} onChange={(e) => setFormData({...formData, category: e.target.value})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>SKU</Label>
-                    <Input value={formData.sku || ""} onChange={(e) => setFormData({...formData, sku: e.target.value})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Unit</Label>
-                    <Input value={formData.unit || ""} placeholder="bags, cubic yards, each" onChange={(e) => setFormData({...formData, unit: e.target.value})} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea value={formData.description || ""} onChange={(e) => setFormData({...formData, description: e.target.value})} rows={3} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Image</Label>
-                  <div className="flex gap-2">
-                    {formData.image ? (
-                      <div className="relative w-24 h-24 rounded-lg overflow-hidden border">
-                        <img src={formData.image} alt="Material" className="w-full h-full object-cover" />
-                        <button 
-                          className="absolute top-1 right-1 bg-black/50 rounded-full p-1"
-                          onClick={() => setFormData({...formData, image: undefined})}
-                        >
-                          <X className="h-3 w-3 text-white" />
-                        </button>
-                      </div>
-                    ) : (
-                      <Button variant="outline" onClick={handleGenerateImage} disabled={isGeneratingImage} data-testid="button-generate-image">
-                        {isGeneratingImage ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ImageIcon className="h-4 w-4 mr-2" />}
-                        {isGeneratingImage ? "Generating..." : "Generate Image with AI"}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="specs" className="space-y-4 mt-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Weight</Label>
-                    <div className="flex gap-2">
-                      <Input type="number" value={formData.weight || ""} onChange={(e) => setFormData({...formData, weight: parseInt(e.target.value) || undefined})} placeholder="40" />
-                      <Input value={formData.weightUnit || "lbs"} onChange={(e) => setFormData({...formData, weightUnit: e.target.value})} className="w-24" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Coverage Area</Label>
-                    <div className="flex gap-2">
-                      <Input type="number" value={formData.coverageArea || ""} onChange={(e) => setFormData({...formData, coverageArea: parseInt(e.target.value) || undefined})} placeholder="8" />
-                      <Input value={formData.coverageUnit || "sq ft"} onChange={(e) => setFormData({...formData, coverageUnit: e.target.value})} placeholder="sq ft per bag" className="flex-1" />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Calculator className="h-4 w-4" /> Calculation Formula
-                  </Label>
-                  <Textarea 
-                    value={formData.calculationFormula || ""} 
-                    onChange={(e) => setFormData({...formData, calculationFormula: e.target.value})} 
-                    placeholder="e.g., Sq ft needed ÷ 8 = number of bags at 3 inch depth"
-                    rows={2}
-                  />
-                  <p className="text-xs text-muted-foreground">This formula helps crews calculate how much material they need.</p>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="supplier" className="space-y-4 mt-4">
-                <p className="text-sm text-muted-foreground mb-4">
-                  <Truck className="h-4 w-4 inline mr-1" />
-                  Supplier info is only visible to crew and managers, not customers.
-                </p>
-                <div className="space-y-2">
-                  <Label>Supplier Name</Label>
-                  <Input value={formData.supplier || ""} onChange={(e) => setFormData({...formData, supplier: e.target.value})} placeholder="ABC Landscape Supply" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Supplier Contact</Label>
-                  <Input value={formData.supplierContact || ""} onChange={(e) => setFormData({...formData, supplierContact: e.target.value})} placeholder="555-1234" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Supplier Website</Label>
-                  <Input value={formData.supplierUrl || ""} onChange={(e) => setFormData({...formData, supplierUrl: e.target.value})} placeholder="https://..." />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="notes" className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label>Crew Notes</Label>
-                  <Textarea 
-                    value={formData.crewNotes || ""} 
-                    onChange={(e) => setFormData({...formData, crewNotes: e.target.value})} 
-                    placeholder="Notes for crew about handling, storage, application..."
-                    rows={3}
-                  />
-                  <p className="text-xs text-muted-foreground">Visible to crew and managers only.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Customer Notes</Label>
-                  <Textarea 
-                    value={formData.customerNotes || ""} 
-                    onChange={(e) => setFormData({...formData, customerNotes: e.target.value})} 
-                    placeholder="Simple tips for customers about this material..."
-                    rows={3}
-                  />
-                  <p className="text-xs text-muted-foreground">Visible to everyone including customers.</p>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-        )}
-
-        <DialogFooter>
-          {step === 1 ? (
-            <>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button onClick={handleGenerateAI} disabled={isGenerating || !name.trim()} data-testid="button-generate-ai">
-                {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                {isGenerating ? "Generating..." : "Generate with AI"}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={handleSave} data-testid="button-save-material">
-                <Plus className="h-4 w-4 mr-2" /> Save Material
-              </Button>
-            </>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      {materials.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          <Package className="w-12 h-12 mx-auto mb-2 opacity-30" />
+          <p>No materials found</p>
+        </div>
+      )}
+    </div>
   );
 }
 
-function BulkImportDialog({ open, onOpenChange, onSuccess }: { open: boolean; onOpenChange: (open: boolean) => void; onSuccess: () => void }) {
-  const [importData, setImportData] = useState("");
-  const [isImporting, setIsImporting] = useState(false);
-  const [results, setResults] = useState<{ imported: number; errors: { row: number; error: string }[] } | null>(null);
-  const { toast } = useToast();
+function MaterialDetailView({ material, categories }: { material: Material; categories: MaterialCategory[] }) {
+  const { data: fieldValues = [] } = useQuery({
+    queryKey: ["/api/materials", material.id, "field-values"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
 
-  const handleImport = async () => {
-    try {
-      const lines = importData.trim().split('\n');
-      if (lines.length < 2) {
-        toast({ title: "Please paste data with headers and at least one row", variant: "destructive" });
-        return;
-      }
+  const category = categories.find(c => c.id === material.categoryId);
 
-      const headers = lines[0].split('\t').map(h => h.trim().toLowerCase());
-      const materials = lines.slice(1).map(line => {
-        const values = line.split('\t');
-        const obj: any = {};
-        headers.forEach((header, i) => {
-          const key = header.replace(/\s+/g, '');
-          if (values[i]) obj[key] = values[i].trim();
-        });
-        return obj;
-      }).filter(m => m.name);
+  const { data: categoryFields = [] } = useQuery<CategoryField[]>({
+    queryKey: ["/api/material-categories", material.categoryId, "fields"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!material.categoryId,
+  });
 
-      setIsImporting(true);
-      const response = await apiRequest("POST", "/api/materials/bulk-import", { materials });
-      const data = await response.json();
-      setResults(data);
-      
-      if (data.imported > 0) {
-        toast({ title: `Imported ${data.imported} materials` });
-        onSuccess();
-      }
-    } catch (err) {
-      toast({ title: "Import failed", variant: "destructive" });
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  const handleDownloadTemplate = async () => {
-    try {
-      const response = await apiRequest("GET", "/api/materials/template");
-      const template = await response.json();
-      
-      const csvContent = [
-        template.headers.join('\t'),
-        Object.values(template.example).join('\t')
-      ].join('\n');
-      
-      const blob = new Blob([csvContent], { type: 'text/tab-separated-values' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'materials_template.tsv';
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      toast({ title: "Failed to download template", variant: "destructive" });
-    }
+  const getFieldValue = (fieldId: string) => {
+    const fv = (fieldValues as any[]).find((v: any) => v.fieldId === fieldId);
+    return fv?.value || null;
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-primary" />
-            Bulk Import Materials
-          </DialogTitle>
-          <DialogDescription>
-            Copy and paste data from Excel or download the template to get started.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleDownloadTemplate} data-testid="button-download-template">
-              <Upload className="h-4 w-4 mr-2" /> Download Template
-            </Button>
+    <div className="space-y-4">
+      <div className="flex gap-4">
+        {material.primaryImage ? (
+          <img src={material.primaryImage} className="w-32 h-32 object-cover rounded" alt={material.name} />
+        ) : (
+          <div className="w-32 h-32 bg-secondary rounded flex items-center justify-center">
+            <Package className="w-12 h-12 text-muted-foreground opacity-30" />
           </div>
-
-          <div className="space-y-2">
-            <Label>Paste Excel Data (Tab-separated)</Label>
-            <Textarea 
-              placeholder="Paste your Excel data here. First row should be headers: name, category, sku, unit, stock, materialType, description..."
-              value={importData}
-              onChange={(e) => setImportData(e.target.value)}
-              rows={10}
-              className="font-mono text-sm"
-              data-testid="textarea-import-data"
-            />
-          </div>
-
-          {results && (
-            <div className="bg-muted p-4 rounded-lg space-y-2">
-              <p className="font-medium">Import Results: {results.imported} materials imported</p>
-              {results.errors.length > 0 && (
-                <div className="text-sm text-destructive">
-                  <p>Errors:</p>
-                  <ul className="list-disc pl-5">
-                    {results.errors.slice(0, 5).map((err, i) => (
-                      <li key={i}>Row {err.row}: {err.error}</li>
-                    ))}
-                    {results.errors.length > 5 && <li>...and {results.errors.length - 5} more errors</li>}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
+        )}
+        <div>
+          <Badge variant={material.status === "Active" ? "default" : "secondary"}>
+            {material.status}
+          </Badge>
+          <p className="text-sm text-muted-foreground mt-1">{category?.name}</p>
+          {material.vendor && <p className="text-sm mt-1">Vendor: {material.vendor}</p>}
+          {material.unitOfMeasure && <p className="text-sm">Unit: {material.unitOfMeasure}</p>}
         </div>
+      </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-          <Button onClick={handleImport} disabled={isImporting || !importData.trim()} data-testid="button-import">
-            {isImporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-            {isImporting ? "Importing..." : "Import Materials"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function MaterialDetailsDialog({ material, open, onOpenChange, isInternal }: { material: Material | null; open: boolean; onOpenChange: (open: boolean) => void; isInternal: boolean }) {
-  if (!material) return null;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <div className="flex items-start gap-4">
-            {material.image ? (
-              <img src={material.image} alt={material.name} className="w-24 h-24 rounded-lg object-cover" />
-            ) : (
-              <div className="w-24 h-24 rounded-lg bg-secondary flex items-center justify-center">
-                <Package className="h-8 w-8 text-muted-foreground" />
-              </div>
-            )}
-            <div>
-              <DialogTitle>{material.name}</DialogTitle>
-              <div className="flex gap-2 mt-2">
-                <Badge variant="outline">{material.category}</Badge>
-                <Badge variant="secondary">{material.sku}</Badge>
-              </div>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          {material.description && (
-            <div>
-              <Label className="text-muted-foreground">Description</Label>
-              <p className="text-sm">{material.description}</p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="text-muted-foreground">In Stock</Label>
-              <p className="font-medium">{material.stock} {material.unit}</p>
-            </div>
-            {material.weight && (
-              <div>
-                <Label className="text-muted-foreground">Weight</Label>
-                <p className="font-medium">{material.weight} {material.weightUnit || 'lbs'}</p>
-              </div>
-            )}
-            {material.coverageArea && (
-              <div className="col-span-2">
-                <Label className="text-muted-foreground">Coverage</Label>
-                <p className="font-medium">{material.coverageArea} {material.coverageUnit}</p>
-              </div>
-            )}
-          </div>
-
-          {material.calculationFormula && (
-            <div className="bg-primary/10 p-3 rounded-lg">
-              <Label className="text-muted-foreground flex items-center gap-1">
-                <Calculator className="h-4 w-4" /> How to Calculate
-              </Label>
-              <p className="text-sm font-medium mt-1">{material.calculationFormula}</p>
-            </div>
-          )}
-
-          {material.customerNotes && (
-            <div>
-              <Label className="text-muted-foreground">Tips</Label>
-              <p className="text-sm">{material.customerNotes}</p>
-            </div>
-          )}
-
-          {/* Internal-only info */}
-          {isInternal && (
-            <>
-              {material.crewNotes && (
-                <div className="border-t pt-4">
-                  <Label className="text-muted-foreground">Crew Notes</Label>
-                  <p className="text-sm">{material.crewNotes}</p>
-                </div>
-              )}
-              
-              {material.supplier && (
-                <div className="bg-secondary/50 p-3 rounded-lg">
-                  <Label className="text-muted-foreground flex items-center gap-1">
-                    <Truck className="h-4 w-4" /> Supplier Info (Internal Only)
-                  </Label>
-                  <p className="font-medium mt-1">{material.supplier}</p>
-                  {material.supplierContact && <p className="text-sm text-muted-foreground">{material.supplierContact}</p>}
-                  {material.supplierUrl && (
-                    <a href={material.supplierUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
-                      Visit Supplier Website
-                    </a>
-                  )}
-                </div>
-              )}
-            </>
-          )}
+      {material.description && (
+        <div>
+          <h4 className="font-medium text-sm">Description</h4>
+          <p className="text-sm text-muted-foreground">{material.description}</p>
         </div>
+      )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      {categoryFields.length > 0 && (
+        <div>
+          <h4 className="font-medium text-sm mb-2">Details</h4>
+          <div className="space-y-1">
+            {categoryFields.filter(f => !f.isHidden && getFieldValue(f.id)).map(field => (
+              <div key={field.id} className="flex gap-2 text-sm">
+                <span className="text-muted-foreground">{field.fieldName}:</span>
+                <span>{getFieldValue(field.id)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
