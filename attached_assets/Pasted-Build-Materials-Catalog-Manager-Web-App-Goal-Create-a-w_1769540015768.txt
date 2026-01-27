@@ -1,0 +1,243 @@
+Build Materials Catalog Manager Web App
+
+Goal
+Create a web app to manage a landscaping materials catalog using categories, category specific fields, and a Smart Add Material workflow that only shows relevant inputs based on category.
+
+1 Categories
+Create these default categories and always sort alphabetically in all dropdowns
+
+Aggregates & Gravel
+Chemicals & Fertilizer
+Hardscape & Pavers
+Landscape
+Mulch & Soil
+Other
+Perennials & Annuals
+Trees & Shrubs
+
+Category Rules
+Categories must be editable without code changes
+Admin can add new categories
+Admin can rename categories and update all linked materials
+Admin can delete categories with confirmation
+If deleting a category with materials require user to either move materials to another category or delete them with an extra confirmation
+No manual reordering categories remain alphabetical automatically
+
+2 Category Management
+Admin can
+Add category
+Rename category
+Delete category with confirm checkbox
+Bulk move materials from one category to another
+
+3 Category Specific Fields
+Admin can define fields per category with the following properties
+
+Field name
+Field type text number dropdown multiselect boolean date textarea image file url
+Required yes or no
+Default value optional
+Help text optional
+Options for dropdown or multiselect
+Show in public catalog yes or no
+Sort order within the category form
+
+Admin can
+Add a field to one category multiple selected categories or all categories
+Edit a field at any time
+Delete a field with confirmation
+Option to hide field but keep existing data or permanently delete field and data
+
+Fields must be editable later without breaking existing materials
+
+4 Material Data
+Each material supports
+
+Name required
+Category required
+Status Active or Inactive
+Primary image optional
+Gallery images optional
+Description optional
+Vendor or supplier optional
+Unit of measure optional
+Tags optional
+Custom field values based on category fields
+
+No SKU item number or pricing fields exist anywhere in the system
+
+5 Search and Filtering
+Admin material list supports
+Search by name vendor tags
+Filter by category and status
+Sort alphabetically by name
+
+6 Smart Add Material Workflow
+Wizard based flow
+
+Step 1 Material Name
+Enter name
+Next
+
+Step 2 Category
+Alphabetical dropdown
+Next
+
+Step 3 Smart Fields
+Show only fields assigned to selected category
+Required fields must be completed to proceed
+
+Step 4 Images
+Upload primary image
+Optional gallery images
+
+Step 5 Preview
+Preview name category images and key fields
+Buttons Confirm and Save Edit Cancel
+
+Cancel Behavior
+Confirm discard draft before exiting
+
+7 Default Category Field Templates
+
+Aggregates & Gravel
+Material Type dropdown Gravel Limestone River Rock Pea Gravel Sand Crusher Run Other
+Size or Grade text
+Color text
+Coverage Notes textarea
+Unit of Measure dropdown ton yard bag
+Supplier or Quarry text
+
+Mulch & Soil
+Material Type dropdown Mulch Topsoil Compost Screened Soil Garden Mix Other
+Color text
+Texture text
+Unit of Measure dropdown yard bag
+Coverage Notes textarea
+Supplier text
+
+Trees & Shrubs
+Botanical Name text
+Common Name text
+Plant Type dropdown Deciduous Tree Evergreen Tree Deciduous Shrub Evergreen Shrub Ornamental Tree
+Mature Size text
+Sun dropdown Full Sun Part Sun Part Shade Shade
+Soil Preference text
+Hardiness Zone text
+Spacing text
+Notes or Care textarea
+Unit of Measure dropdown each
+
+Perennials & Annuals
+Botanical Name text
+Common Name text
+Plant Type dropdown Perennial Annual Groundcover Ornamental Grass
+Sun dropdown Full Sun Part Sun Part Shade Shade
+Bloom Color text
+Bloom Time text
+Mature Size text
+Spacing text
+Unit of Measure dropdown each tray flat
+Notes or Care textarea
+
+Hardscape & Pavers
+Brand text
+Product Line text
+Piece Type dropdown Paver Wall Block Cap Step Slab Edger Other
+Color text
+Size or Dimensions text
+Thickness text
+Finish or Texture text
+Coverage text
+Unit of Measure dropdown pallet layer each square foot
+Install Notes textarea
+
+Landscape
+Material Type text
+Unit of Measure text
+Notes textarea
+
+Chemicals & Fertilizer
+Product Type dropdown Fertilizer Herbicide Insecticide Fungicide Pre emergent Ice Melt Other
+N P K text optional
+Target Use text
+Application Rate text
+Coverage text
+Safety or PPE Notes textarea
+Restricted Use boolean
+Unit of Measure dropdown bag jug bucket
+
+Other
+Notes textarea
+Unit of Measure text
+
+8 Public Catalog Optional
+Read only public catalog
+Category filter alphabetical
+Search bar
+Material detail pages
+Only show fields marked show in public catalog
+Admin toggle to enable or disable public catalog
+
+9 Roles
+Admin login required for all create edit delete actions
+Public users read only if public catalog enabled
+
+10 Data Storage
+Use a real database
+Tables or collections required
+
+Categories
+CategoryFields
+Materials
+MaterialFieldValues
+
+Fields and categories must be editable later without breaking existing records
+
+11 Seed Sample Materials
+
+Sample 1
+Name #57 Limestone Gravel
+Category Aggregates & Gravel
+Material Type Limestone
+Size or Grade #57
+Color Gray
+Coverage Notes Best for drainage and base layers compacts well
+Unit of Measure yard
+Supplier or Quarry Local Quarry
+
+Sample 2
+Name Green Giant Arborvitae
+Category Trees & Shrubs
+Botanical Name Thuja standishii x plicata
+Common Name Green Giant Arborvitae
+Plant Type Evergreen Tree
+Mature Size 30 to 50 ft H by 12 to 18 ft W
+Sun Full Sun
+Soil Preference Adaptable prefers well drained soil
+Hardiness Zone 5 to 8
+Spacing 6 to 10 ft
+Notes or Care Fast growing screening water first season
+Unit of Measure each
+
+Sample 3
+Name Concrete Paver 6x9
+Category Hardscape & Pavers
+Brand Generic
+Product Line Standard
+Piece Type Paver
+Color Charcoal
+Size or Dimensions 6 in by 9 in
+Thickness 2.375 in
+Finish or Texture Smooth
+Coverage Approx 100 square feet per pallet
+Unit of Measure pallet
+Install Notes Use polymeric sand compact in passes
+
+12 Acceptance Requirements
+Categories always alphabetical
+Categories editable with confirmation
+Materials movable between categories
+Category specific fields supported and editable later
+Smart Add shows only relevant fields
+Seed materials match category templates

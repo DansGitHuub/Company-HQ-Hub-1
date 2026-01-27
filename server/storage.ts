@@ -4,7 +4,10 @@ import {
   sops, type Sop, type InsertSop,
   sopTemplates, type SopTemplate, type InsertSopTemplate,
   sopExamples, type SopExample, type InsertSopExample,
+  materialCategories, type MaterialCategory, type InsertMaterialCategory,
+  categoryFields, type CategoryField, type InsertCategoryField,
   materials, type Material, type InsertMaterial,
+  materialFieldValues, type MaterialFieldValue, type InsertMaterialFieldValue,
   candidates, type Candidate, type InsertCandidate,
   candidateDocuments, type CandidateDocument, type InsertCandidateDocument,
   campaigns, type Campaign, type InsertCampaign,
@@ -75,11 +78,34 @@ export interface IStorage {
   updateSopExample(id: string, updates: Partial<SopExample>): Promise<SopExample | undefined>;
   deleteSopExample(id: string): Promise<boolean>;
   
+  // Material Categories
+  getMaterialCategories(): Promise<MaterialCategory[]>;
+  getMaterialCategory(id: string): Promise<MaterialCategory | undefined>;
+  getMaterialCategoryByName(name: string): Promise<MaterialCategory | undefined>;
+  createMaterialCategory(category: InsertMaterialCategory): Promise<MaterialCategory>;
+  updateMaterialCategory(id: string, updates: Partial<MaterialCategory>): Promise<MaterialCategory | undefined>;
+  deleteMaterialCategory(id: string): Promise<boolean>;
+  
+  // Category Fields
+  getCategoryFields(categoryId: string): Promise<CategoryField[]>;
+  getCategoryField(id: string): Promise<CategoryField | undefined>;
+  createCategoryField(field: InsertCategoryField): Promise<CategoryField>;
+  updateCategoryField(id: string, updates: Partial<CategoryField>): Promise<CategoryField | undefined>;
+  deleteCategoryField(id: string): Promise<boolean>;
+  
+  // Materials
   getMaterials(): Promise<Material[]>;
   getMaterial(id: string): Promise<Material | undefined>;
   createMaterial(material: InsertMaterial): Promise<Material>;
   updateMaterial(id: string, updates: Partial<Material>): Promise<Material | undefined>;
   deleteMaterial(id: string): Promise<boolean>;
+  getMaterialsByCategory(categoryId: string): Promise<Material[]>;
+  bulkMoveMaterials(materialIds: string[], newCategoryId: string): Promise<number>;
+  
+  // Material Field Values
+  getMaterialFieldValues(materialId: string): Promise<MaterialFieldValue[]>;
+  setMaterialFieldValue(materialId: string, fieldId: string, value: string | null): Promise<MaterialFieldValue>;
+  deleteMaterialFieldValues(materialId: string): Promise<boolean>;
   
   getCandidates(): Promise<Candidate[]>;
   getCandidate(id: string): Promise<Candidate | undefined>;
@@ -360,6 +386,64 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
+  // Material Categories - sorted alphabetically
+  async getMaterialCategories(): Promise<MaterialCategory[]> {
+    const categories = await db.select().from(materialCategories);
+    return categories.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async getMaterialCategory(id: string): Promise<MaterialCategory | undefined> {
+    const [category] = await db.select().from(materialCategories).where(eq(materialCategories.id, id));
+    return category || undefined;
+  }
+
+  async getMaterialCategoryByName(name: string): Promise<MaterialCategory | undefined> {
+    const [category] = await db.select().from(materialCategories).where(eq(materialCategories.name, name));
+    return category || undefined;
+  }
+
+  async createMaterialCategory(category: InsertMaterialCategory): Promise<MaterialCategory> {
+    const [newCategory] = await db.insert(materialCategories).values(category).returning();
+    return newCategory;
+  }
+
+  async updateMaterialCategory(id: string, updates: Partial<MaterialCategory>): Promise<MaterialCategory | undefined> {
+    const [category] = await db.update(materialCategories).set(updates).where(eq(materialCategories.id, id)).returning();
+    return category || undefined;
+  }
+
+  async deleteMaterialCategory(id: string): Promise<boolean> {
+    await db.delete(materialCategories).where(eq(materialCategories.id, id));
+    return true;
+  }
+
+  // Category Fields - sorted by sortOrder
+  async getCategoryFields(categoryId: string): Promise<CategoryField[]> {
+    const fields = await db.select().from(categoryFields).where(eq(categoryFields.categoryId, categoryId));
+    return fields.sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  async getCategoryField(id: string): Promise<CategoryField | undefined> {
+    const [field] = await db.select().from(categoryFields).where(eq(categoryFields.id, id));
+    return field || undefined;
+  }
+
+  async createCategoryField(field: InsertCategoryField): Promise<CategoryField> {
+    const [newField] = await db.insert(categoryFields).values(field as any).returning();
+    return newField;
+  }
+
+  async updateCategoryField(id: string, updates: Partial<CategoryField>): Promise<CategoryField | undefined> {
+    const [field] = await db.update(categoryFields).set(updates).where(eq(categoryFields.id, id)).returning();
+    return field || undefined;
+  }
+
+  async deleteCategoryField(id: string): Promise<boolean> {
+    await db.delete(categoryFields).where(eq(categoryFields.id, id));
+    return true;
+  }
+
+  // Materials
   async getMaterials(): Promise<Material[]> {
     return db.select().from(materials);
   }
@@ -375,12 +459,54 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateMaterial(id: string, updates: Partial<Material>): Promise<Material | undefined> {
-    const [material] = await db.update(materials).set(updates).where(eq(materials.id, id)).returning();
+    const [material] = await db.update(materials).set({ ...updates, updatedAt: new Date() }).where(eq(materials.id, id)).returning();
     return material || undefined;
   }
 
   async deleteMaterial(id: string): Promise<boolean> {
     await db.delete(materials).where(eq(materials.id, id));
+    return true;
+  }
+
+  async getMaterialsByCategory(categoryId: string): Promise<Material[]> {
+    return db.select().from(materials).where(eq(materials.categoryId, categoryId));
+  }
+
+  async bulkMoveMaterials(materialIds: string[], newCategoryId: string): Promise<number> {
+    let count = 0;
+    for (const id of materialIds) {
+      await db.update(materials).set({ categoryId: newCategoryId, updatedAt: new Date() }).where(eq(materials.id, id));
+      count++;
+    }
+    return count;
+  }
+
+  // Material Field Values
+  async getMaterialFieldValues(materialId: string): Promise<MaterialFieldValue[]> {
+    return db.select().from(materialFieldValues).where(eq(materialFieldValues.materialId, materialId));
+  }
+
+  async setMaterialFieldValue(materialId: string, fieldId: string, value: string | null): Promise<MaterialFieldValue> {
+    // First try to find existing value
+    const [existing] = await db.select().from(materialFieldValues)
+      .where(and(eq(materialFieldValues.materialId, materialId), eq(materialFieldValues.fieldId, fieldId)));
+    
+    if (existing) {
+      const [updated] = await db.update(materialFieldValues)
+        .set({ value })
+        .where(eq(materialFieldValues.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(materialFieldValues)
+        .values({ materialId, fieldId, value })
+        .returning();
+      return created;
+    }
+  }
+
+  async deleteMaterialFieldValues(materialId: string): Promise<boolean> {
+    await db.delete(materialFieldValues).where(eq(materialFieldValues.materialId, materialId));
     return true;
   }
 

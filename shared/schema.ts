@@ -117,17 +117,68 @@ export const insertSopExampleSchema = createInsertSchema(sopExamples).pick({
 export type InsertSopExample = z.infer<typeof insertSopExampleSchema>;
 export type SopExample = typeof sopExamples.$inferSelect;
 
+// Material Categories - editable by admin, always alphabetically sorted
+export const materialCategories = pgTable("material_categories", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMaterialCategorySchema = createInsertSchema(materialCategories).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMaterialCategory = z.infer<typeof insertMaterialCategorySchema>;
+export type MaterialCategory = typeof materialCategories.$inferSelect;
+
+// Category Fields - dynamic fields per category
+export type FieldType = "text" | "number" | "dropdown" | "multiselect" | "boolean" | "date" | "textarea" | "image" | "file" | "url";
+
+export const categoryFields = pgTable("category_fields", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  categoryId: varchar("category_id", { length: 36 }).references(() => materialCategories.id, { onDelete: "cascade" }).notNull(),
+  fieldName: text("field_name").notNull(),
+  fieldType: text("field_type").$type<FieldType>().notNull(),
+  required: boolean("required").notNull().default(false),
+  defaultValue: text("default_value"),
+  helpText: text("help_text"),
+  options: text("options").array(), // For dropdown/multiselect
+  showInPublicCatalog: boolean("show_in_public_catalog").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isHidden: boolean("is_hidden").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCategoryFieldSchema = createInsertSchema(categoryFields).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCategoryField = z.infer<typeof insertCategoryFieldSchema>;
+export type CategoryField = typeof categoryFields.$inferSelect;
+
+// Materials - with both legacy and new dynamic field support
 export const materials = pgTable("materials", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  category: text("category").notNull(),
-  sku: text("sku").notNull().unique(),
-  stock: integer("stock").notNull().default(0),
-  unit: text("unit").notNull(),
+  // New category system
+  categoryId: varchar("category_id", { length: 36 }).references(() => materialCategories.id),
+  status: text("status").notNull().default("Active"), // Active or Inactive
+  primaryImage: text("primary_image"),
+  galleryImages: text("gallery_images").array(),
+  description: text("description"),
+  vendor: text("vendor"),
+  unitOfMeasure: text("unit_of_measure"),
+  tags: text("tags").array(),
+  // Legacy fields kept for backward compatibility
+  category: text("category"),
+  sku: text("sku"),
+  stock: integer("stock").default(0),
+  unit: text("unit"),
   price: integer("price"),
   image: text("image"),
   materialType: text("material_type"),
-  description: text("description"),
   weight: integer("weight"),
   weightUnit: text("weight_unit"),
   coverageArea: integer("coverage_area"),
@@ -140,15 +191,34 @@ export const materials = pgTable("materials", {
   customerNotes: text("customer_notes"),
   aiGenerated: boolean("ai_generated").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertMaterialSchema = createInsertSchema(materials).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
 export type Material = typeof materials.$inferSelect;
+
+// Material Field Values - stores dynamic field values per material
+export const materialFieldValues = pgTable("material_field_values", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  materialId: varchar("material_id", { length: 36 }).references(() => materials.id, { onDelete: "cascade" }).notNull(),
+  fieldId: varchar("field_id", { length: 36 }).references(() => categoryFields.id, { onDelete: "cascade" }).notNull(),
+  value: text("value"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMaterialFieldValueSchema = createInsertSchema(materialFieldValues).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMaterialFieldValue = z.infer<typeof insertMaterialFieldValueSchema>;
+export type MaterialFieldValue = typeof materialFieldValues.$inferSelect;
 
 export type CandidateJobType = "Crew Member" | "Crew Lead" | "Manager" | "Office" | "Sales";
 export type CandidateWorkType = "Maintenance" | "Project";
