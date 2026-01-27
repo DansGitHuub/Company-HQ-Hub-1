@@ -27,7 +27,7 @@ Preferred communication style: Simple, everyday language.
 - **Database**: PostgreSQL
 - **ORM**: Drizzle ORM with drizzle-zod for schema validation
 - **Schema**: Shared between frontend and backend (`shared/schema.ts`)
-- **Key Models**: Users (role-based), SOPs, Materials, Hiring Candidates, Marketing Campaigns, Jobs, Customer Messages, Work Requests, Custom Forms, Equipment, Customer Resources.
+- **Key Models**: Users (role-based), SOPs, Materials, Material Categories, Category Fields, Hiring Candidates, Marketing Campaigns, Jobs, Customer Messages, Work Requests, Custom Forms, Equipment, Customer Resources.
 
 ### Core Features
 - **Role-Based Access Control (RBAC)**: Differentiated access for Admin, Manager, Crew, and Customer roles, including a Master Admin for critical operations.
@@ -45,6 +45,7 @@ Preferred communication style: Simple, everyday language.
 - **Enhanced Job Pipeline**: Tabbed interface for job types, detailed job cards with location, deadlines, estimated hours, and document uploads.
 - **Global Search**: Role-based search functionality across key modules (SOPs, Materials, Jobs, Candidates, Users).
 - **Direct Employee Messaging**: Customers can send messages to specific employees or the general inbox.
+- **Materials Catalog Manager**: Comprehensive materials management with admin-editable categories, category-specific custom fields (text, number, dropdown, boolean, etc.), Smart Add Material 5-step wizard, search/filter/sort capabilities, and role-based access. Includes 10 default categories and 36 field templates for landscaping materials.
 
 ## External Dependencies
 
