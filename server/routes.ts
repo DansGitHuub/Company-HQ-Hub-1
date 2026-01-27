@@ -772,10 +772,27 @@ export async function registerRoutes(
 
   app.post("/api/materials", requireAuth, async (req, res) => {
     try {
-      const material = await storage.createMaterial(req.body);
+      const { name, categoryId, status, description, vendor, unitOfMeasure, primaryImage, galleryImages, tags } = req.body;
+      
+      if (!name || typeof name !== "string" || !name.trim()) {
+        return res.status(400).json({ message: "Material name is required" });
+      }
+      
+      const material = await storage.createMaterial({
+        name: name.trim(),
+        categoryId: categoryId || null,
+        status: status || "Active",
+        description: description || null,
+        vendor: vendor || null,
+        unitOfMeasure: unitOfMeasure || null,
+        primaryImage: primaryImage || null,
+        galleryImages: galleryImages || [],
+        tags: tags || [],
+      });
       res.status(201).json(material);
-    } catch (err) {
-      res.status(500).json({ message: "Error creating material" });
+    } catch (err: any) {
+      console.error("[materials] Error creating material:", err);
+      res.status(500).json({ message: "Error creating material", error: err?.message });
     }
   });
 
