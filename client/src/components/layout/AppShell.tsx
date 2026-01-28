@@ -300,7 +300,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   // Default order for internal roles (help always at very bottom for all roles)
-  const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "todos", "hiring", "jobs", "education", "profile", "assistant"];
+  const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "hiring", "jobs", "education", "profile", "assistant"];
   const adminExtraIds = ["hq", "marketing", "forms", "integrations", "admin"];
   const bottomIds = ["help"]; // Always shown at bottom for all roles
 
@@ -669,6 +669,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
              )}
            </div>
            <div className="flex items-center gap-2">
+              {/* To-Do List button - shown only for active users or admins */}
+              {(todoActiveStatus?.isActive || user?.role === "Admin") && (
+                <Link href="/todos">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="relative gap-2"
+                    data-testid="button-todo-header"
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    <span className="hidden md:inline">To-Do</span>
+                    {todoActiveStatus?.unreadCount && todoActiveStatus.unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                        {todoActiveStatus.unreadCount > 9 ? "9+" : todoActiveStatus.unreadCount}
+                      </span>
+                    )}
+                  </Button>
+                </Link>
+              )}
               <div className="flex items-center gap-2 mr-2 border-r pr-3">
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-muted-foreground hidden md:inline">View:</span>
