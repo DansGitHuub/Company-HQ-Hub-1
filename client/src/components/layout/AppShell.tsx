@@ -134,6 +134,11 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
     description: "Manage users, approve access requests, and configure settings.",
     tips: ["Create user accounts", "Approve role requests", "Company branding"]
   },
+  tools: {
+    title: "Tools",
+    description: "Access specialized tools like the Plow Site Mapper for snow removal.",
+    tips: ["Map plow routes", "Organize sites by group", "AI-powered analysis"]
+  },
   customer_portal: {
     title: "Customer Portal",
     description: "Your dedicated area to communicate and request services.",
@@ -396,8 +401,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           const helpContent = menuHelpContent[item.id];
           const showTodoBadge = item.id === "todos" && todoActiveStatus?.isActive && todoActiveStatus.unreadCount > 0;
           return (
-            <div key={item.href} className="flex items-center group">
-              <Link href={item.href} className="flex-1">
+            <div key={item.href} className="flex items-center group w-full">
+              <Link href={item.href} className="flex-1 min-w-0 block">
                 <div
                   className={cn(
                     "flex items-center gap-3 px-4 py-2.5 rounded-lg text-base font-semibold transition-all cursor-pointer",
