@@ -844,3 +844,59 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).p
 
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
 export type CompanySettings = typeof companySettings.$inferSelect;
+
+// To-Do List System
+export const todos = pgTable("todos", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  priority: text("priority").default("medium"), // low, medium, high, urgent
+  status: text("status").default("pending"), // pending, in_progress, completed
+  dueDate: timestamp("due_date"),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTodoSchema = createInsertSchema(todos).pick({
+  title: true,
+  description: true,
+  priority: true,
+  status: true,
+  dueDate: true,
+});
+
+export type InsertTodo = z.infer<typeof insertTodoSchema>;
+export type Todo = typeof todos.$inferSelect;
+
+// To-Do Assignments (which users are assigned to which todos)
+export const todoAssignments = pgTable("todo_assignments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  todoId: varchar("todo_id", { length: 36 }).references(() => todos.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "cascade" }).notNull(),
+  isRead: boolean("is_read").default(false),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+});
+
+export const insertTodoAssignmentSchema = createInsertSchema(todoAssignments).pick({
+  todoId: true,
+  userId: true,
+});
+
+export type InsertTodoAssignment = z.infer<typeof insertTodoAssignmentSchema>;
+export type TodoAssignment = typeof todoAssignments.$inferSelect;
+
+// Active To-Do Users (which users can see the to-do system)
+export const todoActiveUsers = pgTable("todo_active_users", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  activatedBy: varchar("activated_by", { length: 36 }).references(() => users.id),
+  activatedAt: timestamp("activated_at").defaultNow(),
+});
+
+export const insertTodoActiveUserSchema = createInsertSchema(todoActiveUsers).pick({
+  userId: true,
+});
+
+export type InsertTodoActiveUser = z.infer<typeof insertTodoActiveUserSchema>;
+export type TodoActiveUser = typeof todoActiveUsers.$inferSelect;
