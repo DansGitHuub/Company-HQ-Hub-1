@@ -489,6 +489,92 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/ai/address-autocomplete", requireAuth, async (req, res) => {
+    try {
+      const { query } = req.body;
+      if (!query || query.length < 3) {
+        return res.json({ suggestions: [] });
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are an address autocomplete assistant. Given a partial address input, suggest up to 5 realistic, complete US addresses that match the input.
+            Focus on common address formats like "123 Main St, City, State ZIP".
+            Format your response as JSON with a "suggestions" array of complete address strings.
+            If the input is too vague, provide generic but realistic address completions.
+            Always include city, state abbreviation, and ZIP code in suggestions.`
+          },
+          {
+            role: "user",
+            content: `Complete this partial address: ${query}`
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 512,
+      });
+
+      const result = JSON.parse(completion.choices[0]?.message?.content || '{"suggestions":[]}');
+      res.json({ suggestions: result.suggestions || [] });
+    } catch (err: any) {
+      console.error("AI address autocomplete error:", err);
+      res.json({ suggestions: [] });
+    }
+  });
+
+  app.post("/api/ai/analyze-plow-site", requireAuth, async (req, res) => {
+    try {
+      const { imageBase64 } = req.body;
+      if (!imageBase64) {
+        return res.status(400).json({ message: "Image is required" });
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Analyze this aerial/satellite image of a property for snow removal planning. Identify and describe:
+                1. Driveways - location, approximate size, surface type if visible
+                2. Walkways/Sidewalks - paths, front walks, side walks
+                3. Parking areas - parking lots, parking spaces
+                4. Potential obstacles - trees near paths, islands, curbs
+                5. Suggested plow route - most efficient path to clear snow
+                
+                Format your response as JSON with:
+                - driveways: array of {description, location, priority}
+                - walkways: array of {description, location}
+                - parkingAreas: array of {description, location, approximateSize}
+                - obstacles: array of {description, location, warning}
+                - suggestedRoute: string description of optimal plow path
+                - specialNotes: any important observations`
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: imageBase64.startsWith("data:") ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
+                }
+              }
+            ]
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 2048,
+      });
+
+      const result = JSON.parse(completion.choices[0]?.message?.content || "{}");
+      res.json(result);
+    } catch (err: any) {
+      console.error("AI plow site analysis error:", err);
+      res.status(500).json({ message: "AI analysis failed", error: err.message });
+    }
+  });
+
   app.post("/api/ai/generate-form", requireAuth, async (req, res) => {
     try {
       const { prompt } = req.body;
@@ -2349,6 +2435,45 @@ Generate detailed information for this landscaping material.`;
     if (user.role === "Admin" || user.role === "Manager" || user.role === "Crew") return next();
     return res.status(403).json({ message: "Access denied" });
   };
+
+  // Plow Site Groups
+  app.get("/api/plow-site-groups", requirePlowViewAccess, async (req, res) => {
+    try {
+      const groups = await storage.getPlowSiteGroups();
+      res.json(groups);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching plow site groups" });
+    }
+  });
+
+  app.post("/api/plow-site-groups", requirePlowEditAccess, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const group = await storage.createPlowSiteGroup(req.body, user.id);
+      res.status(201).json(group);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating plow site group" });
+    }
+  });
+
+  app.patch("/api/plow-site-groups/:id", requirePlowEditAccess, async (req, res) => {
+    try {
+      const group = await storage.updatePlowSiteGroup(req.params.id as string, req.body);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      res.json(group);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating plow site group" });
+    }
+  });
+
+  app.delete("/api/plow-site-groups/:id", requirePlowEditAccess, async (req, res) => {
+    try {
+      await storage.deletePlowSiteGroup(req.params.id as string);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting plow site group" });
+    }
+  });
 
   app.get("/api/plow-sites", requirePlowViewAccess, async (req, res) => {
     try {

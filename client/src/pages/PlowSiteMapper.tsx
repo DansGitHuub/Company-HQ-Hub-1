@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import type { PlowSite, User } from "@shared/schema";
+import type { PlowSite, PlowSiteGroup, User } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,15 @@ import {
   Search,
   ChevronRight,
   Snowflake,
-  Navigation
+  Navigation,
+  Folder,
+  FolderPlus,
+  Home,
+  Building2,
+  Route,
+  Tag,
+  Settings,
+  Loader2
 } from "lucide-react";
 
 type Annotation = {
@@ -69,10 +77,19 @@ export default function PlowSiteMapper() {
   const { toast } = useToast();
   const [selectedSite, setSelectedSite] = useState<PlowSite | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [addressSearch, setAddressSearch] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [newSiteName, setNewSiteName] = useState("");
   const [newSiteAddress, setNewSiteAddress] = useState("");
+  const [newSiteGroupId, setNewSiteGroupId] = useState<string | null>(null);
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState<string | null>(null);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupType, setNewGroupType] = useState<string>("custom");
+  const [newGroupColor, setNewGroupColor] = useState("#3b82f6");
+  const [editingGroup, setEditingGroup] = useState<PlowSiteGroup | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [instructions, setInstructions] = useState<Instruction[]>([]);
   const [currentTool, setCurrentTool] = useState<"select" | "rect" | "circle" | "line" | "arrow" | "text" | "icon">("select");
@@ -81,9 +98,37 @@ export default function PlowSiteMapper() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const analyzeWithAI = async () => {
+    if (!uploadedImage) return;
+    setIsAnalyzing(true);
+    setAiAnalysis(null);
+    try {
+      const res = await fetch("/api/ai/analyze-plow-site", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ imageBase64: uploadedImage }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAiAnalysis(data);
+        toast({ title: "AI Analysis Complete" });
+      } else {
+        toast({ title: "AI analysis failed", variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "AI analysis error", variant: "destructive" });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const { data: permissions } = useQuery<PlowPermissions>({
     queryKey: ["/api/plow-site-permissions/my"],
@@ -94,8 +139,107 @@ export default function PlowSiteMapper() {
     enabled: permissions?.canView,
   });
 
+  const { data: groups = [] } = useQuery<PlowSiteGroup[]>({
+    queryKey: ["/api/plow-site-groups"],
+    enabled: permissions?.canView,
+  });
+
+  const createGroup = useMutation({
+    mutationFn: async (data: { name: string; groupType: string; color: string }) => {
+      const res = await fetch("/api/plow-site-groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create group");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/plow-site-groups"] });
+      setIsGroupDialogOpen(false);
+      setNewGroupName("");
+      setNewGroupType("custom");
+      setNewGroupColor("#3b82f6");
+      toast({ title: "Group created successfully" });
+    },
+    onError: () => toast({ title: "Failed to create group", variant: "destructive" }),
+  });
+
+  const updateGroup = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<PlowSiteGroup> }) => {
+      const res = await fetch(`/api/plow-site-groups/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update group");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/plow-site-groups"] });
+      setEditingGroup(null);
+      toast({ title: "Group updated successfully" });
+    },
+    onError: () => toast({ title: "Failed to update group", variant: "destructive" }),
+  });
+
+  const deleteGroup = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/plow-site-groups/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete group");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/plow-site-groups"] });
+      toast({ title: "Group deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete group", variant: "destructive" }),
+  });
+
+  const searchAddresses = useCallback(async (query: string) => {
+    if (query.length < 3) {
+      setAddressSuggestions([]);
+      return;
+    }
+    setIsSearchingAddress(true);
+    try {
+      const res = await fetch("/api/ai/address-autocomplete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ query }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAddressSuggestions(data.suggestions || []);
+      }
+    } catch (err) {
+      console.error("Address search error:", err);
+    } finally {
+      setIsSearchingAddress(false);
+    }
+  }, []);
+
+  const handleAddressChange = (value: string) => {
+    setNewSiteAddress(value);
+    if (addressSearchTimeoutRef.current) {
+      clearTimeout(addressSearchTimeoutRef.current);
+    }
+    addressSearchTimeoutRef.current = setTimeout(() => {
+      searchAddresses(value);
+    }, 300);
+  };
+
+  const filteredSites = selectedGroupFilter 
+    ? sites.filter(site => site.groupId === selectedGroupFilter)
+    : sites;
+
   const createSite = useMutation({
-    mutationFn: async (data: { name: string; address?: string; imageUrl?: string; imageSource?: string }) => {
+    mutationFn: async (data: { name: string; address?: string; groupId?: string; imageUrl?: string; imageSource?: string }) => {
       const res = await fetch("/api/plow-sites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -112,7 +256,9 @@ export default function PlowSiteMapper() {
       setIsEditing(true);
       setNewSiteName("");
       setNewSiteAddress("");
+      setNewSiteGroupId(null);
       setUploadedImage(null);
+      setAddressSuggestions([]);
       toast({ title: "Site created successfully" });
     },
     onError: () => toast({ title: "Failed to create site", variant: "destructive" }),
@@ -168,9 +314,27 @@ export default function PlowSiteMapper() {
     createSite.mutate({
       name: newSiteName,
       address: newSiteAddress,
+      groupId: newSiteGroupId || undefined,
       imageUrl: uploadedImage || undefined,
       imageSource: uploadedImage ? "upload" : "google",
     });
+  };
+
+  const handleCreateGroup = () => {
+    createGroup.mutate({
+      name: newGroupName,
+      groupType: newGroupType,
+      color: newGroupColor,
+    });
+  };
+
+  const getGroupIcon = (groupType: string) => {
+    switch (groupType) {
+      case "residential": return <Home className="h-4 w-4" />;
+      case "commercial": return <Building2 className="h-4 w-4" />;
+      case "route": return <Route className="h-4 w-4" />;
+      default: return <Tag className="h-4 w-4" />;
+    }
   };
 
   const handleSaveSite = () => {
@@ -398,14 +562,59 @@ export default function PlowSiteMapper() {
                     data-testid="input-site-name"
                   />
                 </div>
+                <div className="relative">
+                  <Label>Address</Label>
+                  <div className="relative">
+                    <Input
+                      value={newSiteAddress}
+                      onChange={(e) => handleAddressChange(e.target.value)}
+                      placeholder="Start typing an address..."
+                      data-testid="input-site-address"
+                    />
+                    {isSearchingAddress && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  {addressSuggestions.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {addressSuggestions.map((suggestion, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-accent cursor-pointer"
+                          onClick={() => {
+                            setNewSiteAddress(suggestion);
+                            setAddressSuggestions([]);
+                          }}
+                          data-testid={`address-suggestion-${idx}`}
+                        >
+                          <MapPin className="h-3 w-3 inline mr-2 text-muted-foreground" />
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div>
-                  <Label>Address (Optional)</Label>
-                  <Input
-                    value={newSiteAddress}
-                    onChange={(e) => setNewSiteAddress(e.target.value)}
-                    placeholder="123 Main St, City, State"
-                    data-testid="input-site-address"
-                  />
+                  <Label>Group (Optional)</Label>
+                  <Select value={newSiteGroupId || "none"} onValueChange={(val) => setNewSiteGroupId(val === "none" ? null : val)}>
+                    <SelectTrigger data-testid="select-site-group">
+                      <SelectValue placeholder="Select a group" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Group</SelectItem>
+                      {groups.map((group) => (
+                        <SelectItem key={group.id} value={group.id}>
+                          <span className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: group.color || "#3b82f6" }} />
+                            {group.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label>Property Image</Label>
@@ -454,37 +663,169 @@ export default function PlowSiteMapper() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Sites</CardTitle>
-              <CardDescription>{sites.length} properties</CardDescription>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Folder className="h-4 w-4" />
+                  Groups
+                </CardTitle>
+                {permissions?.canEdit && (
+                  <Dialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="sm" data-testid="button-create-group">
+                        <FolderPlus className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create Group</DialogTitle>
+                        <DialogDescription>Organize your sites into groups</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div>
+                          <Label>Group Name</Label>
+                          <Input
+                            value={newGroupName}
+                            onChange={(e) => setNewGroupName(e.target.value)}
+                            placeholder="e.g., Downtown Route"
+                            data-testid="input-group-name"
+                          />
+                        </div>
+                        <div>
+                          <Label>Type</Label>
+                          <Select value={newGroupType} onValueChange={setNewGroupType}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="residential">
+                                <span className="flex items-center gap-2"><Home className="h-4 w-4" /> Residential</span>
+                              </SelectItem>
+                              <SelectItem value="commercial">
+                                <span className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Commercial</span>
+                              </SelectItem>
+                              <SelectItem value="route">
+                                <span className="flex items-center gap-2"><Route className="h-4 w-4" /> Route</span>
+                              </SelectItem>
+                              <SelectItem value="custom">
+                                <span className="flex items-center gap-2"><Tag className="h-4 w-4" /> Custom</span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Color</Label>
+                          <div className="flex gap-2 mt-2">
+                            {["#3b82f6", "#22c55e", "#eab308", "#f97316", "#ef4444", "#a855f7", "#ec4899"].map((color) => (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => setNewGroupColor(color)}
+                                className={`w-8 h-8 rounded-full transition-all ${newGroupColor === color ? "ring-2 ring-offset-2 ring-primary" : ""}`}
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsGroupDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleCreateGroup} disabled={!newGroupName || createGroup.isPending}>
+                          Create Group
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
             </CardHeader>
-            <CardContent className="space-y-2 max-h-[500px] overflow-y-auto">
-              {sites.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No sites yet</p>
-              ) : (
-                sites.map((site) => (
-                  <div
-                    key={site.id}
-                    onClick={() => {
-                      setSelectedSite(site);
-                      setIsEditing(false);
-                    }}
-                    className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                      selectedSite?.id === site.id ? "bg-primary/10 border border-primary" : "bg-muted/50 hover:bg-muted"
-                    }`}
-                    data-testid={`card-site-${site.id}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium text-sm">{site.name}</span>
-                    </div>
-                    {site.address && (
-                      <p className="text-xs text-muted-foreground mt-1 ml-6">{site.address}</p>
+            <CardContent className="space-y-1">
+              <button
+                type="button"
+                onClick={() => setSelectedGroupFilter(null)}
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                  selectedGroupFilter === null ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
+                }`}
+                data-testid="filter-all-sites"
+              >
+                All Sites ({sites.length})
+              </button>
+              {groups.map((group) => {
+                const groupSiteCount = sites.filter(s => s.groupId === group.id).length;
+                return (
+                  <div key={group.id} className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedGroupFilter(group.id)}
+                      className={`flex-1 text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 ${
+                        selectedGroupFilter === group.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
+                      }`}
+                      data-testid={`filter-group-${group.id}`}
+                    >
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: group.color || "#3b82f6" }} />
+                      {getGroupIcon(group.groupType || "custom")}
+                      <span className="flex-1 truncate">{group.name}</span>
+                      <span className="text-xs text-muted-foreground">({groupSiteCount})</span>
+                    </button>
+                    {permissions?.canEdit && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => deleteGroup.mutate(group.id)}
+                        data-testid={`delete-group-${group.id}`}
+                      >
+                        <Trash2 className="h-3 w-3 text-muted-foreground" />
+                      </Button>
                     )}
                   </div>
-                ))
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Sites</CardTitle>
+              <CardDescription>
+                {selectedGroupFilter ? `${filteredSites.length} in group` : `${sites.length} total`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 max-h-[400px] overflow-y-auto">
+              {filteredSites.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  {selectedGroupFilter ? "No sites in this group" : "No sites yet"}
+                </p>
+              ) : (
+                filteredSites.map((site) => {
+                  const siteGroup = groups.find(g => g.id === site.groupId);
+                  return (
+                    <div
+                      key={site.id}
+                      onClick={() => {
+                        setSelectedSite(site);
+                        setIsEditing(false);
+                      }}
+                      className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                        selectedSite?.id === site.id ? "bg-primary/10 border border-primary" : "bg-muted/50 hover:bg-muted"
+                      }`}
+                      data-testid={`card-site-${site.id}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {siteGroup && (
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: siteGroup.color || "#3b82f6" }} />
+                        )}
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-sm">{site.name}</span>
+                      </div>
+                      {site.address && (
+                        <p className="text-xs text-muted-foreground mt-1 ml-6">{site.address}</p>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </CardContent>
           </Card>
@@ -626,6 +967,73 @@ export default function PlowSiteMapper() {
                             <Upload className="h-4 w-4" />
                           </Button>
                         </div>
+                        {uploadedImage && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={analyzeWithAI}
+                            disabled={isAnalyzing}
+                            className="ml-auto"
+                            data-testid="button-ai-analyze"
+                          >
+                            {isAnalyzing ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-4 w-4 mr-2" />
+                            )}
+                            AI Analyze
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    {aiAnalysis && (
+                      <div className="p-4 bg-muted/50 rounded-lg border space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            AI Analysis Results
+                          </h4>
+                          <Button variant="ghost" size="sm" onClick={() => setAiAnalysis(null)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {aiAnalysis.suggestedRoute && (
+                          <div>
+                            <p className="text-sm font-medium text-primary">Suggested Route:</p>
+                            <p className="text-sm text-muted-foreground">{aiAnalysis.suggestedRoute}</p>
+                          </div>
+                        )}
+                        {aiAnalysis.driveways?.length > 0 && (
+                          <div>
+                            <p className="text-sm font-medium">Driveways ({aiAnalysis.driveways.length}):</p>
+                            {aiAnalysis.driveways.map((d: any, i: number) => (
+                              <p key={i} className="text-xs text-muted-foreground ml-2">- {d.description} ({d.location})</p>
+                            ))}
+                          </div>
+                        )}
+                        {aiAnalysis.walkways?.length > 0 && (
+                          <div>
+                            <p className="text-sm font-medium">Walkways ({aiAnalysis.walkways.length}):</p>
+                            {aiAnalysis.walkways.map((w: any, i: number) => (
+                              <p key={i} className="text-xs text-muted-foreground ml-2">- {w.description}</p>
+                            ))}
+                          </div>
+                        )}
+                        {aiAnalysis.obstacles?.length > 0 && (
+                          <div>
+                            <p className="text-sm font-medium text-orange-600">Obstacles:</p>
+                            {aiAnalysis.obstacles.map((o: any, i: number) => (
+                              <p key={i} className="text-xs text-muted-foreground ml-2">- {o.description} {o.warning && `(${o.warning})`}</p>
+                            ))}
+                          </div>
+                        )}
+                        {aiAnalysis.specialNotes && (
+                          <div>
+                            <p className="text-sm font-medium">Notes:</p>
+                            <p className="text-xs text-muted-foreground">{aiAnalysis.specialNotes}</p>
+                          </div>
+                        )}
                       </div>
                     )}
 

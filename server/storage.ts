@@ -33,6 +33,7 @@ import {
   todos, type Todo, type InsertTodo,
   todoAssignments, type TodoAssignment, type InsertTodoAssignment,
   todoActiveUsers, type TodoActiveUser, type InsertTodoActiveUser,
+  plowSiteGroups, type PlowSiteGroup, type InsertPlowSiteGroup,
   plowSites, type PlowSite, type InsertPlowSite,
   plowSiteManagerPermissions, type PlowSiteManagerPermission, type InsertPlowSiteManagerPermission
 } from "@shared/schema";
@@ -247,6 +248,13 @@ export interface IStorage {
   activateTodoUser(userId: string, activatedBy: string): Promise<TodoActiveUser>;
   deactivateTodoUser(userId: string): Promise<boolean>;
   
+  // Plow Site Groups
+  getPlowSiteGroups(): Promise<PlowSiteGroup[]>;
+  getPlowSiteGroup(id: string): Promise<PlowSiteGroup | undefined>;
+  createPlowSiteGroup(group: InsertPlowSiteGroup, createdBy: string): Promise<PlowSiteGroup>;
+  updatePlowSiteGroup(id: string, updates: Partial<PlowSiteGroup>): Promise<PlowSiteGroup | undefined>;
+  deletePlowSiteGroup(id: string): Promise<boolean>;
+
   // Plow Site Maps
   getPlowSites(): Promise<PlowSite[]>;
   getPlowSite(id: string): Promise<PlowSite | undefined>;
@@ -1065,6 +1073,34 @@ export class DatabaseStorage implements IStorage {
 
   async deactivateTodoUser(userId: string): Promise<boolean> {
     await db.delete(todoActiveUsers).where(eq(todoActiveUsers.userId, userId));
+    return true;
+  }
+
+  // Plow Site Groups
+  async getPlowSiteGroups(): Promise<PlowSiteGroup[]> {
+    return db.select().from(plowSiteGroups);
+  }
+
+  async getPlowSiteGroup(id: string): Promise<PlowSiteGroup | undefined> {
+    const [group] = await db.select().from(plowSiteGroups).where(eq(plowSiteGroups.id, id));
+    return group || undefined;
+  }
+
+  async createPlowSiteGroup(group: InsertPlowSiteGroup, createdBy: string): Promise<PlowSiteGroup> {
+    const [created] = await db.insert(plowSiteGroups).values({ ...group, createdBy }).returning();
+    return created;
+  }
+
+  async updatePlowSiteGroup(id: string, updates: Partial<PlowSiteGroup>): Promise<PlowSiteGroup | undefined> {
+    const [updated] = await db.update(plowSiteGroups)
+      .set(updates)
+      .where(eq(plowSiteGroups.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deletePlowSiteGroup(id: string): Promise<boolean> {
+    await db.delete(plowSiteGroups).where(eq(plowSiteGroups.id, id));
     return true;
   }
 

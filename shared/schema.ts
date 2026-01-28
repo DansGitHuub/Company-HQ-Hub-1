@@ -901,6 +901,29 @@ export const insertTodoActiveUserSchema = createInsertSchema(todoActiveUsers).pi
 export type InsertTodoActiveUser = z.infer<typeof insertTodoActiveUserSchema>;
 export type TodoActiveUser = typeof todoActiveUsers.$inferSelect;
 
+// Plow Site Groups - for organizing sites (residential, commercial, routes, etc.)
+export const plowSiteGroups = pgTable("plow_site_groups", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color").default("#3b82f6"), // blue by default
+  groupType: text("group_type").default("custom"), // residential, commercial, route, custom
+  sortOrder: integer("sort_order").default(0),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPlowSiteGroupSchema = createInsertSchema(plowSiteGroups).pick({
+  name: true,
+  description: true,
+  color: true,
+  groupType: true,
+  sortOrder: true,
+});
+
+export type InsertPlowSiteGroup = z.infer<typeof insertPlowSiteGroupSchema>;
+export type PlowSiteGroup = typeof plowSiteGroups.$inferSelect;
+
 // Plow Site Maps - for snow removal route planning
 export const plowSites = pgTable("plow_sites", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -908,6 +931,7 @@ export const plowSites = pgTable("plow_sites", {
   address: text("address"),
   latitude: text("latitude"),
   longitude: text("longitude"),
+  groupId: varchar("group_id", { length: 36 }).references(() => plowSiteGroups.id),
   imageUrl: text("image_url"),
   imageSource: text("image_source").default("google"), // google, upload
   annotations: jsonb("annotations").default([]),
@@ -923,6 +947,7 @@ export const insertPlowSiteSchema = createInsertSchema(plowSites).pick({
   address: true,
   latitude: true,
   longitude: true,
+  groupId: true,
   imageUrl: true,
   imageSource: true,
   annotations: true,
