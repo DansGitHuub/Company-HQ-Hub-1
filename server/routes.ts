@@ -811,6 +811,49 @@ export async function registerRoutes(
     }
   });
 
+  // Update a material
+  app.patch("/api/materials/:id", requireAuth, async (req, res) => {
+    try {
+      const id = req.params.id as string;
+      const { name, categoryId, status, description, vendor, unitOfMeasure, primaryImage, galleryImages, tags } = req.body;
+      
+      const updates: any = {};
+      if (name !== undefined) updates.name = name;
+      if (categoryId !== undefined) updates.categoryId = categoryId;
+      if (status !== undefined) updates.status = status;
+      if (description !== undefined) updates.description = description;
+      if (vendor !== undefined) updates.vendor = vendor;
+      if (unitOfMeasure !== undefined) updates.unitOfMeasure = unitOfMeasure;
+      if (primaryImage !== undefined) updates.primaryImage = primaryImage;
+      if (galleryImages !== undefined) updates.galleryImages = galleryImages;
+      if (tags !== undefined) updates.tags = tags;
+      
+      const material = await storage.updateMaterial(id, updates);
+      if (!material) {
+        return res.status(404).json({ message: "Material not found" });
+      }
+      res.json(material);
+    } catch (err: any) {
+      console.error("[materials] Error updating material:", err);
+      res.status(500).json({ message: "Error updating material", error: err?.message });
+    }
+  });
+
+  // Delete a material
+  app.delete("/api/materials/:id", requireAuth, async (req, res) => {
+    try {
+      const id = req.params.id as string;
+      const deleted = await storage.deleteMaterial(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Material not found" });
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("[materials] Error deleting material:", err);
+      res.status(500).json({ message: "Error deleting material", error: err?.message });
+    }
+  });
+
   // AI-powered material generation - auto-fills based on name and category
   app.post("/api/materials/ai-generate", requireAuth, async (req, res) => {
     try {
