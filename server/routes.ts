@@ -496,30 +496,54 @@ export async function registerRoutes(
         return res.json({ suggestions: [] });
       }
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are an address autocomplete assistant. Given a partial address input, suggest up to 5 realistic, complete US addresses that match the input.
-            Focus on common address formats like "123 Main St, City, State ZIP".
-            Format your response as JSON with a "suggestions" array of complete address strings.
-            If the input is too vague, provide generic but realistic address completions.
-            Always include city, state abbreviation, and ZIP code in suggestions.`
-          },
-          {
-            role: "user",
-            content: `Complete this partial address: ${query}`
-          }
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 512,
+      // Use OpenStreetMap Nominatim for real address lookups
+      const encodedQuery = encodeURIComponent(query);
+      const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodedQuery}&format=json&addressdetails=1&limit=5&countrycodes=us`;
+      
+      const response = await fetch(nominatimUrl, {
+        headers: {
+          'User-Agent': 'CompanyHQ-PlowMapper/1.0'
+        }
       });
-
-      const result = JSON.parse(completion.choices[0]?.message?.content || '{"suggestions":[]}');
-      res.json({ suggestions: result.suggestions || [] });
+      
+      if (!response.ok) {
+        console.error("Nominatim API error:", response.status);
+        return res.json({ suggestions: [] });
+      }
+      
+      const data = await response.json();
+      
+      // Format the results as clean address strings
+      const suggestions = data.map((result: any) => {
+        const addr = result.address || {};
+        const parts: string[] = [];
+        
+        // Build address from components
+        if (addr.house_number && addr.road) {
+          parts.push(`${addr.house_number} ${addr.road}`);
+        } else if (addr.road) {
+          parts.push(addr.road);
+        }
+        
+        const city = addr.city || addr.town || addr.village || addr.hamlet || addr.municipality;
+        if (city) {
+          parts.push(city);
+        }
+        
+        if (addr.state) {
+          parts.push(addr.state);
+        }
+        
+        if (addr.postcode) {
+          parts.push(addr.postcode);
+        }
+        
+        return parts.length > 0 ? parts.join(', ') : result.display_name;
+      }).filter((s: string) => s && s.length > 0);
+      
+      res.json({ suggestions });
     } catch (err: any) {
-      console.error("AI address autocomplete error:", err);
+      console.error("Address autocomplete error:", err);
       res.json({ suggestions: [] });
     }
   });
