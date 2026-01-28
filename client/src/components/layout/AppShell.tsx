@@ -31,7 +31,8 @@ import {
   Circle,
   Grip,
   Minus,
-  CheckSquare
+  CheckSquare,
+  Snowflake
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -297,11 +298,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     inbox: { icon: Inbox, label: "Messages", href: "/inbox" },
     integrations: { icon: Settings, label: "Integrations", href: "/integrations" },
     admin: { icon: Shield, label: "Admin Panel", href: "/admin" },
+    tools: { icon: Snowflake, label: "Tools", href: "/tools/plow-mapper" },
   };
 
   // Default order for internal roles (help always at very bottom for all roles)
   const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "hiring", "jobs", "education", "profile", "assistant"];
-  const adminExtraIds = ["hq", "marketing", "forms", "integrations", "admin"];
+  const adminExtraIds = ["hq", "marketing", "forms", "tools", "integrations", "admin"];
   const bottomIds = ["help"]; // Always shown at bottom for all roles
 
   const getNavItems = () => {
@@ -318,7 +320,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (effectiveRole === "Admin") {
       allowedIds = [...teamDefaultIds, ...adminExtraIds];
     } else if (effectiveRole === "Manager") {
-      allowedIds = [...teamDefaultIds];
+      allowedIds = [...teamDefaultIds, "tools"];
     } else {
       // Crew role
       allowedIds = teamDefaultIds;

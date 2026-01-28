@@ -31,6 +31,7 @@ import AdminSetup from "@/pages/AdminSetup";
 import EquipmentTracker from "@/pages/EquipmentTracker";
 import SearchPage from "@/pages/Search";
 import TodoList from "@/pages/TodoList";
+import PlowSiteMapper from "@/pages/PlowSiteMapper";
 import NotFound from "@/pages/not-found";
 
 function AppRoutes() {
@@ -82,6 +83,7 @@ function AppRoutes() {
         <Route path="/equipment" component={EquipmentTracker} />
         <Route path="/search" component={SearchPage} />
         <Route path="/todos" component={TodoList} />
+        <Route path="/tools/plow-mapper" component={PlowSiteMapper} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>

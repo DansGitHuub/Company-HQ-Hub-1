@@ -2331,6 +2331,118 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
+  // Plow Site Maps - Tools section
+  const requirePlowEditAccess = async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Not authenticated" });
+    const user = req.user as User;
+    if (user.role === "Admin") return next();
+    if (user.role === "Manager") {
+      const perm = await storage.getPlowSiteManagerPermission(user.id);
+      if (perm?.canEdit) return next();
+    }
+    return res.status(403).json({ message: "You don't have edit access to plow sites" });
+  };
+
+  const requirePlowViewAccess = async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Not authenticated" });
+    const user = req.user as User;
+    if (user.role === "Admin" || user.role === "Manager" || user.role === "Crew") return next();
+    return res.status(403).json({ message: "Access denied" });
+  };
+
+  app.get("/api/plow-sites", requirePlowViewAccess, async (req, res) => {
+    try {
+      const sites = await storage.getPlowSites();
+      res.json(sites);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching plow sites" });
+    }
+  });
+
+  app.get("/api/plow-sites/:id", requirePlowViewAccess, async (req, res) => {
+    try {
+      const site = await storage.getPlowSite(req.params.id as string);
+      if (!site) return res.status(404).json({ message: "Site not found" });
+      res.json(site);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching plow site" });
+    }
+  });
+
+  app.post("/api/plow-sites", requirePlowEditAccess, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const site = await storage.createPlowSite(req.body, user.id);
+      res.status(201).json(site);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating plow site" });
+    }
+  });
+
+  app.patch("/api/plow-sites/:id", requirePlowEditAccess, async (req, res) => {
+    try {
+      const site = await storage.updatePlowSite(req.params.id as string, req.body);
+      if (!site) return res.status(404).json({ message: "Site not found" });
+      res.json(site);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating plow site" });
+    }
+  });
+
+  app.delete("/api/plow-sites/:id", requirePlowEditAccess, async (req, res) => {
+    try {
+      await storage.deletePlowSite(req.params.id as string);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting plow site" });
+    }
+  });
+
+  // Plow Site Manager Permissions
+  app.get("/api/plow-site-permissions", requireAdmin, async (req, res) => {
+    try {
+      const perms = await storage.getPlowSiteManagerPermissions();
+      res.json(perms);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching permissions" });
+    }
+  });
+
+  app.get("/api/plow-site-permissions/my", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role === "Admin") return res.json({ canEdit: true, canView: true });
+      if (user.role === "Manager") {
+        const perm = await storage.getPlowSiteManagerPermission(user.id);
+        return res.json({ canEdit: perm?.canEdit || false, canView: true });
+      }
+      if (user.role === "Crew") return res.json({ canEdit: false, canView: true });
+      return res.json({ canEdit: false, canView: false });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching permissions" });
+    }
+  });
+
+  app.post("/api/plow-site-permissions/:userId", requireAdmin, async (req, res) => {
+    try {
+      const admin = req.user as User;
+      const { canEdit } = req.body;
+      const perm = await storage.setPlowSiteManagerPermission(req.params.userId as string, canEdit, admin.id);
+      res.json(perm);
+    } catch (err) {
+      res.status(500).json({ message: "Error setting permission" });
+    }
+  });
+
+  app.delete("/api/plow-site-permissions/:userId", requireAdmin, async (req, res) => {
+    try {
+      await storage.deletePlowSiteManagerPermission(req.params.userId as string);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting permission" });
+    }
+  });
+
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 
