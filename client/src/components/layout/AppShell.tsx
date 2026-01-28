@@ -30,7 +30,8 @@ import {
   PanelLeft,
   Circle,
   Grip,
-  Minus
+  Minus,
+  CheckSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -242,6 +243,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     staleTime: 60000,
   });
 
+  const { data: todoActiveStatus } = useQuery<{ isActive: boolean; unreadCount: number }>({
+    queryKey: ["/api/todo-active-status"],
+    staleTime: 30000,
+    refetchInterval: 30000,
+  });
+
   const getLogoClasses = () => {
     const shape = companySettings?.logoShape || "square";
     const cornerRadius = companySettings?.logoCornerRadius || 0;
@@ -277,6 +284,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     sops: { icon: BookOpen, label: "SOP Library", href: "/sops" },
     materials: { icon: Hammer, label: "Materials", href: "/materials" },
     equipment: { icon: Truck, label: "Equipment", href: "/equipment" },
+    todos: { icon: CheckSquare, label: "To-Do List", href: "/todos" },
     hiring: { icon: Users, label: "Hiring", href: "/hiring" },
     jobs: { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
     education: { icon: GraduationCap, label: "Customer Hub", href: "/education" },
@@ -292,7 +300,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   // Default order for internal roles (help always at very bottom for all roles)
-  const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "hiring", "jobs", "education", "profile", "assistant"];
+  const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "todos", "hiring", "jobs", "education", "profile", "assistant"];
   const adminExtraIds = ["hq", "marketing", "forms", "integrations", "admin"];
   const bottomIds = ["help"]; // Always shown at bottom for all roles
 
@@ -384,6 +392,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {displayNav.map((item) => {
           const isActive = location === item.href;
           const helpContent = menuHelpContent[item.id];
+          const showTodoBadge = item.id === "todos" && todoActiveStatus?.isActive && todoActiveStatus.unreadCount > 0;
           return (
             <div key={item.href} className="flex items-center group">
               <Link href={item.href} className="flex-1">
@@ -398,7 +407,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   )}
                   onClick={() => setIsMobileOpen(false)}
                 >
-                  <item.icon className="h-5 w-5" />
+                  <div className="relative">
+                    <item.icon className="h-5 w-5" />
+                    {showTodoBadge && (
+                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                        {todoActiveStatus.unreadCount > 9 ? "9+" : todoActiveStatus.unreadCount}
+                      </span>
+                    )}
+                  </div>
                   {item.label}
                 </div>
               </Link>

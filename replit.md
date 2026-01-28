@@ -46,6 +46,7 @@ Preferred communication style: Simple, everyday language.
 - **Global Search**: Role-based search functionality across key modules (SOPs, Materials, Jobs, Candidates, Users).
 - **Direct Employee Messaging**: Customers can send messages to specific employees or the general inbox.
 - **Materials Catalog Manager**: Comprehensive materials management with 8 specialized categories (Aggregates & Gravel, Mulch & Soil, Trees & Shrubs, Perennials & Annuals, Hardscape & Pavers, Landscape, Chemicals & Fertilizer, Other), AI-powered 5-step material creation wizard (Name → Category → AI Auto-Fill → Review → Confirm), category-specific custom fields, bulk operations (select all, move to category), easy category management (add, rename, delete), search/filter/sort capabilities, and role-based access.
+- **Interactive To-Do List**: Task management system with add/edit/delete functionality, priority levels (low, medium, high, urgent), status tracking (pending, in_progress, completed), due dates, user assignments, read/unread status, filtering by status and priority, notification badges in sidebar for unread tasks, and admin-controlled user activation.
 
 ## External Dependencies
 

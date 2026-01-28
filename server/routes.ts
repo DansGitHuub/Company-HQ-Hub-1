@@ -6,7 +6,7 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { sendMaintenanceReminderEmail } from "./email";
 import OpenAI from "openai";
-import { insertSopTemplateSchema, insertSopExampleSchema, insertFormFolderSchema, insertFormTemplateSchema } from "@shared/schema";
+import { insertSopTemplateSchema, insertSopExampleSchema, insertFormFolderSchema, insertFormTemplateSchema, type User } from "@shared/schema";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -2192,7 +2192,7 @@ Generate detailed information for this landscaping material.`;
 
   app.get("/api/todos/:id", requireAuth, async (req, res) => {
     try {
-      const todo = await storage.getTodo(req.params.id);
+      const todo = await storage.getTodo(req.params.id as string);
       if (!todo) return res.status(404).json({ message: "Todo not found" });
       res.json(todo);
     } catch (err) {
@@ -2217,7 +2217,7 @@ Generate detailed information for this landscaping material.`;
 
   app.patch("/api/todos/:id", requireAuth, async (req, res) => {
     try {
-      const todo = await storage.updateTodo(req.params.id, req.body);
+      const todo = await storage.updateTodo(req.params.id as string, req.body);
       if (!todo) return res.status(404).json({ message: "Todo not found" });
       res.json(todo);
     } catch (err) {
@@ -2227,7 +2227,7 @@ Generate detailed information for this landscaping material.`;
 
   app.delete("/api/todos/:id", requireAuth, async (req, res) => {
     try {
-      await storage.deleteTodo(req.params.id);
+      await storage.deleteTodo(req.params.id as string);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Error deleting todo" });
@@ -2237,7 +2237,7 @@ Generate detailed information for this landscaping material.`;
   // To-Do Assignments
   app.get("/api/todos/:id/assignments", requireAuth, async (req, res) => {
     try {
-      const assignments = await storage.getTodoAssignments(req.params.id);
+      const assignments = await storage.getTodoAssignments(req.params.id as string);
       res.json(assignments);
     } catch (err) {
       res.status(500).json({ message: "Error fetching assignments" });
@@ -2263,7 +2263,7 @@ Generate detailed information for this landscaping material.`;
   app.post("/api/todos/:id/assignments", requireAuth, async (req, res) => {
     try {
       const assignment = await storage.createTodoAssignment({
-        todoId: req.params.id,
+        todoId: req.params.id as string,
         userId: req.body.userId
       });
       res.status(201).json(assignment);
@@ -2274,7 +2274,7 @@ Generate detailed information for this landscaping material.`;
 
   app.delete("/api/todo-assignments/:id", requireAuth, async (req, res) => {
     try {
-      await storage.deleteTodoAssignment(req.params.id);
+      await storage.deleteTodoAssignment(req.params.id as string);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Error deleting assignment" });
@@ -2284,7 +2284,7 @@ Generate detailed information for this landscaping material.`;
   app.post("/api/todos/:id/mark-read", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;
-      await storage.markTodoAsRead(req.params.id, user.id);
+      await storage.markTodoAsRead(req.params.id as string, user.id);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Error marking todo as read" });
@@ -2315,7 +2315,7 @@ Generate detailed information for this landscaping material.`;
   app.post("/api/todo-active-users/:userId", requireAdmin, async (req, res) => {
     try {
       const admin = req.user as User;
-      const activeUser = await storage.activateTodoUser(req.params.userId, admin.id);
+      const activeUser = await storage.activateTodoUser(req.params.userId as string, admin.id);
       res.status(201).json(activeUser);
     } catch (err) {
       res.status(500).json({ message: "Error activating todo user" });
@@ -2324,7 +2324,7 @@ Generate detailed information for this landscaping material.`;
 
   app.delete("/api/todo-active-users/:userId", requireAdmin, async (req, res) => {
     try {
-      await storage.deactivateTodoUser(req.params.userId);
+      await storage.deactivateTodoUser(req.params.userId as string);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Error deactivating todo user" });

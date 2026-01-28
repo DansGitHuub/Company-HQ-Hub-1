@@ -60,8 +60,121 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { User, AccessRequest, CompanySettings } from "@shared/schema";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 
 type SafeUser = Omit<User, "password">;
+type TodoActiveUser = { id: string; userId: string; activatedBy: string | null; activatedAt: Date | null };
+
+function TodoActiveUsersManager() {
+  const { toast } = useToast();
+  
+  const { data: users = [] } = useQuery<SafeUser[]>({
+    queryKey: ["/api/admin/users"],
+  });
+
+  const { data: activeUsers = [] } = useQuery<TodoActiveUser[]>({
+    queryKey: ["/api/todo-active-users"],
+  });
+
+  const activateMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await fetch(`/api/todo-active-users/${userId}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to activate user");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/todo-active-users"] });
+      toast({ title: "User activated for To-Do system" });
+    },
+    onError: () => toast({ title: "Failed to activate user", variant: "destructive" }),
+  });
+
+  const deactivateMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await fetch(`/api/todo-active-users/${userId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to deactivate user");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/todo-active-users"] });
+      toast({ title: "User deactivated from To-Do system" });
+    },
+    onError: () => toast({ title: "Failed to deactivate user", variant: "destructive" }),
+  });
+
+  const isUserActive = (userId: string) => activeUsers.some(a => a.userId === userId);
+  const internalUsers = users.filter(u => u.role !== "Customer");
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>To-Do User Management</CardTitle>
+        <CardDescription>
+          Control which users can see and interact with the To-Do list system. 
+          Active users will see a notification icon when they have unread tasks.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {internalUsers.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">No internal users found.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead className="text-center">To-Do Access</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {internalUsers.map((u) => {
+                  const active = isUserActive(u.id);
+                  return (
+                    <TableRow key={u.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
+                            {u.name.charAt(0)}
+                          </div>
+                          <span className="font-medium">{u.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{u.role}</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                      <TableCell className="text-center">
+                        <Switch
+                          checked={active}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              activateMutation.mutate(u.id);
+                            } else {
+                              deactivateMutation.mutate(u.id);
+                            }
+                          }}
+                          disabled={activateMutation.isPending || deactivateMutation.isPending}
+                          data-testid={`switch-todo-access-${u.id}`}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function AdminPanel() {
   const { user } = useAuth();
@@ -317,10 +430,13 @@ export default function AdminPanel() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-lg">
+        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="requests" className="gap-2">
             Requests {pendingRequests.length > 0 && <Badge variant="destructive" className="ml-1">{pendingRequests.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="todos" className="gap-2">
+            To-Do Users
           </TabsTrigger>
           <TabsTrigger value="company" className="gap-2">
             <Building2 className="h-4 w-4" /> Company
@@ -535,6 +651,10 @@ export default function AdminPanel() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="todos" className="mt-6">
+          <TodoActiveUsersManager />
         </TabsContent>
 
         <TabsContent value="company" className="mt-6">

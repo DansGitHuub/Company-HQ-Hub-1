@@ -30,6 +30,7 @@ import Profile from "@/pages/Profile";
 import AdminSetup from "@/pages/AdminSetup";
 import EquipmentTracker from "@/pages/EquipmentTracker";
 import SearchPage from "@/pages/Search";
+import TodoList from "@/pages/TodoList";
 import NotFound from "@/pages/not-found";
 
 function AppRoutes() {
@@ -80,6 +81,7 @@ function AppRoutes() {
         <Route path="/admin-setup" component={AdminSetup} />
         <Route path="/equipment" component={EquipmentTracker} />
         <Route path="/search" component={SearchPage} />
+        <Route path="/todos" component={TodoList} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>
