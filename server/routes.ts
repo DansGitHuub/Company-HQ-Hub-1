@@ -2170,6 +2170,167 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
+  // To-Do System routes
+  app.get("/api/todos", requireAuth, async (req, res) => {
+    try {
+      const allTodos = await storage.getTodos();
+      res.json(allTodos);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching todos" });
+    }
+  });
+
+  app.get("/api/todos/unread-count", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const count = await storage.getUnreadTodoCount(user.id);
+      res.json({ count });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching unread count" });
+    }
+  });
+
+  app.get("/api/todos/:id", requireAuth, async (req, res) => {
+    try {
+      const todo = await storage.getTodo(req.params.id);
+      if (!todo) return res.status(404).json({ message: "Todo not found" });
+      res.json(todo);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching todo" });
+    }
+  });
+
+  app.post("/api/todos", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const todo = await storage.createTodo(req.body, user.id);
+      if (req.body.assignedUserIds && Array.isArray(req.body.assignedUserIds)) {
+        for (const userId of req.body.assignedUserIds) {
+          await storage.createTodoAssignment({ todoId: todo.id, userId });
+        }
+      }
+      res.status(201).json(todo);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating todo" });
+    }
+  });
+
+  app.patch("/api/todos/:id", requireAuth, async (req, res) => {
+    try {
+      const todo = await storage.updateTodo(req.params.id, req.body);
+      if (!todo) return res.status(404).json({ message: "Todo not found" });
+      res.json(todo);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating todo" });
+    }
+  });
+
+  app.delete("/api/todos/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteTodo(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting todo" });
+    }
+  });
+
+  // To-Do Assignments
+  app.get("/api/todos/:id/assignments", requireAuth, async (req, res) => {
+    try {
+      const assignments = await storage.getTodoAssignments(req.params.id);
+      res.json(assignments);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching assignments" });
+    }
+  });
+
+  app.get("/api/my-todos", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const assignments = await storage.getUserTodoAssignments(user.id);
+      const allTodos = await storage.getTodos();
+      const myTodos = allTodos.filter(t => assignments.some(a => a.todoId === t.id));
+      const todosWithReadStatus = myTodos.map(t => ({
+        ...t,
+        isRead: assignments.find(a => a.todoId === t.id)?.isRead || false
+      }));
+      res.json(todosWithReadStatus);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching your todos" });
+    }
+  });
+
+  app.post("/api/todos/:id/assignments", requireAuth, async (req, res) => {
+    try {
+      const assignment = await storage.createTodoAssignment({
+        todoId: req.params.id,
+        userId: req.body.userId
+      });
+      res.status(201).json(assignment);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating assignment" });
+    }
+  });
+
+  app.delete("/api/todo-assignments/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteTodoAssignment(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting assignment" });
+    }
+  });
+
+  app.post("/api/todos/:id/mark-read", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      await storage.markTodoAsRead(req.params.id, user.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error marking todo as read" });
+    }
+  });
+
+  // Active To-Do Users
+  app.get("/api/todo-active-users", requireAdmin, async (req, res) => {
+    try {
+      const activeUsers = await storage.getTodoActiveUsers();
+      res.json(activeUsers);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching active todo users" });
+    }
+  });
+
+  app.get("/api/todo-active-status", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const isActive = await storage.isUserTodoActive(user.id);
+      const unreadCount = isActive ? await storage.getUnreadTodoCount(user.id) : 0;
+      res.json({ isActive, unreadCount });
+    } catch (err) {
+      res.status(500).json({ message: "Error checking todo active status" });
+    }
+  });
+
+  app.post("/api/todo-active-users/:userId", requireAdmin, async (req, res) => {
+    try {
+      const admin = req.user as User;
+      const activeUser = await storage.activateTodoUser(req.params.userId, admin.id);
+      res.status(201).json(activeUser);
+    } catch (err) {
+      res.status(500).json({ message: "Error activating todo user" });
+    }
+  });
+
+  app.delete("/api/todo-active-users/:userId", requireAdmin, async (req, res) => {
+    try {
+      await storage.deactivateTodoUser(req.params.userId);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deactivating todo user" });
+    }
+  });
+
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 

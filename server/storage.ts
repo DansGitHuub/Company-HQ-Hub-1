@@ -29,7 +29,10 @@ import {
   equipmentUploads, type EquipmentUpload, type InsertEquipmentUpload,
   customerResources, type CustomerResource, type InsertCustomerResource,
   savedResources, type SavedResource, type InsertSavedResource,
-  companySettings, type CompanySettings, type InsertCompanySettings
+  companySettings, type CompanySettings, type InsertCompanySettings,
+  todos, type Todo, type InsertTodo,
+  todoAssignments, type TodoAssignment, type InsertTodoAssignment,
+  todoActiveUsers, type TodoActiveUser, type InsertTodoActiveUser
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and } from "drizzle-orm";
@@ -220,6 +223,27 @@ export interface IStorage {
   // Company Settings
   getCompanySettings(): Promise<CompanySettings | undefined>;
   updateCompanySettings(updates: Partial<CompanySettings>): Promise<CompanySettings | undefined>;
+  
+  // To-Do System
+  getTodos(): Promise<Todo[]>;
+  getTodo(id: string): Promise<Todo | undefined>;
+  createTodo(todo: InsertTodo, createdBy: string): Promise<Todo>;
+  updateTodo(id: string, updates: Partial<Todo>): Promise<Todo | undefined>;
+  deleteTodo(id: string): Promise<boolean>;
+  
+  // To-Do Assignments
+  getTodoAssignments(todoId: string): Promise<TodoAssignment[]>;
+  getUserTodoAssignments(userId: string): Promise<TodoAssignment[]>;
+  createTodoAssignment(assignment: InsertTodoAssignment): Promise<TodoAssignment>;
+  deleteTodoAssignment(id: string): Promise<boolean>;
+  markTodoAsRead(todoId: string, userId: string): Promise<boolean>;
+  getUnreadTodoCount(userId: string): Promise<number>;
+  
+  // Active To-Do Users
+  getTodoActiveUsers(): Promise<TodoActiveUser[]>;
+  isUserTodoActive(userId: string): Promise<boolean>;
+  activateTodoUser(userId: string, activatedBy: string): Promise<TodoActiveUser>;
+  deactivateTodoUser(userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -947,6 +971,86 @@ export class DatabaseStorage implements IStorage {
       const [created] = await db.insert(companySettings).values(updates).returning();
       return created;
     }
+  }
+
+  // To-Do System
+  async getTodos(): Promise<Todo[]> {
+    return db.select().from(todos).orderBy(todos.createdAt);
+  }
+
+  async getTodo(id: string): Promise<Todo | undefined> {
+    const [todo] = await db.select().from(todos).where(eq(todos.id, id));
+    return todo || undefined;
+  }
+
+  async createTodo(todo: InsertTodo, createdBy: string): Promise<Todo> {
+    const [created] = await db.insert(todos).values({ ...todo, createdBy }).returning();
+    return created;
+  }
+
+  async updateTodo(id: string, updates: Partial<Todo>): Promise<Todo | undefined> {
+    const [updated] = await db.update(todos)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(todos.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteTodo(id: string): Promise<boolean> {
+    await db.delete(todos).where(eq(todos.id, id));
+    return true;
+  }
+
+  // To-Do Assignments
+  async getTodoAssignments(todoId: string): Promise<TodoAssignment[]> {
+    return db.select().from(todoAssignments).where(eq(todoAssignments.todoId, todoId));
+  }
+
+  async getUserTodoAssignments(userId: string): Promise<TodoAssignment[]> {
+    return db.select().from(todoAssignments).where(eq(todoAssignments.userId, userId));
+  }
+
+  async createTodoAssignment(assignment: InsertTodoAssignment): Promise<TodoAssignment> {
+    const [created] = await db.insert(todoAssignments).values(assignment).returning();
+    return created;
+  }
+
+  async deleteTodoAssignment(id: string): Promise<boolean> {
+    await db.delete(todoAssignments).where(eq(todoAssignments.id, id));
+    return true;
+  }
+
+  async markTodoAsRead(todoId: string, userId: string): Promise<boolean> {
+    await db.update(todoAssignments)
+      .set({ isRead: true })
+      .where(and(eq(todoAssignments.todoId, todoId), eq(todoAssignments.userId, userId)));
+    return true;
+  }
+
+  async getUnreadTodoCount(userId: string): Promise<number> {
+    const unread = await db.select().from(todoAssignments)
+      .where(and(eq(todoAssignments.userId, userId), eq(todoAssignments.isRead, false)));
+    return unread.length;
+  }
+
+  // Active To-Do Users
+  async getTodoActiveUsers(): Promise<TodoActiveUser[]> {
+    return db.select().from(todoActiveUsers);
+  }
+
+  async isUserTodoActive(userId: string): Promise<boolean> {
+    const [active] = await db.select().from(todoActiveUsers).where(eq(todoActiveUsers.userId, userId));
+    return !!active;
+  }
+
+  async activateTodoUser(userId: string, activatedBy: string): Promise<TodoActiveUser> {
+    const [created] = await db.insert(todoActiveUsers).values({ userId, activatedBy }).returning();
+    return created;
+  }
+
+  async deactivateTodoUser(userId: string): Promise<boolean> {
+    await db.delete(todoActiveUsers).where(eq(todoActiveUsers.userId, userId));
+    return true;
   }
 }
 
