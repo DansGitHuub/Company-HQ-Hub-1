@@ -796,6 +796,81 @@ export async function registerRoutes(
     }
   });
 
+  // AI-powered material generation - auto-fills based on name and category
+  app.post("/api/materials/ai-generate", requireAuth, async (req, res) => {
+    try {
+      const { name, category } = req.body;
+      
+      if (!name || !category) {
+        return res.status(400).json({ message: "Name and category are required" });
+      }
+      
+      const systemPrompt = `You are an expert in landscaping materials. Generate accurate, professional information for a material.
+
+IMPORTANT: Be consistent and factual. Use standard industry information for the material type.
+
+Based on the category "${category}", generate appropriate details.
+
+For "${category}" materials, include:
+${category === "Aggregates & Gravel" ? `
+- Description: What it is, common uses (driveways, drainage, base material)
+- Unit of measure: cubic yard, ton, or bag
+- Coverage: Typical sq ft coverage per cubic yard at standard depth` : ""}
+${category === "Mulch & Soil" ? `
+- Description: Material composition, benefits for landscaping
+- Unit of measure: cubic yard or bag
+- Coverage: Sq ft coverage per cubic yard at 2-3 inch depth` : ""}
+${category === "Trees & Shrubs" ? `
+- Description: Growth characteristics, landscaping uses
+- Unit of measure: each or gallon size
+- Include: Mature height, sun requirements, hardiness zone` : ""}
+${category === "Perennials & Annuals" ? `
+- Description: Flower characteristics, growing season
+- Unit of measure: flat, pot, or each
+- Include: Bloom season, sun requirements, spacing` : ""}
+${category === "Hardscape & Pavers" ? `
+- Description: Material type, surface finish, durability
+- Unit of measure: piece, sq ft, or pallet
+- Include: Dimensions, thickness, coverage per pallet` : ""}
+${category === "Chemicals & Fertilizer" ? `
+- Description: Purpose, active ingredients, application method
+- Unit of measure: bag, gallon, or lb
+- Include: NPK ratio for fertilizers, coverage rate` : ""}
+${category === "Landscape" || category === "Other" ? `
+- Description: Product purpose and uses
+- Unit of measure: appropriate unit
+- Include: Key specifications` : ""}
+
+Respond in JSON format:
+{
+  "description": "Clear 2-3 sentence description",
+  "unitOfMeasure": "appropriate unit",
+  "vendor": null,
+  "fieldValues": {}
+}`;
+
+      const userPrompt = `Generate information for: "${name}" in category "${category}"`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 500
+      });
+
+      const content = response.choices[0]?.message?.content || "{}";
+      const aiData = JSON.parse(content);
+      
+      res.json(aiData);
+    } catch (err: any) {
+      console.error("AI generation error:", err);
+      res.status(500).json({ message: "AI generation failed", error: err.message });
+    }
+  });
+
   // AI-powered smart material draft - generates questions and auto-fills data
   app.post("/api/materials/ai-draft", requireAuth, async (req, res) => {
     try {
