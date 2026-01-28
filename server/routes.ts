@@ -735,15 +735,30 @@ export async function registerRoutes(
         return res.status(400).json({ message: "fieldValues object required" });
       }
       
+      // Filter out empty or null values
+      const entries = Object.entries(fieldValues).filter(([_, value]) => 
+        value !== null && value !== undefined && value !== ''
+      );
+      
+      if (entries.length === 0) {
+        return res.json([]);
+      }
+      
       const results = [];
-      for (const [fieldId, value] of Object.entries(fieldValues)) {
-        const fieldValue = await storage.setMaterialFieldValue(id, fieldId, value as string | null);
-        results.push(fieldValue);
+      for (const [fieldId, value] of entries) {
+        try {
+          const fieldValue = await storage.setMaterialFieldValue(id, fieldId, value as string);
+          results.push(fieldValue);
+        } catch (fieldErr) {
+          console.error(`[materials] Error setting field ${fieldId}:`, fieldErr);
+          // Continue with other fields even if one fails
+        }
       }
       
       res.json(results);
-    } catch (err) {
-      res.status(500).json({ message: "Error setting field values" });
+    } catch (err: any) {
+      console.error("[materials] Error setting field values:", err);
+      res.status(500).json({ message: "Error setting field values", error: err?.message });
     }
   });
 

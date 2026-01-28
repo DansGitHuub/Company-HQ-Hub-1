@@ -88,16 +88,16 @@ export async function seedUsers(): Promise<void> {
 }
 
 const SAMPLE_MATERIALS = [
-  { name: 'Premium Mulch - Brown', category: 'Mulch', unit: 'cubic yard', price: 45.00, stock: 100, sku: 'MLH-BRN-001' },
-  { name: 'Premium Mulch - Black', category: 'Mulch', unit: 'cubic yard', price: 48.00, stock: 85, sku: 'MLH-BLK-001' },
-  { name: 'River Rock - Medium', category: 'Stone', unit: 'ton', price: 125.00, stock: 50, sku: 'STN-RVR-001' },
-  { name: 'Paver Bricks - Gray', category: 'Hardscape', unit: 'piece', price: 2.50, stock: 500, sku: 'PVR-GRY-001' },
-  { name: 'Paver Bricks - Red', category: 'Hardscape', unit: 'piece', price: 2.75, stock: 400, sku: 'PVR-RED-001' },
-  { name: 'Topsoil - Premium', category: 'Soil', unit: 'cubic yard', price: 35.00, stock: 75, sku: 'SOL-TOP-001' },
-  { name: 'Compost - Organic', category: 'Soil', unit: 'cubic yard', price: 40.00, stock: 60, sku: 'SOL-CMP-001' },
-  { name: 'Sod - Kentucky Bluegrass', category: 'Grass', unit: 'pallet', price: 275.00, stock: 25, sku: 'GRS-KYB-001' },
-  { name: 'Landscape Fabric', category: 'Supplies', unit: 'roll', price: 45.00, stock: 30, sku: 'SUP-FAB-001' },
-  { name: 'Edging - Black Plastic', category: 'Supplies', unit: 'box', price: 28.00, stock: 40, sku: 'SUP-EDG-001' },
+  { name: 'Premium Mulch - Brown', categoryName: 'Mulch & Soil', unitOfMeasure: 'cubic yard', description: 'High-quality brown hardwood mulch for landscape beds.' },
+  { name: 'Premium Mulch - Black', categoryName: 'Mulch & Soil', unitOfMeasure: 'cubic yard', description: 'Premium dyed black mulch for decorative landscaping.' },
+  { name: 'River Rock - Medium', categoryName: 'Aggregates & Gravel', unitOfMeasure: 'ton', description: 'Natural river rock for drainage and decorative applications.' },
+  { name: 'Paver Bricks - Gray', categoryName: 'Hardscape & Pavers', unitOfMeasure: 'piece', description: 'Standard gray concrete pavers for patios and walkways.' },
+  { name: 'Paver Bricks - Red', categoryName: 'Hardscape & Pavers', unitOfMeasure: 'piece', description: 'Classic red brick pavers for traditional designs.' },
+  { name: 'Topsoil - Premium', categoryName: 'Mulch & Soil', unitOfMeasure: 'cubic yard', description: 'Screened topsoil for lawn and garden applications.' },
+  { name: 'Compost - Organic', categoryName: 'Mulch & Soil', unitOfMeasure: 'cubic yard', description: 'Nutrient-rich organic compost for soil amendment.' },
+  { name: 'Slow Release Fertilizer 10-10-10', categoryName: 'Chemicals & Fertilizer', unitOfMeasure: 'bag', description: 'Balanced slow-release fertilizer for lawns and gardens.' },
+  { name: 'Landscape Fabric - Heavy Duty', categoryName: 'Landscape', unitOfMeasure: 'roll', description: 'Professional grade weed barrier fabric.' },
+  { name: 'Black Plastic Edging', categoryName: 'Landscape', unitOfMeasure: 'box', description: 'Flexible landscape edging for clean bed lines.' },
 ];
 
 const SAMPLE_SOPS = [
@@ -308,8 +308,16 @@ export async function seedSampleData(): Promise<void> {
     const existingMaterials = await storage.getMaterials();
     if (existingMaterials.length === 0) {
       console.log("[seed] Adding sample materials...");
+      const categories = await storage.getMaterialCategories();
       for (const material of SAMPLE_MATERIALS) {
-        await storage.createMaterial(material);
+        const category = categories.find(c => c.name === material.categoryName);
+        await storage.createMaterial({
+          name: material.name,
+          categoryId: category?.id || null,
+          unitOfMeasure: material.unitOfMeasure,
+          description: material.description,
+          status: 'Active',
+        });
       }
       console.log(`[seed] Added ${SAMPLE_MATERIALS.length} sample materials`);
     }

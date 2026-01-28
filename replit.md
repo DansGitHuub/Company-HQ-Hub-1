@@ -45,7 +45,7 @@ Preferred communication style: Simple, everyday language.
 - **Enhanced Job Pipeline**: Tabbed interface for job types, detailed job cards with location, deadlines, estimated hours, and document uploads.
 - **Global Search**: Role-based search functionality across key modules (SOPs, Materials, Jobs, Candidates, Users).
 - **Direct Employee Messaging**: Customers can send messages to specific employees or the general inbox.
-- **Materials Catalog Manager**: Comprehensive materials management with admin-editable categories, category-specific custom fields (text, number, dropdown, boolean, etc.), Smart Add Material 5-step wizard, search/filter/sort capabilities, and role-based access. Includes 10 default categories and 36 field templates for landscaping materials.
+- **Materials Catalog Manager**: Comprehensive materials management with 8 specialized categories (Aggregates & Gravel, Mulch & Soil, Trees & Shrubs, Perennials & Annuals, Hardscape & Pavers, Landscape, Chemicals & Fertilizer, Other), AI-powered 5-step material creation wizard (Name → Category → AI Auto-Fill → Review → Confirm), category-specific custom fields, bulk operations (select all, move to category), easy category management (add, rename, delete), search/filter/sort capabilities, and role-based access.
 
 ## External Dependencies
 
