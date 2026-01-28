@@ -7,8 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { Loader2, Building2, TreePine, Users, Shield, ArrowLeft, CheckCircle, Eye, EyeOff } from "lucide-react";
+import { Loader2, TreePine, Users, Building2, Shield, ArrowLeft, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+
+interface CompanySettings {
+  id: string;
+  companyName: string | null;
+  logoUrl: string | null;
+  logoShape: string | null;
+  logoCornerRadius: number | null;
+}
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation, isLoading } = useAuth();
@@ -33,6 +42,11 @@ export default function AuthPage() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+
+  const { data: companySettings } = useQuery<CompanySettings>({
+    queryKey: ["/api/company-settings"],
+    staleTime: 60000,
+  });
 
   if (user) {
     setLocation("/");
@@ -104,16 +118,45 @@ export default function AuthPage() {
     }
   };
 
+  const getLogoClasses = () => {
+    const shape = companySettings?.logoShape || "square";
+    const cornerRadius = companySettings?.logoCornerRadius || 0;
+    
+    let shapeClass = "";
+    if (shape === "circle") {
+      shapeClass = "rounded-full";
+    } else if (cornerRadius > 0) {
+      if (cornerRadius <= 4) shapeClass = "rounded";
+      else if (cornerRadius <= 8) shapeClass = "rounded-md";
+      else if (cornerRadius <= 12) shapeClass = "rounded-lg";
+      else shapeClass = "rounded-xl";
+    }
+    
+    return shapeClass;
+  };
+
+  const hasLogo = !!companySettings?.logoUrl;
+  const companyName = companySettings?.companyName || "Company HQ";
+  const logoShapeClass = getLogoClasses();
+
   return (
     <div className="min-h-screen flex">
       <div className="flex-1 flex items-center justify-center p-8 bg-background">
-        <Card className="w-full max-w-md shadow-xl">
+        <Card className="w-full max-w-md shadow-xl border-border">
           <CardHeader className="text-center pb-2">
-            <div className="mx-auto w-16 h-16 bg-primary rounded-xl flex items-center justify-center mb-4">
-              <span className="font-heading font-bold text-2xl text-primary-foreground">HQ</span>
-            </div>
-            <CardTitle className="text-2xl font-heading">Company HQ</CardTitle>
-            <CardDescription>Sign in to manage your landscape business</CardDescription>
+            {hasLogo ? (
+              <img 
+                src={companySettings!.logoUrl!} 
+                alt={`${companyName} Logo`}
+                className={`mx-auto w-20 h-20 object-cover mb-4 ${logoShapeClass}`}
+              />
+            ) : (
+              <div className="mx-auto w-16 h-16 bg-primary rounded-xl flex items-center justify-center mb-4">
+                <span className="font-heading font-bold text-2xl text-primary-foreground">HQ</span>
+              </div>
+            )}
+            <CardTitle className="text-2xl font-heading text-foreground">{companyName}</CardTitle>
+            <CardDescription className="text-muted-foreground">Sign in to manage your landscape business</CardDescription>
           </CardHeader>
           <CardContent>
             {showResetForm ? (
@@ -392,11 +435,28 @@ export default function AuthPage() {
         </Card>
       </div>
 
-      <div className="hidden lg:flex flex-1 bg-primary text-primary-foreground p-12 items-center justify-center">
+      <div className="hidden lg:flex flex-1 bg-sidebar text-sidebar-foreground p-12 items-center justify-center">
         <div className="max-w-md space-y-8">
           <div className="space-y-4">
-            <h1 className="text-4xl font-heading font-bold">Landscape Management, Simplified</h1>
-            <p className="text-lg text-primary-foreground/80">
+            <div className="flex items-center gap-4 mb-6">
+              {hasLogo ? (
+                <img 
+                  src={companySettings!.logoUrl!} 
+                  alt={`${companyName} Logo`}
+                  className={`w-16 h-16 object-cover ${logoShapeClass}`}
+                />
+              ) : (
+                <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center">
+                  <span className="font-heading font-bold text-2xl text-primary-foreground">HQ</span>
+                </div>
+              )}
+              <div>
+                <h2 className="text-2xl font-heading font-bold">{companyName}</h2>
+                <p className="text-sidebar-foreground/60">Landscape Management</p>
+              </div>
+            </div>
+            <h1 className="text-3xl font-heading font-bold">Landscape Management, Simplified</h1>
+            <p className="text-lg text-sidebar-foreground/80">
               Everything your team needs to run a professional landscape company in one place.
             </p>
           </div>
@@ -409,7 +469,7 @@ export default function AuthPage() {
               { icon: Shield, text: "Role-Based Access Control" },
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-4">
-                <div className="p-2 bg-primary-foreground/10 rounded-lg">
+                <div className="p-2 bg-sidebar-foreground/10 rounded-lg">
                   <item.icon className="w-5 h-5" />
                 </div>
                 <span className="font-medium">{item.text}</span>
