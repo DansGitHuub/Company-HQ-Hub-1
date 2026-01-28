@@ -900,3 +900,52 @@ export const insertTodoActiveUserSchema = createInsertSchema(todoActiveUsers).pi
 
 export type InsertTodoActiveUser = z.infer<typeof insertTodoActiveUserSchema>;
 export type TodoActiveUser = typeof todoActiveUsers.$inferSelect;
+
+// Plow Site Maps - for snow removal route planning
+export const plowSites = pgTable("plow_sites", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  address: text("address"),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+  imageUrl: text("image_url"),
+  imageSource: text("image_source").default("google"), // google, upload
+  annotations: jsonb("annotations").default([]),
+  instructions: jsonb("instructions").default([]),
+  isPublished: boolean("is_published").default(false),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPlowSiteSchema = createInsertSchema(plowSites).pick({
+  name: true,
+  address: true,
+  latitude: true,
+  longitude: true,
+  imageUrl: true,
+  imageSource: true,
+  annotations: true,
+  instructions: true,
+  isPublished: true,
+});
+
+export type InsertPlowSite = z.infer<typeof insertPlowSiteSchema>;
+export type PlowSite = typeof plowSites.$inferSelect;
+
+// Manager permissions for plow sites (edit vs view-only)
+export const plowSiteManagerPermissions = pgTable("plow_site_manager_permissions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  canEdit: boolean("can_edit").default(false),
+  grantedBy: varchar("granted_by", { length: 36 }).references(() => users.id),
+  grantedAt: timestamp("granted_at").defaultNow(),
+});
+
+export const insertPlowSiteManagerPermissionSchema = createInsertSchema(plowSiteManagerPermissions).pick({
+  userId: true,
+  canEdit: true,
+});
+
+export type InsertPlowSiteManagerPermission = z.infer<typeof insertPlowSiteManagerPermissionSchema>;
+export type PlowSiteManagerPermission = typeof plowSiteManagerPermissions.$inferSelect;

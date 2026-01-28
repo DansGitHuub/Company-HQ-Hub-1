@@ -32,7 +32,9 @@ import {
   companySettings, type CompanySettings, type InsertCompanySettings,
   todos, type Todo, type InsertTodo,
   todoAssignments, type TodoAssignment, type InsertTodoAssignment,
-  todoActiveUsers, type TodoActiveUser, type InsertTodoActiveUser
+  todoActiveUsers, type TodoActiveUser, type InsertTodoActiveUser,
+  plowSites, type PlowSite, type InsertPlowSite,
+  plowSiteManagerPermissions, type PlowSiteManagerPermission, type InsertPlowSiteManagerPermission
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and } from "drizzle-orm";
@@ -244,6 +246,19 @@ export interface IStorage {
   isUserTodoActive(userId: string): Promise<boolean>;
   activateTodoUser(userId: string, activatedBy: string): Promise<TodoActiveUser>;
   deactivateTodoUser(userId: string): Promise<boolean>;
+  
+  // Plow Site Maps
+  getPlowSites(): Promise<PlowSite[]>;
+  getPlowSite(id: string): Promise<PlowSite | undefined>;
+  createPlowSite(site: InsertPlowSite, createdBy: string): Promise<PlowSite>;
+  updatePlowSite(id: string, updates: Partial<PlowSite>): Promise<PlowSite | undefined>;
+  deletePlowSite(id: string): Promise<boolean>;
+  
+  // Plow Site Manager Permissions
+  getPlowSiteManagerPermissions(): Promise<PlowSiteManagerPermission[]>;
+  getPlowSiteManagerPermission(userId: string): Promise<PlowSiteManagerPermission | undefined>;
+  setPlowSiteManagerPermission(userId: string, canEdit: boolean, grantedBy: string): Promise<PlowSiteManagerPermission>;
+  deletePlowSiteManagerPermission(userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1050,6 +1065,62 @@ export class DatabaseStorage implements IStorage {
 
   async deactivateTodoUser(userId: string): Promise<boolean> {
     await db.delete(todoActiveUsers).where(eq(todoActiveUsers.userId, userId));
+    return true;
+  }
+
+  // Plow Site Maps
+  async getPlowSites(): Promise<PlowSite[]> {
+    return db.select().from(plowSites);
+  }
+
+  async getPlowSite(id: string): Promise<PlowSite | undefined> {
+    const [site] = await db.select().from(plowSites).where(eq(plowSites.id, id));
+    return site || undefined;
+  }
+
+  async createPlowSite(site: InsertPlowSite, createdBy: string): Promise<PlowSite> {
+    const [created] = await db.insert(plowSites).values({ ...site, createdBy }).returning();
+    return created;
+  }
+
+  async updatePlowSite(id: string, updates: Partial<PlowSite>): Promise<PlowSite | undefined> {
+    const [updated] = await db.update(plowSites)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(plowSites.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deletePlowSite(id: string): Promise<boolean> {
+    await db.delete(plowSites).where(eq(plowSites.id, id));
+    return true;
+  }
+
+  // Plow Site Manager Permissions
+  async getPlowSiteManagerPermissions(): Promise<PlowSiteManagerPermission[]> {
+    return db.select().from(plowSiteManagerPermissions);
+  }
+
+  async getPlowSiteManagerPermission(userId: string): Promise<PlowSiteManagerPermission | undefined> {
+    const [perm] = await db.select().from(plowSiteManagerPermissions).where(eq(plowSiteManagerPermissions.userId, userId));
+    return perm || undefined;
+  }
+
+  async setPlowSiteManagerPermission(userId: string, canEdit: boolean, grantedBy: string): Promise<PlowSiteManagerPermission> {
+    const existing = await this.getPlowSiteManagerPermission(userId);
+    if (existing) {
+      const [updated] = await db.update(plowSiteManagerPermissions)
+        .set({ canEdit, grantedBy, grantedAt: new Date() })
+        .where(eq(plowSiteManagerPermissions.userId, userId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(plowSiteManagerPermissions).values({ userId, canEdit, grantedBy }).returning();
+    return created;
+  }
+
+  async deletePlowSiteManagerPermission(userId: string): Promise<boolean> {
+    await db.delete(plowSiteManagerPermissions).where(eq(plowSiteManagerPermissions.userId, userId));
     return true;
   }
 }
