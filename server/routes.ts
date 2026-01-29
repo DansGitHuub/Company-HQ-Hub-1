@@ -6,7 +6,7 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { sendMaintenanceReminderEmail } from "./email";
 import OpenAI from "openai";
-import { insertSopTemplateSchema, insertSopExampleSchema, insertFormFolderSchema, insertFormTemplateSchema, type User } from "@shared/schema";
+import { insertSopTemplateSchema, insertSopExampleSchema, insertFormFolderSchema, insertFormTemplateSchema, insertPlowSiteImageSchema, type User } from "@shared/schema";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -2678,6 +2678,55 @@ Generate detailed information for this landscaping material.`;
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Error deleting permission" });
+    }
+  });
+
+  // Plow Site Additional Images
+  app.get("/api/plow-sites/:siteId/images", requireAuth, async (req, res) => {
+    try {
+      const images = await storage.getPlowSiteImages(req.params.siteId);
+      res.json(images);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching site images" });
+    }
+  });
+
+  app.post("/api/plow-sites/:siteId/images", requirePlowEditAccess, async (req, res) => {
+    try {
+      const parseResult = insertPlowSiteImageSchema.safeParse({
+        ...req.body,
+        siteId: req.params.siteId
+      });
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid image data", errors: parseResult.error.errors });
+      }
+      const image = await storage.createPlowSiteImage(parseResult.data);
+      res.status(201).json(image);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating site image" });
+    }
+  });
+
+  app.patch("/api/plow-site-images/:id", requirePlowEditAccess, async (req, res) => {
+    try {
+      const parseResult = insertPlowSiteImageSchema.partial().safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid image data", errors: parseResult.error.errors });
+      }
+      const image = await storage.updatePlowSiteImage(req.params.id, parseResult.data);
+      if (!image) return res.status(404).json({ message: "Image not found" });
+      res.json(image);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating site image" });
+    }
+  });
+
+  app.delete("/api/plow-site-images/:id", requirePlowEditAccess, async (req, res) => {
+    try {
+      await storage.deletePlowSiteImage(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting site image" });
     }
   });
 

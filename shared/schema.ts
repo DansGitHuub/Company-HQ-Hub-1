@@ -974,3 +974,25 @@ export const insertPlowSiteManagerPermissionSchema = createInsertSchema(plowSite
 
 export type InsertPlowSiteManagerPermission = z.infer<typeof insertPlowSiteManagerPermissionSchema>;
 export type PlowSiteManagerPermission = typeof plowSiteManagerPermissions.$inferSelect;
+
+// Additional images for plow sites
+export const plowSiteImages = pgTable("plow_site_images", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  siteId: varchar("site_id", { length: 36 }).references(() => plowSites.id, { onDelete: "cascade" }).notNull(),
+  imageUrl: text("image_url").notNull(),
+  title: text("title"),
+  annotations: jsonb("annotations").default([]),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPlowSiteImageSchema = createInsertSchema(plowSiteImages).pick({
+  siteId: true,
+  imageUrl: true,
+  title: true,
+  annotations: true,
+  sortOrder: true,
+});
+
+export type InsertPlowSiteImage = z.infer<typeof insertPlowSiteImageSchema>;
+export type PlowSiteImage = typeof plowSiteImages.$inferSelect;

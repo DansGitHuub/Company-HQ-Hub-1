@@ -35,7 +35,8 @@ import {
   todoActiveUsers, type TodoActiveUser, type InsertTodoActiveUser,
   plowSiteGroups, type PlowSiteGroup, type InsertPlowSiteGroup,
   plowSites, type PlowSite, type InsertPlowSite,
-  plowSiteManagerPermissions, type PlowSiteManagerPermission, type InsertPlowSiteManagerPermission
+  plowSiteManagerPermissions, type PlowSiteManagerPermission, type InsertPlowSiteManagerPermission,
+  plowSiteImages, type PlowSiteImage, type InsertPlowSiteImage
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and } from "drizzle-orm";
@@ -267,6 +268,12 @@ export interface IStorage {
   getPlowSiteManagerPermission(userId: string): Promise<PlowSiteManagerPermission | undefined>;
   setPlowSiteManagerPermission(userId: string, canEdit: boolean, grantedBy: string): Promise<PlowSiteManagerPermission>;
   deletePlowSiteManagerPermission(userId: string): Promise<boolean>;
+  
+  // Plow Site Images
+  getPlowSiteImages(siteId: string): Promise<PlowSiteImage[]>;
+  createPlowSiteImage(image: InsertPlowSiteImage): Promise<PlowSiteImage>;
+  updatePlowSiteImage(id: string, updates: Partial<PlowSiteImage>): Promise<PlowSiteImage | undefined>;
+  deletePlowSiteImage(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1157,6 +1164,26 @@ export class DatabaseStorage implements IStorage {
 
   async deletePlowSiteManagerPermission(userId: string): Promise<boolean> {
     await db.delete(plowSiteManagerPermissions).where(eq(plowSiteManagerPermissions.userId, userId));
+    return true;
+  }
+  
+  // Plow Site Images
+  async getPlowSiteImages(siteId: string): Promise<PlowSiteImage[]> {
+    return db.select().from(plowSiteImages).where(eq(plowSiteImages.siteId, siteId));
+  }
+  
+  async createPlowSiteImage(image: InsertPlowSiteImage): Promise<PlowSiteImage> {
+    const [created] = await db.insert(plowSiteImages).values(image).returning();
+    return created;
+  }
+  
+  async updatePlowSiteImage(id: string, updates: Partial<PlowSiteImage>): Promise<PlowSiteImage | undefined> {
+    const [updated] = await db.update(plowSiteImages).set(updates).where(eq(plowSiteImages.id, id)).returning();
+    return updated || undefined;
+  }
+  
+  async deletePlowSiteImage(id: string): Promise<boolean> {
+    await db.delete(plowSiteImages).where(eq(plowSiteImages.id, id));
     return true;
   }
 }
