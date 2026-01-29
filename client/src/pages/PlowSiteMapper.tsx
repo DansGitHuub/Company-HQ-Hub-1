@@ -129,6 +129,12 @@ export default function PlowSiteMapper() {
   const [aiAnalysis, setAiAnalysis] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [streetViewAvailable, setStreetViewAvailable] = useState(false);
+  const [streetViewHeading, setStreetViewHeading] = useState(0);
+  const [capturedStreetViewImage, setCapturedStreetViewImage] = useState<string | null>(null);
+  const [isCapturingStreetView, setIsCapturingStreetView] = useState(false);
+  const [additionalImages, setAdditionalImages] = useState<Array<{ id: string; title: string; imageBase64: string; type: "streetview" | "upload" }>>([]);
+  const additionalImageInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -318,6 +324,7 @@ export default function PlowSiteMapper() {
         if (data.coordinates) {
           setMapCoordinates(data.coordinates);
           setMapZoom(19);
+          checkStreetViewAvailability(data.coordinates.lat, data.coordinates.lng);
         }
       }
     } catch (err) {
@@ -325,6 +332,93 @@ export default function PlowSiteMapper() {
     } finally {
       setIsLoadingSatellite(false);
     }
+  };
+
+  const checkStreetViewAvailability = async (lat: number, lng: number) => {
+    try {
+      const res = await fetch("/api/streetview-availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ lat, lng }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStreetViewAvailable(data.available);
+      } else {
+        setStreetViewAvailable(false);
+      }
+    } catch (err) {
+      console.error("Failed to check Street View availability:", err);
+      setStreetViewAvailable(false);
+    }
+  };
+
+  const captureStreetView = async () => {
+    if (!mapCoordinates) return;
+    setIsCapturingStreetView(true);
+    try {
+      const coords = getAdjustedCoordinates();
+      const res = await fetch("/api/capture-streetview-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          lat: coords?.lat || mapCoordinates.lat,
+          lng: coords?.lng || mapCoordinates.lng,
+          heading: streetViewHeading,
+          width: 640,
+          height: 480,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCapturedStreetViewImage(data.imageBase64);
+        toast({ title: "Street View captured", description: "Image captured successfully" });
+      } else {
+        toast({ title: "Capture failed", description: "Could not capture Street View", variant: "destructive" });
+      }
+    } catch (err) {
+      console.error("Failed to capture Street View:", err);
+      toast({ title: "Error", description: "Failed to capture Street View image", variant: "destructive" });
+    } finally {
+      setIsCapturingStreetView(false);
+    }
+  };
+
+  const handleAdditionalImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const imageBase64 = event.target?.result as string;
+        const id = `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        setAdditionalImages(prev => [
+          ...prev,
+          { id, title: file.name.replace(/\.[^/.]+$/, ""), imageBase64, type: "upload" }
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+    
+    if (e.target) e.target.value = "";
+  };
+
+  const addStreetViewToAdditionalImages = () => {
+    if (!capturedStreetViewImage) return;
+    const id = `sv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    setAdditionalImages(prev => [
+      ...prev,
+      { id, title: `Street View ${streetViewHeading}°`, imageBase64: capturedStreetViewImage, type: "streetview" }
+    ]);
+    setCapturedStreetViewImage(null);
+    toast({ title: "Added", description: "Street View image added to site images" });
+  };
+
+  const removeAdditionalImage = (id: string) => {
+    setAdditionalImages(prev => prev.filter(img => img.id !== id));
   };
 
   const getImageDimensions = () => {
@@ -505,6 +599,10 @@ export default function PlowSiteMapper() {
     setMapOffset({ lat: 0, lng: 0 });
     setAspectRatio("16:9");
     setDragDelta({ x: 0, y: 0 });
+    setStreetViewAvailable(false);
+    setStreetViewHeading(0);
+    setCapturedStreetViewImage(null);
+    setAdditionalImages([]);
   };
 
   const filteredSites = selectedGroupFilter 
@@ -1121,6 +1219,142 @@ export default function PlowSiteMapper() {
                     </div>
                   )}
 
+                  {/* Street View Section */}
+                  {streetViewAvailable && mapCoordinates && (
+                    <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
+                      <div className="flex items-center justify-between">
+                        <Label className="flex items-center gap-2">
+                          <Navigation className="h-4 w-4" />
+                          Street View Available
+                        </Label>
+                        <Badge variant="secondary" className="text-xs">Optional</Badge>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs w-20">Direction:</Label>
+                          <input 
+                            type="range" 
+                            min="0" 
+                            max="360" 
+                            value={streetViewHeading}
+                            onChange={(e) => setStreetViewHeading(parseInt(e.target.value))}
+                            className="flex-1"
+                          />
+                          <span className="text-xs w-10 text-right">{streetViewHeading}°</span>
+                        </div>
+                        
+                        {/* Street View Preview */}
+                        {mapsApiKey && (
+                          <div className="relative aspect-video rounded-lg overflow-hidden border">
+                            <img 
+                              src={`https://maps.googleapis.com/maps/api/streetview?size=640x360&location=${mapCoordinates.lat},${mapCoordinates.lng}&heading=${streetViewHeading}&pitch=0&fov=90&key=${mapsApiKey}`}
+                              alt="Street View preview"
+                              className="w-full h-full object-cover"
+                            />
+                            {capturedStreetViewImage && (
+                              <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                                <Camera className="h-3 w-3" />
+                                Captured
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={captureStreetView}
+                            disabled={isCapturingStreetView}
+                            className="flex-1"
+                          >
+                            {isCapturingStreetView ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Capturing...
+                              </>
+                            ) : (
+                              <>
+                                <Camera className="h-3 w-3 mr-1" />
+                                Capture Street View
+                              </>
+                            )}
+                          </Button>
+                          {capturedStreetViewImage && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={addStreetViewToAdditionalImages}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add to Site
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Additional Images Section */}
+                  <div className="space-y-3 p-3 border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2">
+                        <ImagePlus className="h-4 w-4" />
+                        Additional Images ({additionalImages.length})
+                      </Label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => additionalImageInputRef.current?.click()}
+                      >
+                        <Upload className="h-3 w-3 mr-1" />
+                        Add Photos
+                      </Button>
+                      <input
+                        ref={additionalImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleAdditionalImageUpload}
+                      />
+                    </div>
+                    
+                    {additionalImages.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {additionalImages.map((img) => (
+                          <div key={img.id} className="relative group">
+                            <img 
+                              src={img.imageBase64} 
+                              alt={img.title}
+                              className="w-full h-20 object-cover rounded border"
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => removeAdditionalImage(img.id)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 truncate">
+                              {img.type === "streetview" ? "Street View" : img.title}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {additionalImages.length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        Add photos for crews to reference during work
+                      </p>
+                    )}
+                  </div>
+
                   <div className="relative py-2">
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t" />
@@ -1131,7 +1365,7 @@ export default function PlowSiteMapper() {
                   </div>
 
                   <div className="space-y-3">
-                    <Label>Upload Your Own Image</Label>
+                    <Label>Upload Main Image</Label>
                     {imageSource === "upload" && uploadedImage && !uploadedImage.includes("googleapis.com") ? (
                       <div className="relative">
                         <img 
