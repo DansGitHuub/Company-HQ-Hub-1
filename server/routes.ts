@@ -637,6 +637,74 @@ export async function registerRoutes(
     }
   });
 
+  // Check if Street View is available at a location
+  app.post("/api/streetview-availability", requireAuth, async (req, res) => {
+    try {
+      const { lat, lng } = req.body;
+      if (!lat || !lng) {
+        return res.status(400).json({ message: "Coordinates required" });
+      }
+
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: "Google Maps API key not configured" });
+      }
+
+      // Use Street View Metadata API to check availability
+      const metadataUrl = `https://maps.googleapis.com/maps/api/streetview/metadata?location=${lat},${lng}&key=${apiKey}`;
+      const metadataRes = await fetch(metadataUrl);
+      const metadata = await metadataRes.json();
+
+      res.json({
+        available: metadata.status === "OK",
+        panoId: metadata.pano_id || null,
+        location: metadata.location || null
+      });
+    } catch (err: any) {
+      console.error("Street View availability check error:", err);
+      res.status(500).json({ message: "Failed to check Street View availability" });
+    }
+  });
+
+  // Capture Street View image as base64
+  app.post("/api/capture-streetview-image", requireAuth, async (req, res) => {
+    try {
+      const { lat, lng, heading, pitch, fov, width, height } = req.body;
+      if (!lat || !lng) {
+        return res.status(400).json({ message: "Coordinates required" });
+      }
+
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: "Google Maps API key not configured" });
+      }
+
+      // Street View Static API - max 640x640 per request, use scale for higher res
+      const imgWidth = Math.min(width || 640, 640);
+      const imgHeight = Math.min(height || 480, 640);
+      const headingParam = heading !== undefined ? `&heading=${heading}` : "";
+      const pitchParam = pitch !== undefined ? `&pitch=${pitch}` : "&pitch=0";
+      const fovParam = fov !== undefined ? `&fov=${fov}` : "&fov=90";
+
+      const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=${imgWidth}x${imgHeight}${headingParam}${pitchParam}${fovParam}&location=${lat},${lng}&key=${apiKey}`;
+
+      const imageRes = await fetch(streetViewUrl);
+      if (!imageRes.ok) {
+        return res.status(500).json({ message: "Failed to fetch Street View image" });
+      }
+
+      const arrayBuffer = await imageRes.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString('base64');
+      const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
+      const dataUrl = `data:${contentType};base64,${base64}`;
+
+      res.json({ imageBase64: dataUrl });
+    } catch (err: any) {
+      console.error("Capture Street View error:", err);
+      res.status(500).json({ message: "Failed to capture Street View image" });
+    }
+  });
+
   app.post("/api/ai/analyze-plow-site", requireAuth, async (req, res) => {
     try {
       const { imageBase64 } = req.body;
