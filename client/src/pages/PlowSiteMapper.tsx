@@ -105,9 +105,10 @@ export default function PlowSiteMapper() {
   const [capturedMapImage, setCapturedMapImage] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [mapOffset, setMapOffset] = useState<{ lat: number; lng: number }>({ lat: 0, lng: 0 });
-  const [imageSize, setImageSize] = useState<"standard" | "large" | "hd">("hd");
+  const [aspectRatio, setAspectRatio] = useState<"1:1" | "2:3" | "3:4" | "16:9">("16:9");
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [dragDelta, setDragDelta] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const mapPreviewRef = useRef<HTMLDivElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<any>(null);
@@ -327,11 +328,23 @@ export default function PlowSiteMapper() {
   };
 
   const getImageDimensions = () => {
-    switch (imageSize) {
-      case "standard": return { width: 640, height: 400 };
-      case "large": return { width: 800, height: 500 };
-      case "hd": return { width: 1280, height: 800 };
-      default: return { width: 1280, height: 800 };
+    // Always use HD quality (scale=2 gives 1280x800 effective resolution)
+    switch (aspectRatio) {
+      case "1:1": return { width: 640, height: 640 };
+      case "2:3": return { width: 426, height: 640 };
+      case "3:4": return { width: 480, height: 640 };
+      case "16:9": return { width: 640, height: 360 };
+      default: return { width: 640, height: 360 };
+    }
+  };
+
+  const getAspectRatioClass = () => {
+    switch (aspectRatio) {
+      case "1:1": return "aspect-square";
+      case "2:3": return "aspect-[2/3]";
+      case "3:4": return "aspect-[3/4]";
+      case "16:9": return "aspect-video";
+      default: return "aspect-video";
     }
   };
 
@@ -352,28 +365,31 @@ export default function PlowSiteMapper() {
     e.preventDefault();
     setIsDragging(true);
     setDragStart({ x: e.clientX, y: e.clientY });
+    setDragDelta({ x: 0, y: 0 });
   };
 
   const handleMapMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || !dragStart) return;
     
-    const dx = e.clientX - dragStart.x;
-    const dy = e.clientY - dragStart.y;
-    
-    // Convert pixel movement to lat/lng offset
-    const pixelToLatLng = 0.00002 * Math.pow(2, 19 - mapZoom);
-    
-    setMapOffset(prev => ({
-      lat: prev.lat + dy * pixelToLatLng,
-      lng: prev.lng - dx * pixelToLatLng
-    }));
-    
-    setDragStart({ x: e.clientX, y: e.clientY });
+    // Use CSS transform for smooth visual feedback
+    setDragDelta({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y
+    });
   };
 
   const handleMapMouseUp = () => {
+    if (isDragging && (dragDelta.x !== 0 || dragDelta.y !== 0)) {
+      // Convert accumulated pixel movement to lat/lng offset
+      const pixelToLatLng = 0.00002 * Math.pow(2, 19 - mapZoom);
+      setMapOffset(prev => ({
+        lat: prev.lat + dragDelta.y * pixelToLatLng,
+        lng: prev.lng - dragDelta.x * pixelToLatLng
+      }));
+    }
     setIsDragging(false);
     setDragStart(null);
+    setDragDelta({ x: 0, y: 0 });
   };
 
   const handleMapWheel = (e: React.WheelEvent) => {
@@ -389,28 +405,30 @@ export default function PlowSiteMapper() {
     if (e.touches.length === 1) {
       setIsDragging(true);
       setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+      setDragDelta({ x: 0, y: 0 });
     }
   };
 
   const handleMapTouchMove = (e: React.TouchEvent) => {
     if (!isDragging || !dragStart || e.touches.length !== 1) return;
     
-    const dx = e.touches[0].clientX - dragStart.x;
-    const dy = e.touches[0].clientY - dragStart.y;
-    
-    const pixelToLatLng = 0.00002 * Math.pow(2, 19 - mapZoom);
-    
-    setMapOffset(prev => ({
-      lat: prev.lat + dy * pixelToLatLng,
-      lng: prev.lng - dx * pixelToLatLng
-    }));
-    
-    setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    setDragDelta({
+      x: e.touches[0].clientX - dragStart.x,
+      y: e.touches[0].clientY - dragStart.y
+    });
   };
 
   const handleMapTouchEnd = () => {
+    if (isDragging && (dragDelta.x !== 0 || dragDelta.y !== 0)) {
+      const pixelToLatLng = 0.00002 * Math.pow(2, 19 - mapZoom);
+      setMapOffset(prev => ({
+        lat: prev.lat + dragDelta.y * pixelToLatLng,
+        lng: prev.lng - dragDelta.x * pixelToLatLng
+      }));
+    }
     setIsDragging(false);
     setDragStart(null);
+    setDragDelta({ x: 0, y: 0 });
   };
 
   const getAdjustedCoordinates = () => {
@@ -485,7 +503,8 @@ export default function PlowSiteMapper() {
     setCapturedMapImage(null);
     setIsCapturing(false);
     setMapOffset({ lat: 0, lng: 0 });
-    setImageSize("hd");
+    setAspectRatio("16:9");
+    setDragDelta({ x: 0, y: 0 });
   };
 
   const filteredSites = selectedGroupFilter 
@@ -988,24 +1007,24 @@ export default function PlowSiteMapper() {
                       <div className="flex items-center justify-between">
                         <Label>Adjust View & Capture</Label>
                         <div className="flex items-center gap-2">
-                          <Select value={imageSize} onValueChange={(v) => setImageSize(v as typeof imageSize)}>
-                            <SelectTrigger className="h-7 w-24 text-xs">
+                          <Select value={aspectRatio} onValueChange={(v) => setAspectRatio(v as typeof aspectRatio)}>
+                            <SelectTrigger className="h-7 w-20 text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="standard">Standard</SelectItem>
-                              <SelectItem value="large">Large</SelectItem>
-                              <SelectItem value="hd">HD</SelectItem>
+                              <SelectItem value="16:9">16:9</SelectItem>
+                              <SelectItem value="3:4">3:4</SelectItem>
+                              <SelectItem value="2:3">2:3</SelectItem>
+                              <SelectItem value="1:1">1:1</SelectItem>
                             </SelectContent>
                           </Select>
-                          <span className="text-xs text-muted-foreground">Zoom: {mapZoom}</span>
                         </div>
                       </div>
                       
                       {/* Interactive map preview with mouse/touch controls */}
                       <div 
                         ref={mapPreviewRef}
-                        className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                        className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${getAspectRatioClass()} max-h-[400px]`}
                         onMouseDown={handleMapMouseDown}
                         onMouseMove={handleMapMouseMove}
                         onMouseUp={handleMapMouseUp}
@@ -1016,9 +1035,10 @@ export default function PlowSiteMapper() {
                         onTouchEnd={handleMapTouchEnd}
                       >
                         <img 
-                          src={mapsApiKey && getAdjustedCoordinates() ? `https://maps.googleapis.com/maps/api/staticmap?center=${getAdjustedCoordinates()!.lat},${getAdjustedCoordinates()!.lng}&zoom=${mapZoom}&size=800x400&maptype=satellite&key=${mapsApiKey}` : satelliteImageUrl || ''}
+                          src={mapsApiKey && getAdjustedCoordinates() ? `https://maps.googleapis.com/maps/api/staticmap?center=${getAdjustedCoordinates()!.lat},${getAdjustedCoordinates()!.lng}&zoom=${mapZoom}&size=640x640&scale=2&maptype=satellite&key=${mapsApiKey}` : satelliteImageUrl || ''}
                           alt="Satellite view" 
-                          className="w-full h-64 object-cover pointer-events-none"
+                          className="w-full h-full object-cover pointer-events-none transition-transform duration-75"
+                          style={{ transform: isDragging ? `translate(${dragDelta.x}px, ${dragDelta.y}px)` : 'none' }}
                           draggable={false}
                           onError={(e) => {
                             if (satelliteImageUrl) {
@@ -1073,7 +1093,7 @@ export default function PlowSiteMapper() {
                       </div>
 
                       <p className="text-xs text-muted-foreground text-center">
-                        Drag to pan, scroll to zoom. Use buttons for precise control.
+                        Drag to pan, scroll to zoom. HD quality enabled.
                       </p>
 
                       <Button
