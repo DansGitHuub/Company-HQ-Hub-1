@@ -47,6 +47,7 @@ Preferred communication style: Simple, everyday language.
 - **Direct Employee Messaging**: Customers can send messages to specific employees or the general inbox.
 - **Materials Catalog Manager**: Comprehensive materials management with 8 specialized categories (Aggregates & Gravel, Mulch & Soil, Trees & Shrubs, Perennials & Annuals, Hardscape & Pavers, Landscape, Chemicals & Fertilizer, Other), AI-powered 5-step material creation wizard (Name → Category → AI Auto-Fill → Review → Confirm), category-specific custom fields, bulk operations (select all, move to category), easy category management (add, rename, delete), search/filter/sort capabilities, and role-based access.
 - **Interactive To-Do List**: Task management system with add/edit/delete functionality, priority levels (low, medium, high, urgent), status tracking (pending, in_progress, completed), due dates, user assignments, read/unread status, filtering by status and priority, notification badges in sidebar for unread tasks, and admin-controlled user activation.
+- **Plow Site Mapper**: Snow removal route planning tool with Google Maps integration for accurate address lookup, interactive satellite imagery with zoom controls, AI-powered property analysis, site grouping with organizational categories, multi-step site creation workflow (Info → Image Selection → Confirmation), canvas-based markup tools for annotating property images, and instruction management for plow crews.
 
 ## External Dependencies
 
@@ -83,3 +84,4 @@ Preferred communication style: Simple, everyday language.
 ### Environment Variables
 - `DATABASE_URL`
 - `SESSION_SECRET`
+- `GOOGLE_MAPS_API_KEY` (for Plow Site Mapper address lookup and satellite imagery)

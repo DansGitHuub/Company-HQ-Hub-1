@@ -41,7 +41,11 @@ import {
   Route,
   Tag,
   Settings,
-  Loader2
+  Loader2,
+  ZoomIn,
+  ZoomOut,
+  Camera,
+  Minus
 } from "lucide-react";
 
 type Annotation = {
@@ -90,6 +94,13 @@ export default function PlowSiteMapper() {
   const [satelliteImageUrl, setSatelliteImageUrl] = useState<string | null>(null);
   const [isLoadingSatellite, setIsLoadingSatellite] = useState(false);
   const [imageSource, setImageSource] = useState<"satellite" | "upload" | null>(null);
+  const [mapCoordinates, setMapCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapZoom, setMapZoom] = useState(19);
+  const [capturedMapImage, setCapturedMapImage] = useState<string | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const googleMapRef = useRef<any>(null);
+  const [mapsApiKey, setMapsApiKey] = useState<string>("");
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupType, setNewGroupType] = useState<string>("custom");
@@ -126,6 +137,18 @@ export default function PlowSiteMapper() {
         }
       );
     }
+  }, []);
+
+  // Fetch Google Maps API key on mount
+  useEffect(() => {
+    fetch("/api/maps-config", { credentials: "include" })
+      .then(res => res.json())
+      .then(data => {
+        if (data.apiKey) {
+          setMapsApiKey(data.apiKey);
+        }
+      })
+      .catch(err => console.log("Could not load maps config:", err));
   }, []);
 
   const analyzeWithAI = async () => {
@@ -268,6 +291,8 @@ export default function PlowSiteMapper() {
   const fetchSatelliteImage = async (address: string) => {
     setIsLoadingSatellite(true);
     setSatelliteImageUrl(null);
+    setMapCoordinates(null);
+    setCapturedMapImage(null);
     try {
       const res = await fetch("/api/address-satellite-image", {
         method: "POST",
@@ -278,11 +303,51 @@ export default function PlowSiteMapper() {
       if (res.ok) {
         const data = await res.json();
         setSatelliteImageUrl(data.imageUrl);
+        if (data.coordinates) {
+          setMapCoordinates(data.coordinates);
+          setMapZoom(19);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch satellite image:", err);
     } finally {
       setIsLoadingSatellite(false);
+    }
+  };
+
+  const captureMapView = async () => {
+    if (!mapCoordinates) return;
+    setIsCapturing(true);
+    
+    try {
+      // Fetch the image as base64 to avoid CORS issues on canvas
+      const res = await fetch("/api/capture-satellite-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ 
+          lat: mapCoordinates.lat,
+          lng: mapCoordinates.lng,
+          zoom: mapZoom 
+        }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (data.imageBase64) {
+          setCapturedMapImage(data.imageBase64);
+          setUploadedImage(data.imageBase64);
+          setImageSource("satellite");
+          toast({ title: "View captured successfully!" });
+        }
+      } else {
+        toast({ title: "Failed to capture view", variant: "destructive" });
+      }
+    } catch (err) {
+      console.error("Failed to capture map view:", err);
+      toast({ title: "Failed to capture view", variant: "destructive" });
+    } finally {
+      setIsCapturing(false);
     }
   };
 
@@ -304,6 +369,10 @@ export default function PlowSiteMapper() {
     setIsManualEntry(false);
     setSatelliteImageUrl(null);
     setImageSource(null);
+    setMapCoordinates(null);
+    setMapZoom(19);
+    setCapturedMapImage(null);
+    setIsCapturing(false);
   };
 
   const filteredSites = selectedGroupFilter 
@@ -797,39 +866,88 @@ export default function PlowSiteMapper() {
                   </div>
 
                   {isLoadingSatellite ? (
-                    <div className="h-48 flex items-center justify-center bg-muted rounded-lg">
+                    <div className="h-64 flex items-center justify-center bg-muted rounded-lg">
                       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                      <span className="ml-2 text-muted-foreground">Loading satellite image...</span>
+                      <span className="ml-2 text-muted-foreground">Loading map...</span>
                     </div>
-                  ) : satelliteImageUrl ? (
+                  ) : mapCoordinates ? (
                     <div className="space-y-3">
-                      <Label>Satellite Image from Google Maps</Label>
-                      <div className="relative">
+                      <div className="flex items-center justify-between">
+                        <Label>Adjust View & Capture</Label>
+                        <span className="text-xs text-muted-foreground">Zoom: {mapZoom}</span>
+                      </div>
+                      
+                      {/* Interactive map preview with zoom controls */}
+                      <div className="relative rounded-lg overflow-hidden border-2 border-muted">
                         <img 
-                          src={satelliteImageUrl} 
+                          src={mapsApiKey ? `https://maps.googleapis.com/maps/api/staticmap?center=${mapCoordinates.lat},${mapCoordinates.lng}&zoom=${mapZoom}&size=800x400&maptype=satellite&key=${mapsApiKey}` : satelliteImageUrl || ''}
                           alt="Satellite view" 
-                          className={`w-full h-48 object-cover rounded-lg border-2 ${imageSource === "satellite" ? "border-primary" : "border-transparent"}`}
+                          className="w-full h-64 object-cover"
+                          onError={(e) => {
+                            // Fallback: fetch through API if direct access fails
+                            if (satelliteImageUrl) {
+                              (e.target as HTMLImageElement).src = satelliteImageUrl;
+                            }
+                          }}
                         />
-                        {imageSource === "satellite" && (
-                          <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs">
-                            Selected
+                        
+                        {/* Zoom controls */}
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-background/90 hover:bg-background shadow-md"
+                            onClick={() => setMapZoom(Math.min(21, mapZoom + 1))}
+                            disabled={mapZoom >= 21}
+                          >
+                            <ZoomIn className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-background/90 hover:bg-background shadow-md"
+                            onClick={() => setMapZoom(Math.max(15, mapZoom - 1))}
+                            disabled={mapZoom <= 15}
+                          >
+                            <ZoomOut className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        {/* Captured indicator */}
+                        {capturedMapImage && (
+                          <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                            <Camera className="h-3 w-3" />
+                            Captured
                           </div>
                         )}
                       </div>
+
+                      <p className="text-xs text-muted-foreground text-center">
+                        Use zoom buttons to adjust the view, then capture the image
+                      </p>
+
                       <Button
-                        variant={imageSource === "satellite" ? "default" : "outline"}
-                        onClick={() => {
-                          setImageSource("satellite");
-                          setUploadedImage(satelliteImageUrl);
-                        }}
+                        onClick={captureMapView}
                         className="w-full"
+                        disabled={isCapturing}
+                        data-testid="button-capture-view"
                       >
-                        Use This Satellite Image
+                        {isCapturing ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Capturing...
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="h-4 w-4 mr-2" />
+                            {capturedMapImage ? "Recapture View" : "Capture This View"}
+                          </>
+                        )}
                       </Button>
                     </div>
                   ) : (
-                    <div className="h-48 flex items-center justify-center bg-muted rounded-lg">
-                      <span className="text-muted-foreground">No satellite image available</span>
+                    <div className="h-64 flex items-center justify-center bg-muted rounded-lg">
+                      <span className="text-muted-foreground">Map not available for this address</span>
                     </div>
                   )}
 
@@ -945,11 +1063,16 @@ export default function PlowSiteMapper() {
                     </Button>
                     <Button 
                       onClick={() => setCreateStep("confirm")} 
-                      disabled={!uploadedImage}
+                      disabled={!capturedMapImage && !uploadedImage?.startsWith("data:")}
                       data-testid="button-next-step"
                     >
                       Continue
                     </Button>
+                    {!capturedMapImage && mapCoordinates && (
+                      <p className="text-xs text-muted-foreground w-full text-center">
+                        Please capture the view before continuing
+                      </p>
+                    )}
                   </>
                 )}
                 {createStep === "confirm" && (

@@ -537,12 +537,72 @@ export async function registerRoutes(
     }
   });
 
-  // Get satellite image URL for an address
+  // Get satellite image URL for an address or coordinates
   app.post("/api/address-satellite-image", requireAuth, async (req, res) => {
     try {
-      const { address } = req.body;
-      if (!address) {
-        return res.status(400).json({ message: "Address is required" });
+      const { address, coordinates, zoom } = req.body;
+      
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: "Google Maps API key not configured" });
+      }
+
+      let lat: number, lng: number;
+      let formattedAddress: string | undefined;
+      const zoomLevel = zoom || 19;
+
+      // If coordinates provided, use them directly
+      if (coordinates && coordinates.lat && coordinates.lng) {
+        lat = coordinates.lat;
+        lng = coordinates.lng;
+      } else if (address) {
+        // Otherwise, geocode the address
+        const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
+        const geocodeRes = await fetch(geocodeUrl);
+        const geocodeData = await geocodeRes.json();
+
+        if (geocodeData.status !== 'OK' || !geocodeData.results?.[0]) {
+          return res.status(404).json({ message: "Address not found" });
+        }
+
+        const location = geocodeData.results[0].geometry.location;
+        lat = location.lat;
+        lng = location.lng;
+        formattedAddress = geocodeData.results[0].formatted_address;
+      } else {
+        return res.status(400).json({ message: "Address or coordinates required" });
+      }
+
+      // Generate satellite image URL using Google Static Maps API
+      const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoomLevel}&size=800x500&maptype=satellite&key=${apiKey}`;
+
+      res.json({ 
+        imageUrl: satelliteUrl,
+        coordinates: { lat, lng },
+        zoom: zoomLevel,
+        formattedAddress
+      });
+    } catch (err: any) {
+      console.error("Satellite image error:", err);
+      res.status(500).json({ message: "Failed to get satellite image" });
+    }
+  });
+
+  // Get Google Maps API key for client-side map embed
+  app.get("/api/maps-config", requireAuth, async (req, res) => {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ message: "Google Maps API key not configured" });
+    }
+    res.json({ apiKey });
+  });
+
+  // Capture satellite image as base64 (to avoid CORS issues on canvas)
+  app.post("/api/capture-satellite-image", requireAuth, async (req, res) => {
+    try {
+      const { lat, lng, zoom } = req.body;
+      if (!lat || !lng) {
+        return res.status(400).json({ message: "Coordinates required" });
       }
 
       const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -550,30 +610,24 @@ export async function registerRoutes(
         return res.status(500).json({ message: "Google Maps API key not configured" });
       }
 
-      // First, geocode the address to get coordinates
-      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
-      const geocodeRes = await fetch(geocodeUrl);
-      const geocodeData = await geocodeRes.json();
+      const zoomLevel = zoom || 19;
+      const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoomLevel}&size=800x500&maptype=satellite&key=${apiKey}`;
 
-      if (geocodeData.status !== 'OK' || !geocodeData.results?.[0]) {
-        return res.status(404).json({ message: "Address not found" });
+      // Fetch the image and convert to base64
+      const imageRes = await fetch(satelliteUrl);
+      if (!imageRes.ok) {
+        return res.status(500).json({ message: "Failed to fetch satellite image" });
       }
 
-      const location = geocodeData.results[0].geometry.location;
-      const lat = location.lat;
-      const lng = location.lng;
+      const arrayBuffer = await imageRes.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString('base64');
+      const contentType = imageRes.headers.get('content-type') || 'image/png';
+      const dataUrl = `data:${contentType};base64,${base64}`;
 
-      // Generate satellite image URL using Google Static Maps API
-      const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=19&size=800x500&maptype=satellite&key=${apiKey}`;
-
-      res.json({ 
-        imageUrl: satelliteUrl,
-        coordinates: { lat, lng },
-        formattedAddress: geocodeData.results[0].formatted_address
-      });
+      res.json({ imageBase64: dataUrl });
     } catch (err: any) {
-      console.error("Satellite image error:", err);
-      res.status(500).json({ message: "Failed to get satellite image" });
+      console.error("Capture satellite image error:", err);
+      res.status(500).json({ message: "Failed to capture satellite image" });
     }
   });
 
