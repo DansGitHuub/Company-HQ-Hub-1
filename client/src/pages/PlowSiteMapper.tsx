@@ -1268,6 +1268,7 @@ export default function PlowSiteMapper() {
                             onClick={captureStreetView}
                             disabled={isCapturingStreetView}
                             className="flex-1"
+                            data-testid="button-capture-streetview"
                           >
                             {isCapturingStreetView ? (
                               <>
@@ -1286,6 +1287,7 @@ export default function PlowSiteMapper() {
                               variant="default"
                               size="sm"
                               onClick={addStreetViewToAdditionalImages}
+                              data-testid="button-add-streetview"
                             >
                               <Plus className="h-3 w-3 mr-1" />
                               Add to Site
@@ -1307,6 +1309,7 @@ export default function PlowSiteMapper() {
                         variant="outline"
                         size="sm"
                         onClick={() => additionalImageInputRef.current?.click()}
+                        data-testid="button-add-photos"
                       >
                         <Upload className="h-3 w-3 mr-1" />
                         Add Photos
