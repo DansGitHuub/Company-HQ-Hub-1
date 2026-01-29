@@ -100,10 +100,28 @@ export default function PlowSiteMapper() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get user's location on mount for better address suggestions
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.log("Geolocation not available:", error.message);
+        }
+      );
+    }
+  }, []);
 
   const analyzeWithAI = async () => {
     if (!uploadedImage) return;
@@ -207,11 +225,19 @@ export default function PlowSiteMapper() {
     }
     setIsSearchingAddress(true);
     try {
+      const requestBody: { query: string; latitude?: number; longitude?: number } = { query };
+      
+      // Include user's location for better local results
+      if (userLocation) {
+        requestBody.latitude = userLocation.latitude;
+        requestBody.longitude = userLocation.longitude;
+      }
+      
       const res = await fetch("/api/ai/address-autocomplete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ query }),
+        body: JSON.stringify(requestBody),
       });
       if (res.ok) {
         const data = await res.json();
@@ -222,7 +248,7 @@ export default function PlowSiteMapper() {
     } finally {
       setIsSearchingAddress(false);
     }
-  }, []);
+  }, [userLocation]);
 
   const handleAddressChange = (value: string) => {
     setNewSiteAddress(value);

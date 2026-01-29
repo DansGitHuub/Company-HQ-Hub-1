@@ -491,55 +491,77 @@ export async function registerRoutes(
 
   app.post("/api/ai/address-autocomplete", requireAuth, async (req, res) => {
     try {
-      const { query } = req.body;
+      const { query, latitude, longitude } = req.body;
       if (!query || query.length < 3) {
         return res.json({ suggestions: [] });
       }
 
-      // Use OpenStreetMap Nominatim for real address lookups
+      // Use Photon (Komoot) geocoder - faster, more accurate, and based on OSM data
+      // It supports location biasing for better local results
       const encodedQuery = encodeURIComponent(query);
-      const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodedQuery}&format=json&addressdetails=1&limit=5&countrycodes=us`;
+      let photonUrl = `https://photon.komoot.io/api/?q=${encodedQuery}&limit=8&lang=en`;
       
-      const response = await fetch(nominatimUrl, {
+      // Add location bias if coordinates provided (prioritize nearby addresses)
+      if (latitude && longitude) {
+        photonUrl += `&lat=${latitude}&lon=${longitude}`;
+      }
+      
+      const response = await fetch(photonUrl, {
         headers: {
           'User-Agent': 'CompanyHQ-PlowMapper/1.0'
         }
       });
       
       if (!response.ok) {
-        console.error("Nominatim API error:", response.status);
+        console.error("Photon API error:", response.status);
         return res.json({ suggestions: [] });
       }
       
       const data = await response.json();
       
       // Format the results as clean address strings
-      const suggestions = data.map((result: any) => {
-        const addr = result.address || {};
-        const parts: string[] = [];
-        
-        // Build address from components
-        if (addr.house_number && addr.road) {
-          parts.push(`${addr.house_number} ${addr.road}`);
-        } else if (addr.road) {
-          parts.push(addr.road);
-        }
-        
-        const city = addr.city || addr.town || addr.village || addr.hamlet || addr.municipality;
-        if (city) {
-          parts.push(city);
-        }
-        
-        if (addr.state) {
-          parts.push(addr.state);
-        }
-        
-        if (addr.postcode) {
-          parts.push(addr.postcode);
-        }
-        
-        return parts.length > 0 ? parts.join(', ') : result.display_name;
-      }).filter((s: string) => s && s.length > 0);
+      // Filter for US addresses only and prefer street-level results
+      const suggestions = (data.features || [])
+        .filter((feature: any) => {
+          const props = feature.properties || {};
+          // Only include US addresses
+          return props.country === 'United States' || props.countrycode === 'US';
+        })
+        .filter((feature: any) => {
+          const props = feature.properties || {};
+          // Prefer addresses with house numbers or at least street names
+          return props.housenumber || props.street || props.name;
+        })
+        .slice(0, 5)
+        .map((feature: any) => {
+          const props = feature.properties || {};
+          const parts: string[] = [];
+          
+          // Build address from components
+          if (props.housenumber && props.street) {
+            parts.push(`${props.housenumber} ${props.street}`);
+          } else if (props.street) {
+            parts.push(props.street);
+          } else if (props.name) {
+            parts.push(props.name);
+          }
+          
+          const city = props.city || props.locality || props.district;
+          if (city) {
+            parts.push(city);
+          }
+          
+          if (props.state) {
+            parts.push(props.state);
+          }
+          
+          if (props.postcode) {
+            parts.push(props.postcode);
+          }
+          
+          return parts.length > 1 ? parts.join(', ') : null;
+        })
+        .filter((s: string | null) => s && s.length > 0);
       
       res.json({ suggestions });
     } catch (err: any) {
