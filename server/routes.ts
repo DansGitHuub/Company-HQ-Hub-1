@@ -496,72 +496,39 @@ export async function registerRoutes(
         return res.json({ suggestions: [] });
       }
 
-      // Use Photon (Komoot) geocoder - faster, more accurate, and based on OSM data
-      // It supports location biasing for better local results
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        console.error("Google Maps API key not configured");
+        return res.json({ suggestions: [] });
+      }
+
+      // Use Google Places Autocomplete API for accurate address suggestions
       const encodedQuery = encodeURIComponent(query);
-      let photonUrl = `https://photon.komoot.io/api/?q=${encodedQuery}&limit=8&lang=en`;
+      let googleUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodedQuery}&types=address&components=country:us&key=${apiKey}`;
       
       // Add location bias if coordinates provided (prioritize nearby addresses)
       if (latitude && longitude) {
-        photonUrl += `&lat=${latitude}&lon=${longitude}`;
+        googleUrl += `&location=${latitude},${longitude}&radius=50000`; // 50km radius bias
       }
       
-      const response = await fetch(photonUrl, {
-        headers: {
-          'User-Agent': 'CompanyHQ-PlowMapper/1.0'
-        }
-      });
+      const response = await fetch(googleUrl);
       
       if (!response.ok) {
-        console.error("Photon API error:", response.status);
+        console.error("Google Places API error:", response.status);
         return res.json({ suggestions: [] });
       }
       
       const data = await response.json();
       
-      // Format the results as clean address strings
-      // Filter for US addresses only and prefer street-level results
-      const suggestions = (data.features || [])
-        .filter((feature: any) => {
-          const props = feature.properties || {};
-          // Only include US addresses
-          return props.country === 'United States' || props.countrycode === 'US';
-        })
-        .filter((feature: any) => {
-          const props = feature.properties || {};
-          // Prefer addresses with house numbers or at least street names
-          return props.housenumber || props.street || props.name;
-        })
+      if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+        console.error("Google Places API status:", data.status, data.error_message);
+        return res.json({ suggestions: [] });
+      }
+      
+      // Extract the address descriptions from predictions
+      const suggestions = (data.predictions || [])
         .slice(0, 5)
-        .map((feature: any) => {
-          const props = feature.properties || {};
-          const parts: string[] = [];
-          
-          // Build address from components
-          if (props.housenumber && props.street) {
-            parts.push(`${props.housenumber} ${props.street}`);
-          } else if (props.street) {
-            parts.push(props.street);
-          } else if (props.name) {
-            parts.push(props.name);
-          }
-          
-          const city = props.city || props.locality || props.district;
-          if (city) {
-            parts.push(city);
-          }
-          
-          if (props.state) {
-            parts.push(props.state);
-          }
-          
-          if (props.postcode) {
-            parts.push(props.postcode);
-          }
-          
-          return parts.length > 1 ? parts.join(', ') : null;
-        })
-        .filter((s: string | null) => s && s.length > 0);
+        .map((prediction: any) => prediction.description);
       
       res.json({ suggestions });
     } catch (err: any) {
