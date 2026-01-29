@@ -131,9 +131,14 @@ export default function PlowSiteMapper() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [streetViewAvailable, setStreetViewAvailable] = useState(false);
   const [streetViewHeading, setStreetViewHeading] = useState(0);
+  const [streetViewPitch, setStreetViewPitch] = useState(0);
+  const [streetViewFov, setStreetViewFov] = useState(90);
   const [capturedStreetViewImage, setCapturedStreetViewImage] = useState<string | null>(null);
   const [isCapturingStreetView, setIsCapturingStreetView] = useState(false);
   const [additionalImages, setAdditionalImages] = useState<Array<{ id: string; title: string; imageBase64: string; type: "streetview" | "upload" }>>([]);
+  const [isStreetViewDragging, setIsStreetViewDragging] = useState(false);
+  const [streetViewDragStart, setStreetViewDragStart] = useState<{ x: number; y: number } | null>(null);
+  const streetViewRef = useRef<HTMLDivElement>(null);
   const additionalImageInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -366,7 +371,9 @@ export default function PlowSiteMapper() {
         body: JSON.stringify({
           lat: coords?.lat || mapCoordinates.lat,
           lng: coords?.lng || mapCoordinates.lng,
-          heading: streetViewHeading,
+          heading: Math.round(streetViewHeading),
+          pitch: Math.round(streetViewPitch),
+          fov: Math.round(streetViewFov),
           width: 640,
           height: 480,
         }),
@@ -411,7 +418,7 @@ export default function PlowSiteMapper() {
     const id = `sv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     setAdditionalImages(prev => [
       ...prev,
-      { id, title: `Street View ${streetViewHeading}°`, imageBase64: capturedStreetViewImage, type: "streetview" }
+      { id, title: `Street View ${Math.round(streetViewHeading)}°`, imageBase64: capturedStreetViewImage, type: "streetview" }
     ]);
     setCapturedStreetViewImage(null);
     toast({ title: "Added", description: "Street View image added to site images" });
@@ -419,6 +426,72 @@ export default function PlowSiteMapper() {
 
   const removeAdditionalImage = (id: string) => {
     setAdditionalImages(prev => prev.filter(img => img.id !== id));
+  };
+
+  // Street View navigation handlers
+  const handleStreetViewMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsStreetViewDragging(true);
+    setStreetViewDragStart({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleStreetViewMouseMove = (e: React.MouseEvent) => {
+    if (!isStreetViewDragging || !streetViewDragStart) return;
+    
+    const deltaX = e.clientX - streetViewDragStart.x;
+    const deltaY = e.clientY - streetViewDragStart.y;
+    
+    // Horizontal drag changes heading (0.5 degrees per pixel)
+    const newHeading = (streetViewHeading - deltaX * 0.5 + 360) % 360;
+    setStreetViewHeading(newHeading);
+    
+    // Vertical drag changes pitch (-90 to 90 degrees, 0.3 degrees per pixel)
+    const newPitch = Math.max(-90, Math.min(90, streetViewPitch + deltaY * 0.3));
+    setStreetViewPitch(newPitch);
+    
+    setStreetViewDragStart({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleStreetViewMouseUp = () => {
+    setIsStreetViewDragging(false);
+    setStreetViewDragStart(null);
+  };
+
+  const handleStreetViewWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    // Scroll changes FOV (zoom) - lower FOV = more zoomed in
+    const delta = e.deltaY > 0 ? 5 : -5;
+    const newFov = Math.max(30, Math.min(120, streetViewFov + delta));
+    setStreetViewFov(newFov);
+  };
+
+  const handleStreetViewTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      setIsStreetViewDragging(true);
+      setStreetViewDragStart({ x: touch.clientX, y: touch.clientY });
+    }
+  };
+
+  const handleStreetViewTouchMove = (e: React.TouchEvent) => {
+    if (!isStreetViewDragging || !streetViewDragStart || e.touches.length !== 1) return;
+    
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - streetViewDragStart.x;
+    const deltaY = touch.clientY - streetViewDragStart.y;
+    
+    const newHeading = (streetViewHeading - deltaX * 0.5 + 360) % 360;
+    setStreetViewHeading(newHeading);
+    
+    const newPitch = Math.max(-90, Math.min(90, streetViewPitch + deltaY * 0.3));
+    setStreetViewPitch(newPitch);
+    
+    setStreetViewDragStart({ x: touch.clientX, y: touch.clientY });
+  };
+
+  const handleStreetViewTouchEnd = () => {
+    setIsStreetViewDragging(false);
+    setStreetViewDragStart(null);
   };
 
   const getImageDimensions = () => {
@@ -601,6 +674,8 @@ export default function PlowSiteMapper() {
     setDragDelta({ x: 0, y: 0 });
     setStreetViewAvailable(false);
     setStreetViewHeading(0);
+    setStreetViewPitch(0);
+    setStreetViewFov(90);
     setCapturedStreetViewImage(null);
     setAdditionalImages([]);
   };
@@ -1231,26 +1306,25 @@ export default function PlowSiteMapper() {
                       </div>
                       
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs w-20">Direction:</Label>
-                          <input 
-                            type="range" 
-                            min="0" 
-                            max="360" 
-                            value={streetViewHeading}
-                            onChange={(e) => setStreetViewHeading(parseInt(e.target.value))}
-                            className="flex-1"
-                          />
-                          <span className="text-xs w-10 text-right">{streetViewHeading}°</span>
-                        </div>
-                        
-                        {/* Street View Preview */}
+                        {/* Street View Preview - Interactive */}
                         {mapsApiKey && (
-                          <div className="relative aspect-video rounded-lg overflow-hidden border">
+                          <div 
+                            ref={streetViewRef}
+                            className={`relative aspect-video rounded-lg overflow-hidden border select-none ${isStreetViewDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                            onMouseDown={handleStreetViewMouseDown}
+                            onMouseMove={handleStreetViewMouseMove}
+                            onMouseUp={handleStreetViewMouseUp}
+                            onMouseLeave={handleStreetViewMouseUp}
+                            onWheel={handleStreetViewWheel}
+                            onTouchStart={handleStreetViewTouchStart}
+                            onTouchMove={handleStreetViewTouchMove}
+                            onTouchEnd={handleStreetViewTouchEnd}
+                          >
                             <img 
-                              src={`https://maps.googleapis.com/maps/api/streetview?size=640x360&location=${mapCoordinates.lat},${mapCoordinates.lng}&heading=${streetViewHeading}&pitch=0&fov=90&key=${mapsApiKey}`}
+                              src={`https://maps.googleapis.com/maps/api/streetview?size=640x360&location=${mapCoordinates.lat},${mapCoordinates.lng}&heading=${Math.round(streetViewHeading)}&pitch=${Math.round(streetViewPitch)}&fov=${Math.round(streetViewFov)}&key=${mapsApiKey}`}
                               alt="Street View preview"
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover pointer-events-none"
+                              draggable={false}
                             />
                             {capturedStreetViewImage && (
                               <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
@@ -1258,8 +1332,32 @@ export default function PlowSiteMapper() {
                                 Captured
                               </div>
                             )}
+                            {/* View indicators */}
+                            <div className="absolute bottom-2 left-2 bg-background/90 text-foreground px-2 py-1 rounded text-xs flex gap-2">
+                              <span>{Math.round(streetViewHeading)}°</span>
+                              <span>Pitch: {Math.round(streetViewPitch)}°</span>
+                              <span>Zoom: {Math.round(120 - streetViewFov + 30)}%</span>
+                            </div>
+                            {/* Reset button */}
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="absolute top-2 right-2 h-6 w-6 bg-background/90 hover:bg-background shadow-md"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setStreetViewHeading(0); 
+                                setStreetViewPitch(0); 
+                                setStreetViewFov(90); 
+                              }}
+                              title="Reset view"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
                           </div>
                         )}
+                        <p className="text-xs text-muted-foreground text-center">
+                          Drag to look around, scroll to zoom
+                        </p>
                         
                         <div className="flex gap-2">
                           <Button
