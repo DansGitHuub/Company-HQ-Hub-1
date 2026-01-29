@@ -600,7 +600,7 @@ export async function registerRoutes(
   // Capture satellite image as base64 (to avoid CORS issues on canvas)
   app.post("/api/capture-satellite-image", requireAuth, async (req, res) => {
     try {
-      const { lat, lng, zoom } = req.body;
+      const { lat, lng, zoom, width, height } = req.body;
       if (!lat || !lng) {
         return res.status(400).json({ message: "Coordinates required" });
       }
@@ -611,7 +611,13 @@ export async function registerRoutes(
       }
 
       const zoomLevel = zoom || 19;
-      const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoomLevel}&size=800x500&maptype=satellite&key=${apiKey}`;
+      // Google Static Maps API supports up to 640x640 for free, 2048x2048 for premium
+      // Use scale=2 for higher resolution (doubles the actual pixel count)
+      const imgWidth = Math.min(width || 640, 640);
+      const imgHeight = Math.min(height || 400, 640);
+      const scale = (width && width > 640) || (height && height > 640) ? 2 : 1;
+      
+      const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoomLevel}&size=${imgWidth}x${imgHeight}&scale=${scale}&maptype=satellite&key=${apiKey}`;
 
       // Fetch the image and convert to base64
       const imageRes = await fetch(satelliteUrl);

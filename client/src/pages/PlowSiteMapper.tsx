@@ -45,7 +45,13 @@ import {
   ZoomIn,
   ZoomOut,
   Camera,
-  Minus
+  Minus,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  Move,
+  RotateCcw,
+  ImagePlus
 } from "lucide-react";
 
 type Annotation = {
@@ -98,6 +104,8 @@ export default function PlowSiteMapper() {
   const [mapZoom, setMapZoom] = useState(19);
   const [capturedMapImage, setCapturedMapImage] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [mapOffset, setMapOffset] = useState<{ lat: number; lng: number }>({ lat: 0, lng: 0 });
+  const [imageSize, setImageSize] = useState<"standard" | "large" | "hd">("hd");
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<any>(null);
   const [mapsApiKey, setMapsApiKey] = useState<string>("");
@@ -315,9 +323,42 @@ export default function PlowSiteMapper() {
     }
   };
 
+  const getImageDimensions = () => {
+    switch (imageSize) {
+      case "standard": return { width: 640, height: 400 };
+      case "large": return { width: 800, height: 500 };
+      case "hd": return { width: 1280, height: 800 };
+      default: return { width: 1280, height: 800 };
+    }
+  };
+
+  const panMap = (direction: "up" | "down" | "left" | "right") => {
+    const panAmount = 0.0005 * Math.pow(2, 19 - mapZoom);
+    setMapOffset(prev => {
+      switch (direction) {
+        case "up": return { ...prev, lat: prev.lat + panAmount };
+        case "down": return { ...prev, lat: prev.lat - panAmount };
+        case "left": return { ...prev, lng: prev.lng - panAmount };
+        case "right": return { ...prev, lng: prev.lng + panAmount };
+        default: return prev;
+      }
+    });
+  };
+
+  const getAdjustedCoordinates = () => {
+    if (!mapCoordinates) return null;
+    return {
+      lat: mapCoordinates.lat + mapOffset.lat,
+      lng: mapCoordinates.lng + mapOffset.lng
+    };
+  };
+
   const captureMapView = async () => {
-    if (!mapCoordinates) return;
+    const coords = getAdjustedCoordinates();
+    if (!coords) return;
     setIsCapturing(true);
+    
+    const dimensions = getImageDimensions();
     
     try {
       // Fetch the image as base64 to avoid CORS issues on canvas
@@ -326,9 +367,11 @@ export default function PlowSiteMapper() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ 
-          lat: mapCoordinates.lat,
-          lng: mapCoordinates.lng,
-          zoom: mapZoom 
+          lat: coords.lat,
+          lng: coords.lng,
+          zoom: mapZoom,
+          width: dimensions.width,
+          height: dimensions.height
         }),
       });
       
@@ -373,6 +416,8 @@ export default function PlowSiteMapper() {
     setMapZoom(19);
     setCapturedMapImage(null);
     setIsCapturing(false);
+    setMapOffset({ lat: 0, lng: 0 });
+    setImageSize("hd");
   };
 
   const filteredSites = selectedGroupFilter 
@@ -874,22 +919,73 @@ export default function PlowSiteMapper() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label>Adjust View & Capture</Label>
-                        <span className="text-xs text-muted-foreground">Zoom: {mapZoom}</span>
+                        <div className="flex items-center gap-2">
+                          <Select value={imageSize} onValueChange={(v) => setImageSize(v as typeof imageSize)}>
+                            <SelectTrigger className="h-7 w-24 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="standard">Standard</SelectItem>
+                              <SelectItem value="large">Large</SelectItem>
+                              <SelectItem value="hd">HD</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <span className="text-xs text-muted-foreground">Zoom: {mapZoom}</span>
+                        </div>
                       </div>
                       
-                      {/* Interactive map preview with zoom controls */}
+                      {/* Interactive map preview with controls */}
                       <div className="relative rounded-lg overflow-hidden border-2 border-muted">
                         <img 
-                          src={mapsApiKey ? `https://maps.googleapis.com/maps/api/staticmap?center=${mapCoordinates.lat},${mapCoordinates.lng}&zoom=${mapZoom}&size=800x400&maptype=satellite&key=${mapsApiKey}` : satelliteImageUrl || ''}
+                          src={mapsApiKey && getAdjustedCoordinates() ? `https://maps.googleapis.com/maps/api/staticmap?center=${getAdjustedCoordinates()!.lat},${getAdjustedCoordinates()!.lng}&zoom=${mapZoom}&size=800x400&maptype=satellite&key=${mapsApiKey}` : satelliteImageUrl || ''}
                           alt="Satellite view" 
                           className="w-full h-64 object-cover"
                           onError={(e) => {
-                            // Fallback: fetch through API if direct access fails
                             if (satelliteImageUrl) {
                               (e.target as HTMLImageElement).src = satelliteImageUrl;
                             }
                           }}
                         />
+                        
+                        {/* Pan controls - top */}
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="absolute top-2 left-1/2 -translate-x-1/2 h-7 w-7 bg-background/90 hover:bg-background shadow-md"
+                          onClick={() => panMap("up")}
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                        
+                        {/* Pan controls - bottom */}
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="absolute bottom-2 left-1/2 -translate-x-1/2 h-7 w-7 bg-background/90 hover:bg-background shadow-md"
+                          onClick={() => panMap("down")}
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                        
+                        {/* Pan controls - left */}
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="absolute left-2 top-1/2 -translate-y-1/2 h-7 w-7 bg-background/90 hover:bg-background shadow-md"
+                          onClick={() => panMap("left")}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        
+                        {/* Pan controls - right */}
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="absolute right-12 top-1/2 -translate-y-1/2 h-7 w-7 bg-background/90 hover:bg-background shadow-md"
+                          onClick={() => panMap("right")}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
                         
                         {/* Zoom controls */}
                         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1">
@@ -911,6 +1007,15 @@ export default function PlowSiteMapper() {
                           >
                             <ZoomOut className="h-4 w-4" />
                           </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-background/90 hover:bg-background shadow-md"
+                            onClick={() => setMapOffset({ lat: 0, lng: 0 })}
+                            title="Reset to center"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
                         </div>
 
                         {/* Captured indicator */}
@@ -923,7 +1028,7 @@ export default function PlowSiteMapper() {
                       </div>
 
                       <p className="text-xs text-muted-foreground text-center">
-                        Use zoom buttons to adjust the view, then capture the image
+                        Use arrows to pan, +/- to zoom. Choose image quality above.
                       </p>
 
                       <Button
@@ -1063,12 +1168,12 @@ export default function PlowSiteMapper() {
                     </Button>
                     <Button 
                       onClick={() => setCreateStep("confirm")} 
-                      disabled={!capturedMapImage && !uploadedImage?.startsWith("data:")}
+                      disabled={!uploadedImage}
                       data-testid="button-next-step"
                     >
                       Continue
                     </Button>
-                    {!capturedMapImage && mapCoordinates && (
+                    {!uploadedImage && mapCoordinates && (
                       <p className="text-xs text-muted-foreground w-full text-center">
                         Please capture the view before continuing
                       </p>
