@@ -537,6 +537,46 @@ export async function registerRoutes(
     }
   });
 
+  // Get satellite image URL for an address
+  app.post("/api/address-satellite-image", requireAuth, async (req, res) => {
+    try {
+      const { address } = req.body;
+      if (!address) {
+        return res.status(400).json({ message: "Address is required" });
+      }
+
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: "Google Maps API key not configured" });
+      }
+
+      // First, geocode the address to get coordinates
+      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
+      const geocodeRes = await fetch(geocodeUrl);
+      const geocodeData = await geocodeRes.json();
+
+      if (geocodeData.status !== 'OK' || !geocodeData.results?.[0]) {
+        return res.status(404).json({ message: "Address not found" });
+      }
+
+      const location = geocodeData.results[0].geometry.location;
+      const lat = location.lat;
+      const lng = location.lng;
+
+      // Generate satellite image URL using Google Static Maps API
+      const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=19&size=800x500&maptype=satellite&key=${apiKey}`;
+
+      res.json({ 
+        imageUrl: satelliteUrl,
+        coordinates: { lat, lng },
+        formattedAddress: geocodeData.results[0].formatted_address
+      });
+    } catch (err: any) {
+      console.error("Satellite image error:", err);
+      res.status(500).json({ message: "Failed to get satellite image" });
+    }
+  });
+
   app.post("/api/ai/analyze-plow-site", requireAuth, async (req, res) => {
     try {
       const { imageBase64 } = req.body;

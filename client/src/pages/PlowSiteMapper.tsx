@@ -85,6 +85,11 @@ export default function PlowSiteMapper() {
   const [newSiteName, setNewSiteName] = useState("");
   const [newSiteAddress, setNewSiteAddress] = useState("");
   const [newSiteGroupId, setNewSiteGroupId] = useState<string | null>(null);
+  const [createStep, setCreateStep] = useState<"info" | "image" | "confirm">("info");
+  const [isManualEntry, setIsManualEntry] = useState(false);
+  const [satelliteImageUrl, setSatelliteImageUrl] = useState<string | null>(null);
+  const [isLoadingSatellite, setIsLoadingSatellite] = useState(false);
+  const [imageSource, setImageSource] = useState<"satellite" | "upload" | null>(null);
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupType, setNewGroupType] = useState<string>("custom");
@@ -260,6 +265,47 @@ export default function PlowSiteMapper() {
     }, 300);
   };
 
+  const fetchSatelliteImage = async (address: string) => {
+    setIsLoadingSatellite(true);
+    setSatelliteImageUrl(null);
+    try {
+      const res = await fetch("/api/address-satellite-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ address }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSatelliteImageUrl(data.imageUrl);
+      }
+    } catch (err) {
+      console.error("Failed to fetch satellite image:", err);
+    } finally {
+      setIsLoadingSatellite(false);
+    }
+  };
+
+  const handleAddressSelect = (address: string) => {
+    setNewSiteAddress(address);
+    setAddressSuggestions([]);
+    // Fetch satellite image for the selected address
+    fetchSatelliteImage(address);
+    setCreateStep("image");
+  };
+
+  const resetCreateDialog = () => {
+    setNewSiteName("");
+    setNewSiteAddress("");
+    setNewSiteGroupId(null);
+    setUploadedImage(null);
+    setAddressSuggestions([]);
+    setCreateStep("info");
+    setIsManualEntry(false);
+    setSatelliteImageUrl(null);
+    setImageSource(null);
+  };
+
   const filteredSites = selectedGroupFilter 
     ? sites.filter(site => site.groupId === selectedGroupFilter)
     : sites;
@@ -280,11 +326,7 @@ export default function PlowSiteMapper() {
       setSelectedSite(site);
       setIsCreateDialogOpen(false);
       setIsEditing(true);
-      setNewSiteName("");
-      setNewSiteAddress("");
-      setNewSiteGroupId(null);
-      setUploadedImage(null);
-      setAddressSuggestions([]);
+      resetCreateDialog();
       toast({ title: "Site created successfully" });
     },
     onError: () => toast({ title: "Failed to create site", variant: "destructive" }),
@@ -342,7 +384,7 @@ export default function PlowSiteMapper() {
       address: newSiteAddress,
       groupId: newSiteGroupId || undefined,
       imageUrl: uploadedImage || undefined,
-      imageSource: uploadedImage ? "upload" : "google",
+      imageSource: imageSource || (uploadedImage ? "upload" : undefined),
     });
   };
 
@@ -575,113 +617,355 @@ export default function PlowSiteMapper() {
             </DialogTrigger>
             <DialogContent className="max-w-lg">
               <DialogHeader>
-                <DialogTitle>Create New Plow Site</DialogTitle>
-                <DialogDescription>Add a property for snow removal planning</DialogDescription>
+                <DialogTitle>
+                  {createStep === "info" && "Create New Plow Site"}
+                  {createStep === "image" && "Select Property Image"}
+                  {createStep === "confirm" && "Confirm Site Details"}
+                </DialogTitle>
+                <DialogDescription>
+                  {createStep === "info" && "Enter site details or upload an image directly"}
+                  {createStep === "image" && "Choose to use the satellite image or upload your own"}
+                  {createStep === "confirm" && "Review and create your plow site"}
+                </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div>
-                  <Label>Site Name</Label>
-                  <Input
-                    value={newSiteName}
-                    onChange={(e) => setNewSiteName(e.target.value)}
-                    placeholder="e.g., Johnson Property"
-                    data-testid="input-site-name"
-                  />
-                </div>
-                <div className="relative">
-                  <Label>Address</Label>
-                  <div className="relative">
-                    <Input
-                      value={newSiteAddress}
-                      onChange={(e) => handleAddressChange(e.target.value)}
-                      placeholder="Start typing an address..."
-                      data-testid="input-site-address"
-                    />
-                    {isSearchingAddress && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      </div>
-                    )}
-                  </div>
-                  {addressSuggestions.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                      {addressSuggestions.map((suggestion, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-accent cursor-pointer"
-                          onClick={() => {
-                            setNewSiteAddress(suggestion);
-                            setAddressSuggestions([]);
-                          }}
-                          data-testid={`address-suggestion-${idx}`}
-                        >
-                          <MapPin className="h-3 w-3 inline mr-2 text-muted-foreground" />
-                          {suggestion}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <Label>Group (Optional)</Label>
-                  <Select value={newSiteGroupId || "none"} onValueChange={(val) => setNewSiteGroupId(val === "none" ? null : val)}>
-                    <SelectTrigger data-testid="select-site-group">
-                      <SelectValue placeholder="Select a group" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Group</SelectItem>
-                      {groups.map((group) => (
-                        <SelectItem key={group.id} value={group.id}>
-                          <span className="flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: group.color || "#3b82f6" }} />
-                            {group.name}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Property Image</Label>
-                  <div className="mt-2 space-y-2">
+              
+              {/* Step indicator */}
+              <div className="flex items-center justify-center gap-2 py-2">
+                <div className={`w-8 h-1 rounded ${createStep === "info" ? "bg-primary" : "bg-muted"}`} />
+                <div className={`w-8 h-1 rounded ${createStep === "image" ? "bg-primary" : "bg-muted"}`} />
+                <div className={`w-8 h-1 rounded ${createStep === "confirm" ? "bg-primary" : "bg-muted"}`} />
+              </div>
+
+              {/* Step 1: Info */}
+              {createStep === "info" && (
+                <div className="space-y-4 py-4">
+                  {/* Toggle between address lookup and manual entry */}
+                  <div className="flex gap-2 p-1 bg-muted rounded-lg">
                     <Button
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full"
-                      data-testid="button-upload-image"
+                      variant={!isManualEntry ? "default" : "ghost"}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setIsManualEntry(false)}
+                    >
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Find Address
+                    </Button>
+                    <Button
+                      variant={isManualEntry ? "default" : "ghost"}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setIsManualEntry(true)}
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      Upload Image
+                      Manual Entry
                     </Button>
+                  </div>
+
+                  <div>
+                    <Label>Site Name</Label>
+                    <Input
+                      value={newSiteName}
+                      onChange={(e) => setNewSiteName(e.target.value)}
+                      placeholder="e.g., Johnson Property"
+                      data-testid="input-site-name"
+                    />
+                  </div>
+
+                  {!isManualEntry ? (
+                    <div className="relative">
+                      <Label>Address</Label>
+                      <div className="relative">
+                        <Input
+                          value={newSiteAddress}
+                          onChange={(e) => handleAddressChange(e.target.value)}
+                          placeholder="Start typing an address..."
+                          data-testid="input-site-address"
+                        />
+                        {isSearchingAddress && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      {addressSuggestions.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          {addressSuggestions.map((suggestion, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-accent cursor-pointer"
+                              onClick={() => handleAddressSelect(suggestion)}
+                              data-testid={`address-suggestion-${idx}`}
+                            >
+                              <MapPin className="h-3 w-3 inline mr-2 text-muted-foreground" />
+                              {suggestion}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Select an address to see satellite imagery
+                      </p>
+                      {newSiteAddress.length > 5 && addressSuggestions.length === 0 && !isSearchingAddress && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 w-full"
+                          onClick={() => handleAddressSelect(newSiteAddress)}
+                          data-testid="button-use-typed-address"
+                        >
+                          Use this address
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <Label>Address (Optional)</Label>
+                        <Input
+                          value={newSiteAddress}
+                          onChange={(e) => setNewSiteAddress(e.target.value)}
+                          placeholder="Enter address manually..."
+                          data-testid="input-site-address-manual"
+                        />
+                      </div>
+                      <div>
+                        <Label>Property Image</Label>
+                        <div className="mt-2 space-y-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-full"
+                            data-testid="button-upload-image"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload Image
+                          </Button>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleImageUpload}
+                          />
+                          {uploadedImage && (
+                            <div className="relative">
+                              <img src={uploadedImage} alt="Preview" className="w-full h-40 object-cover rounded-lg" />
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="absolute top-2 right-2"
+                                onClick={() => setUploadedImage(null)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div>
+                    <Label>Group (Optional)</Label>
+                    <Select value={newSiteGroupId || "none"} onValueChange={(val) => setNewSiteGroupId(val === "none" ? null : val)}>
+                      <SelectTrigger data-testid="select-site-group">
+                        <SelectValue placeholder="Select a group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Group</SelectItem>
+                        {groups.map((group) => (
+                          <SelectItem key={group.id} value={group.id}>
+                            <span className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: group.color || "#3b82f6" }} />
+                              {group.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Image Selection */}
+              {createStep === "image" && (
+                <div className="space-y-4 py-4">
+                  <div className="text-sm text-muted-foreground mb-2">
+                    <MapPin className="h-4 w-4 inline mr-1" />
+                    {newSiteAddress}
+                  </div>
+
+                  {isLoadingSatellite ? (
+                    <div className="h-48 flex items-center justify-center bg-muted rounded-lg">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-muted-foreground">Loading satellite image...</span>
+                    </div>
+                  ) : satelliteImageUrl ? (
+                    <div className="space-y-3">
+                      <Label>Satellite Image from Google Maps</Label>
+                      <div className="relative">
+                        <img 
+                          src={satelliteImageUrl} 
+                          alt="Satellite view" 
+                          className={`w-full h-48 object-cover rounded-lg border-2 ${imageSource === "satellite" ? "border-primary" : "border-transparent"}`}
+                        />
+                        {imageSource === "satellite" && (
+                          <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs">
+                            Selected
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        variant={imageSource === "satellite" ? "default" : "outline"}
+                        onClick={() => {
+                          setImageSource("satellite");
+                          setUploadedImage(satelliteImageUrl);
+                        }}
+                        className="w-full"
+                      >
+                        Use This Satellite Image
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="h-48 flex items-center justify-center bg-muted rounded-lg">
+                      <span className="text-muted-foreground">No satellite image available</span>
+                    </div>
+                  )}
+
+                  <div className="relative py-2">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">Or</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label>Upload Your Own Image</Label>
+                    {imageSource === "upload" && uploadedImage && !uploadedImage.includes("googleapis.com") ? (
+                      <div className="relative">
+                        <img 
+                          src={uploadedImage} 
+                          alt="Uploaded" 
+                          className="w-full h-48 object-cover rounded-lg border-2 border-primary"
+                        />
+                        <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs">
+                          Selected
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="absolute bottom-2 right-2"
+                          onClick={() => {
+                            setUploadedImage(satelliteImageUrl);
+                            setImageSource(satelliteImageUrl ? "satellite" : null);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full"
+                        data-testid="button-upload-own-image"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Different Image
+                      </Button>
+                    )}
                     <input
                       ref={fileInputRef}
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={handleImageUpload}
+                      onChange={(e) => {
+                        handleImageUpload(e);
+                        setImageSource("upload");
+                      }}
                     />
-                    {uploadedImage && (
-                      <div className="relative">
-                        <img src={uploadedImage} alt="Preview" className="w-full h-40 object-cover rounded-lg" />
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="absolute top-2 right-2"
-                          onClick={() => setUploadedImage(null)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Confirm */}
+              {createStep === "confirm" && (
+                <div className="space-y-4 py-4">
+                  <div className="bg-muted p-4 rounded-lg space-y-3">
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Site Name</Label>
+                      <p className="font-medium">{newSiteName}</p>
+                    </div>
+                    {newSiteAddress && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Address</Label>
+                        <p className="text-sm">{newSiteAddress}</p>
+                      </div>
+                    )}
+                    {newSiteGroupId && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Group</Label>
+                        <p className="text-sm">{groups.find(g => g.id === newSiteGroupId)?.name || "None"}</p>
                       </div>
                     )}
                   </div>
+                  {uploadedImage && (
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Property Image</Label>
+                      <img src={uploadedImage} alt="Property" className="w-full h-40 object-cover rounded-lg mt-1" />
+                    </div>
+                  )}
                 </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreateSite} disabled={!newSiteName || createSite.isPending} data-testid="button-submit-site">
-                  Create Site
-                </Button>
+              )}
+
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                {createStep === "info" && (
+                  <>
+                    <Button variant="outline" onClick={() => { setIsCreateDialogOpen(false); resetCreateDialog(); }}>
+                      Cancel
+                    </Button>
+                    {isManualEntry && (
+                      <Button 
+                        onClick={() => setCreateStep("confirm")} 
+                        disabled={!newSiteName}
+                        data-testid="button-next-step"
+                      >
+                        Continue
+                      </Button>
+                    )}
+                  </>
+                )}
+                {createStep === "image" && (
+                  <>
+                    <Button variant="outline" onClick={() => setCreateStep("info")}>
+                      Back
+                    </Button>
+                    <Button 
+                      onClick={() => setCreateStep("confirm")} 
+                      disabled={!uploadedImage}
+                      data-testid="button-next-step"
+                    >
+                      Continue
+                    </Button>
+                  </>
+                )}
+                {createStep === "confirm" && (
+                  <>
+                    <Button variant="outline" onClick={() => setCreateStep(isManualEntry ? "info" : "image")}>
+                      Back
+                    </Button>
+                    <Button 
+                      onClick={handleCreateSite} 
+                      disabled={!newSiteName || createSite.isPending} 
+                      data-testid="button-submit-site"
+                    >
+                      Create Site
+                    </Button>
+                  </>
+                )}
               </DialogFooter>
             </DialogContent>
           </Dialog>
