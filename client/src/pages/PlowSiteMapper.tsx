@@ -1478,6 +1478,14 @@ export default function PlowSiteMapper() {
                 {createStep === "satellite" && (
                   <>
                     <Button variant="outline" onClick={() => setCreateStep("info")}>Back</Button>
+                    <Button
+                      variant="outline"
+                      onClick={captureMapView}
+                      disabled={isCapturing}
+                      data-testid="button-capture-satellite"
+                    >
+                      <Camera className="h-4 w-4 mr-2" /> {isCapturing ? "Capturing..." : capturedMapImage ? "Recapture" : "Capture"}
+                    </Button>
                     {capturedMapImage && (
                       <Button 
                         variant="outline" 
@@ -1488,14 +1496,11 @@ export default function PlowSiteMapper() {
                       </Button>
                     )}
                     <Button
-                      onClick={async () => {
-                        if (!capturedMapImage) await captureMapView();
-                        setCreateStep(streetViewAvailable ? "streetview" : "photos");
-                      }}
-                      disabled={isCapturing}
+                      onClick={() => setCreateStep(streetViewAvailable ? "streetview" : "photos")}
+                      disabled={!capturedMapImage}
                       data-testid="button-next-step"
                     >
-                      {capturedMapImage ? "Next" : "Capture & Continue"}
+                      Next
                     </Button>
                   </>
                 )}
