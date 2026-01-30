@@ -907,7 +907,7 @@ function FormBuilderDialog({ form, open, onOpenChange }: { form: CustomForm; ope
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0">
-        <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+        <div className="flex items-center justify-between p-4 pr-12 border-b bg-muted/30">
           <div className="flex items-center gap-3">
             <FileText className="h-5 w-5 text-primary" />
             <span className="font-semibold">Form Builder</span>
