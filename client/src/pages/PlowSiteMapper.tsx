@@ -51,7 +51,9 @@ import {
   ChevronLeft,
   Move,
   RotateCcw,
-  ImagePlus
+  ImagePlus,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 
 type Annotation = {
@@ -133,6 +135,7 @@ export default function PlowSiteMapper() {
   const [streetViewHeading, setStreetViewHeading] = useState(0);
   const [streetViewPitch, setStreetViewPitch] = useState(0);
   const [streetViewFov, setStreetViewFov] = useState(90);
+  const [streetViewOffset, setStreetViewOffset] = useState({ lat: 0, lng: 0 });
   const [capturedStreetViewImage, setCapturedStreetViewImage] = useState<string | null>(null);
   const [isCapturingStreetView, setIsCapturingStreetView] = useState(false);
   const [additionalImages, setAdditionalImages] = useState<Array<{ id: string; title: string; imageBase64: string; type: "streetview" | "upload" }>>([]);
@@ -437,7 +440,25 @@ export default function PlowSiteMapper() {
     setAdditionalImages(prev => prev.filter(img => img.id !== id));
   };
 
-  // Street View navigation is now handled by arrow buttons (no drag)
+  // Street View navigation - arrows for rotation, forward/backward for walking
+  const moveStreetView = (direction: "forward" | "backward") => {
+    // Move ~10 meters in the direction of current heading
+    const distance = 0.0001; // roughly 10 meters
+    const headingRad = (streetViewHeading * Math.PI) / 180;
+    const multiplier = direction === "forward" ? 1 : -1;
+    setStreetViewOffset(prev => ({
+      lat: prev.lat + Math.cos(headingRad) * distance * multiplier,
+      lng: prev.lng + Math.sin(headingRad) * distance * multiplier
+    }));
+  };
+
+  const getStreetViewCoordinates = () => {
+    if (!mapCoordinates) return null;
+    return {
+      lat: mapCoordinates.lat + streetViewOffset.lat,
+      lng: mapCoordinates.lng + streetViewOffset.lng
+    };
+  };
 
   const getImageDimensions = () => {
     // Always use HD quality (scale=2 gives 1280x800 effective resolution)
@@ -1260,19 +1281,20 @@ export default function PlowSiteMapper() {
 
                   <div ref={streetViewRef} className="relative rounded-lg overflow-hidden border-2 border-muted h-[450px]">
                     <img 
-                      src={`https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${mapCoordinates.lat},${mapCoordinates.lng}&heading=${Math.round(streetViewHeading)}&pitch=${Math.round(streetViewPitch)}&fov=${Math.round(streetViewFov)}&key=${mapsApiKey}`}
+                      src={`https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${getStreetViewCoordinates()?.lat || mapCoordinates.lat},${getStreetViewCoordinates()?.lng || mapCoordinates.lng}&heading=${Math.round(streetViewHeading)}&pitch=${Math.round(streetViewPitch)}&fov=${Math.round(streetViewFov)}&key=${mapsApiKey}`}
                       alt="Street View"
                       className="w-full h-full object-cover"
                       draggable={false}
                     />
                     
-                    {/* Arrow navigation controls */}
+                    {/* Rotate left/right controls */}
                     <Button
                       variant="secondary"
                       size="icon"
                       className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
                       onClick={() => setStreetViewHeading(prev => (prev - 30 + 360) % 360)}
                       data-testid="button-streetview-left"
+                      title="Rotate left"
                     >
                       <ChevronLeft className="h-6 w-6" />
                     </Button>
@@ -1283,16 +1305,19 @@ export default function PlowSiteMapper() {
                       className="absolute right-14 top-1/2 -translate-y-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
                       onClick={() => setStreetViewHeading(prev => (prev + 30) % 360)}
                       data-testid="button-streetview-right"
+                      title="Rotate right"
                     >
                       <ChevronRight className="h-6 w-6" />
                     </Button>
                     
+                    {/* Walk forward/backward controls */}
                     <Button
                       variant="secondary"
                       size="icon"
                       className="absolute top-2 left-1/2 -translate-x-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
-                      onClick={() => setStreetViewPitch(prev => Math.min(90, prev + 15))}
-                      data-testid="button-streetview-up"
+                      onClick={() => moveStreetView("forward")}
+                      data-testid="button-streetview-forward"
+                      title="Walk forward"
                     >
                       <ChevronUp className="h-6 w-6" />
                     </Button>
@@ -1301,38 +1326,54 @@ export default function PlowSiteMapper() {
                       variant="secondary"
                       size="icon"
                       className="absolute bottom-12 left-1/2 -translate-x-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
-                      onClick={() => setStreetViewPitch(prev => Math.max(-90, prev - 15))}
-                      data-testid="button-streetview-down"
+                      onClick={() => moveStreetView("backward")}
+                      data-testid="button-streetview-backward"
+                      title="Walk backward"
                     >
                       <ChevronDown className="h-6 w-6" />
                     </Button>
                     
-                    {/* Zoom controls */}
-                    <div className="absolute right-2 top-2 flex flex-col gap-1">
+                    {/* Zoom and tilt controls */}
+                    <div className="absolute right-2 top-2 flex flex-col gap-1 z-10">
                       <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/80 shadow-md"
                         onClick={() => setStreetViewFov(prev => Math.max(30, prev - 15))}
-                        data-testid="button-streetview-zoom-in">
+                        data-testid="button-streetview-zoom-in"
+                        title="Zoom in">
                         <ZoomIn className="h-4 w-4" />
                       </Button>
                       <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/80 shadow-md"
                         onClick={() => setStreetViewFov(prev => Math.min(120, prev + 15))}
-                        data-testid="button-streetview-zoom-out">
+                        data-testid="button-streetview-zoom-out"
+                        title="Zoom out">
                         <ZoomOut className="h-4 w-4" />
                       </Button>
                       <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/80 shadow-md"
-                        onClick={() => { setStreetViewHeading(0); setStreetViewPitch(0); setStreetViewFov(90); }}
-                        data-testid="button-streetview-reset">
+                        onClick={() => setStreetViewPitch(prev => Math.min(90, prev + 15))}
+                        data-testid="button-streetview-tilt-up"
+                        title="Look up">
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                      <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/80 shadow-md"
+                        onClick={() => setStreetViewPitch(prev => Math.max(-90, prev - 15))}
+                        data-testid="button-streetview-tilt-down"
+                        title="Look down">
+                        <ArrowDown className="h-4 w-4" />
+                      </Button>
+                      <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/80 shadow-md"
+                        onClick={() => { setStreetViewHeading(0); setStreetViewPitch(0); setStreetViewFov(90); setStreetViewOffset({ lat: 0, lng: 0 }); }}
+                        data-testid="button-streetview-reset"
+                        title="Reset view">
                         <RotateCcw className="h-4 w-4" />
                       </Button>
                     </div>
                     
                     {capturedStreetViewImage && (
-                      <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                      <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1 z-10">
                         <Camera className="h-3 w-3" /> Captured
                       </div>
                     )}
                     
-                    <div className="absolute bottom-2 left-2 bg-background/90 text-foreground px-2 py-1 rounded text-xs flex gap-2">
+                    <div className="absolute bottom-2 left-2 bg-background/90 text-foreground px-2 py-1 rounded text-xs flex gap-2 z-10">
                       <span>{Math.round(streetViewHeading)}°</span>
                       <span>Pitch: {Math.round(streetViewPitch)}°</span>
                     </div>
