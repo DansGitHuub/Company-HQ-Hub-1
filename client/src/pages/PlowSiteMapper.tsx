@@ -95,7 +95,7 @@ export default function PlowSiteMapper() {
   const [newSiteName, setNewSiteName] = useState("");
   const [newSiteAddress, setNewSiteAddress] = useState("");
   const [newSiteGroupId, setNewSiteGroupId] = useState<string | null>(null);
-  const [createStep, setCreateStep] = useState<"info" | "image" | "confirm">("info");
+  const [createStep, setCreateStep] = useState<"info" | "satellite" | "streetview" | "photos" | "confirm">("info");
   const [isManualEntry, setIsManualEntry] = useState(false);
   const [satelliteImageUrl, setSatelliteImageUrl] = useState<string | null>(null);
   const [isLoadingSatellite, setIsLoadingSatellite] = useState(false);
@@ -668,7 +668,7 @@ export default function PlowSiteMapper() {
     setAddressSuggestions([]);
     // Fetch satellite image for the selected address
     fetchSatelliteImage(address);
-    setCreateStep("image");
+    setCreateStep("satellite");
   };
 
   const resetCreateDialog = () => {
@@ -936,6 +936,13 @@ export default function PlowSiteMapper() {
     }
   }, [uploadedImage, drawAnnotations]);
 
+  // Auto-skip streetview step if street view is not available
+  useEffect(() => {
+    if (createStep === "streetview" && (!streetViewAvailable || !mapCoordinates || !mapsApiKey)) {
+      setCreateStep("photos");
+    }
+  }, [createStep, streetViewAvailable, mapCoordinates, mapsApiKey]);
+
   const addInstruction = () => {
     setInstructions([
       ...instructions,
@@ -1005,25 +1012,31 @@ export default function PlowSiteMapper() {
                 New Site
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-3xl">
               <DialogHeader>
                 <DialogTitle>
-                  {createStep === "info" && "Create New Plow Site"}
-                  {createStep === "image" && "Select Property Image"}
-                  {createStep === "confirm" && "Confirm Site Details"}
+                  {createStep === "info" && "Step 1: Site Details"}
+                  {createStep === "satellite" && "Step 2: Overhead View"}
+                  {createStep === "streetview" && "Step 3: Street View"}
+                  {createStep === "photos" && "Step 4: Additional Photos"}
+                  {createStep === "confirm" && "Step 5: Confirm & Create"}
                 </DialogTitle>
                 <DialogDescription>
-                  {createStep === "info" && "Enter site details or upload an image directly"}
-                  {createStep === "image" && "Choose to use the satellite image or upload your own"}
-                  {createStep === "confirm" && "Review and create your plow site"}
+                  {createStep === "info" && "Enter site name and address"}
+                  {createStep === "satellite" && "Drag to pan, scroll to zoom, then capture"}
+                  {createStep === "streetview" && "Drag to look around, scroll to zoom"}
+                  {createStep === "photos" && "Add any additional reference photos"}
+                  {createStep === "confirm" && "Review your site details"}
                 </DialogDescription>
               </DialogHeader>
               
               {/* Step indicator */}
-              <div className="flex items-center justify-center gap-2 py-2">
-                <div className={`w-8 h-1 rounded ${createStep === "info" ? "bg-primary" : "bg-muted"}`} />
-                <div className={`w-8 h-1 rounded ${createStep === "image" ? "bg-primary" : "bg-muted"}`} />
-                <div className={`w-8 h-1 rounded ${createStep === "confirm" ? "bg-primary" : "bg-muted"}`} />
+              <div className="flex items-center justify-center gap-1 py-2">
+                <div className={`w-6 h-1 rounded ${createStep === "info" ? "bg-primary" : "bg-muted"}`} />
+                <div className={`w-6 h-1 rounded ${createStep === "satellite" ? "bg-primary" : "bg-muted"}`} />
+                <div className={`w-6 h-1 rounded ${createStep === "streetview" ? "bg-primary" : streetViewAvailable ? "bg-muted" : "bg-muted/30"}`} />
+                <div className={`w-6 h-1 rounded ${createStep === "photos" ? "bg-primary" : "bg-muted"}`} />
+                <div className={`w-6 h-1 rounded ${createStep === "confirm" ? "bg-primary" : "bg-muted"}`} />
               </div>
 
               {/* Step 1: Info */}
@@ -1178,365 +1191,235 @@ export default function PlowSiteMapper() {
                 </div>
               )}
 
-              {/* Step 2: Image Selection */}
-              {createStep === "image" && (
-                <div className="space-y-4 py-4">
-                  <div className="text-sm text-muted-foreground mb-2">
-                    <MapPin className="h-4 w-4 inline mr-1" />
-                    {newSiteAddress}
+              {/* Step 2: Satellite View */}
+              {createStep === "satellite" && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground flex items-center gap-1">
+                      <MapPin className="h-4 w-4" />
+                      {newSiteAddress}
+                    </div>
+                    <Select value={aspectRatio} onValueChange={(v) => setAspectRatio(v as typeof aspectRatio)}>
+                      <SelectTrigger className="h-7 w-20 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="16:9">16:9</SelectItem>
+                        <SelectItem value="3:4">3:4</SelectItem>
+                        <SelectItem value="2:3">2:3</SelectItem>
+                        <SelectItem value="1:1">1:1</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {isLoadingSatellite ? (
-                    <div className="h-64 flex items-center justify-center bg-muted rounded-lg">
+                    <div className="h-80 flex items-center justify-center bg-muted rounded-lg">
                       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                       <span className="ml-2 text-muted-foreground">Loading map...</span>
                     </div>
                   ) : mapCoordinates ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label>Adjust View & Capture</Label>
-                        <div className="flex items-center gap-2">
-                          <Select value={aspectRatio} onValueChange={(v) => setAspectRatio(v as typeof aspectRatio)}>
-                            <SelectTrigger className="h-7 w-20 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="16:9">16:9</SelectItem>
-                              <SelectItem value="3:4">3:4</SelectItem>
-                              <SelectItem value="2:3">2:3</SelectItem>
-                              <SelectItem value="1:1">1:1</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      
-                      {/* Interactive map preview with mouse/touch controls */}
-                      <div 
-                        ref={mapPreviewRef}
-                        className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${getAspectRatioClass()} max-h-[400px]`}
-                        onMouseDown={handleMapMouseDown}
-                        onMouseMove={handleMapMouseMove}
-                        onMouseUp={handleMapMouseUp}
-                        onMouseLeave={handleMapMouseUp}
-                        onWheel={handleMapWheel}
-                        onTouchStart={handleMapTouchStart}
-                        onTouchMove={handleMapTouchMove}
-                        onTouchEnd={handleMapTouchEnd}
-                      >
-                        <img 
-                          src={mapsApiKey && getAdjustedCoordinates() ? `https://maps.googleapis.com/maps/api/staticmap?center=${getAdjustedCoordinates()!.lat},${getAdjustedCoordinates()!.lng}&zoom=${mapZoom}&size=640x640&scale=2&maptype=satellite&key=${mapsApiKey}` : satelliteImageUrl || ''}
-                          alt="Satellite view" 
-                          className="w-full h-full object-cover pointer-events-none transition-transform duration-75"
-                          style={{ transform: isDragging ? `translate(${dragDelta.x}px, ${dragDelta.y}px)` : 'none' }}
-                          draggable={false}
-                          onError={(e) => {
-                            if (satelliteImageUrl) {
-                              (e.target as HTMLImageElement).src = satelliteImageUrl;
-                            }
-                          }}
-                        />
-                        
-                        {/* Zoom controls */}
-                        <div className="absolute right-2 top-2 flex flex-col gap-1">
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8 bg-background/90 hover:bg-background shadow-md"
-                            onClick={(e) => { e.stopPropagation(); setMapZoom(Math.min(21, mapZoom + 1)); }}
-                            disabled={mapZoom >= 21}
-                          >
-                            <ZoomIn className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8 bg-background/90 hover:bg-background shadow-md"
-                            onClick={(e) => { e.stopPropagation(); setMapZoom(Math.max(15, mapZoom - 1)); }}
-                            disabled={mapZoom <= 15}
-                          >
-                            <ZoomOut className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8 bg-background/90 hover:bg-background shadow-md"
-                            onClick={(e) => { e.stopPropagation(); setMapOffset({ lat: 0, lng: 0 }); }}
-                            title="Reset to center"
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
-                        </div>
-
-                        {/* Captured indicator */}
-                        {capturedMapImage && (
-                          <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
-                            <Camera className="h-3 w-3" />
-                            Captured
-                          </div>
-                        )}
-                        
-                        {/* Zoom level indicator */}
-                        <div className="absolute bottom-2 left-2 bg-background/90 text-foreground px-2 py-1 rounded text-xs">
-                          Zoom: {mapZoom}
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-muted-foreground text-center">
-                        Drag to pan, scroll to zoom. HD quality enabled.
-                      </p>
-
-                      <Button
-                        onClick={captureMapView}
-                        className="w-full"
-                        disabled={isCapturing}
-                        data-testid="button-capture-view"
-                      >
-                        {isCapturing ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Capturing...
-                          </>
-                        ) : (
-                          <>
-                            <Camera className="h-4 w-4 mr-2" />
-                            {capturedMapImage ? "Recapture View" : "Capture This View"}
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="h-64 flex items-center justify-center bg-muted rounded-lg">
-                      <span className="text-muted-foreground">Map not available for this address</span>
-                    </div>
-                  )}
-
-                  {/* Street View Section */}
-                  {streetViewAvailable && mapCoordinates && (
-                    <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
-                      <div className="flex items-center justify-between">
-                        <Label className="flex items-center gap-2">
-                          <Navigation className="h-4 w-4" />
-                          Street View Available
-                        </Label>
-                        <Badge variant="secondary" className="text-xs">Optional</Badge>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        {/* Street View Preview - Interactive */}
-                        {mapsApiKey && (
-                          <div 
-                            ref={streetViewRef}
-                            className={`relative aspect-video rounded-lg overflow-hidden border select-none ${isStreetViewDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-                            onMouseDown={handleStreetViewMouseDown}
-                            onMouseMove={handleStreetViewMouseMove}
-                            onMouseUp={handleStreetViewMouseUp}
-                            onMouseLeave={handleStreetViewMouseUp}
-                            onWheel={handleStreetViewWheel}
-                            onTouchStart={handleStreetViewTouchStart}
-                            onTouchMove={handleStreetViewTouchMove}
-                            onTouchEnd={handleStreetViewTouchEnd}
-                          >
-                            <img 
-                              src={`https://maps.googleapis.com/maps/api/streetview?size=640x360&location=${mapCoordinates.lat},${mapCoordinates.lng}&heading=${Math.round(streetViewHeading)}&pitch=${Math.round(streetViewPitch)}&fov=${Math.round(streetViewFov)}&key=${mapsApiKey}`}
-                              alt="Street View preview"
-                              className="w-full h-full object-cover pointer-events-none"
-                              draggable={false}
-                            />
-                            {capturedStreetViewImage && (
-                              <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
-                                <Camera className="h-3 w-3" />
-                                Captured
-                              </div>
-                            )}
-                            {/* View indicators */}
-                            <div className="absolute bottom-2 left-2 bg-background/90 text-foreground px-2 py-1 rounded text-xs flex gap-2">
-                              <span>{Math.round(streetViewHeading)}°</span>
-                              <span>Pitch: {Math.round(streetViewPitch)}°</span>
-                              <span>Zoom: {Math.round(120 - streetViewFov + 30)}%</span>
-                            </div>
-                            {/* Reset button */}
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="absolute top-2 right-2 h-6 w-6 bg-background/90 hover:bg-background shadow-md"
-                              onClick={(e) => { 
-                                e.stopPropagation(); 
-                                setStreetViewHeading(0); 
-                                setStreetViewPitch(0); 
-                                setStreetViewFov(90); 
-                              }}
-                              title="Reset view"
-                            >
-                              <RotateCcw className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                        <p className="text-xs text-muted-foreground text-center">
-                          Drag to look around, scroll to zoom
-                        </p>
-                        
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={captureStreetView}
-                            disabled={isCapturingStreetView}
-                            className="flex-1"
-                            data-testid="button-capture-streetview"
-                          >
-                            {isCapturingStreetView ? (
-                              <>
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Capturing...
-                              </>
-                            ) : (
-                              <>
-                                <Camera className="h-3 w-3 mr-1" />
-                                Capture Street View
-                              </>
-                            )}
-                          </Button>
-                          {capturedStreetViewImage && (
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={addStreetViewToAdditionalImages}
-                              data-testid="button-add-streetview"
-                            >
-                              <Plus className="h-3 w-3 mr-1" />
-                              Add to Site
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Additional Images Section */}
-                  <div className="space-y-3 p-3 border rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <Label className="flex items-center gap-2">
-                        <ImagePlus className="h-4 w-4" />
-                        Additional Images ({additionalImages.length})
-                      </Label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => additionalImageInputRef.current?.click()}
-                        data-testid="button-add-photos"
-                      >
-                        <Upload className="h-3 w-3 mr-1" />
-                        Add Photos
-                      </Button>
-                      <input
-                        ref={additionalImageInputRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={handleAdditionalImageUpload}
+                    <div 
+                      ref={mapPreviewRef}
+                      className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} h-80`}
+                      onMouseDown={handleMapMouseDown}
+                      onMouseMove={handleMapMouseMove}
+                      onMouseUp={handleMapMouseUp}
+                      onMouseLeave={handleMapMouseUp}
+                      onWheel={handleMapWheel}
+                      onTouchStart={handleMapTouchStart}
+                      onTouchMove={handleMapTouchMove}
+                      onTouchEnd={handleMapTouchEnd}
+                    >
+                      <img 
+                        src={mapsApiKey && getAdjustedCoordinates() ? `https://maps.googleapis.com/maps/api/staticmap?center=${getAdjustedCoordinates()!.lat},${getAdjustedCoordinates()!.lng}&zoom=${mapZoom}&size=640x640&scale=2&maptype=satellite&key=${mapsApiKey}` : satelliteImageUrl || ''}
+                        alt="Satellite view" 
+                        className="w-full h-full object-cover pointer-events-none"
+                        style={{ transform: isDragging ? `translate(${dragDelta.x}px, ${dragDelta.y}px)` : 'none' }}
+                        draggable={false}
                       />
-                    </div>
-                    
-                    {additionalImages.length > 0 && (
-                      <div className="grid grid-cols-3 gap-2">
-                        {additionalImages.map((img) => (
-                          <div key={img.id} className="relative group">
-                            <img 
-                              src={img.imageBase64} 
-                              alt={img.title}
-                              className="w-full h-20 object-cover rounded border"
-                            />
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <Button
-                                variant="destructive"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => removeAdditionalImage(img.id)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 truncate">
-                              {img.type === "streetview" ? "Street View" : img.title}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {additionalImages.length === 0 && (
-                      <p className="text-xs text-muted-foreground text-center py-2">
-                        Add photos for crews to reference during work
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="relative py-2">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">Or</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label>Upload Main Image</Label>
-                    {imageSource === "upload" && uploadedImage && !uploadedImage.includes("googleapis.com") ? (
-                      <div className="relative">
-                        <img 
-                          src={uploadedImage} 
-                          alt="Uploaded" 
-                          className="w-full h-48 object-cover rounded-lg border-2 border-primary"
-                        />
-                        <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs">
-                          Selected
-                        </div>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="absolute bottom-2 right-2"
-                          onClick={() => {
-                            setUploadedImage(satelliteImageUrl);
-                            setImageSource(satelliteImageUrl ? "satellite" : null);
-                          }}
-                        >
-                          <X className="h-4 w-4" />
+                      
+                      {/* Zoom controls */}
+                      <div className="absolute right-2 top-2 flex flex-col gap-1">
+                        <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/90 shadow-md"
+                          onClick={(e) => { e.stopPropagation(); setMapZoom(Math.min(21, mapZoom + 1)); }} disabled={mapZoom >= 21}>
+                          <ZoomIn className="h-4 w-4" />
+                        </Button>
+                        <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/90 shadow-md"
+                          onClick={(e) => { e.stopPropagation(); setMapZoom(Math.max(15, mapZoom - 1)); }} disabled={mapZoom <= 15}>
+                          <ZoomOut className="h-4 w-4" />
+                        </Button>
+                        <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/90 shadow-md"
+                          onClick={(e) => { e.stopPropagation(); setMapOffset({ lat: 0, lng: 0 }); }} title="Reset">
+                          <RotateCcw className="h-4 w-4" />
                         </Button>
                       </div>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full"
-                        data-testid="button-upload-own-image"
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload Different Image
+
+                      {capturedMapImage && (
+                        <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                          <Camera className="h-3 w-3" /> Captured
+                        </div>
+                      )}
+                      
+                      <div className="absolute bottom-2 left-2 bg-background/90 text-foreground px-2 py-1 rounded text-xs">
+                        Zoom: {mapZoom}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-80 flex flex-col items-center justify-center bg-muted rounded-lg gap-3">
+                      <span className="text-muted-foreground">Map not available</span>
+                      <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                        <Upload className="h-4 w-4 mr-2" /> Upload Image Instead
+                      </Button>
+                    </div>
+                  )}
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      handleImageUpload(e);
+                      setImageSource("upload");
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Step 3: Street View */}
+              {createStep === "streetview" && mapCoordinates && mapsApiKey && (
+                <div className="space-y-3">
+                  <div className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Navigation className="h-4 w-4" />
+                    Street-level view of {newSiteAddress}
+                  </div>
+
+                  <div 
+                    ref={streetViewRef}
+                    className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isStreetViewDragging ? 'cursor-grabbing' : 'cursor-grab'} h-80`}
+                    onMouseDown={handleStreetViewMouseDown}
+                    onMouseMove={handleStreetViewMouseMove}
+                    onMouseUp={handleStreetViewMouseUp}
+                    onMouseLeave={handleStreetViewMouseUp}
+                    onWheel={handleStreetViewWheel}
+                    onTouchStart={handleStreetViewTouchStart}
+                    onTouchMove={handleStreetViewTouchMove}
+                    onTouchEnd={handleStreetViewTouchEnd}
+                  >
+                    <img 
+                      src={`https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${mapCoordinates.lat},${mapCoordinates.lng}&heading=${Math.round(streetViewHeading)}&pitch=${Math.round(streetViewPitch)}&fov=${Math.round(streetViewFov)}&key=${mapsApiKey}`}
+                      alt="Street View"
+                      className="w-full h-full object-cover pointer-events-none"
+                      draggable={false}
+                    />
+                    
+                    {capturedStreetViewImage && (
+                      <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                        <Camera className="h-3 w-3" /> Captured
+                      </div>
+                    )}
+                    
+                    <div className="absolute bottom-2 left-2 bg-background/90 text-foreground px-2 py-1 rounded text-xs flex gap-2">
+                      <span>{Math.round(streetViewHeading)}°</span>
+                      <span>Pitch: {Math.round(streetViewPitch)}°</span>
+                    </div>
+                    
+                    <Button variant="secondary" size="icon" 
+                      className="absolute top-2 right-2 h-8 w-8 bg-background/90 shadow-md"
+                      onClick={(e) => { e.stopPropagation(); setStreetViewHeading(0); setStreetViewPitch(0); setStreetViewFov(90); }}>
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={captureStreetView}
+                      disabled={isCapturingStreetView}
+                      className="flex-1"
+                      data-testid="button-capture-streetview"
+                    >
+                      {isCapturingStreetView ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Capturing...</>
+                      ) : (
+                        <><Camera className="h-4 w-4 mr-2" /> {capturedStreetViewImage ? "Recapture" : "Capture This View"}</>
+                      )}
+                    </Button>
+                    {capturedStreetViewImage && (
+                      <Button variant="outline" onClick={addStreetViewToAdditionalImages} data-testid="button-add-streetview">
+                        <Plus className="h-4 w-4 mr-2" /> Save & Add Another
                       </Button>
                     )}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        handleImageUpload(e);
-                        setImageSource("upload");
-                      }}
-                    />
                   </div>
                 </div>
               )}
 
-              {/* Step 3: Confirm */}
+              {/* Step 4: Additional Photos */}
+              {createStep === "photos" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-2">
+                      <ImagePlus className="h-4 w-4" />
+                      Additional Reference Photos ({additionalImages.length})
+                    </Label>
+                    <Button
+                      variant="outline"
+                      onClick={() => additionalImageInputRef.current?.click()}
+                      data-testid="button-add-photos"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Photos
+                    </Button>
+                    <input
+                      ref={additionalImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={handleAdditionalImageUpload}
+                    />
+                  </div>
+
+                  {additionalImages.length > 0 ? (
+                    <div className="grid grid-cols-4 gap-3">
+                      {additionalImages.map((img) => (
+                        <div key={img.id} className="relative group">
+                          <img src={img.imageBase64} alt={img.title} className="w-full h-24 object-cover rounded-lg border" />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                            <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => removeAdditionalImage(img.id)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-2 py-1 rounded-b-lg truncate">
+                            {img.type === "streetview" ? "Street View" : img.title}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-48 flex flex-col items-center justify-center bg-muted rounded-lg gap-3">
+                      <ImagePlus className="h-12 w-12 text-muted-foreground" />
+                      <p className="text-muted-foreground">No additional photos yet</p>
+                      <p className="text-xs text-muted-foreground">Upload photos to help crews identify specific areas</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 5: Confirm */}
               {createStep === "confirm" && (
-                <div className="space-y-4 py-4">
+                <div className="space-y-4">
                   <div className="bg-muted p-4 rounded-lg space-y-3">
-                    <div>
-                      <Label className="text-muted-foreground text-xs">Site Name</Label>
-                      <p className="font-medium">{newSiteName}</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Site Name</Label>
+                        <p className="font-medium">{newSiteName}</p>
+                      </div>
+                      {newSiteGroupId && (
+                        <div>
+                          <Label className="text-muted-foreground text-xs">Group</Label>
+                          <p className="text-sm">{groups.find(g => g.id === newSiteGroupId)?.name || "None"}</p>
+                        </div>
+                      )}
                     </div>
                     {newSiteAddress && (
                       <div>
@@ -1544,19 +1427,31 @@ export default function PlowSiteMapper() {
                         <p className="text-sm">{newSiteAddress}</p>
                       </div>
                     )}
-                    {newSiteGroupId && (
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    {uploadedImage && (
                       <div>
-                        <Label className="text-muted-foreground text-xs">Group</Label>
-                        <p className="text-sm">{groups.find(g => g.id === newSiteGroupId)?.name || "None"}</p>
+                        <Label className="text-muted-foreground text-xs">Main Image</Label>
+                        <img src={uploadedImage} alt="Property" className="w-full h-32 object-cover rounded-lg mt-1" />
+                      </div>
+                    )}
+                    {additionalImages.length > 0 && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Additional Images ({additionalImages.length})</Label>
+                        <div className="flex gap-1 mt-1 overflow-x-auto">
+                          {additionalImages.slice(0, 3).map((img) => (
+                            <img key={img.id} src={img.imageBase64} alt={img.title} className="h-32 w-20 object-cover rounded" />
+                          ))}
+                          {additionalImages.length > 3 && (
+                            <div className="h-32 w-20 bg-muted rounded flex items-center justify-center text-sm">
+                              +{additionalImages.length - 3}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
-                  {uploadedImage && (
-                    <div>
-                      <Label className="text-muted-foreground text-xs">Property Image</Label>
-                      <img src={uploadedImage} alt="Property" className="w-full h-40 object-cover rounded-lg mt-1" />
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -1567,40 +1462,55 @@ export default function PlowSiteMapper() {
                       Cancel
                     </Button>
                     {isManualEntry && (
-                      <Button 
-                        onClick={() => setCreateStep("confirm")} 
-                        disabled={!newSiteName}
-                        data-testid="button-next-step"
-                      >
+                      <Button onClick={() => setCreateStep("photos")} disabled={!newSiteName} data-testid="button-next-step">
                         Continue
                       </Button>
                     )}
                   </>
                 )}
-                {createStep === "image" && (
+                {createStep === "satellite" && (
                   <>
-                    <Button variant="outline" onClick={() => setCreateStep("info")}>
-                      Back
-                    </Button>
-                    <Button 
-                      onClick={() => setCreateStep("confirm")} 
-                      disabled={!uploadedImage}
+                    <Button variant="outline" onClick={() => setCreateStep("info")}>Back</Button>
+                    <Button
+                      onClick={async () => {
+                        if (!capturedMapImage) await captureMapView();
+                        setCreateStep(streetViewAvailable ? "streetview" : "photos");
+                      }}
+                      disabled={isCapturing}
                       data-testid="button-next-step"
                     >
-                      Continue
+                      {capturedMapImage ? "Next" : "Capture & Continue"}
                     </Button>
-                    {!uploadedImage && mapCoordinates && (
-                      <p className="text-xs text-muted-foreground w-full text-center">
-                        Please capture the view before continuing
-                      </p>
-                    )}
+                  </>
+                )}
+                {createStep === "streetview" && (
+                  <>
+                    <Button variant="outline" onClick={() => setCreateStep("satellite")}>Back</Button>
+                    <Button variant="ghost" onClick={() => setCreateStep("photos")}>Skip</Button>
+                    <Button
+                      onClick={async () => {
+                        if (capturedStreetViewImage) addStreetViewToAdditionalImages();
+                        setCreateStep("photos");
+                      }}
+                      data-testid="button-next-step"
+                    >
+                      {capturedStreetViewImage ? "Save & Continue" : "Continue"}
+                    </Button>
+                  </>
+                )}
+                {createStep === "photos" && (
+                  <>
+                    <Button variant="outline" onClick={() => setCreateStep(streetViewAvailable && mapCoordinates ? "streetview" : mapCoordinates ? "satellite" : "info")}>
+                      Back
+                    </Button>
+                    <Button onClick={() => setCreateStep("confirm")} data-testid="button-next-step">
+                      Review Site
+                    </Button>
                   </>
                 )}
                 {createStep === "confirm" && (
                   <>
-                    <Button variant="outline" onClick={() => setCreateStep(isManualEntry ? "info" : "image")}>
-                      Back
-                    </Button>
+                    <Button variant="outline" onClick={() => setCreateStep("photos")}>Back</Button>
                     <Button 
                       onClick={handleCreateSite} 
                       disabled={!newSiteName || createSite.isPending} 
