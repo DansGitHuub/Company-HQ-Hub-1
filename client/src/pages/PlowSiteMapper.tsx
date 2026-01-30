@@ -1378,26 +1378,6 @@ export default function PlowSiteMapper() {
                       <span>Pitch: {Math.round(streetViewPitch)}°</span>
                     </div>
                   </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={captureStreetView}
-                      disabled={isCapturingStreetView}
-                      className="flex-1"
-                      data-testid="button-capture-streetview"
-                    >
-                      {isCapturingStreetView ? (
-                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Capturing...</>
-                      ) : (
-                        <><Camera className="h-4 w-4 mr-2" /> {capturedStreetViewImage ? "Recapture" : "Capture This View"}</>
-                      )}
-                    </Button>
-                    {capturedStreetViewImage && (
-                      <Button variant="outline" onClick={addStreetViewToAdditionalImages} data-testid="button-add-streetview">
-                        <Plus className="h-4 w-4 mr-2" /> Save & Add Another
-                      </Button>
-                    )}
-                  </div>
                 </div>
               )}
 
@@ -1548,15 +1528,28 @@ export default function PlowSiteMapper() {
                 {createStep === "streetview" && (
                   <>
                     <Button variant="outline" onClick={() => setCreateStep("satellite")}>Back</Button>
-                    <Button variant="ghost" onClick={() => setCreateStep("photos")}>Skip</Button>
                     <Button
-                      onClick={async () => {
-                        if (capturedStreetViewImage) addStreetViewToAdditionalImages();
-                        setCreateStep("photos");
-                      }}
+                      variant="outline"
+                      onClick={captureStreetView}
+                      disabled={isCapturingStreetView}
+                      data-testid="button-capture-streetview"
+                    >
+                      <Camera className="h-4 w-4 mr-2" /> {isCapturingStreetView ? "Capturing..." : capturedStreetViewImage ? "Recapture" : "Capture"}
+                    </Button>
+                    {capturedStreetViewImage && (
+                      <Button 
+                        variant="outline" 
+                        onClick={addStreetViewToAdditionalImages}
+                        data-testid="button-add-streetview"
+                      >
+                        <Plus className="h-4 w-4 mr-2" /> Save & Add Another
+                      </Button>
+                    )}
+                    <Button
+                      onClick={() => setCreateStep("photos")}
                       data-testid="button-next-step"
                     >
-                      {capturedStreetViewImage ? "Save & Continue" : "Continue"}
+                      {capturedStreetViewImage ? "Next" : "Skip"}
                     </Button>
                   </>
                 )}
