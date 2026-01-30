@@ -948,7 +948,7 @@ export default function PlowSiteMapper() {
                 </DialogTitle>
                 <DialogDescription>
                   {createStep === "info" && "Enter site name and address"}
-                  {createStep === "satellite" && "Drag to pan, scroll to zoom, then capture"}
+                  {createStep === "satellite" && "Use arrows to pan, zoom buttons to adjust view"}
                   {createStep === "streetview" && "Use arrows to look around, buttons to zoom"}
                   {createStep === "photos" && "Add any additional reference photos"}
                   {createStep === "confirm" && "Review your site details"}
@@ -1119,22 +1119,9 @@ export default function PlowSiteMapper() {
               {/* Step 2: Satellite View */}
               {createStep === "satellite" && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      <MapPin className="h-4 w-4" />
-                      {newSiteAddress}
-                    </div>
-                    <Select value={aspectRatio} onValueChange={(v) => setAspectRatio(v as typeof aspectRatio)}>
-                      <SelectTrigger className="h-7 w-20 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="16:9">16:9</SelectItem>
-                        <SelectItem value="3:4">3:4</SelectItem>
-                        <SelectItem value="2:3">2:3</SelectItem>
-                        <SelectItem value="1:1">1:1</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="text-sm text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-4 w-4" />
+                    {newSiteAddress}
                   </div>
 
                   {isLoadingSatellite ? (
@@ -1145,8 +1132,7 @@ export default function PlowSiteMapper() {
                   ) : mapCoordinates ? (
                     <div 
                       ref={mapPreviewRef}
-                      className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} w-full ${getAspectRatioClass()}`}
-                      style={{ maxWidth: '100%' }}
+                      className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} h-80`}
                       onMouseDown={handleMapMouseDown}
                       onMouseMove={handleMapMouseMove}
                       onMouseUp={handleMapMouseUp}
@@ -1164,8 +1150,49 @@ export default function PlowSiteMapper() {
                         draggable={false}
                       />
                       
+                      {/* Arrow navigation controls */}
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
+                        onClick={(e) => { e.stopPropagation(); panMap("left"); }}
+                        data-testid="button-satellite-left"
+                      >
+                        <ChevronLeft className="h-6 w-6" />
+                      </Button>
+                      
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="absolute right-14 top-1/2 -translate-y-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
+                        onClick={(e) => { e.stopPropagation(); panMap("right"); }}
+                        data-testid="button-satellite-right"
+                      >
+                        <ChevronRight className="h-6 w-6" />
+                      </Button>
+                      
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="absolute top-2 left-1/2 -translate-x-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
+                        onClick={(e) => { e.stopPropagation(); panMap("up"); }}
+                        data-testid="button-satellite-up"
+                      >
+                        <ChevronUp className="h-6 w-6" />
+                      </Button>
+                      
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="absolute bottom-12 left-1/2 -translate-x-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
+                        onClick={(e) => { e.stopPropagation(); panMap("down"); }}
+                        data-testid="button-satellite-down"
+                      >
+                        <ChevronDown className="h-6 w-6" />
+                      </Button>
+                      
                       {/* Zoom controls */}
-                      <div className="absolute right-2 top-2 flex flex-col gap-1">
+                      <div className="absolute right-2 top-2 flex flex-col gap-1 z-10">
                         <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/90 shadow-md"
                           onClick={(e) => { e.stopPropagation(); setMapZoom(Math.min(21, mapZoom + 1)); }} disabled={mapZoom >= 21}>
                           <ZoomIn className="h-4 w-4" />
@@ -1181,12 +1208,12 @@ export default function PlowSiteMapper() {
                       </div>
 
                       {capturedMapImage && (
-                        <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                        <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1 z-10">
                           <Camera className="h-3 w-3" /> Captured
                         </div>
                       )}
                       
-                      <div className="absolute bottom-2 left-2 bg-background/90 text-foreground px-2 py-1 rounded text-xs">
+                      <div className="absolute bottom-2 left-2 bg-background/90 text-foreground px-2 py-1 rounded text-xs z-10">
                         Zoom: {mapZoom}
                       </div>
                     </div>
