@@ -431,12 +431,15 @@ export default function PlowSiteMapper() {
   // Street View navigation handlers
   const handleStreetViewMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsStreetViewDragging(true);
     setStreetViewDragStart({ x: e.clientX, y: e.clientY });
   };
 
   const handleStreetViewMouseMove = (e: React.MouseEvent) => {
     if (!isStreetViewDragging || !streetViewDragStart) return;
+    e.preventDefault();
+    e.stopPropagation();
     
     const deltaX = e.clientX - streetViewDragStart.x;
     const deltaY = e.clientY - streetViewDragStart.y;
@@ -452,13 +455,15 @@ export default function PlowSiteMapper() {
     setStreetViewDragStart({ x: e.clientX, y: e.clientY });
   };
 
-  const handleStreetViewMouseUp = () => {
+  const handleStreetViewMouseUp = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setIsStreetViewDragging(false);
     setStreetViewDragStart(null);
   };
 
   const handleStreetViewWheel = (e: React.WheelEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     // Scroll changes FOV (zoom) - lower FOV = more zoomed in
     const delta = e.deltaY > 0 ? 5 : -5;
     const newFov = Math.max(30, Math.min(120, streetViewFov + delta));
@@ -467,6 +472,7 @@ export default function PlowSiteMapper() {
 
   const handleStreetViewTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
+      e.stopPropagation();
       const touch = e.touches[0];
       setIsStreetViewDragging(true);
       setStreetViewDragStart({ x: touch.clientX, y: touch.clientY });
@@ -475,6 +481,8 @@ export default function PlowSiteMapper() {
 
   const handleStreetViewTouchMove = (e: React.TouchEvent) => {
     if (!isStreetViewDragging || !streetViewDragStart || e.touches.length !== 1) return;
+    e.preventDefault();
+    e.stopPropagation();
     
     const touch = e.touches[0];
     const deltaX = touch.clientX - streetViewDragStart.x;
@@ -489,7 +497,8 @@ export default function PlowSiteMapper() {
     setStreetViewDragStart({ x: touch.clientX, y: touch.clientY });
   };
 
-  const handleStreetViewTouchEnd = () => {
+  const handleStreetViewTouchEnd = (e: React.TouchEvent) => {
+    e.stopPropagation();
     setIsStreetViewDragging(false);
     setStreetViewDragStart(null);
   };
@@ -537,6 +546,8 @@ export default function PlowSiteMapper() {
 
   const handleMapMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || !dragStart) return;
+    e.preventDefault();
+    e.stopPropagation();
     
     // Use CSS transform for smooth visual feedback
     setDragDelta({
@@ -545,7 +556,8 @@ export default function PlowSiteMapper() {
     });
   };
 
-  const handleMapMouseUp = () => {
+  const handleMapMouseUp = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (isDragging && (dragDelta.x !== 0 || dragDelta.y !== 0)) {
       // Convert accumulated pixel movement to lat/lng offset
       const pixelToLatLng = 0.00002 * Math.pow(2, 19 - mapZoom);
@@ -561,6 +573,7 @@ export default function PlowSiteMapper() {
 
   const handleMapWheel = (e: React.WheelEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     if (e.deltaY < 0) {
       setMapZoom(prev => Math.min(21, prev + 1));
     } else {
@@ -570,6 +583,7 @@ export default function PlowSiteMapper() {
 
   const handleMapTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
+      e.stopPropagation();
       setIsDragging(true);
       setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
       setDragDelta({ x: 0, y: 0 });
@@ -578,6 +592,8 @@ export default function PlowSiteMapper() {
 
   const handleMapTouchMove = (e: React.TouchEvent) => {
     if (!isDragging || !dragStart || e.touches.length !== 1) return;
+    e.preventDefault();
+    e.stopPropagation();
     
     setDragDelta({
       x: e.touches[0].clientX - dragStart.x,
@@ -989,7 +1005,7 @@ export default function PlowSiteMapper() {
                 New Site
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {createStep === "info" && "Create New Plow Site"}
