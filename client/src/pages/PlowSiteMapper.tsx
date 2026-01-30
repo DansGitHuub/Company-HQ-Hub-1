@@ -428,12 +428,18 @@ export default function PlowSiteMapper() {
     setAdditionalImages(prev => prev.filter(img => img.id !== id));
   };
 
-  // Street View navigation handlers
+  // Street View navigation handlers - use refs to avoid stale closures and accumulate deltas
+  const streetViewAccumulatedDelta = useRef({ x: 0, y: 0 });
+  const streetViewLastUpdate = useRef<number>(0);
+  const streetViewThrottleMs = 120; // Update every 120ms during drag
+  
   const handleStreetViewMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsStreetViewDragging(true);
     setStreetViewDragStart({ x: e.clientX, y: e.clientY });
+    streetViewAccumulatedDelta.current = { x: 0, y: 0 };
+    streetViewLastUpdate.current = Date.now();
   };
 
   const handleStreetViewMouseMove = (e: React.MouseEvent) => {
@@ -441,24 +447,42 @@ export default function PlowSiteMapper() {
     e.preventDefault();
     e.stopPropagation();
     
+    // Accumulate delta from last position
     const deltaX = e.clientX - streetViewDragStart.x;
     const deltaY = e.clientY - streetViewDragStart.y;
+    streetViewAccumulatedDelta.current.x += deltaX;
+    streetViewAccumulatedDelta.current.y += deltaY;
     
-    // Horizontal drag changes heading (0.5 degrees per pixel)
-    const newHeading = (streetViewHeading - deltaX * 0.5 + 360) % 360;
-    setStreetViewHeading(newHeading);
-    
-    // Vertical drag changes pitch (-90 to 90 degrees, 0.3 degrees per pixel)
-    const newPitch = Math.max(-90, Math.min(90, streetViewPitch + deltaY * 0.3));
-    setStreetViewPitch(newPitch);
-    
+    // Update drag start for next move
     setStreetViewDragStart({ x: e.clientX, y: e.clientY });
+    
+    const now = Date.now();
+    // Apply accumulated delta when throttle interval passes
+    if (now - streetViewLastUpdate.current >= streetViewThrottleMs) {
+      const accX = streetViewAccumulatedDelta.current.x;
+      const accY = streetViewAccumulatedDelta.current.y;
+      
+      // Use functional updates to avoid stale closure
+      setStreetViewHeading(prev => (prev - accX * 0.3 + 360) % 360);
+      setStreetViewPitch(prev => Math.max(-90, Math.min(90, prev + accY * 0.2)));
+      
+      streetViewAccumulatedDelta.current = { x: 0, y: 0 };
+      streetViewLastUpdate.current = now;
+    }
   };
 
   const handleStreetViewMouseUp = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Apply any remaining accumulated delta on mouse up
+    if (streetViewAccumulatedDelta.current.x !== 0 || streetViewAccumulatedDelta.current.y !== 0) {
+      const accX = streetViewAccumulatedDelta.current.x;
+      const accY = streetViewAccumulatedDelta.current.y;
+      setStreetViewHeading(prev => (prev - accX * 0.3 + 360) % 360);
+      setStreetViewPitch(prev => Math.max(-90, Math.min(90, prev + accY * 0.2)));
+    }
     setIsStreetViewDragging(false);
     setStreetViewDragStart(null);
+    streetViewAccumulatedDelta.current = { x: 0, y: 0 };
   };
 
   const handleStreetViewWheel = (e: React.WheelEvent) => {
@@ -476,6 +500,8 @@ export default function PlowSiteMapper() {
       const touch = e.touches[0];
       setIsStreetViewDragging(true);
       setStreetViewDragStart({ x: touch.clientX, y: touch.clientY });
+      streetViewAccumulatedDelta.current = { x: 0, y: 0 };
+      streetViewLastUpdate.current = Date.now();
     }
   };
 
@@ -487,20 +513,36 @@ export default function PlowSiteMapper() {
     const touch = e.touches[0];
     const deltaX = touch.clientX - streetViewDragStart.x;
     const deltaY = touch.clientY - streetViewDragStart.y;
-    
-    const newHeading = (streetViewHeading - deltaX * 0.5 + 360) % 360;
-    setStreetViewHeading(newHeading);
-    
-    const newPitch = Math.max(-90, Math.min(90, streetViewPitch + deltaY * 0.3));
-    setStreetViewPitch(newPitch);
+    streetViewAccumulatedDelta.current.x += deltaX;
+    streetViewAccumulatedDelta.current.y += deltaY;
     
     setStreetViewDragStart({ x: touch.clientX, y: touch.clientY });
+    
+    const now = Date.now();
+    if (now - streetViewLastUpdate.current >= streetViewThrottleMs) {
+      const accX = streetViewAccumulatedDelta.current.x;
+      const accY = streetViewAccumulatedDelta.current.y;
+      
+      setStreetViewHeading(prev => (prev - accX * 0.3 + 360) % 360);
+      setStreetViewPitch(prev => Math.max(-90, Math.min(90, prev + accY * 0.2)));
+      
+      streetViewAccumulatedDelta.current = { x: 0, y: 0 };
+      streetViewLastUpdate.current = now;
+    }
   };
 
   const handleStreetViewTouchEnd = (e: React.TouchEvent) => {
     e.stopPropagation();
+    // Apply any remaining accumulated delta
+    if (streetViewAccumulatedDelta.current.x !== 0 || streetViewAccumulatedDelta.current.y !== 0) {
+      const accX = streetViewAccumulatedDelta.current.x;
+      const accY = streetViewAccumulatedDelta.current.y;
+      setStreetViewHeading(prev => (prev - accX * 0.3 + 360) % 360);
+      setStreetViewPitch(prev => Math.max(-90, Math.min(90, prev + accY * 0.2)));
+    }
     setIsStreetViewDragging(false);
     setStreetViewDragStart(null);
+    streetViewAccumulatedDelta.current = { x: 0, y: 0 };
   };
 
   const getImageDimensions = () => {
