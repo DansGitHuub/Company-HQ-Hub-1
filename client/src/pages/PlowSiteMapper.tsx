@@ -428,18 +428,15 @@ export default function PlowSiteMapper() {
     setAdditionalImages(prev => prev.filter(img => img.id !== id));
   };
 
-  // Street View navigation handlers - use refs to avoid stale closures and accumulate deltas
-  const streetViewAccumulatedDelta = useRef({ x: 0, y: 0 });
-  const streetViewLastUpdate = useRef<number>(0);
-  const streetViewThrottleMs = 120; // Update every 120ms during drag
+  // Street View navigation handlers - immediate visual feedback + update on release
+  const [streetViewDragOffset, setStreetViewDragOffset] = useState({ x: 0, y: 0 });
   
   const handleStreetViewMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsStreetViewDragging(true);
     setStreetViewDragStart({ x: e.clientX, y: e.clientY });
-    streetViewAccumulatedDelta.current = { x: 0, y: 0 };
-    streetViewLastUpdate.current = Date.now();
+    setStreetViewDragOffset({ x: 0, y: 0 });
   };
 
   const handleStreetViewMouseMove = (e: React.MouseEvent) => {
@@ -447,42 +444,23 @@ export default function PlowSiteMapper() {
     e.preventDefault();
     e.stopPropagation();
     
-    // Accumulate delta from last position
-    const deltaX = e.clientX - streetViewDragStart.x;
-    const deltaY = e.clientY - streetViewDragStart.y;
-    streetViewAccumulatedDelta.current.x += deltaX;
-    streetViewAccumulatedDelta.current.y += deltaY;
-    
-    // Update drag start for next move
-    setStreetViewDragStart({ x: e.clientX, y: e.clientY });
-    
-    const now = Date.now();
-    // Apply accumulated delta when throttle interval passes
-    if (now - streetViewLastUpdate.current >= streetViewThrottleMs) {
-      const accX = streetViewAccumulatedDelta.current.x;
-      const accY = streetViewAccumulatedDelta.current.y;
-      
-      // Use functional updates to avoid stale closure
-      setStreetViewHeading(prev => (prev - accX * 0.3 + 360) % 360);
-      setStreetViewPitch(prev => Math.max(-90, Math.min(90, prev + accY * 0.2)));
-      
-      streetViewAccumulatedDelta.current = { x: 0, y: 0 };
-      streetViewLastUpdate.current = now;
-    }
+    // Update visual offset for immediate CSS transform feedback
+    setStreetViewDragOffset({
+      x: e.clientX - streetViewDragStart.x,
+      y: e.clientY - streetViewDragStart.y
+    });
   };
 
   const handleStreetViewMouseUp = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // Apply any remaining accumulated delta on mouse up
-    if (streetViewAccumulatedDelta.current.x !== 0 || streetViewAccumulatedDelta.current.y !== 0) {
-      const accX = streetViewAccumulatedDelta.current.x;
-      const accY = streetViewAccumulatedDelta.current.y;
-      setStreetViewHeading(prev => (prev - accX * 0.3 + 360) % 360);
-      setStreetViewPitch(prev => Math.max(-90, Math.min(90, prev + accY * 0.2)));
+    // Apply the accumulated drag as heading/pitch change
+    if (streetViewDragOffset.x !== 0 || streetViewDragOffset.y !== 0) {
+      setStreetViewHeading(prev => (prev - streetViewDragOffset.x * 0.3 + 360) % 360);
+      setStreetViewPitch(prev => Math.max(-90, Math.min(90, prev + streetViewDragOffset.y * 0.2)));
     }
     setIsStreetViewDragging(false);
     setStreetViewDragStart(null);
-    streetViewAccumulatedDelta.current = { x: 0, y: 0 };
+    setStreetViewDragOffset({ x: 0, y: 0 });
   };
 
   const handleStreetViewWheel = (e: React.WheelEvent) => {
@@ -500,8 +478,7 @@ export default function PlowSiteMapper() {
       const touch = e.touches[0];
       setIsStreetViewDragging(true);
       setStreetViewDragStart({ x: touch.clientX, y: touch.clientY });
-      streetViewAccumulatedDelta.current = { x: 0, y: 0 };
-      streetViewLastUpdate.current = Date.now();
+      setStreetViewDragOffset({ x: 0, y: 0 });
     }
   };
 
@@ -511,38 +488,21 @@ export default function PlowSiteMapper() {
     e.stopPropagation();
     
     const touch = e.touches[0];
-    const deltaX = touch.clientX - streetViewDragStart.x;
-    const deltaY = touch.clientY - streetViewDragStart.y;
-    streetViewAccumulatedDelta.current.x += deltaX;
-    streetViewAccumulatedDelta.current.y += deltaY;
-    
-    setStreetViewDragStart({ x: touch.clientX, y: touch.clientY });
-    
-    const now = Date.now();
-    if (now - streetViewLastUpdate.current >= streetViewThrottleMs) {
-      const accX = streetViewAccumulatedDelta.current.x;
-      const accY = streetViewAccumulatedDelta.current.y;
-      
-      setStreetViewHeading(prev => (prev - accX * 0.3 + 360) % 360);
-      setStreetViewPitch(prev => Math.max(-90, Math.min(90, prev + accY * 0.2)));
-      
-      streetViewAccumulatedDelta.current = { x: 0, y: 0 };
-      streetViewLastUpdate.current = now;
-    }
+    setStreetViewDragOffset({
+      x: touch.clientX - streetViewDragStart.x,
+      y: touch.clientY - streetViewDragStart.y
+    });
   };
 
   const handleStreetViewTouchEnd = (e: React.TouchEvent) => {
     e.stopPropagation();
-    // Apply any remaining accumulated delta
-    if (streetViewAccumulatedDelta.current.x !== 0 || streetViewAccumulatedDelta.current.y !== 0) {
-      const accX = streetViewAccumulatedDelta.current.x;
-      const accY = streetViewAccumulatedDelta.current.y;
-      setStreetViewHeading(prev => (prev - accX * 0.3 + 360) % 360);
-      setStreetViewPitch(prev => Math.max(-90, Math.min(90, prev + accY * 0.2)));
+    if (streetViewDragOffset.x !== 0 || streetViewDragOffset.y !== 0) {
+      setStreetViewHeading(prev => (prev - streetViewDragOffset.x * 0.3 + 360) % 360);
+      setStreetViewPitch(prev => Math.max(-90, Math.min(90, prev + streetViewDragOffset.y * 0.2)));
     }
     setIsStreetViewDragging(false);
     setStreetViewDragStart(null);
-    streetViewAccumulatedDelta.current = { x: 0, y: 0 };
+    setStreetViewDragOffset({ x: 0, y: 0 });
   };
 
   const getImageDimensions = () => {
@@ -1262,7 +1222,7 @@ export default function PlowSiteMapper() {
                   ) : mapCoordinates ? (
                     <div 
                       ref={mapPreviewRef}
-                      className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} h-80`}
+                      className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${getAspectRatioClass()} max-h-[400px]`}
                       onMouseDown={handleMapMouseDown}
                       onMouseMove={handleMapMouseMove}
                       onMouseUp={handleMapMouseUp}
@@ -1351,11 +1311,21 @@ export default function PlowSiteMapper() {
                     <img 
                       src={`https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${mapCoordinates.lat},${mapCoordinates.lng}&heading=${Math.round(streetViewHeading)}&pitch=${Math.round(streetViewPitch)}&fov=${Math.round(streetViewFov)}&key=${mapsApiKey}`}
                       alt="Street View"
-                      className="w-full h-full object-cover pointer-events-none"
+                      className="w-full h-full object-cover pointer-events-none transition-none"
+                      style={{ transform: isStreetViewDragging ? `translate(${streetViewDragOffset.x}px, ${streetViewDragOffset.y}px)` : 'none' }}
                       draggable={false}
                     />
                     
-                    {capturedStreetViewImage && (
+                    {/* Drag indicator overlay */}
+                    {isStreetViewDragging && (streetViewDragOffset.x !== 0 || streetViewDragOffset.y !== 0) && (
+                      <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                        <div className="bg-black/50 text-white px-3 py-1.5 rounded-full text-sm backdrop-blur-sm">
+                          Release to look {streetViewDragOffset.x < -20 ? 'right' : streetViewDragOffset.x > 20 ? 'left' : streetViewDragOffset.y < -20 ? 'down' : streetViewDragOffset.y > 20 ? 'up' : 'around'}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {capturedStreetViewImage && !isStreetViewDragging && (
                       <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
                         <Camera className="h-3 w-3" /> Captured
                       </div>
