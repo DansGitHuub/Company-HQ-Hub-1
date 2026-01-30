@@ -1408,26 +1408,26 @@ export default function PlowSiteMapper() {
                   </div>
 
                   {additionalImages.length > 0 ? (
-                    <div className="grid grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
                       {additionalImages.map((img) => (
                         <div key={img.id} className="relative group">
-                          <img src={img.imageBase64} alt={img.title} className="w-full h-24 object-cover rounded-lg border" />
+                          <img src={img.imageBase64} alt={img.title} className="w-full h-48 object-cover rounded-lg border" />
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
-                            <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => removeAdditionalImage(img.id)}>
-                              <X className="h-4 w-4" />
+                            <Button variant="destructive" size="sm" className="h-10 px-4" onClick={() => removeAdditionalImage(img.id)}>
+                              <X className="h-4 w-4 mr-2" /> Remove
                             </Button>
                           </div>
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-2 py-1 rounded-b-lg truncate">
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-sm px-3 py-2 rounded-b-lg truncate">
                             {img.type === "streetview" ? "Street View" : img.title}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="h-48 flex flex-col items-center justify-center bg-muted rounded-lg gap-3">
-                      <ImagePlus className="h-12 w-12 text-muted-foreground" />
-                      <p className="text-muted-foreground">No additional photos yet</p>
-                      <p className="text-xs text-muted-foreground">Upload photos to help crews identify specific areas</p>
+                    <div className="h-64 flex flex-col items-center justify-center bg-muted rounded-lg gap-3">
+                      <ImagePlus className="h-16 w-16 text-muted-foreground" />
+                      <p className="text-muted-foreground text-lg">No additional photos yet</p>
+                      <p className="text-sm text-muted-foreground">Upload photos or go back to capture more views</p>
                     </div>
                   )}
                 </div>
