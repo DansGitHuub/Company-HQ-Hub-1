@@ -450,7 +450,7 @@ export default function PlowSiteMapper() {
   };
 
   const panMap = (direction: "up" | "down" | "left" | "right") => {
-    const panAmount = 0.0005 * Math.pow(2, 19 - mapZoom);
+    const panAmount = 0.000125 * Math.pow(2, 19 - mapZoom);
     setMapOffset(prev => {
       switch (direction) {
         case "up": return { ...prev, lat: prev.lat + panAmount };
@@ -937,7 +937,7 @@ export default function PlowSiteMapper() {
                 New Site
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl">
+            <DialogContent className="max-w-5xl h-[90vh]">
               <DialogHeader>
                 <DialogTitle>
                   {createStep === "info" && "Step 1: Site Details"}
@@ -1125,14 +1125,14 @@ export default function PlowSiteMapper() {
                   </div>
 
                   {isLoadingSatellite ? (
-                    <div className="h-80 flex items-center justify-center bg-muted rounded-lg">
+                    <div className="h-[450px] flex items-center justify-center bg-muted rounded-lg">
                       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                       <span className="ml-2 text-muted-foreground">Loading map...</span>
                     </div>
                   ) : mapCoordinates ? (
                     <div 
                       ref={mapPreviewRef}
-                      className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} h-80`}
+                      className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} h-[450px]`}
                       onMouseDown={handleMapMouseDown}
                       onMouseMove={handleMapMouseMove}
                       onMouseUp={handleMapMouseUp}
@@ -1218,7 +1218,7 @@ export default function PlowSiteMapper() {
                       </div>
                     </div>
                   ) : (
-                    <div className="h-80 flex flex-col items-center justify-center bg-muted rounded-lg gap-3">
+                    <div className="h-[450px] flex flex-col items-center justify-center bg-muted rounded-lg gap-3">
                       <span className="text-muted-foreground">Map not available</span>
                       <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
                         <Upload className="h-4 w-4 mr-2" /> Upload Image Instead
@@ -1247,7 +1247,7 @@ export default function PlowSiteMapper() {
                     Street-level view of {newSiteAddress}
                   </div>
 
-                  <div ref={streetViewRef} className="relative rounded-lg overflow-hidden border-2 border-muted h-80">
+                  <div ref={streetViewRef} className="relative rounded-lg overflow-hidden border-2 border-muted h-[450px]">
                     <img 
                       src={`https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${mapCoordinates.lat},${mapCoordinates.lng}&heading=${Math.round(streetViewHeading)}&pitch=${Math.round(streetViewPitch)}&fov=${Math.round(streetViewFov)}&key=${mapsApiKey}`}
                       alt="Street View"
