@@ -1145,7 +1145,8 @@ export default function PlowSiteMapper() {
                   ) : mapCoordinates ? (
                     <div 
                       ref={mapPreviewRef}
-                      className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${getAspectRatioClass()} max-h-[400px]`}
+                      className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} w-full ${getAspectRatioClass()}`}
+                      style={{ maxWidth: '100%' }}
                       onMouseDown={handleMapMouseDown}
                       onMouseMove={handleMapMouseMove}
                       onMouseUp={handleMapMouseUp}
@@ -1228,47 +1229,45 @@ export default function PlowSiteMapper() {
                     />
                     
                     {/* Arrow navigation controls */}
-                    <div className="absolute inset-0 pointer-events-none">
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-background/80 hover:bg-background shadow-lg pointer-events-auto"
-                        onClick={() => setStreetViewHeading(prev => (prev - 30 + 360) % 360)}
-                        data-testid="button-streetview-left"
-                      >
-                        <ChevronLeft className="h-6 w-6" />
-                      </Button>
-                      
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-background/80 hover:bg-background shadow-lg pointer-events-auto"
-                        onClick={() => setStreetViewHeading(prev => (prev + 30) % 360)}
-                        data-testid="button-streetview-right"
-                      >
-                        <ChevronRight className="h-6 w-6" />
-                      </Button>
-                      
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="absolute top-2 left-1/2 -translate-x-1/2 h-10 w-10 bg-background/80 hover:bg-background shadow-lg pointer-events-auto"
-                        onClick={() => setStreetViewPitch(prev => Math.min(90, prev + 15))}
-                        data-testid="button-streetview-up"
-                      >
-                        <ChevronUp className="h-6 w-6" />
-                      </Button>
-                      
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="absolute bottom-12 left-1/2 -translate-x-1/2 h-10 w-10 bg-background/80 hover:bg-background shadow-lg pointer-events-auto"
-                        onClick={() => setStreetViewPitch(prev => Math.max(-90, prev - 15))}
-                        data-testid="button-streetview-down"
-                      >
-                        <ChevronDown className="h-6 w-6" />
-                      </Button>
-                    </div>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
+                      onClick={() => setStreetViewHeading(prev => (prev - 30 + 360) % 360)}
+                      data-testid="button-streetview-left"
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </Button>
+                    
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute right-14 top-1/2 -translate-y-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
+                      onClick={() => setStreetViewHeading(prev => (prev + 30) % 360)}
+                      data-testid="button-streetview-right"
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </Button>
+                    
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute top-2 left-1/2 -translate-x-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
+                      onClick={() => setStreetViewPitch(prev => Math.min(90, prev + 15))}
+                      data-testid="button-streetview-up"
+                    >
+                      <ChevronUp className="h-6 w-6" />
+                    </Button>
+                    
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute bottom-12 left-1/2 -translate-x-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
+                      onClick={() => setStreetViewPitch(prev => Math.max(-90, prev - 15))}
+                      data-testid="button-streetview-down"
+                    >
+                      <ChevronDown className="h-6 w-6" />
+                    </Button>
                     
                     {/* Zoom controls */}
                     <div className="absolute right-2 top-2 flex flex-col gap-1">
