@@ -422,6 +422,17 @@ export default function PlowSiteMapper() {
     toast({ title: "Added", description: "Street View image added to site images" });
   };
 
+  const addSatelliteToAdditionalImages = () => {
+    if (!capturedMapImage) return;
+    const id = `sat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    setAdditionalImages(prev => [
+      ...prev,
+      { id, title: `Overhead View (Zoom ${mapZoom})`, imageBase64: capturedMapImage, type: "upload" }
+    ]);
+    setCapturedMapImage(null);
+    toast({ title: "Added", description: "Overhead image added to site images" });
+  };
+
   const removeAdditionalImage = (id: string) => {
     setAdditionalImages(prev => prev.filter(img => img.id !== id));
   };
@@ -1467,6 +1478,15 @@ export default function PlowSiteMapper() {
                 {createStep === "satellite" && (
                   <>
                     <Button variant="outline" onClick={() => setCreateStep("info")}>Back</Button>
+                    {capturedMapImage && (
+                      <Button 
+                        variant="outline" 
+                        onClick={addSatelliteToAdditionalImages}
+                        data-testid="button-add-satellite"
+                      >
+                        <Plus className="h-4 w-4 mr-2" /> Save & Add Another
+                      </Button>
+                    )}
                     <Button
                       onClick={async () => {
                         if (!capturedMapImage) await captureMapView();
