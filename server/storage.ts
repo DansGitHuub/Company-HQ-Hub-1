@@ -17,6 +17,8 @@ import {
   integrations,
   featureRequests, type FeatureRequest, type InsertFeatureRequest,
   customerMessages, type CustomerMessage, type InsertCustomerMessage,
+  messagingThreads, type MessagingThread, type InsertMessagingThread,
+  threadMessages, type ThreadMessage, type InsertThreadMessage,
   workRequests, type WorkRequest, type InsertWorkRequest,
   accessRequests, type AccessRequest, type InsertAccessRequest,
   customForms, type CustomForm, type InsertCustomForm,
@@ -42,7 +44,7 @@ import {
   aiAgentSuggestions, type AiAgentSuggestion, type InsertAiAgentSuggestion
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, ilike, or, and } from "drizzle-orm";
+import { eq, ilike, or, and, desc, isNull } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -295,6 +297,17 @@ export interface IStorage {
   createAiAgentSuggestion(suggestion: InsertAiAgentSuggestion): Promise<AiAgentSuggestion>;
   updateAiAgentSuggestion(id: string, updates: Partial<AiAgentSuggestion>): Promise<AiAgentSuggestion | undefined>;
   deleteAiAgentSuggestion(id: string): Promise<boolean>;
+  
+  // Messaging Threads
+  getMessagingThreads(filters?: { customerId?: string; assignedEmployeeId?: string; status?: string }): Promise<MessagingThread[]>;
+  getMessagingThread(id: string): Promise<MessagingThread | undefined>;
+  createMessagingThread(thread: InsertMessagingThread & { initialMessage?: string }): Promise<MessagingThread>;
+  updateMessagingThread(id: string, updates: Partial<MessagingThread>): Promise<MessagingThread | undefined>;
+  
+  // Thread Messages
+  getThreadMessages(threadId: string, includeInternalNotes?: boolean): Promise<ThreadMessage[]>;
+  createThreadMessage(message: InsertThreadMessage): Promise<ThreadMessage>;
+  markMessagesAsRead(threadId: string, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1275,6 +1288,106 @@ export class DatabaseStorage implements IStorage {
   async deleteAiAgentSuggestion(id: string): Promise<boolean> {
     await db.delete(aiAgentSuggestions).where(eq(aiAgentSuggestions.id, id));
     return true;
+  }
+  
+  // Messaging Threads
+  async getMessagingThreads(filters?: { customerId?: string; assignedEmployeeId?: string; status?: string }): Promise<MessagingThread[]> {
+    let query = db.select().from(messagingThreads);
+    
+    if (filters) {
+      const conditions = [];
+      if (filters.customerId) {
+        conditions.push(eq(messagingThreads.customerId, filters.customerId));
+      }
+      if (filters.assignedEmployeeId) {
+        conditions.push(eq(messagingThreads.assignedEmployeeId, filters.assignedEmployeeId));
+      }
+      if (filters.status) {
+        conditions.push(eq(messagingThreads.status, filters.status));
+      }
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+    }
+    
+    return query.orderBy(messagingThreads.lastMessageAt);
+  }
+  
+  async getMessagingThread(id: string): Promise<MessagingThread | undefined> {
+    const [thread] = await db.select().from(messagingThreads).where(eq(messagingThreads.id, id));
+    return thread || undefined;
+  }
+  
+  async createMessagingThread(data: InsertMessagingThread & { initialMessage?: string }): Promise<MessagingThread> {
+    const { initialMessage, ...threadData } = data;
+    const [thread] = await db.insert(messagingThreads).values(threadData).returning();
+    
+    // If there's an initial message, create it
+    if (initialMessage && thread) {
+      await db.insert(threadMessages).values({
+        threadId: thread.id,
+        senderId: threadData.customerId,
+        senderRole: "customer",
+        content: initialMessage,
+      });
+    }
+    
+    return thread;
+  }
+  
+  async updateMessagingThread(id: string, updates: Partial<MessagingThread>): Promise<MessagingThread | undefined> {
+    const [updated] = await db.update(messagingThreads).set(updates).where(eq(messagingThreads.id, id)).returning();
+    return updated || undefined;
+  }
+  
+  // Thread Messages
+  async getThreadMessages(threadId: string, includeInternalNotes = true): Promise<ThreadMessage[]> {
+    let query = db.select().from(threadMessages).where(eq(threadMessages.threadId, threadId));
+    
+    if (!includeInternalNotes) {
+      query = query.where(and(
+        eq(threadMessages.threadId, threadId),
+        eq(threadMessages.isInternalNote, false)
+      )) as any;
+    }
+    
+    return query.orderBy(threadMessages.createdAt);
+  }
+  
+  async createThreadMessage(message: InsertThreadMessage): Promise<ThreadMessage> {
+    const [created] = await db.insert(threadMessages).values(message).returning();
+    
+    // Update thread's last message info
+    await db.update(messagingThreads).set({
+      lastMessageAt: new Date(),
+      lastMessageBy: message.senderId,
+      unreadByCustomer: message.senderRole === "employee" && !message.isInternalNote,
+      unreadByEmployee: message.senderRole === "customer",
+    }).where(eq(messagingThreads.id, message.threadId));
+    
+    return created;
+  }
+  
+  async markMessagesAsRead(threadId: string, userId: string): Promise<void> {
+    // Get the thread to determine if user is customer or employee
+    const thread = await this.getMessagingThread(threadId);
+    if (!thread) return;
+    
+    // Mark all messages in thread as read
+    await db.update(threadMessages).set({ readAt: new Date() })
+      .where(and(
+        eq(threadMessages.threadId, threadId),
+        eq(threadMessages.readAt, null as any)
+      ));
+    
+    // Update thread unread status based on who is reading
+    if (thread.customerId === userId) {
+      await db.update(messagingThreads).set({ unreadByCustomer: false })
+        .where(eq(messagingThreads.id, threadId));
+    } else {
+      await db.update(messagingThreads).set({ unreadByEmployee: false })
+        .where(eq(messagingThreads.id, threadId));
+    }
   }
 }
 
