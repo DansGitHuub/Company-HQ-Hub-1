@@ -269,6 +269,14 @@ export async function registerRoutes(
     }
     next();
   };
+  
+  // Role-based access control middleware
+  const requireRole = (roles: string[]) => (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ message: `Access denied. Required role: ${roles.join(" or ")}` });
+    }
+    next();
+  };
 
   app.get("/api/ai-agents", requireAuth, requireMasterAdmin, async (req, res) => {
     try {
@@ -3450,6 +3458,207 @@ Generate detailed information for this landscaping material.`;
       res.status(500).json({ message: "Error deleting site image" });
     }
   });
+
+  // ================== BUSINESS PROCESSES ==================
+  
+  app.get("/api/business-processes", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const processes = await storage.getBusinessProcesses();
+      res.json(processes);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching processes" });
+    }
+  });
+  
+  app.get("/api/business-processes/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const process = await storage.getBusinessProcess(req.params.id);
+      if (!process) return res.status(404).json({ message: "Process not found" });
+      res.json(process);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching process" });
+    }
+  });
+  
+  app.post("/api/business-processes", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const process = await storage.createBusinessProcess(req.body);
+      res.status(201).json(process);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating process" });
+    }
+  });
+  
+  app.patch("/api/business-processes/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const process = await storage.updateBusinessProcess(req.params.id, req.body);
+      if (!process) return res.status(404).json({ message: "Process not found" });
+      res.json(process);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating process" });
+    }
+  });
+  
+  app.delete("/api/business-processes/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      await storage.deleteBusinessProcess(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting process" });
+    }
+  });
+  
+  // ================== PROCESS AUDIT RESULTS ==================
+  
+  app.get("/api/process-audits", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const { processId } = req.query;
+      const results = await storage.getProcessAuditResults(processId as string | undefined);
+      res.json(results);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching audit results" });
+    }
+  });
+  
+  app.get("/api/process-audits/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const result = await storage.getProcessAuditResult(req.params.id);
+      if (!result) return res.status(404).json({ message: "Audit result not found" });
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching audit result" });
+    }
+  });
+  
+  app.post("/api/process-audits/run", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const { processId } = req.body;
+      if (!processId) {
+        return res.status(400).json({ message: "Process ID is required" });
+      }
+      
+      const process = await storage.getBusinessProcess(processId);
+      if (!process) {
+        return res.status(404).json({ message: "Process not found" });
+      }
+      
+      // Create a pending audit result
+      const auditResult = await storage.createProcessAuditResult({
+        processId,
+        status: "running",
+      });
+      
+      // Start the audit in background (non-blocking)
+      runProcessAudit(processId, auditResult.id);
+      
+      res.status(202).json({ 
+        message: "Audit started",
+        auditId: auditResult.id,
+        estimatedTime: "30-60 seconds",
+        estimatedCost: "$0.02-0.05"
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Error starting audit" });
+    }
+  });
+  
+  // Background function to run the actual audit
+  async function runProcessAudit(processId: string, auditId: string) {
+    const startTime = Date.now();
+    try {
+      const process = await storage.getBusinessProcess(processId);
+      if (!process) return;
+      
+      // Analyze the process using AI
+      const systemPrompt = `You are a business process auditor for a landscape management company. Analyze the given process and provide detailed scores and recommendations.
+
+You will evaluate the process on these criteria (each 0-100):
+1. Efficiency - Are there unnecessary steps? Can steps be combined?
+2. Reliability - Are there failure points? What happens if someone misses a step?
+3. Customer Experience - Is the customer kept informed? Is it easy for them to understand?
+4. Communication - Are the right people notified at the right times?
+
+Respond with a JSON object containing:
+{
+  "overallScore": <number 0-100>,
+  "efficiencyScore": <number 0-100>,
+  "reliabilityScore": <number 0-100>,
+  "customerExperienceScore": <number 0-100>,
+  "communicationScore": <number 0-100>,
+  "findings": [
+    {"type": "issue|opportunity|strength", "title": "string", "description": "string", "severity": "low|medium|high"}
+  ],
+  "recommendations": [
+    {"title": "string", "description": "string", "priority": "low|medium|high", "estimatedEffort": "string", "expectedImpact": "string"}
+  ],
+  "estimatedImprovementTime": "string"
+}`;
+
+      const userPrompt = `Analyze this business process:
+
+Name: ${process.name}
+Description: ${process.description || "No description provided"}
+Category: ${process.category}
+Roles Involved: ${process.rolesInvolved?.join(", ") || "Not specified"}
+Estimated Duration: ${process.estimatedDuration || "Not specified"}
+
+Process Steps:
+${JSON.stringify(process.stepsJson, null, 2)}
+
+Notifications:
+${JSON.stringify(process.notificationsJson, null, 2)}
+
+Provide a comprehensive audit with specific, actionable recommendations for this landscaping business.`;
+
+      const response = await fetch("https://modelfarm.replit.app/v1beta2/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.AI_INTEGRATIONS_OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          response_format: { type: "json_object" }
+        })
+      });
+
+      const data = await response.json();
+      const auditData = JSON.parse(data.choices[0].message.content);
+      const tokensUsed = (data.usage?.total_tokens || 0);
+      const cost = (tokensUsed / 1000) * 0.00015; // Approximate cost
+      
+      await storage.updateProcessAuditResult(auditId, {
+        status: "completed",
+        overallScore: auditData.overallScore,
+        efficiencyScore: auditData.efficiencyScore,
+        reliabilityScore: auditData.reliabilityScore,
+        customerExperienceScore: auditData.customerExperienceScore,
+        communicationScore: auditData.communicationScore,
+        findingsJson: auditData.findings,
+        recommendationsJson: auditData.recommendations,
+        estimatedImprovementTime: auditData.estimatedImprovementTime,
+        estimatedCost: cost.toFixed(4),
+        tokensUsed,
+        runDurationMs: Date.now() - startTime,
+        completedAt: new Date()
+      });
+      
+      // Update the process's lastAuditedAt
+      await storage.updateBusinessProcess(processId, { lastAuditedAt: new Date() });
+      
+    } catch (err) {
+      console.error("Process audit failed:", err);
+      await storage.updateProcessAuditResult(auditId, {
+        status: "failed",
+        runDurationMs: Date.now() - startTime,
+        completedAt: new Date()
+      });
+    }
+  }
 
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
