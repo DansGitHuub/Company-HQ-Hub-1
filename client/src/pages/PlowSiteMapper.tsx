@@ -1383,53 +1383,86 @@ export default function PlowSiteMapper() {
 
               {/* Step 4: Additional Photos */}
               {createStep === "photos" && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label className="flex items-center gap-2">
-                      <ImagePlus className="h-4 w-4" />
-                      Additional Reference Photos ({additionalImages.length})
-                    </Label>
-                    <Button
-                      variant="outline"
-                      onClick={() => additionalImageInputRef.current?.click()}
-                      data-testid="button-add-photos"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Photos
-                    </Button>
-                    <input
-                      ref={additionalImageInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={handleAdditionalImageUpload}
-                    />
+                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                  <Label className="flex items-center gap-2 text-base font-medium">
+                    <ImagePlus className="h-5 w-5" />
+                    All Captured Photos
+                  </Label>
+
+                  {/* Main Overhead Image */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Overhead View (Required)</span>
+                      <Button variant="outline" size="sm" onClick={() => setCreateStep("satellite")}>
+                        <Camera className="h-4 w-4 mr-2" /> Recapture
+                      </Button>
+                    </div>
+                    {capturedMapImage ? (
+                      <img src={capturedMapImage} alt="Overhead" className="w-full h-56 object-cover rounded-lg border" />
+                    ) : (
+                      <div className="h-56 flex items-center justify-center bg-muted rounded-lg border border-dashed">
+                        <p className="text-muted-foreground">No overhead image captured</p>
+                      </div>
+                    )}
                   </div>
 
-                  {additionalImages.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
-                      {additionalImages.map((img) => (
-                        <div key={img.id} className="relative group">
-                          <img src={img.imageBase64} alt={img.title} className="w-full h-48 object-cover rounded-lg border" />
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
-                            <Button variant="destructive" size="sm" className="h-10 px-4" onClick={() => removeAdditionalImage(img.id)}>
-                              <X className="h-4 w-4 mr-2" /> Remove
-                            </Button>
-                          </div>
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-sm px-3 py-2 rounded-b-lg truncate">
-                            {img.type === "streetview" ? "Street View" : img.title}
-                          </div>
+                  {/* Street View Image */}
+                  {streetViewAvailable && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-muted-foreground">Street View (Optional)</span>
+                        <Button variant="outline" size="sm" onClick={() => setCreateStep("streetview")}>
+                          <Camera className="h-4 w-4 mr-2" /> {capturedStreetViewImage ? "Recapture" : "Capture"}
+                        </Button>
+                      </div>
+                      {capturedStreetViewImage ? (
+                        <img src={capturedStreetViewImage} alt="Street View" className="w-full h-56 object-cover rounded-lg border" />
+                      ) : (
+                        <div className="h-32 flex items-center justify-center bg-muted rounded-lg border border-dashed">
+                          <p className="text-muted-foreground text-sm">No street view captured yet</p>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="h-64 flex flex-col items-center justify-center bg-muted rounded-lg gap-3">
-                      <ImagePlus className="h-16 w-16 text-muted-foreground" />
-                      <p className="text-muted-foreground text-lg">No additional photos yet</p>
-                      <p className="text-sm text-muted-foreground">Upload photos or go back to capture more views</p>
+                      )}
                     </div>
                   )}
+
+                  {/* Additional Images */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Additional Photos ({additionalImages.length})</span>
+                      <Button variant="outline" size="sm" onClick={() => additionalImageInputRef.current?.click()} data-testid="button-add-photos">
+                        <Upload className="h-4 w-4 mr-2" /> Upload
+                      </Button>
+                      <input
+                        ref={additionalImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleAdditionalImageUpload}
+                      />
+                    </div>
+                    {additionalImages.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        {additionalImages.map((img) => (
+                          <div key={img.id} className="relative group">
+                            <img src={img.imageBase64} alt={img.title} className="w-full h-40 object-cover rounded-lg border" />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-lg">
+                              <Button variant="destructive" size="sm" onClick={() => removeAdditionalImage(img.id)}>
+                                <X className="h-4 w-4 mr-1" /> Remove
+                              </Button>
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-2 py-1 rounded-b-lg truncate">
+                              {img.type === "streetview" ? "Street View" : img.title}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="h-24 flex items-center justify-center bg-muted rounded-lg border border-dashed">
+                        <p className="text-muted-foreground text-sm">Use "Save & Add Another" in previous steps or upload here</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
