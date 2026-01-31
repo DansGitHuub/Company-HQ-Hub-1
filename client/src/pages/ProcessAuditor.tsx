@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -86,13 +86,16 @@ export default function ProcessAuditor() {
   });
 
   // Stop polling when audit completes
-  const runningAudit = auditResults.find(a => a.id === pollingAuditId);
-  if (runningAudit && runningAudit.status !== "running" && pollingAuditId) {
-    setPollingAuditId(null);
-    if (runningAudit.status === "completed") {
-      toast({ title: "Audit Complete", description: "Process audit has finished successfully" });
+  useEffect(() => {
+    if (!pollingAuditId) return;
+    const runningAudit = auditResults.find(a => a.id === pollingAuditId);
+    if (runningAudit && runningAudit.status !== "running") {
+      setPollingAuditId(null);
+      if (runningAudit.status === "completed") {
+        toast({ title: "Audit Complete", description: "Process audit has finished successfully" });
+      }
     }
-  }
+  }, [auditResults, pollingAuditId, toast]);
 
   const selectedProcess = processes.find(p => p.id === selectedProcessId);
   const latestAudit = auditResults.find(a => a.processId === selectedProcessId && a.status === "completed");
