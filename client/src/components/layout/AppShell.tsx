@@ -301,13 +301,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     marketing: { icon: Megaphone, label: "Marketing", href: "/marketing" },
     forms: { icon: FileText, label: "Forms", href: "/forms" },
     inbox: { icon: Inbox, label: "Messages", href: "/inbox" },
+    communications: { icon: MessageSquare, label: "Communications", href: "/communications" },
     integrations: { icon: Settings, label: "Integrations", href: "/integrations" },
     admin: { icon: Shield, label: "Admin Panel", href: "/admin" },
     tools: { icon: Snowflake, label: "Tools", href: "/tools/plow-mapper" },
   };
 
   // Default order for internal roles (help always at very bottom for all roles)
-  const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "hiring", "jobs", "education", "profile", "assistant"];
+  const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "hiring", "jobs", "education", "communications", "profile", "assistant"];
   const adminExtraIds = ["hq", "marketing", "forms", "tools", "integrations", "admin"];
   const bottomIds = ["help"]; // Always shown at bottom for all roles
 
