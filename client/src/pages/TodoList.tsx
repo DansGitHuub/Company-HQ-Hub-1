@@ -56,10 +56,13 @@ export default function TodoList() {
     queryKey: ["/api/users"],
   });
 
-  const { data: activeUsers = [] } = useQuery({
+  const { data: activeUsers = [] } = useQuery<{ userId: string }[]>({
     queryKey: ["/api/todo-active-users"],
-    enabled: isAdmin,
   });
+
+  // Get list of users who can be assigned to todos (only active todo users)
+  const activeUserIds = new Set(activeUsers.map(au => au.userId));
+  const assignableUsers = users.filter(u => activeUserIds.has(u.id));
 
   const displayTodos = isAdmin ? allTodos : myTodos;
 
@@ -450,7 +453,7 @@ export default function TodoList() {
             <div>
               <Label>Assign To</Label>
               <div className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-2">
-                {users.filter(u => u.role !== "Customer").map((u) => (
+                {assignableUsers.length > 0 ? assignableUsers.map((u) => (
                   <label key={u.id} className="flex items-center gap-2 cursor-pointer">
                     <Checkbox
                       checked={newTodo.assignedUserIds.includes(u.id)}
@@ -464,7 +467,9 @@ export default function TodoList() {
                     />
                     <span className="text-sm">{u.name} ({u.role})</span>
                   </label>
-                ))}
+                )) : (
+                  <p className="text-sm text-muted-foreground py-2">No active todo users. Enable users in Admin Panel first.</p>
+                )}
               </div>
             </div>
             <DialogFooter>
@@ -579,7 +584,7 @@ export default function TodoList() {
             <DialogTitle>Assign Users to Task</DialogTitle>
           </DialogHeader>
           <div className="max-h-60 overflow-y-auto space-y-2">
-            {users.filter(u => u.role !== "Customer").map((u) => (
+            {assignableUsers.length > 0 ? assignableUsers.map((u) => (
               <button
                 key={u.id}
                 className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left"
@@ -596,7 +601,9 @@ export default function TodoList() {
                   <p className="text-sm text-muted-foreground">{u.role}</p>
                 </div>
               </button>
-            ))}
+            )) : (
+              <p className="text-sm text-muted-foreground py-4 text-center">No active todo users. Enable users in Admin Panel first.</p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>

@@ -2559,7 +2559,7 @@ Generate detailed information for this landscaping material.`;
   });
 
   // Active To-Do Users
-  app.get("/api/todo-active-users", requireAdmin, async (req, res) => {
+  app.get("/api/todo-active-users", requireAuth, async (req, res) => {
     try {
       const activeUsers = await storage.getTodoActiveUsers();
       res.json(activeUsers);
