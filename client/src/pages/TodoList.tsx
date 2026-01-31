@@ -52,12 +52,14 @@ export default function TodoList() {
     queryKey: ["/api/todo-active-status"],
   });
 
-  const { data: users = [] } = useQuery<UserType[]>({
-    queryKey: ["/api/users"],
+  const { data: users = [], refetch: refetchUsers } = useQuery<UserType[]>({
+    queryKey: ["/api/admin/users"],
+    staleTime: 0,
   });
 
-  const { data: activeUsers = [] } = useQuery<{ userId: string }[]>({
+  const { data: activeUsers = [], refetch: refetchActiveUsers } = useQuery<{ userId: string }[]>({
     queryKey: ["/api/todo-active-users"],
+    staleTime: 0, // Always refetch to get fresh active users list
   });
 
   // Get list of users who can be assigned to todos (only active todo users)
@@ -219,7 +221,7 @@ export default function TodoList() {
           </p>
         </div>
         {isAdmin && (
-          <Button onClick={() => setAddDialogOpen(true)} data-testid="button-add-todo">
+          <Button onClick={async () => { await Promise.all([refetchUsers(), refetchActiveUsers()]); setAddDialogOpen(true); }} data-testid="button-add-todo">
             <Plus className="w-4 h-4 mr-2" />
             Add Task
           </Button>
