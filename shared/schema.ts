@@ -1194,3 +1194,128 @@ export const insertProcessAuditResultSchema = createInsertSchema(processAuditRes
 
 export type InsertProcessAuditResult = z.infer<typeof insertProcessAuditResultSchema>;
 export type ProcessAuditResult = typeof processAuditResults.$inferSelect;
+
+// Integration Wizard - Software catalog and configured integrations
+export const softwareIntegrations = pgTable("software_integrations", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  category: text("category").notNull(), // CRM, Accounting, Scheduling, Communication, Payments, etc.
+  description: text("description"),
+  logoUrl: text("logo_url"),
+  websiteUrl: text("website_url"),
+  apiDocsUrl: text("api_docs_url"),
+  authType: text("auth_type").default("api_key"), // api_key, oauth2, basic, custom
+  isPopular: boolean("is_popular").default(false),
+  aiResearchedAt: timestamp("ai_researched_at"),
+  capabilitiesJson: jsonb("capabilities_json"), // AI-discovered capabilities
+  setupInstructionsJson: jsonb("setup_instructions_json"), // AI-generated setup steps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSoftwareIntegrationSchema = createInsertSchema(softwareIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSoftwareIntegration = z.infer<typeof insertSoftwareIntegrationSchema>;
+export type SoftwareIntegration = typeof softwareIntegrations.$inferSelect;
+
+// User's configured integrations
+export const configuredIntegrations = pgTable("configured_integrations", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  softwareId: varchar("software_id", { length: 36 }).references(() => softwareIntegrations.id),
+  name: text("name").notNull(), // User-friendly name for this connection
+  status: text("status").notNull().default("pending"), // pending, configuring, testing, active, error, disabled
+  authConfigJson: jsonb("auth_config_json"), // Encrypted credentials reference
+  settingsJson: jsonb("settings_json"), // Integration-specific settings
+  lastTestedAt: timestamp("last_tested_at"),
+  lastTestResult: text("last_test_result"), // passed, failed
+  lastTestMessage: text("last_test_message"),
+  lastSyncAt: timestamp("last_sync_at"),
+  syncFrequency: text("sync_frequency").default("manual"), // manual, hourly, daily, realtime
+  enabledCapabilities: jsonb("enabled_capabilities"), // Array of enabled capability IDs
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertConfiguredIntegrationSchema = createInsertSchema(configuredIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertConfiguredIntegration = z.infer<typeof insertConfiguredIntegrationSchema>;
+export type ConfiguredIntegration = typeof configuredIntegrations.$inferSelect;
+
+// Integration capabilities - what each integration can do
+export const integrationCapabilities = pgTable("integration_capabilities", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  softwareId: varchar("software_id", { length: 36 }).references(() => softwareIntegrations.id),
+  name: text("name").notNull(), // e.g., "Sync Customers", "Create Invoices"
+  description: text("description"),
+  capabilityType: text("capability_type").notNull(), // sync, webhook, action, report
+  direction: text("direction").default("both"), // inbound, outbound, both
+  dataType: text("data_type"), // customers, jobs, invoices, payments, etc.
+  requiresWebhook: boolean("requires_webhook").default(false),
+  setupComplexity: text("setup_complexity").default("simple"), // simple, moderate, complex
+  estimatedSetupTime: text("estimated_setup_time"),
+  aiGenerated: boolean("ai_generated").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertIntegrationCapabilitySchema = createInsertSchema(integrationCapabilities).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertIntegrationCapability = z.infer<typeof insertIntegrationCapabilitySchema>;
+export type IntegrationCapability = typeof integrationCapabilities.$inferSelect;
+
+// Integration test results
+export const integrationTests = pgTable("integration_tests", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  configuredIntegrationId: varchar("configured_integration_id", { length: 36 }).references(() => configuredIntegrations.id),
+  testType: text("test_type").notNull(), // connection, auth, capability, full
+  status: text("status").notNull().default("running"), // running, passed, failed
+  testStepsJson: jsonb("test_steps_json"), // Array of test steps with results
+  errorDetails: text("error_details"),
+  duration: integer("duration"), // milliseconds
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertIntegrationTestSchema = createInsertSchema(integrationTests).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export type InsertIntegrationTest = z.infer<typeof insertIntegrationTestSchema>;
+export type IntegrationTest = typeof integrationTests.$inferSelect;
+
+// AI research sessions for discovering integration capabilities
+export const integrationResearchSessions = pgTable("integration_research_sessions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  softwareName: text("software_name").notNull(),
+  category: text("category"),
+  status: text("status").notNull().default("researching"), // researching, completed, failed
+  researchResultsJson: jsonb("research_results_json"), // AI findings
+  discoveredCapabilities: jsonb("discovered_capabilities"), // Array of capabilities found
+  suggestedSetupSteps: jsonb("suggested_setup_steps"), // Array of setup steps
+  estimatedCost: text("estimated_cost").default("0.00"),
+  tokensUsed: integer("tokens_used").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertIntegrationResearchSessionSchema = createInsertSchema(integrationResearchSessions).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export type InsertIntegrationResearchSession = z.infer<typeof insertIntegrationResearchSessionSchema>;
+export type IntegrationResearchSession = typeof integrationResearchSessions.$inferSelect;

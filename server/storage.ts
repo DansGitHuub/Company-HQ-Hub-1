@@ -43,7 +43,12 @@ import {
   aiAgentUsageLogs, type AiAgentUsageLog, type InsertAiAgentUsageLog,
   aiAgentSuggestions, type AiAgentSuggestion, type InsertAiAgentSuggestion,
   businessProcesses, type BusinessProcess, type InsertBusinessProcess,
-  processAuditResults, type ProcessAuditResult, type InsertProcessAuditResult
+  processAuditResults, type ProcessAuditResult, type InsertProcessAuditResult,
+  softwareIntegrations, type SoftwareIntegration, type InsertSoftwareIntegration,
+  configuredIntegrations, type ConfiguredIntegration, type InsertConfiguredIntegration,
+  integrationCapabilities, type IntegrationCapability, type InsertIntegrationCapability,
+  integrationTests, type IntegrationTest, type InsertIntegrationTest,
+  integrationResearchSessions, type IntegrationResearchSession, type InsertIntegrationResearchSession
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull } from "drizzle-orm";
@@ -323,6 +328,31 @@ export interface IStorage {
   getProcessAuditResult(id: string): Promise<ProcessAuditResult | undefined>;
   createProcessAuditResult(result: InsertProcessAuditResult): Promise<ProcessAuditResult>;
   updateProcessAuditResult(id: string, updates: Partial<ProcessAuditResult>): Promise<ProcessAuditResult | undefined>;
+  
+  // Integration Wizard
+  getSoftwareIntegrations(category?: string): Promise<SoftwareIntegration[]>;
+  getSoftwareIntegration(id: string): Promise<SoftwareIntegration | undefined>;
+  getSoftwareIntegrationByName(name: string): Promise<SoftwareIntegration | undefined>;
+  createSoftwareIntegration(integration: InsertSoftwareIntegration): Promise<SoftwareIntegration>;
+  updateSoftwareIntegration(id: string, updates: Partial<SoftwareIntegration>): Promise<SoftwareIntegration | undefined>;
+  
+  getConfiguredIntegrations(): Promise<ConfiguredIntegration[]>;
+  getConfiguredIntegration(id: string): Promise<ConfiguredIntegration | undefined>;
+  createConfiguredIntegration(integration: InsertConfiguredIntegration): Promise<ConfiguredIntegration>;
+  updateConfiguredIntegration(id: string, updates: Partial<ConfiguredIntegration>): Promise<ConfiguredIntegration | undefined>;
+  deleteConfiguredIntegration(id: string): Promise<void>;
+  
+  getIntegrationCapabilities(softwareId: string): Promise<IntegrationCapability[]>;
+  createIntegrationCapability(capability: InsertIntegrationCapability): Promise<IntegrationCapability>;
+  
+  getIntegrationTests(configuredIntegrationId: string): Promise<IntegrationTest[]>;
+  getIntegrationTest(id: string): Promise<IntegrationTest | undefined>;
+  createIntegrationTest(test: InsertIntegrationTest): Promise<IntegrationTest>;
+  updateIntegrationTest(id: string, updates: Partial<IntegrationTest>): Promise<IntegrationTest | undefined>;
+  
+  getIntegrationResearchSession(id: string): Promise<IntegrationResearchSession | undefined>;
+  createIntegrationResearchSession(session: InsertIntegrationResearchSession): Promise<IntegrationResearchSession>;
+  updateIntegrationResearchSession(id: string, updates: Partial<IntegrationResearchSession>): Promise<IntegrationResearchSession | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1454,6 +1484,110 @@ export class DatabaseStorage implements IStorage {
   async updateProcessAuditResult(id: string, updates: Partial<ProcessAuditResult>): Promise<ProcessAuditResult | undefined> {
     const [updated] = await db.update(processAuditResults).set(updates)
       .where(eq(processAuditResults.id, id)).returning();
+    return updated || undefined;
+  }
+
+  // Integration Wizard implementations
+  async getSoftwareIntegrations(category?: string): Promise<SoftwareIntegration[]> {
+    if (category) {
+      return await db.select().from(softwareIntegrations)
+        .where(eq(softwareIntegrations.category, category))
+        .orderBy(desc(softwareIntegrations.isPopular), softwareIntegrations.name);
+    }
+    return await db.select().from(softwareIntegrations)
+      .orderBy(desc(softwareIntegrations.isPopular), softwareIntegrations.name);
+  }
+
+  async getSoftwareIntegration(id: string): Promise<SoftwareIntegration | undefined> {
+    const [result] = await db.select().from(softwareIntegrations).where(eq(softwareIntegrations.id, id));
+    return result || undefined;
+  }
+
+  async getSoftwareIntegrationByName(name: string): Promise<SoftwareIntegration | undefined> {
+    const [result] = await db.select().from(softwareIntegrations).where(ilike(softwareIntegrations.name, name));
+    return result || undefined;
+  }
+
+  async createSoftwareIntegration(integration: InsertSoftwareIntegration): Promise<SoftwareIntegration> {
+    const [created] = await db.insert(softwareIntegrations).values(integration).returning();
+    return created;
+  }
+
+  async updateSoftwareIntegration(id: string, updates: Partial<SoftwareIntegration>): Promise<SoftwareIntegration | undefined> {
+    const [updated] = await db.update(softwareIntegrations).set({ ...updates, updatedAt: new Date() })
+      .where(eq(softwareIntegrations.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async getConfiguredIntegrations(): Promise<ConfiguredIntegration[]> {
+    return await db.select().from(configuredIntegrations).orderBy(desc(configuredIntegrations.createdAt));
+  }
+
+  async getConfiguredIntegration(id: string): Promise<ConfiguredIntegration | undefined> {
+    const [result] = await db.select().from(configuredIntegrations).where(eq(configuredIntegrations.id, id));
+    return result || undefined;
+  }
+
+  async createConfiguredIntegration(integration: InsertConfiguredIntegration): Promise<ConfiguredIntegration> {
+    const [created] = await db.insert(configuredIntegrations).values(integration).returning();
+    return created;
+  }
+
+  async updateConfiguredIntegration(id: string, updates: Partial<ConfiguredIntegration>): Promise<ConfiguredIntegration | undefined> {
+    const [updated] = await db.update(configuredIntegrations).set({ ...updates, updatedAt: new Date() })
+      .where(eq(configuredIntegrations.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteConfiguredIntegration(id: string): Promise<void> {
+    await db.delete(configuredIntegrations).where(eq(configuredIntegrations.id, id));
+  }
+
+  async getIntegrationCapabilities(softwareId: string): Promise<IntegrationCapability[]> {
+    return await db.select().from(integrationCapabilities)
+      .where(eq(integrationCapabilities.softwareId, softwareId));
+  }
+
+  async createIntegrationCapability(capability: InsertIntegrationCapability): Promise<IntegrationCapability> {
+    const [created] = await db.insert(integrationCapabilities).values(capability).returning();
+    return created;
+  }
+
+  async getIntegrationTests(configuredIntegrationId: string): Promise<IntegrationTest[]> {
+    return await db.select().from(integrationTests)
+      .where(eq(integrationTests.configuredIntegrationId, configuredIntegrationId))
+      .orderBy(desc(integrationTests.createdAt));
+  }
+
+  async getIntegrationTest(id: string): Promise<IntegrationTest | undefined> {
+    const [result] = await db.select().from(integrationTests).where(eq(integrationTests.id, id));
+    return result || undefined;
+  }
+
+  async createIntegrationTest(test: InsertIntegrationTest): Promise<IntegrationTest> {
+    const [created] = await db.insert(integrationTests).values(test).returning();
+    return created;
+  }
+
+  async updateIntegrationTest(id: string, updates: Partial<IntegrationTest>): Promise<IntegrationTest | undefined> {
+    const [updated] = await db.update(integrationTests).set(updates)
+      .where(eq(integrationTests.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async getIntegrationResearchSession(id: string): Promise<IntegrationResearchSession | undefined> {
+    const [result] = await db.select().from(integrationResearchSessions).where(eq(integrationResearchSessions.id, id));
+    return result || undefined;
+  }
+
+  async createIntegrationResearchSession(session: InsertIntegrationResearchSession): Promise<IntegrationResearchSession> {
+    const [created] = await db.insert(integrationResearchSessions).values(session).returning();
+    return created;
+  }
+
+  async updateIntegrationResearchSession(id: string, updates: Partial<IntegrationResearchSession>): Promise<IntegrationResearchSession | undefined> {
+    const [updated] = await db.update(integrationResearchSessions).set(updates)
+      .where(eq(integrationResearchSessions.id, id)).returning();
     return updated || undefined;
   }
 }

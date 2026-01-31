@@ -34,6 +34,7 @@ import TodoList from "@/pages/TodoList";
 import PlowSiteMapper from "@/pages/PlowSiteMapper";
 import MessagingInbox from "@/pages/MessagingInbox";
 import ProcessAuditor from "@/pages/ProcessAuditor";
+import IntegrationWizard from "@/pages/IntegrationWizard";
 import NotFound from "@/pages/not-found";
 
 function AppRoutes() {
@@ -88,6 +89,7 @@ function AppRoutes() {
         <Route path="/tools/plow-mapper" component={PlowSiteMapper} />
         <Route path="/communications" component={MessagingInbox} />
         <Route path="/tools/process-auditor" component={ProcessAuditor} />
+        <Route path="/tools/integration-wizard" component={IntegrationWizard} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>
