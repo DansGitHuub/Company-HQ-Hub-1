@@ -19,6 +19,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -613,6 +614,9 @@ function NewThreadDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Start New Conversation</DialogTitle>
+          <DialogDescription>
+            Create a new conversation to communicate with customers or team members.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 mt-4">
           <div className="grid gap-2">
@@ -641,12 +645,12 @@ function NewThreadDialog({
               </div>
               <div className="grid gap-2">
                 <Label>Assign To (optional)</Label>
-                <Select value={assignedEmployeeId} onValueChange={setAssignedEmployeeId}>
+                <Select value={assignedEmployeeId || "unassigned"} onValueChange={(v) => setAssignedEmployeeId(v === "unassigned" ? "" : v)}>
                   <SelectTrigger data-testid="select-assign-to">
                     <SelectValue placeholder="Leave unassigned" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
                     {employees.map(emp => (
                       <SelectItem key={emp.id} value={emp.id}>{emp.name || emp.username}</SelectItem>
                     ))}
@@ -672,12 +676,12 @@ function NewThreadDialog({
           {isCustomer && (
             <div className="grid gap-2">
               <Label>Send To (optional)</Label>
-              <Select value={assignedEmployeeId} onValueChange={setAssignedEmployeeId}>
+              <Select value={assignedEmployeeId || "general_inbox"} onValueChange={(v) => setAssignedEmployeeId(v === "general_inbox" ? "" : v)}>
                 <SelectTrigger data-testid="select-send-to">
                   <SelectValue placeholder="General Inbox" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">General Inbox</SelectItem>
+                  <SelectItem value="general_inbox">General Inbox</SelectItem>
                   {employees.map(emp => (
                     <SelectItem key={emp.id} value={emp.id}>{emp.name || emp.username}</SelectItem>
                   ))}
