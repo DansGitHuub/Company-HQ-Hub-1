@@ -6,7 +6,16 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { sendMaintenanceReminderEmail } from "./email";
 import OpenAI from "openai";
-import { insertSopTemplateSchema, insertSopExampleSchema, insertFormFolderSchema, insertFormTemplateSchema, insertPlowSiteImageSchema, type User } from "@shared/schema";
+import { 
+  insertSopTemplateSchema, 
+  insertSopExampleSchema, 
+  insertFormFolderSchema, 
+  insertFormTemplateSchema, 
+  insertPlowSiteImageSchema, 
+  insertConfiguredIntegrationSchema,
+  insertIntegrationResearchSessionSchema,
+  type User 
+} from "@shared/schema";
 import { z } from "zod";
 
 const openai = new OpenAI({
@@ -3710,20 +3719,29 @@ Provide a comprehensive audit with specific, actionable recommendations for this
   // Create configured integration
   app.post("/api/configured-integrations", requireAuth, requireRole(["Admin"]), async (req, res) => {
     try {
-      const integration = await storage.createConfiguredIntegration(req.body);
+      const validated = insertConfiguredIntegrationSchema.parse(req.body);
+      const integration = await storage.createConfiguredIntegration(validated);
       res.status(201).json(integration);
     } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: err.errors });
+      }
       res.status(500).json({ message: "Error creating configured integration" });
     }
   });
   
   // Update configured integration
+  const updateConfiguredIntegrationSchema = insertConfiguredIntegrationSchema.partial();
   app.patch("/api/configured-integrations/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
     try {
-      const integration = await storage.updateConfiguredIntegration(req.params.id, req.body);
+      const validated = updateConfiguredIntegrationSchema.parse(req.body);
+      const integration = await storage.updateConfiguredIntegration(req.params.id, validated);
       if (!integration) return res.status(404).json({ message: "Configured integration not found" });
       res.json(integration);
     } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: err.errors });
+      }
       res.status(500).json({ message: "Error updating configured integration" });
     }
   });
