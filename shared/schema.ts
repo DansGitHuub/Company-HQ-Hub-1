@@ -447,6 +447,58 @@ export const insertCustomerMessageSchema = createInsertSchema(customerMessages).
 export type InsertCustomerMessage = z.infer<typeof insertCustomerMessageSchema>;
 export type CustomerMessage = typeof customerMessages.$inferSelect;
 
+// Internal Messaging - threaded conversation system
+export const messagingThreads = pgTable("messaging_threads", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id", { length: 36 }).references(() => users.id).notNull(),
+  assignedEmployeeId: varchar("assigned_employee_id", { length: 36 }).references(() => users.id),
+  subject: text("subject").notNull(),
+  status: text("status").notNull().default("open"), // open, in_progress, resolved, closed
+  priority: text("priority").default("normal"), // low, normal, high, urgent
+  lastMessageAt: timestamp("last_message_at").defaultNow(),
+  lastMessageBy: varchar("last_message_by", { length: 36 }).references(() => users.id),
+  unreadByCustomer: boolean("unread_by_customer").default(false),
+  unreadByEmployee: boolean("unread_by_employee").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  closedAt: timestamp("closed_at"),
+  closedBy: varchar("closed_by", { length: 36 }).references(() => users.id),
+});
+
+export const insertMessagingThreadSchema = createInsertSchema(messagingThreads).pick({
+  customerId: true,
+  assignedEmployeeId: true,
+  subject: true,
+  priority: true,
+});
+
+export type InsertMessagingThread = z.infer<typeof insertMessagingThreadSchema>;
+export type MessagingThread = typeof messagingThreads.$inferSelect;
+
+// Thread Messages - individual messages in a thread
+export const threadMessages = pgTable("thread_messages", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  threadId: varchar("thread_id", { length: 36 }).references(() => messagingThreads.id).notNull(),
+  senderId: varchar("sender_id", { length: 36 }).references(() => users.id).notNull(),
+  senderRole: text("sender_role").notNull(), // customer, employee
+  content: text("content").notNull(),
+  isInternalNote: boolean("is_internal_note").default(false), // Internal notes visible only to staff
+  attachments: text("attachments").array(),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertThreadMessageSchema = createInsertSchema(threadMessages).pick({
+  threadId: true,
+  senderId: true,
+  senderRole: true,
+  content: true,
+  isInternalNote: true,
+  attachments: true,
+});
+
+export type InsertThreadMessage = z.infer<typeof insertThreadMessageSchema>;
+export type ThreadMessage = typeof threadMessages.$inferSelect;
+
 export const workRequests = pgTable("work_requests", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id", { length: 36 }).references(() => users.id).notNull(),
