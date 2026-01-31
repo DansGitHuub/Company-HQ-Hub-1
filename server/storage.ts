@@ -36,7 +36,10 @@ import {
   plowSiteGroups, type PlowSiteGroup, type InsertPlowSiteGroup,
   plowSites, type PlowSite, type InsertPlowSite,
   plowSiteManagerPermissions, type PlowSiteManagerPermission, type InsertPlowSiteManagerPermission,
-  plowSiteImages, type PlowSiteImage, type InsertPlowSiteImage
+  plowSiteImages, type PlowSiteImage, type InsertPlowSiteImage,
+  aiAgents, type AiAgent, type InsertAiAgent,
+  aiAgentUsageLogs, type AiAgentUsageLog, type InsertAiAgentUsageLog,
+  aiAgentSuggestions, type AiAgentSuggestion, type InsertAiAgentSuggestion
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and } from "drizzle-orm";
@@ -274,6 +277,22 @@ export interface IStorage {
   createPlowSiteImage(image: InsertPlowSiteImage): Promise<PlowSiteImage>;
   updatePlowSiteImage(id: string, updates: Partial<PlowSiteImage>): Promise<PlowSiteImage | undefined>;
   deletePlowSiteImage(id: string): Promise<boolean>;
+  
+  // AI Agents
+  getAiAgents(): Promise<AiAgent[]>;
+  getAiAgent(id: string): Promise<AiAgent | undefined>;
+  updateAiAgent(id: string, updates: Partial<AiAgent>): Promise<AiAgent | undefined>;
+  
+  // AI Agent Usage Logs
+  getAiAgentUsageLogs(agentId?: string): Promise<AiAgentUsageLog[]>;
+  createAiAgentUsageLog(log: InsertAiAgentUsageLog): Promise<AiAgentUsageLog>;
+  getTotalAgentCost(agentId?: string): Promise<number>;
+  
+  // AI Agent Suggestions
+  getAiAgentSuggestions(agentId?: string): Promise<AiAgentSuggestion[]>;
+  createAiAgentSuggestion(suggestion: InsertAiAgentSuggestion): Promise<AiAgentSuggestion>;
+  updateAiAgentSuggestion(id: string, updates: Partial<AiAgentSuggestion>): Promise<AiAgentSuggestion | undefined>;
+  deleteAiAgentSuggestion(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1184,6 +1203,65 @@ export class DatabaseStorage implements IStorage {
   
   async deletePlowSiteImage(id: string): Promise<boolean> {
     await db.delete(plowSiteImages).where(eq(plowSiteImages.id, id));
+    return true;
+  }
+  
+  // AI Agents
+  async getAiAgents(): Promise<AiAgent[]> {
+    return db.select().from(aiAgents);
+  }
+  
+  async getAiAgent(id: string): Promise<AiAgent | undefined> {
+    const [agent] = await db.select().from(aiAgents).where(eq(aiAgents.id, id));
+    return agent || undefined;
+  }
+  
+  async updateAiAgent(id: string, updates: Partial<AiAgent>): Promise<AiAgent | undefined> {
+    const [updated] = await db.update(aiAgents)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(aiAgents.id, id))
+      .returning();
+    return updated || undefined;
+  }
+  
+  // AI Agent Usage Logs
+  async getAiAgentUsageLogs(agentId?: string): Promise<AiAgentUsageLog[]> {
+    if (agentId) {
+      return db.select().from(aiAgentUsageLogs).where(eq(aiAgentUsageLogs.agentId, agentId));
+    }
+    return db.select().from(aiAgentUsageLogs);
+  }
+  
+  async createAiAgentUsageLog(log: InsertAiAgentUsageLog): Promise<AiAgentUsageLog> {
+    const [created] = await db.insert(aiAgentUsageLogs).values(log).returning();
+    return created;
+  }
+  
+  async getTotalAgentCost(agentId?: string): Promise<number> {
+    const logs = await this.getAiAgentUsageLogs(agentId);
+    return logs.reduce((sum, log) => sum + parseFloat(log.estimatedCost || "0"), 0);
+  }
+  
+  // AI Agent Suggestions
+  async getAiAgentSuggestions(agentId?: string): Promise<AiAgentSuggestion[]> {
+    if (agentId) {
+      return db.select().from(aiAgentSuggestions).where(eq(aiAgentSuggestions.agentId, agentId));
+    }
+    return db.select().from(aiAgentSuggestions);
+  }
+  
+  async createAiAgentSuggestion(suggestion: InsertAiAgentSuggestion): Promise<AiAgentSuggestion> {
+    const [created] = await db.insert(aiAgentSuggestions).values(suggestion).returning();
+    return created;
+  }
+  
+  async updateAiAgentSuggestion(id: string, updates: Partial<AiAgentSuggestion>): Promise<AiAgentSuggestion | undefined> {
+    const [updated] = await db.update(aiAgentSuggestions).set(updates).where(eq(aiAgentSuggestions.id, id)).returning();
+    return updated || undefined;
+  }
+  
+  async deleteAiAgentSuggestion(id: string): Promise<boolean> {
+    await db.delete(aiAgentSuggestions).where(eq(aiAgentSuggestions.id, id));
     return true;
   }
 }

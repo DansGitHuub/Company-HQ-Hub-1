@@ -996,3 +996,78 @@ export const insertPlowSiteImageSchema = createInsertSchema(plowSiteImages).pick
 
 export type InsertPlowSiteImage = z.infer<typeof insertPlowSiteImageSchema>;
 export type PlowSiteImage = typeof plowSiteImages.$inferSelect;
+
+// AI Agents - Master Admin controlled autonomous agents
+export const aiAgents = pgTable("ai_agents", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").default("general"),
+  isEnabled: boolean("is_enabled").default(false),
+  lastRunAt: timestamp("last_run_at"),
+  runFrequency: text("run_frequency").default("manual"),
+  configJson: jsonb("config_json").default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAiAgentSchema = createInsertSchema(aiAgents).pick({
+  name: true,
+  description: true,
+  category: true,
+  isEnabled: true,
+  runFrequency: true,
+  configJson: true,
+});
+
+export type InsertAiAgent = z.infer<typeof insertAiAgentSchema>;
+export type AiAgent = typeof aiAgents.$inferSelect;
+
+// AI Agent Usage Logs - Track costs and actions
+export const aiAgentUsageLogs = pgTable("ai_agent_usage_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id", { length: 36 }).references(() => aiAgents.id, { onDelete: "cascade" }).notNull(),
+  action: text("action").notNull(),
+  inputTokens: integer("input_tokens").default(0),
+  outputTokens: integer("output_tokens").default(0),
+  estimatedCost: text("estimated_cost").default("0.00"),
+  resultSummary: text("result_summary"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAiAgentUsageLogSchema = createInsertSchema(aiAgentUsageLogs).pick({
+  agentId: true,
+  action: true,
+  inputTokens: true,
+  outputTokens: true,
+  estimatedCost: true,
+  resultSummary: true,
+});
+
+export type InsertAiAgentUsageLog = z.infer<typeof insertAiAgentUsageLogSchema>;
+export type AiAgentUsageLog = typeof aiAgentUsageLogs.$inferSelect;
+
+// AI Agent Suggestions - Improvement ideas with cost estimates
+export const aiAgentSuggestions = pgTable("ai_agent_suggestions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id", { length: 36 }).references(() => aiAgents.id, { onDelete: "cascade" }).notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  estimatedCost: text("estimated_cost").default("0.00"),
+  priority: text("priority").default("medium"),
+  status: text("status").default("pending"),
+  implementedAt: timestamp("implemented_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAiAgentSuggestionSchema = createInsertSchema(aiAgentSuggestions).pick({
+  agentId: true,
+  title: true,
+  description: true,
+  estimatedCost: true,
+  priority: true,
+  status: true,
+});
+
+export type InsertAiAgentSuggestion = z.infer<typeof insertAiAgentSuggestionSchema>;
+export type AiAgentSuggestion = typeof aiAgentSuggestions.$inferSelect;
