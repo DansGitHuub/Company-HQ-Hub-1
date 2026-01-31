@@ -2162,6 +2162,222 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
+  // ================== MESSAGING THREADS (Threaded Conversations) ==================
+  
+  // Get messaging threads - role-based filtering
+  app.get("/api/messaging-threads", requireAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+      const { status, customerId, employeeId } = req.query;
+      
+      let filters: any = {};
+      if (status) filters.status = status as string;
+      
+      // Role-based access control
+      if (user.role === "Customer") {
+        // Customers can only see their own conversations
+        filters.customerId = user.id;
+      } else if (user.role === "Crew") {
+        // Crew can only see conversations assigned to them
+        filters.assignedEmployeeId = user.id;
+      } else if (user.role === "Manager") {
+        // Managers can see their assigned conversations or filter by employee/customer
+        if (employeeId) {
+          filters.assignedEmployeeId = employeeId as string;
+        } else if (!customerId) {
+          // Default: show only their assigned conversations
+          filters.assignedEmployeeId = user.id;
+        }
+        if (customerId) filters.customerId = customerId as string;
+      } else if (user.role === "Admin") {
+        // Admins can see all conversations with optional filters
+        if (customerId) filters.customerId = customerId as string;
+        if (employeeId) filters.assignedEmployeeId = employeeId as string;
+      }
+      
+      const threads = await storage.getMessagingThreads(Object.keys(filters).length > 0 ? filters : undefined);
+      res.json(threads);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching conversations" });
+    }
+  });
+  
+  // Get single messaging thread
+  app.get("/api/messaging-threads/:id", requireAuth, async (req, res) => {
+    try {
+      const thread = await storage.getMessagingThread(req.params.id);
+      if (!thread) return res.status(404).json({ message: "Conversation not found" });
+      
+      // Access control
+      const user = req.user!;
+      if (user.role === "Customer" && thread.customerId !== user.id) {
+        return res.status(403).json({ message: "Not authorized to view this conversation" });
+      }
+      if (user.role === "Crew" && thread.assignedEmployeeId !== user.id) {
+        return res.status(403).json({ message: "Not authorized to view this conversation" });
+      }
+      
+      res.json(thread);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching conversation" });
+    }
+  });
+  
+  // Create new messaging thread
+  app.post("/api/messaging-threads", requireAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+      const { subject, assignedEmployeeId, initialMessage, priority } = req.body;
+      
+      if (!subject) {
+        return res.status(400).json({ message: "Subject is required" });
+      }
+      
+      const thread = await storage.createMessagingThread({
+        customerId: user.role === "Customer" ? user.id : req.body.customerId,
+        assignedEmployeeId: assignedEmployeeId || null,
+        subject,
+        priority: priority || "normal",
+        initialMessage,
+      });
+      
+      res.status(201).json(thread);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating conversation" });
+    }
+  });
+  
+  // Update messaging thread (status, assignment, priority)
+  app.patch("/api/messaging-threads/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+      const thread = await storage.getMessagingThread(req.params.id);
+      if (!thread) return res.status(404).json({ message: "Conversation not found" });
+      
+      // Only admins, managers, and assigned employees can update
+      if (user.role === "Customer") {
+        return res.status(403).json({ message: "Not authorized to update conversation" });
+      }
+      if (user.role === "Crew" && thread.assignedEmployeeId !== user.id) {
+        return res.status(403).json({ message: "Not authorized to update this conversation" });
+      }
+      
+      const { status, assignedEmployeeId, priority } = req.body;
+      const updates: any = {};
+      if (status) {
+        updates.status = status;
+        if (status === "closed") {
+          updates.closedAt = new Date();
+          updates.closedBy = user.id;
+        }
+      }
+      if (assignedEmployeeId !== undefined) updates.assignedEmployeeId = assignedEmployeeId;
+      if (priority) updates.priority = priority;
+      
+      const updated = await storage.updateMessagingThread(req.params.id, updates);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating conversation" });
+    }
+  });
+  
+  // Get messages in a thread
+  app.get("/api/messaging-threads/:id/messages", requireAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+      const thread = await storage.getMessagingThread(req.params.id);
+      if (!thread) return res.status(404).json({ message: "Conversation not found" });
+      
+      // Access control
+      if (user.role === "Customer" && thread.customerId !== user.id) {
+        return res.status(403).json({ message: "Not authorized to view this conversation" });
+      }
+      if (user.role === "Crew" && thread.assignedEmployeeId !== user.id) {
+        return res.status(403).json({ message: "Not authorized to view this conversation" });
+      }
+      
+      // Customers don't see internal notes
+      const includeInternalNotes = user.role !== "Customer";
+      const messages = await storage.getThreadMessages(req.params.id, includeInternalNotes);
+      
+      // Mark as read for this user
+      await storage.markMessagesAsRead(req.params.id, user.id);
+      
+      res.json(messages);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching messages" });
+    }
+  });
+  
+  // Add message to thread
+  app.post("/api/messaging-threads/:id/messages", requireAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+      const thread = await storage.getMessagingThread(req.params.id);
+      if (!thread) return res.status(404).json({ message: "Conversation not found" });
+      
+      // Access control
+      if (user.role === "Customer" && thread.customerId !== user.id) {
+        return res.status(403).json({ message: "Not authorized to message in this conversation" });
+      }
+      if (user.role === "Crew" && thread.assignedEmployeeId !== user.id) {
+        return res.status(403).json({ message: "Not authorized to message in this conversation" });
+      }
+      
+      const { content, isInternalNote, attachments } = req.body;
+      
+      if (!content) {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+      
+      // Only staff can add internal notes
+      if (isInternalNote && user.role === "Customer") {
+        return res.status(403).json({ message: "Customers cannot add internal notes" });
+      }
+      
+      const message = await storage.createThreadMessage({
+        threadId: req.params.id,
+        senderId: user.id,
+        senderRole: user.role === "Customer" ? "customer" : "employee",
+        content,
+        isInternalNote: isInternalNote || false,
+        attachments: attachments || null,
+      });
+      
+      // Update thread status to in_progress if it was open
+      if (thread.status === "open" && user.role !== "Customer") {
+        await storage.updateMessagingThread(req.params.id, { status: "in_progress" });
+      }
+      
+      res.status(201).json(message);
+    } catch (err) {
+      res.status(500).json({ message: "Error sending message" });
+    }
+  });
+  
+  // Get unread conversation count for current user
+  app.get("/api/messaging-threads/unread-count", requireAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+      let filters: any = {};
+      
+      if (user.role === "Customer") {
+        filters.customerId = user.id;
+      } else {
+        filters.assignedEmployeeId = user.id;
+      }
+      
+      const threads = await storage.getMessagingThreads(filters);
+      const unreadCount = threads.filter(t => 
+        user.role === "Customer" ? t.unreadByCustomer : t.unreadByEmployee
+      ).length;
+      
+      res.json({ unreadCount });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching unread count" });
+    }
+  });
+
   app.post("/api/work-requests", requireAuth, async (req, res) => {
     try {
       const request = await storage.createWorkRequest({
