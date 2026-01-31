@@ -39,7 +39,16 @@ import {
   Sparkles,
   HelpCircle,
   Inbox,
-  Truck
+  Truck,
+  Bot,
+  Power,
+  DollarSign,
+  Calendar,
+  Play,
+  RefreshCw,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
@@ -430,7 +439,7 @@ export default function AdminPanel() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+        <TabsList className={`grid w-full max-w-3xl ${user?.isMasterAdmin ? 'grid-cols-5' : 'grid-cols-4'}`}>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="requests" className="gap-2">
             Requests {pendingRequests.length > 0 && <Badge variant="destructive" className="ml-1">{pendingRequests.length}</Badge>}
@@ -441,6 +450,11 @@ export default function AdminPanel() {
           <TabsTrigger value="company" className="gap-2">
             <Building2 className="h-4 w-4" /> Company
           </TabsTrigger>
+          {user?.isMasterAdmin && (
+            <TabsTrigger value="ai-agents" className="gap-2">
+              <Bot className="h-4 w-4" /> AI Agents
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="users" className="mt-6">
@@ -838,7 +852,394 @@ export default function AdminPanel() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {user?.isMasterAdmin && (
+          <TabsContent value="ai-agents" className="mt-6">
+            <AiAgentsPanel />
+          </TabsContent>
+        )}
       </Tabs>
+    </div>
+  );
+}
+
+// AI Agents Panel Component - Master Admin only
+function AiAgentsPanel() {
+  const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
+
+  // Fetch AI agents
+  const { data: agents = [], isLoading: agentsLoading, refetch: refetchAgents } = useQuery<any[]>({
+    queryKey: ["/api/ai-agents"],
+  });
+
+  // Fetch cost summary
+  const { data: costSummary } = useQuery<any>({
+    queryKey: ["/api/ai-agents/costs/summary"],
+  });
+
+  // Mutation to toggle agent
+  const toggleAgentMutation = useMutation({
+    mutationFn: async ({ id, isEnabled }: { id: string; isEnabled: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/ai-agents/${id}`, { isEnabled });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-agents"] });
+    },
+  });
+
+  // Mutation to run agent
+  const runAgentMutation = useMutation({
+    mutationFn: async (agentId: string) => {
+      const res = await apiRequest("POST", `/api/ai-agents/${agentId}/run`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-agents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-agents/costs/summary"] });
+    },
+  });
+
+  // Fetch suggestions for an agent
+  const fetchSuggestions = async (agentId: string) => {
+    const res = await fetch(`/api/ai-agents/${agentId}/suggestions`, { credentials: "include" });
+    return res.json();
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "Never";
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return `$${amount.toFixed(4)}`;
+  };
+
+  if (agentsLoading) {
+    return (
+      <div className="flex justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Cost Summary Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            AI Usage & Costs
+          </CardTitle>
+          <CardDescription>Track your AI agent usage and estimated costs</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-muted/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-green-600">
+                {formatCurrency(costSummary?.totalCost || 0)}
+              </div>
+              <p className="text-sm text-muted-foreground">Total Cost (This Period)</p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-blue-600">
+                {costSummary?.totalRuns || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Total Runs</p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-amber-600">
+                {formatCurrency(costSummary?.projectedMonthly || 0)}
+              </div>
+              <p className="text-sm text-muted-foreground">Projected Monthly</p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-4">
+              <div className="text-lg font-semibold flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                {costSummary?.nextBillingDate ? new Date(costSummary.nextBillingDate).toLocaleDateString() : "N/A"}
+              </div>
+              <p className="text-sm text-muted-foreground">Next Billing Date</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* AI Agents List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bot className="h-5 w-5" />
+            AI Agents
+          </CardTitle>
+          <CardDescription>
+            Control your autonomous AI agents. They analyze your data and suggest improvements.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {agents.map((agent: any) => (
+            <AgentCard
+              key={agent.id}
+              agent={agent}
+              isExpanded={expandedAgent === agent.id}
+              onToggleExpand={() => setExpandedAgent(expandedAgent === agent.id ? null : agent.id)}
+              onToggleEnabled={(enabled) => toggleAgentMutation.mutate({ id: agent.id, isEnabled: enabled })}
+              onRun={() => runAgentMutation.mutate(agent.id)}
+              isRunning={runAgentMutation.isPending && runAgentMutation.variables === agent.id}
+              costData={costSummary?.agentCosts?.find((c: any) => c.agentId === agent.id)}
+              fetchSuggestions={fetchSuggestions}
+            />
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Individual Agent Card
+function AgentCard({
+  agent,
+  isExpanded,
+  onToggleExpand,
+  onToggleEnabled,
+  onRun,
+  isRunning,
+  costData,
+  fetchSuggestions,
+}: {
+  agent: any;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onToggleEnabled: (enabled: boolean) => void;
+  onRun: () => void;
+  isRunning: boolean;
+  costData?: any;
+  fetchSuggestions: (agentId: string) => Promise<any[]>;
+}) {
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
+  const loadSuggestions = async () => {
+    setLoadingSuggestions(true);
+    try {
+      const data = await fetchSuggestions(agent.id);
+      setSuggestions(data);
+    } catch (e) {
+      console.error("Failed to load suggestions:", e);
+    }
+    setLoadingSuggestions(false);
+  };
+
+  React.useEffect(() => {
+    if (isExpanded) {
+      loadSuggestions();
+    }
+  }, [isExpanded]);
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case "forms":
+        return <FileText className="h-5 w-5" />;
+      case "sops":
+        return <BookOpen className="h-5 w-5" />;
+      case "communications":
+        return <Inbox className="h-5 w-5" />;
+      case "hiring":
+        return <Users className="h-5 w-5" />;
+      default:
+        return <Bot className="h-5 w-5" />;
+    }
+  };
+
+  const getFrequencyLabel = (frequency: string) => {
+    switch (frequency) {
+      case "daily":
+        return "Runs Daily";
+      case "weekly":
+        return "Runs Weekly";
+      case "monthly":
+        return "Runs Monthly";
+      default:
+        return "Manual Only";
+    }
+  };
+
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      {/* Agent Header */}
+      <div
+        className="flex items-center justify-between p-4 bg-muted/30 cursor-pointer hover:bg-muted/50"
+        onClick={onToggleExpand}
+      >
+        <div className="flex items-center gap-4">
+          <div className={`p-2 rounded-full ${agent.isEnabled ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+            {getCategoryIcon(agent.category)}
+          </div>
+          <div>
+            <h3 className="font-semibold flex items-center gap-2">
+              {agent.name}
+              {agent.isEnabled ? (
+                <Badge variant="default" className="bg-green-500">Active</Badge>
+              ) : (
+                <Badge variant="secondary">Inactive</Badge>
+              )}
+            </h3>
+            <p className="text-sm text-muted-foreground">{agent.description}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-right text-sm">
+            <div className="text-muted-foreground">{getFrequencyLabel(agent.runFrequency)}</div>
+            <div className="text-xs">Last: {agent.lastRunAt ? new Date(agent.lastRunAt).toLocaleDateString() : 'Never'}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant={agent.isEnabled ? "outline" : "default"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleEnabled(!agent.isEnabled);
+              }}
+              className="gap-1"
+            >
+              <Power className="h-4 w-4" />
+              {agent.isEnabled ? "Turn Off" : "Turn On"}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRun();
+              }}
+              disabled={!agent.isEnabled || isRunning}
+              className="gap-1"
+            >
+              {isRunning ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              Run Now
+            </Button>
+          </div>
+          {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+        </div>
+      </div>
+
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className="p-4 border-t bg-background">
+          {/* Cost Info */}
+          <div className="flex gap-4 mb-4 text-sm">
+            <div className="bg-muted/50 rounded px-3 py-2">
+              <span className="text-muted-foreground">Total Cost:</span>{" "}
+              <span className="font-semibold">${(costData?.totalCost || 0).toFixed(4)}</span>
+            </div>
+            <div className="bg-muted/50 rounded px-3 py-2">
+              <span className="text-muted-foreground">Runs:</span>{" "}
+              <span className="font-semibold">{costData?.runCount || 0}</span>
+            </div>
+          </div>
+
+          {/* Suggestions */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-amber-500" />
+                AI Suggestions
+              </h4>
+              <Button variant="ghost" size="sm" onClick={loadSuggestions} disabled={loadingSuggestions}>
+                <RefreshCw className={`h-4 w-4 ${loadingSuggestions ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+
+            {loadingSuggestions ? (
+              <div className="flex justify-center p-4">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : suggestions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No suggestions yet. Run the agent to generate improvement ideas.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {suggestions.map((suggestion: any) => (
+                  <SuggestionCard key={suggestion.id} suggestion={suggestion} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Suggestion Card
+function SuggestionCard({ suggestion }: { suggestion: any }) {
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "high":
+        return "text-red-500 bg-red-50";
+      case "low":
+        return "text-green-500 bg-green-50";
+      default:
+        return "text-amber-500 bg-amber-50";
+    }
+  };
+
+  const updateSuggestionMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/ai-suggestions/${id}`, { status, implementedAt: status === "implemented" ? new Date() : null });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-agents"] });
+    },
+  });
+
+  return (
+    <div className="border rounded-lg p-4 bg-muted/20">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <h5 className="font-medium">{suggestion.title}</h5>
+            <Badge className={getPriorityColor(suggestion.priority)} variant="outline">
+              {suggestion.priority}
+            </Badge>
+            {suggestion.status === "implemented" && (
+              <Badge variant="default" className="bg-green-500">Implemented</Badge>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground">{suggestion.description}</p>
+          <div className="flex items-center gap-4 mt-2 text-xs">
+            <span className="flex items-center gap-1 text-green-600 font-medium">
+              <DollarSign className="h-3 w-3" />
+              Est. Cost: {suggestion.estimatedCost}
+            </span>
+            <span className="text-muted-foreground">
+              Created: {new Date(suggestion.createdAt).toLocaleDateString()}
+            </span>
+          </div>
+        </div>
+        {suggestion.status !== "implemented" && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => updateSuggestionMutation.mutate({ id: suggestion.id, status: "implemented" })}
+            disabled={updateSuggestionMutation.isPending}
+          >
+            <CheckCircle className="h-4 w-4 mr-1" />
+            Mark Done
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

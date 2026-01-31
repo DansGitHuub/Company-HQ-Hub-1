@@ -48,6 +48,12 @@ Preferred communication style: Simple, everyday language.
 - **Materials Catalog Manager**: Comprehensive materials management with 8 specialized categories (Aggregates & Gravel, Mulch & Soil, Trees & Shrubs, Perennials & Annuals, Hardscape & Pavers, Landscape, Chemicals & Fertilizer, Other), AI-powered 5-step material creation wizard (Name → Category → AI Auto-Fill → Review → Confirm), category-specific custom fields, bulk operations (select all, move to category), easy category management (add, rename, delete), search/filter/sort capabilities, and role-based access.
 - **Interactive To-Do List**: Task management system with add/edit/delete functionality, priority levels (low, medium, high, urgent), status tracking (pending, in_progress, completed), due dates, user assignments, read/unread status, filtering by status and priority, notification badges in sidebar for unread tasks, and admin-controlled user activation.
 - **Plow Site Mapper**: Snow removal route planning tool with Google Maps integration for accurate address lookup, interactive satellite imagery with zoom controls, AI-powered property analysis, site grouping with organizational categories, multi-step site creation workflow (Info → Image Selection → Confirmation), canvas-based markup tools for annotating property images, and instruction management for plow crews.
+- **AI Agents System** (Master Admin only): Autonomous AI agents that analyze and improve various systems. Features include:
+  - **Agent Management**: On/off toggles for each agent, manual run triggers, and scheduling options (manual, daily, weekly, monthly).
+  - **Available Agents**: Forms Manager (form improvements), SOP Assistant (SOP enhancements), Communication Optimizer (messaging improvements), Hiring Helper (hiring pipeline optimization).
+  - **Cost Tracking**: Real-time cost tracking per agent, monthly cost projection, next billing date display, and cost breakdown by agent.
+  - **AI Suggestions**: Each agent generates detailed improvement suggestions with cost estimates and priority levels. Suggestions can be marked as implemented or dismissed.
+  - **Security**: Master Admin access only - hidden from other users entirely.
 
 ## External Dependencies
 

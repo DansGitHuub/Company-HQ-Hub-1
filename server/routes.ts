@@ -7,6 +7,7 @@ import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { sendMaintenanceReminderEmail } from "./email";
 import OpenAI from "openai";
 import { insertSopTemplateSchema, insertSopExampleSchema, insertFormFolderSchema, insertFormTemplateSchema, insertPlowSiteImageSchema, type User } from "@shared/schema";
+import { z } from "zod";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -258,6 +259,273 @@ export async function registerRoutes(
       res.sendStatus(204);
     } catch (err) {
       res.status(500).json({ message: "Error deleting user" });
+    }
+  });
+
+  // AI Agents - Master Admin only
+  const requireMasterAdmin = (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user?.isMasterAdmin) {
+      return res.status(403).json({ message: "Access denied. Master Admin only." });
+    }
+    next();
+  };
+
+  app.get("/api/ai-agents", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const agents = await storage.getAiAgents();
+      res.json(agents);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching AI agents" });
+    }
+  });
+
+  const updateAiAgentSchema = z.object({
+    isEnabled: z.boolean().optional(),
+    runFrequency: z.enum(["manual", "daily", "weekly", "monthly"]).optional(),
+    configJson: z.record(z.unknown()).optional(),
+  }).strict();
+
+  app.patch("/api/ai-agents/:id", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const parsed = updateAiAgentSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
+      }
+      const agent = await storage.updateAiAgent(req.params.id as string, parsed.data);
+      if (!agent) return res.status(404).json({ message: "Agent not found" });
+      res.json(agent);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating AI agent" });
+    }
+  });
+
+  app.get("/api/ai-agents/:id/logs", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const logs = await storage.getAiAgentUsageLogs(req.params.id as string);
+      res.json(logs);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching agent logs" });
+    }
+  });
+
+  app.get("/api/ai-agents/:id/suggestions", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const suggestions = await storage.getAiAgentSuggestions(req.params.id as string);
+      res.json(suggestions);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching agent suggestions" });
+    }
+  });
+
+  app.post("/api/ai-agents/:id/run", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const agent = await storage.getAiAgent(req.params.id as string);
+      if (!agent) return res.status(404).json({ message: "Agent not found" });
+      if (!agent.isEnabled) return res.status(400).json({ message: "Agent is disabled" });
+      
+      // Run the agent based on its category
+      let result: any = { message: "Agent executed", suggestions: [] };
+      let inputTokens = 0, outputTokens = 0, cost = 0;
+      
+      if (agent.category === "forms") {
+        // Forms Manager Agent
+        const forms = await storage.getCustomForms();
+        const publishedForms = forms.filter(f => f.isPublished);
+        
+        if (publishedForms.length > 0) {
+          const prompt = `Analyze these ${publishedForms.length} forms and suggest 1-3 improvements.
+
+Forms:
+${publishedForms.slice(0, 5).map(f => `- "${f.title}": ${(f.fields as any[])?.length || 0} fields`).join("\n")}
+
+Respond with a JSON object in this exact format:
+{"suggestions": [{"title": "suggestion title", "description": "detailed explanation of the improvement", "estimatedCost": "$0.05", "priority": "medium"}]}`;
+
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" },
+            max_tokens: 500,
+          });
+          
+          inputTokens = completion.usage?.prompt_tokens || 0;
+          outputTokens = completion.usage?.completion_tokens || 0;
+          cost = (inputTokens * 0.00015 + outputTokens * 0.0006) / 1000;
+          
+          try {
+            const responseText = completion.choices[0]?.message?.content || "{}";
+            const parsed = JSON.parse(responseText);
+            const suggestions = parsed.suggestions || [];
+            
+            if (Array.isArray(suggestions)) {
+              for (const s of suggestions) {
+                if (s.title && s.description) {
+                  await storage.createAiAgentSuggestion({
+                    agentId: agent.id,
+                    title: String(s.title).slice(0, 200),
+                    description: String(s.description).slice(0, 1000),
+                    estimatedCost: s.estimatedCost || "$0.05",
+                    priority: ["low", "medium", "high"].includes(s.priority) ? s.priority : "medium",
+                  });
+                }
+              }
+              result.suggestions = suggestions;
+            }
+          } catch (e) {
+            console.error("Failed to parse Forms Manager AI response:", e);
+            result.error = "Failed to parse AI response";
+          }
+        } else {
+          result.message = "No published forms to analyze";
+        }
+      } else if (agent.category === "sops") {
+        // SOP Assistant Agent
+        const sops = await storage.getSops();
+        const activeSops = sops.filter((s: any) => !s.isArchived).slice(0, 5);
+        
+        if (activeSops.length > 0) {
+          const prompt = `Analyze these ${activeSops.length} SOPs and suggest 1-3 improvements.
+
+SOPs:
+${activeSops.map((s: any) => `- "${s.title}": ${s.content?.length || 0} chars`).join("\n")}
+
+Respond with a JSON object in this exact format:
+{"suggestions": [{"title": "suggestion title", "description": "detailed explanation of the improvement", "estimatedCost": "$0.05", "priority": "medium"}]}`;
+
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" },
+            max_tokens: 500,
+          });
+          
+          inputTokens = completion.usage?.prompt_tokens || 0;
+          outputTokens = completion.usage?.completion_tokens || 0;
+          cost = (inputTokens * 0.00015 + outputTokens * 0.0006) / 1000;
+          
+          try {
+            const responseText = completion.choices[0]?.message?.content || "{}";
+            const parsed = JSON.parse(responseText);
+            const suggestions = parsed.suggestions || [];
+            
+            if (Array.isArray(suggestions)) {
+              for (const s of suggestions) {
+                if (s.title && s.description) {
+                  await storage.createAiAgentSuggestion({
+                    agentId: agent.id,
+                    title: String(s.title).slice(0, 200),
+                    description: String(s.description).slice(0, 1000),
+                    estimatedCost: s.estimatedCost || "$0.05",
+                    priority: ["low", "medium", "high"].includes(s.priority) ? s.priority : "medium",
+                  });
+                }
+              }
+              result.suggestions = suggestions;
+            }
+          } catch (e) {
+            console.error("Failed to parse SOP Assistant AI response:", e);
+            result.error = "Failed to parse AI response";
+          }
+        } else {
+          result.message = "No active SOPs to analyze";
+        }
+      }
+      
+      // Log the usage
+      await storage.createAiAgentUsageLog({
+        agentId: agent.id,
+        action: "manual_run",
+        inputTokens,
+        outputTokens,
+        estimatedCost: cost.toFixed(4),
+        resultSummary: `Generated ${result.suggestions?.length || 0} suggestions`,
+      });
+      
+      // Update last run time
+      await storage.updateAiAgent(agent.id, { lastRunAt: new Date() });
+      
+      res.json(result);
+    } catch (err) {
+      console.error("Error running AI agent:", err);
+      res.status(500).json({ message: "Error running AI agent" });
+    }
+  });
+
+  const updateAiSuggestionSchema = z.object({
+    status: z.enum(["pending", "implemented", "dismissed"]).optional(),
+    implementedAt: z.union([z.string(), z.null()]).optional(),
+  }).strict();
+
+  app.patch("/api/ai-suggestions/:id", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const parsed = updateAiSuggestionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
+      }
+      const updates: any = { ...parsed.data };
+      if (updates.implementedAt && typeof updates.implementedAt === "string") {
+        updates.implementedAt = new Date(updates.implementedAt);
+      }
+      const suggestion = await storage.updateAiAgentSuggestion(req.params.id as string, updates);
+      if (!suggestion) return res.status(404).json({ message: "Suggestion not found" });
+      res.json(suggestion);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating suggestion" });
+    }
+  });
+
+  app.delete("/api/ai-suggestions/:id", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      await storage.deleteAiAgentSuggestion(req.params.id as string);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting suggestion" });
+    }
+  });
+
+  app.get("/api/ai-agents/costs/summary", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const agents = await storage.getAiAgents();
+      const allLogs = await storage.getAiAgentUsageLogs();
+      
+      // Scope to current billing period (current month)
+      const now = new Date();
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const logs = allLogs.filter(l => l.createdAt && new Date(l.createdAt) >= firstOfMonth);
+      
+      // Calculate costs by agent (current period only)
+      const agentCosts = agents.map(agent => {
+        const agentLogs = logs.filter(l => l.agentId === agent.id);
+        const totalCost = agentLogs.reduce((sum, l) => sum + parseFloat(l.estimatedCost || "0"), 0);
+        return {
+          agentId: agent.id,
+          agentName: agent.name,
+          totalCost,
+          runCount: agentLogs.length,
+        };
+      });
+      
+      // Overall totals (current period)
+      const totalCost = agentCosts.reduce((sum, a) => sum + a.totalCost, 0);
+      const totalRuns = agentCosts.reduce((sum, a) => sum + a.runCount, 0);
+      
+      // Calculate projected monthly cost based on current period usage
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const dayOfMonth = now.getDate();
+      const projectedMonthly = dayOfMonth > 0 ? (totalCost / dayOfMonth) * daysInMonth : 0;
+      
+      const nextBillingDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      
+      res.json({
+        agentCosts,
+        totalCost,
+        totalRuns,
+        projectedMonthly,
+        nextBillingDate: nextBillingDate.toISOString(),
+        currency: "USD",
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching cost summary" });
     }
   });
 
