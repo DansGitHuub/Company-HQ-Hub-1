@@ -281,7 +281,9 @@ export interface IStorage {
   // AI Agents
   getAiAgents(): Promise<AiAgent[]>;
   getAiAgent(id: string): Promise<AiAgent | undefined>;
+  createAiAgent(agent: InsertAiAgent): Promise<AiAgent>;
   updateAiAgent(id: string, updates: Partial<AiAgent>): Promise<AiAgent | undefined>;
+  deleteAiAgent(id: string): Promise<boolean>;
   
   // AI Agent Usage Logs
   getAiAgentUsageLogs(agentId?: string): Promise<AiAgentUsageLog[]>;
@@ -1216,12 +1218,22 @@ export class DatabaseStorage implements IStorage {
     return agent || undefined;
   }
   
+  async createAiAgent(agent: InsertAiAgent): Promise<AiAgent> {
+    const [created] = await db.insert(aiAgents).values(agent).returning();
+    return created;
+  }
+  
   async updateAiAgent(id: string, updates: Partial<AiAgent>): Promise<AiAgent | undefined> {
     const [updated] = await db.update(aiAgents)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(aiAgents.id, id))
       .returning();
     return updated || undefined;
+  }
+  
+  async deleteAiAgent(id: string): Promise<boolean> {
+    await db.delete(aiAgents).where(eq(aiAgents.id, id));
+    return true;
   }
   
   // AI Agent Usage Logs

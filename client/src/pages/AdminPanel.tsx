@@ -900,6 +900,17 @@ function AiAgentsPanel() {
     },
   });
 
+  // Mutation to delete agent
+  const deleteAgentMutation = useMutation({
+    mutationFn: async (agentId: string) => {
+      await apiRequest("DELETE", `/api/ai-agents/${agentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-agents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-agents/costs/summary"] });
+    },
+  });
+
   // Fetch suggestions for an agent
   const fetchSuggestions = async (agentId: string) => {
     const res = await fetch(`/api/ai-agents/${agentId}/suggestions`, { credentials: "include" });
@@ -972,14 +983,17 @@ function AiAgentsPanel() {
 
       {/* AI Agents List */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bot className="h-5 w-5" />
-            AI Agents
-          </CardTitle>
-          <CardDescription>
-            Control your autonomous AI agents. They analyze your data and suggest improvements.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Bot className="h-5 w-5" />
+              AI Agents
+            </CardTitle>
+            <CardDescription>
+              Control your autonomous AI agents. They analyze your data and suggest improvements.
+            </CardDescription>
+          </div>
+          <CreateAgentDialog onCreated={() => refetchAgents()} />
         </CardHeader>
         <CardContent className="space-y-4">
           {agents.map((agent: any) => (
@@ -990,6 +1004,7 @@ function AiAgentsPanel() {
               onToggleExpand={() => setExpandedAgent(expandedAgent === agent.id ? null : agent.id)}
               onToggleEnabled={(enabled) => toggleAgentMutation.mutate({ id: agent.id, isEnabled: enabled })}
               onRun={() => runAgentMutation.mutate(agent.id)}
+              onDelete={() => deleteAgentMutation.mutate(agent.id)}
               isRunning={runAgentMutation.isPending && runAgentMutation.variables === agent.id}
               costData={costSummary?.agentCosts?.find((c: any) => c.agentId === agent.id)}
               fetchSuggestions={fetchSuggestions}
@@ -1008,6 +1023,7 @@ function AgentCard({
   onToggleExpand,
   onToggleEnabled,
   onRun,
+  onDelete,
   isRunning,
   costData,
   fetchSuggestions,
@@ -1017,6 +1033,7 @@ function AgentCard({
   onToggleExpand: () => void;
   onToggleEnabled: (enabled: boolean) => void;
   onRun: () => void;
+  onDelete: () => void;
   isRunning: boolean;
   costData?: any;
   fetchSuggestions: (agentId: string) => Promise<any[]>;
@@ -1044,13 +1061,17 @@ function AgentCard({
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case "forms":
+      case "forms_builder":
         return <FileText className="h-5 w-5" />;
       case "sops":
+      case "sop_builder":
         return <BookOpen className="h-5 w-5" />;
       case "communications":
         return <Inbox className="h-5 w-5" />;
       case "hiring":
         return <Users className="h-5 w-5" />;
+      case "content_creator":
+        return <GraduationCap className="h-5 w-5" />;
       default:
         return <Bot className="h-5 w-5" />;
     }
@@ -1126,6 +1147,19 @@ function AgentCard({
                 <Play className="h-4 w-4" />
               )}
               Run Now
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm("Delete this agent and all its suggestions?")) {
+                  onDelete();
+                }
+              }}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
           {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
@@ -1337,6 +1371,120 @@ function CreateUserDialog({ open, onOpenChange, isMasterAdmin }: { open: boolean
             <Button type="submit" disabled={createMutation.isPending}>
               {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Create User
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreateAgentDialog({ onCreated }: { onCreated: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    category: "custom",
+    runFrequency: "manual" as "manual" | "daily" | "weekly" | "monthly",
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const res = await apiRequest("POST", "/api/ai-agents", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-agents"] });
+      setOpen(false);
+      setFormData({ name: "", description: "", category: "custom", runFrequency: "manual" });
+      onCreated();
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createMutation.mutate(formData);
+  };
+
+  const categoryOptions = [
+    { value: "custom", label: "Custom Agent" },
+    { value: "sop_builder", label: "SOP Builder" },
+    { value: "forms_builder", label: "Forms Builder" },
+    { value: "content_creator", label: "Content Creator" },
+    { value: "forms", label: "Forms Analyzer" },
+    { value: "sops", label: "SOP Analyzer" },
+    { value: "communications", label: "Communications" },
+    { value: "hiring", label: "Hiring" },
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button className="gap-2" data-testid="button-create-agent">
+          <Plus className="w-4 h-4" /> Create Agent
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Bot className="h-5 w-5" />
+            Create AI Agent
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          <div className="grid gap-2">
+            <Label>Agent Name</Label>
+            <Input
+              placeholder="e.g., Equipment Maintenance Analyzer"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+              data-testid="input-agent-name"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Description</Label>
+            <Input
+              placeholder="What should this agent do?"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              data-testid="input-agent-description"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Category / Type</Label>
+            <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
+              <SelectTrigger data-testid="select-agent-category">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {categoryOptions.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>Run Frequency</Label>
+            <Select value={formData.runFrequency} onValueChange={(val: any) => setFormData({ ...formData, runFrequency: val })}>
+              <SelectTrigger data-testid="select-agent-frequency">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manual">Manual Only</SelectItem>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit-agent">
+              {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Create Agent
             </Button>
           </div>
         </form>

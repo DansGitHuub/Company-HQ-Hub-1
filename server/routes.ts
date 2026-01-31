@@ -279,6 +279,30 @@ export async function registerRoutes(
     }
   });
 
+  const createAiAgentSchema = z.object({
+    name: z.string().min(1).max(100),
+    description: z.string().max(500).optional(),
+    category: z.string().max(50).optional(),
+    runFrequency: z.enum(["manual", "daily", "weekly", "monthly"]).optional(),
+    configJson: z.record(z.unknown()).optional(),
+  });
+
+  app.post("/api/ai-agents", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const parsed = createAiAgentSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
+      }
+      const agent = await storage.createAiAgent({
+        ...parsed.data,
+        isEnabled: false,
+      });
+      res.status(201).json(agent);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating AI agent" });
+    }
+  });
+
   const updateAiAgentSchema = z.object({
     isEnabled: z.boolean().optional(),
     runFrequency: z.enum(["manual", "daily", "weekly", "monthly"]).optional(),
@@ -296,6 +320,15 @@ export async function registerRoutes(
       res.json(agent);
     } catch (err) {
       res.status(500).json({ message: "Error updating AI agent" });
+    }
+  });
+
+  app.delete("/api/ai-agents/:id", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      await storage.deleteAiAgent(req.params.id as string);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting AI agent" });
     }
   });
 
@@ -428,6 +461,142 @@ Respond with a JSON object in this exact format:
           }
         } else {
           result.message = "No active SOPs to analyze";
+        }
+      } else if (agent.category === "sop_builder") {
+        // SOP Builder Agent - Creates new SOPs with rich content
+        const prompt = `You are an expert at creating Standard Operating Procedures for a landscaping company.
+Create a comprehensive SOP suggestion for a common landscaping task. Include:
+1. Clear step-by-step instructions
+2. [IMAGE: description] placeholders for photos/diagrams
+3. [VIDEO: description] placeholders for training videos
+4. Safety considerations
+5. Equipment needed
+6. Time estimates
+
+Respond with a JSON object:
+{"suggestions": [{"title": "SOP Title - e.g., 'Lawn Mower Daily Maintenance'", "description": "Full SOP content with instructions, [IMAGE: description] and [VIDEO: description] placeholders, safety notes, equipment list, and estimated time", "estimatedCost": "$0.10", "priority": "high"}]}`;
+
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [{ role: "user", content: prompt }],
+          response_format: { type: "json_object" },
+          max_tokens: 1500,
+        });
+        
+        inputTokens = completion.usage?.prompt_tokens || 0;
+        outputTokens = completion.usage?.completion_tokens || 0;
+        cost = (inputTokens * 0.00015 + outputTokens * 0.0006) / 1000;
+        
+        try {
+          const responseText = completion.choices[0]?.message?.content || "{}";
+          const parsed = JSON.parse(responseText);
+          const suggestions = parsed.suggestions || [];
+          
+          if (Array.isArray(suggestions)) {
+            for (const s of suggestions) {
+              if (s.title && s.description) {
+                await storage.createAiAgentSuggestion({
+                  agentId: agent.id,
+                  title: String(s.title).slice(0, 200),
+                  description: String(s.description).slice(0, 5000),
+                  estimatedCost: s.estimatedCost || "$0.10",
+                  priority: ["low", "medium", "high"].includes(s.priority) ? s.priority : "high",
+                });
+              }
+            }
+            result.suggestions = suggestions;
+          }
+        } catch (e) {
+          console.error("Failed to parse SOP Builder AI response:", e);
+          result.error = "Failed to parse AI response";
+        }
+      } else if (agent.category === "forms_builder") {
+        // Forms Builder Agent - Creates new forms
+        const prompt = `You are an expert at creating business forms for a landscaping company.
+Suggest a useful form that the company could use. Include:
+1. Form title and purpose
+2. List of fields with types (text, number, date, select, checkbox, etc.)
+3. Validation rules if any
+
+Respond with a JSON object:
+{"suggestions": [{"title": "Form Name - e.g., 'New Customer Intake Form'", "description": "Purpose: [why this form is useful]\\n\\nFields:\\n- Customer Name (text, required)\\n- Phone (phone, required)\\n- Email (email)\\n- Property Address (text, required)\\n- Service Type (select: Lawn Care, Landscaping, Snow Removal, Other)\\n- Budget Range (select: Under $500, $500-$1000, $1000-$5000, $5000+)\\n- Special Instructions (textarea)\\n- Preferred Contact Method (radio: Phone, Email, Text)", "estimatedCost": "$0.05", "priority": "medium"}]}`;
+
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [{ role: "user", content: prompt }],
+          response_format: { type: "json_object" },
+          max_tokens: 1000,
+        });
+        
+        inputTokens = completion.usage?.prompt_tokens || 0;
+        outputTokens = completion.usage?.completion_tokens || 0;
+        cost = (inputTokens * 0.00015 + outputTokens * 0.0006) / 1000;
+        
+        try {
+          const responseText = completion.choices[0]?.message?.content || "{}";
+          const parsed = JSON.parse(responseText);
+          const suggestions = parsed.suggestions || [];
+          
+          if (Array.isArray(suggestions)) {
+            for (const s of suggestions) {
+              if (s.title && s.description) {
+                await storage.createAiAgentSuggestion({
+                  agentId: agent.id,
+                  title: String(s.title).slice(0, 200),
+                  description: String(s.description).slice(0, 2000),
+                  estimatedCost: s.estimatedCost || "$0.05",
+                  priority: ["low", "medium", "high"].includes(s.priority) ? s.priority : "medium",
+                });
+              }
+            }
+            result.suggestions = suggestions;
+          }
+        } catch (e) {
+          console.error("Failed to parse Forms Builder AI response:", e);
+          result.error = "Failed to parse AI response";
+        }
+      } else if (agent.category === "content_creator") {
+        // Content Creator Agent - Creates articles for Resource Library
+        const prompt = `You are an expert content writer for a landscaping company.
+Create an educational article that can be added to the company's Resource Library for employees and customers.
+Topics could include: seasonal lawn care tips, plant care guides, equipment maintenance, landscaping design principles, etc.
+
+Respond with a JSON object:
+{"suggestions": [{"title": "Article Title - e.g., 'Spring Lawn Care: 10 Essential Steps'", "description": "Full article content with introduction, main sections, tips, and conclusion. Make it informative and practical for both employees and customers.", "estimatedCost": "$0.08", "priority": "medium"}]}`;
+
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [{ role: "user", content: prompt }],
+          response_format: { type: "json_object" },
+          max_tokens: 1500,
+        });
+        
+        inputTokens = completion.usage?.prompt_tokens || 0;
+        outputTokens = completion.usage?.completion_tokens || 0;
+        cost = (inputTokens * 0.00015 + outputTokens * 0.0006) / 1000;
+        
+        try {
+          const responseText = completion.choices[0]?.message?.content || "{}";
+          const parsed = JSON.parse(responseText);
+          const suggestions = parsed.suggestions || [];
+          
+          if (Array.isArray(suggestions)) {
+            for (const s of suggestions) {
+              if (s.title && s.description) {
+                await storage.createAiAgentSuggestion({
+                  agentId: agent.id,
+                  title: String(s.title).slice(0, 200),
+                  description: String(s.description).slice(0, 5000),
+                  estimatedCost: s.estimatedCost || "$0.08",
+                  priority: ["low", "medium", "high"].includes(s.priority) ? s.priority : "medium",
+                });
+              }
+            }
+            result.suggestions = suggestions;
+          }
+        } catch (e) {
+          console.error("Failed to parse Content Creator AI response:", e);
+          result.error = "Failed to parse AI response";
         }
       }
       
