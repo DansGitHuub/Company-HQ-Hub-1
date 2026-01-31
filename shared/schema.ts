@@ -1123,3 +1123,74 @@ export const insertAiAgentSuggestionSchema = createInsertSchema(aiAgentSuggestio
 
 export type InsertAiAgentSuggestion = z.infer<typeof insertAiAgentSuggestionSchema>;
 export type AiAgentSuggestion = typeof aiAgentSuggestions.$inferSelect;
+
+// Business Processes - Define workflows that can be audited
+export const businessProcesses = pgTable("business_processes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").default("general"), // customer_facing, internal, hiring, jobs, etc.
+  stepsJson: jsonb("steps_json").default([]), // Array of step definitions
+  notificationsJson: jsonb("notifications_json").default([]), // Notification triggers
+  rolesInvolved: text("roles_involved").array(), // Customer, Crew, Manager, Admin
+  estimatedDuration: text("estimated_duration"), // e.g., "2-4 hours", "1-2 days"
+  isActive: boolean("is_active").default(true),
+  lastAuditedAt: timestamp("last_audited_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBusinessProcessSchema = createInsertSchema(businessProcesses).pick({
+  name: true,
+  description: true,
+  category: true,
+  stepsJson: true,
+  notificationsJson: true,
+  rolesInvolved: true,
+  estimatedDuration: true,
+  isActive: true,
+});
+
+export type InsertBusinessProcess = z.infer<typeof insertBusinessProcessSchema>;
+export type BusinessProcess = typeof businessProcesses.$inferSelect;
+
+// Process Audit Results - Store audit findings and recommendations
+export const processAuditResults = pgTable("process_audit_results", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  processId: varchar("process_id", { length: 36 }).references(() => businessProcesses.id, { onDelete: "cascade" }).notNull(),
+  agentId: varchar("agent_id", { length: 36 }).references(() => aiAgents.id),
+  status: text("status").default("pending"), // pending, running, completed, failed
+  overallScore: integer("overall_score"), // 0-100 score
+  efficiencyScore: integer("efficiency_score"),
+  reliabilityScore: integer("reliability_score"),
+  customerExperienceScore: integer("customer_experience_score"),
+  communicationScore: integer("communication_score"),
+  findingsJson: jsonb("findings_json").default([]), // Array of findings
+  recommendationsJson: jsonb("recommendations_json").default([]), // Array of recommendations
+  estimatedImprovementTime: text("estimated_improvement_time"),
+  estimatedCost: text("estimated_cost").default("0.00"),
+  tokensUsed: integer("tokens_used").default(0),
+  runDurationMs: integer("run_duration_ms"),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertProcessAuditResultSchema = createInsertSchema(processAuditResults).pick({
+  processId: true,
+  agentId: true,
+  status: true,
+  overallScore: true,
+  efficiencyScore: true,
+  reliabilityScore: true,
+  customerExperienceScore: true,
+  communicationScore: true,
+  findingsJson: true,
+  recommendationsJson: true,
+  estimatedImprovementTime: true,
+  estimatedCost: true,
+  tokensUsed: true,
+  runDurationMs: true,
+});
+
+export type InsertProcessAuditResult = z.infer<typeof insertProcessAuditResultSchema>;
+export type ProcessAuditResult = typeof processAuditResults.$inferSelect;

@@ -41,7 +41,9 @@ import {
   plowSiteImages, type PlowSiteImage, type InsertPlowSiteImage,
   aiAgents, type AiAgent, type InsertAiAgent,
   aiAgentUsageLogs, type AiAgentUsageLog, type InsertAiAgentUsageLog,
-  aiAgentSuggestions, type AiAgentSuggestion, type InsertAiAgentSuggestion
+  aiAgentSuggestions, type AiAgentSuggestion, type InsertAiAgentSuggestion,
+  businessProcesses, type BusinessProcess, type InsertBusinessProcess,
+  processAuditResults, type ProcessAuditResult, type InsertProcessAuditResult
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull } from "drizzle-orm";
@@ -308,6 +310,19 @@ export interface IStorage {
   getThreadMessages(threadId: string, includeInternalNotes?: boolean): Promise<ThreadMessage[]>;
   createThreadMessage(message: InsertThreadMessage): Promise<ThreadMessage>;
   markMessagesAsRead(threadId: string, userId: string): Promise<void>;
+  
+  // Business Processes
+  getBusinessProcesses(): Promise<BusinessProcess[]>;
+  getBusinessProcess(id: string): Promise<BusinessProcess | undefined>;
+  createBusinessProcess(process: InsertBusinessProcess): Promise<BusinessProcess>;
+  updateBusinessProcess(id: string, updates: Partial<BusinessProcess>): Promise<BusinessProcess | undefined>;
+  deleteBusinessProcess(id: string): Promise<boolean>;
+  
+  // Process Audit Results
+  getProcessAuditResults(processId?: string): Promise<ProcessAuditResult[]>;
+  getProcessAuditResult(id: string): Promise<ProcessAuditResult | undefined>;
+  createProcessAuditResult(result: InsertProcessAuditResult): Promise<ProcessAuditResult>;
+  updateProcessAuditResult(id: string, updates: Partial<ProcessAuditResult>): Promise<ProcessAuditResult | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1388,6 +1403,58 @@ export class DatabaseStorage implements IStorage {
       await db.update(messagingThreads).set({ unreadByEmployee: false })
         .where(eq(messagingThreads.id, threadId));
     }
+  }
+  
+  // Business Processes
+  async getBusinessProcesses(): Promise<BusinessProcess[]> {
+    return await db.select().from(businessProcesses).orderBy(businessProcesses.name);
+  }
+  
+  async getBusinessProcess(id: string): Promise<BusinessProcess | undefined> {
+    const [process] = await db.select().from(businessProcesses).where(eq(businessProcesses.id, id));
+    return process || undefined;
+  }
+  
+  async createBusinessProcess(process: InsertBusinessProcess): Promise<BusinessProcess> {
+    const [created] = await db.insert(businessProcesses).values(process).returning();
+    return created;
+  }
+  
+  async updateBusinessProcess(id: string, updates: Partial<BusinessProcess>): Promise<BusinessProcess | undefined> {
+    const [updated] = await db.update(businessProcesses).set({ ...updates, updatedAt: new Date() })
+      .where(eq(businessProcesses.id, id)).returning();
+    return updated || undefined;
+  }
+  
+  async deleteBusinessProcess(id: string): Promise<boolean> {
+    const result = await db.delete(businessProcesses).where(eq(businessProcesses.id, id));
+    return true;
+  }
+  
+  // Process Audit Results
+  async getProcessAuditResults(processId?: string): Promise<ProcessAuditResult[]> {
+    if (processId) {
+      return await db.select().from(processAuditResults)
+        .where(eq(processAuditResults.processId, processId))
+        .orderBy(desc(processAuditResults.createdAt));
+    }
+    return await db.select().from(processAuditResults).orderBy(desc(processAuditResults.createdAt));
+  }
+  
+  async getProcessAuditResult(id: string): Promise<ProcessAuditResult | undefined> {
+    const [result] = await db.select().from(processAuditResults).where(eq(processAuditResults.id, id));
+    return result || undefined;
+  }
+  
+  async createProcessAuditResult(result: InsertProcessAuditResult): Promise<ProcessAuditResult> {
+    const [created] = await db.insert(processAuditResults).values(result).returning();
+    return created;
+  }
+  
+  async updateProcessAuditResult(id: string, updates: Partial<ProcessAuditResult>): Promise<ProcessAuditResult | undefined> {
+    const [updated] = await db.update(processAuditResults).set(updates)
+      .where(eq(processAuditResults.id, id)).returning();
+    return updated || undefined;
   }
 }
 
