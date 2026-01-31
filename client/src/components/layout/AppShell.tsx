@@ -682,13 +682,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="relative gap-2"
+                    className="relative gap-2 h-10"
                     data-testid="button-todo-header"
                   >
-                    <CheckSquare className="h-4 w-4" />
-                    <span className="hidden md:inline">To-Do</span>
+                    <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-600 shadow-md shadow-emerald-500/30">
+                      <CheckSquare className="h-4 w-4 text-white drop-shadow-sm" />
+                    </div>
+                    <span className="hidden md:inline font-medium">To-Do</span>
                     {todoActiveStatus?.unreadCount && todoActiveStatus.unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                      <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm">
                         {todoActiveStatus.unreadCount > 9 ? "9+" : todoActiveStatus.unreadCount}
                       </span>
                     )}
@@ -703,13 +705,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     size="sm"
                     onClick={() => setIsTileView(!isTileView)}
                     className={cn(
-                      "gap-2 transition-colors",
+                      "gap-2 transition-colors h-10",
                       isTileView && "bg-primary text-primary-foreground"
                     )}
                     data-testid="button-tile-view-toggle"
                   >
-                    {isTileView ? <PanelLeft className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
-                    <span>{isTileView ? "Back to Menu" : "Tile View"}</span>
+                    <div className={cn(
+                      "relative w-7 h-7 flex items-center justify-center rounded-lg shadow-md transition-all",
+                      isTileView 
+                        ? "bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 shadow-slate-500/30" 
+                        : "bg-gradient-to-br from-violet-400 via-violet-500 to-violet-600 shadow-violet-500/30"
+                    )}>
+                      {isTileView ? <PanelLeft className="h-4 w-4 text-white drop-shadow-sm" /> : <LayoutGrid className="h-4 w-4 text-white drop-shadow-sm" />}
+                    </div>
+                    <span className="font-medium">{isTileView ? "Back to Menu" : "Tile View"}</span>
                   </Button>
                 </div>
                 {isTileView && (
