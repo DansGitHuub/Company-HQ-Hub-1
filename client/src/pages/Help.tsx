@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 import { 
   HelpCircle, 
   Home, 
@@ -30,7 +32,9 @@ import {
   Star,
   Settings,
   Search,
-  ArrowLeft
+  ArrowLeft,
+  Flag,
+  AlertTriangle
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -548,6 +552,103 @@ export default function Help() {
   );
 }
 
+function ReportArticleButton({ articleId, articleTitle }: { articleId: string; articleTitle: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [description, setDescription] = useState("");
+  const [reportType, setReportType] = useState("outdated");
+  
+  const reportMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/help/articles/${articleId}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ reportType, description })
+      });
+      if (!res.ok) throw new Error("Failed to submit report");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Report submitted", 
+        description: "Thank you! An admin will review your feedback." 
+      });
+      setOpen(false);
+      setDescription("");
+    },
+    onError: () => {
+      toast({ 
+        title: "Error", 
+        description: "Could not submit report. Please try again.", 
+        variant: "destructive" 
+      });
+    }
+  });
+  
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground" data-testid="report-article-btn">
+          <Flag className="h-4 w-4" />
+          Report Issue
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-yellow-500" />
+            Report an Issue
+          </DialogTitle>
+          <DialogDescription>
+            Let us know if this article needs updating
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Article</label>
+            <p className="text-muted-foreground">{articleTitle}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Issue Type</label>
+            <Select value={reportType} onValueChange={setReportType}>
+              <SelectTrigger data-testid="report-type-select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="outdated">Outdated information</SelectItem>
+                <SelectItem value="incorrect">Incorrect information</SelectItem>
+                <SelectItem value="unclear">Unclear or confusing</SelectItem>
+                <SelectItem value="missing">Missing information</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Description (optional)</label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Tell us what's wrong or what could be improved..."
+              data-testid="report-description"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={() => reportMutation.mutate()} 
+            disabled={reportMutation.isPending}
+            data-testid="submit-report-btn"
+          >
+            {reportMutation.isPending ? "Submitting..." : "Submit Report"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function HelpArticlesSection() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedArticle, setSelectedArticle] = useState<HelpArticle | null>(null);
@@ -584,8 +685,13 @@ function HelpArticlesSection() {
         
         <Card>
           <CardHeader>
-            <CardTitle>{selectedArticle.title}</CardTitle>
-            <CardDescription>{selectedArticle.summary}</CardDescription>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle>{selectedArticle.title}</CardTitle>
+                <CardDescription>{selectedArticle.summary}</CardDescription>
+              </div>
+              <ReportArticleButton articleId={selectedArticle.id} articleTitle={selectedArticle.title} />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-wrap">
