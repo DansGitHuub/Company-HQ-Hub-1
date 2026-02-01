@@ -368,7 +368,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const hasLogo = !!companySettings?.logoUrl;
     
     return (
-    <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground bg-gradient-to-b from-white/[0.03] to-transparent">
+    <div className="sidebar-themed flex flex-col h-full text-sidebar-foreground">
       <div className="p-6 pb-8 border-b border-sidebar-border">
         <a 
           href="/" 
@@ -645,7 +645,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <Menu className="h-6 w-6" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-64 border-r border-sidebar-border bg-sidebar">
+            <SheetContent side="left" className="p-0 w-64 border-r border-sidebar-border sidebar-themed">
               <NavContent />
             </SheetContent>
           </Sheet>

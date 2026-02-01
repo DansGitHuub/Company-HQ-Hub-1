@@ -8,6 +8,15 @@ export type ThemeId =
   | "winter" 
   | "desert";
 
+export interface ThemeStyle {
+  borderRadius: string;
+  cardShadow: string;
+  buttonStyle: "solid" | "outline" | "soft";
+  sidebarStyle: "solid" | "glass" | "gradient";
+  cardBorder: string;
+  inputStyle: "minimal" | "bordered" | "filled";
+}
+
 export interface Theme {
   id: ThemeId;
   name: string;
@@ -23,7 +32,9 @@ export interface Theme {
     gradientTo: string;
     sidebar: string;
     sidebarForeground: string;
+    sidebarAccent: string;
   };
+  style: ThemeStyle;
 }
 
 export const themes: Theme[] = [
@@ -37,11 +48,20 @@ export const themes: Theme[] = [
       primaryForeground: "0 0% 100%",
       accent: "142 50% 45%",
       accentForeground: "0 0% 100%",
-      cardGlow: "rgba(34, 139, 34, 0.15)",
+      cardGlow: "rgba(34, 139, 34, 0.12)",
       gradientFrom: "142 40% 20%",
       gradientTo: "142 50% 15%",
       sidebar: "142 40% 12%",
       sidebarForeground: "142 20% 95%",
+      sidebarAccent: "142 60% 45%",
+    },
+    style: {
+      borderRadius: "0.5rem",
+      cardShadow: "0 2px 8px -2px rgba(0,0,0,0.1), 0 4px 16px -4px rgba(34,139,34,0.08)",
+      buttonStyle: "solid",
+      sidebarStyle: "solid",
+      cardBorder: "1px solid hsl(142 20% 88%)",
+      inputStyle: "bordered",
     },
   },
   {
@@ -54,11 +74,20 @@ export const themes: Theme[] = [
       primaryForeground: "0 0% 100%",
       accent: "190 70% 50%",
       accentForeground: "0 0% 100%",
-      cardGlow: "rgba(30, 144, 200, 0.15)",
+      cardGlow: "rgba(30, 144, 200, 0.12)",
       gradientFrom: "200 60% 18%",
       gradientTo: "210 65% 12%",
       sidebar: "205 50% 14%",
       sidebarForeground: "200 20% 95%",
+      sidebarAccent: "195 80% 55%",
+    },
+    style: {
+      borderRadius: "0.75rem",
+      cardShadow: "0 4px 20px -4px rgba(30,144,200,0.15), 0 2px 8px -2px rgba(0,0,0,0.08)",
+      buttonStyle: "soft",
+      sidebarStyle: "glass",
+      cardBorder: "1px solid hsl(200 30% 90%)",
+      inputStyle: "minimal",
     },
   },
   {
@@ -71,11 +100,20 @@ export const themes: Theme[] = [
       primaryForeground: "0 0% 100%",
       accent: "35 95% 55%",
       accentForeground: "0 0% 15%",
-      cardGlow: "rgba(255, 140, 50, 0.15)",
+      cardGlow: "rgba(255, 140, 50, 0.12)",
       gradientFrom: "25 50% 18%",
       gradientTo: "15 55% 12%",
       sidebar: "20 45% 14%",
       sidebarForeground: "30 20% 95%",
+      sidebarAccent: "30 90% 55%",
+    },
+    style: {
+      borderRadius: "1rem",
+      cardShadow: "0 6px 24px -6px rgba(255,140,50,0.2), 0 2px 6px -2px rgba(0,0,0,0.06)",
+      buttonStyle: "solid",
+      sidebarStyle: "gradient",
+      cardBorder: "none",
+      inputStyle: "filled",
     },
   },
   {
@@ -88,11 +126,20 @@ export const themes: Theme[] = [
       primaryForeground: "0 0% 100%",
       accent: "210 20% 55%",
       accentForeground: "0 0% 100%",
-      cardGlow: "rgba(100, 116, 139, 0.15)",
+      cardGlow: "rgba(100, 116, 139, 0.1)",
       gradientFrom: "220 20% 18%",
       gradientTo: "225 25% 12%",
       sidebar: "220 20% 14%",
       sidebarForeground: "220 15% 95%",
+      sidebarAccent: "220 25% 60%",
+    },
+    style: {
+      borderRadius: "0.25rem",
+      cardShadow: "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)",
+      buttonStyle: "outline",
+      sidebarStyle: "solid",
+      cardBorder: "1px solid hsl(220 15% 85%)",
+      inputStyle: "bordered",
     },
   },
   {
@@ -105,11 +152,20 @@ export const themes: Theme[] = [
       primaryForeground: "0 0% 15%",
       accent: "60 70% 50%",
       accentForeground: "0 0% 15%",
-      cardGlow: "rgba(132, 204, 22, 0.15)",
+      cardGlow: "rgba(132, 204, 22, 0.12)",
       gradientFrom: "85 40% 18%",
       gradientTo: "90 45% 12%",
       sidebar: "85 35% 14%",
       sidebarForeground: "85 20% 95%",
+      sidebarAccent: "75 70% 50%",
+    },
+    style: {
+      borderRadius: "1.25rem",
+      cardShadow: "0 4px 12px -2px rgba(132,204,22,0.15), 0 2px 4px -1px rgba(0,0,0,0.05)",
+      buttonStyle: "soft",
+      sidebarStyle: "gradient",
+      cardBorder: "none",
+      inputStyle: "minimal",
     },
   },
   {
@@ -122,11 +178,20 @@ export const themes: Theme[] = [
       primaryForeground: "0 0% 100%",
       accent: "30 80% 50%",
       accentForeground: "0 0% 100%",
-      cardGlow: "rgba(180, 83, 9, 0.15)",
+      cardGlow: "rgba(180, 83, 9, 0.12)",
       gradientFrom: "15 50% 18%",
       gradientTo: "10 55% 12%",
       sidebar: "15 45% 14%",
       sidebarForeground: "20 20% 95%",
+      sidebarAccent: "25 80% 50%",
+    },
+    style: {
+      borderRadius: "0.375rem",
+      cardShadow: "0 3px 10px -3px rgba(180,83,9,0.18), 0 2px 4px -1px rgba(0,0,0,0.08)",
+      buttonStyle: "solid",
+      sidebarStyle: "solid",
+      cardBorder: "1px solid hsl(20 30% 88%)",
+      inputStyle: "bordered",
     },
   },
   {
@@ -139,11 +204,20 @@ export const themes: Theme[] = [
       primaryForeground: "0 0% 100%",
       accent: "200 50% 65%",
       accentForeground: "0 0% 15%",
-      cardGlow: "rgba(147, 197, 253, 0.2)",
+      cardGlow: "rgba(147, 197, 253, 0.15)",
       gradientFrom: "215 35% 20%",
       gradientTo: "220 40% 15%",
       sidebar: "215 30% 16%",
       sidebarForeground: "210 25% 95%",
+      sidebarAccent: "200 60% 70%",
+    },
+    style: {
+      borderRadius: "0.625rem",
+      cardShadow: "0 4px 16px -4px rgba(147,197,253,0.25), 0 2px 6px -2px rgba(0,0,0,0.05)",
+      buttonStyle: "outline",
+      sidebarStyle: "glass",
+      cardBorder: "1px solid hsl(210 30% 92%)",
+      inputStyle: "minimal",
     },
   },
   {
@@ -156,11 +230,20 @@ export const themes: Theme[] = [
       primaryForeground: "0 0% 100%",
       accent: "25 55% 55%",
       accentForeground: "0 0% 100%",
-      cardGlow: "rgba(217, 119, 6, 0.15)",
+      cardGlow: "rgba(217, 119, 6, 0.12)",
       gradientFrom: "35 40% 18%",
       gradientTo: "30 45% 12%",
       sidebar: "35 35% 14%",
       sidebarForeground: "35 20% 95%",
+      sidebarAccent: "40 70% 55%",
+    },
+    style: {
+      borderRadius: "0.125rem",
+      cardShadow: "0 2px 8px -2px rgba(217,119,6,0.15), 0 1px 3px -1px rgba(0,0,0,0.1)",
+      buttonStyle: "solid",
+      sidebarStyle: "solid",
+      cardBorder: "2px solid hsl(35 25% 85%)",
+      inputStyle: "filled",
     },
   },
 ];
@@ -171,8 +254,9 @@ export function getTheme(id: ThemeId | string | null | undefined): Theme {
 
 export function applyTheme(theme: Theme) {
   const root = document.documentElement;
-  const { colors } = theme;
+  const { colors, style } = theme;
   
+  // Apply colors
   root.style.setProperty("--primary", colors.primary);
   root.style.setProperty("--primary-foreground", colors.primaryForeground);
   root.style.setProperty("--accent", colors.accent);
@@ -180,6 +264,16 @@ export function applyTheme(theme: Theme) {
   root.style.setProperty("--card-glow", colors.cardGlow);
   root.style.setProperty("--sidebar", colors.sidebar);
   root.style.setProperty("--sidebar-foreground", colors.sidebarForeground);
+  root.style.setProperty("--sidebar-accent", colors.sidebarAccent);
   
+  // Apply style characteristics
+  root.style.setProperty("--radius", style.borderRadius);
+  root.style.setProperty("--card-shadow", style.cardShadow);
+  root.style.setProperty("--card-border", style.cardBorder);
+  
+  // Set data attributes for CSS targeting
   root.setAttribute("data-theme", theme.id);
+  root.setAttribute("data-button-style", style.buttonStyle);
+  root.setAttribute("data-sidebar-style", style.sidebarStyle);
+  root.setAttribute("data-input-style", style.inputStyle);
 }

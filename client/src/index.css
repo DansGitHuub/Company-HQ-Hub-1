@@ -147,6 +147,9 @@
 
 :root {
   --card-glow: rgba(34, 139, 34, 0.15);
+  --card-shadow: 0 2px 8px -2px rgba(0,0,0,0.1);
+  --card-border: 1px solid hsl(var(--border));
+  --sidebar-accent: 142 60% 45%;
 }
 
 @layer base {
@@ -294,4 +297,94 @@
     @apply opacity-100;
     animation: shimmer 2s linear infinite;
   }
+}
+
+/* Theme-specific button styles */
+[data-button-style="solid"] .btn-theme {
+  @apply border-transparent shadow-sm;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+[data-button-style="solid"] .btn-theme:hover {
+  filter: brightness(1.1);
+  @apply shadow-md;
+}
+
+[data-button-style="outline"] .btn-theme {
+  @apply bg-transparent border-2;
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+}
+[data-button-style="outline"] .btn-theme:hover {
+  background: hsl(var(--primary) / 0.1);
+}
+
+[data-button-style="soft"] .btn-theme {
+  @apply border-transparent;
+  background: hsl(var(--primary) / 0.15);
+  color: hsl(var(--primary));
+}
+[data-button-style="soft"] .btn-theme:hover {
+  background: hsl(var(--primary) / 0.25);
+}
+
+/* Theme-specific sidebar styles */
+.sidebar-themed {
+  background: hsl(var(--sidebar));
+  transition: background 0.3s ease;
+}
+
+[data-sidebar-style="solid"] .sidebar-themed {
+  background: hsl(var(--sidebar));
+}
+
+[data-sidebar-style="glass"] .sidebar-themed {
+  background: hsl(var(--sidebar) / 0.85);
+  backdrop-filter: blur(12px);
+  border-right: 1px solid hsl(var(--sidebar-border) / 0.5);
+}
+
+[data-sidebar-style="gradient"] .sidebar-themed {
+  background: linear-gradient(180deg, hsl(var(--sidebar)) 0%, hsl(var(--sidebar) / 0.9) 50%, hsl(var(--sidebar) / 0.8) 100%);
+}
+
+/* Theme-specific input styles */
+[data-input-style="minimal"] .input-themed {
+  @apply border-0 border-b-2 rounded-none bg-transparent;
+  border-color: hsl(var(--border));
+}
+[data-input-style="minimal"] .input-themed:focus {
+  border-color: hsl(var(--primary));
+  @apply ring-0;
+}
+
+[data-input-style="bordered"] .input-themed {
+  @apply border-2 bg-transparent;
+  border-color: hsl(var(--border));
+}
+[data-input-style="bordered"] .input-themed:focus {
+  border-color: hsl(var(--primary));
+}
+
+[data-input-style="filled"] .input-themed {
+  @apply border-0;
+  background: hsl(var(--muted) / 0.5);
+}
+[data-input-style="filled"] .input-themed:focus {
+  background: hsl(var(--muted) / 0.8);
+  @apply ring-2;
+  --tw-ring-color: hsl(var(--primary) / 0.3);
+}
+
+/* Theme-specific card styles */
+.card-themed {
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  border: var(--card-border);
+}
+
+/* Sidebar accent indicator */
+.sidebar-accent-bar {
+  background: hsl(var(--sidebar-accent));
+  box-shadow: 0 0 10px hsl(var(--sidebar-accent) / 0.5);
 }

@@ -13,7 +13,11 @@ Preferred communication style: Simple, everyday language.
 - **State Management**: React Query for server state, React Context for local state
 - **UI**: shadcn/ui, Radix UI, Tailwind CSS v4 for styling
 - **Features**: Framer Motion for animations, @hello-pangea/dnd for drag & drop, Recharts for data visualization, React Hook Form with Zod for form handling.
-- **Theming**: 8 landscape-inspired color themes, user-selectable and persistent.
+- **Theming**: 8 landscape-inspired themes with unique visual characteristics:
+  - Each theme has distinct colors, border radius, shadows, and sidebar styles
+  - Button styles: solid, outline, or soft depending on theme
+  - Sidebar styles: solid, glass (blur), or gradient depending on theme
+  - Input styles: minimal, bordered, or filled depending on theme
 - **Navigation**: Traditional sidebar and "Tile View" with Grid, Radial, and Dock layouts.
 
 ### Backend
