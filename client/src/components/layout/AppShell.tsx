@@ -6,6 +6,7 @@ import type { CompanySettings } from "@shared/schema";
 import FloatingChatPopup from "@/components/FloatingChatPopup";
 import UpdatesPopup from "@/components/UpdatesPopup";
 import FloatingAssistantButton from "@/components/FloatingAssistantButton";
+import InteractiveCalendar from "@/components/InteractiveCalendar";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -808,9 +809,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
               </div>
-              <span className="text-sm font-medium text-muted-foreground hidden md:inline-block ml-2">
-                {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-              </span>
+              <div className="hidden md:block ml-2">
+                <InteractiveCalendar />
+              </div>
            </div>
         </header>
 
