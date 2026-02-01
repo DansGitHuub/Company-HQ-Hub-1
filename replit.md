@@ -55,7 +55,11 @@ Preferred communication style: Simple, everyday language.
   - **AI Suggestions**: Each agent generates detailed improvement suggestions with cost estimates and priority levels. Suggestions can be marked as implemented or dismissed.
   - **Security**: Master Admin access only - hidden from other users entirely.
 - **Update Notification System**: Role-based app update announcements with bell icon button in header, popup showing new features/improvements/fixes, user acknowledgment tracking, and mark-all-read functionality. Admins can create/edit/delete updates with version numbers, categories (feature, improvement, fix, security), and role-based visibility.
-- **Help Articles System**: Database-backed searchable help articles with role-based filtering. Categories organize articles, and users can search across titles, summaries, and content. Integrated into the Help page alongside existing walkthrough features.
+- **Help Articles System**: Database-backed searchable help articles with role-based filtering (15 comprehensive articles covering all platform features). Categories organize articles, and users can search across titles, summaries, and content. Integrated into the Help page alongside existing walkthrough features. Includes article feedback/reporting system:
+  - **Report Issues**: Users can report outdated, incorrect, unclear, or missing information in articles
+  - **Admin Reports Center**: "Help Reports" tab in Admin Panel for reviewing and resolving article reports
+  - **User Notifications**: When admins resolve reports and update articles, users with sufficient role level receive notifications
+  - **Report Status Workflow**: pending → in_progress → resolved/dismissed
 - **Floating Assistant Button**: Combined access point (sparkle icon) in bottom-right corner that opens a menu with AI Assistant chat and Help Center navigation options. Replaces standalone chat button for better discoverability.
 
 ## External Dependencies
