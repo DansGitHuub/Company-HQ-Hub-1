@@ -70,6 +70,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { User, AccessRequest, CompanySettings } from "@shared/schema";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import ArticleReportsCenter from "@/components/ArticleReportsCenter";
 
 type SafeUser = Omit<User, "password">;
 type TodoActiveUser = { id: string; userId: string; activatedBy: string | null; activatedAt: Date | null };
@@ -439,13 +440,16 @@ export default function AdminPanel() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className={`grid w-full max-w-3xl ${user?.isMasterAdmin ? 'grid-cols-5' : 'grid-cols-4'}`}>
+        <TabsList className={`grid w-full max-w-4xl ${user?.isMasterAdmin ? 'grid-cols-6' : 'grid-cols-5'}`}>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="requests" className="gap-2">
             Requests {pendingRequests.length > 0 && <Badge variant="destructive" className="ml-1">{pendingRequests.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="todos" className="gap-2">
             To-Do Users
+          </TabsTrigger>
+          <TabsTrigger value="help-reports" className="gap-2">
+            <HelpCircle className="h-4 w-4" /> Help Reports
           </TabsTrigger>
           <TabsTrigger value="company" className="gap-2">
             <Building2 className="h-4 w-4" /> Company
@@ -669,6 +673,10 @@ export default function AdminPanel() {
 
         <TabsContent value="todos" className="mt-6">
           <TodoActiveUsersManager />
+        </TabsContent>
+
+        <TabsContent value="help-reports" className="mt-6">
+          <ArticleReportsCenter />
         </TabsContent>
 
         <TabsContent value="company" className="mt-6">
