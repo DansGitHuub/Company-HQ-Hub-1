@@ -89,11 +89,6 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
     description: "Resource library with care guides, instructions, and documents for customers.",
     tips: ["Create guides and instructions", "Upload manufacturer documents", "Customers can bookmark favorites"]
   },
-  profile: {
-    title: "My Profile",
-    description: "Update your personal info and profile picture.",
-    tips: ["Add contact details", "Upload a profile photo", "Keep info current"]
-  },
   help: {
     title: "Help Center",
     description: "Access guides, walkthroughs, and FAQs for using Company HQ.",
@@ -289,7 +284,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     hiring: { icon: Users, label: "Hiring", href: "/hiring" },
     jobs: { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
     education: { icon: GraduationCap, label: "Customer Hub", href: "/education" },
-    profile: { icon: User, label: "My Profile", href: "/profile" },
     help: { icon: HelpCircle, label: "Help", href: "/help" },
     hq: { icon: Building2, label: "Company HQ", href: "/hq" },
     marketing: { icon: Megaphone, label: "Marketing", href: "/marketing" },
@@ -301,7 +295,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   // Default order for internal roles (help always at very bottom for all roles)
-  const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "hiring", "jobs", "education", "profile"];
+  const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "hiring", "jobs", "education"];
   const adminExtraIds = ["hq", "marketing", "forms", "tools", "integrations", "admin"];
   const bottomIds = ["help"]; // Always shown at bottom for all roles
 
@@ -453,27 +447,36 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         })}
       </div>
 
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="mt-auto p-4 border-t-2 border-primary/20 bg-gradient-to-t from-primary/5 to-transparent">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="w-full justify-start px-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-              <Avatar className="h-8 w-8 mr-2">
-                <AvatarFallback className="bg-primary text-primary-foreground">
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start px-3 py-6 hover:bg-primary/10 rounded-xl border border-sidebar-border/50 bg-sidebar-accent/30 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+              data-testid="button-user-profile-menu"
+            >
+              <Avatar className="h-10 w-10 mr-3 ring-2 ring-primary/20 ring-offset-2 ring-offset-sidebar">
+                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground text-lg font-bold">
                   {user?.name?.charAt(0) || "?"}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex flex-col items-start text-xs">
-                <span className="font-medium">{user?.name || "User"}</span>
-                <span className="opacity-70">
+              <div className="flex flex-col items-start">
+                <span className="font-semibold text-sm">{user?.name || "User"}</span>
+                <span className="text-xs text-muted-foreground">
                   {previewRole ? `Viewing: ${previewRole}` : (user?.role || "N/A")}
                 </span>
               </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56" align="end" forceMount>
-            <DropdownMenuLabel>Account</DropdownMenuLabel>
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium">{user?.name || "User"}</p>
+                <p className="text-xs text-muted-foreground">{user?.email || user?.username}</p>
+              </div>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
+            <DropdownMenuItem asChild className="cursor-pointer">
               <Link href="/profile">
                 <User className="mr-2 h-4 w-4" />
                 My Profile
@@ -482,7 +485,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <DropdownMenuSeparator />
             <DropdownMenuItem 
               onClick={() => logoutMutation.mutate()} 
-              className="text-destructive focus:text-destructive"
+              className="text-destructive focus:text-destructive cursor-pointer"
             >
               <LogOut className="mr-2 h-4 w-4" />
               Log out
