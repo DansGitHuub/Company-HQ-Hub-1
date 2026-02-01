@@ -52,7 +52,9 @@ import {
   appUpdates, type AppUpdate, type InsertAppUpdate,
   userUpdateAcknowledgments, type UserUpdateAcknowledgment, type InsertUserUpdateAcknowledgment,
   helpArticles, type HelpArticle, type InsertHelpArticle,
-  helpCategories, type HelpCategory, type InsertHelpCategory
+  helpCategories, type HelpCategory, type InsertHelpCategory,
+  helpArticleReports, type HelpArticleReport, type InsertHelpArticleReport,
+  articleUpdateNotifications, type ArticleUpdateNotification, type InsertArticleUpdateNotification
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull } from "drizzle-orm";
@@ -383,6 +385,20 @@ export interface IStorage {
   createHelpCategory(category: InsertHelpCategory): Promise<HelpCategory>;
   updateHelpCategory(id: string, updates: Partial<HelpCategory>): Promise<HelpCategory | undefined>;
   deleteHelpCategory(id: string): Promise<boolean>;
+  
+  // Help Article Reports
+  getArticleReports(status?: string): Promise<HelpArticleReport[]>;
+  getArticleReportsByArticle(articleId: string): Promise<HelpArticleReport[]>;
+  createArticleReport(report: InsertHelpArticleReport): Promise<HelpArticleReport>;
+  updateArticleReport(id: string, updates: Partial<HelpArticleReport>): Promise<HelpArticleReport | undefined>;
+  getPendingReportsCount(): Promise<number>;
+  
+  // Article Update Notifications
+  getUserArticleNotifications(userId: string): Promise<ArticleUpdateNotification[]>;
+  getUnreadArticleNotifications(userId: string): Promise<ArticleUpdateNotification[]>;
+  createArticleNotification(notification: InsertArticleUpdateNotification): Promise<ArticleUpdateNotification>;
+  markArticleNotificationRead(id: string): Promise<boolean>;
+  notifyUsersOfArticleUpdate(articleId: string, message: string, minRole: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1749,6 +1765,82 @@ export class DatabaseStorage implements IStorage {
   async deleteHelpCategory(id: string): Promise<boolean> {
     await db.delete(helpCategories).where(eq(helpCategories.id, id));
     return true;
+  }
+
+  // Help Article Reports
+  async getArticleReports(status?: string): Promise<HelpArticleReport[]> {
+    if (status) {
+      return await db.select().from(helpArticleReports)
+        .where(eq(helpArticleReports.status, status))
+        .orderBy(desc(helpArticleReports.createdAt));
+    }
+    return await db.select().from(helpArticleReports).orderBy(desc(helpArticleReports.createdAt));
+  }
+
+  async getArticleReportsByArticle(articleId: string): Promise<HelpArticleReport[]> {
+    return await db.select().from(helpArticleReports)
+      .where(eq(helpArticleReports.articleId, articleId))
+      .orderBy(desc(helpArticleReports.createdAt));
+  }
+
+  async createArticleReport(report: InsertHelpArticleReport): Promise<HelpArticleReport> {
+    const [created] = await db.insert(helpArticleReports).values(report).returning();
+    return created;
+  }
+
+  async updateArticleReport(id: string, updates: Partial<HelpArticleReport>): Promise<HelpArticleReport | undefined> {
+    const [updated] = await db.update(helpArticleReports).set(updates)
+      .where(eq(helpArticleReports.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async getPendingReportsCount(): Promise<number> {
+    const results = await db.select().from(helpArticleReports)
+      .where(eq(helpArticleReports.status, "pending"));
+    return results.length;
+  }
+
+  // Article Update Notifications
+  async getUserArticleNotifications(userId: string): Promise<ArticleUpdateNotification[]> {
+    return await db.select().from(articleUpdateNotifications)
+      .where(eq(articleUpdateNotifications.userId, userId))
+      .orderBy(desc(articleUpdateNotifications.createdAt));
+  }
+
+  async getUnreadArticleNotifications(userId: string): Promise<ArticleUpdateNotification[]> {
+    return await db.select().from(articleUpdateNotifications)
+      .where(and(
+        eq(articleUpdateNotifications.userId, userId),
+        eq(articleUpdateNotifications.isRead, false)
+      ))
+      .orderBy(desc(articleUpdateNotifications.createdAt));
+  }
+
+  async createArticleNotification(notification: InsertArticleUpdateNotification): Promise<ArticleUpdateNotification> {
+    const [created] = await db.insert(articleUpdateNotifications).values(notification).returning();
+    return created;
+  }
+
+  async markArticleNotificationRead(id: string): Promise<boolean> {
+    await db.update(articleUpdateNotifications).set({ isRead: true })
+      .where(eq(articleUpdateNotifications.id, id));
+    return true;
+  }
+
+  async notifyUsersOfArticleUpdate(articleId: string, message: string, minRole: string): Promise<void> {
+    const roleHierarchy: Record<string, number> = { Customer: 1, Crew: 2, Manager: 3, Admin: 4 };
+    const minRoleLevel = roleHierarchy[minRole] || 1;
+    const allUsers = await db.select().from(users);
+    const eligibleUsers = allUsers.filter(u => roleHierarchy[u.role] >= minRoleLevel);
+    
+    for (const user of eligibleUsers) {
+      await db.insert(articleUpdateNotifications).values({
+        articleId,
+        userId: user.id,
+        notificationType: "updated",
+        message
+      });
+    }
   }
 }
 

@@ -1402,3 +1402,45 @@ export const insertHelpCategorySchema = createInsertSchema(helpCategories).omit(
 
 export type InsertHelpCategory = z.infer<typeof insertHelpCategorySchema>;
 export type HelpCategory = typeof helpCategories.$inferSelect;
+
+// Help Article Feedback Reports - users can report articles as outdated
+export const helpArticleReports = pgTable("help_article_reports", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  articleId: varchar("article_id", { length: 36 }).notNull().references(() => helpArticles.id),
+  reportedBy: varchar("reported_by", { length: 36 }).notNull().references(() => users.id),
+  reportType: text("report_type").notNull().default("outdated"), // outdated, unclear, incorrect
+  description: text("description"), // Optional details about what's wrong
+  status: text("status").notNull().default("pending"), // pending, in_progress, resolved, dismissed
+  resolvedBy: varchar("resolved_by", { length: 36 }).references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  resolutionNote: text("resolution_note"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertHelpArticleReportSchema = createInsertSchema(helpArticleReports).omit({
+  id: true,
+  createdAt: true,
+  resolvedAt: true,
+});
+
+export type InsertHelpArticleReport = z.infer<typeof insertHelpArticleReportSchema>;
+export type HelpArticleReport = typeof helpArticleReports.$inferSelect;
+
+// Article Update Notifications - track when users are notified about article updates
+export const articleUpdateNotifications = pgTable("article_update_notifications", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  articleId: varchar("article_id", { length: 36 }).notNull().references(() => helpArticles.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  notificationType: text("notification_type").notNull().default("updated"), // updated, new
+  message: text("message"),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertArticleUpdateNotificationSchema = createInsertSchema(articleUpdateNotifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertArticleUpdateNotification = z.infer<typeof insertArticleUpdateNotificationSchema>;
+export type ArticleUpdateNotification = typeof articleUpdateNotifications.$inferSelect;

@@ -4225,6 +4225,104 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  // ==================== HELP ARTICLE REPORTS ====================
+  
+  // Report an article as outdated/incorrect
+  app.post("/api/help/articles/:id/report", requireAuth, async (req, res) => {
+    try {
+      const report = await storage.createArticleReport({
+        articleId: req.params.id,
+        reportedBy: req.user!.id,
+        reportType: req.body.reportType || "outdated",
+        description: req.body.description,
+        status: "pending"
+      });
+      res.status(201).json(report);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating report" });
+    }
+  });
+  
+  // Admin: Get all article reports
+  app.get("/api/help/reports", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const reports = await storage.getArticleReports(status);
+      res.json(reports);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching reports" });
+    }
+  });
+  
+  // Admin: Get pending reports count
+  app.get("/api/help/reports/count", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const count = await storage.getPendingReportsCount();
+      res.json({ count });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching report count" });
+    }
+  });
+  
+  // Admin: Update report status (resolve/dismiss)
+  app.patch("/api/help/reports/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const updates: any = { ...req.body };
+      if (req.body.status === "resolved" || req.body.status === "dismissed") {
+        updates.resolvedBy = req.user!.id;
+        updates.resolvedAt = new Date();
+      }
+      const report = await storage.updateArticleReport(req.params.id, updates);
+      if (!report) return res.status(404).json({ message: "Report not found" });
+      
+      // If resolved, notify users about the article update
+      if (req.body.status === "resolved" && req.body.notifyUsers) {
+        const article = await storage.getHelpArticle(report.articleId);
+        if (article) {
+          await storage.notifyUsersOfArticleUpdate(
+            report.articleId,
+            `Article "${article.title}" has been updated`,
+            article.minRole
+          );
+        }
+      }
+      
+      res.json(report);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating report" });
+    }
+  });
+  
+  // Get user's article update notifications
+  app.get("/api/help/notifications", requireAuth, async (req, res) => {
+    try {
+      const notifications = await storage.getUserArticleNotifications(req.user!.id);
+      res.json(notifications);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching notifications" });
+    }
+  });
+  
+  // Get unread article notifications count
+  app.get("/api/help/notifications/unread", requireAuth, async (req, res) => {
+    try {
+      const notifications = await storage.getUnreadArticleNotifications(req.user!.id);
+      res.json({ count: notifications.length, notifications });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching notifications" });
+    }
+  });
+  
+  // Mark notification as read
+  app.post("/api/help/notifications/:id/read", requireAuth, async (req, res) => {
+    try {
+      await storage.markArticleNotificationRead(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error marking notification as read" });
+    }
+  });
+
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 
