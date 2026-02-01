@@ -4323,6 +4323,74 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  // ==================== GOOGLE CALENDAR INTEGRATION ====================
+  
+  // Check if Google Calendar is connected via Replit connector
+  app.get("/api/google-calendar/status", requireAuth, async (req, res) => {
+    try {
+      const { isGoogleCalendarConnected } = await import("./googleCalendar");
+      const connected = await isGoogleCalendarConnected();
+      res.json({ connected });
+    } catch (err) {
+      res.json({ connected: false });
+    }
+  });
+  
+  // Get events from Google Calendar
+  app.get("/api/google-calendar/events", requireAuth, async (req, res) => {
+    try {
+      const { getCalendarEvents } = await import("./googleCalendar");
+      const { start, end } = req.query;
+      
+      const startDate = start ? new Date(start as string) : new Date();
+      const endDate = end ? new Date(end as string) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      
+      const events = await getCalendarEvents(startDate, endDate);
+      
+      // Map to simplified format
+      const mappedEvents = events.map((event: any) => ({
+        id: event.id,
+        title: event.summary || "Untitled Event",
+        description: event.description || "",
+        start: event.start?.dateTime || event.start?.date,
+        end: event.end?.dateTime || event.end?.date,
+        location: event.location || "",
+        allDay: !event.start?.dateTime
+      }));
+      
+      res.json(mappedEvents);
+    } catch (err: any) {
+      console.error("Error fetching Google Calendar events:", err);
+      if (err.message?.includes("not connected")) {
+        return res.status(401).json({ message: "Google Calendar not connected" });
+      }
+      res.status(500).json({ message: "Error fetching calendar events" });
+    }
+  });
+  
+  // Get list of calendars from Google Calendar
+  app.get("/api/google-calendar/calendars", requireAuth, async (req, res) => {
+    try {
+      const { getCalendarList } = await import("./googleCalendar");
+      const calendars = await getCalendarList();
+      
+      const mappedCalendars = calendars.map((cal: any) => ({
+        id: cal.id,
+        name: cal.summary,
+        primary: cal.primary || false,
+        backgroundColor: cal.backgroundColor
+      }));
+      
+      res.json(mappedCalendars);
+    } catch (err: any) {
+      console.error("Error fetching Google Calendar list:", err);
+      if (err.message?.includes("not connected")) {
+        return res.status(401).json({ message: "Google Calendar not connected" });
+      }
+      res.status(500).json({ message: "Error fetching calendars" });
+    }
+  });
+
   // ==================== CALENDAR CONNECTIONS ====================
   
   // Get user's calendar connections

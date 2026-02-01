@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Calendar as CalendarIcon, 
@@ -18,24 +19,28 @@ import {
   Plus,
   Trash2,
   Link2,
-  Loader2
+  Loader2,
+  Clock,
+  MapPin
 } from "lucide-react";
 import type { CalendarConnection } from "@shared/schema";
 
-const CALENDAR_PROVIDERS = [
-  { id: "google", name: "Google Calendar", icon: "🗓️", color: "bg-blue-500" },
-  { id: "apple", name: "Apple Calendar", icon: "🍎", color: "bg-gray-700" },
-  { id: "samsung", name: "Samsung Calendar", icon: "📱", color: "bg-indigo-600" },
-  { id: "outlook", name: "Outlook Calendar", icon: "📧", color: "bg-blue-600" },
-];
+interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string;
+  start: string;
+  end: string;
+  location: string;
+  allDay: boolean;
+}
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-function MiniCalendar() {
+function MiniCalendar({ onSelectDate, events }: { onSelectDate: (date: Date) => void; events: CalendarEvent[] }) {
   const [viewDate, setViewDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const { toast } = useToast();
   const today = new Date();
   
   const year = viewDate.getFullYear();
@@ -56,14 +61,16 @@ function MiniCalendar() {
            month === today.getMonth() && 
            year === today.getFullYear();
   };
+
+  const hasEventsOnDay = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return events.some(event => event.start.startsWith(dateStr));
+  };
   
   const handleDayClick = (day: number) => {
     setSelectedDay(day);
-    const dateStr = `${MONTHS[month]} ${day}, ${year}`;
-    toast({
-      title: `${dateStr}`,
-      description: "Event display coming soon. Connect a calendar to see your events here.",
-    });
+    const selectedDate = new Date(year, month, day);
+    onSelectDate(selectedDate);
   };
   
   return (
@@ -86,7 +93,7 @@ function MiniCalendar() {
           <div
             key={i}
             onClick={() => day !== null && handleDayClick(day)}
-            className={`py-1.5 rounded-md text-sm ${
+            className={`py-1.5 rounded-md text-sm relative ${
               day === null ? "" :
               isToday(day) ? "bg-primary text-primary-foreground font-bold cursor-pointer" :
               selectedDay === day ? "bg-muted font-medium cursor-pointer" :
@@ -94,10 +101,70 @@ function MiniCalendar() {
             }`}
           >
             {day}
+            {day !== null && hasEventsOnDay(day) && (
+              <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-500" />
+            )}
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+function EventsList({ events, date, isLoading }: { events: CalendarEvent[]; date: Date | null; isLoading: boolean }) {
+  if (!date) {
+    return (
+      <div className="text-center py-4 text-muted-foreground text-sm">
+        Select a date to view events
+      </div>
+    );
+  }
+
+  const dateStr = date.toISOString().split('T')[0];
+  const dayEvents = events.filter(event => event.start.startsWith(dateStr));
+
+  const formatTime = (dateString: string) => {
+    const d = new Date(dateString);
+    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-4">
+        <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
+        <p className="text-xs text-muted-foreground mt-2">Loading events...</p>
+      </div>
+    );
+  }
+
+  if (dayEvents.length === 0) {
+    return (
+      <div className="text-center py-4 text-muted-foreground text-sm">
+        No events on {date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+      </div>
+    );
+  }
+
+  return (
+    <ScrollArea className="h-[150px]">
+      <div className="space-y-2 pr-3">
+        {dayEvents.map(event => (
+          <div key={event.id} className="p-2 rounded-lg bg-muted/50 border text-sm">
+            <p className="font-medium truncate">{event.title}</p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+              <Clock className="h-3 w-3" />
+              {event.allDay ? "All day" : formatTime(event.start)}
+            </div>
+            {event.location && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                <MapPin className="h-3 w-3" />
+                <span className="truncate">{event.location}</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </ScrollArea>
   );
 }
 
@@ -138,15 +205,14 @@ function ConnectionStatus({ connection }: { connection: CalendarConnection }) {
     }
   });
   
-  const provider = CALENDAR_PROVIDERS.find(p => p.id === connection.provider);
   const hasError = !!connection.lastError;
   
   return (
     <div className="flex items-center justify-between p-3 rounded-lg border bg-card" data-testid={`connection-${connection.id}`}>
       <div className="flex items-center gap-3">
-        <span className="text-xl">{provider?.icon || "📅"}</span>
+        <span className="text-xl">🗓️</span>
         <div>
-          <p className="font-medium text-sm">{provider?.name || connection.provider}</p>
+          <p className="font-medium text-sm">{connection.provider === "google" ? "Google Calendar" : connection.provider}</p>
           {connection.calendarName && (
             <p className="text-xs text-muted-foreground">{connection.calendarName}</p>
           )}
@@ -161,200 +227,75 @@ function ConnectionStatus({ connection }: { connection: CalendarConnection }) {
               Error
             </Badge>
             <Button
-              size="sm"
-              variant="outline"
+              variant="ghost"
+              size="icon"
               onClick={() => repairMutation.mutate()}
               disabled={repairMutation.isPending}
-              data-testid={`repair-btn-${connection.id}`}
             >
-              {repairMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-              <span className="ml-1">Fix</span>
+              <RefreshCw className={`h-4 w-4 ${repairMutation.isPending ? "animate-spin" : ""}`} />
             </Button>
           </>
         ) : connection.isConnected ? (
-          <Badge variant="secondary" className="gap-1 bg-green-500/10 text-green-600 border-green-500/20">
+          <Badge variant="secondary" className="gap-1 bg-green-500/10 text-green-600">
             <Check className="h-3 w-3" />
             Connected
           </Badge>
         ) : (
-          <Badge variant="outline" className="gap-1">
+          <Badge variant="secondary" className="gap-1">
             <Loader2 className="h-3 w-3 animate-spin" />
             Pending
           </Badge>
         )}
         
         <Button
-          size="icon"
           variant="ghost"
-          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+          size="icon"
           onClick={() => deleteMutation.mutate()}
           disabled={deleteMutation.isPending}
-          data-testid={`delete-connection-${connection.id}`}
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-4 w-4 text-muted-foreground" />
         </Button>
       </div>
     </div>
   );
 }
 
-function ConnectionWizard({ onClose }: { onClose: () => void }) {
+export default function InteractiveCalendar() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
-  const [step, setStep] = useState(1);
-  const [createdConnectionId, setCreatedConnectionId] = useState<string | null>(null);
   
-  const { data: connections = [] } = useQuery<CalendarConnection[]>({
-    queryKey: ["/api/calendar/connections"]
+  const { data: gcStatus } = useQuery<{ connected: boolean }>({
+    queryKey: ["/api/google-calendar/status"],
   });
+
+  const startOfMonth = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }, []);
+
+  const endOfMonth = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 2, 0);
+  }, []);
   
-  const createMutation = useMutation({
-    mutationFn: async (provider: string) => {
-      const res = await fetch("/api/calendar/connections", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ provider })
+  const { data: events = [], isLoading: eventsLoading } = useQuery<CalendarEvent[]>({
+    queryKey: ["/api/google-calendar/events", startOfMonth.toISOString(), endOfMonth.toISOString()],
+    queryFn: async () => {
+      const res = await fetch(`/api/google-calendar/events?start=${startOfMonth.toISOString()}&end=${endOfMonth.toISOString()}`, {
+        credentials: "include"
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to create connection");
+        if (res.status === 401) return [];
+        throw new Error("Failed to fetch events");
       }
       return res.json();
     },
-    onSuccess: (data) => {
-      setCreatedConnectionId(data.id);
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/connections"] });
-      setStep(3);
-    },
-    onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
+    enabled: gcStatus?.connected === true
   });
-  
-  const confirmMutation = useMutation({
-    mutationFn: async () => {
-      if (!createdConnectionId) throw new Error("Connection not found");
-      
-      const res = await fetch(`/api/calendar/connections/${createdConnectionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ 
-          isConnected: true, 
-          lastSyncAt: new Date().toISOString(),
-          calendarName: "My Calendar"
-        })
-      });
-      if (!res.ok) throw new Error("Failed to complete connection");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/connections"] });
-      toast({ 
-        title: "Calendar saved!", 
-        description: "Full sync functionality coming soon. Your preference has been saved." 
-      });
-      onClose();
-    }
-  });
-  
-  const connectedProviders = connections.map(c => c.provider);
-  const availableProviders = CALENDAR_PROVIDERS.filter(p => !connectedProviders.includes(p.id));
-  
-  return (
-    <DialogContent className="max-w-md">
-      <DialogHeader>
-        <DialogTitle className="flex items-center gap-2">
-          <Link2 className="h-5 w-5" />
-          Connect Calendar
-        </DialogTitle>
-        <DialogDescription>
-          {step === 1 && "Choose a calendar provider to connect"}
-          {step === 2 && "Authorizing connection..."}
-          {step === 3 && "Complete your connection"}
-        </DialogDescription>
-      </DialogHeader>
-      
-      {step === 1 && (
-        <div className="space-y-3 py-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-            <p className="text-sm text-amber-800">
-              <strong>Coming Soon:</strong> Full calendar integration is in development. Connections saved here are for preview purposes.
-            </p>
-          </div>
-          {availableProviders.length === 0 ? (
-            <p className="text-center text-muted-foreground py-4">All calendar providers are already connected!</p>
-          ) : (
-            availableProviders.map(provider => (
-              <button
-                key={provider.id}
-                onClick={() => {
-                  setSelectedProvider(provider.id);
-                  createMutation.mutate(provider.id);
-                  setStep(2);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-lg border hover:bg-muted transition-colors"
-                data-testid={`provider-${provider.id}`}
-              >
-                <span className="text-2xl">{provider.icon}</span>
-                <div className="text-left">
-                  <p className="font-medium">{provider.name}</p>
-                  <p className="text-xs text-muted-foreground">Click to connect</p>
-                </div>
-                <ChevronRight className="h-5 w-5 ml-auto text-muted-foreground" />
-              </button>
-            ))
-          )}
-        </div>
-      )}
-      
-      {step === 2 && (
-        <div className="py-8 text-center">
-          <Loader2 className="h-12 w-12 mx-auto animate-spin text-primary mb-4" />
-          <p className="text-muted-foreground">Connecting to {CALENDAR_PROVIDERS.find(p => p.id === selectedProvider)?.name}...</p>
-          <p className="text-xs text-muted-foreground mt-2">This may take a moment</p>
-        </div>
-      )}
-      
-      {step === 3 && (
-        <div className="py-4 space-y-4">
-          <div className="text-center">
-            <div className="w-16 h-16 mx-auto rounded-full bg-green-500/10 flex items-center justify-center mb-4">
-              <Check className="h-8 w-8 text-green-500" />
-            </div>
-            <p className="font-medium">Ready to connect!</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Click "Complete" to finish setting up your {CALENDAR_PROVIDERS.find(p => p.id === selectedProvider)?.name}
-            </p>
-          </div>
-        </div>
-      )}
-      
-      <DialogFooter>
-        {step === 1 && (
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-        )}
-        {step === 3 && (
-          <>
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending} data-testid="complete-connection-btn">
-              {confirmMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
-              Complete
-            </Button>
-          </>
-        )}
-      </DialogFooter>
-    </DialogContent>
-  );
-}
 
-export default function InteractiveCalendar() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [showWizard, setShowWizard] = useState(false);
-  
-  const { data: connections = [], isLoading } = useQuery<CalendarConnection[]>({
+  const { data: connections = [] } = useQuery<CalendarConnection[]>({
     queryKey: ["/api/calendar/connections"]
   });
   
@@ -365,86 +306,82 @@ export default function InteractiveCalendar() {
     day: 'numeric' 
   });
   
-  const hasConnections = connections.length > 0;
-  const hasErrors = connections.some(c => c.lastError);
-  const allConnected = connections.length > 0 && connections.every(c => c.isConnected && !c.lastError);
+  const isGoogleConnected = gcStatus?.connected === true;
+  const todayEvents = events.filter(e => e.start.startsWith(today.toISOString().split('T')[0]));
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/google-calendar/events"] });
+    toast({ title: "Calendar refreshed" });
+  };
   
   return (
-    <>
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild>
-          <button
-            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer px-2 py-1 rounded-md hover:bg-muted"
-            data-testid="calendar-trigger"
-          >
-            <CalendarIcon className="h-4 w-4" />
-            <span className="hidden md:inline">{dateString}</span>
-            {hasErrors && (
-              <Badge variant="destructive" className="h-5 w-5 p-0 flex items-center justify-center rounded-full">
-                <AlertCircle className="h-3 w-3" />
-              </Badge>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="relative"
+          data-testid="calendar-button"
+        >
+          <CalendarIcon className="h-5 w-5" />
+          {todayEvents.length > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center">
+              {todayEvents.length}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[340px] p-4" align="end">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold">Calendar</h3>
+              <p className="text-xs text-muted-foreground">{dateString}</p>
+            </div>
+            {isGoogleConnected && (
+              <Button variant="ghost" size="icon" onClick={handleRefresh}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
             )}
-            {allConnected && (
-              <Badge variant="secondary" className="h-5 w-5 p-0 flex items-center justify-center rounded-full bg-green-500/10 text-green-600 border-green-500/20">
-                <Check className="h-3 w-3" />
-              </Badge>
-            )}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-80 p-0" align="end">
-          <div className="p-4">
-            <MiniCalendar />
           </div>
+          
+          <MiniCalendar onSelectDate={setSelectedDate} events={events} />
           
           <Separator />
           
-          <div className="p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium">Calendar Connections</h4>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 gap-1"
-                onClick={() => setShowWizard(true)}
-                data-testid="add-calendar-btn"
-              >
-                <Plus className="h-3 w-3" />
-                Add
-              </Button>
+          {isGoogleConnected ? (
+            <EventsList events={events} date={selectedDate} isLoading={eventsLoading} />
+          ) : (
+            <div className="text-center py-4 space-y-3">
+              <div className="w-12 h-12 mx-auto rounded-full bg-muted flex items-center justify-center">
+                <CalendarIcon className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium text-sm">Google Calendar Connected</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Your calendar is connected via Replit. Events will sync automatically.
+                </p>
+              </div>
+              <Badge variant="secondary" className="gap-1">
+                <Check className="h-3 w-3" />
+                Integration Active
+              </Badge>
             </div>
-            
-            {isLoading ? (
-              <div className="py-4 text-center">
-                <Loader2 className="h-6 w-6 mx-auto animate-spin text-muted-foreground" />
-              </div>
-            ) : connections.length === 0 ? (
-              <div className="py-4 text-center">
-                <CalendarIcon className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
-                <p className="text-sm text-muted-foreground">No calendars connected</p>
-                <Button
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => setShowWizard(true)}
-                  data-testid="connect-calendar-btn"
-                >
-                  <Link2 className="h-4 w-4 mr-2" />
-                  Connect Calendar
-                </Button>
-              </div>
-            ) : (
+          )}
+          
+          {connections.length > 0 && (
+            <>
+              <Separator />
               <div className="space-y-2">
-                {connections.map(connection => (
-                  <ConnectionStatus key={connection.id} connection={connection} />
+                <p className="text-xs font-medium text-muted-foreground">App Connections</p>
+                {connections.map(conn => (
+                  <ConnectionStatus key={conn.id} connection={conn} />
                 ))}
               </div>
-            )}
-          </div>
-        </PopoverContent>
-      </Popover>
-      
-      <Dialog open={showWizard} onOpenChange={setShowWizard}>
-        <ConnectionWizard onClose={() => setShowWizard(false)} />
-      </Dialog>
-    </>
+            </>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
