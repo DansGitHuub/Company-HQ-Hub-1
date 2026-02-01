@@ -4323,6 +4323,106 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  // ==================== CALENDAR CONNECTIONS ====================
+  
+  // Get user's calendar connections
+  app.get("/api/calendar/connections", requireAuth, async (req, res) => {
+    try {
+      const connections = await storage.getUserCalendarConnections(req.user!.id);
+      res.json(connections);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching calendar connections" });
+    }
+  });
+  
+  // Get specific calendar connection
+  app.get("/api/calendar/connections/:id", requireAuth, async (req, res) => {
+    try {
+      const connection = await storage.getCalendarConnection(req.params.id);
+      if (!connection || connection.userId !== req.user!.id) {
+        return res.status(404).json({ message: "Connection not found" });
+      }
+      res.json(connection);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching connection" });
+    }
+  });
+  
+  // Create/initiate a calendar connection
+  app.post("/api/calendar/connections", requireAuth, async (req, res) => {
+    try {
+      const { provider } = req.body;
+      if (!provider) {
+        return res.status(400).json({ message: "Provider is required" });
+      }
+      
+      // Check if connection already exists
+      const existing = await storage.getCalendarConnectionByProvider(req.user!.id, provider);
+      if (existing) {
+        return res.status(400).json({ message: "Connection already exists for this provider" });
+      }
+      
+      const connection = await storage.createCalendarConnection({
+        userId: req.user!.id,
+        provider,
+        isConnected: false
+      });
+      res.status(201).json(connection);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating connection" });
+    }
+  });
+  
+  // Update calendar connection (for completing OAuth flow or updating status)
+  app.patch("/api/calendar/connections/:id", requireAuth, async (req, res) => {
+    try {
+      const connection = await storage.getCalendarConnection(req.params.id);
+      if (!connection || connection.userId !== req.user!.id) {
+        return res.status(404).json({ message: "Connection not found" });
+      }
+      
+      const updated = await storage.updateCalendarConnection(req.params.id, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating connection" });
+    }
+  });
+  
+  // Repair/reconnect a calendar connection
+  app.post("/api/calendar/connections/:id/repair", requireAuth, async (req, res) => {
+    try {
+      const connection = await storage.getCalendarConnection(req.params.id);
+      if (!connection || connection.userId !== req.user!.id) {
+        return res.status(404).json({ message: "Connection not found" });
+      }
+      
+      // Clear error and reset for reconnection
+      const updated = await storage.updateCalendarConnection(req.params.id, {
+        lastError: null,
+        isConnected: true,
+        lastSyncAt: new Date()
+      });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Error repairing connection" });
+    }
+  });
+  
+  // Delete calendar connection
+  app.delete("/api/calendar/connections/:id", requireAuth, async (req, res) => {
+    try {
+      const connection = await storage.getCalendarConnection(req.params.id);
+      if (!connection || connection.userId !== req.user!.id) {
+        return res.status(404).json({ message: "Connection not found" });
+      }
+      
+      await storage.deleteCalendarConnection(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting connection" });
+    }
+  });
+
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 
