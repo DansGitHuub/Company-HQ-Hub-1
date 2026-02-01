@@ -1444,3 +1444,29 @@ export const insertArticleUpdateNotificationSchema = createInsertSchema(articleU
 
 export type InsertArticleUpdateNotification = z.infer<typeof insertArticleUpdateNotificationSchema>;
 export type ArticleUpdateNotification = typeof articleUpdateNotifications.$inferSelect;
+
+// Calendar Connections
+export const calendarConnections = pgTable("calendar_connections", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  provider: text("provider").notNull(), // google, apple, samsung, outlook
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  tokenExpiry: timestamp("token_expiry"),
+  calendarId: text("calendar_id"),
+  calendarName: text("calendar_name"),
+  isConnected: boolean("is_connected").notNull().default(false),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCalendarConnectionSchema = createInsertSchema(calendarConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCalendarConnection = z.infer<typeof insertCalendarConnectionSchema>;
+export type CalendarConnection = typeof calendarConnections.$inferSelect;

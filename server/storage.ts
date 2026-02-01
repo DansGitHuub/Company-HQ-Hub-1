@@ -54,7 +54,8 @@ import {
   helpArticles, type HelpArticle, type InsertHelpArticle,
   helpCategories, type HelpCategory, type InsertHelpCategory,
   helpArticleReports, type HelpArticleReport, type InsertHelpArticleReport,
-  articleUpdateNotifications, type ArticleUpdateNotification, type InsertArticleUpdateNotification
+  articleUpdateNotifications, type ArticleUpdateNotification, type InsertArticleUpdateNotification,
+  calendarConnections, type CalendarConnection, type InsertCalendarConnection
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull } from "drizzle-orm";
@@ -399,6 +400,14 @@ export interface IStorage {
   createArticleNotification(notification: InsertArticleUpdateNotification): Promise<ArticleUpdateNotification>;
   markArticleNotificationRead(id: string): Promise<boolean>;
   notifyUsersOfArticleUpdate(articleId: string, message: string, minRole: string): Promise<void>;
+  
+  // Calendar Connections
+  getUserCalendarConnections(userId: string): Promise<CalendarConnection[]>;
+  getCalendarConnection(id: string): Promise<CalendarConnection | undefined>;
+  getCalendarConnectionByProvider(userId: string, provider: string): Promise<CalendarConnection | undefined>;
+  createCalendarConnection(connection: InsertCalendarConnection): Promise<CalendarConnection>;
+  updateCalendarConnection(id: string, updates: Partial<CalendarConnection>): Promise<CalendarConnection | undefined>;
+  deleteCalendarConnection(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1841,6 +1850,41 @@ export class DatabaseStorage implements IStorage {
         message
       });
     }
+  }
+
+  // Calendar Connections
+  async getUserCalendarConnections(userId: string): Promise<CalendarConnection[]> {
+    return await db.select().from(calendarConnections)
+      .where(eq(calendarConnections.userId, userId))
+      .orderBy(desc(calendarConnections.createdAt));
+  }
+
+  async getCalendarConnection(id: string): Promise<CalendarConnection | undefined> {
+    const [result] = await db.select().from(calendarConnections).where(eq(calendarConnections.id, id));
+    return result || undefined;
+  }
+
+  async getCalendarConnectionByProvider(userId: string, provider: string): Promise<CalendarConnection | undefined> {
+    const [result] = await db.select().from(calendarConnections)
+      .where(and(eq(calendarConnections.userId, userId), eq(calendarConnections.provider, provider)));
+    return result || undefined;
+  }
+
+  async createCalendarConnection(connection: InsertCalendarConnection): Promise<CalendarConnection> {
+    const [created] = await db.insert(calendarConnections).values(connection).returning();
+    return created;
+  }
+
+  async updateCalendarConnection(id: string, updates: Partial<CalendarConnection>): Promise<CalendarConnection | undefined> {
+    const [updated] = await db.update(calendarConnections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(calendarConnections.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteCalendarConnection(id: string): Promise<boolean> {
+    await db.delete(calendarConnections).where(eq(calendarConnections.id, id));
+    return true;
   }
 }
 
