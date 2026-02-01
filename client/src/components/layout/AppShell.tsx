@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import type { CompanySettings } from "@shared/schema";
 import FloatingChatPopup from "@/components/FloatingChatPopup";
+import UpdatesPopup from "@/components/UpdatesPopup";
+import FloatingAssistantButton from "@/components/FloatingAssistantButton";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -32,7 +34,8 @@ import {
   Grip,
   Minus,
   CheckSquare,
-  Snowflake
+  Snowflake,
+  Bell
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -169,6 +172,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const contentRef = React.useRef<HTMLDivElement>(null);
   const [isTileView, setIsTileView] = React.useState(false);
   const [tileLayout, setTileLayout] = React.useState<TileLayout>("grid");
+  const [isUpdatesOpen, setIsUpdatesOpen] = React.useState(false);
+  const [isChatOpen, setIsChatOpen] = React.useState(false);
 
   // Reset scroll to top when navigating between pages
   React.useEffect(() => {
@@ -243,6 +248,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     queryKey: ["/api/todo-active-status"],
     staleTime: 30000,
     refetchInterval: 30000,
+  });
+
+  const { data: unseenUpdates = [] } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/updates/unseen"],
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   const getLogoClasses = () => {
@@ -713,6 +724,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   )}
                 </Button>
               </Link>
+              {/* Updates/What's New button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="relative gap-2 h-10"
+                onClick={() => setIsUpdatesOpen(true)}
+                data-testid="button-updates-header"
+              >
+                <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 shadow-md shadow-blue-500/30">
+                  <Bell className="h-4 w-4 text-white drop-shadow-sm" />
+                </div>
+                <span className="hidden md:inline font-medium">Updates</span>
+                {unseenUpdates.length > 0 && (
+                  <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                    {unseenUpdates.length > 9 ? "9+" : unseenUpdates.length}
+                  </span>
+                )}
+              </Button>
               <div className="flex items-center gap-2 mr-2 border-r pr-3">
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-muted-foreground hidden md:inline">View:</span>
@@ -798,11 +827,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </main>
       
       {user && effectiveRole && (
-        <FloatingChatPopup 
-          userRole={effectiveRole} 
-          userName={user.name || user.username || undefined} 
-        />
+        <>
+          <FloatingChatPopup 
+            userRole={effectiveRole} 
+            userName={user.name || user.username || undefined}
+            isOpen={isChatOpen}
+            onClose={() => setIsChatOpen(false)}
+          />
+          <FloatingAssistantButton
+            onChatClick={() => setIsChatOpen(true)}
+            isChatOpen={isChatOpen}
+          />
+        </>
       )}
+      
+      <UpdatesPopup isOpen={isUpdatesOpen} onClose={() => setIsUpdatesOpen(false)} />
     </div>
   );
 }

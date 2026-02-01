@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
@@ -26,9 +28,22 @@ import {
   Phone,
   Calendar,
   Star,
-  Settings
+  Settings,
+  Search,
+  ArrowLeft
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+
+interface HelpArticle {
+  id: string;
+  title: string;
+  slug: string;
+  summary: string;
+  content: string;
+  category: string;
+  minRole: string;
+  isPublished: boolean;
+}
 
 type WalkthroughStep = {
   title: string;
@@ -526,6 +541,110 @@ export default function Help() {
             </div>
           </div>
         </>
+      )}
+      
+      <HelpArticlesSection />
+    </div>
+  );
+}
+
+function HelpArticlesSection() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedArticle, setSelectedArticle] = useState<HelpArticle | null>(null);
+  
+  const { data: articles = [] } = useQuery<HelpArticle[]>({
+    queryKey: ["/api/help/articles"],
+  });
+  
+  const { data: searchResults = [] } = useQuery<HelpArticle[]>({
+    queryKey: ["/api/help/articles/search", searchQuery],
+    queryFn: async () => {
+      if (!searchQuery.trim()) return [];
+      const res = await fetch(`/api/help/articles/search?q=${encodeURIComponent(searchQuery)}`);
+      return res.json();
+    },
+    enabled: searchQuery.trim().length > 0,
+  });
+  
+  const displayedArticles = searchQuery.trim() ? searchResults : articles;
+  
+  if (selectedArticle) {
+    return (
+      <div className="space-y-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setSelectedArticle(null)}
+          className="gap-2"
+          data-testid="back-to-articles"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Articles
+        </Button>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>{selectedArticle.title}</CardTitle>
+            <CardDescription>{selectedArticle.summary}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-wrap">
+              {selectedArticle.content}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  if (articles.length === 0) {
+    return null;
+  }
+  
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Help Articles</h2>
+        <div className="relative w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search articles..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="help-search-input"
+          />
+        </div>
+      </div>
+      
+      {displayedArticles.length === 0 ? (
+        <Card className="bg-muted/30">
+          <CardContent className="py-8 text-center text-muted-foreground">
+            <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
+            <p>No articles found</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-3">
+          {displayedArticles.map((article) => (
+            <Card 
+              key={article.id}
+              className="cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => setSelectedArticle(article)}
+              data-testid={`article-${article.id}`}
+            >
+              <CardContent className="py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-medium">{article.title}</h3>
+                    <p className="text-sm text-muted-foreground mt-1">{article.summary}</p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
     </div>
   );

@@ -54,6 +54,9 @@ Preferred communication style: Simple, everyday language.
   - **Cost Tracking**: Real-time cost tracking per agent, monthly cost projection, next billing date display, and cost breakdown by agent.
   - **AI Suggestions**: Each agent generates detailed improvement suggestions with cost estimates and priority levels. Suggestions can be marked as implemented or dismissed.
   - **Security**: Master Admin access only - hidden from other users entirely.
+- **Update Notification System**: Role-based app update announcements with bell icon button in header, popup showing new features/improvements/fixes, user acknowledgment tracking, and mark-all-read functionality. Admins can create/edit/delete updates with version numbers, categories (feature, improvement, fix, security), and role-based visibility.
+- **Help Articles System**: Database-backed searchable help articles with role-based filtering. Categories organize articles, and users can search across titles, summaries, and content. Integrated into the Help page alongside existing walkthrough features.
+- **Floating Assistant Button**: Combined access point (sparkle icon) in bottom-right corner that opens a menu with AI Assistant chat and Help Center navigation options. Replaces standalone chat button for better discoverability.
 
 ## External Dependencies
 

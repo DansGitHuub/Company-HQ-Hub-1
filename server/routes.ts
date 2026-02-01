@@ -4034,6 +4034,197 @@ Provide accurate information based on publicly available documentation.`;
     }
   }
 
+  // ==================== APP UPDATES ====================
+  
+  // Get updates for current user's role
+  app.get("/api/updates", requireAuth, async (req, res) => {
+    try {
+      const updates = await storage.getAppUpdatesForRole(req.user!.role);
+      res.json(updates);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching updates" });
+    }
+  });
+  
+  // Get unseen updates for current user (for popup)
+  app.get("/api/updates/unseen", requireAuth, async (req, res) => {
+    try {
+      const updates = await storage.getUnseenUpdatesForUser(req.user!.id, req.user!.role);
+      res.json(updates);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching unseen updates" });
+    }
+  });
+  
+  // Admin: Get all updates
+  app.get("/api/updates/admin", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const updates = await storage.getAppUpdates();
+      res.json(updates);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching updates" });
+    }
+  });
+  
+  // Acknowledge an update
+  app.post("/api/updates/:id/acknowledge", requireAuth, async (req, res) => {
+    try {
+      await storage.acknowledgeUpdate(req.user!.id, req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error acknowledging update" });
+    }
+  });
+  
+  // Admin: Create update
+  app.post("/api/updates", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const update = await storage.createAppUpdate(req.body);
+      res.status(201).json(update);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating update" });
+    }
+  });
+  
+  // Admin: Update update
+  app.patch("/api/updates/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const update = await storage.updateAppUpdate(req.params.id, req.body);
+      if (!update) return res.status(404).json({ message: "Update not found" });
+      res.json(update);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating update" });
+    }
+  });
+  
+  // Admin: Delete update
+  app.delete("/api/updates/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      await storage.deleteAppUpdate(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting update" });
+    }
+  });
+  
+  // ==================== HELP CENTER ====================
+  
+  // Get help articles for current user's role
+  app.get("/api/help/articles", requireAuth, async (req, res) => {
+    try {
+      const articles = await storage.getHelpArticles(req.user!.role);
+      res.json(articles);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching help articles" });
+    }
+  });
+  
+  // Search help articles
+  app.get("/api/help/articles/search", requireAuth, async (req, res) => {
+    try {
+      const query = req.query.q as string || "";
+      if (!query.trim()) return res.json([]);
+      const articles = await storage.searchHelpArticles(query, req.user!.role);
+      res.json(articles);
+    } catch (err) {
+      res.status(500).json({ message: "Error searching help articles" });
+    }
+  });
+  
+  // Get article by slug
+  app.get("/api/help/articles/slug/:slug", requireAuth, async (req, res) => {
+    try {
+      const article = await storage.getHelpArticleBySlug(req.params.slug);
+      if (!article) return res.status(404).json({ message: "Article not found" });
+      res.json(article);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching help article" });
+    }
+  });
+  
+  // Get article by ID
+  app.get("/api/help/articles/:id", requireAuth, async (req, res) => {
+    try {
+      const article = await storage.getHelpArticle(req.params.id);
+      if (!article) return res.status(404).json({ message: "Article not found" });
+      res.json(article);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching help article" });
+    }
+  });
+  
+  // Admin: Create help article
+  app.post("/api/help/articles", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const article = await storage.createHelpArticle(req.body);
+      res.status(201).json(article);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating help article" });
+    }
+  });
+  
+  // Admin: Update help article
+  app.patch("/api/help/articles/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const article = await storage.updateHelpArticle(req.params.id, req.body);
+      if (!article) return res.status(404).json({ message: "Article not found" });
+      res.json(article);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating help article" });
+    }
+  });
+  
+  // Admin: Delete help article
+  app.delete("/api/help/articles/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      await storage.deleteHelpArticle(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting help article" });
+    }
+  });
+  
+  // Get help categories for current user's role
+  app.get("/api/help/categories", requireAuth, async (req, res) => {
+    try {
+      const categories = await storage.getHelpCategories(req.user!.role);
+      res.json(categories);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching help categories" });
+    }
+  });
+  
+  // Admin: Create help category
+  app.post("/api/help/categories", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const category = await storage.createHelpCategory(req.body);
+      res.status(201).json(category);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating help category" });
+    }
+  });
+  
+  // Admin: Update help category
+  app.patch("/api/help/categories/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const category = await storage.updateHelpCategory(req.params.id, req.body);
+      if (!category) return res.status(404).json({ message: "Category not found" });
+      res.json(category);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating help category" });
+    }
+  });
+  
+  // Admin: Delete help category
+  app.delete("/api/help/categories/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      await storage.deleteHelpCategory(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting help category" });
+    }
+  });
+
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 

@@ -48,7 +48,11 @@ import {
   configuredIntegrations, type ConfiguredIntegration, type InsertConfiguredIntegration,
   integrationCapabilities, type IntegrationCapability, type InsertIntegrationCapability,
   integrationTests, type IntegrationTest, type InsertIntegrationTest,
-  integrationResearchSessions, type IntegrationResearchSession, type InsertIntegrationResearchSession
+  integrationResearchSessions, type IntegrationResearchSession, type InsertIntegrationResearchSession,
+  appUpdates, type AppUpdate, type InsertAppUpdate,
+  userUpdateAcknowledgments, type UserUpdateAcknowledgment, type InsertUserUpdateAcknowledgment,
+  helpArticles, type HelpArticle, type InsertHelpArticle,
+  helpCategories, type HelpCategory, type InsertHelpCategory
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull } from "drizzle-orm";
@@ -353,6 +357,32 @@ export interface IStorage {
   getIntegrationResearchSession(id: string): Promise<IntegrationResearchSession | undefined>;
   createIntegrationResearchSession(session: InsertIntegrationResearchSession): Promise<IntegrationResearchSession>;
   updateIntegrationResearchSession(id: string, updates: Partial<IntegrationResearchSession>): Promise<IntegrationResearchSession | undefined>;
+  
+  // App Updates
+  getAppUpdates(): Promise<AppUpdate[]>;
+  getAppUpdatesForRole(role: string): Promise<AppUpdate[]>;
+  getUnseenUpdatesForUser(userId: string, role: string): Promise<AppUpdate[]>;
+  getAppUpdate(id: string): Promise<AppUpdate | undefined>;
+  createAppUpdate(update: InsertAppUpdate): Promise<AppUpdate>;
+  updateAppUpdate(id: string, updates: Partial<AppUpdate>): Promise<AppUpdate | undefined>;
+  deleteAppUpdate(id: string): Promise<boolean>;
+  acknowledgeUpdate(userId: string, updateId: string): Promise<UserUpdateAcknowledgment>;
+  
+  // Help Articles
+  getHelpArticles(role?: string): Promise<HelpArticle[]>;
+  getHelpArticle(id: string): Promise<HelpArticle | undefined>;
+  getHelpArticleBySlug(slug: string): Promise<HelpArticle | undefined>;
+  searchHelpArticles(query: string, role: string): Promise<HelpArticle[]>;
+  createHelpArticle(article: InsertHelpArticle): Promise<HelpArticle>;
+  updateHelpArticle(id: string, updates: Partial<HelpArticle>): Promise<HelpArticle | undefined>;
+  deleteHelpArticle(id: string): Promise<boolean>;
+  
+  // Help Categories
+  getHelpCategories(role?: string): Promise<HelpCategory[]>;
+  getHelpCategory(id: string): Promise<HelpCategory | undefined>;
+  createHelpCategory(category: InsertHelpCategory): Promise<HelpCategory>;
+  updateHelpCategory(id: string, updates: Partial<HelpCategory>): Promise<HelpCategory | undefined>;
+  deleteHelpCategory(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1589,6 +1619,136 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(integrationResearchSessions).set(updates)
       .where(eq(integrationResearchSessions.id, id)).returning();
     return updated || undefined;
+  }
+
+  // App Updates
+  async getAppUpdates(): Promise<AppUpdate[]> {
+    return await db.select().from(appUpdates).orderBy(desc(appUpdates.publishedAt));
+  }
+
+  async getAppUpdatesForRole(role: string): Promise<AppUpdate[]> {
+    const roleHierarchy: Record<string, number> = { Customer: 1, Crew: 2, Manager: 3, Admin: 4 };
+    const userLevel = roleHierarchy[role] || 1;
+    const results = await db.select().from(appUpdates)
+      .where(eq(appUpdates.isActive, true))
+      .orderBy(desc(appUpdates.publishedAt));
+    return results.filter(u => roleHierarchy[u.minRole] <= userLevel);
+  }
+
+  async getUnseenUpdatesForUser(userId: string, role: string): Promise<AppUpdate[]> {
+    const roleHierarchy: Record<string, number> = { Customer: 1, Crew: 2, Manager: 3, Admin: 4 };
+    const userLevel = roleHierarchy[role] || 1;
+    const acknowledged = await db.select().from(userUpdateAcknowledgments).where(eq(userUpdateAcknowledgments.userId, userId));
+    const acknowledgedIds = new Set(acknowledged.map(a => a.updateId));
+    const updates = await db.select().from(appUpdates)
+      .where(eq(appUpdates.isActive, true))
+      .orderBy(desc(appUpdates.publishedAt));
+    return updates.filter(u => roleHierarchy[u.minRole] <= userLevel && !acknowledgedIds.has(u.id));
+  }
+
+  async getAppUpdate(id: string): Promise<AppUpdate | undefined> {
+    const [result] = await db.select().from(appUpdates).where(eq(appUpdates.id, id));
+    return result || undefined;
+  }
+
+  async createAppUpdate(update: InsertAppUpdate): Promise<AppUpdate> {
+    const [created] = await db.insert(appUpdates).values(update).returning();
+    return created;
+  }
+
+  async updateAppUpdate(id: string, updates: Partial<AppUpdate>): Promise<AppUpdate | undefined> {
+    const [updated] = await db.update(appUpdates).set(updates).where(eq(appUpdates.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteAppUpdate(id: string): Promise<boolean> {
+    await db.delete(userUpdateAcknowledgments).where(eq(userUpdateAcknowledgments.updateId, id));
+    const result = await db.delete(appUpdates).where(eq(appUpdates.id, id));
+    return true;
+  }
+
+  async acknowledgeUpdate(userId: string, updateId: string): Promise<UserUpdateAcknowledgment> {
+    const [created] = await db.insert(userUpdateAcknowledgments).values({ userId, updateId }).returning();
+    return created;
+  }
+
+  // Help Articles
+  async getHelpArticles(role?: string): Promise<HelpArticle[]> {
+    const roleHierarchy: Record<string, number> = { Customer: 1, Crew: 2, Manager: 3, Admin: 4 };
+    const userLevel = role ? (roleHierarchy[role] || 1) : 4;
+    const results = await db.select().from(helpArticles)
+      .where(eq(helpArticles.isPublished, true))
+      .orderBy(helpArticles.sortOrder);
+    return results.filter(a => roleHierarchy[a.minRole] <= userLevel);
+  }
+
+  async getHelpArticle(id: string): Promise<HelpArticle | undefined> {
+    const [result] = await db.select().from(helpArticles).where(eq(helpArticles.id, id));
+    return result || undefined;
+  }
+
+  async getHelpArticleBySlug(slug: string): Promise<HelpArticle | undefined> {
+    const [result] = await db.select().from(helpArticles).where(eq(helpArticles.slug, slug));
+    return result || undefined;
+  }
+
+  async searchHelpArticles(query: string, role: string): Promise<HelpArticle[]> {
+    const roleHierarchy: Record<string, number> = { Customer: 1, Crew: 2, Manager: 3, Admin: 4 };
+    const userLevel = roleHierarchy[role] || 1;
+    const results = await db.select().from(helpArticles)
+      .where(and(
+        eq(helpArticles.isPublished, true),
+        or(
+          ilike(helpArticles.title, `%${query}%`),
+          ilike(helpArticles.summary, `%${query}%`),
+          ilike(helpArticles.content, `%${query}%`)
+        )
+      ));
+    return results.filter(a => roleHierarchy[a.minRole] <= userLevel);
+  }
+
+  async createHelpArticle(article: InsertHelpArticle): Promise<HelpArticle> {
+    const [created] = await db.insert(helpArticles).values(article).returning();
+    return created;
+  }
+
+  async updateHelpArticle(id: string, updates: Partial<HelpArticle>): Promise<HelpArticle | undefined> {
+    const [updated] = await db.update(helpArticles).set({ ...updates, updatedAt: new Date() })
+      .where(eq(helpArticles.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteHelpArticle(id: string): Promise<boolean> {
+    await db.delete(helpArticles).where(eq(helpArticles.id, id));
+    return true;
+  }
+
+  // Help Categories
+  async getHelpCategories(role?: string): Promise<HelpCategory[]> {
+    const roleHierarchy: Record<string, number> = { Customer: 1, Crew: 2, Manager: 3, Admin: 4 };
+    const userLevel = role ? (roleHierarchy[role] || 1) : 4;
+    const results = await db.select().from(helpCategories).orderBy(helpCategories.sortOrder);
+    return results.filter(c => roleHierarchy[c.minRole] <= userLevel);
+  }
+
+  async getHelpCategory(id: string): Promise<HelpCategory | undefined> {
+    const [result] = await db.select().from(helpCategories).where(eq(helpCategories.id, id));
+    return result || undefined;
+  }
+
+  async createHelpCategory(category: InsertHelpCategory): Promise<HelpCategory> {
+    const [created] = await db.insert(helpCategories).values(category).returning();
+    return created;
+  }
+
+  async updateHelpCategory(id: string, updates: Partial<HelpCategory>): Promise<HelpCategory | undefined> {
+    const [updated] = await db.update(helpCategories).set(updates).where(eq(helpCategories.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteHelpCategory(id: string): Promise<boolean> {
+    await db.delete(helpCategories).where(eq(helpCategories.id, id));
+    return true;
   }
 }
 

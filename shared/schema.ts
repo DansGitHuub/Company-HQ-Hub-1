@@ -1319,3 +1319,86 @@ export const insertIntegrationResearchSessionSchema = createInsertSchema(integra
 
 export type InsertIntegrationResearchSession = z.infer<typeof insertIntegrationResearchSessionSchema>;
 export type IntegrationResearchSession = typeof integrationResearchSessions.$inferSelect;
+
+// App Updates - for announcing new features to users by role
+export const appUpdates = pgTable("app_updates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  version: text("version").notNull(), // e.g., "1.2.0"
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  detailedContent: text("detailed_content"), // Rich text/markdown for full details
+  minRole: text("min_role").notNull().default("Customer"), // Minimum role to see this update
+  category: text("category").notNull().default("feature"), // feature, improvement, fix, security
+  isActive: boolean("is_active").notNull().default(true),
+  publishedAt: timestamp("published_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAppUpdateSchema = createInsertSchema(appUpdates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAppUpdate = z.infer<typeof insertAppUpdateSchema>;
+export type AppUpdate = typeof appUpdates.$inferSelect;
+
+// Track which updates users have seen
+export const userUpdateAcknowledgments = pgTable("user_update_acknowledgments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  updateId: varchar("update_id", { length: 36 }).notNull().references(() => appUpdates.id),
+  acknowledgedAt: timestamp("acknowledged_at").defaultNow(),
+});
+
+export const insertUserUpdateAcknowledgmentSchema = createInsertSchema(userUpdateAcknowledgments).omit({
+  id: true,
+  acknowledgedAt: true,
+});
+
+export type InsertUserUpdateAcknowledgment = z.infer<typeof insertUserUpdateAcknowledgmentSchema>;
+export type UserUpdateAcknowledgment = typeof userUpdateAcknowledgments.$inferSelect;
+
+// Help Articles - comprehensive documentation by role
+export const helpArticles = pgTable("help_articles", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(), // URL-friendly identifier
+  summary: text("summary").notNull(), // Brief description for search results
+  content: text("content").notNull(), // Full article content (markdown)
+  category: text("category").notNull(), // e.g., "Getting Started", "Jobs", "SOPs", "Admin"
+  minRole: text("min_role").notNull().default("Customer"), // Minimum role to see this article
+  tags: text("tags").array(), // For search/filtering
+  relatedArticles: text("related_articles").array(), // Array of article IDs
+  sortOrder: integer("sort_order").notNull().default(0),
+  isPublished: boolean("is_published").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertHelpArticleSchema = createInsertSchema(helpArticles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertHelpArticle = z.infer<typeof insertHelpArticleSchema>;
+export type HelpArticle = typeof helpArticles.$inferSelect;
+
+// Help Categories for organizing articles
+export const helpCategories = pgTable("help_categories", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  icon: text("icon"), // Lucide icon name
+  minRole: text("min_role").notNull().default("Customer"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertHelpCategorySchema = createInsertSchema(helpCategories).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertHelpCategory = z.infer<typeof insertHelpCategorySchema>;
+export type HelpCategory = typeof helpCategories.$inferSelect;
