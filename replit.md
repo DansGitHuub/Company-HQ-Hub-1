@@ -61,6 +61,13 @@ Preferred communication style: Simple, everyday language.
   - **User Notifications**: When admins resolve reports and update articles, users with sufficient role level receive notifications
   - **Report Status Workflow**: pending → in_progress → resolved/dismissed
 - **Floating Assistant Button**: Combined access point (sparkle icon) in bottom-right corner that opens a menu with AI Assistant chat and Help Center navigation options. Replaces standalone chat button for better discoverability.
+- **Interactive Calendar**: Clickable calendar in the header that opens a mini calendar view with external calendar connection management:
+  - **Mini Calendar**: Monthly view with day navigation
+  - **Calendar Connections**: Connect to Google Calendar, Apple Calendar, Samsung Calendar, or Outlook
+  - **Connection Wizard**: Step-by-step flow to connect external calendars (Select provider → Authorize → Complete)
+  - **Connection Status**: Visual indicators showing connected, pending, or error states
+  - **Fix Connection**: One-click repair button for broken connections
+  - **Connection Management**: Add and remove calendar connections easily
 
 ## External Dependencies
 

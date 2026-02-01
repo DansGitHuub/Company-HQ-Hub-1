@@ -4381,9 +4381,19 @@ Provide accurate information based on publicly available documentation.`;
         return res.status(404).json({ message: "Connection not found" });
       }
       
-      const updated = await storage.updateCalendarConnection(req.params.id, req.body);
+      // Convert date strings to Date objects
+      const updates = { ...req.body };
+      if (updates.lastSyncAt && typeof updates.lastSyncAt === 'string') {
+        updates.lastSyncAt = new Date(updates.lastSyncAt);
+      }
+      if (updates.tokenExpiry && typeof updates.tokenExpiry === 'string') {
+        updates.tokenExpiry = new Date(updates.tokenExpiry);
+      }
+      
+      const updated = await storage.updateCalendarConnection(req.params.id, updates);
       res.json(updated);
     } catch (err) {
+      console.error("Error updating calendar connection:", err);
       res.status(500).json({ message: "Error updating connection" });
     }
   });

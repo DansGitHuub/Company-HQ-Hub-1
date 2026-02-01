@@ -190,6 +190,7 @@ function ConnectionWizard({ onClose }: { onClose: () => void }) {
   const { toast } = useToast();
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [step, setStep] = useState(1);
+  const [createdConnectionId, setCreatedConnectionId] = useState<string | null>(null);
   
   const { data: connections = [] } = useQuery<CalendarConnection[]>({
     queryKey: ["/api/calendar/connections"]
@@ -209,7 +210,8 @@ function ConnectionWizard({ onClose }: { onClose: () => void }) {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setCreatedConnectionId(data.id);
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/connections"] });
       setStep(3);
     },
@@ -220,16 +222,15 @@ function ConnectionWizard({ onClose }: { onClose: () => void }) {
   
   const confirmMutation = useMutation({
     mutationFn: async () => {
-      const connection = connections.find(c => c.provider === selectedProvider);
-      if (!connection) throw new Error("Connection not found");
+      if (!createdConnectionId) throw new Error("Connection not found");
       
-      const res = await fetch(`/api/calendar/connections/${connection.id}`, {
+      const res = await fetch(`/api/calendar/connections/${createdConnectionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ 
           isConnected: true, 
-          lastSyncAt: new Date(),
+          lastSyncAt: new Date().toISOString(),
           calendarName: "My Calendar"
         })
       });
