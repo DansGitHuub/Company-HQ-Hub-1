@@ -2,12 +2,17 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
@@ -21,9 +26,10 @@ import {
   Link2,
   Loader2,
   Clock,
-  MapPin
+  MapPin,
+  AlertTriangle,
+  ExternalLink
 } from "lucide-react";
-import type { CalendarConnection } from "@shared/schema";
 
 interface CalendarEvent {
   id: string;
@@ -35,12 +41,20 @@ interface CalendarEvent {
   allDay: boolean;
 }
 
+interface CalendarStatus {
+  connected: boolean;
+  hasCredentials: boolean;
+}
+
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-function MiniCalendar({ onSelectDate, events }: { onSelectDate: (date: Date) => void; events: CalendarEvent[] }) {
+function MiniCalendar({ onSelectDate, selectedDate, events }: { 
+  onSelectDate: (date: Date) => void; 
+  selectedDate: Date | null;
+  events: CalendarEvent[] 
+}) {
   const [viewDate, setViewDate] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const today = new Date();
   
   const year = viewDate.getFullYear();
@@ -62,15 +76,21 @@ function MiniCalendar({ onSelectDate, events }: { onSelectDate: (date: Date) => 
            year === today.getFullYear();
   };
 
+  const isSelected = (day: number) => {
+    if (!selectedDate) return false;
+    return day === selectedDate.getDate() && 
+           month === selectedDate.getMonth() && 
+           year === selectedDate.getFullYear();
+  };
+
   const hasEventsOnDay = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     return events.some(event => event.start.startsWith(dateStr));
   };
   
   const handleDayClick = (day: number) => {
-    setSelectedDay(day);
-    const selectedDate = new Date(year, month, day);
-    onSelectDate(selectedDate);
+    const selectedDateNew = new Date(year, month, day);
+    onSelectDate(selectedDateNew);
   };
   
   return (
@@ -93,10 +113,11 @@ function MiniCalendar({ onSelectDate, events }: { onSelectDate: (date: Date) => 
           <div
             key={i}
             onClick={() => day !== null && handleDayClick(day)}
+            data-testid={day !== null ? `calendar-day-${day}` : undefined}
             className={`py-1.5 rounded-md text-sm relative ${
               day === null ? "" :
               isToday(day) ? "bg-primary text-primary-foreground font-bold cursor-pointer" :
-              selectedDay === day ? "bg-muted font-medium cursor-pointer" :
+              isSelected(day) ? "bg-blue-100 dark:bg-blue-900 font-medium cursor-pointer ring-2 ring-blue-500" :
               "hover:bg-muted cursor-pointer"
             }`}
           >
@@ -146,7 +167,7 @@ function EventsList({ events, date, isLoading }: { events: CalendarEvent[]; date
   }
 
   return (
-    <ScrollArea className="h-[150px]">
+    <ScrollArea className="h-[120px]">
       <div className="space-y-2 pr-3">
         {dayEvents.map(event => (
           <div key={event.id} className="p-2 rounded-lg bg-muted/50 border text-sm">
@@ -168,105 +189,257 @@ function EventsList({ events, date, isLoading }: { events: CalendarEvent[]; date
   );
 }
 
-function ConnectionStatus({ connection }: { connection: CalendarConnection }) {
+function CreateEventDialog({ 
+  open, 
+  onOpenChange, 
+  selectedDate,
+  onConflictCheck 
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  selectedDate: Date | null;
+  onConflictCheck: (start: string, end: string) => Promise<{ hasConflicts: boolean; conflicts: any[] }>;
+}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
-  const repairMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/calendar/connections/${connection.id}/repair`, {
-        method: "POST",
-        credentials: "include"
-      });
-      if (!res.ok) throw new Error("Failed to repair connection");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/connections"] });
-      toast({ title: "Connection repaired", description: "Your calendar is now connected." });
-    },
-    onError: () => {
-      toast({ title: "Repair failed", description: "Please try again.", variant: "destructive" });
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [location, setLocation] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [startTime, setStartTime] = useState("09:00");
+  const [endDate, setEndDate] = useState("");
+  const [endTime, setEndTime] = useState("10:00");
+  const [allDay, setAllDay] = useState(false);
+  const [conflicts, setConflicts] = useState<any[]>([]);
+  const [checkingConflicts, setCheckingConflicts] = useState(false);
+  
+  useState(() => {
+    if (selectedDate) {
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      setStartDate(dateStr);
+      setEndDate(dateStr);
     }
   });
   
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/calendar/connections/${connection.id}`, {
-        method: "DELETE",
-        credentials: "include"
-      });
-      if (!res.ok) throw new Error("Failed to delete connection");
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/google-calendar/events", data);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/calendar/connections"] });
-      toast({ title: "Connection removed" });
+      queryClient.invalidateQueries({ queryKey: ["/api/google-calendar/events"] });
+      toast({ title: "Event created", description: "Added to your Google Calendar" });
+      onOpenChange(false);
+      resetForm();
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to create event", description: err.message, variant: "destructive" });
     }
   });
   
-  const hasError = !!connection.lastError;
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setLocation("");
+    setStartTime("09:00");
+    setEndTime("10:00");
+    setAllDay(false);
+    setConflicts([]);
+  };
+  
+  const handleCheckConflicts = async () => {
+    if (!startDate || !endDate) return;
+    
+    setCheckingConflicts(true);
+    try {
+      const start = allDay ? `${startDate}T00:00:00` : `${startDate}T${startTime}:00`;
+      const end = allDay ? `${endDate}T23:59:59` : `${endDate}T${endTime}:00`;
+      
+      const result = await onConflictCheck(start, end);
+      setConflicts(result.conflicts);
+      
+      if (result.hasConflicts) {
+        toast({ 
+          title: "Scheduling conflict detected", 
+          description: "There are existing events during this time",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error("Error checking conflicts:", err);
+    } finally {
+      setCheckingConflicts(false);
+    }
+  };
+  
+  const handleSubmit = () => {
+    if (!title.trim() || !startDate || !endDate) {
+      toast({ title: "Missing required fields", variant: "destructive" });
+      return;
+    }
+    
+    const start = allDay ? startDate : `${startDate}T${startTime}:00`;
+    const end = allDay ? endDate : `${endDate}T${endTime}:00`;
+    
+    createMutation.mutate({ title, description, location, start, end, allDay });
+  };
   
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg border bg-card" data-testid={`connection-${connection.id}`}>
-      <div className="flex items-center gap-3">
-        <span className="text-xl">🗓️</span>
-        <div>
-          <p className="font-medium text-sm">{connection.provider === "google" ? "Google Calendar" : connection.provider}</p>
-          {connection.calendarName && (
-            <p className="text-xs text-muted-foreground">{connection.calendarName}</p>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Event</DialogTitle>
+          <DialogDescription>Create a new event in your Google Calendar</DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="event-title">Title *</Label>
+            <Input 
+              id="event-title"
+              placeholder="Event title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              data-testid="event-title-input"
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="start-date">Start Date *</Label>
+              <Input 
+                id="start-date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                data-testid="event-start-date"
+              />
+            </div>
+            {!allDay && (
+              <div className="space-y-2">
+                <Label htmlFor="start-time">Start Time</Label>
+                <Input 
+                  id="start-time"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  data-testid="event-start-time"
+                />
+              </div>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="end-date">End Date *</Label>
+              <Input 
+                id="end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                data-testid="event-end-date"
+              />
+            </div>
+            {!allDay && (
+              <div className="space-y-2">
+                <Label htmlFor="end-time">End Time</Label>
+                <Input 
+                  id="end-time"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  data-testid="event-end-time"
+                />
+              </div>
+            )}
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="all-day" 
+              checked={allDay} 
+              onCheckedChange={(checked) => setAllDay(checked === true)}
+            />
+            <Label htmlFor="all-day" className="text-sm">All day event</Label>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="location">Location</Label>
+            <Input 
+              id="location"
+              placeholder="Event location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              data-testid="event-location-input"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea 
+              id="description"
+              placeholder="Event description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              data-testid="event-description-input"
+            />
+          </div>
+          
+          {conflicts.length > 0 && (
+            <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-sm font-medium">Conflict Warning</span>
+              </div>
+              <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">
+                You have {conflicts.length} existing event(s) during this time
+              </p>
+            </div>
           )}
         </div>
-      </div>
-      
-      <div className="flex items-center gap-2">
-        {hasError ? (
-          <>
-            <Badge variant="destructive" className="gap-1">
-              <AlertCircle className="h-3 w-3" />
-              Error
-            </Badge>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => repairMutation.mutate()}
-              disabled={repairMutation.isPending}
-            >
-              <RefreshCw className={`h-4 w-4 ${repairMutation.isPending ? "animate-spin" : ""}`} />
-            </Button>
-          </>
-        ) : connection.isConnected ? (
-          <Badge variant="secondary" className="gap-1 bg-green-500/10 text-green-600">
-            <Check className="h-3 w-3" />
-            Connected
-          </Badge>
-        ) : (
-          <Badge variant="secondary" className="gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Pending
-          </Badge>
-        )}
         
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => deleteMutation.mutate()}
-          disabled={deleteMutation.isPending}
-        >
-          <Trash2 className="h-4 w-4 text-muted-foreground" />
-        </Button>
-      </div>
-    </div>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleCheckConflicts}
+            disabled={!startDate || !endDate || checkingConflicts}
+            data-testid="check-conflicts-button"
+          >
+            {checkingConflicts ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <AlertCircle className="h-4 w-4 mr-2" />
+            )}
+            Check Conflicts
+          </Button>
+          <Button 
+            onClick={handleSubmit}
+            disabled={createMutation.isPending || !title.trim()}
+            data-testid="create-event-button"
+          >
+            {createMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Plus className="h-4 w-4 mr-2" />
+            )}
+            Create Event
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 export default function InteractiveCalendar() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
-  const { data: gcStatus } = useQuery<{ connected: boolean }>({
+  const { data: gcStatus } = useQuery<CalendarStatus>({
     queryKey: ["/api/google-calendar/status"],
   });
 
@@ -294,10 +467,41 @@ export default function InteractiveCalendar() {
     },
     enabled: gcStatus?.connected === true
   });
-
-  const { data: connections = [] } = useQuery<CalendarConnection[]>({
-    queryKey: ["/api/calendar/connections"]
+  
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/auth/google/connect", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to start OAuth");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      window.location.href = data.url;
+    },
+    onError: (err: any) => {
+      toast({ title: "Connection failed", description: err.message, variant: "destructive" });
+    }
   });
+  
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/google-calendar/disconnect", { 
+        method: "DELETE",
+        credentials: "include" 
+      });
+      if (!res.ok) throw new Error("Failed to disconnect");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/google-calendar/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/google-calendar/events"] });
+      toast({ title: "Calendar disconnected" });
+    }
+  });
+  
+  const checkConflicts = async (start: string, end: string) => {
+    const res = await apiRequest("POST", "/api/google-calendar/check-conflicts", { start, end });
+    return res.json();
+  };
   
   const today = new Date();
   const dateString = today.toLocaleDateString(undefined, { 
@@ -306,7 +510,8 @@ export default function InteractiveCalendar() {
     day: 'numeric' 
   });
   
-  const isGoogleConnected = gcStatus?.connected === true;
+  const isConnected = gcStatus?.connected === true;
+  const hasCredentials = gcStatus?.hasCredentials === true;
   const todayEvents = events.filter(e => e.start.startsWith(today.toISOString().split('T')[0]));
 
   const handleRefresh = () => {
@@ -315,73 +520,122 @@ export default function InteractiveCalendar() {
   };
   
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="relative"
-          data-testid="calendar-button"
-        >
-          <CalendarIcon className="h-5 w-5" />
-          {todayEvents.length > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center">
-              {todayEvents.length}
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[340px] p-4" align="end">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold">Calendar</h3>
-              <p className="text-xs text-muted-foreground">{dateString}</p>
+    <>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="relative"
+            data-testid="calendar-button"
+          >
+            <CalendarIcon className="h-5 w-5" />
+            {todayEvents.length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center">
+                {todayEvents.length}
+              </span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[340px] p-4" align="end">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold">Calendar</h3>
+                <p className="text-xs text-muted-foreground">{dateString}</p>
+              </div>
+              {isConnected && (
+                <Button variant="ghost" size="icon" onClick={handleRefresh}>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-            {isGoogleConnected && (
-              <Button variant="ghost" size="icon" onClick={handleRefresh}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
+            
+            <MiniCalendar 
+              onSelectDate={setSelectedDate} 
+              selectedDate={selectedDate}
+              events={events} 
+            />
+            
+            <Separator />
+            
+            {isConnected ? (
+              <>
+                <EventsList events={events} date={selectedDate} isLoading={eventsLoading} />
+                
+                <div className="flex gap-2">
+                  <Button 
+                    className="flex-1" 
+                    size="sm"
+                    onClick={() => setShowCreateEvent(true)}
+                    data-testid="add-event-button"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Event
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => disconnectMutation.mutate()}
+                    disabled={disconnectMutation.isPending}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Check className="h-3 w-3 text-green-500" />
+                  <span>Connected to Google Calendar</span>
+                </div>
+              </>
+            ) : hasCredentials ? (
+              <div className="text-center py-4 space-y-3">
+                <div className="w-12 h-12 mx-auto rounded-full bg-muted flex items-center justify-center">
+                  <CalendarIcon className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Connect Your Calendar</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Link your Google Calendar to view events and check for conflicts
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => connectMutation.mutate()}
+                  disabled={connectMutation.isPending}
+                  className="w-full"
+                  data-testid="connect-google-calendar-button"
+                >
+                  {connectMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Link2 className="h-4 w-4 mr-2" />
+                  )}
+                  Connect Google Calendar
+                </Button>
+              </div>
+            ) : (
+              <div className="text-center py-4 space-y-3">
+                <div className="w-12 h-12 mx-auto rounded-full bg-muted flex items-center justify-center">
+                  <AlertCircle className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Calendar Not Configured</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Google Calendar integration requires setup by an administrator
+                  </p>
+                </div>
+              </div>
             )}
           </div>
-          
-          <MiniCalendar onSelectDate={setSelectedDate} events={events} />
-          
-          <Separator />
-          
-          {isGoogleConnected ? (
-            <EventsList events={events} date={selectedDate} isLoading={eventsLoading} />
-          ) : (
-            <div className="text-center py-4 space-y-3">
-              <div className="w-12 h-12 mx-auto rounded-full bg-muted flex items-center justify-center">
-                <CalendarIcon className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-medium text-sm">Google Calendar Connected</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Your calendar is connected via Replit. Events will sync automatically.
-                </p>
-              </div>
-              <Badge variant="secondary" className="gap-1">
-                <Check className="h-3 w-3" />
-                Integration Active
-              </Badge>
-            </div>
-          )}
-          
-          {connections.length > 0 && (
-            <>
-              <Separator />
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">App Connections</p>
-                {connections.map(conn => (
-                  <ConnectionStatus key={conn.id} connection={conn} />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+        </PopoverContent>
+      </Popover>
+      
+      <CreateEventDialog 
+        open={showCreateEvent}
+        onOpenChange={setShowCreateEvent}
+        selectedDate={selectedDate}
+        onConflictCheck={checkConflicts}
+      />
+    </>
   );
 }
