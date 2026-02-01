@@ -34,7 +34,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import {
-  MessageSquare,
+  Mail,
   Plus,
   Send,
   Clock,
@@ -226,7 +226,7 @@ export default function MessagingInbox() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
-            <MessageSquare className="h-8 w-8" />
+            <Mail className="h-8 w-8" />
             {isAdmin ? "Communications Center" : "Messages"}
           </h1>
           <p className="text-muted-foreground">
@@ -302,7 +302,7 @@ export default function MessagingInbox() {
                 </div>
               ) : filteredThreads.length === 0 ? (
                 <div className="text-center p-8 text-muted-foreground">
-                  <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                  <Mail className="h-12 w-12 mx-auto mb-2 opacity-30" />
                   <p>No conversations found</p>
                 </div>
               ) : (
@@ -449,7 +449,7 @@ export default function MessagingInbox() {
                     </div>
                   ) : messages.length === 0 ? (
                     <div className="text-center p-8 text-muted-foreground">
-                      <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                      <Mail className="h-12 w-12 mx-auto mb-2 opacity-30" />
                       <p>No messages yet</p>
                     </div>
                   ) : (
@@ -544,7 +544,7 @@ export default function MessagingInbox() {
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-[500px] text-muted-foreground">
-              <MessageSquare className="h-16 w-16 mb-4 opacity-30" />
+              <Mail className="h-16 w-16 mb-4 opacity-30" />
               <p className="text-lg">Select a conversation to view</p>
               <p className="text-sm">Or start a new conversation</p>
             </div>

@@ -20,11 +20,10 @@ import {
   User,
   Sparkles,
   Shield,
-  MessageSquare,
+  Mail,
   Inbox,
   HelpCircle,
   Truck,
-  Bell,
   Info,
   ClipboardCheck,
   LayoutGrid,
@@ -295,15 +294,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     hq: { icon: Building2, label: "Company HQ", href: "/hq" },
     marketing: { icon: Megaphone, label: "Marketing", href: "/marketing" },
     forms: { icon: FileText, label: "Forms", href: "/forms" },
-    inbox: { icon: Inbox, label: "Messages", href: "/inbox" },
-    communications: { icon: MessageSquare, label: "Communications", href: "/communications" },
+    inbox: { icon: Mail, label: "Messages", href: "/inbox" },
     integrations: { icon: Settings, label: "Integrations", href: "/integrations" },
     admin: { icon: Shield, label: "Admin Panel", href: "/admin" },
     tools: { icon: Snowflake, label: "Tools", href: "/tools/plow-mapper" },
   };
 
   // Default order for internal roles (help always at very bottom for all roles)
-  const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "hiring", "jobs", "education", "communications", "profile"];
+  const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "hiring", "jobs", "education", "profile"];
   const adminExtraIds = ["hq", "marketing", "forms", "tools", "integrations", "admin"];
   const bottomIds = ["help"]; // Always shown at bottom for all roles
 
@@ -693,6 +691,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   </Button>
                 </Link>
               )}
+              {/* Communications/Inbox button */}
+              <Link href="/communications">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="relative gap-2 h-10"
+                  data-testid="button-communications-header"
+                >
+                  <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 shadow-md shadow-amber-500/30">
+                    <Mail className="h-4 w-4 text-white drop-shadow-sm" />
+                  </div>
+                  <span className="hidden md:inline font-medium">Messages</span>
+                  {unreadData && unreadData.count > 0 && (
+                    <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                      {unreadData.count > 9 ? "9+" : unreadData.count}
+                    </span>
+                  )}
+                </Button>
+              </Link>
               <div className="flex items-center gap-2 mr-2 border-r pr-3">
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-muted-foreground hidden md:inline">View:</span>
@@ -759,20 +776,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
               </div>
-              <Button
-                variant="ghost"
-                size="lg"
-                className="relative h-16 w-16 hover:bg-primary/10 flex items-center justify-center"
-                onClick={() => navigate(effectiveRole === "Customer" ? "/customer" : "/inbox")}
-                data-testid="button-notifications"
-              >
-                <Bell className="h-10 w-10 text-primary" />
-                {unreadData && unreadData.count > 0 && (
-                  <span className="absolute top-0 right-0 h-7 w-7 rounded-full bg-destructive text-destructive-foreground text-sm flex items-center justify-center font-bold animate-pulse shadow-lg border-2 border-background">
-                    {unreadData.count > 9 ? "9+" : unreadData.count}
-                  </span>
-                )}
-              </Button>
               <span className="text-sm font-medium text-muted-foreground hidden md:inline-block ml-2">
                 {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
               </span>
