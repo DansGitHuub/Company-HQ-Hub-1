@@ -39,6 +39,27 @@ export default function EmployeePortal() {
     });
   };
 
+  const handleDiscard = () => {
+    toast({
+      title: "Changes Discarded",
+      description: "Your changes have been reverted.",
+    });
+  };
+
+  const handleViewBenefitsGuide = () => {
+    toast({
+      title: "Benefits Guide",
+      description: "Opening the company benefits guide...",
+    });
+  };
+
+  const handleSubmitPTO = () => {
+    toast({
+      title: "PTO Request Submitted",
+      description: "Your time off request has been sent to your manager for approval.",
+    });
+  };
+
   const navItems = [
     { id: "profile" as Section, icon: User, label: "Personal Profile" },
     { id: "address" as Section, icon: Home, label: "Address & Contact" },
@@ -110,7 +131,7 @@ export default function EmployeePortal() {
               </div>
 
               <div className="pt-6 border-t flex justify-end gap-3">
-                <Button variant="outline">Discard Changes</Button>
+                <Button variant="outline" onClick={handleDiscard}>Discard Changes</Button>
                 <Button className="gap-2" onClick={handleSave} data-testid="button-save-profile"><Save className="w-4 h-4" /> Save Information</Button>
               </div>
             </CardContent>
@@ -158,7 +179,7 @@ export default function EmployeePortal() {
               </div>
 
               <div className="pt-6 border-t flex justify-end gap-3">
-                <Button variant="outline">Discard Changes</Button>
+                <Button variant="outline" onClick={handleDiscard}>Discard Changes</Button>
                 <Button className="gap-2" onClick={handleSave} data-testid="button-save-address"><Save className="w-4 h-4" /> Save Address</Button>
               </div>
             </CardContent>
@@ -225,7 +246,7 @@ export default function EmployeePortal() {
               </div>
 
               <div className="pt-6 border-t flex justify-end gap-3">
-                <Button variant="outline">Discard Changes</Button>
+                <Button variant="outline" onClick={handleDiscard}>Discard Changes</Button>
                 <Button className="gap-2" onClick={handleSave} data-testid="button-save-payroll"><Save className="w-4 h-4" /> Save Payroll Settings</Button>
               </div>
             </CardContent>
@@ -308,7 +329,7 @@ export default function EmployeePortal() {
                     <p className="text-sm text-muted-foreground">Open Enrollment Period</p>
                     <p className="font-medium">November 1 - November 30</p>
                   </div>
-                  <Button variant="outline">View Benefits Guide</Button>
+                  <Button variant="outline" onClick={handleViewBenefitsGuide}>View Benefits Guide</Button>
                 </div>
               </div>
             </CardContent>
@@ -374,7 +395,7 @@ export default function EmployeePortal() {
                   <Label>Notes (Optional)</Label>
                   <Input placeholder="Family vacation" data-testid="input-pto-notes" />
                 </div>
-                <Button data-testid="button-submit-pto">Submit Request</Button>
+                <Button onClick={handleSubmitPTO} data-testid="button-submit-pto">Submit Request</Button>
               </div>
 
               <div className="pt-6 border-t space-y-4">
