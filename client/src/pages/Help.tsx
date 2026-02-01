@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { 
   HelpCircle, 
@@ -379,7 +380,7 @@ export default function Help() {
   const isCustomer = effectiveRole === "Customer";
   
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-heading font-bold text-foreground flex items-center gap-3">
@@ -405,149 +406,166 @@ export default function Help() {
         </div>
       )}
 
-      <Card className="bg-gradient-to-r from-primary/5 to-primary/10">
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row items-center gap-6">
-            <div className="flex-1">
-              <h2 className="text-2xl font-heading font-bold mb-2">
-                {isCustomer ? "Welcome to Your Customer Portal" : "New Here?"}
-              </h2>
-              <p className="text-muted-foreground mb-4">
-                {isCustomer 
-                  ? "Learn how to communicate with our team, request services, and access helpful resources for your landscaping."
-                  : "Take a quick walkthrough to learn the basics of Company HQ. We'll show you where everything is and how to get started."}
-              </p>
-              <WalkthroughDialog 
-                steps={isCustomer ? customerWalkthrough : adminWalkthrough} 
-                triggerText={isCustomer ? "Take the Tour" : "Start Walkthrough"} 
-              />
-            </div>
-            <div className="p-6 bg-background rounded-xl shadow-sm">
-              {isCustomer ? <Leaf className="h-16 w-16 text-primary/50" /> : <BookOpen className="h-16 w-16 text-primary/50" />}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {isCustomer ? (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-muted/30">
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-blue-500/10 rounded-lg">
-                    <MessageSquare className="h-6 w-6 text-blue-500" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Send a Message</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Questions? Reach out anytime through your portal.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-muted/30">
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-green-500/10 rounded-lg">
-                    <Calendar className="h-6 w-6 text-green-500" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Request Service</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Need work done? Submit a request and we'll follow up.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-muted/30">
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-purple-500/10 rounded-lg">
-                    <Leaf className="h-6 w-6 text-purple-500" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Care Guides</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Find tips for maintaining your beautiful landscape.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Frequently Asked Questions</h2>
-            <div className="space-y-4">
-              {customerFAQs.map((faq, i) => (
-                <Card key={i}>
-                  <CardHeader>
-                    <CardTitle className="text-base">{faq.question}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{faq.answer}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-
-          <Card className="bg-muted/30">
+      <Tabs defaultValue="articles" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsTrigger value="articles" className="gap-2" data-testid="tab-articles">
+            <FileText className="h-4 w-4" />
+            Help Articles
+          </TabsTrigger>
+          <TabsTrigger value="walkthroughs" className="gap-2" data-testid="tab-walkthroughs">
+            <BookOpen className="h-4 w-4" />
+            Walkthroughs & FAQs
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="articles" className="mt-0">
+          <HelpArticlesSection />
+        </TabsContent>
+        
+        <TabsContent value="walkthroughs" className="space-y-8 mt-0">
+          <Card className="bg-gradient-to-r from-primary/5 to-primary/10">
             <CardContent className="pt-6">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-primary/10 rounded-lg">
-                  <Phone className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-1">Need More Help?</h3>
-                  <p className="text-sm text-muted-foreground">
-                    If you can't find what you're looking for, send us a message through your Customer Portal. We're here to help!
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                <div className="flex-1">
+                  <h2 className="text-2xl font-heading font-bold mb-2">
+                    {isCustomer ? "Welcome to Your Customer Portal" : "New Here?"}
+                  </h2>
+                  <p className="text-muted-foreground mb-4">
+                    {isCustomer 
+                      ? "Learn how to communicate with our team, request services, and access helpful resources for your landscaping."
+                      : "Take a quick walkthrough to learn the basics of Company HQ. We'll show you where everything is and how to get started."}
                   </p>
+                  <WalkthroughDialog 
+                    steps={isCustomer ? customerWalkthrough : adminWalkthrough} 
+                    triggerText={isCustomer ? "Take the Tour" : "Start Walkthrough"} 
+                  />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </>
-      ) : (
-        <>
-          <Card className="bg-muted/30">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-primary/10 rounded-lg">
-                  <HelpCircle className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-1">Quick Tip: Info Icons</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Hover over any menu item in the sidebar to see an info icon. Click it for a quick description and tips about that feature.
-                  </p>
+                <div className="p-6 bg-background rounded-xl shadow-sm">
+                  {isCustomer ? <Leaf className="h-16 w-16 text-primary/50" /> : <BookOpen className="h-16 w-16 text-primary/50" />}
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Common Questions</h2>
-            <div className="space-y-4">
-              {staffFAQs.map((faq, i) => (
-                <Card key={i}>
-                  <CardHeader>
-                    <CardTitle className="text-base">{faq.question}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{faq.answer}</p>
+          {isCustomer ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-muted/30">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 bg-blue-500/10 rounded-lg">
+                        <MessageSquare className="h-6 w-6 text-blue-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold mb-1">Send a Message</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Questions? Reach out anytime through your portal.
+                        </p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-      
-      <HelpArticlesSection />
+                <Card className="bg-muted/30">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 bg-green-500/10 rounded-lg">
+                        <Calendar className="h-6 w-6 text-green-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold mb-1">Request Service</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Need work done? Submit a request and we'll follow up.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-muted/30">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 bg-purple-500/10 rounded-lg">
+                        <Leaf className="h-6 w-6 text-purple-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold mb-1">Care Guides</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Find tips for maintaining your beautiful landscape.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold">Frequently Asked Questions</h2>
+                <div className="space-y-4">
+                  {customerFAQs.map((faq, i) => (
+                    <Card key={i}>
+                      <CardHeader>
+                        <CardTitle className="text-base">{faq.question}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground">{faq.answer}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              <Card className="bg-muted/30">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-primary/10 rounded-lg">
+                      <Phone className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-1">Need More Help?</h3>
+                      <p className="text-sm text-muted-foreground">
+                        If you can't find what you're looking for, send us a message through your Customer Portal. We're here to help!
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              <Card className="bg-muted/30">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-primary/10 rounded-lg">
+                      <HelpCircle className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-1">Quick Tip: Info Icons</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Hover over any menu item in the sidebar to see an info icon. Click it for a quick description and tips about that feature.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold">Common Questions</h2>
+                <div className="space-y-4">
+                  {staffFAQs.map((faq, i) => (
+                    <Card key={i}>
+                      <CardHeader>
+                        <CardTitle className="text-base">{faq.question}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground">{faq.answer}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
