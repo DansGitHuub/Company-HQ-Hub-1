@@ -24,7 +24,6 @@ import Education from "@/pages/Education";
 import EmployeePortal from "@/pages/EmployeePortal";
 import HQOverview from "@/pages/HQOverview";
 import JobPipeline from "@/pages/JobPipeline";
-import Assistant from "@/pages/Assistant";
 import Help from "@/pages/Help";
 import Profile from "@/pages/Profile";
 import AdminSetup from "@/pages/AdminSetup";
@@ -80,7 +79,6 @@ function AppRoutes() {
         <Route path="/employee-portal" component={EmployeePortal} />
         <Route path="/hq" component={HQOverview} />
         <Route path="/jobs" component={JobPipeline} />
-        <Route path="/assistant" component={Assistant} />
         <Route path="/help" component={Help} />
         <Route path="/admin-setup" component={AdminSetup} />
         <Route path="/equipment" component={EquipmentTracker} />

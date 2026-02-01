@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import type { CompanySettings } from "@shared/schema";
+import FloatingChatPopup from "@/components/FloatingChatPopup";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -93,11 +94,6 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
     title: "My Profile",
     description: "Update your personal info and profile picture.",
     tips: ["Add contact details", "Upload a profile photo", "Keep info current"]
-  },
-  assistant: {
-    title: "AI Assistant",
-    description: "Chat with an AI assistant for help with landscaping questions.",
-    tips: ["Ask business questions", "Get landscaping advice", "Conversation history is saved"]
   },
   help: {
     title: "Help Center",
@@ -295,7 +291,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     jobs: { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
     education: { icon: GraduationCap, label: "Customer Hub", href: "/education" },
     profile: { icon: User, label: "My Profile", href: "/profile" },
-    assistant: { icon: Sparkles, label: "Assistant", href: "/assistant" },
     help: { icon: HelpCircle, label: "Help", href: "/help" },
     hq: { icon: Building2, label: "Company HQ", href: "/hq" },
     marketing: { icon: Megaphone, label: "Marketing", href: "/marketing" },
@@ -308,7 +303,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   // Default order for internal roles (help always at very bottom for all roles)
-  const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "hiring", "jobs", "education", "communications", "profile", "assistant"];
+  const teamDefaultIds = ["dashboard", "sops", "materials", "equipment", "hiring", "jobs", "education", "communications", "profile"];
   const adminExtraIds = ["hq", "marketing", "forms", "tools", "integrations", "admin"];
   const bottomIds = ["help"]; // Always shown at bottom for all roles
 
@@ -795,6 +790,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </main>
+      
+      {user && effectiveRole && (
+        <FloatingChatPopup 
+          userRole={effectiveRole} 
+          userName={user.name || user.username || undefined} 
+        />
+      )}
     </div>
   );
 }
