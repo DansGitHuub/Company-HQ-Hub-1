@@ -34,6 +34,8 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 
 function MiniCalendar() {
   const [viewDate, setViewDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const { toast } = useToast();
   const today = new Date();
   
   const year = viewDate.getFullYear();
@@ -55,6 +57,15 @@ function MiniCalendar() {
            year === today.getFullYear();
   };
   
+  const handleDayClick = (day: number) => {
+    setSelectedDay(day);
+    const dateStr = `${MONTHS[month]} ${day}, ${year}`;
+    toast({
+      title: `${dateStr}`,
+      description: "Event display coming soon. Connect a calendar to see your events here.",
+    });
+  };
+  
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -74,9 +85,11 @@ function MiniCalendar() {
         {days.map((day, i) => (
           <div
             key={i}
+            onClick={() => day !== null && handleDayClick(day)}
             className={`py-1.5 rounded-md text-sm ${
               day === null ? "" :
-              isToday(day) ? "bg-primary text-primary-foreground font-bold" :
+              isToday(day) ? "bg-primary text-primary-foreground font-bold cursor-pointer" :
+              selectedDay === day ? "bg-muted font-medium cursor-pointer" :
               "hover:bg-muted cursor-pointer"
             }`}
           >
@@ -239,7 +252,10 @@ function ConnectionWizard({ onClose }: { onClose: () => void }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/connections"] });
-      toast({ title: "Calendar connected!", description: "Your calendar is now synced." });
+      toast({ 
+        title: "Calendar saved!", 
+        description: "Full sync functionality coming soon. Your preference has been saved." 
+      });
       onClose();
     }
   });
@@ -263,6 +279,11 @@ function ConnectionWizard({ onClose }: { onClose: () => void }) {
       
       {step === 1 && (
         <div className="space-y-3 py-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+            <p className="text-sm text-amber-800">
+              <strong>Coming Soon:</strong> Full calendar integration is in development. Connections saved here are for preview purposes.
+            </p>
+          </div>
           {availableProviders.length === 0 ? (
             <p className="text-center text-muted-foreground py-4">All calendar providers are already connected!</p>
           ) : (
