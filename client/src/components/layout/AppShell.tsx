@@ -375,17 +375,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           className="flex flex-col items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
           data-testid="link-logo-home"
         >
-          {hasLogo ? (
-            <img 
-              src={companySettings.logoUrl!} 
-              alt="Company Logo - Click to go home"
-              className={cn("object-cover shrink-0", sizeClass, shapeClass)}
-            />
-          ) : (
-            <div className="h-16 w-16 rounded-lg bg-primary flex items-center justify-center shrink-0">
-              <span className="font-heading font-bold text-2xl text-primary-foreground">HQ</span>
-            </div>
-          )}
+          <img 
+            src={hasLogo ? companySettings.logoUrl! : "/images/companyhq-logo.png"} 
+            alt="Company Logo - Click to go home"
+            className={cn("object-cover shrink-0", hasLogo ? sizeClass : "h-16 w-16", hasLogo ? shapeClass : "rounded-lg")}
+          />
           <div className="text-center">
             <h1 className="font-heading font-bold text-lg leading-tight text-sidebar-foreground">
               {companySettings?.companyName || "Company HQ"}

@@ -144,17 +144,11 @@ export default function AuthPage() {
       <div className="flex-1 flex items-center justify-center p-8 bg-background">
         <Card className="w-full max-w-md shadow-xl border-border">
           <CardHeader className="text-center pb-2">
-            {hasLogo ? (
-              <img 
-                src={companySettings!.logoUrl!} 
-                alt={`${companyName} Logo`}
-                className={`mx-auto w-20 h-20 object-cover mb-4 ${logoShapeClass}`}
-              />
-            ) : (
-              <div className="mx-auto w-16 h-16 bg-primary rounded-xl flex items-center justify-center mb-4">
-                <span className="font-heading font-bold text-2xl text-primary-foreground">HQ</span>
-              </div>
-            )}
+            <img 
+              src={hasLogo ? companySettings!.logoUrl! : "/images/companyhq-logo.png"} 
+              alt={`${companyName} Logo`}
+              className={`mx-auto w-20 h-20 object-cover mb-4 ${hasLogo ? logoShapeClass : 'rounded-xl'}`}
+            />
             <CardTitle className="text-2xl font-heading text-foreground">{companyName}</CardTitle>
             <CardDescription className="text-muted-foreground">Sign in to manage your landscape business</CardDescription>
           </CardHeader>
@@ -439,17 +433,11 @@ export default function AuthPage() {
         <div className="max-w-md space-y-8">
           <div className="space-y-4">
             <div className="flex items-center gap-4 mb-6">
-              {hasLogo ? (
-                <img 
-                  src={companySettings!.logoUrl!} 
-                  alt={`${companyName} Logo`}
-                  className={`w-16 h-16 object-cover ${logoShapeClass}`}
-                />
-              ) : (
-                <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center">
-                  <span className="font-heading font-bold text-2xl text-primary-foreground">HQ</span>
-                </div>
-              )}
+              <img 
+                src={hasLogo ? companySettings!.logoUrl! : "/images/companyhq-logo.png"} 
+                alt={`${companyName} Logo`}
+                className={`w-16 h-16 object-cover ${hasLogo ? logoShapeClass : 'rounded-xl'}`}
+              />
               <div>
                 <h2 className="text-2xl font-heading font-bold">{companyName}</h2>
                 <p className="text-sidebar-foreground/60">Landscape Management</p>
