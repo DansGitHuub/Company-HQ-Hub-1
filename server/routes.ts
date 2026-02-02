@@ -3098,7 +3098,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.patch("/api/company-settings", requireAdmin, async (req, res) => {
+  app.patch("/api/company-settings", requireAuth, requireMasterAdmin, async (req, res) => {
     try {
       const settings = await storage.updateCompanySettings(req.body);
       res.json(settings);
