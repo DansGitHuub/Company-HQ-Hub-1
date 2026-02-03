@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, requireAuth, requireAdmin, hashPassword } from "./auth";
+import { setupAuth, requireAuth, requireAdmin, hashPassword, comparePasswords } from "./auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { sendMaintenanceReminderEmail } from "./email";
@@ -195,15 +195,26 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Username already exists" });
       }
 
+      const userRole = role || "Crew";
+      const hashedPassword = await hashPassword(password);
+      
+      // Store plaintext password for staff (non-customer) so Master Admin can view it
+      const isStaff = userRole !== "Customer";
+      
       const user = await storage.createUser({
         username,
-        password: await hashPassword(password),
+        password: hashedPassword,
         email,
         name,
-        role: role || "Crew",
+        role: userRole,
       });
       
-      const { password: _, ...safeUser } = user;
+      // Update storedPassword separately for staff
+      if (isStaff) {
+        await storage.updateUser(user.id, { storedPassword: password });
+      }
+      
+      const { password: _, storedPassword: __, ...safeUser } = user;
       res.status(201).json(safeUser);
     } catch (err) {
       res.status(500).json({ message: "Error creating user" });
@@ -237,10 +248,15 @@ export async function registerRoutes(
       if (isActive !== undefined) updates.isActive = Boolean(isActive);
       if (password) {
         updates.password = await hashPassword(password);
+        // Update storedPassword for staff (non-customer) so Master Admin sees updated password
+        const effectiveRole = role || targetUser.role;
+        if (effectiveRole !== "Customer") {
+          updates.storedPassword = password;
+        }
       }
       
       const user = await storage.updateUser(id, updates);
-      const { password: _, ...safeUser } = user!;
+      const { password: _, storedPassword: __, ...safeUser } = user!;
       res.json(safeUser);
     } catch (err) {
       res.status(500).json({ message: "Error updating user" });
@@ -268,6 +284,35 @@ export async function registerRoutes(
       res.sendStatus(204);
     } catch (err) {
       res.status(500).json({ message: "Error deleting user" });
+    }
+  });
+
+  // Master Admin view stored password for staff users
+  app.get("/api/admin/users/:id/password", requireAuth, async (req, res) => {
+    try {
+      if (!req.user?.isMasterAdmin) {
+        return res.status(403).json({ message: "Only Master Admin can view stored passwords" });
+      }
+      
+      const id = req.params.id as string;
+      const targetUser = await storage.getUser(id);
+      
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Only allow viewing passwords for staff (non-customer)
+      if (targetUser.role === "Customer") {
+        return res.status(403).json({ message: "Cannot view customer passwords. Customers must use password recovery." });
+      }
+      
+      res.json({ 
+        userId: targetUser.id,
+        username: targetUser.username,
+        storedPassword: targetUser.storedPassword || "(not stored)"
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching password" });
     }
   });
 
@@ -2734,7 +2779,7 @@ Generate detailed information for this landscaping material.`;
     try {
       const user = await storage.getUser(req.user!.id);
       if (!user) return res.status(404).json({ message: "User not found" });
-      const { password, recoveryToken, recoveryExpires, ...safeUser } = user;
+      const { password, recoveryToken, recoveryExpires, storedPassword, ...safeUser } = user;
       res.json(safeUser);
     } catch (err) {
       res.status(500).json({ message: "Error fetching profile" });
@@ -2743,7 +2788,7 @@ Generate detailed information for this landscaping material.`;
 
   app.patch("/api/profile", requireAuth, async (req, res) => {
     try {
-      const { name, email, bio, phone, profilePicture, theme } = req.body;
+      const { name, email, bio, phone, profilePicture, theme, currentPassword, newPassword } = req.body;
       const updates: any = { updatedAt: new Date() };
       if (name !== undefined) updates.name = name;
       if (email !== undefined) updates.email = email;
@@ -2752,9 +2797,32 @@ Generate detailed information for this landscaping material.`;
       if (profilePicture !== undefined) updates.profilePicture = profilePicture;
       if (theme !== undefined) updates.theme = theme;
       
+      // Self-service password change
+      if (newPassword) {
+        const currentUser = await storage.getUser(req.user!.id);
+        if (!currentUser) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        
+        // Verify current password if provided
+        if (currentPassword) {
+          const isValidPassword = await comparePasswords(currentPassword, currentUser.password);
+          if (!isValidPassword) {
+            return res.status(400).json({ message: "Current password is incorrect" });
+          }
+        }
+        
+        updates.password = await hashPassword(newPassword);
+        
+        // Update storedPassword for staff (non-customer) so Master Admin sees updated password
+        if (currentUser.role !== "Customer") {
+          updates.storedPassword = newPassword;
+        }
+      }
+      
       const user = await storage.updateUser(req.user!.id, updates);
       if (!user) return res.status(404).json({ message: "User not found" });
-      const { password, recoveryToken, recoveryExpires, ...safeUser } = user;
+      const { password, recoveryToken, recoveryExpires, storedPassword, ...safeUser } = user;
       res.json(safeUser);
     } catch (err) {
       res.status(500).json({ message: "Error updating profile" });

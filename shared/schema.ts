@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   isApplicant: boolean("is_applicant").notNull().default(false),
   recoveryToken: text("recovery_token"),
   recoveryExpires: timestamp("recovery_expires"),
+  storedPassword: text("stored_password"), // Plaintext password for staff (Admin/Manager/Crew) visible to Master Admin
   bio: text("bio"),
   phone: text("phone"),
   profilePicture: text("profile_picture"),
