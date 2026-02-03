@@ -45,8 +45,8 @@ export async function sendPasswordRecoveryEmail(toEmail: string, recoveryToken: 
   
   const recoveryUrl = `${process.env.REPLIT_DEV_DOMAIN ? 'https://' + process.env.REPLIT_DEV_DOMAIN : 'http://localhost:5000'}/auth?recovery=${recoveryToken}`;
   
-  // Use Resend's default sending address until custom domain is verified
-  const senderEmail = 'Company HQ <onboarding@resend.dev>';
+  // Use verified domain for sending emails
+  const senderEmail = 'Company HQ <noreply@chapinlandscapes.com>';
   
   const { data, error } = await client.emails.send({
     from: senderEmail,
@@ -104,8 +104,8 @@ export async function sendMaintenanceReminderEmail(
     dueInfo = `Due at ${dueHours.toLocaleString()} hours`;
   }
 
-  // Use Resend's default sending address until custom domain is verified
-  const senderEmail = 'Company HQ <onboarding@resend.dev>';
+  // Use verified domain for sending emails
+  const senderEmail = 'Company HQ <noreply@chapinlandscapes.com>';
   
   const { data, error } = await client.emails.send({
     from: senderEmail,
