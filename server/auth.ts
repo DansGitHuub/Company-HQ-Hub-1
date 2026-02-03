@@ -181,11 +181,18 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Invalid or expired token" });
       }
       
-      await storage.updateUser(user.id, {
+      const updates: Record<string, any> = {
         password: await hashPassword(newPassword),
         recoveryToken: null,
         recoveryExpires: null,
-      });
+      };
+      
+      // Update storedPassword for staff (non-customer) so Master Admin sees updated password
+      if (user.role !== "Customer") {
+        updates.storedPassword = newPassword;
+      }
+      
+      await storage.updateUser(user.id, updates);
       
       res.json({ message: "Password reset successful" });
     } catch (err) {

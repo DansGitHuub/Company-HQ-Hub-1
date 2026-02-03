@@ -63,8 +63,16 @@ export async function seedUsers(): Promise<void> {
           role: seedUser.role,
         });
         
+        const userUpdates: any = {};
         if (seedUser.isMasterAdmin) {
-          await storage.updateUser(newUser.id, { isMasterAdmin: true });
+          userUpdates.isMasterAdmin = true;
+        }
+        // Store plaintext password for staff (non-customer) for Master Admin visibility
+        if (seedUser.role !== "Customer") {
+          userUpdates.storedPassword = seedUser.password;
+        }
+        if (Object.keys(userUpdates).length > 0) {
+          await storage.updateUser(newUser.id, userUpdates);
         }
         
         console.log(`[seed] Created account: ${seedUser.username} (${seedUser.role})${seedUser.isMasterAdmin ? ' [MASTER ADMIN]' : ''}`);
@@ -74,6 +82,10 @@ export async function seedUsers(): Promise<void> {
         
         if (seedUser.isMasterAdmin) {
           updates.isMasterAdmin = true;
+        }
+        // Store plaintext password for staff (non-customer) for Master Admin visibility
+        if (seedUser.role !== "Customer") {
+          updates.storedPassword = seedUser.password;
         }
         
         await storage.updateUser(existingUser.id, updates);
