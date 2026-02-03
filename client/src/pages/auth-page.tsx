@@ -76,7 +76,8 @@ export default function AuthPage() {
         setRecoverySent(true);
         toast({
           title: "Recovery email sent",
-          description: "Check your inbox for the recovery token",
+          description: `Check your inbox at ${recoveryEmail} for the recovery token`,
+          duration: Infinity,
         });
       } else {
         const data = await res.json().catch(() => ({}));
@@ -84,6 +85,7 @@ export default function AuthPage() {
           title: "Error",
           description: data.message || "Failed to send recovery email",
           variant: "destructive",
+          duration: 10000,
         });
       }
     } catch {
@@ -91,6 +93,7 @@ export default function AuthPage() {
         title: "Error",
         description: "Failed to send recovery email",
         variant: "destructive",
+        duration: 10000,
       });
     }
     setRecoveryLoading(false);
@@ -311,7 +314,7 @@ export default function AuthPage() {
                           <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
                           <p className="font-medium">Recovery instructions sent!</p>
                           <p className="text-sm text-muted-foreground mt-2">
-                            Check your email for the recovery token. Then click below to reset your password.
+                            We've sent a recovery token to <strong>{recoveryEmail}</strong>. Check your inbox and then click below to reset your password.
                           </p>
                           <Button
                             className="mt-4"

@@ -152,7 +152,8 @@ export function setupAuth(app: Express) {
       const { email } = req.body;
       const user = await storage.getUserByEmail(email);
       if (!user) {
-        return res.json({ message: "If the email exists, a recovery link will be sent." });
+        // Return success message even if user doesn't exist (security best practice)
+        return res.json({ message: "If the email exists, a recovery link will be sent.", email });
       }
       
       const token = randomBytes(32).toString("hex");
@@ -161,12 +162,13 @@ export function setupAuth(app: Express) {
       
       try {
         await sendPasswordRecoveryEmail(user.email!, token, user.name || user.username);
-        console.log(`Recovery email sent to ${email}`);
-      } catch (emailErr) {
-        console.error("Failed to send recovery email:", emailErr);
+        console.log(`[email] Recovery email sent successfully to ${email}`);
+        res.json({ message: "Recovery email sent!", email, sent: true });
+      } catch (emailErr: any) {
+        console.error("[email] Failed to send recovery email:", emailErr?.message || emailErr);
+        // Still return success to not reveal if email exists, but log the error
+        res.json({ message: "If the email exists, a recovery link will be sent.", email, sent: false });
       }
-      
-      res.json({ message: "If the email exists, a recovery link will be sent." });
     } catch (err) {
       res.status(500).json({ message: "Error processing recovery request" });
     }
