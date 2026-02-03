@@ -17,6 +17,8 @@ import {
   UserCheck, 
   UserX,
   Key,
+  Eye,
+  EyeOff,
   Trash2,
   Loader2,
   Crown,
@@ -192,6 +194,9 @@ export default function AdminPanel() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [resetPasswordUser, setResetPasswordUser] = useState<SafeUser | null>(null);
   const [newPassword, setNewPassword] = useState("");
+  const [viewPasswordUser, setViewPasswordUser] = useState<SafeUser | null>(null);
+  const [viewedPassword, setViewedPassword] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const isMasterAdmin = user?.isMasterAdmin === true;
 
   const { data: users = [], isLoading } = useQuery<SafeUser[]>({
@@ -373,6 +378,27 @@ export default function AdminPanel() {
       toast({ title: "Failed to reset password", variant: "destructive" });
     },
   });
+
+  const viewPasswordMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await apiRequest("GET", `/api/admin/users/${userId}/password`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setViewedPassword(data.storedPassword);
+      setShowPassword(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Cannot view password", variant: "destructive" });
+      setViewPasswordUser(null);
+    },
+  });
+
+  const handleViewPassword = (targetUser: SafeUser) => {
+    setViewPasswordUser(targetUser);
+    setViewedPassword(null);
+    viewPasswordMutation.mutate(targetUser.id);
+  };
 
   const handleAccessRequest = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -584,9 +610,24 @@ export default function AdminPanel() {
                                     </>
                                   )}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setResetPasswordUser(u)}>
-                                  <Key className="w-4 h-4 mr-2" /> Reset Password
-                                </DropdownMenuItem>
+                                {/* View Password - Master Admin only, staff users only */}
+                                {isMasterAdmin && u.role !== "Customer" && (
+                                  <DropdownMenuItem onClick={() => handleViewPassword(u)}>
+                                    <Eye className="w-4 h-4 mr-2" /> View Password
+                                  </DropdownMenuItem>
+                                )}
+                                {/* Reset Password - for staff users (admin can reset) */}
+                                {u.role !== "Customer" && (
+                                  <DropdownMenuItem onClick={() => setResetPasswordUser(u)}>
+                                    <Key className="w-4 h-4 mr-2" /> Reset Password
+                                  </DropdownMenuItem>
+                                )}
+                                {/* For customers - show message about password recovery */}
+                                {u.role === "Customer" && (
+                                  <DropdownMenuItem disabled className="text-muted-foreground">
+                                    <Key className="w-4 h-4 mr-2" /> Customer uses recovery
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   className="text-destructive focus:text-destructive"
@@ -919,6 +960,53 @@ export default function AdminPanel() {
             >
               {resetPasswordMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Reset Password
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Password Dialog - Master Admin only */}
+      <Dialog open={!!viewPasswordUser} onOpenChange={(open) => !open && setViewPasswordUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Password for {viewPasswordUser?.name || viewPasswordUser?.username}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {viewPasswordMutation.isPending ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin" />
+              </div>
+            ) : viewedPassword ? (
+              <div className="space-y-2">
+                <Label>Stored Password</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={viewedPassword}
+                    readOnly
+                    className="font-mono"
+                    data-testid="input-view-password"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowPassword(!showPassword)}
+                    data-testid="button-toggle-password-visibility"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  This is the current password for this staff member. If they change their own password, it will be updated here automatically.
+                </p>
+              </div>
+            ) : (
+              <p className="text-muted-foreground">Password not available.</p>
+            )}
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setViewPasswordUser(null)}>
+              Close
             </Button>
           </div>
         </DialogContent>
