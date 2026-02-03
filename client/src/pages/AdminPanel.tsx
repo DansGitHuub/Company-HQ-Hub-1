@@ -190,6 +190,8 @@ export default function AdminPanel() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<SafeUser | null>(null);
+  const [newPassword, setNewPassword] = useState("");
   const isMasterAdmin = user?.isMasterAdmin === true;
 
   const { data: users = [], isLoading } = useQuery<SafeUser[]>({
@@ -353,6 +355,22 @@ export default function AdminPanel() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({ title: "User deleted" });
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ id, password }: { id: string; password: string }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${id}`, { password });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Password reset", description: "The user's password has been updated" });
+      setResetPasswordUser(null);
+      setNewPassword("");
+    },
+    onError: () => {
+      toast({ title: "Failed to reset password", variant: "destructive" });
     },
   });
 
@@ -566,7 +584,7 @@ export default function AdminPanel() {
                                     </>
                                   )}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setResetPasswordUser(u)}>
                                   <Key className="w-4 h-4 mr-2" /> Reset Password
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
@@ -867,6 +885,44 @@ export default function AdminPanel() {
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Password Reset Dialog */}
+      <Dialog open={!!resetPasswordUser} onOpenChange={(open) => !open && setResetPasswordUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password for {resetPasswordUser?.name || resetPasswordUser?.username}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                data-testid="input-reset-password"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This will immediately change the user's password. Make sure to share the new password with them securely.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setResetPasswordUser(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => resetPasswordUser && resetPasswordMutation.mutate({ id: resetPasswordUser.id, password: newPassword })}
+              disabled={!newPassword || resetPasswordMutation.isPending}
+              data-testid="button-confirm-reset-password"
+            >
+              {resetPasswordMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Reset Password
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
