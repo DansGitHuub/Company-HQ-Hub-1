@@ -74,6 +74,17 @@ export default function AuthPage() {
       });
       if (res.ok) {
         setRecoverySent(true);
+        toast({
+          title: "Recovery email sent",
+          description: "Check your inbox for the recovery token",
+        });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast({
+          title: "Error",
+          description: data.message || "Failed to send recovery email",
+          variant: "destructive",
+        });
       }
     } catch {
       toast({
@@ -268,68 +279,14 @@ export default function AuthPage() {
                       Sign In
                     </Button>
                     <div className="flex flex-col gap-2">
-                      <Dialog open={recoveryOpen} onOpenChange={setRecoveryOpen}>
-                        <DialogTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="link"
-                            className="text-sm text-muted-foreground"
-                          >
-                            Forgot password?
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Password Recovery</DialogTitle>
-                            <DialogDescription>
-                              Enter your email address to receive a password recovery link.
-                            </DialogDescription>
-                          </DialogHeader>
-                          {recoverySent ? (
-                            <div className="text-center py-6">
-                              <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                              <p className="font-medium">Recovery instructions sent!</p>
-                              <p className="text-sm text-muted-foreground mt-2">
-                                Check your email for the recovery token. Then click below to reset your password.
-                              </p>
-                              <Button
-                                className="mt-4"
-                                onClick={() => {
-                                  setRecoveryOpen(false);
-                                  setShowResetForm(true);
-                                  setRecoverySent(false);
-                                }}
-                              >
-                                Enter Recovery Token
-                              </Button>
-                            </div>
-                          ) : (
-                            <form onSubmit={handleRecovery} className="space-y-4 mt-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="recovery-email">Email Address</Label>
-                                <Input
-                                  id="recovery-email"
-                                  type="email"
-                                  value={recoveryEmail}
-                                  onChange={(e) => setRecoveryEmail(e.target.value)}
-                                  placeholder="Enter your email"
-                                  required
-                                />
-                              </div>
-                              <Button
-                                type="submit"
-                                className="w-full"
-                                disabled={recoveryLoading}
-                              >
-                                {recoveryLoading ? (
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                ) : null}
-                                Send Recovery Email
-                              </Button>
-                            </form>
-                          )}
-                        </DialogContent>
-                      </Dialog>
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="text-sm text-muted-foreground"
+                        onClick={() => setRecoveryOpen(true)}
+                      >
+                        Forgot password?
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -341,6 +298,59 @@ export default function AuthPage() {
                       </Button>
                     </div>
                   </form>
+                  <Dialog open={recoveryOpen} onOpenChange={setRecoveryOpen}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Password Recovery</DialogTitle>
+                        <DialogDescription>
+                          Enter your email address to receive a password recovery link.
+                        </DialogDescription>
+                      </DialogHeader>
+                      {recoverySent ? (
+                        <div className="text-center py-6">
+                          <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                          <p className="font-medium">Recovery instructions sent!</p>
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Check your email for the recovery token. Then click below to reset your password.
+                          </p>
+                          <Button
+                            className="mt-4"
+                            onClick={() => {
+                              setRecoveryOpen(false);
+                              setShowResetForm(true);
+                              setRecoverySent(false);
+                            }}
+                          >
+                            Enter Recovery Token
+                          </Button>
+                        </div>
+                      ) : (
+                        <form onSubmit={handleRecovery} className="space-y-4 mt-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="recovery-email">Email Address</Label>
+                            <Input
+                              id="recovery-email"
+                              type="email"
+                              value={recoveryEmail}
+                              onChange={(e) => setRecoveryEmail(e.target.value)}
+                              placeholder="Enter your email"
+                              required
+                            />
+                          </div>
+                          <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={recoveryLoading}
+                          >
+                            {recoveryLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : null}
+                            Send Recovery Email
+                          </Button>
+                        </form>
+                      )}
+                    </DialogContent>
+                  </Dialog>
                 </TabsContent>
 
                 <TabsContent value="register">
