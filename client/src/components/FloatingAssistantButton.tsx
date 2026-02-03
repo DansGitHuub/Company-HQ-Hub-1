@@ -80,7 +80,7 @@ export default function FloatingAssistantButton({ onChatClick, isChatOpen }: Flo
       <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
         <Button
           size="lg"
-          className="h-14 w-14 rounded-full shadow-lg"
+          className="h-auto min-h-12 px-4 py-2 rounded-full shadow-lg gap-2"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
           data-testid="floating-assistant-btn"
         >
@@ -92,7 +92,7 @@ export default function FloatingAssistantButton({ onChatClick, isChatOpen }: Flo
                 animate={{ rotate: 0, opacity: 1 }}
                 exit={{ rotate: 90, opacity: 0 }}
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5" />
               </motion.div>
             ) : (
               <motion.div
@@ -101,10 +101,11 @@ export default function FloatingAssistantButton({ onChatClick, isChatOpen }: Flo
                 animate={{ rotate: 0, opacity: 1 }}
                 exit={{ rotate: -90, opacity: 0 }}
               >
-                <Sparkles className="h-6 w-6" />
+                <Sparkles className="h-5 w-5" />
               </motion.div>
             )}
           </AnimatePresence>
+          <span className="text-sm font-medium">Help / AI</span>
         </Button>
       </motion.div>
     </div>

@@ -54,6 +54,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 
@@ -679,130 +680,181 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
              )}
            </div>
            <div className="flex items-center gap-2">
+              <TooltipProvider delayDuration={300}>
               {/* To-Do List button - shown only for active users or admins */}
               {(todoActiveStatus?.isActive || user?.role === "Admin") && (
-                <Link href="/todos">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link href="/todos">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="relative gap-2 h-10"
+                        data-testid="button-todo-header"
+                      >
+                        <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-600 shadow-md shadow-emerald-500/30">
+                          <CheckSquare className="h-4 w-4 text-white drop-shadow-sm" />
+                        </div>
+                        <span className="hidden md:inline font-medium">To-Do</span>
+                        {todoActiveStatus?.unreadCount && todoActiveStatus.unreadCount > 0 && (
+                          <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm">
+                            {todoActiveStatus.unreadCount > 9 ? "9+" : todoActiveStatus.unreadCount}
+                          </span>
+                        )}
+                      </Button>
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View your tasks and to-do items</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {/* Communications/Inbox button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link href="/communications">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="relative gap-2 h-10"
+                      data-testid="button-communications-header"
+                    >
+                      <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 shadow-md shadow-amber-500/30">
+                        <Mail className="h-4 w-4 text-white drop-shadow-sm" />
+                      </div>
+                      <span className="hidden md:inline font-medium">Messages</span>
+                      {unreadData && unreadData.count > 0 && (
+                        <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                          {unreadData.count > 9 ? "9+" : unreadData.count}
+                        </span>
+                      )}
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>View messages and conversations</p>
+                </TooltipContent>
+              </Tooltip>
+              {/* Updates/What's New button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="relative gap-2 h-10"
-                    data-testid="button-todo-header"
+                    onClick={() => setIsUpdatesOpen(true)}
+                    data-testid="button-updates-header"
                   >
-                    <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-600 shadow-md shadow-emerald-500/30">
-                      <CheckSquare className="h-4 w-4 text-white drop-shadow-sm" />
+                    <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 shadow-md shadow-blue-500/30">
+                      <Bell className="h-4 w-4 text-white drop-shadow-sm" />
                     </div>
-                    <span className="hidden md:inline font-medium">To-Do</span>
-                    {todoActiveStatus?.unreadCount && todoActiveStatus.unreadCount > 0 && (
-                      <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm">
-                        {todoActiveStatus.unreadCount > 9 ? "9+" : todoActiveStatus.unreadCount}
+                    <span className="hidden md:inline font-medium">Updates</span>
+                    {unseenUpdates.length > 0 && (
+                      <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                        {unseenUpdates.length > 9 ? "9+" : unseenUpdates.length}
                       </span>
                     )}
                   </Button>
-                </Link>
-              )}
-              {/* Communications/Inbox button */}
-              <Link href="/communications">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="relative gap-2 h-10"
-                  data-testid="button-communications-header"
-                >
-                  <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 shadow-md shadow-amber-500/30">
-                    <Mail className="h-4 w-4 text-white drop-shadow-sm" />
-                  </div>
-                  <span className="hidden md:inline font-medium">Messages</span>
-                  {unreadData && unreadData.count > 0 && (
-                    <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
-                      {unreadData.count > 9 ? "9+" : unreadData.count}
-                    </span>
-                  )}
-                </Button>
-              </Link>
-              {/* Updates/What's New button */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="relative gap-2 h-10"
-                onClick={() => setIsUpdatesOpen(true)}
-                data-testid="button-updates-header"
-              >
-                <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 shadow-md shadow-blue-500/30">
-                  <Bell className="h-4 w-4 text-white drop-shadow-sm" />
-                </div>
-                <span className="hidden md:inline font-medium">Updates</span>
-                {unseenUpdates.length > 0 && (
-                  <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
-                    {unseenUpdates.length > 9 ? "9+" : unseenUpdates.length}
-                  </span>
-                )}
-              </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>See what's new and recent updates</p>
+                </TooltipContent>
+              </Tooltip>
               <div className="flex items-center gap-2 mr-2 border-r pr-3">
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-muted-foreground hidden md:inline">View:</span>
-                  <Button
-                    variant={isTileView ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setIsTileView(!isTileView)}
-                    className={cn(
-                      "gap-2 transition-colors h-10",
-                      isTileView && "bg-primary text-primary-foreground"
-                    )}
-                    data-testid="button-tile-view-toggle"
-                  >
-                    <div className={cn(
-                      "relative w-7 h-7 flex items-center justify-center rounded-lg shadow-md transition-all",
-                      isTileView 
-                        ? "bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 shadow-slate-500/30" 
-                        : "bg-gradient-to-br from-violet-400 via-violet-500 to-violet-600 shadow-violet-500/30"
-                    )}>
-                      {isTileView ? <PanelLeft className="h-4 w-4 text-white drop-shadow-sm" /> : <LayoutGrid className="h-4 w-4 text-white drop-shadow-sm" />}
-                    </div>
-                    <span className="font-medium">{isTileView ? "Back to Menu" : "Tile View"}</span>
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={isTileView ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setIsTileView(!isTileView)}
+                        className={cn(
+                          "gap-2 transition-colors h-10",
+                          isTileView && "bg-primary text-primary-foreground"
+                        )}
+                        data-testid="button-tile-view-toggle"
+                      >
+                        <div className={cn(
+                          "relative w-7 h-7 flex items-center justify-center rounded-lg shadow-md transition-all",
+                          isTileView 
+                            ? "bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 shadow-slate-500/30" 
+                            : "bg-gradient-to-br from-violet-400 via-violet-500 to-violet-600 shadow-violet-500/30"
+                        )}>
+                          {isTileView ? <PanelLeft className="h-4 w-4 text-white drop-shadow-sm" /> : <LayoutGrid className="h-4 w-4 text-white drop-shadow-sm" />}
+                        </div>
+                        <span className="font-medium">{isTileView ? "Back to Menu" : "Tile View"}</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{isTileView ? "Switch to sidebar navigation" : "Switch to tile-based navigation"}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 {isTileView && (
                   <div className="flex items-center gap-1 pl-2 border-l" role="group" aria-label="Tile layout options">
                     <span className="text-xs text-muted-foreground hidden md:inline mr-1">Layout:</span>
-                    <Button
-                      variant={tileLayout === "grid" ? "secondary" : "ghost"}
-                      size="sm"
-                      className="gap-1 h-8 px-2"
-                      onClick={() => setTileLayout("grid")}
-                      aria-label="Switch to grid layout"
-                      aria-pressed={tileLayout === "grid"}
-                      data-testid="button-layout-grid"
-                    >
-                      <Grip className="h-4 w-4" />
-                      <span className="hidden lg:inline text-xs">Grid</span>
-                    </Button>
-                    <Button
-                      variant={tileLayout === "radial" ? "secondary" : "ghost"}
-                      size="sm"
-                      className="gap-1 h-8 px-2"
-                      onClick={() => setTileLayout("radial")}
-                      aria-label="Switch to radial layout"
-                      aria-pressed={tileLayout === "radial"}
-                      data-testid="button-layout-radial"
-                    >
-                      <Circle className="h-4 w-4" />
-                      <span className="hidden lg:inline text-xs">Radial</span>
-                    </Button>
-                    <Button
-                      variant={tileLayout === "dock" ? "secondary" : "ghost"}
-                      size="sm"
-                      className="gap-1 h-8 px-2"
-                      onClick={() => setTileLayout("dock")}
-                      aria-label="Switch to dock layout"
-                      aria-pressed={tileLayout === "dock"}
-                      data-testid="button-layout-dock"
-                    >
-                      <Minus className="h-4 w-4" />
-                      <span className="hidden lg:inline text-xs">Dock</span>
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={tileLayout === "grid" ? "secondary" : "ghost"}
+                          size="sm"
+                          className="gap-1 h-8 px-2"
+                          onClick={() => setTileLayout("grid")}
+                          aria-label="Switch to grid layout"
+                          aria-pressed={tileLayout === "grid"}
+                          data-testid="button-layout-grid"
+                        >
+                          <Grip className="h-4 w-4" />
+                          <span className="hidden lg:inline text-xs">Grid</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Grid layout</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={tileLayout === "radial" ? "secondary" : "ghost"}
+                          size="sm"
+                          className="gap-1 h-8 px-2"
+                          onClick={() => setTileLayout("radial")}
+                          aria-label="Switch to radial layout"
+                          aria-pressed={tileLayout === "radial"}
+                          data-testid="button-layout-radial"
+                        >
+                          <Circle className="h-4 w-4" />
+                          <span className="hidden lg:inline text-xs">Radial</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Radial layout</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={tileLayout === "dock" ? "secondary" : "ghost"}
+                          size="sm"
+                          className="gap-1 h-8 px-2"
+                          onClick={() => setTileLayout("dock")}
+                          aria-label="Switch to dock layout"
+                          aria-pressed={tileLayout === "dock"}
+                          data-testid="button-layout-dock"
+                        >
+                          <Minus className="h-4 w-4" />
+                          <span className="hidden lg:inline text-xs">Dock</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Dock layout</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 )}
               </div>
+              </TooltipProvider>
               <div className="hidden md:block ml-2">
                 <InteractiveCalendar />
               </div>
