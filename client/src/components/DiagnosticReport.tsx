@@ -23,6 +23,7 @@ import {
   Clock,
   Download,
   FileText,
+  Hammer,
   Info,
   Loader2,
   RefreshCw,
@@ -32,6 +33,7 @@ import {
   Users,
   Zap
 } from "lucide-react";
+import DevelopmentTracker from "./DevelopmentTracker";
 
 interface ErrorLog {
   id: string;
@@ -574,65 +576,89 @@ export default function DiagnosticReport() {
     });
   };
 
+  const [activeTab, setActiveTab] = useState("system");
+
   return (
     <div className="space-y-6" data-testid="diagnostic-report">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Bug className="h-6 w-6" />
-            Diagnostic Report
+            Diagnostics & Development
           </h2>
           <p className="text-muted-foreground">
-            Monitor system health, track errors, and review activity logs
+            Monitor system health, track errors, and manage incomplete features
           </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="report-mode" className="text-sm">Simple</Label>
-            <Switch
-              id="report-mode"
-              checked={isAdvanced}
-              onCheckedChange={setIsAdvanced}
-              data-testid="switch-report-mode"
-            />
-            <Label htmlFor="report-mode" className="text-sm">Advanced</Label>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleRefresh} data-testid="button-refresh-report">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleDownload} disabled={!report} data-testid="button-download-report">
-            <Download className="h-4 w-4 mr-2" />
-            Download
-          </Button>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center items-center p-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      ) : report ? (
-        isAdvanced ? (
-          <AdvancedReportView report={report as AdvancedReport} />
-        ) : (
-          <SimpleReportView report={report as SimpleReport} />
-        )
-      ) : (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium">No Report Data Available</p>
-            <p className="text-muted-foreground">Click refresh to generate a diagnostic report.</p>
-          </CardContent>
-        </Card>
-      )}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsTrigger value="system" data-testid="tab-system-report">
+            <Bug className="h-4 w-4 mr-2" />
+            System Report
+          </TabsTrigger>
+          <TabsTrigger value="development" data-testid="tab-development-tracker">
+            <Hammer className="h-4 w-4 mr-2" />
+            Development Tracker
+          </TabsTrigger>
+        </TabsList>
 
-      {report && (
-        <p className="text-xs text-muted-foreground text-center">
-          Report generated at {formatDate(report.generatedAt)}
-        </p>
-      )}
+        <TabsContent value="system">
+          <div className="space-y-6">
+            <div className="flex items-center justify-end gap-4">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="report-mode" className="text-sm">Simple</Label>
+                <Switch
+                  id="report-mode"
+                  checked={isAdvanced}
+                  onCheckedChange={setIsAdvanced}
+                  data-testid="switch-report-mode"
+                />
+                <Label htmlFor="report-mode" className="text-sm">Advanced</Label>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleRefresh} data-testid="button-refresh-report">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDownload} disabled={!report} data-testid="button-download-report">
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </Button>
+            </div>
+
+            {isLoading ? (
+              <div className="flex justify-center items-center p-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : report ? (
+              isAdvanced ? (
+                <AdvancedReportView report={report as AdvancedReport} />
+              ) : (
+                <SimpleReportView report={report as SimpleReport} />
+              )
+            ) : (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium">No Report Data Available</p>
+                  <p className="text-muted-foreground">Click refresh to generate a diagnostic report.</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {report && (
+              <p className="text-xs text-muted-foreground text-center">
+                Report generated at {formatDate(report.generatedAt)}
+              </p>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="development">
+          <DevelopmentTracker />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
