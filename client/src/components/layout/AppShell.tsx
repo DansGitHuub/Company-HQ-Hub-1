@@ -172,17 +172,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [showSuggestions, setShowSuggestions] = React.useState(false);
   const searchRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
+  const sidebarNavRef = React.useRef<HTMLDivElement>(null);
+  const sidebarScrollPosition = React.useRef<number>(0);
   const [isTileView, setIsTileView] = React.useState(false);
   const [tileLayout, setTileLayout] = React.useState<TileLayout>("grid");
   const [isUpdatesOpen, setIsUpdatesOpen] = React.useState(false);
   const [isChatOpen, setIsChatOpen] = React.useState(false);
 
-  // Reset scroll to top when navigating between pages
+  // Reset main content scroll to top when navigating between pages
+  // But preserve sidebar scroll position
   React.useEffect(() => {
     if (contentRef.current) {
       contentRef.current.scrollTop = 0;
     }
+    // Restore sidebar scroll position after navigation
+    if (sidebarNavRef.current) {
+      sidebarNavRef.current.scrollTop = sidebarScrollPosition.current;
+    }
   }, [location]);
+
+  // Save sidebar scroll position when it changes
+  const handleSidebarScroll = React.useCallback(() => {
+    if (sidebarNavRef.current) {
+      sidebarScrollPosition.current = sidebarNavRef.current.scrollTop;
+    }
+  }, []);
 
   // Role-based search suggestions - comprehensive list
   const getSuggestions = () => {
@@ -390,7 +404,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </a>
       </div>
 
-      <div className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
+      <div 
+        ref={sidebarNavRef}
+        onScroll={handleSidebarScroll}
+        className="flex-1 py-6 px-3 space-y-1 overflow-y-auto"
+      >
         {displayNav.map((item) => {
           const isActive = location === item.href;
           const helpContent = menuHelpContent[item.id];
