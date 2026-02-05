@@ -55,7 +55,9 @@ import {
   helpCategories, type HelpCategory, type InsertHelpCategory,
   helpArticleReports, type HelpArticleReport, type InsertHelpArticleReport,
   articleUpdateNotifications, type ArticleUpdateNotification, type InsertArticleUpdateNotification,
-  calendarConnections, type CalendarConnection, type InsertCalendarConnection
+  calendarConnections, type CalendarConnection, type InsertCalendarConnection,
+  errorLogs, type ErrorLog, type InsertErrorLog,
+  activityLogs, type ActivityLog, type InsertActivityLog
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull } from "drizzle-orm";
@@ -408,6 +410,16 @@ export interface IStorage {
   createCalendarConnection(connection: InsertCalendarConnection): Promise<CalendarConnection>;
   updateCalendarConnection(id: string, updates: Partial<CalendarConnection>): Promise<CalendarConnection | undefined>;
   deleteCalendarConnection(id: string): Promise<boolean>;
+  
+  // Error Logs
+  getErrorLogs(filters?: { severity?: string; feature?: string; isResolved?: boolean; limit?: number }): Promise<ErrorLog[]>;
+  createErrorLog(log: InsertErrorLog): Promise<ErrorLog>;
+  updateErrorLog(id: string, updates: Partial<ErrorLog>): Promise<ErrorLog | undefined>;
+  getErrorStats(): Promise<{ total: number; unresolved: number; bySeverity: Record<string, number>; byFeature: Record<string, number> }>;
+  
+  // Activity Logs
+  getActivityLogs(filters?: { feature?: string; action?: string; userId?: string; limit?: number }): Promise<ActivityLog[]>;
+  createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1885,6 +1897,84 @@ export class DatabaseStorage implements IStorage {
   async deleteCalendarConnection(id: string): Promise<boolean> {
     await db.delete(calendarConnections).where(eq(calendarConnections.id, id));
     return true;
+  }
+
+  // Error Logs
+  async getErrorLogs(filters?: { severity?: string; feature?: string; isResolved?: boolean; limit?: number }): Promise<ErrorLog[]> {
+    let query = db.select().from(errorLogs);
+    const conditions: any[] = [];
+    
+    if (filters?.severity) {
+      conditions.push(eq(errorLogs.severity, filters.severity));
+    }
+    if (filters?.feature) {
+      conditions.push(eq(errorLogs.feature, filters.feature));
+    }
+    if (filters?.isResolved !== undefined) {
+      conditions.push(eq(errorLogs.isResolved, filters.isResolved));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.orderBy(desc(errorLogs.createdAt)).limit(filters?.limit || 100);
+  }
+
+  async createErrorLog(log: InsertErrorLog): Promise<ErrorLog> {
+    const [created] = await db.insert(errorLogs).values(log).returning();
+    return created;
+  }
+
+  async updateErrorLog(id: string, updates: Partial<ErrorLog>): Promise<ErrorLog | undefined> {
+    const [updated] = await db.update(errorLogs).set(updates).where(eq(errorLogs.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async getErrorStats(): Promise<{ total: number; unresolved: number; bySeverity: Record<string, number>; byFeature: Record<string, number> }> {
+    const allErrors = await db.select().from(errorLogs);
+    
+    const total = allErrors.length;
+    const unresolved = allErrors.filter(e => !e.isResolved).length;
+    
+    const bySeverity: Record<string, number> = {};
+    const byFeature: Record<string, number> = {};
+    
+    allErrors.forEach(e => {
+      const sev = e.severity || 'unknown';
+      const feat = e.feature || 'unknown';
+      bySeverity[sev] = (bySeverity[sev] || 0) + 1;
+      byFeature[feat] = (byFeature[feat] || 0) + 1;
+    });
+    
+    return { total, unresolved, bySeverity, byFeature };
+  }
+
+  // Activity Logs
+  async getActivityLogs(filters?: { feature?: string; action?: string; userId?: string; limit?: number }): Promise<ActivityLog[]> {
+    let query = db.select().from(activityLogs);
+    const conditions: any[] = [];
+    
+    if (filters?.feature) {
+      conditions.push(eq(activityLogs.feature, filters.feature));
+    }
+    if (filters?.action) {
+      conditions.push(eq(activityLogs.action, filters.action));
+    }
+    if (filters?.userId) {
+      conditions.push(eq(activityLogs.userId, filters.userId));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.orderBy(desc(activityLogs.createdAt)).limit(filters?.limit || 100);
+  }
+
+  async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
+    const [created] = await db.insert(activityLogs).values(log).returning();
+    return created;
   }
 }
 

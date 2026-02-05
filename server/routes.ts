@@ -4778,6 +4778,295 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  // ========== DIAGNOSTIC REPORT ENDPOINTS (Master Admin only) ==========
+  
+  const requireMasterAdmin = (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    if (req.user.role !== "Admin" || !req.user.isMasterAdmin) {
+      return res.status(403).json({ message: "Master Admin access required" });
+    }
+    next();
+  };
+  
+  // Get error logs with optional filters
+  app.get("/api/admin/diagnostics/errors", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.severity) filters.severity = req.query.severity as string;
+      if (req.query.feature) filters.feature = req.query.feature as string;
+      if (req.query.isResolved !== undefined) filters.isResolved = req.query.isResolved === "true";
+      if (req.query.limit) filters.limit = parseInt(req.query.limit as string);
+      
+      const errors = await storage.getErrorLogs(filters);
+      res.json(errors);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching error logs" });
+    }
+  });
+  
+  // Get error statistics
+  app.get("/api/admin/diagnostics/errors/stats", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getErrorStats();
+      res.json(stats);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching error statistics" });
+    }
+  });
+  
+  // Update error (mark as resolved, etc.)
+  app.patch("/api/admin/diagnostics/errors/:id", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const updates = req.body;
+      if (updates.isResolved) {
+        updates.resolvedAt = new Date();
+        updates.resolvedBy = req.user!.id;
+      }
+      const updated = await storage.updateErrorLog(req.params.id, updates);
+      if (!updated) {
+        return res.status(404).json({ message: "Error log not found" });
+      }
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating error log" });
+    }
+  });
+  
+  // Get activity logs with optional filters
+  app.get("/api/admin/diagnostics/activities", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.feature) filters.feature = req.query.feature as string;
+      if (req.query.action) filters.action = req.query.action as string;
+      if (req.query.userId) filters.userId = req.query.userId as string;
+      if (req.query.limit) filters.limit = parseInt(req.query.limit as string);
+      
+      const activities = await storage.getActivityLogs(filters);
+      res.json(activities);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching activity logs" });
+    }
+  });
+  
+  // Generate diagnostic report (Simple mode - high-level summary)
+  app.get("/api/admin/diagnostics/report/simple", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const errorStats = await storage.getErrorStats();
+      const recentErrors = await storage.getErrorLogs({ limit: 10, isResolved: false });
+      const recentActivities = await storage.getActivityLogs({ limit: 20 });
+      
+      // Get system summary data
+      const users = await storage.getAllUsers();
+      const sops = await storage.getSops();
+      const materials = await storage.getMaterials();
+      const jobs = await storage.getJobs();
+      const todos = await storage.getTodos();
+      
+      const report = {
+        generatedAt: new Date().toISOString(),
+        mode: "simple",
+        systemHealth: {
+          status: errorStats.unresolved > 10 ? "needs_attention" : errorStats.unresolved > 0 ? "good" : "excellent",
+          unresolvedIssues: errorStats.unresolved,
+          totalIssuesLogged: errorStats.total,
+        },
+        quickStats: {
+          totalUsers: users.length,
+          activeUsers: users.filter((u: User) => u.isActive).length,
+          totalSOPs: sops.filter((s: any) => !s.isArchived).length,
+          totalMaterials: materials.length,
+          activeJobs: jobs.filter((j: any) => j.status !== "Completed").length,
+          pendingTodos: todos.filter((t: any) => t.status === "pending").length,
+        },
+        recentIssues: recentErrors.slice(0, 5).map((e: any) => ({
+          id: e.id,
+          when: e.createdAt,
+          what: e.feature || "General",
+          summary: e.errorMessage.substring(0, 100) + (e.errorMessage.length > 100 ? "..." : ""),
+          severity: e.severity,
+        })),
+        recentActivity: recentActivities.slice(0, 10).map((a: any) => ({
+          when: a.createdAt,
+          action: a.action,
+          feature: a.feature,
+          description: a.description,
+        })),
+      };
+      
+      res.json(report);
+    } catch (err) {
+      console.error("Error generating simple report:", err);
+      res.status(500).json({ message: "Error generating diagnostic report" });
+    }
+  });
+  
+  // Generate diagnostic report (Advanced mode - full technical details)
+  app.get("/api/admin/diagnostics/report/advanced", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const errorStats = await storage.getErrorStats();
+      const allErrors = await storage.getErrorLogs({ limit: 100 });
+      const allActivities = await storage.getActivityLogs({ limit: 100 });
+      
+      // Get comprehensive system data
+      const users = await storage.getAllUsers();
+      const sops = await storage.getSops();
+      const materials = await storage.getMaterials();
+      const jobs = await storage.getJobs();
+      const candidates = await storage.getCandidates();
+      const equipment = await storage.getAllEquipment();
+      const forms = await storage.getCustomForms();
+      const todos = await storage.getTodos();
+      
+      // Analyze error patterns
+      const errorsByEndpoint: Record<string, number> = {};
+      const errorsByTime: Record<string, number> = {};
+      
+      allErrors.forEach((e: any) => {
+        const endpoint = e.endpoint || "unknown";
+        errorsByEndpoint[endpoint] = (errorsByEndpoint[endpoint] || 0) + 1;
+        
+        const hour = new Date(e.createdAt).toISOString().substring(0, 13);
+        errorsByTime[hour] = (errorsByTime[hour] || 0) + 1;
+      });
+      
+      // Calculate user activity
+      const userActivityCounts: Record<string, number> = {};
+      allActivities.forEach((a: any) => {
+        if (a.userId) {
+          userActivityCounts[a.userId] = (userActivityCounts[a.userId] || 0) + 1;
+        }
+      });
+      
+      const report = {
+        generatedAt: new Date().toISOString(),
+        mode: "advanced",
+        systemHealth: {
+          status: errorStats.unresolved > 10 ? "needs_attention" : errorStats.unresolved > 0 ? "good" : "excellent",
+          totalErrors: errorStats.total,
+          unresolvedErrors: errorStats.unresolved,
+          errorsBySeverity: errorStats.bySeverity,
+          errorsByFeature: errorStats.byFeature,
+        },
+        systemUsage: {
+          users: {
+            total: users.length,
+            active: users.filter((u: User) => u.isActive).length,
+            byRole: users.reduce((acc: Record<string, number>, u: User) => {
+              acc[u.role] = (acc[u.role] || 0) + 1;
+              return acc;
+            }, {}),
+          },
+          sops: {
+            total: sops.length,
+            active: sops.filter((s: any) => !s.isArchived).length,
+            archived: sops.filter((s: any) => s.isArchived).length,
+          },
+          materials: { total: materials.length },
+          jobs: {
+            total: jobs.length,
+            byStatus: jobs.reduce((acc: Record<string, number>, j: any) => {
+              acc[j.status] = (acc[j.status] || 0) + 1;
+              return acc;
+            }, {}),
+          },
+          hiring: { totalCandidates: candidates.length },
+          equipment: { total: equipment.length },
+          forms: {
+            total: forms.length,
+            published: forms.filter((f: any) => f.status === "published").length,
+            draft: forms.filter((f: any) => f.status === "draft").length,
+          },
+          todos: {
+            total: todos.length,
+            pending: todos.filter((t: any) => t.status === "pending").length,
+            inProgress: todos.filter((t: any) => t.status === "in_progress").length,
+            completed: todos.filter((t: any) => t.status === "completed").length,
+          },
+        },
+        errorAnalysis: {
+          byEndpoint: Object.entries(errorsByEndpoint)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10)
+            .map(([endpoint, count]) => ({ endpoint, count })),
+          byTimeHour: Object.entries(errorsByTime)
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .slice(-24)
+            .map(([hour, count]) => ({ hour, count })),
+        },
+        recentErrors: allErrors.slice(0, 20).map((e: any) => ({
+          id: e.id,
+          type: e.errorType,
+          message: e.errorMessage,
+          endpoint: e.endpoint,
+          httpMethod: e.httpMethod,
+          statusCode: e.statusCode,
+          feature: e.feature,
+          severity: e.severity,
+          userId: e.userId,
+          userRole: e.userRole,
+          isResolved: e.isResolved,
+          createdAt: e.createdAt,
+          stackTrace: e.stackTrace,
+        })),
+        recentActivity: allActivities.slice(0, 30).map((a: any) => ({
+          id: a.id,
+          action: a.action,
+          feature: a.feature,
+          description: a.description,
+          entityType: a.entityType,
+          entityId: a.entityId,
+          userId: a.userId,
+          userRole: a.userRole,
+          success: a.success,
+          createdAt: a.createdAt,
+          metadata: a.metadata ? JSON.parse(a.metadata) : null,
+        })),
+        mostActiveUsers: Object.entries(userActivityCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([userId, count]) => {
+            const user = users.find((u: User) => u.id === userId);
+            return {
+              userId,
+              username: user?.username || "Unknown",
+              role: user?.role,
+              actionCount: count,
+            };
+          }),
+      };
+      
+      res.json(report);
+    } catch (err) {
+      console.error("Error generating advanced report:", err);
+      res.status(500).json({ message: "Error generating diagnostic report" });
+    }
+  });
+  
+  // Log a frontend error (for catching React errors)
+  app.post("/api/diagnostics/log-error", requireAuth, async (req, res) => {
+    try {
+      const { errorType, errorMessage, stackTrace, feature, severity } = req.body;
+      
+      await storage.createErrorLog({
+        errorType: errorType || "frontend_error",
+        errorMessage: errorMessage || "Unknown frontend error",
+        stackTrace,
+        feature,
+        severity: severity || "error",
+        userId: req.user?.id,
+        userRole: req.user?.role,
+        endpoint: req.get("Referer"),
+        userAgent: req.get("User-Agent"),
+      });
+      
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error logging frontend error" });
+    }
+  });
+
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 
