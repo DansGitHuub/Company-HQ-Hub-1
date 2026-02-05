@@ -5057,6 +5057,74 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  // Development Tracker endpoints (Master Admin only)
+  app.get("/api/development-tracker", requireMasterAdmin, async (req, res) => {
+    try {
+      const { status, category, priority } = req.query;
+      const items = await storage.getDevelopmentItems({
+        status: status as string | undefined,
+        category: category as string | undefined,
+        priority: priority as string | undefined,
+      });
+      res.json(items);
+    } catch (err) {
+      console.error("Error fetching development items:", err);
+      res.status(500).json({ message: "Error fetching development items" });
+    }
+  });
+
+  app.get("/api/development-tracker/:id", requireMasterAdmin, async (req, res) => {
+    try {
+      const item = await storage.getDevelopmentItem(req.params.id);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      res.json(item);
+    } catch (err) {
+      console.error("Error fetching development item:", err);
+      res.status(500).json({ message: "Error fetching development item" });
+    }
+  });
+
+  app.post("/api/development-tracker", requireMasterAdmin, async (req, res) => {
+    try {
+      const item = await storage.createDevelopmentItem({
+        ...req.body,
+        updatedBy: req.user?.id,
+      });
+      res.json(item);
+    } catch (err) {
+      console.error("Error creating development item:", err);
+      res.status(500).json({ message: "Error creating development item" });
+    }
+  });
+
+  app.put("/api/development-tracker/:id", requireMasterAdmin, async (req, res) => {
+    try {
+      const item = await storage.updateDevelopmentItem(req.params.id, {
+        ...req.body,
+        updatedBy: req.user?.id,
+      });
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      res.json(item);
+    } catch (err) {
+      console.error("Error updating development item:", err);
+      res.status(500).json({ message: "Error updating development item" });
+    }
+  });
+
+  app.delete("/api/development-tracker/:id", requireMasterAdmin, async (req, res) => {
+    try {
+      await storage.deleteDevelopmentItem(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting development item:", err);
+      res.status(500).json({ message: "Error deleting development item" });
+    }
+  });
+
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 
