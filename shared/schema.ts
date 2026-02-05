@@ -1526,3 +1526,31 @@ export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
 
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLogs.$inferSelect;
+
+// Development Tracker - for tracking incomplete features and systems
+export const developmentTracker = pgTable("development_tracker", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  featureName: text("feature_name").notNull(),
+  category: text("category").notNull(), // core, integration, ui, backend, etc.
+  status: text("status").default("in_progress"), // not_started, in_progress, blocked, needs_review, completed
+  priority: text("priority").default("medium"), // low, medium, high, critical
+  percentComplete: integer("percent_complete").default(0),
+  description: text("description"), // What the feature does
+  currentState: text("current_state"), // What's already built
+  remainingWork: text("remaining_work"), // What still needs to be done (JSON array)
+  blockers: text("blockers"), // What's blocking progress (JSON array)
+  suggestions: text("suggestions"), // Alternative approaches or tips (JSON array)
+  additionalInfo: text("additional_info"), // Setup requirements, API keys needed, etc.
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  updatedBy: varchar("updated_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDevelopmentTrackerSchema = createInsertSchema(developmentTracker).omit({
+  id: true,
+  createdAt: true,
+  lastUpdated: true,
+});
+
+export type InsertDevelopmentTracker = z.infer<typeof insertDevelopmentTrackerSchema>;
+export type DevelopmentTracker = typeof developmentTracker.$inferSelect;

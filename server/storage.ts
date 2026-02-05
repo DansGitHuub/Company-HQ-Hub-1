@@ -57,7 +57,8 @@ import {
   articleUpdateNotifications, type ArticleUpdateNotification, type InsertArticleUpdateNotification,
   calendarConnections, type CalendarConnection, type InsertCalendarConnection,
   errorLogs, type ErrorLog, type InsertErrorLog,
-  activityLogs, type ActivityLog, type InsertActivityLog
+  activityLogs, type ActivityLog, type InsertActivityLog,
+  developmentTracker, type DevelopmentTracker, type InsertDevelopmentTracker
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull } from "drizzle-orm";
@@ -420,6 +421,13 @@ export interface IStorage {
   // Activity Logs
   getActivityLogs(filters?: { feature?: string; action?: string; userId?: string; limit?: number }): Promise<ActivityLog[]>;
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
+  
+  // Development Tracker
+  getDevelopmentItems(filters?: { status?: string; category?: string; priority?: string }): Promise<DevelopmentTracker[]>;
+  getDevelopmentItem(id: string): Promise<DevelopmentTracker | undefined>;
+  createDevelopmentItem(item: InsertDevelopmentTracker): Promise<DevelopmentTracker>;
+  updateDevelopmentItem(id: string, updates: Partial<DevelopmentTracker>): Promise<DevelopmentTracker | undefined>;
+  deleteDevelopmentItem(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1975,6 +1983,50 @@ export class DatabaseStorage implements IStorage {
   async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
     const [created] = await db.insert(activityLogs).values(log).returning();
     return created;
+  }
+
+  // Development Tracker
+  async getDevelopmentItems(filters?: { status?: string; category?: string; priority?: string }): Promise<DevelopmentTracker[]> {
+    let query = db.select().from(developmentTracker);
+    const conditions: any[] = [];
+    
+    if (filters?.status) {
+      conditions.push(eq(developmentTracker.status, filters.status));
+    }
+    if (filters?.category) {
+      conditions.push(eq(developmentTracker.category, filters.category));
+    }
+    if (filters?.priority) {
+      conditions.push(eq(developmentTracker.priority, filters.priority));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.orderBy(desc(developmentTracker.priority), developmentTracker.featureName);
+  }
+
+  async getDevelopmentItem(id: string): Promise<DevelopmentTracker | undefined> {
+    const [result] = await db.select().from(developmentTracker).where(eq(developmentTracker.id, id));
+    return result || undefined;
+  }
+
+  async createDevelopmentItem(item: InsertDevelopmentTracker): Promise<DevelopmentTracker> {
+    const [created] = await db.insert(developmentTracker).values(item).returning();
+    return created;
+  }
+
+  async updateDevelopmentItem(id: string, updates: Partial<DevelopmentTracker>): Promise<DevelopmentTracker | undefined> {
+    const [updated] = await db.update(developmentTracker)
+      .set({ ...updates, lastUpdated: new Date() })
+      .where(eq(developmentTracker.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteDevelopmentItem(id: string): Promise<boolean> {
+    await db.delete(developmentTracker).where(eq(developmentTracker.id, id));
+    return true;
   }
 }
 
