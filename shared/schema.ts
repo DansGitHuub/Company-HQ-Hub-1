@@ -1471,3 +1471,58 @@ export const insertCalendarConnectionSchema = createInsertSchema(calendarConnect
 
 export type InsertCalendarConnection = z.infer<typeof insertCalendarConnectionSchema>;
 export type CalendarConnection = typeof calendarConnections.$inferSelect;
+
+// Error Logs - for tracking application errors
+export const errorLogs = pgTable("error_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  errorType: text("error_type").notNull(), // api_error, database_error, auth_error, validation_error, frontend_error
+  errorMessage: text("error_message").notNull(),
+  stackTrace: text("stack_trace"),
+  endpoint: text("endpoint"), // API endpoint that caused the error
+  httpMethod: text("http_method"), // GET, POST, PATCH, DELETE
+  statusCode: integer("status_code"),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id),
+  userRole: text("user_role"),
+  requestBody: text("request_body"), // Sanitized request body (no passwords)
+  userAgent: text("user_agent"),
+  ipAddress: text("ip_address"),
+  feature: text("feature"), // sops, materials, jobs, hiring, todos, etc.
+  severity: text("severity").default("error"), // info, warning, error, critical
+  isResolved: boolean("is_resolved").default(false),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: varchar("resolved_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertErrorLogSchema = createInsertSchema(errorLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertErrorLog = z.infer<typeof insertErrorLogSchema>;
+export type ErrorLog = typeof errorLogs.$inferSelect;
+
+// Activity Logs - for tracking key user actions
+export const activityLogs = pgTable("activity_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  action: text("action").notNull(), // login, logout, create, update, delete, view
+  feature: text("feature").notNull(), // sops, materials, jobs, hiring, todos, users, settings, etc.
+  description: text("description"), // Human-readable description
+  entityType: text("entity_type"), // user, sop, material, job, etc.
+  entityId: text("entity_id"), // ID of the affected entity
+  userId: varchar("user_id", { length: 36 }).references(() => users.id),
+  userRole: text("user_role"),
+  metadata: text("metadata"), // JSON string with additional details
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  success: boolean("success").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type ActivityLog = typeof activityLogs.$inferSelect;
