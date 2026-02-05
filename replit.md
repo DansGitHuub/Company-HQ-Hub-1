@@ -79,6 +79,7 @@ Preferred communication style: Simple, everyday language.
   - **Activity Logging**: Tracks key user actions like create, update, delete operations with feature context and success status.
   - **Report Export**: Download diagnostic reports as JSON for sharing with technical support.
   - **Error Resolution**: Mark errors as resolved with timestamp and resolver tracking.
+  - **Development Tracker**: Track incomplete features and systems with status, priority, percent complete, remaining work, blockers, suggestions, and additional setup info. Pre-seeded with items like Calendar Integration, Hiring Pipeline, Job Pipeline, Equipment Automation, and Customer Portal. Supports CRUD operations for managing development progress.
   - **Security**: Master Admin access only - hidden from other users entirely.
 
 ## External Dependencies
