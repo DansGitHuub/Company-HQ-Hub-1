@@ -464,14 +464,16 @@ export default function DevelopmentTracker() {
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/development-tracker", data);
+      if (!res.ok) throw new Error("Failed to create item");
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/development-tracker"] });
-      setIsAddOpen(false);
+      setTimeout(() => setIsAddOpen(false), 100);
       toast({ title: "Item added successfully" });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Create error:", error);
       toast({ title: "Error adding item", variant: "destructive" });
     }
   });
@@ -479,15 +481,19 @@ export default function DevelopmentTracker() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       const res = await apiRequest("PUT", `/api/development-tracker/${id}`, data);
+      if (!res.ok) throw new Error("Failed to update item");
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/development-tracker"] });
-      setIsEditOpen(false);
-      setEditingItem(null);
+      setTimeout(() => {
+        setIsEditOpen(false);
+        setEditingItem(null);
+      }, 100);
       toast({ title: "Item updated successfully" });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Update error:", error);
       toast({ title: "Error updating item", variant: "destructive" });
     }
   });
