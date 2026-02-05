@@ -3208,7 +3208,22 @@ Generate detailed information for this landscaping material.`;
   app.post("/api/todos", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;
-      const todo = await storage.createTodo(req.body, user.id);
+      
+      // Validate required fields
+      if (!req.body.title || req.body.title.trim() === "") {
+        return res.status(400).json({ message: "Title is required" });
+      }
+      
+      const todoData = {
+        title: req.body.title,
+        description: req.body.description || null,
+        priority: req.body.priority || "medium",
+        status: req.body.status || "pending",
+        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
+      };
+      
+      const todo = await storage.createTodo(todoData, user.id);
+      
       if (req.body.assignedUserIds && Array.isArray(req.body.assignedUserIds)) {
         for (const userId of req.body.assignedUserIds) {
           await storage.createTodoAssignment({ todoId: todo.id, userId });
@@ -3216,7 +3231,8 @@ Generate detailed information for this landscaping material.`;
       }
       res.status(201).json(todo);
     } catch (err) {
-      res.status(500).json({ message: "Error creating todo" });
+      console.error("[TODO] Error creating todo:", err);
+      res.status(500).json({ message: "Error creating todo. Please try again." });
     }
   });
 

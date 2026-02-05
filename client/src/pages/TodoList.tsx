@@ -81,11 +81,14 @@ export default function TodoList() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...data,
-          dueDate: data.dueDate ? new Date(data.dueDate) : null,
+          dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
         }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to create todo");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to create todo");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -95,7 +98,14 @@ export default function TodoList() {
       setNewTodo({ title: "", description: "", priority: "medium", status: "pending", dueDate: "", assignedUserIds: [] });
       toast({ title: "Task created successfully" });
     },
-    onError: () => toast({ title: "Failed to create task", variant: "destructive" }),
+    onError: (error: Error) => {
+      toast({ 
+        title: "Failed to create task", 
+        description: error.message || "Please check your input and try again.",
+        variant: "destructive",
+        duration: 30000,
+      });
+    },
   });
 
   const updateTodo = useMutation({
@@ -106,7 +116,10 @@ export default function TodoList() {
         body: JSON.stringify(data),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to update todo");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to update todo");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -115,7 +128,14 @@ export default function TodoList() {
       setEditingTodo(null);
       toast({ title: "Task updated" });
     },
-    onError: () => toast({ title: "Failed to update task", variant: "destructive" }),
+    onError: (error: Error) => {
+      toast({ 
+        title: "Failed to update task", 
+        description: error.message || "Please check your input and try again.",
+        variant: "destructive",
+        duration: 30000,
+      });
+    },
   });
 
   const deleteTodo = useMutation({
