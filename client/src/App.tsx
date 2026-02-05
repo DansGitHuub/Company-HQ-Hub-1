@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppProvider } from "@/lib/store";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppShell from "@/components/layout/AppShell";
 import { Loader2 } from "lucide-react";
 
@@ -96,16 +97,18 @@ function AppRoutes() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <AppProvider>
-            <Toaster />
-            <AppRoutes />
-          </AppProvider>
-        </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthProvider>
+            <AppProvider>
+              <Toaster />
+              <AppRoutes />
+            </AppProvider>
+          </AuthProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

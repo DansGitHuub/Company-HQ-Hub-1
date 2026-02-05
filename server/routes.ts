@@ -4780,16 +4780,6 @@ Provide accurate information based on publicly available documentation.`;
 
   // ========== DIAGNOSTIC REPORT ENDPOINTS (Master Admin only) ==========
   
-  const requireMasterAdmin = (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
-    if (req.user.role !== "Admin" || !req.user.isMasterAdmin) {
-      return res.status(403).json({ message: "Master Admin access required" });
-    }
-    next();
-  };
-  
   // Get error logs with optional filters
   app.get("/api/admin/diagnostics/errors", requireAuth, requireMasterAdmin, async (req, res) => {
     try {
