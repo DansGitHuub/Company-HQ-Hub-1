@@ -72,6 +72,14 @@ Preferred communication style: Simple, everyday language.
   - **Connection Status**: Visual indicators showing connected, pending, or error states
   - **Fix Connection**: One-click repair button for broken connections
   - **Connection Management**: Add and remove calendar connections easily
+- **Diagnostic Report System** (Master Admin only): Comprehensive error tracking and system monitoring tool with two viewing modes:
+  - **Simple Mode**: Non-technical view showing system health status (Excellent/Good/Needs Attention), quick stats (users, SOPs, materials, jobs, todos), recent issues summary, and recent activity feed.
+  - **Advanced Mode**: Full technical details including error counts by severity and feature, system usage breakdowns, error analysis by endpoint and time, detailed error logs with stack traces, activity logs with metadata, and most active users ranking.
+  - **Error Tracking**: Automatic logging of API errors, frontend React errors (via ErrorBoundary), and user actions across all features.
+  - **Activity Logging**: Tracks key user actions like create, update, delete operations with feature context and success status.
+  - **Report Export**: Download diagnostic reports as JSON for sharing with technical support.
+  - **Error Resolution**: Mark errors as resolved with timestamp and resolver tracking.
+  - **Security**: Master Admin access only - hidden from other users entirely.
 
 ## External Dependencies
 
