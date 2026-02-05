@@ -4905,7 +4905,7 @@ Provide accurate information based on publicly available documentation.`;
       const materials = await storage.getMaterials();
       const jobs = await storage.getJobs();
       const candidates = await storage.getCandidates();
-      const equipment = await storage.getAllEquipment();
+      const equipment = await storage.getEquipment();
       const forms = await storage.getCustomForms();
       const todos = await storage.getTodos();
       

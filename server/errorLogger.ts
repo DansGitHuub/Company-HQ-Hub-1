@@ -3,7 +3,7 @@ import { storage } from "./storage";
 import type { InsertErrorLog, InsertActivityLog } from "@shared/schema";
 
 type ErrorSeverity = "info" | "warning" | "error" | "critical";
-type FeatureType = "sops" | "materials" | "jobs" | "hiring" | "todos" | "equipment" | "forms" | "messages" | "users" | "settings" | "auth" | "calendar" | "plow_sites" | "ai_agents" | "help" | "updates" | "general";
+type FeatureType = "sops" | "materials" | "jobs" | "hiring" | "todos" | "equipment" | "forms" | "messages" | "users" | "settings" | "auth" | "calendar" | "plow_sites" | "ai_agents" | "help" | "updates" | "frontend" | "general";
 
 interface ErrorLogOptions {
   errorType: string;

@@ -73,6 +73,7 @@ import type { User, AccessRequest, CompanySettings } from "@shared/schema";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import ArticleReportsCenter from "@/components/ArticleReportsCenter";
+import DiagnosticReport from "@/components/DiagnosticReport";
 
 type SafeUser = Omit<User, "password">;
 type TodoActiveUser = { id: string; userId: string; activatedBy: string | null; activatedAt: Date | null };
@@ -484,7 +485,7 @@ export default function AdminPanel() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className={`grid w-full max-w-4xl ${user?.isMasterAdmin ? 'grid-cols-6' : 'grid-cols-5'}`}>
+        <TabsList className={`grid w-full max-w-5xl ${user?.isMasterAdmin ? 'grid-cols-7' : 'grid-cols-5'}`}>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="requests" className="gap-2">
             Requests {pendingRequests.length > 0 && <Badge variant="destructive" className="ml-1">{pendingRequests.length}</Badge>}
@@ -501,6 +502,11 @@ export default function AdminPanel() {
           {user?.isMasterAdmin && (
             <TabsTrigger value="ai-agents" className="gap-2">
               <Bot className="h-4 w-4" /> AI Agents
+            </TabsTrigger>
+          )}
+          {user?.isMasterAdmin && (
+            <TabsTrigger value="diagnostics" className="gap-2" data-testid="tab-diagnostics">
+              <AlertCircle className="h-4 w-4" /> Diagnostics
             </TabsTrigger>
           )}
         </TabsList>
@@ -923,6 +929,12 @@ export default function AdminPanel() {
         {user?.isMasterAdmin && (
           <TabsContent value="ai-agents" className="mt-6">
             <AiAgentsPanel />
+          </TabsContent>
+        )}
+
+        {user?.isMasterAdmin && (
+          <TabsContent value="diagnostics" className="mt-6">
+            <DiagnosticReport />
           </TabsContent>
         )}
       </Tabs>
