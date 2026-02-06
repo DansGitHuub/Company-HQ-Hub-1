@@ -3608,7 +3608,6 @@ Generate detailed information for this landscaping material.`;
     try {
       const user = req.user as User;
       
-      // Validate required fields
       if (!req.body.title || req.body.title.trim() === "") {
         return res.status(400).json({ message: "Title is required" });
       }
@@ -3623,8 +3622,16 @@ Generate detailed information for this landscaping material.`;
       
       const todo = await storage.createTodo(todoData, user.id);
       
+      await storage.createTodoHistory({
+        todoId: todo.id,
+        changedBy: user.id,
+        changeType: "created",
+        newValue: JSON.stringify({ title: todo.title, description: todo.description, priority: todo.priority, dueDate: todo.dueDate }),
+      });
+
       if (req.body.assignedUserIds && Array.isArray(req.body.assignedUserIds)) {
-        for (const userId of req.body.assignedUserIds) {
+        const uniqueIds = [...new Set(req.body.assignedUserIds as string[])];
+        for (const userId of uniqueIds) {
           await storage.createTodoAssignment({ todoId: todo.id, userId });
         }
       }
@@ -3637,8 +3644,44 @@ Generate detailed information for this landscaping material.`;
 
   app.patch("/api/todos/:id", requireAuth, async (req, res) => {
     try {
-      const todo = await storage.updateTodo(req.params.id as string, req.body);
-      if (!todo) return res.status(404).json({ message: "Todo not found" });
+      const user = req.user as User;
+      const existingTodo = await storage.getTodo(req.params.id as string);
+      if (!existingTodo) return res.status(404).json({ message: "Todo not found" });
+
+      const isAssigned = (await storage.getTodoAssignments(req.params.id as string)).some(a => a.userId === user.id);
+      const isCreatorOrAdmin = existingTodo.createdBy === user.id || user.role === "Admin" || user.isMasterAdmin;
+      if (!isCreatorOrAdmin && !isAssigned) {
+        return res.status(403).json({ message: "You don't have permission to update this task" });
+      }
+
+      const allowedUpdates: Partial<Todo> = {};
+      if (isCreatorOrAdmin) {
+        if (req.body.title !== undefined) allowedUpdates.title = req.body.title;
+        if (req.body.description !== undefined) allowedUpdates.description = req.body.description;
+        if (req.body.priority !== undefined) allowedUpdates.priority = req.body.priority;
+        if (req.body.dueDate !== undefined) allowedUpdates.dueDate = req.body.dueDate ? new Date(req.body.dueDate) : null;
+      }
+      if (req.body.status !== undefined) allowedUpdates.status = req.body.status;
+
+      const changedFields: string[] = [];
+      for (const [key, val] of Object.entries(allowedUpdates)) {
+        const oldVal = (existingTodo as any)[key];
+        const oldStr = oldVal instanceof Date ? oldVal.toISOString() : String(oldVal ?? "");
+        const newStr = val instanceof Date ? val.toISOString() : String(val ?? "");
+        if (oldStr !== newStr) {
+          changedFields.push(key);
+          await storage.createTodoHistory({
+            todoId: existingTodo.id,
+            changedBy: user.id,
+            changeType: key === "status" ? "status_changed" : "updated",
+            fieldChanged: key,
+            oldValue: oldStr,
+            newValue: newStr,
+          });
+        }
+      }
+
+      const todo = await storage.updateTodo(req.params.id as string, allowedUpdates);
       res.json(todo);
     } catch (err) {
       res.status(500).json({ message: "Error updating todo" });
@@ -3662,15 +3705,39 @@ Generate detailed information for this landscaping material.`;
 
   app.patch("/api/todos/:id/archive", requireAuth, async (req, res) => {
     try {
+      const user = req.user as User;
       const todo = await storage.getTodo(req.params.id as string);
       if (!todo) return res.status(404).json({ message: "Todo not found" });
       if (todo.status !== "completed") {
         return res.status(400).json({ message: "Only completed tasks can be archived" });
       }
       const updated = await storage.updateTodo(req.params.id as string, { status: "archived" });
+      await storage.createTodoHistory({
+        todoId: todo.id,
+        changedBy: user.id,
+        changeType: "archived",
+        fieldChanged: "status",
+        oldValue: "completed",
+        newValue: "archived",
+      });
       res.json(updated);
     } catch (err) {
       res.status(500).json({ message: "Error archiving todo" });
+    }
+  });
+
+  app.get("/api/todos/:id/history", requireAuth, async (req, res) => {
+    try {
+      const history = await storage.getTodoHistory(req.params.id as string);
+      const allUsers = await storage.getAllUsers();
+      const userMap = new Map(allUsers.map(u => [u.id, u.name]));
+      const enriched = history.map(h => ({
+        ...h,
+        changedByName: h.changedBy ? userMap.get(h.changedBy) || "Unknown" : null,
+      }));
+      res.json(enriched);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching todo history" });
     }
   });
 
@@ -3713,6 +3780,10 @@ Generate detailed information for this landscaping material.`;
 
   app.post("/api/todos/:id/assignments", requireAuth, async (req, res) => {
     try {
+      const existing = await storage.getTodoAssignments(req.params.id as string);
+      if (existing.some(a => a.userId === req.body.userId)) {
+        return res.status(409).json({ message: "User is already assigned to this task" });
+      }
       const assignment = await storage.createTodoAssignment({
         todoId: req.params.id as string,
         userId: req.body.userId

@@ -949,6 +949,20 @@ export const insertTodoAssignmentSchema = createInsertSchema(todoAssignments).pi
 export type InsertTodoAssignment = z.infer<typeof insertTodoAssignmentSchema>;
 export type TodoAssignment = typeof todoAssignments.$inferSelect;
 
+// To-Do History (track changes to todos)
+export const todoHistory = pgTable("todo_history", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  todoId: varchar("todo_id", { length: 36 }).references(() => todos.id, { onDelete: "cascade" }).notNull(),
+  changedBy: varchar("changed_by", { length: 36 }).references(() => users.id),
+  changeType: text("change_type").notNull(), // created, updated, status_changed, archived
+  fieldChanged: text("field_changed"),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  changedAt: timestamp("changed_at").defaultNow(),
+});
+
+export type TodoHistory = typeof todoHistory.$inferSelect;
+
 // Active To-Do Users (which users can see the to-do system)
 export const todoActiveUsers = pgTable("todo_active_users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),

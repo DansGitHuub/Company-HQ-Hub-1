@@ -34,6 +34,7 @@ import {
   companySettings, type CompanySettings, type InsertCompanySettings,
   todos, type Todo, type InsertTodo,
   todoAssignments, type TodoAssignment, type InsertTodoAssignment,
+  todoHistory, type TodoHistory,
   todoActiveUsers, type TodoActiveUser, type InsertTodoActiveUser,
   plowSiteGroups, type PlowSiteGroup, type InsertPlowSiteGroup,
   plowSites, type PlowSite, type InsertPlowSite,
@@ -271,6 +272,10 @@ export interface IStorage {
   markTodoAsRead(todoId: string, userId: string): Promise<boolean>;
   getUnreadTodoCount(userId: string): Promise<number>;
   
+  // To-Do History
+  getTodoHistory(todoId: string): Promise<TodoHistory[]>;
+  createTodoHistory(entry: { todoId: string; changedBy: string; changeType: string; fieldChanged?: string; oldValue?: string; newValue?: string }): Promise<TodoHistory>;
+
   // Active To-Do Users
   getTodoActiveUsers(): Promise<TodoActiveUser[]>;
   isUserTodoActive(userId: string): Promise<boolean>;
@@ -1255,6 +1260,18 @@ export class DatabaseStorage implements IStorage {
     const unread = await db.select().from(todoAssignments)
       .where(and(eq(todoAssignments.userId, userId), eq(todoAssignments.isRead, false)));
     return unread.length;
+  }
+
+  // To-Do History
+  async getTodoHistory(todoId: string): Promise<TodoHistory[]> {
+    return db.select().from(todoHistory)
+      .where(eq(todoHistory.todoId, todoId))
+      .orderBy(todoHistory.changedAt);
+  }
+
+  async createTodoHistory(entry: { todoId: string; changedBy: string; changeType: string; fieldChanged?: string; oldValue?: string; newValue?: string }): Promise<TodoHistory> {
+    const [created] = await db.insert(todoHistory).values(entry).returning();
+    return created;
   }
 
   // Active To-Do Users

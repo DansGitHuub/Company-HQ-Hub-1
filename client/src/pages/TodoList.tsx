@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Check, Trash2, Edit2, Calendar, Clock, User, AlertCircle, CheckCircle2, Circle, ChevronDown, ChevronUp, Users, Archive } from "lucide-react";
+import { Plus, Trash2, Edit2, Calendar, Clock, User, AlertCircle, CheckCircle2, Circle, ChevronDown, ChevronUp, Users, Archive, History, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { format } from "date-fns";
+import { format, differenceInDays, differenceInHours, isPast, isToday } from "date-fns";
 import type { Todo, User as UserType } from "@shared/schema";
 
 type AssignedUser = { userId: string; name: string };
@@ -32,20 +32,62 @@ type TodoWithDetails = Todo & {
   creatorName?: string | null;
 };
 
+type HistoryEntry = {
+  id: string;
+  todoId: string;
+  changedBy: string | null;
+  changedByName: string | null;
+  changeType: string;
+  fieldChanged: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  changedAt: string;
+};
+
+function getDueCountdown(dueDate: string | Date | null | undefined): { text: string; color: string } | null {
+  if (!dueDate) return null;
+  const due = new Date(dueDate);
+  const now = new Date();
+
+  if (isToday(due)) {
+    return { text: "Due today", color: "text-orange-600 font-semibold" };
+  }
+
+  if (isPast(due)) {
+    const daysOverdue = differenceInDays(now, due);
+    if (daysOverdue === 0) {
+      const hoursOverdue = differenceInHours(now, due);
+      return { text: `${hoursOverdue}h overdue`, color: "text-red-600 font-semibold" };
+    }
+    return { text: `${daysOverdue}d overdue`, color: "text-red-600 font-semibold" };
+  }
+
+  const daysLeft = differenceInDays(due, now);
+  if (daysLeft === 0) {
+    const hoursLeft = differenceInHours(due, now);
+    return { text: `${hoursLeft}h left`, color: "text-orange-500" };
+  }
+  if (daysLeft <= 3) {
+    return { text: `${daysLeft}d left`, color: "text-orange-500" };
+  }
+  return { text: `${daysLeft}d left`, color: "text-muted-foreground" };
+}
+
 export default function TodoList() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
   const isAdmin = user?.role === "Admin" || user?.isMasterAdmin;
-  
+
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+  const [editingTodo, setEditingTodo] = useState<TodoWithDetails | null>(null);
   const [toggledTodos, setToggledTodos] = useState<Set<string>>(new Set());
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [archiveConfirmTodo, setArchiveConfirmTodo] = useState<TodoWithDetails | null>(null);
+  const [historyTodoId, setHistoryTodoId] = useState<string | null>(null);
 
   const [newTodo, setNewTodo] = useState({
     title: "",
@@ -81,6 +123,17 @@ export default function TodoList() {
     staleTime: 0,
   });
 
+  const { data: todoHistoryData = [] } = useQuery<HistoryEntry[]>({
+    queryKey: ["/api/todos", historyTodoId, "history"],
+    queryFn: async () => {
+      if (!historyTodoId) return [];
+      const res = await fetch(`/api/todos/${historyTodoId}/history`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch history");
+      return res.json();
+    },
+    enabled: !!historyTodoId,
+  });
+
   const activeUserIds = new Set(activeUsers.map(au => au.userId));
   const assignableUsers = users.filter(u => activeUserIds.has(u.id));
 
@@ -114,13 +167,14 @@ export default function TodoList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-todos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/todos/unread-count"] });
       setAddDialogOpen(false);
       setNewTodo({ title: "", description: "", priority: "medium", status: "pending", dueDate: "", assignedUserIds: [] });
       toast({ title: "Task created successfully" });
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "Failed to create task", 
+      toast({
+        title: "Failed to create task",
         description: error.message || "Please check your input and try again.",
         variant: "destructive",
         duration: 30000,
@@ -149,8 +203,8 @@ export default function TodoList() {
       toast({ title: "Task updated" });
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "Failed to update task", 
+      toast({
+        title: "Failed to update task",
         description: error.message || "Please check your input and try again.",
         variant: "destructive",
         duration: 30000,
@@ -160,10 +214,7 @@ export default function TodoList() {
 
   const deleteTodo = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/todos/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      const res = await fetch(`/api/todos/${id}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to delete todo");
@@ -179,10 +230,7 @@ export default function TodoList() {
 
   const archiveTodo = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/todos/${id}/archive`, {
-        method: "PATCH",
-        credentials: "include",
-      });
+      const res = await fetch(`/api/todos/${id}/archive`, { method: "PATCH", credentials: "include" });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to archive todo");
@@ -203,10 +251,7 @@ export default function TodoList() {
 
   const markAsRead = useMutation({
     mutationFn: async (todoId: string) => {
-      const res = await fetch(`/api/todos/${todoId}/mark-read`, {
-        method: "POST",
-        credentials: "include",
-      });
+      const res = await fetch(`/api/todos/${todoId}/mark-read`, { method: "POST", credentials: "include" });
       if (!res.ok) throw new Error("Failed to mark as read");
     },
     onSuccess: () => {
@@ -223,13 +268,18 @@ export default function TodoList() {
         body: JSON.stringify({ userId }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to assign user");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to assign user");
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-todos"] });
       toast({ title: "User assigned to task" });
     },
+    onError: (error: Error) => toast({ title: "Assignment failed", description: error.message, variant: "destructive" }),
   });
 
   const getPriorityColor = (priority: string) => {
@@ -280,6 +330,21 @@ export default function TodoList() {
 
   const isCreator = (todo: TodoWithDetails) => todo.createdBy === user?.id;
   const canDelete = (todo: TodoWithDetails) => isCreator(todo) || user?.isMasterAdmin;
+  const isAssignedUser = (todo: TodoWithDetails) => todo.assignedUsers?.some(a => a.userId === user?.id);
+  const canEdit = (todo: TodoWithDetails) => isCreator(todo) || isAdmin || isAssignedUser(todo);
+
+  const formatHistoryChange = (entry: HistoryEntry) => {
+    if (entry.changeType === "created") return "Created this task";
+    if (entry.changeType === "archived") return "Archived this task";
+    if (entry.changeType === "status_changed") {
+      return `Changed status from "${entry.oldValue}" to "${entry.newValue}"`;
+    }
+    if (entry.fieldChanged === "title") return `Changed title from "${entry.oldValue}" to "${entry.newValue}"`;
+    if (entry.fieldChanged === "priority") return `Changed priority from "${entry.oldValue}" to "${entry.newValue}"`;
+    if (entry.fieldChanged === "description") return "Updated description";
+    if (entry.fieldChanged === "dueDate") return `Changed due date`;
+    return `Updated ${entry.fieldChanged}`;
+  };
 
   if (!todoActiveStatus?.isActive && !isAdmin) {
     return (
@@ -359,13 +424,12 @@ export default function TodoList() {
           {filteredTodos.map((todo) => {
             const expanded = isTodoExpanded(todo);
             const isUnread = todo.isRead === false;
+            const countdown = getDueCountdown(todo.dueDate);
 
             return (
               <Card
                 key={todo.id}
-                className={`cursor-pointer transition-all hover:shadow-md ${
-                  isUnread ? "border-primary border-2" : ""
-                }`}
+                className={`cursor-pointer transition-all hover:shadow-md ${isUnread ? "border-primary border-2" : ""}`}
                 data-testid={`card-todo-${todo.id}`}
               >
                 <CardHeader className="pb-2">
@@ -396,7 +460,13 @@ export default function TodoList() {
                           {todo.dueDate && (
                             <span className="text-xs text-muted-foreground flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
-                              {format(new Date(todo.dueDate), "MMM d, yyyy")}
+                              Due: {format(new Date(todo.dueDate), "MMM d, yyyy")}
+                            </span>
+                          )}
+                          {countdown && todo.status !== "completed" && todo.status !== "archived" && (
+                            <span className={`text-xs flex items-center gap-1 ${countdown.color}`} data-testid={`text-countdown-${todo.id}`}>
+                              <Timer className="w-3 h-3" />
+                              {countdown.text}
                             </span>
                           )}
                           {isUnread && (
@@ -413,31 +483,33 @@ export default function TodoList() {
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       {isAdmin && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTodoId(todo.id);
-                              setAssignDialogOpen(true);
-                            }}
-                            data-testid={`button-assign-${todo.id}`}
-                          >
-                            <Users className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingTodo(todo);
-                            }}
-                            data-testid={`button-edit-${todo.id}`}
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                        </>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            refetchUsers();
+                            refetchActiveUsers();
+                            setSelectedTodoId(todo.id);
+                            setAssignDialogOpen(true);
+                          }}
+                          data-testid={`button-assign-${todo.id}`}
+                        >
+                          <Users className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {canEdit(todo) && todo.status !== "archived" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTodo(todo);
+                          }}
+                          data-testid={`button-edit-${todo.id}`}
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
                       )}
                       {canDelete(todo) && (
                         <Button
@@ -490,8 +562,8 @@ export default function TodoList() {
                           <span>By: {todo.creatorName}</span>
                         )}
                       </div>
-                      {!isAdmin && todo.status !== "completed" && todo.status !== "archived" && (
-                        <div className="mt-4">
+                      <div className="flex items-center gap-2 mt-3">
+                        {!isAdmin && todo.status !== "completed" && todo.status !== "archived" && (
                           <Button
                             onClick={() => updateTodo.mutate({ id: todo.id, data: { status: "in_progress" } })}
                             variant="outline"
@@ -500,10 +572,22 @@ export default function TodoList() {
                             data-testid={`button-start-${todo.id}`}
                           >
                             <Clock className="w-4 h-4 mr-2" />
-                            Start Working
+                            {todo.status === "in_progress" ? "In Progress" : "Start Working"}
                           </Button>
-                        </div>
-                      )}
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setHistoryTodoId(todo.id);
+                          }}
+                          data-testid={`button-history-${todo.id}`}
+                        >
+                          <History className="w-4 h-4 mr-1" />
+                          History
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 )}
@@ -532,6 +616,33 @@ export default function TodoList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!historyTodoId} onOpenChange={(open) => !open && setHistoryTodoId(null)}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Task History</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {todoHistoryData.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No history recorded yet</p>
+            ) : (
+              todoHistoryData.map((entry) => (
+                <div key={entry.id} className="flex gap-3 text-sm border-b pb-3 last:border-0" data-testid={`history-entry-${entry.id}`}>
+                  <div className="mt-0.5">
+                    <History className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-foreground">{formatHistoryChange(entry)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {entry.changedByName || "Unknown"} — {format(new Date(entry.changedAt), "MMM d, yyyy h:mm a")}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="max-w-md">
@@ -613,9 +724,7 @@ export default function TodoList() {
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)}>
-                Cancel
-              </Button>
+              <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={createTodo.isPending} data-testid="button-submit-todo">
                 {createTodo.isPending ? "Creating..." : "Create Task"}
               </Button>
@@ -630,90 +739,13 @@ export default function TodoList() {
             <DialogTitle>Edit Task</DialogTitle>
           </DialogHeader>
           {editingTodo && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                updateTodo.mutate({
-                  id: editingTodo.id,
-                  data: {
-                    title: formData.get("title") as string,
-                    description: formData.get("description") as string,
-                    priority: formData.get("priority") as string,
-                    status: formData.get("status") as string,
-                    dueDate: formData.get("dueDate") ? new Date(formData.get("dueDate") as string) : null,
-                  },
-                });
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <Label htmlFor="edit-title">Title *</Label>
-                <Input
-                  id="edit-title"
-                  name="title"
-                  defaultValue={editingTodo.title}
-                  required
-                  data-testid="input-edit-todo-title"
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-description">Description</Label>
-                <Textarea
-                  id="edit-description"
-                  name="description"
-                  defaultValue={editingTodo.description || ""}
-                  rows={3}
-                  data-testid="input-edit-todo-description"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Priority</Label>
-                  <Select name="priority" defaultValue={editingTodo.priority || "medium"}>
-                    <SelectTrigger data-testid="select-edit-todo-priority">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Status</Label>
-                  <Select name="status" defaultValue={editingTodo.status || "pending"}>
-                    <SelectTrigger data-testid="select-edit-todo-status">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label>Due Date</Label>
-                <Input
-                  type="date"
-                  name="dueDate"
-                  defaultValue={editingTodo.dueDate ? format(new Date(editingTodo.dueDate), "yyyy-MM-dd") : ""}
-                  data-testid="input-edit-todo-due-date"
-                />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setEditingTodo(null)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={updateTodo.isPending} data-testid="button-save-edit-todo">
-                  {updateTodo.isPending ? "Saving..." : "Save Changes"}
-                </Button>
-              </DialogFooter>
-            </form>
+            <EditTodoForm
+              todo={editingTodo}
+              isCreatorOrAdmin={isCreator(editingTodo) || !!isAdmin}
+              onSubmit={(data) => updateTodo.mutate({ id: editingTodo.id, data })}
+              onCancel={() => setEditingTodo(null)}
+              isPending={updateTodo.isPending}
+            />
           )}
         </DialogContent>
       </Dialog>
@@ -724,26 +756,141 @@ export default function TodoList() {
             <DialogTitle>Assign User to Task</DialogTitle>
           </DialogHeader>
           <div className="space-y-2 max-h-60 overflow-y-auto">
-            {assignableUsers.map((u) => (
-              <Button
-                key={u.id}
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => {
-                  if (selectedTodoId) {
-                    assignUser.mutate({ todoId: selectedTodoId, userId: u.id });
-                    setAssignDialogOpen(false);
-                  }
-                }}
-                data-testid={`button-assign-user-${u.id}`}
-              >
-                <User className="w-4 h-4 mr-2" />
-                {u.name} ({u.role})
-              </Button>
-            ))}
+            {(() => {
+              const selectedTodo = displayTodos.find(t => t.id === selectedTodoId);
+              const alreadyAssigned = new Set(selectedTodo?.assignedUsers?.map(a => a.userId) || []);
+              const availableUsers = assignableUsers.filter(u => !alreadyAssigned.has(u.id));
+              if (availableUsers.length === 0) {
+                return <p className="text-sm text-muted-foreground text-center py-4">All active users are already assigned to this task.</p>;
+              }
+              return availableUsers.map((u) => (
+                <Button
+                  key={u.id}
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    if (selectedTodoId) {
+                      assignUser.mutate({ todoId: selectedTodoId, userId: u.id });
+                      setAssignDialogOpen(false);
+                    }
+                  }}
+                  data-testid={`button-assign-user-${u.id}`}
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  {u.name} ({u.role})
+                </Button>
+              ));
+            })()}
           </div>
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function EditTodoForm({
+  todo,
+  isCreatorOrAdmin,
+  onSubmit,
+  onCancel,
+  isPending,
+}: {
+  todo: TodoWithDetails;
+  isCreatorOrAdmin: boolean;
+  onSubmit: (data: Partial<Todo>) => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  const [title, setTitle] = useState(todo.title);
+  const [description, setDescription] = useState(todo.description || "");
+  const [priority, setPriority] = useState(todo.priority || "medium");
+  const [status, setStatus] = useState(todo.status || "pending");
+  const [dueDate, setDueDate] = useState(todo.dueDate ? format(new Date(todo.dueDate), "yyyy-MM-dd") : "");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data: Partial<Todo> = { status };
+    if (isCreatorOrAdmin) {
+      data.title = title;
+      data.description = description;
+      data.priority = priority;
+      data.dueDate = dueDate ? new Date(dueDate) : null;
+    }
+    onSubmit(data);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="edit-title">Title *</Label>
+        <Input
+          id="edit-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+          disabled={!isCreatorOrAdmin}
+          data-testid="input-edit-todo-title"
+        />
+      </div>
+      <div>
+        <Label htmlFor="edit-description">Description</Label>
+        <Textarea
+          id="edit-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          disabled={!isCreatorOrAdmin}
+          data-testid="input-edit-todo-description"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Priority</Label>
+          <Select value={priority} onValueChange={setPriority} disabled={!isCreatorOrAdmin}>
+            <SelectTrigger data-testid="select-edit-todo-priority">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="urgent">Urgent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Status</Label>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger data-testid="select-edit-todo-status">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div>
+        <Label>Due Date</Label>
+        <Input
+          type="date"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+          disabled={!isCreatorOrAdmin}
+          data-testid="input-edit-todo-due-date"
+        />
+      </div>
+      {!isCreatorOrAdmin && (
+        <p className="text-xs text-muted-foreground italic">As an assigned user, you can update the status. Only the creator or admin can change other fields.</p>
+      )}
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" disabled={isPending} data-testid="button-save-edit-todo">
+          {isPending ? "Saving..." : "Save Changes"}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
