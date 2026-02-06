@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { SopCategory } from "@shared/schema";
 import {
   ArrowLeft,
@@ -170,6 +170,27 @@ function StepTypeSelection({ data, onChange }: { data: SOPBuilderData; onChange:
 }
 
 function StepIdentity({ data, onChange, categories }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void; categories: SopCategory[] }) {
+  const { toast } = useToast();
+  const [showNewTopic, setShowNewTopic] = useState(false);
+  const [newTopicName, setNewTopicName] = useState("");
+
+  const createTopicMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await apiRequest("POST", "/api/sop-categories", { name });
+      return await res.json();
+    },
+    onSuccess: (newCat: SopCategory) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sop-categories"] });
+      onChange({ categoryId: newCat.id, category: newCat.name });
+      setNewTopicName("");
+      setShowNewTopic(false);
+      toast({ title: "Topic created", description: `"${newCat.name}" has been added.` });
+    },
+    onError: () => {
+      toast({ title: "Failed to create topic", variant: "destructive" });
+    },
+  });
+
   return (
     <div className="space-y-4">
       <div>
@@ -191,6 +212,10 @@ function StepIdentity({ data, onChange, categories }: { data: SOPBuilderData; on
         <div>
           <Label htmlFor="sop-category">Topic *</Label>
           <Select value={data.categoryId} onValueChange={(v) => {
+            if (v === "__new__") {
+              setShowNewTopic(true);
+              return;
+            }
             const cat = categories.find(c => c.id === v);
             onChange({ categoryId: v, category: cat?.name || "" });
           }}>
@@ -201,8 +226,43 @@ function StepIdentity({ data, onChange, categories }: { data: SOPBuilderData; on
               {categories.map(cat => (
                 <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
               ))}
+              <SelectItem value="__new__" className="text-primary font-medium">
+                <span className="flex items-center gap-1"><Plus className="h-3 w-3" /> Add new topic</span>
+              </SelectItem>
             </SelectContent>
           </Select>
+          {showNewTopic && (
+            <div className="flex gap-2 mt-2">
+              <Input
+                value={newTopicName}
+                onChange={(e) => setNewTopicName(e.target.value)}
+                placeholder="Enter new topic name"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newTopicName.trim()) {
+                    createTopicMutation.mutate(newTopicName.trim());
+                  }
+                  if (e.key === "Escape") setShowNewTopic(false);
+                }}
+                data-testid="input-new-topic"
+              />
+              <Button
+                size="sm"
+                onClick={() => newTopicName.trim() && createTopicMutation.mutate(newTopicName.trim())}
+                disabled={!newTopicName.trim() || createTopicMutation.isPending}
+                data-testid="button-create-topic"
+              >
+                {createTopicMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setShowNewTopic(false); setNewTopicName(""); }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground mt-1">Group this SOP under a topic for easy navigation</p>
         </div>
       </div>
@@ -1275,7 +1335,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between mr-16">
+      <div className="flex items-center justify-center gap-3">
         <Button
           variant="outline"
           onClick={handleBack}
@@ -1286,36 +1346,35 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
 
-        <div className="flex gap-2">
+        <Button
+          variant="outline"
+          onClick={onCancel}
+          className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
+          data-testid="button-wizard-exit"
+        >
+          Exit
+        </Button>
+
+        {currentStep === WIZARD_STEPS.length - 1 ? (
           <Button
-            variant="outline"
-            onClick={onCancel}
-            className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
-            data-testid="button-wizard-exit"
+            onClick={handleCreate}
+            disabled={isSubmitting || !canProceed()}
+            className="hover:brightness-110 hover:shadow-md transition-all"
+            data-testid="button-wizard-create"
           >
-            Exit
+            {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
+            Create SOP
           </Button>
-          {currentStep === WIZARD_STEPS.length - 1 ? (
-            <Button
-              onClick={handleCreate}
-              disabled={isSubmitting || !canProceed()}
-              className="hover:brightness-110 hover:shadow-md transition-all"
-              data-testid="button-wizard-create"
-            >
-              {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
-              Create SOP
-            </Button>
-          ) : (
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed()}
-              className="hover:brightness-110 hover:shadow-md transition-all"
-              data-testid="button-wizard-next"
-            >
-              Next <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-          )}
-        </div>
+        ) : (
+          <Button
+            onClick={handleNext}
+            disabled={!canProceed()}
+            className="hover:brightness-110 hover:shadow-md transition-all"
+            data-testid="button-wizard-next"
+          >
+            Next <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        )}
       </div>
     </div>
   );
