@@ -18,85 +18,9 @@ interface SeedUser {
   isMasterAdmin?: boolean;
 }
 
-const SEED_USERS: SeedUser[] = [
-  {
-    username: "Chapin123",
-    password: "PassW0rd123",
-    name: "Chapin",
-    role: "Admin",
-    isMasterAdmin: true,
-  },
-  {
-    username: "tester1",
-    password: "Test1234!",
-    name: "Tester One",
-    role: "Admin",
-  },
-  {
-    username: "tester2",
-    password: "Test1234!",
-    name: "Tester Two",
-    role: "Manager",
-  },
-  {
-    username: "tester3",
-    password: "Test1234!",
-    name: "Tester Three",
-    role: "Crew",
-  },
-];
-
 export async function seedUsers(): Promise<void> {
-  console.log("[seed] Checking for required accounts...");
-  
-  for (const seedUser of SEED_USERS) {
-    try {
-      const existingUser = await storage.getUserByUsername(seedUser.username);
-      
-      if (!existingUser) {
-        const hashedPassword = await hashPassword(seedUser.password);
-        const newUser = await storage.createUser({
-          username: seedUser.username,
-          password: hashedPassword,
-          name: seedUser.name,
-          email: `${seedUser.username.toLowerCase()}@example.com`,
-          role: seedUser.role,
-        });
-        
-        const userUpdates: any = {};
-        if (seedUser.isMasterAdmin) {
-          userUpdates.isMasterAdmin = true;
-        }
-        // Store plaintext password for staff (non-customer) for Master Admin visibility
-        if (seedUser.role !== "Customer") {
-          userUpdates.storedPassword = seedUser.password;
-        }
-        if (Object.keys(userUpdates).length > 0) {
-          await storage.updateUser(newUser.id, userUpdates);
-        }
-        
-        console.log(`[seed] Created account: ${seedUser.username} (${seedUser.role})${seedUser.isMasterAdmin ? ' [MASTER ADMIN]' : ''}`);
-      } else {
-        const hashedPassword = await hashPassword(seedUser.password);
-        const updates: any = { password: hashedPassword };
-        
-        if (seedUser.isMasterAdmin) {
-          updates.isMasterAdmin = true;
-        }
-        // Store plaintext password for staff (non-customer) for Master Admin visibility
-        if (seedUser.role !== "Customer") {
-          updates.storedPassword = seedUser.password;
-        }
-        
-        await storage.updateUser(existingUser.id, updates);
-        console.log(`[seed] Reset password for: ${seedUser.username}${seedUser.isMasterAdmin ? ' [MASTER ADMIN]' : ''}`);
-      }
-    } catch (error) {
-      console.error(`[seed] Error with account ${seedUser.username}:`, error);
-    }
-  }
-  
-  console.log("[seed] Account check complete");
+  console.log("[seed] Startup check - preserving all existing user data");
+  console.log("[seed] Account check complete (no modifications)");
 }
 
 const SAMPLE_MATERIALS = [
