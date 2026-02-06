@@ -1274,6 +1274,39 @@ Respond with a JSON object:
     }
   });
 
+  app.post("/api/geocode", requireAuth, async (req, res) => {
+    try {
+      const { address } = req.body;
+      if (!address) {
+        return res.status(400).json({ message: "Address is required" });
+      }
+
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: "Google Maps API key not configured" });
+      }
+
+      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
+      const geocodeRes = await fetch(geocodeUrl);
+      const geocodeData = await geocodeRes.json();
+
+      if (geocodeData.status !== "OK" || !geocodeData.results?.length) {
+        return res.json({ results: [] });
+      }
+
+      const results = geocodeData.results.slice(0, 5).map((r: any) => ({
+        formatted_address: r.formatted_address,
+        lat: r.geometry.location.lat,
+        lng: r.geometry.location.lng,
+      }));
+
+      res.json({ results });
+    } catch (err: any) {
+      console.error("Geocode error:", err);
+      res.status(500).json({ message: "Geocode failed" });
+    }
+  });
+
   // Get satellite image URL for an address or coordinates
   app.post("/api/address-satellite-image", requireAuth, async (req, res) => {
     try {

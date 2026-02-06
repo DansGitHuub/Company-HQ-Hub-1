@@ -33,7 +33,8 @@ import {
   Image as ImageIcon, Pencil, ArrowRight, Circle, Square, Type,
   Undo, Redo, Minus, MoreVertical, Upload, Map, Camera, List,
   Navigation, Crosshair, Pentagon, MousePointer, PenTool, Eye,
-  ArrowUp, ArrowDown, Menu, Satellite,
+  ArrowUp, ArrowDown, Menu, Satellite, Check, Compass, MapPinned,
+  Layers, Ruler, Globe, ScanSearch,
 } from "lucide-react";
 import { Stage, Layer, Line, Rect, Circle as KonvaCircle, Arrow as KonvaArrow, Text as KonvaText, Image as KonvaImage } from "react-konva";
 import maplibregl from "maplibre-gl";
@@ -96,6 +97,7 @@ export default function PlowSiteMapper() {
 
   const [isCreateSiteOpen, setIsCreateSiteOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<PlowSiteGroup | null>(null);
 
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
@@ -301,11 +303,165 @@ export default function PlowSiteMapper() {
         )}
 
         {!selectedSite ? (
-          <div className="flex-1 flex items-center justify-center" data-testid="no-site-selected">
-            <div className="text-center space-y-4">
-              <MapPin className="h-16 w-16 mx-auto text-muted-foreground/30" />
-              <h2 className="text-xl font-semibold text-muted-foreground">Select a site</h2>
-              <p className="text-sm text-muted-foreground">Choose a site from the sidebar to view its map, photos, and markup.</p>
+          <div className="flex-1 overflow-auto" data-testid="no-site-selected">
+            <div className="max-w-4xl mx-auto px-6 py-10 space-y-8">
+              <div className="text-center space-y-3">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 mb-2">
+                  <Compass className="h-10 w-10 text-primary" />
+                </div>
+                <h1 className="text-3xl font-bold tracking-tight">Site Photo Markup & Map Tool</h1>
+                <p className="text-muted-foreground max-w-lg mx-auto">
+                  Capture, annotate, and manage your job sites. Create detailed maps, mark up photos, and build instructions for your crew.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {canEdit && (
+                  <Card
+                    className="group cursor-pointer border-dashed border-2 border-primary/30 hover:border-primary hover:shadow-lg transition-all hover:scale-[1.02]"
+                    onClick={() => setIsCreateSiteOpen(true)}
+                    data-testid="action-new-site"
+                  >
+                    <CardContent className="p-6 text-center space-y-3">
+                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                        <Plus className="h-7 w-7 text-primary" />
+                      </div>
+                      <h3 className="font-semibold text-lg">Create New Site</h3>
+                      <p className="text-sm text-muted-foreground">Add a new job site with address lookup, satellite imagery, and mapping tools.</p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {sites.length > 0 && (
+                  <Card
+                    className="group cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02]"
+                    onClick={() => { if (!sidebarOpen) setSidebarOpen(true); }}
+                    data-testid="action-browse-sites"
+                  >
+                    <CardContent className="p-6 text-center space-y-3">
+                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
+                        <ScanSearch className="h-7 w-7 text-blue-500" />
+                      </div>
+                      <h3 className="font-semibold text-lg">Find Existing Site</h3>
+                      <p className="text-sm text-muted-foreground">Browse and search through your {sites.length} saved site{sites.length !== 1 ? "s" : ""} in the sidebar.</p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {canEdit && groups.length > 0 && (
+                  <Card
+                    className="group cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02]"
+                    onClick={() => setIsCreateGroupOpen(true)}
+                    data-testid="action-manage-groups"
+                  >
+                    <CardContent className="p-6 text-center space-y-3">
+                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-violet-500/10 group-hover:bg-violet-500/20 transition-colors">
+                        <Layers className="h-7 w-7 text-violet-500" />
+                      </div>
+                      <h3 className="font-semibold text-lg">Organize Groups</h3>
+                      <p className="text-sm text-muted-foreground">Create and manage site groups to keep your projects organized.</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {sites.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                      <MapPinned className="h-5 w-5 text-muted-foreground" />
+                      Recent Sites
+                    </h2>
+                    <Badge variant="outline">{sites.length} total</Badge>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {sites.slice(0, 6).map((site) => {
+                      const group = groups.find(g => g.id === site.groupId);
+                      return (
+                        <Card
+                          key={site.id}
+                          className="cursor-pointer hover:shadow-md transition-all hover:scale-[1.01] overflow-hidden"
+                          onClick={() => { setSelectedSiteId(site.id); setActiveTab("map"); }}
+                          data-testid={`recent-site-${site.id}`}
+                        >
+                          {site.imageUrl ? (
+                            <div className="h-28 bg-muted overflow-hidden">
+                              <img src={site.imageUrl} alt="" className="w-full h-full object-cover" />
+                            </div>
+                          ) : (
+                            <div className="h-28 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
+                              <Globe className="h-8 w-8 text-muted-foreground/30" />
+                            </div>
+                          )}
+                          <CardContent className="p-3 space-y-1">
+                            <p className="font-medium text-sm truncate">{site.name}</p>
+                            {site.address && <p className="text-xs text-muted-foreground truncate">{site.address}</p>}
+                            {group && (
+                              <Badge variant="outline" className="text-[10px]" style={{ borderColor: group.color || undefined, color: group.color || undefined }}>
+                                {group.name}
+                              </Badge>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {sites.length === 0 && (
+                <Card className="border-muted">
+                  <CardContent className="py-10 text-center space-y-3">
+                    <Globe className="h-12 w-12 mx-auto text-muted-foreground/20" />
+                    <h3 className="font-medium text-muted-foreground">No sites yet</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm mx-auto">Get started by creating your first site. You can add addresses, satellite imagery, photos, and markup annotations.</p>
+                    {canEdit && (
+                      <Button onClick={() => setIsCreateSiteOpen(true)} className="mt-2" data-testid="empty-create-site">
+                        <Plus className="h-4 w-4 mr-2" /> Create Your First Site
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {groups.length > 0 && (
+                <div className="space-y-3">
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <Folder className="h-5 w-5 text-muted-foreground" />
+                    Site Groups
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
+                    {groups.map((g) => {
+                      const count = sites.filter(s => s.groupId === g.id).length;
+                      return (
+                        <div key={g.id} className="flex items-center gap-1">
+                          <Badge
+                            variant="outline"
+                            className="cursor-pointer hover:bg-muted transition-colors py-1.5 px-3"
+                            style={{ borderColor: g.color || undefined }}
+                            onClick={() => { setSelectedGroupFilter(g.id); if (!sidebarOpen) setSidebarOpen(true); }}
+                            data-testid={`landing-group-${g.id}`}
+                          >
+                            <div className="w-2.5 h-2.5 rounded-full mr-2 shrink-0" style={{ backgroundColor: g.color || "#6b7280" }} />
+                            {g.name} ({count})
+                          </Badge>
+                          {canEdit && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => setEditingGroup(g)}
+                              data-testid={`edit-group-${g.id}`}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -371,6 +527,7 @@ export default function PlowSiteMapper() {
 
       <CreateSiteDialog open={isCreateSiteOpen} onOpenChange={setIsCreateSiteOpen} groups={groups} />
       <CreateGroupDialog open={isCreateGroupOpen} onOpenChange={setIsCreateGroupOpen} />
+      <EditGroupDialog group={editingGroup} onOpenChange={(open) => { if (!open) setEditingGroup(null); }} />
     </div>
   );
 }
@@ -1518,6 +1675,9 @@ function CreateSiteDialog({ open, onOpenChange, groups }: {
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [satelliteUrl, setSatelliteUrl] = useState<string | null>(null);
   const [isLoadingSat, setIsLoadingSat] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetForm = () => {
     setStep(1);
@@ -1527,24 +1687,53 @@ function CreateSiteDialog({ open, onOpenChange, groups }: {
     setGeocodeResults([]);
     setSelectedGeocode(null);
     setSatelliteUrl(null);
+    setSuggestions([]);
+    setShowSuggestions(false);
   };
 
   useEffect(() => {
     if (!open) resetForm();
   }, [open]);
 
-  const handleGeocode = async () => {
-    if (!address.trim()) return;
+  const fetchSuggestions = useCallback(async (query: string) => {
+    if (query.length < 3) { setSuggestions([]); return; }
+    try {
+      const res = await apiRequest("POST", "/api/ai/address-autocomplete", { query });
+      const data = await res.json();
+      setSuggestions(data.suggestions || []);
+      setShowSuggestions(true);
+    } catch {
+      setSuggestions([]);
+    }
+  }, []);
+
+  const handleAddressChange = (value: string) => {
+    setAddress(value);
+    setSelectedGeocode(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchSuggestions(value), 300);
+  };
+
+  const selectSuggestion = (suggestion: string) => {
+    setAddress(suggestion);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    handleGeocode(suggestion);
+  };
+
+  const handleGeocode = async (addr?: string) => {
+    const searchAddr = addr || address;
+    if (!searchAddr.trim()) return;
     setIsGeocoding(true);
     try {
-      const res = await apiRequest("POST", "/api/geocode", { address });
+      const res = await apiRequest("POST", "/api/geocode", { address: searchAddr });
       const data = await res.json();
       setGeocodeResults(data.results || []);
       if (data.results?.length > 0) {
         setSelectedGeocode(data.results[0]);
       }
     } catch {
-      toast({ title: "Geocode failed", variant: "destructive" });
+      toast({ title: "Address lookup failed", variant: "destructive" });
     } finally {
       setIsGeocoding(false);
     }
@@ -1554,7 +1743,7 @@ function CreateSiteDialog({ open, onOpenChange, groups }: {
     if (!selectedGeocode) return;
     setIsLoadingSat(true);
     try {
-      const res = await apiRequest("POST", "/api/satellite-image", { address: selectedGeocode.formatted_address || address });
+      const res = await apiRequest("POST", "/api/address-satellite-image", { address: selectedGeocode.formatted_address || address });
       const data = await res.json();
       setSatelliteUrl(data.imageUrl || null);
     } catch {
@@ -1598,7 +1787,10 @@ function CreateSiteDialog({ open, onOpenChange, groups }: {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg" data-testid="create-site-dialog">
         <DialogHeader>
-          <DialogTitle>Create New Site</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-primary" />
+            Create New Site
+          </DialogTitle>
           <DialogDescription>
             {step === 1 && "Enter site details and find its location."}
             {step === 2 && "Review the overhead satellite view."}
@@ -1612,23 +1804,45 @@ function CreateSiteDialog({ open, onOpenChange, groups }: {
               <Label>Site Name *</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Main Street Office" data-testid="create-site-name" />
             </div>
-            <div>
+            <div className="relative">
               <Label>Address</Label>
               <div className="flex gap-2">
                 <Input
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="123 Main St, City, State"
-                  onKeyDown={(e) => { if (e.key === "Enter") handleGeocode(); }}
+                  onChange={(e) => handleAddressChange(e.target.value)}
+                  placeholder="Start typing an address..."
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { setShowSuggestions(false); handleGeocode(); }
+                    if (e.key === "Escape") setShowSuggestions(false);
+                  }}
+                  onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                   data-testid="create-site-address"
                 />
-                <Button variant="outline" onClick={handleGeocode} disabled={isGeocoding} data-testid="geocode-btn">
+                <Button variant="outline" onClick={() => handleGeocode()} disabled={isGeocoding || !address.trim()} data-testid="geocode-btn">
                   {isGeocoding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                 </Button>
               </div>
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-auto" data-testid="address-suggestions">
+                  {suggestions.map((s, i) => (
+                    <div
+                      key={i}
+                      className="px-3 py-2 text-sm cursor-pointer hover:bg-muted transition-colors flex items-center gap-2"
+                      onMouseDown={() => selectSuggestion(s)}
+                      data-testid={`suggestion-${i}`}
+                    >
+                      <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className="truncate">{s}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">Type at least 3 characters for address suggestions</p>
             </div>
             {geocodeResults.length > 0 && (
-              <div className="space-y-1 max-h-32 overflow-auto">
+              <div className="space-y-1 max-h-32 overflow-auto border rounded-md p-1">
+                <p className="text-xs font-medium text-muted-foreground px-2 py-1">Matching locations:</p>
                 {geocodeResults.map((r, i) => (
                   <div
                     key={i}
@@ -1638,10 +1852,16 @@ function CreateSiteDialog({ open, onOpenChange, groups }: {
                     onClick={() => setSelectedGeocode(r)}
                     data-testid={`geocode-result-${i}`}
                   >
-                    <MapPin className="h-3 w-3 inline mr-1" />
+                    <MapPin className="h-3 w-3 inline mr-1 text-primary" />
                     {r.formatted_address}
                   </div>
                 ))}
+              </div>
+            )}
+            {selectedGeocode && (
+              <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/20 rounded-md">
+                <Check className="h-4 w-4 text-green-600 shrink-0" />
+                <p className="text-sm text-green-700">{selectedGeocode.formatted_address}</p>
               </div>
             )}
             <div>
@@ -1653,7 +1873,12 @@ function CreateSiteDialog({ open, onOpenChange, groups }: {
                 <SelectContent>
                   <SelectItem value="none">No group</SelectItem>
                   {groups.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                    <SelectItem key={g.id} value={g.id}>
+                      <span className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: g.color || "#6b7280" }} />
+                        {g.name}
+                      </span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1715,11 +1940,11 @@ function CreateSiteDialog({ open, onOpenChange, groups }: {
           )}
           {step < 3 ? (
             <Button onClick={() => setStep(step + 1)} disabled={step === 1 && !name.trim()} data-testid="create-site-next">
-              Next
+              Next <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
             <Button onClick={() => createSite.mutate()} disabled={createSite.isPending} data-testid="create-site-submit">
-              {createSite.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              {createSite.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
               Create Site
             </Button>
           )}
@@ -1804,6 +2029,98 @@ function CreateGroupDialog({ open, onOpenChange }: {
             {createGroup.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
             Create
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditGroupDialog({ group, onOpenChange }: {
+  group: PlowSiteGroup | null;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const [color, setColor] = useState("#3b82f6");
+
+  useEffect(() => {
+    if (group) {
+      setName(group.name);
+      setColor(group.color || "#3b82f6");
+    }
+  }, [group]);
+
+  const updateGroup = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/plow-site-groups/${group!.id}`, { name, color });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/plow-site-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/plow-sites"] });
+      onOpenChange(false);
+      toast({ title: "Group updated" });
+    },
+    onError: () => toast({ title: "Failed to update group", variant: "destructive" }),
+  });
+
+  const deleteGroup = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/plow-site-groups/${group!.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/plow-site-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/plow-sites"] });
+      onOpenChange(false);
+      toast({ title: "Group deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete group", variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={!!group} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md" data-testid="edit-group-dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Edit className="h-4 w-4" />
+            Edit Group
+          </DialogTitle>
+          <DialogDescription>Rename this group or change its color.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Group Name *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Group name" data-testid="edit-group-name" />
+          </div>
+          <div>
+            <Label>Color</Label>
+            <div className="flex gap-2 mt-1">
+              {PRESET_COLORS.slice(0, 7).map((c) => (
+                <button
+                  key={c}
+                  className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${
+                    color === c ? "border-foreground scale-110" : "border-transparent"
+                  }`}
+                  style={{ backgroundColor: c }}
+                  onClick={() => setColor(c)}
+                  data-testid={`edit-group-color-${c}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <DialogFooter className="flex justify-between sm:justify-between">
+          <Button variant="destructive" size="sm" onClick={() => deleteGroup.mutate()} disabled={deleteGroup.isPending} data-testid="delete-group-btn">
+            {deleteGroup.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}
+            Delete
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={() => updateGroup.mutate()} disabled={!name.trim() || updateGroup.isPending} data-testid="save-group-btn">
+              {updateGroup.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+              Save
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
