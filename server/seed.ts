@@ -38,8 +38,8 @@ export async function seedUsers(): Promise<void> {
     // Remove the extra 'admin' account if it exists
     const adminAccount = await storage.getUserByUsername("admin");
     if (adminAccount) {
-      await storage.deleteUser(adminAccount.id);
-      console.log("[seed] Removed duplicate admin account");
+      const deleted = await storage.deleteUser(adminAccount.id);
+      console.log(`[seed] Removed duplicate admin account: ${deleted ? "success" : "failed"}`);
     }
 
     // Ensure no other users have master admin (only Chapin123)
