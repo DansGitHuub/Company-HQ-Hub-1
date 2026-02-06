@@ -315,55 +315,59 @@ export default function PlowSiteMapper() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-2xl mx-auto">
                 {canEdit && (
                   <Card
                     className="group cursor-pointer border-dashed border-2 border-primary/30 hover:border-primary hover:shadow-lg transition-all hover:scale-[1.02]"
                     onClick={() => setIsCreateSiteOpen(true)}
                     data-testid="action-new-site"
                   >
-                    <CardContent className="p-6 text-center space-y-3">
-                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                        <Plus className="h-7 w-7 text-primary" />
+                    <CardContent className="p-8 text-center space-y-4">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                        <Plus className="h-8 w-8 text-primary" />
                       </div>
-                      <h3 className="font-semibold text-lg">Create New Site</h3>
+                      <h3 className="font-semibold text-xl">Create New Site</h3>
                       <p className="text-sm text-muted-foreground">Add a new job site with address lookup, satellite imagery, and mapping tools.</p>
                     </CardContent>
                   </Card>
                 )}
 
-                {sites.length > 0 && (
-                  <Card
-                    className="group cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02]"
-                    onClick={() => { if (!sidebarOpen) setSidebarOpen(true); }}
-                    data-testid="action-browse-sites"
-                  >
-                    <CardContent className="p-6 text-center space-y-3">
-                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
-                        <ScanSearch className="h-7 w-7 text-blue-500" />
-                      </div>
-                      <h3 className="font-semibold text-lg">Find Existing Site</h3>
-                      <p className="text-sm text-muted-foreground">Browse and search through your {sites.length} saved site{sites.length !== 1 ? "s" : ""} in the sidebar.</p>
-                    </CardContent>
-                  </Card>
-                )}
+                <Card
+                  className="group cursor-pointer border-dashed border-2 border-blue-500/30 hover:border-blue-500 hover:shadow-lg transition-all hover:scale-[1.02]"
+                  onClick={() => { if (!sidebarOpen) setSidebarOpen(true); }}
+                  data-testid="action-browse-sites"
+                >
+                  <CardContent className="p-8 text-center space-y-4">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
+                      <ScanSearch className="h-8 w-8 text-blue-500" />
+                    </div>
+                    <h3 className="font-semibold text-xl">Find Existing Site</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {sites.length > 0
+                        ? `Browse and search through your ${sites.length} saved site${sites.length !== 1 ? "s" : ""} in the sidebar.`
+                        : "Open the sidebar to browse and search your saved sites."}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
 
-                {canEdit && groups.length > 0 && (
+              {canEdit && groups.length > 0 && (
+                <div className="flex justify-center">
                   <Card
-                    className="group cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02]"
+                    className="group cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] max-w-xs w-full"
                     onClick={() => setIsCreateGroupOpen(true)}
                     data-testid="action-manage-groups"
                   >
-                    <CardContent className="p-6 text-center space-y-3">
-                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-violet-500/10 group-hover:bg-violet-500/20 transition-colors">
-                        <Layers className="h-7 w-7 text-violet-500" />
+                    <CardContent className="p-5 text-center space-y-2">
+                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-violet-500/10 group-hover:bg-violet-500/20 transition-colors">
+                        <Layers className="h-6 w-6 text-violet-500" />
                       </div>
-                      <h3 className="font-semibold text-lg">Organize Groups</h3>
-                      <p className="text-sm text-muted-foreground">Create and manage site groups to keep your projects organized.</p>
+                      <h3 className="font-semibold">Organize Groups</h3>
+                      <p className="text-xs text-muted-foreground">Create and manage site groups to keep your projects organized.</p>
                     </CardContent>
                   </Card>
-                )}
-              </div>
+                </div>
+              )}
 
               {sites.length > 0 && (
                 <div className="space-y-3">
@@ -492,6 +496,7 @@ export default function PlowSiteMapper() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
               <TabsList className="mx-4 mt-2 w-fit">
                 <TabsTrigger value="map" data-testid="tab-map"><Map className="h-4 w-4 mr-1" /> Map</TabsTrigger>
+                <TabsTrigger value="overhead" data-testid="tab-overhead"><Satellite className="h-4 w-4 mr-1" /> Overhead Views</TabsTrigger>
                 <TabsTrigger value="photos" data-testid="tab-photos"><ImageIcon className="h-4 w-4 mr-1" /> Photos</TabsTrigger>
                 <TabsTrigger value="markup" data-testid="tab-markup"><Pencil className="h-4 w-4 mr-1" /> Markup</TabsTrigger>
                 <TabsTrigger value="instructions" data-testid="tab-instructions"><List className="h-4 w-4 mr-1" /> Instructions</TabsTrigger>
@@ -499,6 +504,9 @@ export default function PlowSiteMapper() {
 
               <TabsContent value="map" className="flex-1 overflow-hidden m-0 p-0">
                 <MapTab site={selectedSite} canEdit={!!canEdit} />
+              </TabsContent>
+              <TabsContent value="overhead" className="flex-1 overflow-hidden m-0 p-0">
+                <OverheadViewsTab site={selectedSite} canEdit={!!canEdit} />
               </TabsContent>
               <TabsContent value="photos" className="flex-1 overflow-auto m-0 p-4">
                 <PhotosTab
@@ -882,6 +890,454 @@ function MapTab({ site, canEdit }: { site: PlowSite; canEdit: boolean }) {
         )}
       </div>
     </div>
+  );
+}
+
+const CAPTURE_WIDTH = 640;
+const CAPTURE_HEIGHT = 400;
+
+function OverheadViewsTab({ site, canEdit }: { site: PlowSite; canEdit: boolean }) {
+  const { toast } = useToast();
+  const [mode, setMode] = useState<"capture" | "review">("review");
+  const [zoom, setZoom] = useState(19);
+  const [panLat, setPanLat] = useState(0);
+  const [panLng, setPanLng] = useState(0);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [captureTitle, setCaptureTitle] = useState("");
+  const [recapturePhotoId, setRecapturePhotoId] = useState<string | null>(null);
+  const [viewingPhoto, setViewingPhoto] = useState<SitePhoto | null>(null);
+
+  const hasCoords = site.latitude && site.longitude;
+  const baseLat = parseFloat(site.latitude || "0");
+  const baseLng = parseFloat(site.longitude || "0");
+
+  useEffect(() => {
+    setPanLat(baseLat);
+    setPanLng(baseLng);
+    setZoom(19);
+    setPreviewUrl(null);
+    setCaptureTitle("");
+    setRecapturePhotoId(null);
+  }, [site.id]);
+
+  const { data: overheadPhotos = [], isLoading: photosLoading } = useQuery<SitePhoto[]>({
+    queryKey: [`/api/plow-sites/${site.id}/site-photos`],
+  });
+
+  const savedOverheads = useMemo(
+    () => overheadPhotos.filter(p => p.source === "satellite" || p.source === "overhead"),
+    [overheadPhotos]
+  );
+
+  const nudgeAmount = useMemo(() => {
+    return 0.001 * Math.pow(2, 19 - zoom);
+  }, [zoom]);
+
+  const handleCapture = async () => {
+    setIsCapturing(true);
+    try {
+      const res = await apiRequest("POST", "/api/capture-satellite-image", {
+        lat: panLat,
+        lng: panLng,
+        zoom,
+        width: CAPTURE_WIDTH,
+        height: CAPTURE_HEIGHT,
+      });
+      const data = await res.json();
+      if (data.imageBase64) {
+        setPreviewUrl(data.imageBase64);
+        setCaptureTitle(`Overhead View - Zoom ${zoom}`);
+      }
+    } catch {
+      toast({ title: "Failed to capture image", variant: "destructive" });
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  const saveCapture = useMutation({
+    mutationFn: async () => {
+      if (!previewUrl) throw new Error("No image to save");
+
+      if (recapturePhotoId) {
+        const res = await apiRequest("PATCH", `/api/site-photos/${recapturePhotoId}`, {
+          imageUrl: previewUrl,
+          title: captureTitle || `Overhead View - Zoom ${zoom}`,
+          width: CAPTURE_WIDTH,
+          height: CAPTURE_HEIGHT,
+        });
+        return res.json();
+      }
+
+      const res = await apiRequest("POST", `/api/plow-sites/${site.id}/site-photos`, {
+        imageUrl: previewUrl,
+        title: captureTitle || `Overhead View - Zoom ${zoom}`,
+        source: "overhead",
+        width: CAPTURE_WIDTH,
+        height: CAPTURE_HEIGHT,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/plow-sites/${site.id}/site-photos`] });
+      setPreviewUrl(null);
+      setCaptureTitle("");
+      setRecapturePhotoId(null);
+      setMode("review");
+      toast({ title: recapturePhotoId ? "Image recaptured" : "Overhead view saved" });
+    },
+    onError: () => toast({ title: "Failed to save image", variant: "destructive" }),
+  });
+
+  const deletePhoto = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/site-photos/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/plow-sites/${site.id}/site-photos`] });
+      setViewingPhoto(null);
+      toast({ title: "Photo deleted" });
+    },
+  });
+
+  const startRecapture = (photo: SitePhoto) => {
+    setRecapturePhotoId(photo.id);
+    setCaptureTitle(photo.title || "");
+    setPreviewUrl(null);
+    setMode("capture");
+    setViewingPhoto(null);
+  };
+
+  if (!hasCoords) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8" data-testid="no-coords-overhead">
+        <div className="text-center space-y-2">
+          <Satellite className="h-12 w-12 mx-auto text-muted-foreground/40" />
+          <h3 className="font-medium">No coordinates</h3>
+          <p className="text-sm text-muted-foreground">Enter an address for this site to capture overhead views.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden" data-testid="overhead-views-tab">
+      <div className="border-b px-4 py-2 flex items-center justify-between bg-card">
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={mode === "review" ? "default" : "outline"}
+            onClick={() => { setMode("review"); setPreviewUrl(null); setRecapturePhotoId(null); }}
+            data-testid="overhead-review-mode"
+          >
+            <Eye className="h-4 w-4 mr-1" /> Review ({savedOverheads.length})
+          </Button>
+          {canEdit && (
+            <Button
+              size="sm"
+              variant={mode === "capture" ? "default" : "outline"}
+              onClick={() => { setMode("capture"); setPreviewUrl(null); setRecapturePhotoId(null); }}
+              data-testid="overhead-capture-mode"
+            >
+              <Camera className="h-4 w-4 mr-1" /> Capture New
+            </Button>
+          )}
+        </div>
+        {mode === "capture" && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Badge variant="outline">Zoom: {zoom}</Badge>
+            <Badge variant="outline">{CAPTURE_WIDTH}x{CAPTURE_HEIGHT}px</Badge>
+          </div>
+        )}
+      </div>
+
+      {mode === "capture" ? (
+        <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex flex-col items-center justify-center bg-muted/30 p-4 overflow-auto">
+            {previewUrl ? (
+              <div className="space-y-4 w-full max-w-2xl">
+                <div className="border rounded-lg overflow-hidden shadow-lg bg-card">
+                  <img
+                    src={previewUrl}
+                    alt="Captured overhead"
+                    className="w-full"
+                    style={{ aspectRatio: `${CAPTURE_WIDTH}/${CAPTURE_HEIGHT}` }}
+                    data-testid="captured-preview"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Input
+                    value={captureTitle}
+                    onChange={(e) => setCaptureTitle(e.target.value)}
+                    placeholder="Name this overhead view..."
+                    className="flex-1"
+                    data-testid="capture-title-input"
+                  />
+                  <Button variant="outline" onClick={() => setPreviewUrl(null)} data-testid="retake-btn">
+                    <Camera className="h-4 w-4 mr-1" /> Retake
+                  </Button>
+                  <Button onClick={() => saveCapture.mutate()} disabled={saveCapture.isPending} data-testid="save-capture-btn">
+                    {saveCapture.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                    {recapturePhotoId ? "Replace" : "Save"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 w-full max-w-2xl">
+                <div className="relative border rounded-lg overflow-hidden shadow-lg bg-black" style={{ aspectRatio: `${CAPTURE_WIDTH}/${CAPTURE_HEIGHT}` }}>
+                  <SatellitePreview lat={panLat} lng={panLng} zoom={zoom} width={CAPTURE_WIDTH} height={CAPTURE_HEIGHT} />
+
+                  <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-white/40 m-1 rounded" />
+
+                  {isCapturing && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <div className="text-center text-white space-y-2">
+                        <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                        <p className="text-sm">Capturing...</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-center gap-3">
+                  <div className="flex items-center gap-1 bg-card border rounded-lg p-1">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setPanLat(p => p + nudgeAmount)} data-testid="pan-up">
+                      <ArrowUp className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setPanLat(p => p - nudgeAmount)} data-testid="pan-down">
+                      <ArrowDown className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setPanLng(p => p - nudgeAmount)} data-testid="pan-left">
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setPanLng(p => p + nudgeAmount)} data-testid="pan-right">
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <Separator orientation="vertical" className="h-8" />
+
+                  <div className="flex items-center gap-1 bg-card border rounded-lg p-1">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setZoom(z => Math.max(15, z - 1))} data-testid="zoom-out">
+                      <ZoomOut className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm font-mono w-8 text-center">{zoom}</span>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setZoom(z => Math.min(21, z + 1))} data-testid="zoom-in">
+                      <ZoomIn className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <Separator orientation="vertical" className="h-8" />
+
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setPanLat(baseLat); setPanLng(baseLng); setZoom(19); }} data-testid="reset-view">
+                    <Crosshair className="h-4 w-4" />
+                  </Button>
+
+                  <Separator orientation="vertical" className="h-8" />
+
+                  <Button onClick={handleCapture} disabled={isCapturing} data-testid="capture-btn">
+                    {isCapturing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Camera className="h-4 w-4 mr-1" />}
+                    Capture This View
+                  </Button>
+                </div>
+
+                {recapturePhotoId && (
+                  <div className="flex items-center gap-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-md text-sm">
+                    <Camera className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span className="text-amber-700">Recapturing: the captured image will replace the existing one</span>
+                    <Button size="sm" variant="ghost" className="ml-auto h-7" onClick={() => { setRecapturePhotoId(null); setMode("review"); }}>
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-auto p-4" data-testid="overhead-review">
+          {photosLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : savedOverheads.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 space-y-4">
+              <Satellite className="h-16 w-16 text-muted-foreground/20" />
+              <h3 className="font-medium text-lg text-muted-foreground">No overhead views yet</h3>
+              <p className="text-sm text-muted-foreground max-w-sm text-center">
+                Capture satellite images of this site from different angles and zoom levels.
+              </p>
+              {canEdit && (
+                <Button onClick={() => setMode("capture")} data-testid="start-capturing">
+                  <Camera className="h-4 w-4 mr-2" /> Start Capturing
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Satellite className="h-5 w-5 text-muted-foreground" />
+                  Saved Overhead Views
+                  <Badge variant="outline">{savedOverheads.length}</Badge>
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {savedOverheads.map((photo) => (
+                  <Card
+                    key={photo.id}
+                    className="overflow-hidden group cursor-pointer hover:shadow-md transition-all"
+                    data-testid={`overhead-card-${photo.id}`}
+                  >
+                    <div
+                      className="relative bg-muted"
+                      style={{ aspectRatio: `${CAPTURE_WIDTH}/${CAPTURE_HEIGHT}` }}
+                      onClick={() => setViewingPhoto(photo)}
+                    >
+                      <img
+                        src={photo.imageUrl}
+                        alt={photo.title || "Overhead view"}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <Eye className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                    <CardContent className="p-3 space-y-1">
+                      <p className="text-sm font-medium truncate">{photo.title || "Overhead View"}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          {photo.createdAt ? new Date(photo.createdAt).toLocaleDateString() : ""}
+                        </span>
+                        {canEdit && (
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={(e) => { e.stopPropagation(); startRecapture(photo); }}
+                              data-testid={`recapture-${photo.id}`}
+                            >
+                              <Camera className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-destructive"
+                              onClick={(e) => { e.stopPropagation(); deletePhoto.mutate(photo.id); }}
+                              data-testid={`delete-overhead-${photo.id}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <Dialog open={!!viewingPhoto} onOpenChange={(open) => { if (!open) setViewingPhoto(null); }}>
+        <DialogContent className="sm:max-w-3xl" data-testid="view-overhead-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Satellite className="h-5 w-5" />
+              {viewingPhoto?.title || "Overhead View"}
+            </DialogTitle>
+            <DialogDescription>
+              {viewingPhoto?.createdAt
+                ? `Captured on ${new Date(viewingPhoto.createdAt).toLocaleString()}`
+                : "Overhead satellite capture"
+              }
+            </DialogDescription>
+          </DialogHeader>
+          {viewingPhoto && (
+            <div className="space-y-4">
+              <div className="border rounded-lg overflow-hidden">
+                <img
+                  src={viewingPhoto.imageUrl}
+                  alt={viewingPhoto.title || "Overhead view"}
+                  className="w-full"
+                  style={{ aspectRatio: `${CAPTURE_WIDTH}/${CAPTURE_HEIGHT}` }}
+                  data-testid="full-view-image"
+                />
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Badge variant="outline">{viewingPhoto.width || CAPTURE_WIDTH}x{viewingPhoto.height || CAPTURE_HEIGHT}px</Badge>
+              </div>
+            </div>
+          )}
+          {canEdit && viewingPhoto && (
+            <DialogFooter>
+              <Button variant="destructive" size="sm" onClick={() => { deletePhoto.mutate(viewingPhoto.id); }} data-testid="delete-from-view">
+                <Trash2 className="h-4 w-4 mr-1" /> Delete
+              </Button>
+              <Button variant="outline" onClick={() => startRecapture(viewingPhoto)} data-testid="recapture-from-view">
+                <Camera className="h-4 w-4 mr-1" /> Recapture
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function SatellitePreview({ lat, lng, zoom, width, height }: { lat: number; lng: number; zoom: number; width: number; height: number }) {
+  const [imgSrc, setImgSrc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await apiRequest("POST", "/api/capture-satellite-image", {
+          lat, lng, zoom, width: Math.min(width, 640), height: Math.min(height, 640),
+        });
+        const data = await res.json();
+        if (data.imageBase64) {
+          setImgSrc(data.imageBase64);
+        }
+      } catch {
+        setImgSrc(null);
+      } finally {
+        setLoading(false);
+      }
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [lat, lng, zoom, width, height]);
+
+  if (loading && !imgSrc) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-muted">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!imgSrc) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-muted">
+        <p className="text-sm text-muted-foreground">Failed to load satellite view</p>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={imgSrc}
+      alt="Satellite preview"
+      className="absolute inset-0 w-full h-full object-cover"
+      data-testid="satellite-live-preview"
+    />
   );
 }
 
