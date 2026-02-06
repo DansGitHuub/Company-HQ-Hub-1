@@ -1047,7 +1047,7 @@ Respond with a JSON object:
           prompt,
           negativePrompt: negativePrompt || null,
           style: style || null,
-          model: "dall-e-3",
+          model: "gpt-image-1",
           requestedSize: "1024x1024",
           resultMediaId: null,
           status: "blocked",
@@ -1091,12 +1091,9 @@ Respond with a JSON object:
       ].filter(Boolean).join(". ");
 
       const imageResponse = await openai.images.generate({
-        model: "dall-e-3",
+        model: "gpt-image-1",
         prompt: fullPrompt,
-        n: 1,
         size: "1024x1024",
-        quality: "standard",
-        response_format: "b64_json",
       });
 
       const b64 = imageResponse.data?.[0]?.b64_json;
@@ -1133,7 +1130,7 @@ Respond with a JSON object:
         aiPrompt: prompt,
         aiStyle: style || null,
         aiNegativePrompt: negativePrompt || null,
-        aiModel: "dall-e-3",
+        aiModel: "gpt-image-1",
         aiWatermarked: useWatermark,
         metadata: { revisedPrompt: imageResponse.data?.[0]?.revised_prompt },
         createdBy: user.id,
@@ -1146,7 +1143,7 @@ Respond with a JSON object:
         prompt,
         negativePrompt: negativePrompt || null,
         style: style || null,
-        model: "dall-e-3",
+        model: "gpt-image-1",
         requestedSize: "1024x1024",
         resultMediaId: media.id,
         status: "success",
@@ -1164,7 +1161,7 @@ Respond with a JSON object:
           prompt: req.body.prompt || "",
           negativePrompt: null,
           style: null,
-          model: "dall-e-3",
+          model: "gpt-image-1",
           requestedSize: "1024x1024",
           resultMediaId: null,
           status: "failed",
