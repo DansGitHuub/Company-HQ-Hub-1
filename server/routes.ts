@@ -1275,6 +1275,89 @@ Generate 3-7 detailed steps depending on the complexity of the procedure. Make i
     }
   });
 
+  app.post("/api/sop-deep-research", requireAuth, async (req, res) => {
+    try {
+      const { title, sopType, steps, outcome, audience, skillLevel, existingTools, existingMaterials, existingPpe, field } = req.body;
+      if (!title) {
+        return res.status(400).json({ message: "Title is required" });
+      }
+      if (!field || !["tools", "safety"].includes(field)) {
+        return res.status(400).json({ message: "Field must be 'tools' or 'safety'" });
+      }
+
+      const stepsContext = Array.isArray(steps) && steps.length > 0
+        ? steps.filter((s: any) => s.title || s.instruction).map((s: any, i: number) =>
+            `Step ${i + 1}: ${s.title || ""}${s.instruction ? " - " + s.instruction : ""}`
+          ).join("\n")
+        : "";
+
+      const fieldFocus = field === "safety" ? `Focus ONLY on safety and compliance for this procedure.
+
+Return JSON with:
+- safetyNotes: string (comprehensive safety warnings, hazard identification, emergency procedures, first aid steps - be very detailed and specific to the procedure)
+- complianceNotes: string (OSHA regulations, EPA requirements, state/local codes, certifications needed, inspection requirements - cite specific standards where possible)
+- ppe: string (one item per line - include specific protection ratings, ANSI/OSHA standards where applicable)` :
+
+        `Focus on providing the MOST DETAILED and SPECIFIC recommendations possible.
+
+Return JSON with:
+- tools: string (one tool per line, include specific sizes/types/specs where relevant, e.g. "Round-point shovel (size 2)" not just "shovel", "3/4 inch garden hose (50 ft minimum)" not just "hose")
+- materials: string (one material per line, include estimated quantities for a typical job, e.g. "Mulch - hardwood, double-shredded (3-4 cubic yards per 100 sq ft)" not just "mulch")
+- ppe: string (one item per line, include specific protection ratings and standards, e.g. "ANSI Z87.1 rated safety glasses" not just "safety glasses")
+- timingTarget: string (realistic target time with reasoning, e.g. "45 minutes for average residential job")
+- timingMax: string (maximum time considering complications, e.g. "90 minutes including cleanup and site inspection")
+- reasoning: string (brief explanation of why these specific items are recommended)`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a senior landscaping operations expert with 20+ years of field experience. You specialize in creating detailed equipment lists, material specifications, and time estimates for landscaping procedures.
+
+Your recommendations should be:
+- SPECIFIC: Include exact tool sizes, material quantities, and brand-agnostic specifications
+- PRACTICAL: Based on real-world landscaping operations
+- SAFETY-CONSCIOUS: Include all relevant PPE with proper standards (ANSI, OSHA)
+- COMPLETE: Don't miss any tool or material that a crew would need
+- QUANTIFIED: Include estimated quantities, sizes, and specifications
+
+${fieldFocus}
+
+Return ONLY valid JSON with NO additional text.`
+          },
+          {
+            role: "user",
+            content: `Procedure: "${title}"
+${sopType ? `Type: ${sopType}` : ""}
+${outcome ? `Expected Outcome: ${outcome}` : ""}
+${audience ? `Target Audience: ${audience}` : ""}
+${skillLevel ? `Skill Level: ${skillLevel}` : ""}
+${stepsContext ? `\nProcedure Steps:\n${stepsContext}` : ""}
+${existingTools ? `\nCurrently listed tools (enhance these): ${existingTools}` : ""}
+${existingMaterials ? `\nCurrently listed materials (enhance these): ${existingMaterials}` : ""}
+${existingPpe ? `\nCurrently listed PPE (enhance these): ${existingPpe}` : ""}
+
+Provide comprehensive, industry-grade recommendations based on the full context above.`
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.5,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ message: "No response from AI" });
+      }
+
+      const research = JSON.parse(content);
+      res.json(research);
+    } catch (err: any) {
+      console.error("[sop-deep-research] Error:", err.message);
+      res.status(500).json({ message: "Failed to generate deep research" });
+    }
+  });
+
   app.get("/api/sop-drafts", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;

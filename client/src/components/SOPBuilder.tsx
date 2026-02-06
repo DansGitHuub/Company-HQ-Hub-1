@@ -563,12 +563,27 @@ function StepBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: P
   );
 }
 
-function StepToolsMaterials({ data, onChange }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void }) {
+function StepToolsMaterials({ data, onChange, onDeepResearch, isResearching }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void; onDeepResearch?: () => void; isResearching?: boolean }) {
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-semibold">Tools, Materials & Equipment</h3>
-        <p className="text-sm text-muted-foreground">List everything needed before starting this procedure.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold">Tools, Materials & Equipment</h3>
+          <p className="text-sm text-muted-foreground">List everything needed before starting this procedure.</p>
+        </div>
+        {onDeepResearch && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDeepResearch}
+            disabled={isResearching}
+            className="gap-1.5 shrink-0 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-600 dark:text-violet-300 dark:hover:bg-violet-900/30"
+            data-testid="btn-deep-research-tools"
+          >
+            {isResearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {isResearching ? "Researching..." : "AI Deep Research"}
+          </Button>
+        )}
       </div>
       <div>
         <Label htmlFor="sop-tools" className="flex items-center gap-1"><Wrench className="h-3 w-3" /> Tools Required</Label>
@@ -639,14 +654,29 @@ Steel-toe boots"
   );
 }
 
-function StepSafety({ data, onChange }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void }) {
+function StepSafety({ data, onChange, onDeepResearch, isResearching }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void; onDeepResearch?: () => void; isResearching?: boolean }) {
   const isSafetyType = data.sopType === "safety" || data.sopType === "emergency";
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-semibold">Safety & Compliance</h3>
-        <p className="text-sm text-muted-foreground">Document safety requirements and compliance notes.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold">Safety & Compliance</h3>
+          <p className="text-sm text-muted-foreground">Document safety requirements and compliance notes.</p>
+        </div>
+        {onDeepResearch && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDeepResearch}
+            disabled={isResearching}
+            className="gap-1.5 shrink-0 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-600 dark:text-violet-300 dark:hover:bg-violet-900/30"
+            data-testid="btn-deep-research-safety"
+          >
+            {isResearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {isResearching ? "Researching..." : "AI Deep Research"}
+          </Button>
+        )}
       </div>
       {isSafetyType && (
         <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
@@ -1368,6 +1398,59 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
     }
   };
 
+  const [isDeepResearching, setIsDeepResearching] = useState(false);
+
+  const handleDeepResearch = async (field: "tools" | "safety") => {
+    if (!data.title.trim()) {
+      toast({ title: "Enter a title first", description: "The AI needs your SOP title for context.", variant: "destructive" });
+      return;
+    }
+    setIsDeepResearching(true);
+    try {
+      const res = await apiRequest("POST", "/api/sop-deep-research", {
+        title: data.title,
+        sopType: data.sopType,
+        steps: data.steps,
+        outcome: data.outcome,
+        audience: data.audience,
+        skillLevel: data.skillLevel,
+        existingTools: data.tools,
+        existingMaterials: data.materials,
+        existingPpe: data.ppe,
+        field,
+      });
+      const research = await res.json();
+
+      if (field === "safety") {
+        setData(prev => ({
+          ...prev,
+          safetyNotes: research.safetyNotes ?? prev.safetyNotes,
+          complianceNotes: research.complianceNotes ?? prev.complianceNotes,
+          ppe: research.ppe ?? prev.ppe,
+        }));
+      } else {
+        setData(prev => ({
+          ...prev,
+          tools: research.tools ?? prev.tools,
+          materials: research.materials ?? prev.materials,
+          ppe: research.ppe ?? prev.ppe,
+          timingTarget: research.timingTarget ?? prev.timingTarget,
+          timingMax: research.timingMax ?? prev.timingMax,
+        }));
+      }
+      toast({
+        title: "Deep research complete",
+        description: research.reasoning
+          ? `${research.reasoning.slice(0, 120)}${research.reasoning.length > 120 ? "..." : ""}`
+          : "Expert-level suggestions applied. Review and adjust as needed.",
+      });
+    } catch (err: any) {
+      toast({ title: "Deep research failed", description: err.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setIsDeepResearching(false);
+    }
+  };
+
   const updateData = useCallback((updates: Partial<SOPBuilderData>) => {
     setData(prev => ({ ...prev, ...updates }));
   }, []);
@@ -1426,8 +1509,8 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
       case 3: return <StepAudience data={data} onChange={updateData} />;
       case 4: return <StepBuilder data={data} onChange={updateData} />;
       case 5: return <StepMedia data={data} onChange={updateData} />;
-      case 6: return <StepToolsMaterials data={data} onChange={updateData} />;
-      case 7: return <StepSafety data={data} onChange={updateData} />;
+      case 6: return <StepToolsMaterials data={data} onChange={updateData} onDeepResearch={() => handleDeepResearch("tools")} isResearching={isDeepResearching} />;
+      case 7: return <StepSafety data={data} onChange={updateData} onDeepResearch={() => handleDeepResearch("safety")} isResearching={isDeepResearching} />;
       case 8: return <StepReview data={data} />;
       default: return null;
     }
