@@ -1,0 +1,210 @@
+You are a senior full-stack engineer. Build this project in a test-first way. DO NOT skip or hand-wave any tests.
+
+PROJECT NAME: CompanyHQ SOP Builder (v1)
+
+PRIMARY GOAL
+Create the fastest, simplest SOP builder that still supports advanced options (logic, roles, QC, versioning, assignments, feedback, automation hooks storage, and per-user UI preferences). Must be web app (desktop + mobile responsive).
+
+NON-NEGOTIABLE RULES (MUST IMPLEMENT)
+1) One primary action per screen. Extra controls live under “Advanced”.
+2) Save-as-you-go. No data loss.
+3) Every field has placeholder + example + validation.
+4) “Simple Mode” default; “Advanced Mode” reveals extra controls.
+5) Per-user preferences must change UI without changing SOP content.
+6) Every wizard screen has Back, Next, Save Draft, Exit, Help (collapsible).
+7) Permissions enforced server-side (not just UI).
+
+TECH STACK (USE EXACTLY)
+Frontend: React + TypeScript + Tailwind + React Router + React Hook Form + Zod
+Backend: Node.js + Express (or Fastify) + PostgreSQL + Prisma ORM
+Auth: email/password + JWT
+Testing: Vitest (unit), Supertest (API integration), Playwright (E2E)
+Uploads: implement abstraction; v1 can store locally, but code must be structured so S3 can replace it later.
+
+BUILD ORDER (STRICT — DO IN THIS ORDER)
+PHASE 0: Initialize repo, env example, scripts, lint, formatting.
+PHASE 1: Database schema with Prisma + migrations + seed script.
+PHASE 2: Backend API endpoints (auth, SOPs, steps, versions, assignments, feedback, preferences).
+PHASE 3: Write tests FIRST (Vitest + Supertest + Playwright) for acceptance criteria below.
+PHASE 4: Implement backend until all API tests pass.
+PHASE 5: Implement frontend screens (wizard + list + view) until Playwright E2E passes.
+PHASE 6: Final polish (validation messages, empty states, error handling).
+
+HARD STOP RULE
+If any required test is failing, you must fix it before moving to the next phase. Do not continue.
+
+DATABASE MODEL (MUST MATCH)
+Create Prisma models for these tables with fields exactly as described:
+- users
+- user_preferences
+- sop_templates
+- sops
+- sop_versions
+- sop_steps
+- sop_assignments
+- sop_acknowledgements
+- sop_feedback
+- automation_hooks (storage only)
+- events_log
+
+Use UUID primary keys. Enforce org_id scoping everywhere. Add indexes where needed.
+
+ROLES & PERMISSIONS (SERVER ENFORCED)
+Roles: admin, manager, editor, viewer, trainee
+Rules:
+- Viewer cannot edit any SOP fields.
+- Editor can create/edit drafts but cannot publish.
+- Manager/Admin can publish.
+- Only Admin/Manager can accept feedback into a new version.
+- No cross-org data access ever.
+
+ROUTES / SCREENS (MUST EXIST)
+- /sops (list + filters + search)
+- /sops/new (wizard)
+- /sops/:id (overview)
+- /sops/:id/edit (wizard edit)
+- /sops/:id/versions
+- /sops/:id/versions/:versionId (read-only)
+- /sops/:id/publish
+- /sops/:id/assign
+- /sops/:id/analytics (v1 basic)
+- /sops/:id/feedback
+- /settings/profile (user prefs)
+- /settings/org (admin basic)
+
+WIZARD SCREENS (MUST IMPLEMENT IN ORDER)
+1) SOP Type Selection (tiles)
+2) SOP Identity (name/category required; internal_code unique per org; aliases)
+3) Outcome Definition (type required; correct fields required)
+4) Audience & Skill Level
+5) Structure Builder (linear/phases/decision_tree/checklist_reference/time_based)
+6) Steps Builder (reorder + add multiple + import/paste)
+7) Step Editor (title+instruction required; optional why/success/common mistakes)
+8) Media & Evidence (attach media; proof required toggle with proof_type required)
+9) Conditional Logic (IF/THEN; store JSON rules; validate schema)
+10) Roles & Responsibility
+11) Tools / Materials / PPE / Equipment
+12) Timing & Standards (validate max >= target)
+13) QC & Error Handling
+14) Safety & Compliance (if Safety/Emergency SOP type, require safety or compliance notes to publish)
+15) Versioning & Ownership (owner required; viewer role minimum required)
+16) Automation Hooks (storage only; validate config JSON)
+17) Review & Simulation (deterministic rule evaluation stub)
+18) Publish (creates version snapshot; locks version)
+19) Assign (role/user; acknowledgement toggle)
+20) Feedback (submit + review + accept -> new draft version)
+
+API ENDPOINTS (MINIMUM — MUST WORK)
+Auth:
+- POST /api/auth/register
+- POST /api/auth/login
+- GET  /api/auth/me
+Preferences:
+- GET /api/preferences/me
+- PUT /api/preferences/me
+SOPs:
+- GET  /api/sops
+- POST /api/sops
+- GET  /api/sops/:id
+- PUT  /api/sops/:id
+- POST /api/sops/:id/clone
+- POST /api/sops/:id/publish
+- POST /api/sops/:id/archive
+Steps:
+- POST   /api/sops/:id/steps
+- PUT    /api/sops/:id/steps/:stepId
+- DELETE /api/sops/:id/steps/:stepId
+- PUT    /api/sops/:id/steps/reorder
+Versions:
+- GET /api/sops/:id/versions
+- GET /api/sops/:id/versions/:versionId
+Assignments:
+- POST /api/sops/:id/assign
+- GET  /api/assignments/me
+Feedback:
+- POST /api/sops/:id/feedback
+- GET  /api/sops/:id/feedback
+- POST /api/sops/:id/feedback/:feedbackId/accept
+Automation hooks:
+- GET    /api/sops/:id/hooks
+- POST   /api/sops/:id/hooks
+- PUT    /api/sops/:id/hooks/:hookId
+- DELETE /api/sops/:id/hooks/:hookId
+
+TESTS (WRITE THESE BEFORE IMPLEMENTATION)
+A) Wizard Contract (API-level where possible + UI E2E)
+1. Create SOP -> Linear -> 1 step -> Publish succeeds.
+2. Create SOP -> Phases -> 2 phases -> steps assigned -> Publish succeeds.
+3. Proof required step cannot save unless proof_type provided.
+4. KPI outcome: blocks invalid max < target.
+5. Safety SOP type requires safety/compliance notes before publish.
+
+B) Permissions (API integration)
+1. Viewer cannot PUT /api/sops/:id
+2. Editor cannot POST /api/sops/:id/publish
+3. Manager can publish
+4. Only Admin/Manager can accept feedback
+5. Cross-org access is forbidden (403/404)
+
+C) Version Snapshot Integrity (API integration)
+1. Publish creates new current sop_version snapshot.
+2. Editing SOP after publish must not mutate old version.
+3. Versions endpoint returns correct historical versions.
+
+D) Personalization (UI + API)
+1. PUT preferences updates rendering (step density/media-first) without changing SOP data.
+2. Preferences persist across reload/login.
+
+E) Data Integrity
+1. internal_code unique per org.
+2. reorder endpoint persists correct order_index.
+
+F) Playwright E2E Happy Path
+Script:
+- Register/login as manager
+- Create SOP through wizard with 3 steps, one proof-required, one QC checkpoint
+- Publish
+- Assign to trainee role
+- Logout
+- Login as trainee
+- See assignment
+- Acknowledge
+- Submit feedback on step
+- Logout
+- Login as manager
+- Accept feedback -> new draft version created (published version unchanged)
+
+SEED DATA (MUST PROVIDE)
+Seed 5 users:
+- 1 admin, 1 manager, 1 editor, 1 viewer, 1 trainee
+Seed 3 sample SOPs (published):
+1) Plant a Tree (B&B) (linear)
+2) Weekly Lawn Mowing Route (phases)
+3) Skid Steer Daily Inspection (checklist_reference)
+Each sample must include:
+- 5–8 steps
+- at least 1 proof-required step
+- at least 1 QC checkpoint
+- at least 1 conditional rule
+- at least 1 assignment to trainee
+
+DELIVERABLES (YOU MUST OUTPUT)
+1) A short “How to run” section (commands for db, migrate, seed, dev, test).
+2) A list of what is completed vs not completed.
+3) The exact location of tests and how to run them.
+4) A checklist confirming each non-negotiable rule is satisfied.
+
+IMPORTANT EXECUTION NOTES
+- Use clean, minimal UI. Do not over-design.
+- Use consistent error handling and status codes.
+- Validate request bodies with Zod on server.
+- Never trust client for permissions.
+- Use transactions where needed (publish snapshot).
+- Keep code modular: routes/controllers/services/validators.
+
+BEGIN NOW.
+First output ONLY:
+- Proposed folder structure
+- Prisma schema draft (models only)
+- Test plan file list (names/paths of test files)
+DO NOT write implementation yet until those are shown.

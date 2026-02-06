@@ -9,7 +9,7 @@ import {
   Search, Plus, ArrowLeft, Edit, Trash2, Sparkles, Upload, FileText, 
   Link2, Loader2, Save, X, ChevronRight, ChevronDown, Archive, Copy, 
   Move, MoreVertical, FolderPlus, Pencil, Check, ExternalLink, FileUp,
-  LayoutTemplate, BookMarked, Image, File
+  LayoutTemplate, BookMarked, Image, File, ClipboardList
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import SOPBuilder from "@/components/SOPBuilder";
 import type { Sop, SopCategory, SopTemplate, SopExample } from "@shared/schema";
 
 export default function SOPs() {
@@ -43,6 +44,9 @@ export default function SOPs() {
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [movingSopId, setMovingSopId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  
+  // SOP Builder state
+  const [showBuilder, setShowBuilder] = useState(false);
   
   // Templates & Examples state
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
@@ -414,6 +418,29 @@ export default function SOPs() {
     );
   }
 
+  if (showBuilder) {
+    return (
+      <SOPBuilder
+        categories={categories}
+        onComplete={(sopData) => {
+          createMutation.mutate({
+            title: sopData.title,
+            category: sopData.category,
+            categoryId: sopData.categoryId,
+            content: sopData.content,
+            ownerId: user?.id,
+          }, {
+            onSuccess: () => {
+              setShowBuilder(false);
+            }
+          });
+        }}
+        onCancel={() => setShowBuilder(false)}
+        isSubmitting={createMutation.isPending}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -422,6 +449,9 @@ export default function SOPs() {
           <p className="text-muted-foreground">Standard Operating Procedures & Knowledge Base</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setShowBuilder(true)} className="gap-2" data-testid="button-sop-builder">
+            <ClipboardList className="w-4 h-4" /> SOP Builder
+          </Button>
           <Button variant="outline" onClick={() => setAiGenerateOpen(true)} className="gap-2" data-testid="button-ai-generate-sop">
             <Sparkles className="w-4 h-4" /> Generate with AI
           </Button>
