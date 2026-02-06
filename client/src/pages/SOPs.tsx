@@ -19,8 +19,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import SOPBuilder from "@/components/SOPBuilder";
-import type { Sop, SopCategory, SopTemplate, SopExample } from "@shared/schema";
+import SOPBuilder, { type SOPBuilderData } from "@/components/SOPBuilder";
+import type { Sop, SopCategory, SopTemplate, SopExample, SopDraft } from "@shared/schema";
+import { Clock, PlayCircle } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function SOPs() {
   const queryClient = useQueryClient();
@@ -47,6 +49,12 @@ export default function SOPs() {
   
   // SOP Builder state
   const [showBuilder, setShowBuilder] = useState(false);
+  const [builderInitialData, setBuilderInitialData] = useState<(SOPBuilderData & { draftId?: number }) | undefined>(undefined);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+
+  const { data: drafts = [] } = useQuery<SopDraft[]>({
+    queryKey: ["/api/sop-drafts"],
+  });
   
   // Templates & Examples state
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
@@ -422,6 +430,7 @@ export default function SOPs() {
     return (
       <SOPBuilder
         categories={categories}
+        initialData={builderInitialData}
         onComplete={(sopData) => {
           createMutation.mutate({
             title: sopData.title,
@@ -431,12 +440,33 @@ export default function SOPs() {
             ownerId: user?.id,
           }, {
             onSuccess: () => {
+              if (builderInitialData?.draftId) {
+                apiRequest("DELETE", `/api/sop-drafts/${builderInitialData.draftId}`).then(() => {
+                  queryClient.invalidateQueries({ queryKey: ["/api/sop-drafts"] });
+                }).catch(() => {});
+              }
               setShowBuilder(false);
+              setBuilderInitialData(undefined);
             }
           });
         }}
-        onCancel={() => setShowBuilder(false)}
+        onCancel={() => { setShowBuilder(false); setBuilderInitialData(undefined); }}
         isSubmitting={createMutation.isPending}
+        onSaveDraft={async (draftData) => {
+          setIsSavingDraft(true);
+          try {
+            await apiRequest("POST", "/api/sop-drafts", draftData);
+            queryClient.invalidateQueries({ queryKey: ["/api/sop-drafts"] });
+            toast({ title: "Saved to queue", description: "You can resume this SOP later from your drafts." });
+            setShowBuilder(false);
+            setBuilderInitialData(undefined);
+          } catch {
+            toast({ title: "Failed to save draft", variant: "destructive" });
+          } finally {
+            setIsSavingDraft(false);
+          }
+        }}
+        isSavingDraft={isSavingDraft}
       />
     );
   }
@@ -449,7 +479,7 @@ export default function SOPs() {
           <p className="text-muted-foreground">Standard Operating Procedures & Knowledge Base</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => setShowBuilder(true)} className="gap-2" data-testid="button-sop-builder">
+          <Button variant="outline" onClick={() => { setBuilderInitialData(undefined); setShowBuilder(true); }} className="gap-2" data-testid="button-sop-builder">
             <ClipboardList className="w-4 h-4" /> SOP Builder
           </Button>
           <Button variant="outline" onClick={() => setAiGenerateOpen(true)} className="gap-2" data-testid="button-ai-generate-sop">
@@ -462,9 +492,12 @@ export default function SOPs() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+        <TabsList className="grid w-full max-w-lg grid-cols-4">
           <TabsTrigger value="topics" className="gap-2">
             <FolderPlus className="w-4 h-4" /> Topics
+          </TabsTrigger>
+          <TabsTrigger value="drafts" className="gap-2" data-testid="tab-drafts">
+            <Clock className="w-4 h-4" /> Queue {drafts.length > 0 && <Badge variant="secondary" className="ml-1 text-xs px-1.5">{drafts.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="templates" className="gap-2">
             <LayoutTemplate className="w-4 h-4" /> Templates
@@ -566,6 +599,86 @@ export default function SOPs() {
                   </CardContent>
                 </Card>
               )}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="drafts" className="space-y-4 mt-6">
+          <div>
+            <p className="text-muted-foreground text-sm mb-4">
+              SOPs you started but haven't finished yet. Resume where you left off.
+            </p>
+          </div>
+          {drafts.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <Clock className="h-12 w-12 text-muted-foreground/40 mb-3" />
+                <p className="font-medium text-muted-foreground">No drafts in queue</p>
+                <p className="text-sm text-muted-foreground mt-1">When you save an SOP to your queue, it will appear here</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {drafts.map((draft) => {
+                const draftData = draft.data as SOPBuilderData;
+                const sopTypeLabel = draft.sopType ? {
+                  standard: "Standard Procedure", safety: "Safety Procedure",
+                  maintenance: "Maintenance", training: "Training Guide",
+                  quality: "Quality Control", emergency: "Emergency Response",
+                }[draft.sopType] || draft.sopType : null;
+
+                return (
+                  <Card key={draft.id} className="hover:shadow-md transition-all" data-testid={`draft-card-${draft.id}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{draft.title}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {sopTypeLabel && <Badge variant="outline" className="text-xs">{sopTypeLabel}</Badge>}
+                            <Badge variant="secondary" className="text-xs">Step {(draft.currentStep || 0) + 1} of 9</Badge>
+                          </div>
+                          {draft.updatedAt && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Last edited: {new Date(draft.updatedAt).toLocaleDateString()} at {new Date(draft.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setBuilderInitialData({ ...draftData, draftId: Number(draft.id) });
+                              setShowBuilder(true);
+                            }}
+                            className="gap-1"
+                            data-testid={`btn-resume-draft-${draft.id}`}
+                          >
+                            <PlayCircle className="h-3.5 w-3.5" /> Resume
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:bg-destructive/10"
+                            onClick={async () => {
+                              try {
+                                await apiRequest("DELETE", `/api/sop-drafts/${draft.id}`);
+                                queryClient.invalidateQueries({ queryKey: ["/api/sop-drafts"] });
+                                toast({ title: "Draft deleted" });
+                              } catch {
+                                toast({ title: "Failed to delete draft", variant: "destructive" });
+                              }
+                            }}
+                            data-testid={`btn-delete-draft-${draft.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>

@@ -1,5 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +12,16 @@ import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { SopCategory } from "@shared/schema";
@@ -40,6 +51,7 @@ import {
   Sparkles,
   Camera,
   Palette,
+  Clock,
 } from "lucide-react";
 
 interface SOPStep {
@@ -63,7 +75,7 @@ interface SOPMediaItem {
   aiStyle?: string;
 }
 
-interface SOPBuilderData {
+export interface SOPBuilderData {
   title: string;
   category: string;
   categoryId: string;
@@ -169,7 +181,7 @@ function StepTypeSelection({ data, onChange }: { data: SOPBuilderData; onChange:
   );
 }
 
-function StepIdentity({ data, onChange, categories }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void; categories: SopCategory[] }) {
+function StepIdentity({ data, onChange, categories, onAiSuggest, isAiSuggesting }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void; categories: SopCategory[]; onAiSuggest?: () => void; isAiSuggesting?: boolean }) {
   const { toast } = useToast();
   const [showNewTopic, setShowNewTopic] = useState(false);
   const [newTopicName, setNewTopicName] = useState("");
@@ -208,6 +220,22 @@ function StepIdentity({ data, onChange, categories }: { data: SOPBuilderData; on
             data-testid="input-sop-title"
           />
           <p className="text-xs text-muted-foreground mt-1">Choose a clear, action-oriented title</p>
+          {onAiSuggest && data.title.trim().length >= 3 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAiSuggest}
+              disabled={isAiSuggesting}
+              className="mt-2 gap-2 text-purple-600 border-purple-300 hover:bg-purple-50 hover:border-purple-400 dark:text-purple-400 dark:border-purple-600 dark:hover:bg-purple-900/20"
+              data-testid="btn-ai-suggest"
+            >
+              {isAiSuggesting ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> AI is filling in fields...</>
+              ) : (
+                <><Sparkles className="h-4 w-4" /> Auto-fill with AI</>
+              )}
+            </Button>
+          )}
         </div>
         <div>
           <Label htmlFor="sop-category">Topic *</Label>
@@ -1192,31 +1220,153 @@ interface SOPBuilderProps {
   onComplete: (sopData: { title: string; category: string; categoryId: string; content: string }) => void;
   onCancel: () => void;
   isSubmitting: boolean;
+  initialData?: SOPBuilderData & { draftId?: number };
+  onSaveDraft?: (draftData: { title: string; categoryId: string; sopType: string; currentStep: number; data: SOPBuilderData; draftId?: number }) => void;
+  isSavingDraft?: boolean;
 }
 
-export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitting }: SOPBuilderProps) {
+const INITIAL_DATA: SOPBuilderData = {
+  title: "",
+  category: "",
+  categoryId: "",
+  sopType: "",
+  outcome: "",
+  outcomeType: "",
+  audience: "",
+  skillLevel: "",
+  steps: [createEmptyStep()],
+  headerImage: null,
+  stepImages: {},
+  tools: "",
+  materials: "",
+  ppe: "",
+  safetyNotes: "",
+  complianceNotes: "",
+  timingTarget: "",
+  timingMax: "",
+};
+
+export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitting, initialData, onSaveDraft, isSavingDraft }: SOPBuilderProps) {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [currentStep, setCurrentStep] = useState(0);
-  const [data, setData] = useState<SOPBuilderData>({
-    title: "",
-    category: "",
-    categoryId: "",
-    sopType: "",
-    outcome: "",
-    outcomeType: "",
-    audience: "",
-    skillLevel: "",
-    steps: [createEmptyStep()],
-    headerImage: null,
-    stepImages: {},
-    tools: "",
-    materials: "",
-    ppe: "",
-    safetyNotes: "",
-    complianceNotes: "",
-    timingTarget: "",
-    timingMax: "",
-  });
+  const [data, setData] = useState<SOPBuilderData>(initialData || { ...INITIAL_DATA, steps: [createEmptyStep()] });
+  const [draftId, setDraftId] = useState<number | undefined>(initialData?.draftId);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showNavDialog, setShowNavDialog] = useState(false);
+  const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
+  const [isAiSuggesting, setIsAiSuggesting] = useState(false);
+
+  const isDirty = useMemo(() => {
+    const base = initialData || INITIAL_DATA;
+    return data.title !== base.title || 
+      data.sopType !== base.sopType || 
+      data.categoryId !== base.categoryId ||
+      data.outcome !== base.outcome ||
+      data.outcomeType !== base.outcomeType ||
+      data.audience !== base.audience ||
+      data.skillLevel !== base.skillLevel ||
+      data.tools !== base.tools ||
+      data.materials !== base.materials ||
+      data.ppe !== base.ppe ||
+      data.safetyNotes !== base.safetyNotes ||
+      data.complianceNotes !== base.complianceNotes ||
+      data.timingTarget !== base.timingTarget ||
+      data.timingMax !== base.timingMax ||
+      data.headerImage !== base.headerImage ||
+      Object.keys(data.stepImages).length > 0 ||
+      data.steps.some(s => s.title || s.instruction);
+  }, [data, initialData]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const handleClick = (e: MouseEvent) => {
+      const link = (e.target as HTMLElement).closest("a[href]");
+      if (!link) return;
+      const href = link.getAttribute("href");
+      if (!href || href.startsWith("http") || href.startsWith("#")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setPendingNavPath(href);
+      setShowNavDialog(true);
+    };
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, [isDirty]);
+
+  const confirmNavigation = () => {
+    setShowNavDialog(false);
+    if (pendingNavPath) {
+      navigate(pendingNavPath);
+    }
+    setPendingNavPath(null);
+  };
+
+  const handleCancelClick = () => {
+    if (isDirty) {
+      setShowCancelDialog(true);
+    } else {
+      onCancel();
+    }
+  };
+
+  const handleSaveDraft = () => {
+    if (!onSaveDraft) return;
+    onSaveDraft({
+      title: data.title || "Untitled Draft",
+      categoryId: data.categoryId,
+      sopType: data.sopType,
+      currentStep,
+      data,
+      draftId,
+    });
+  };
+
+  const handleAiSuggest = async () => {
+    if (!data.title.trim()) {
+      toast({ title: "Enter a title first", description: "We need a title to generate suggestions.", variant: "destructive" });
+      return;
+    }
+    setIsAiSuggesting(true);
+    try {
+      const res = await apiRequest("POST", "/api/sop-suggest", {
+        title: data.title,
+        sopType: data.sopType,
+        category: data.category,
+      });
+      const suggestions = await res.json();
+      setData(prev => ({
+        ...prev,
+        outcome: prev.outcome || suggestions.outcome || "",
+        outcomeType: prev.outcomeType || suggestions.outcomeType || "",
+        audience: prev.audience || suggestions.audience || "",
+        skillLevel: prev.skillLevel || suggestions.skillLevel || "",
+        steps: (prev.steps.length <= 1 && !prev.steps[0]?.title) ? (suggestions.steps || prev.steps) : prev.steps,
+        tools: prev.tools || suggestions.tools || "",
+        materials: prev.materials || suggestions.materials || "",
+        ppe: prev.ppe || suggestions.ppe || "",
+        safetyNotes: prev.safetyNotes || suggestions.safetyNotes || "",
+        complianceNotes: prev.complianceNotes || suggestions.complianceNotes || "",
+        timingTarget: prev.timingTarget || suggestions.timingTarget || "",
+        timingMax: prev.timingMax || suggestions.timingMax || "",
+      }));
+      toast({ title: "AI suggestions applied", description: "Fields have been auto-filled. Review and adjust as needed." });
+    } catch (err: any) {
+      toast({ title: "AI suggestion failed", description: err.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setIsAiSuggesting(false);
+    }
+  };
 
   const updateData = useCallback((updates: Partial<SOPBuilderData>) => {
     setData(prev => ({ ...prev, ...updates }));
@@ -1271,7 +1421,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
   const renderStep = () => {
     switch (currentStep) {
       case 0: return <StepTypeSelection data={data} onChange={updateData} />;
-      case 1: return <StepIdentity data={data} onChange={updateData} categories={categories} />;
+      case 1: return <StepIdentity data={data} onChange={updateData} categories={categories} onAiSuggest={handleAiSuggest} isAiSuggesting={isAiSuggesting} />;
       case 2: return <StepOutcome data={data} onChange={updateData} />;
       case 3: return <StepAudience data={data} onChange={updateData} />;
       case 4: return <StepBuilder data={data} onChange={updateData} />;
@@ -1285,6 +1435,68 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
 
   return (
     <div className="space-y-6 pb-20" data-testid="sop-builder">
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to cancel?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved work in the SOP Builder. If you cancel now, all your progress will be lost. You can also save it to your queue to continue later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="btn-cancel-stay">Keep Working</AlertDialogCancel>
+            {onSaveDraft && (
+              <Button
+                variant="outline"
+                onClick={() => { setShowCancelDialog(false); handleSaveDraft(); }}
+                disabled={isSavingDraft}
+                data-testid="btn-cancel-save-draft"
+              >
+                <Clock className="h-4 w-4 mr-2" /> Save to Queue
+              </Button>
+            )}
+            <AlertDialogAction
+              onClick={() => { setShowCancelDialog(false); onCancel(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="btn-cancel-confirm"
+            >
+              Discard & Leave
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showNavDialog} onOpenChange={setShowNavDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes in the SOP Builder. If you navigate away now, your progress will be lost. Would you like to save it to your queue first?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingNavPath(null)} data-testid="btn-nav-stay">Stay Here</AlertDialogCancel>
+            {onSaveDraft && (
+              <Button
+                variant="outline"
+                onClick={() => { setShowNavDialog(false); handleSaveDraft(); }}
+                disabled={isSavingDraft}
+                data-testid="btn-nav-save-draft"
+              >
+                <Clock className="h-4 w-4 mr-2" /> Save & Leave
+              </Button>
+            )}
+            <AlertDialogAction
+              onClick={confirmNavigation}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="btn-nav-leave"
+            >
+              Leave Without Saving
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -1296,7 +1508,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
         <Button
           variant="ghost"
           size="icon"
-          onClick={onCancel}
+          onClick={handleCancelClick}
           className="hover:bg-destructive/10 hover:text-destructive transition-colors"
           data-testid="button-exit-builder"
         >
@@ -1312,19 +1524,20 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
           const isActive = index === currentStep;
           const isComplete = index < currentStep;
           return (
-            <Button
+            <div
               key={step.id}
-              variant={isActive ? "default" : isComplete ? "secondary" : "ghost"}
-              size="sm"
-              className="text-xs gap-1 transition-all hover:scale-105"
-              onClick={() => {
-                if (index <= currentStep || canProceed()) setCurrentStep(index);
-              }}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors select-none ${
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : isComplete
+                    ? "bg-secondary text-secondary-foreground"
+                    : "text-muted-foreground"
+              }`}
               data-testid={`wizard-step-${step.id}`}
             >
               {isComplete ? <Check className="h-3 w-3" /> : <Icon className="h-3 w-3" />}
               {step.label}
-            </Button>
+            </div>
           );
         })}
       </div>
@@ -1348,12 +1561,25 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
 
         <Button
           variant="outline"
-          onClick={onCancel}
+          onClick={handleCancelClick}
           className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
           data-testid="button-wizard-exit"
         >
-          Exit
+          Cancel
         </Button>
+
+        {onSaveDraft && (
+          <Button
+            variant="outline"
+            onClick={handleSaveDraft}
+            disabled={isSavingDraft || !data.title.trim()}
+            className="hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300 dark:hover:bg-amber-900/20 transition-colors"
+            data-testid="button-save-draft"
+          >
+            {isSavingDraft ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Clock className="h-4 w-4 mr-2" />}
+            Save to Queue
+          </Button>
+        )}
 
         {currentStep === WIZARD_STEPS.length - 1 ? (
           <Button

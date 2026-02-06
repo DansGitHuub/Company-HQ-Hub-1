@@ -1226,6 +1226,116 @@ Respond with a JSON object:
     }
   });
 
+  app.post("/api/sop-suggest", requireAuth, async (req, res) => {
+    try {
+      const { title, sopType, category } = req.body;
+      if (!title) {
+        return res.status(400).json({ message: "Title is required" });
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert landscaping operations manager. Generate detailed SOP (Standard Operating Procedure) content for a landscaping company. Return ONLY valid JSON with NO additional text.
+
+The JSON must include these fields:
+- outcome: string (clear description of what successful completion looks like)
+- outcomeType: string (one of: "completion", "quality", "safety", "kpi")
+- audience: string (who this SOP is for, e.g., "Landscape Crew Members")
+- skillLevel: string (one of: "beginner", "intermediate", "advanced", "all")
+- steps: array of objects with { id: string (random 7-char), title: string, instruction: string, why: string, successCriteria: string, commonMistakes: string, proofRequired: boolean, proofType: string, isQCCheckpoint: boolean }
+- tools: string (tools needed, one per line)
+- materials: string (materials needed, one per line)
+- ppe: string (PPE required, one per line)
+- safetyNotes: string (safety warnings and precautions)
+- complianceNotes: string (regulatory or compliance notes)
+- timingTarget: string (target completion time, e.g., "45 minutes")
+- timingMax: string (maximum allowed time, e.g., "90 minutes")
+
+Generate 3-7 detailed steps depending on the complexity of the procedure. Make instructions practical and specific to landscaping.`
+          },
+          {
+            role: "user",
+            content: `Generate SOP content for: "${title}"${sopType ? ` (Type: ${sopType})` : ""}${category ? ` (Category: ${category})` : ""}`
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ message: "No response from AI" });
+      }
+
+      const suggestions = JSON.parse(content);
+      res.json(suggestions);
+    } catch (err: any) {
+      console.error("[sop-suggest] Error:", err.message);
+      res.status(500).json({ message: "Failed to generate AI suggestions" });
+    }
+  });
+
+  app.get("/api/sop-drafts", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const drafts = await storage.getSopDrafts(user.id);
+      res.json(drafts);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch drafts" });
+    }
+  });
+
+  app.get("/api/sop-drafts/:id", requireAuth, async (req, res) => {
+    try {
+      const draft = await storage.getSopDraft(req.params.id);
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      const user = req.user as User;
+      if (draft.ownerId !== user.id && user.role !== "Admin" && !user.isMasterAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      res.json(draft);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch draft" });
+    }
+  });
+
+  app.post("/api/sop-drafts", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { title, categoryId, sopType, currentStep, data, draftId } = req.body;
+      const draft = await storage.upsertSopDraft({
+        id: draftId || undefined,
+        ownerId: user.id,
+        title: title || "Untitled Draft",
+        categoryId: categoryId || null,
+        sopType: sopType || null,
+        currentStep: currentStep || 0,
+        data: data || {},
+      });
+      res.json(draft);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to save draft" });
+    }
+  });
+
+  app.delete("/api/sop-drafts/:id", requireAuth, async (req, res) => {
+    try {
+      const draft = await storage.getSopDraft(req.params.id);
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      const user = req.user as User;
+      if (draft.ownerId !== user.id && user.role !== "Admin" && !user.isMasterAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      await storage.deleteSopDraft(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete draft" });
+    }
+  });
+
   app.post("/api/ai/address-autocomplete", requireAuth, async (req, res) => {
     try {
       const { query, latitude, longitude } = req.body;

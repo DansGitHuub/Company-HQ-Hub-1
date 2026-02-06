@@ -63,7 +63,8 @@ import {
   activityLogs, type ActivityLog, type InsertActivityLog,
   developmentTracker, type DevelopmentTracker, type InsertDevelopmentTracker,
   sopMedia, type SopMedia, type InsertSopMedia,
-  aiGenerationEvents, type AiGenerationEvent, type InsertAiGenerationEvent
+  aiGenerationEvents, type AiGenerationEvent, type InsertAiGenerationEvent,
+  sopDrafts, type SopDraft, type InsertSopDraft
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull } from "drizzle-orm";
@@ -462,6 +463,11 @@ export interface IStorage {
   createAiGenerationEvent(event: InsertAiGenerationEvent): Promise<AiGenerationEvent>;
   getAiGenerationEventsCount(userId: string, since: Date): Promise<number>;
   getAiGenerationEventsCountAll(since: Date): Promise<number>;
+
+  getSopDrafts(ownerId: string): Promise<SopDraft[]>;
+  getSopDraft(id: string): Promise<SopDraft | undefined>;
+  upsertSopDraft(draft: InsertSopDraft & { id?: string }): Promise<SopDraft>;
+  deleteSopDraft(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2170,6 +2176,35 @@ export class DatabaseStorage implements IStorage {
     const results = await db.select().from(aiGenerationEvents)
       .where(eq(aiGenerationEvents.status, "success"));
     return results.filter(r => r.createdAt && r.createdAt >= since).length;
+  }
+
+  async getSopDrafts(ownerId: string): Promise<SopDraft[]> {
+    return await db.select().from(sopDrafts)
+      .where(eq(sopDrafts.ownerId, ownerId))
+      .orderBy(desc(sopDrafts.updatedAt));
+  }
+
+  async getSopDraft(id: string): Promise<SopDraft | undefined> {
+    const [draft] = await db.select().from(sopDrafts).where(eq(sopDrafts.id, id));
+    return draft || undefined;
+  }
+
+  async upsertSopDraft(draft: InsertSopDraft & { id?: string }): Promise<SopDraft> {
+    if (draft.id) {
+      const [updated] = await db.update(sopDrafts)
+        .set({ ...draft, updatedAt: new Date() })
+        .where(eq(sopDrafts.id, draft.id))
+        .returning();
+      if (updated) return updated;
+    }
+    const { id, ...insertData } = draft;
+    const [created] = await db.insert(sopDrafts).values(insertData).returning();
+    return created;
+  }
+
+  async deleteSopDraft(id: string): Promise<boolean> {
+    const result = await db.delete(sopDrafts).where(eq(sopDrafts.id, id));
+    return (result?.rowCount ?? 0) > 0;
   }
 }
 

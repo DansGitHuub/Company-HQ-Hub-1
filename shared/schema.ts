@@ -1695,3 +1695,22 @@ export const insertAiGenerationEventSchema = createInsertSchema(aiGenerationEven
 
 export type InsertAiGenerationEvent = z.infer<typeof insertAiGenerationEventSchema>;
 export type AiGenerationEvent = typeof aiGenerationEvents.$inferSelect;
+
+export const sopDrafts = pgTable("sop_drafts", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id", { length: 36 }).references(() => users.id).notNull(),
+  title: text("title").notNull().default("Untitled Draft"),
+  categoryId: varchar("category_id", { length: 36 }),
+  sopType: text("sop_type"),
+  currentStep: integer("current_step").notNull().default(0),
+  data: jsonb("data").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSopDraftSchema = createInsertSchema(sopDrafts).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertSopDraft = z.infer<typeof insertSopDraftSchema>;
+export type SopDraft = typeof sopDrafts.$inferSelect;
