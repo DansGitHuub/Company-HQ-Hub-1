@@ -436,6 +436,9 @@ export default function SOPs() {
             title: sopData.title,
             category: sopData.category,
             categoryId: sopData.categoryId,
+            superCategory: sopData.superCategory || undefined,
+            subCategory: sopData.subCategory || undefined,
+            sopType: sopData.sopType || undefined,
             content: sopData.content,
             ownerId: user?.id,
           }, {

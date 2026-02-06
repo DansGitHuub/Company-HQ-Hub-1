@@ -75,11 +75,23 @@ interface SOPMediaItem {
   aiStyle?: string;
 }
 
+interface SOPClassification {
+  superCategory: string;
+  mainCategory: string;
+  subCategory: string;
+  sopType: string;
+  confidence: number;
+  matchedOn?: string;
+}
+
 export interface SOPBuilderData {
   title: string;
   category: string;
   categoryId: string;
   sopType: string;
+  superCategory: string;
+  subCategory: string;
+  classification: SOPClassification | null;
   outcome: string;
   outcomeType: string;
   audience: string;
@@ -185,6 +197,41 @@ function StepIdentity({ data, onChange, categories, onAiSuggest, isAiSuggesting 
   const { toast } = useToast();
   const [showNewTopic, setShowNewTopic] = useState(false);
   const [newTopicName, setNewTopicName] = useState("");
+  const [isClassifying, setIsClassifying] = useState(false);
+  const classifyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const classifyTitle = useCallback(async (title: string) => {
+    if (title.trim().length < 3) {
+      onChange({ classification: null, superCategory: "", subCategory: "" });
+      return;
+    }
+    setIsClassifying(true);
+    try {
+      const res = await apiRequest("POST", "/api/sop-classify", { title });
+      const classification = await res.json();
+      onChange({
+        classification,
+        superCategory: classification.superCategory || "",
+        subCategory: classification.subCategory || "",
+      });
+    } catch {
+      onChange({ classification: null });
+    } finally {
+      setIsClassifying(false);
+    }
+  }, [onChange]);
+
+  const handleTitleChange = useCallback((title: string) => {
+    onChange({ title });
+    if (classifyTimerRef.current) clearTimeout(classifyTimerRef.current);
+    classifyTimerRef.current = setTimeout(() => classifyTitle(title), 500);
+  }, [onChange, classifyTitle]);
+
+  useEffect(() => {
+    return () => {
+      if (classifyTimerRef.current) clearTimeout(classifyTimerRef.current);
+    };
+  }, []);
 
   const createTopicMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -203,11 +250,19 @@ function StepIdentity({ data, onChange, categories, onAiSuggest, isAiSuggesting 
     },
   });
 
+  const confidenceColor = data.classification
+    ? data.classification.confidence >= 0.8
+      ? "text-green-600 bg-green-50 border-green-200 dark:text-green-400 dark:bg-green-950/30 dark:border-green-800"
+      : data.classification.confidence >= 0.5
+        ? "text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-800"
+        : "text-gray-500 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-900/30 dark:border-gray-700"
+    : "";
+
   return (
     <div className="space-y-4">
       <div>
         <h3 className="text-lg font-semibold">SOP Identity</h3>
-        <p className="text-sm text-muted-foreground">Give your SOP a clear name and assign it to a topic.</p>
+        <p className="text-sm text-muted-foreground">Give your SOP a clear name and assign it to a topic. We'll auto-detect the category for you.</p>
       </div>
       <div className="space-y-4">
         <div>
@@ -215,11 +270,49 @@ function StepIdentity({ data, onChange, categories, onAiSuggest, isAiSuggesting 
           <Input
             id="sop-title"
             value={data.title}
-            onChange={(e) => onChange({ title: e.target.value })}
+            onChange={(e) => handleTitleChange(e.target.value)}
             placeholder="e.g., Plant a Tree (Balled & Burlapped)"
             data-testid="input-sop-title"
           />
           <p className="text-xs text-muted-foreground mt-1">Choose a clear, action-oriented title</p>
+
+          {isClassifying && (
+            <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Classifying...</span>
+            </div>
+          )}
+
+          {data.classification && !isClassifying && data.classification.confidence >= 0.3 && (
+            <div className={`mt-3 p-3 rounded-lg border ${confidenceColor} transition-all`} data-testid="classification-result">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="h-4 w-4" />
+                <span className="font-medium text-sm">Auto-Classification</span>
+                <Badge variant="outline" className="text-xs ml-auto">
+                  {Math.round(data.classification.confidence * 100)}% match
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="font-medium opacity-70">Super Category:</span>
+                  <p className="font-semibold">{data.classification.superCategory}</p>
+                </div>
+                <div>
+                  <span className="font-medium opacity-70">Main Category:</span>
+                  <p className="font-semibold">{data.classification.mainCategory}</p>
+                </div>
+                <div>
+                  <span className="font-medium opacity-70">Sub Category:</span>
+                  <p className="font-semibold capitalize">{data.classification.subCategory}</p>
+                </div>
+                <div>
+                  <span className="font-medium opacity-70">SOP Type:</span>
+                  <p className="font-semibold">{data.classification.sopType}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {onAiSuggest && data.title.trim().length >= 3 && (
             <Button
               variant="outline"
@@ -1039,6 +1132,40 @@ function StepReview({ data }: { data: SOPBuilderData }) {
         </Card>
       </div>
 
+      {data.classification && data.classification.confidence >= 0.3 && (
+        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Auto-Classification
+              <Badge variant="outline" className="text-xs ml-auto">
+                {Math.round(data.classification.confidence * 100)}% match
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground">Super Category:</span>
+                <p className="font-medium">{data.classification.superCategory}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Main Category:</span>
+                <p className="font-medium">{data.classification.mainCategory}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Sub Category:</span>
+                <p className="font-medium capitalize">{data.classification.subCategory}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Classified Type:</span>
+                <p className="font-medium">{data.classification.sopType}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {data.outcome && (
         <Card>
           <CardContent className="p-3">
@@ -1230,6 +1357,9 @@ const INITIAL_DATA: SOPBuilderData = {
   category: "",
   categoryId: "",
   sopType: "",
+  superCategory: "",
+  subCategory: "",
+  classification: null,
   outcome: "",
   outcomeType: "",
   audience: "",
@@ -1345,6 +1475,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
         category: data.category,
       });
       const suggestions = await res.json();
+      const classification = suggestions.classification || null;
       setData(prev => ({
         ...prev,
         outcome: prev.outcome || suggestions.outcome || "",
@@ -1359,6 +1490,9 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
         complianceNotes: prev.complianceNotes || suggestions.complianceNotes || "",
         timingTarget: prev.timingTarget || suggestions.timingTarget || "",
         timingMax: prev.timingMax || suggestions.timingMax || "",
+        classification: classification || prev.classification,
+        superCategory: classification?.superCategory || prev.superCategory || "",
+        subCategory: classification?.subCategory || prev.subCategory || "",
       }));
       toast({ title: "AI suggestions applied", description: "Fields have been auto-filled. Review and adjust as needed." });
     } catch (err: any) {

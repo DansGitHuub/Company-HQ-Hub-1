@@ -20,6 +20,7 @@ import {
   type User 
 } from "@shared/schema";
 import { z } from "zod";
+import { autoClassifySOPTitle, getTaxonomy } from "@shared/sopClassification";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -774,10 +775,18 @@ Respond with a JSON object:
 
   app.post("/api/sops", requireAuth, async (req, res) => {
     try {
-      const sop = await storage.createSop({
-        ...req.body,
-        ownerId: req.user?.id,
-      });
+      const body = { ...req.body, ownerId: req.user?.id };
+      if (body.title && !body.superCategory) {
+        const classification = autoClassifySOPTitle(body.title);
+        if (classification.confidence >= 0.5) {
+          body.superCategory = classification.superCategory;
+          body.subCategory = classification.subCategory;
+          if (!body.sopType) {
+            body.sopType = classification.sopType;
+          }
+        }
+      }
+      const sop = await storage.createSop(body);
       res.status(201).json(sop);
     } catch (err) {
       res.status(500).json({ message: "Error creating SOP" });
@@ -1223,6 +1232,29 @@ Respond with a JSON object:
     }
   });
 
+  app.post("/api/sop-classify", requireAuth, async (req, res) => {
+    try {
+      const { title } = req.body;
+      if (!title || title.trim().length < 2) {
+        return res.status(400).json({ message: "Title is required" });
+      }
+      const classification = autoClassifySOPTitle(title);
+      res.json(classification);
+    } catch (err: any) {
+      console.error("[sop-classify] Error:", err.message);
+      res.status(500).json({ message: "Failed to classify SOP" });
+    }
+  });
+
+  app.get("/api/sop-taxonomy", requireAuth, async (_req, res) => {
+    try {
+      const taxonomy = getTaxonomy();
+      res.json(taxonomy);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch taxonomy" });
+    }
+  });
+
   app.post("/api/sop-suggest", requireAuth, async (req, res) => {
     try {
       const { title, sopType, category } = req.body;
@@ -1230,13 +1262,19 @@ Respond with a JSON object:
         return res.status(400).json({ message: "Title is required" });
       }
 
+      const classification = autoClassifySOPTitle(title);
+
+      const classificationContext = classification.confidence >= 0.5
+        ? `\nAuto-classified as: Super Category="${classification.superCategory}", Main Category="${classification.mainCategory}", Sub Category="${classification.subCategory}", SOP Type="${classification.sopType}" (confidence: ${Math.round(classification.confidence * 100)}%). Use this classification to inform your response, ensuring tools, materials, and safety requirements are specific to this sub-category of landscaping work.`
+        : "";
+
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
             content: `You are a senior landscaping operations expert with 20+ years of field experience. Generate a comprehensive, industry-grade SOP (Standard Operating Procedure) for a landscaping company. Return ONLY valid JSON with NO additional text.
-
+${classificationContext}
 Your recommendations must be:
 - SPECIFIC: Include exact tool sizes, material quantities, and brand-agnostic specifications
 - PRACTICAL: Based on real-world landscaping operations and best practices
@@ -1275,6 +1313,7 @@ Generate 3-7 detailed steps depending on the complexity. Make every field as det
       }
 
       const suggestions = JSON.parse(content);
+      suggestions.classification = classification;
       res.json(suggestions);
     } catch (err: any) {
       console.error("[sop-suggest] Error:", err.message);
