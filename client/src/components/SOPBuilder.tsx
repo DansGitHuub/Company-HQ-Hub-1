@@ -1440,7 +1440,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure you want to cancel?</AlertDialogTitle>
             <AlertDialogDescription>
-              You have unsaved work in the SOP Builder. If you cancel now, all your progress will be lost. You can also save it to your queue to continue later.
+              You have unsaved work in the SOP Builder. If you cancel now, all your progress will be lost. You can also save to drafts to continue later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1452,7 +1452,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
                 disabled={isSavingDraft}
                 data-testid="btn-cancel-save-draft"
               >
-                <Clock className="h-4 w-4 mr-2" /> Save to Queue
+                <Clock className="h-4 w-4 mr-2" /> Save to Drafts
               </Button>
             )}
             <AlertDialogAction
@@ -1471,7 +1471,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
           <AlertDialogHeader>
             <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
             <AlertDialogDescription>
-              You have unsaved changes in the SOP Builder. If you navigate away now, your progress will be lost. Would you like to save it to your queue first?
+              You have unsaved changes in the SOP Builder. If you navigate away now, your progress will be lost. Would you like to save to drafts first?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1577,7 +1577,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
             data-testid="button-save-draft"
           >
             {isSavingDraft ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Clock className="h-4 w-4 mr-2" />}
-            Save to Queue
+            Save to Drafts
           </Button>
         )}
 

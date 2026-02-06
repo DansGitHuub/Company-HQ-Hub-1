@@ -457,7 +457,7 @@ export default function SOPs() {
           try {
             await apiRequest("POST", "/api/sop-drafts", draftData);
             queryClient.invalidateQueries({ queryKey: ["/api/sop-drafts"] });
-            toast({ title: "Saved to queue", description: "You can resume this SOP later from your drafts." });
+            toast({ title: "Saved to drafts", description: "You can resume this SOP later from your drafts." });
             setShowBuilder(false);
             setBuilderInitialData(undefined);
           } catch {
@@ -497,7 +497,7 @@ export default function SOPs() {
             <FolderPlus className="w-4 h-4" /> Topics
           </TabsTrigger>
           <TabsTrigger value="drafts" className="gap-2" data-testid="tab-drafts">
-            <Clock className="w-4 h-4" /> Queue {drafts.length > 0 && <Badge variant="secondary" className="ml-1 text-xs px-1.5">{drafts.length}</Badge>}
+            <Clock className="w-4 h-4" /> Drafts {drafts.length > 0 && <Badge variant="secondary" className="ml-1 text-xs px-1.5">{drafts.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="templates" className="gap-2">
             <LayoutTemplate className="w-4 h-4" /> Templates
@@ -613,8 +613,8 @@ export default function SOPs() {
             <Card className="border-dashed">
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                 <Clock className="h-12 w-12 text-muted-foreground/40 mb-3" />
-                <p className="font-medium text-muted-foreground">No drafts in queue</p>
-                <p className="text-sm text-muted-foreground mt-1">When you save an SOP to your queue, it will appear here</p>
+                <p className="font-medium text-muted-foreground">No drafts saved</p>
+                <p className="text-sm text-muted-foreground mt-1">When you save an SOP to drafts, it will appear here</p>
               </CardContent>
             </Card>
           ) : (
