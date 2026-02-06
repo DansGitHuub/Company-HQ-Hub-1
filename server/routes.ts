@@ -3564,7 +3564,21 @@ Generate detailed information for this landscaping material.`;
   app.get("/api/todos", requireAuth, async (req, res) => {
     try {
       const allTodos = await storage.getTodos();
-      res.json(allTodos);
+      const allUsers = await storage.getAllUsers();
+      const userMap = new Map(allUsers.map(u => [u.id, u.name]));
+
+      const todosWithAssignees = await Promise.all(allTodos.map(async (todo) => {
+        const assignments = await storage.getTodoAssignments(todo.id);
+        return {
+          ...todo,
+          assignedUsers: assignments.map(a => ({
+            userId: a.userId,
+            name: userMap.get(a.userId) || "Unknown",
+          })),
+          creatorName: todo.createdBy ? userMap.get(todo.createdBy) || "Unknown" : null,
+        };
+      }));
+      res.json(todosWithAssignees);
     } catch (err) {
       res.status(500).json({ message: "Error fetching todos" });
     }
@@ -3633,10 +3647,30 @@ Generate detailed information for this landscaping material.`;
 
   app.delete("/api/todos/:id", requireAuth, async (req, res) => {
     try {
+      const user = req.user as User;
+      const todo = await storage.getTodo(req.params.id as string);
+      if (!todo) return res.status(404).json({ message: "Todo not found" });
+      if (todo.createdBy !== user.id && !user.isMasterAdmin) {
+        return res.status(403).json({ message: "Only the creator can delete this task" });
+      }
       await storage.deleteTodo(req.params.id as string);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Error deleting todo" });
+    }
+  });
+
+  app.patch("/api/todos/:id/archive", requireAuth, async (req, res) => {
+    try {
+      const todo = await storage.getTodo(req.params.id as string);
+      if (!todo) return res.status(404).json({ message: "Todo not found" });
+      if (todo.status !== "completed") {
+        return res.status(400).json({ message: "Only completed tasks can be archived" });
+      }
+      const updated = await storage.updateTodo(req.params.id as string, { status: "archived" });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Error archiving todo" });
     }
   });
 
@@ -3655,12 +3689,23 @@ Generate detailed information for this landscaping material.`;
       const user = req.user as User;
       const assignments = await storage.getUserTodoAssignments(user.id);
       const allTodos = await storage.getTodos();
+      const allUsers = await storage.getAllUsers();
+      const userMap = new Map(allUsers.map(u => [u.id, u.name]));
       const myTodos = allTodos.filter(t => assignments.some(a => a.todoId === t.id));
-      const todosWithReadStatus = myTodos.map(t => ({
-        ...t,
-        isRead: assignments.find(a => a.todoId === t.id)?.isRead || false
+
+      const todosWithDetails = await Promise.all(myTodos.map(async (t) => {
+        const todoAssignments = await storage.getTodoAssignments(t.id);
+        return {
+          ...t,
+          isRead: assignments.find(a => a.todoId === t.id)?.isRead || false,
+          assignedUsers: todoAssignments.map(a => ({
+            userId: a.userId,
+            name: userMap.get(a.userId) || "Unknown",
+          })),
+          creatorName: t.createdBy ? userMap.get(t.createdBy) || "Unknown" : null,
+        };
       }));
-      res.json(todosWithReadStatus);
+      res.json(todosWithDetails);
     } catch (err) {
       res.status(500).json({ message: "Error fetching your todos" });
     }

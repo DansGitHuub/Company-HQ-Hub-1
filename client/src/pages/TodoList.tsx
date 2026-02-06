@@ -1,9 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Check, Trash2, Edit2, Calendar, Clock, User, AlertCircle, CheckCircle2, Circle, ChevronDown, ChevronUp, Users } from "lucide-react";
+import { Plus, Check, Trash2, Edit2, Calendar, Clock, User, AlertCircle, CheckCircle2, Circle, ChevronDown, ChevronUp, Users, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,7 +25,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import type { Todo, User as UserType } from "@shared/schema";
 
-type TodoWithReadStatus = Todo & { isRead?: boolean };
+type AssignedUser = { userId: string; name: string };
+type TodoWithDetails = Todo & {
+  isRead?: boolean;
+  assignedUsers?: AssignedUser[];
+  creatorName?: string | null;
+};
 
 export default function TodoList() {
   const queryClient = useQueryClient();
@@ -25,11 +40,12 @@ export default function TodoList() {
   
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
-  const [expandedTodo, setExpandedTodo] = useState<string | null>(null);
+  const [toggledTodos, setToggledTodos] = useState<Set<string>>(new Set());
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [archiveConfirmTodo, setArchiveConfirmTodo] = useState<TodoWithDetails | null>(null);
 
   const [newTodo, setNewTodo] = useState({
     title: "",
@@ -40,16 +56,19 @@ export default function TodoList() {
     assignedUserIds: [] as string[],
   });
 
-  const { data: allTodos = [], isLoading: todosLoading } = useQuery<Todo[]>({
+  const { data: allTodos = [], isLoading: todosLoading } = useQuery<TodoWithDetails[]>({
     queryKey: ["/api/todos"],
+    refetchInterval: 30000,
   });
 
-  const { data: myTodos = [] } = useQuery<TodoWithReadStatus[]>({
+  const { data: myTodos = [] } = useQuery<TodoWithDetails[]>({
     queryKey: ["/api/my-todos"],
+    refetchInterval: 30000,
   });
 
   const { data: todoActiveStatus } = useQuery<{ isActive: boolean; unreadCount: number }>({
     queryKey: ["/api/todo-active-status"],
+    refetchInterval: 30000,
   });
 
   const { data: users = [], refetch: refetchUsers } = useQuery<UserType[]>({
@@ -59,17 +78,18 @@ export default function TodoList() {
 
   const { data: activeUsers = [], refetch: refetchActiveUsers } = useQuery<{ userId: string }[]>({
     queryKey: ["/api/todo-active-users"],
-    staleTime: 0, // Always refetch to get fresh active users list
+    staleTime: 0,
   });
 
-  // Get list of users who can be assigned to todos (only active todo users)
   const activeUserIds = new Set(activeUsers.map(au => au.userId));
   const assignableUsers = users.filter(u => activeUserIds.has(u.id));
 
   const displayTodos = isAdmin ? allTodos : myTodos;
 
   const filteredTodos = displayTodos.filter(todo => {
+    if (filterStatus === "archived") return todo.status === "archived";
     if (filterStatus !== "all" && todo.status !== filterStatus) return false;
+    if (filterStatus === "all" && todo.status === "archived") return false;
     if (filterPriority !== "all" && todo.priority !== filterPriority) return false;
     return true;
   });
@@ -144,14 +164,41 @@ export default function TodoList() {
         method: "DELETE",
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to delete todo");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to delete todo");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-todos"] });
       toast({ title: "Task deleted" });
     },
-    onError: () => toast({ title: "Failed to delete task", variant: "destructive" }),
+    onError: (error: Error) => toast({ title: "Failed to delete task", description: error.message, variant: "destructive" }),
+  });
+
+  const archiveTodo = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/todos/${id}/archive`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to archive todo");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-todos"] });
+      setArchiveConfirmTodo(null);
+      toast({ title: "Task archived" });
+    },
+    onError: (error: Error) => {
+      setArchiveConfirmTodo(null);
+      toast({ title: "Failed to archive task", description: error.message, variant: "destructive" });
+    },
   });
 
   const markAsRead = useMutation({
@@ -198,22 +245,41 @@ export default function TodoList() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "completed": return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+      case "archived": return <Archive className="w-5 h-5 text-gray-400" />;
       case "in_progress": return <Clock className="w-5 h-5 text-blue-500" />;
       default: return <Circle className="w-5 h-5 text-gray-400" />;
     }
   };
 
-  const handleTodoClick = (todo: TodoWithReadStatus) => {
+  const handleTodoClick = useCallback((todo: TodoWithDetails) => {
     if (!todo.isRead && !isAdmin) {
       markAsRead.mutate(todo.id);
     }
-    setExpandedTodo(expandedTodo === todo.id ? null : todo.id);
-  };
+    setToggledTodos(prev => {
+      const next = new Set(prev);
+      if (next.has(todo.id)) {
+        next.delete(todo.id);
+      } else {
+        next.add(todo.id);
+      }
+      return next;
+    });
+  }, [isAdmin, markAsRead]);
+
+  const isTodoExpanded = useCallback((todo: TodoWithDetails) => {
+    const isUnread = todo.isRead === false;
+    const wasToggled = toggledTodos.has(todo.id);
+    if (isUnread) return !wasToggled;
+    return wasToggled;
+  }, [toggledTodos]);
 
   const handleToggleStatus = (todo: Todo) => {
     const nextStatus = todo.status === "completed" ? "pending" : "completed";
     updateTodo.mutate({ id: todo.id, data: { status: nextStatus } });
   };
+
+  const isCreator = (todo: TodoWithDetails) => todo.createdBy === user?.id;
+  const canDelete = (todo: TodoWithDetails) => isCreator(todo) || user?.isMasterAdmin;
 
   if (!todoActiveStatus?.isActive && !isAdmin) {
     return (
@@ -254,10 +320,11 @@ export default function TodoList() {
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="all">All Active</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="in_progress">In Progress</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
           </SelectContent>
         </Select>
 
@@ -289,82 +356,96 @@ export default function TodoList() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {filteredTodos.map((todo) => (
-            <Card
-              key={todo.id}
-              className={`cursor-pointer transition-all hover:shadow-md ${
-                (todo as TodoWithReadStatus).isRead === false ? "border-primary border-2" : ""
-              }`}
-              data-testid={`card-todo-${todo.id}`}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3" onClick={() => handleTodoClick(todo as TodoWithReadStatus)}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleStatus(todo);
-                      }}
-                      className="hover:scale-110 transition-transform"
-                      data-testid={`button-toggle-status-${todo.id}`}
-                    >
-                      {getStatusIcon(todo.status || "pending")}
-                    </button>
-                    <div>
-                      <CardTitle className={`text-lg ${todo.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
-                        {todo.title}
-                      </CardTitle>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge className={`${getPriorityColor(todo.priority || "medium")} text-white text-xs`}>
-                          {todo.priority || "medium"}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {todo.status || "pending"}
-                        </Badge>
-                        {todo.dueDate && (
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {format(new Date(todo.dueDate), "MMM d, yyyy")}
-                          </span>
-                        )}
-                        {(todo as TodoWithReadStatus).isRead === false && (
-                          <Badge variant="default" className="text-xs bg-primary">New</Badge>
-                        )}
+          {filteredTodos.map((todo) => {
+            const expanded = isTodoExpanded(todo);
+            const isUnread = todo.isRead === false;
+
+            return (
+              <Card
+                key={todo.id}
+                className={`cursor-pointer transition-all hover:shadow-md ${
+                  isUnread ? "border-primary border-2" : ""
+                }`}
+                data-testid={`card-todo-${todo.id}`}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1 min-w-0" onClick={() => handleTodoClick(todo)}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (todo.status !== "archived") handleToggleStatus(todo);
+                        }}
+                        className="hover:scale-110 transition-transform shrink-0"
+                        data-testid={`button-toggle-status-${todo.id}`}
+                        disabled={todo.status === "archived"}
+                      >
+                        {getStatusIcon(todo.status || "pending")}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className={`text-lg ${todo.status === "completed" || todo.status === "archived" ? "line-through text-muted-foreground" : ""}`}>
+                          {todo.title}
+                        </CardTitle>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <Badge className={`${getPriorityColor(todo.priority || "medium")} text-white text-xs`}>
+                            {todo.priority || "medium"}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {todo.status === "archived" ? "archived" : todo.status || "pending"}
+                          </Badge>
+                          {todo.dueDate && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {format(new Date(todo.dueDate), "MMM d, yyyy")}
+                            </span>
+                          )}
+                          {isUnread && (
+                            <Badge variant="default" className="text-xs bg-primary">New</Badge>
+                          )}
+                          {todo.assignedUsers && todo.assignedUsers.length > 0 && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-assigned-${todo.id}`}>
+                              <User className="w-3 h-3" />
+                              {todo.assignedUsers.map(u => u.name).join(", ")}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {isAdmin && (
-                      <>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isAdmin && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedTodoId(todo.id);
+                              setAssignDialogOpen(true);
+                            }}
+                            data-testid={`button-assign-${todo.id}`}
+                          >
+                            <Users className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTodo(todo);
+                            }}
+                            data-testid={`button-edit-${todo.id}`}
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                      {canDelete(todo) && (
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedTodoId(todo.id);
-                            setAssignDialogOpen(true);
-                          }}
-                          data-testid={`button-assign-${todo.id}`}
-                        >
-                          <Users className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingTodo(todo);
-                          }}
-                          data-testid={`button-edit-${todo.id}`}
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm("Delete this task?")) {
+                            if (confirm("Delete this task permanently?")) {
                               deleteTodo.mutate(todo.id);
                             }
                           }}
@@ -372,48 +453,85 @@ export default function TodoList() {
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
-                      </>
-                    )}
-                    <button onClick={() => handleTodoClick(todo as TodoWithReadStatus)}>
-                      {expandedTodo === todo.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                    </button>
+                      )}
+                      {!canDelete(todo) && todo.status === "completed" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setArchiveConfirmTodo(todo);
+                          }}
+                          data-testid={`button-archive-${todo.id}`}
+                          title="Archive completed task"
+                        >
+                          <Archive className="w-4 h-4 text-muted-foreground" />
+                        </Button>
+                      )}
+                      <button onClick={() => handleTodoClick(todo)} data-testid={`button-expand-${todo.id}`}>
+                        {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              {expandedTodo === todo.id && (
-                <CardContent className="pt-0">
-                  <div className="border-t pt-4 mt-2">
-                    {todo.description ? (
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{todo.description}</p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">No description provided</p>
-                    )}
-                    <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
-                      {todo.createdAt && (
-                        <span>Created: {format(new Date(todo.createdAt), "MMM d, yyyy h:mm a")}</span>
+                </CardHeader>
+                {expanded && (
+                  <CardContent className="pt-0">
+                    <div className="border-t pt-4 mt-2">
+                      {todo.description ? (
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{todo.description}</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">No description provided</p>
+                      )}
+                      <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground flex-wrap">
+                        {todo.createdAt && (
+                          <span>Created: {format(new Date(todo.createdAt), "MMM d, yyyy h:mm a")}</span>
+                        )}
+                        {todo.creatorName && (
+                          <span>By: {todo.creatorName}</span>
+                        )}
+                      </div>
+                      {!isAdmin && todo.status !== "completed" && todo.status !== "archived" && (
+                        <div className="mt-4">
+                          <Button
+                            onClick={() => updateTodo.mutate({ id: todo.id, data: { status: "in_progress" } })}
+                            variant="outline"
+                            size="sm"
+                            disabled={todo.status === "in_progress"}
+                            data-testid={`button-start-${todo.id}`}
+                          >
+                            <Clock className="w-4 h-4 mr-2" />
+                            Start Working
+                          </Button>
+                        </div>
                       )}
                     </div>
-                    {!isAdmin && todo.status !== "completed" && (
-                      <div className="mt-4">
-                        <Button
-                          onClick={() => updateTodo.mutate({ id: todo.id, data: { status: "in_progress" } })}
-                          variant="outline"
-                          size="sm"
-                          disabled={todo.status === "in_progress"}
-                          data-testid={`button-start-${todo.id}`}
-                        >
-                          <Clock className="w-4 h-4 mr-2" />
-                          Start Working
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          ))}
+                  </CardContent>
+                )}
+              </Card>
+            );
+          })}
         </div>
       )}
+
+      <AlertDialog open={!!archiveConfirmTodo} onOpenChange={(open) => !open && setArchiveConfirmTodo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please confirm that "{archiveConfirmTodo?.title}" has been completed before archiving. Archived tasks will be moved out of your active list.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="btn-archive-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => archiveConfirmTodo && archiveTodo.mutate(archiveConfirmTodo.id)}
+              data-testid="btn-archive-confirm"
+            >
+              Yes, task is complete — Archive it
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="max-w-md">
@@ -591,7 +709,7 @@ export default function TodoList() {
                 <Button type="button" variant="outline" onClick={() => setEditingTodo(null)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updateTodo.isPending} data-testid="button-update-todo">
+                <Button type="submit" disabled={updateTodo.isPending} data-testid="button-save-edit-todo">
                   {updateTodo.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </DialogFooter>
@@ -601,37 +719,29 @@ export default function TodoList() {
       </Dialog>
 
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Assign Users to Task</DialogTitle>
+            <DialogTitle>Assign User to Task</DialogTitle>
           </DialogHeader>
-          <div className="max-h-60 overflow-y-auto space-y-2">
-            {assignableUsers.length > 0 ? assignableUsers.map((u) => (
-              <button
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {assignableUsers.map((u) => (
+              <Button
                 key={u.id}
-                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left"
+                variant="outline"
+                className="w-full justify-start"
                 onClick={() => {
                   if (selectedTodoId) {
                     assignUser.mutate({ todoId: selectedTodoId, userId: u.id });
+                    setAssignDialogOpen(false);
                   }
                 }}
                 data-testid={`button-assign-user-${u.id}`}
               >
-                <User className="w-8 h-8 p-1.5 bg-primary/10 rounded-full" />
-                <div>
-                  <p className="font-medium">{u.name}</p>
-                  <p className="text-sm text-muted-foreground">{u.role}</p>
-                </div>
-              </button>
-            )) : (
-              <p className="text-sm text-muted-foreground py-4 text-center">No active todo users. Enable users in Admin Panel first.</p>
-            )}
+                <User className="w-4 h-4 mr-2" />
+                {u.name} ({u.role})
+              </Button>
+            ))}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
-              Done
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
