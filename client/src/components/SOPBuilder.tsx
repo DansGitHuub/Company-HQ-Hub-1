@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import type { SopCategory } from "@shared/schema";
 import {
   ArrowLeft,
@@ -33,7 +35,11 @@ import {
   AlertTriangle,
   Info,
   FileText,
-  Lightbulb
+  Lightbulb,
+  ImageIcon,
+  Sparkles,
+  Camera,
+  Palette,
 } from "lucide-react";
 
 interface SOPStep {
@@ -48,6 +54,15 @@ interface SOPStep {
   isQCCheckpoint: boolean;
 }
 
+interface SOPMediaItem {
+  id: string;
+  url: string;
+  alt: string;
+  source: "upload" | "ai_generated";
+  aiPrompt?: string;
+  aiStyle?: string;
+}
+
 interface SOPBuilderData {
   title: string;
   category: string;
@@ -58,6 +73,8 @@ interface SOPBuilderData {
   audience: string;
   skillLevel: string;
   steps: SOPStep[];
+  headerImage: SOPMediaItem | null;
+  stepImages: Record<string, SOPMediaItem>;
   tools: string;
   materials: string;
   ppe: string;
@@ -73,6 +90,7 @@ const WIZARD_STEPS = [
   { id: "outcome", label: "Outcome", icon: Target },
   { id: "audience", label: "Audience", icon: Users },
   { id: "steps", label: "Steps", icon: ClipboardList },
+  { id: "media", label: "Media", icon: ImageIcon },
   { id: "tools", label: "Tools & Materials", icon: Wrench },
   { id: "safety", label: "Safety", icon: HardHat },
   { id: "review", label: "Review & Create", icon: Eye },
@@ -579,6 +597,323 @@ function StepSafety({ data, onChange }: { data: SOPBuilderData; onChange: (d: Pa
   );
 }
 
+const AI_STYLES = [
+  { value: "photoreal", label: "Photo-Realistic", description: "Realistic photography style", icon: Camera },
+  { value: "diagram", label: "Diagram", description: "Technical diagram with labels", icon: ClipboardList },
+  { value: "illustration", label: "Illustration", description: "Simple, clean illustration", icon: Palette },
+  { value: "icon", label: "Icon / Flat", description: "Minimal flat icon style", icon: Sparkles },
+];
+
+function AIImageGenerator({ 
+  targetType, 
+  stepIndex,
+  onImageGenerated 
+}: { 
+  targetType: "sop_header" | "sop_step";
+  stepIndex?: number;
+  onImageGenerated: (media: SOPMediaItem) => void;
+}) {
+  const { toast } = useToast();
+  const [prompt, setPrompt] = useState("");
+  const [style, setStyle] = useState<string>("photoreal");
+  const [negativePrompt, setNegativePrompt] = useState("");
+  const [preview, setPreview] = useState<SOPMediaItem | null>(null);
+  const [internalUseOnly, setInternalUseOnly] = useState(true);
+
+  const { data: aiSettings } = useQuery<{
+    enabled: boolean;
+    canGenerate: boolean;
+    allowedRoles: string[];
+    dailyLimit: number;
+    monthlyLimit: number;
+    watermarkDefault: boolean;
+    dailyUsed: number;
+    monthlyUsed: number;
+  }>({
+    queryKey: ["/api/ai-image-settings"],
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/sop-media/ai-generate", {
+        targetType,
+        stepIndex,
+        prompt,
+        negativePrompt: negativePrompt || undefined,
+        style,
+      });
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      setPreview({
+        id: data.id,
+        url: data.url,
+        alt: data.alt || prompt,
+        source: "ai_generated",
+        aiPrompt: prompt,
+        aiStyle: style,
+      });
+      toast({ title: "Image generated successfully" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  if (!aiSettings?.enabled) {
+    return (
+      <div className="text-center py-6 text-muted-foreground" data-testid="ai-disabled-message">
+        <Sparkles className="h-8 w-8 mx-auto mb-2 opacity-40" />
+        <p className="text-sm">AI image generation is currently disabled.</p>
+        <p className="text-xs mt-1">An Admin can enable it in Company Settings.</p>
+      </div>
+    );
+  }
+
+  if (!aiSettings?.canGenerate) {
+    return (
+      <div className="text-center py-6 text-muted-foreground" data-testid="ai-disabled-message">
+        <Sparkles className="h-8 w-8 mx-auto mb-2 opacity-40" />
+        <p className="text-sm">AI image generation is not available for your role.</p>
+        <p className="text-xs mt-1">Ask an Admin to enable this feature.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4" data-testid="ai-image-generator">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>Daily: {aiSettings?.dailyUsed || 0}/{aiSettings?.dailyLimit || 10}</span>
+        <span>Monthly: {aiSettings?.monthlyUsed || 0}/{aiSettings?.monthlyLimit || 200}</span>
+      </div>
+
+      <div>
+        <Label>Style</Label>
+        <div className="grid grid-cols-2 gap-2 mt-1">
+          {AI_STYLES.map((s) => {
+            const Icon = s.icon;
+            return (
+              <Card
+                key={s.value}
+                className={`cursor-pointer p-2 transition-all hover:border-primary ${style === s.value ? "border-primary ring-1 ring-primary/30" : ""}`}
+                onClick={() => setStyle(s.value)}
+                data-testid={`style-${s.value}`}
+              >
+                <div className="flex items-center gap-2">
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium">{s.label}</p>
+                    <p className="text-xs text-muted-foreground hidden sm:block">{s.description}</p>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="ai-prompt">Describe the image *</Label>
+        <Textarea
+          id="ai-prompt"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="e.g., A crew member properly staking a newly planted tree with rubber ties"
+          rows={3}
+          data-testid="input-ai-prompt"
+        />
+        <p className="text-xs text-muted-foreground mt-1">Be specific about what you want to see</p>
+      </div>
+
+      <div>
+        <Label htmlFor="ai-negative">Avoid (optional)</Label>
+        <Input
+          id="ai-negative"
+          value={negativePrompt}
+          onChange={(e) => setNegativePrompt(e.target.value)}
+          placeholder="e.g., text, watermark, low quality"
+          data-testid="input-ai-negative"
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Switch
+          id="internal-use"
+          checked={internalUseOnly}
+          onCheckedChange={setInternalUseOnly}
+          data-testid="switch-internal-use"
+        />
+        <Label htmlFor="internal-use" className="text-xs cursor-pointer">Internal training use only</Label>
+      </div>
+
+      <Button
+        onClick={() => generateMutation.mutate()}
+        disabled={!prompt.trim() || generateMutation.isPending}
+        className="w-full"
+        data-testid="btn-generate-ai-image"
+      >
+        {generateMutation.isPending ? (
+          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating...</>
+        ) : (
+          <><Sparkles className="h-4 w-4 mr-2" /> Generate Image</>
+        )}
+      </Button>
+
+      {preview && (
+        <Card data-testid="ai-preview">
+          <CardContent className="p-3 space-y-3">
+            <div className="relative">
+              <img
+                src={`/api/objects${preview.url.replace("/objects", "")}`}
+                alt={preview.alt}
+                className="w-full rounded-md border max-h-64 object-contain bg-muted"
+                data-testid="ai-preview-image"
+              />
+              <Badge className="absolute top-2 left-2 bg-purple-600 text-white text-xs" data-testid="badge-ai">
+                <Sparkles className="h-3 w-3 mr-1" /> AI
+              </Badge>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  onImageGenerated(preview);
+                  setPreview(null);
+                  setPrompt("");
+                }}
+                className="flex-1"
+                data-testid="btn-save-ai-image"
+              >
+                <Check className="h-4 w-4 mr-1" /> Save to SOP
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setPreview(null)}
+                data-testid="btn-discard-ai-image"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void }) {
+  return (
+    <div className="space-y-6" data-testid="step-media">
+      <div>
+        <h3 className="text-lg font-semibold">Media & Images</h3>
+        <p className="text-sm text-muted-foreground">Add images to your SOP header and individual steps using AI generation.</p>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <ImageIcon className="h-4 w-4" /> Header Image
+          </CardTitle>
+          <CardDescription className="text-xs">A cover image for your SOP</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {data.headerImage ? (
+            <div className="space-y-2">
+              <div className="relative">
+                <img
+                  src={`/api/objects${data.headerImage.url.replace("/objects", "")}`}
+                  alt={data.headerImage.alt}
+                  className="w-full rounded-md border max-h-48 object-contain bg-muted"
+                  data-testid="header-image-preview"
+                />
+                {data.headerImage.source === "ai_generated" && (
+                  <Badge className="absolute top-2 left-2 bg-purple-600 text-white text-xs">
+                    <Sparkles className="h-3 w-3 mr-1" /> AI
+                  </Badge>
+                )}
+              </div>
+              {data.headerImage.aiPrompt && (
+                <p className="text-xs text-muted-foreground">Prompt: {data.headerImage.aiPrompt}</p>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onChange({ headerImage: null })}
+                data-testid="btn-remove-header-image"
+              >
+                <Trash2 className="h-3 w-3 mr-1" /> Remove
+              </Button>
+            </div>
+          ) : (
+            <AIImageGenerator
+              targetType="sop_header"
+              onImageGenerated={(media) => onChange({ headerImage: media })}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      {data.steps.filter(s => s.title).length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" /> Step Images
+            </CardTitle>
+            <CardDescription className="text-xs">Add images to individual steps</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {data.steps.filter(s => s.title).map((step, idx) => (
+              <div key={step.id} className="border rounded-md p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Step {idx + 1}: {step.title}</p>
+                  {data.stepImages[step.id] && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        const newImages = { ...data.stepImages };
+                        delete newImages[step.id];
+                        onChange({ stepImages: newImages });
+                      }}
+                      data-testid={`btn-remove-step-image-${idx}`}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+                {data.stepImages[step.id] ? (
+                  <div className="relative">
+                    <img
+                      src={`/api/objects${data.stepImages[step.id].url.replace("/objects", "")}`}
+                      alt={data.stepImages[step.id].alt}
+                      className="w-full rounded border max-h-36 object-contain bg-muted"
+                      data-testid={`step-image-preview-${idx}`}
+                    />
+                    {data.stepImages[step.id].source === "ai_generated" && (
+                      <Badge className="absolute top-1 left-1 bg-purple-600 text-white text-[10px]">
+                        <Sparkles className="h-2.5 w-2.5 mr-0.5" /> AI
+                      </Badge>
+                    )}
+                  </div>
+                ) : (
+                  <AIImageGenerator
+                    targetType="sop_step"
+                    stepIndex={idx}
+                    onImageGenerated={(media) => {
+                      onChange({ stepImages: { ...data.stepImages, [step.id]: media } });
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function StepReview({ data }: { data: SOPBuilderData }) {
   const completedSteps = data.steps.filter(s => s.title && s.instruction).length;
 
@@ -672,6 +1007,36 @@ function StepReview({ data }: { data: SOPBuilderData }) {
           </CardContent>
         </Card>
       )}
+
+      {(data.headerImage || Object.keys(data.stepImages).length > 0) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Media</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-wrap gap-2">
+              {data.headerImage && (
+                <div className="relative w-20 h-20 rounded border overflow-hidden">
+                  <img src={`/api/objects${data.headerImage.url.replace("/objects", "")}`} alt="Header" className="w-full h-full object-cover" />
+                  {data.headerImage.source === "ai_generated" && (
+                    <Badge className="absolute top-0.5 left-0.5 bg-purple-600 text-white text-[8px] px-1 py-0"><Sparkles className="h-2 w-2" /></Badge>
+                  )}
+                  <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] text-center">Header</span>
+                </div>
+              )}
+              {data.steps.map((step, idx) => data.stepImages[step.id] ? (
+                <div key={step.id} className="relative w-20 h-20 rounded border overflow-hidden">
+                  <img src={`/api/objects${data.stepImages[step.id].url.replace("/objects", "")}`} alt={`Step ${idx+1}`} className="w-full h-full object-cover" />
+                  {data.stepImages[step.id].source === "ai_generated" && (
+                    <Badge className="absolute top-0.5 left-0.5 bg-purple-600 text-white text-[8px] px-1 py-0"><Sparkles className="h-2 w-2" /></Badge>
+                  )}
+                  <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] text-center">Step {idx+1}</span>
+                </div>
+              ) : null)}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
@@ -681,6 +1046,16 @@ function generateSOPContent(data: SOPBuilderData): string {
 
   const sopTypeLabel = SOP_TYPES.find(t => t.value === data.sopType)?.label || "";
   const skillLabel = SKILL_LEVELS.find(l => l.value === data.skillLevel)?.label || "";
+
+  if (data.headerImage) {
+    const imgSrc = `/api/objects${data.headerImage.url.replace("/objects", "")}`;
+    html += `<div class="sop-header-image" style="margin-bottom:16px;text-align:center;">`;
+    html += `<img src="${imgSrc}" alt="${data.headerImage.alt || ""}" style="max-width:100%;max-height:300px;border-radius:8px;" />`;
+    if (data.headerImage.source === "ai_generated") {
+      html += `<p style="font-size:11px;color:#888;margin-top:4px;">AI Generated</p>`;
+    }
+    html += `</div>`;
+  }
 
   html += `<div class="sop-header">`;
   html += `<p><strong>Type:</strong> ${sopTypeLabel}</p>`;
@@ -727,6 +1102,13 @@ function generateSOPContent(data: SOPBuilderData): string {
       html += `<li>`;
       html += `<strong>${step.title || `Step ${i + 1}`}</strong>`;
       if (step.instruction) html += `<p>${step.instruction.replace(/\n/g, "<br>")}</p>`;
+      if (data.stepImages[step.id]) {
+        const stepImg = data.stepImages[step.id];
+        const imgSrc = `/api/objects${stepImg.url.replace("/objects", "")}`;
+        html += `<div style="margin:8px 0;"><img src="${imgSrc}" alt="${stepImg.alt || ""}" style="max-width:100%;max-height:200px;border-radius:6px;border:1px solid #eee;" />`;
+        if (stepImg.source === "ai_generated") html += `<span style="font-size:10px;color:#888;"> AI Generated</span>`;
+        html += `</div>`;
+      }
       if (step.why) html += `<p><em>Why: ${step.why}</em></p>`;
       if (step.successCriteria) html += `<p>✅ <strong>Success:</strong> ${step.successCriteria}</p>`;
       if (step.commonMistakes) html += `<p>⚠️ <strong>Avoid:</strong> ${step.commonMistakes}</p>`;
@@ -765,6 +1147,8 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
     audience: "",
     skillLevel: "",
     steps: [createEmptyStep()],
+    headerImage: null,
+    stepImages: {},
     tools: "",
     materials: "",
     ppe: "",
@@ -786,11 +1170,12 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
       case 3: return !!data.skillLevel;
       case 4: return data.steps.length > 0 && data.steps.some(s => s.title && s.instruction);
       case 5: return true;
-      case 6: {
+      case 6: return true;
+      case 7: {
         const isSafetyType = data.sopType === "safety" || data.sopType === "emergency";
         return !isSafetyType || (!!data.safetyNotes || !!data.complianceNotes);
       }
-      case 7: return true;
+      case 8: return true;
       default: return true;
     }
   };
@@ -830,9 +1215,10 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
       case 2: return <StepOutcome data={data} onChange={updateData} />;
       case 3: return <StepAudience data={data} onChange={updateData} />;
       case 4: return <StepBuilder data={data} onChange={updateData} />;
-      case 5: return <StepToolsMaterials data={data} onChange={updateData} />;
-      case 6: return <StepSafety data={data} onChange={updateData} />;
-      case 7: return <StepReview data={data} />;
+      case 5: return <StepMedia data={data} onChange={updateData} />;
+      case 6: return <StepToolsMaterials data={data} onChange={updateData} />;
+      case 7: return <StepSafety data={data} onChange={updateData} />;
+      case 8: return <StepReview data={data} />;
       default: return null;
     }
   };

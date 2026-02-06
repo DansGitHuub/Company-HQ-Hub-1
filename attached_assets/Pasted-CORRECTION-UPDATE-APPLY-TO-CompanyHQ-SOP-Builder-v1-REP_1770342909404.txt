@@ -1,0 +1,193 @@
+CORRECTION / UPDATE — APPLY TO “CompanyHQ SOP Builder (v1)” REPLIT PROMPT
+Purpose: Add an AI-generated image option for SOP header + step media, with strict safety and permission controls, and without breaking existing media/step UX requirements.
+
+============================================================
+A) NEW REQUIREMENT: AI IMAGE GENERATION (SOP MEDIA)
+============================================================
+
+A1) Where AI images can be created
+Allow AI-generated images for:
+- SOP header media (cover/reference)
+- Step media (step-specific)
+This is an alternative to uploading/camera/URL.
+
+A2) How AI images are generated (workflow)
+In the media picker (SOP header or step), add a source option:
+- “Generate with AI”
+Flow:
+1) User selects style template (optional): Photo-real, Diagram, Simple illustration, Iconic/flat
+2) User enters prompt text (required) + optional “Do/Don’t include” list
+3) System shows a preview (1–2 images)
+4) User selects one and clicks “Save to SOP”
+5) Saved image becomes a normal media item (stored in our storage adapter) with provenance metadata.
+
+A3) Safety and constraints (must implement)
+- Only allow internal users with role: Admin or Manager by default.
+- Provide org setting to enable for Editor.
+- Block generation of disallowed content (policy filter): nudity/sexual content, graphic violence, hate/extremism, illegal activity instructions, real person likeness requests, trademarks/logos.
+- Require an “Internal training use only” checkbox for AI images (default checked).
+- Auto watermark ON by default: “AI Generated” (org setting can control).
+- Store prompt + settings + creator id + timestamp for audit.
+
+A4) Quality requirements
+- Generate at least 1024px on the long edge (or equivalent).
+- Must support zoom like any other media.
+- Store original + derivatives.
+
+A5) Cost control
+- Rate limit per user per day (org-configurable).
+- Allow “image credits” or monthly cap per org (org-configurable).
+- Cache and reuse prior generations when prompt/settings match (optional v1.1).
+
+A6) Transparency
+- AI images must be labeled in UI (badge).
+- Media metadata shows: “Generated with AI” + prompt.
+
+============================================================
+B) DATA MODEL UPDATES (PRISMA)
+============================================================
+
+B1) Extend sop_media and sop_step_media
+Add fields to BOTH tables:
+- source (enum: upload, camera, url, email_stub, ai_generated)
+- ai_prompt (text nullable)
+- ai_style (text nullable)
+- ai_negative_prompt (text nullable)
+- ai_model (text nullable)
+- ai_seed (text nullable)
+- ai_watermarked (bool default true)
+
+B2) Add ai_generation_events table (audit)
+Table: ai_generation_events
+- id (uuid)
+- org_id (uuid)
+- user_id (uuid)
+- target_type (enum: sop_header, sop_step)
+- target_id (uuid) (sop_id or step_id)
+- prompt (text)
+- negative_prompt (text nullable)
+- style (text nullable)
+- model (text nullable)
+- requested_size (text)
+- result_media_id (uuid nullable)
+- status (enum: success, blocked, failed)
+- error_message (text nullable)
+- created_at (timestamp)
+
+============================================================
+C) BACKEND API UPDATES
+============================================================
+
+C1) Org setting for AI image generation
+Add to org settings:
+- ai_images_enabled (bool)
+- ai_images_allowed_roles (text[]) default ["admin","manager"]
+- ai_images_daily_limit_per_user (int) default 10
+- ai_images_monthly_limit_per_org (int) default 200
+- ai_images_watermark_default (bool) default true
+
+Endpoints:
+- GET /api/settings/org
+- PUT /api/settings/org (admin only)
+
+C2) AI image generation endpoint (server-side)
+- POST /api/ai/images/generate
+Request body (Zod-validated):
+{
+  targetType: "sop_header" | "sop_step",
+  targetId: string,
+  prompt: string,
+  negativePrompt?: string,
+  style?: "photoreal" | "diagram" | "illustration" | "icon",
+  count?: 1 | 2,
+  watermark?: boolean
+}
+
+Behavior:
+- Validate org settings enable feature
+- Validate role allowed
+- Enforce rate limits (daily/user + monthly/org)
+- Run safety filter BEFORE generation (block disallowed prompts)
+- Call image generation provider (implementation detail):
+  - v1 can use a provider abstraction ImageGenAdapter with a stub mode for tests.
+- Store generated image via StorageAdapter (original + derivatives)
+- Create sop_media or sop_step_media record with source=ai_generated and AI metadata
+- Write ai_generation_events audit row
+- Return created media item(s)
+
+C3) Safety filter
+Implement a simple server-side policy gate:
+- Keyword + category filter (basic)
+- If possible, integrate provider-side moderation
+- Always record blocked events with status=blocked
+
+============================================================
+D) FRONTEND UPDATES
+============================================================
+
+D1) Media picker additions
+In SOP header media and step media manager:
+Add a “Generate with AI” tab.
+
+UI elements:
+- Prompt textarea with examples
+- Style selector (4 options)
+- Optional “avoid/include” chips
+- Generate button
+- Preview results (1–2)
+- Save selected
+
+D2) Labeling
+- Badge on thumbnails: “AI”
+- In viewer metadata panel: show prompt and creator
+
+D3) Permissions
+If user lacks permission:
+- Hide AI tab OR show disabled with tooltip (“Ask admin to enable”)
+
+============================================================
+E) TEST UPDATES
+============================================================
+
+E1) API integration test (happy path with stubbed generator)
+- As manager, call POST /api/ai/images/generate for a step
+- Assert:
+  - returns media item
+  - media.source = ai_generated
+  - ai_generation_events row created with success
+  - media appears in GET /api/steps/:stepId/media
+
+E2) Permission test
+- As viewer/editor (depending on org settings), generation is 403.
+
+E3) Rate limit test
+- Set daily limit = 1 in org settings
+- Generate twice -> second fails with 429; audit row status=blocked or failed with rate message.
+
+E4) UI E2E test (Playwright)
+- Create SOP + step
+- Open step media manager
+- Generate with AI (stub response)
+- Thumbnail appears with AI badge
+- Open viewer and verify zoom works
+- Reload page; media persists
+
+============================================================
+F) ACCEPTANCE CRITERIA (NEW)
+============================================================
+- Users can generate AI images for SOP header and steps (if org enabled).
+- Generated images are stored like any other media, zoomable, and persist.
+- Original + derivatives exist.
+- AI images are labeled and auditable.
+- Safety/permissions/rate limits enforced server-side.
+
+============================================================
+INSTRUCTION TO REPLIT
+============================================================
+1) Apply schema changes + migrations.
+2) Implement ImageGenAdapter with stub mode for tests.
+3) Implement server endpoint with rate limits and safety gate.
+4) Add UI tab and ensure it fits existing Steps Workspace and media manager.
+5) Update tests and ensure all old tests still pass.
+
+END UPDATE

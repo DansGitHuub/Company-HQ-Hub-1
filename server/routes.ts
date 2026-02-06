@@ -991,6 +991,241 @@ Respond with a JSON object:
     }
   });
 
+  const BLOCKED_KEYWORDS = [
+    "nude", "nudity", "naked", "sexual", "porn", "erotic", "gore", "violence", "blood",
+    "hate", "extremism", "terrorist", "illegal", "drug", "weapon", "bomb", "kill",
+    "trademark", "logo", "brand", "copyright", "celebrity", "real person"
+  ];
+
+  function checkPromptSafety(prompt: string): { safe: boolean; reason?: string } {
+    const lower = prompt.toLowerCase();
+    for (const keyword of BLOCKED_KEYWORDS) {
+      if (lower.includes(keyword)) {
+        return { safe: false, reason: `Content policy violation: "${keyword}" is not allowed` };
+      }
+    }
+    return { safe: true };
+  }
+
+  const aiImageGenerateSchema = z.object({
+    targetType: z.enum(["sop_header", "sop_step"]),
+    targetId: z.string().optional(),
+    stepIndex: z.number().optional(),
+    prompt: z.string().min(3).max(1000),
+    negativePrompt: z.string().max(500).optional(),
+    style: z.enum(["photoreal", "diagram", "illustration", "icon"]).optional(),
+    watermark: z.boolean().optional(),
+  });
+
+  app.post("/api/sop-media/ai-generate", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      const settings = await storage.getCompanySettings();
+      if (settings && !settings.aiImagesEnabled) {
+        return res.status(403).json({ message: "AI image generation is disabled" });
+      }
+
+      const allowedRoles = (settings?.aiImagesAllowedRoles as string[]) || ["Admin", "Manager"];
+      if (!user.isMasterAdmin && !allowedRoles.includes(user.role)) {
+        return res.status(403).json({ message: "Your role does not have permission to generate AI images" });
+      }
+
+      const parsed = aiImageGenerateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request", errors: parsed.error.errors });
+      }
+
+      const { targetType, targetId, stepIndex, prompt, negativePrompt, style, watermark } = parsed.data;
+
+      const safetyCheck = checkPromptSafety(prompt);
+      if (!safetyCheck.safe) {
+        await storage.createAiGenerationEvent({
+          userId: user.id,
+          targetType,
+          targetId: targetId || null,
+          prompt,
+          negativePrompt: negativePrompt || null,
+          style: style || null,
+          model: "dall-e-3",
+          requestedSize: "1024x1024",
+          resultMediaId: null,
+          status: "blocked",
+          errorMessage: safetyCheck.reason || "Content policy violation",
+        });
+        return res.status(400).json({ message: safetyCheck.reason });
+      }
+
+      const dailyLimit = settings?.aiImagesDailyLimit || 10;
+      const monthlyLimit = settings?.aiImagesMonthlyLimit || 200;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dailyCount = await storage.getAiGenerationEventsCount(user.id, today);
+      if (dailyCount >= dailyLimit) {
+        return res.status(429).json({ message: `Daily limit reached (${dailyLimit} images/day)` });
+      }
+
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      const monthlyCount = await storage.getAiGenerationEventsCountAll(monthStart);
+      if (monthlyCount >= monthlyLimit) {
+        return res.status(429).json({ message: `Monthly limit reached (${monthlyLimit} images/month)` });
+      }
+
+      const stylePrompts: Record<string, string> = {
+        photoreal: "photorealistic, high quality photography, professional, detailed",
+        diagram: "technical diagram, clean lines, labeled, professional schematic",
+        illustration: "simple illustration, clean, educational, clear colors",
+        icon: "flat icon style, minimal, simple shapes, bold colors",
+      };
+
+      const fullPrompt = [
+        `Landscaping/outdoor work context: ${prompt}`,
+        style ? stylePrompts[style] : "",
+        negativePrompt ? `Avoid: ${negativePrompt}` : "",
+        (watermark !== false && settings?.aiImagesWatermarkDefault !== false)
+          ? "Include a small subtle 'AI Generated' text watermark in the bottom-right corner"
+          : "",
+      ].filter(Boolean).join(". ");
+
+      const imageResponse = await openai.images.generate({
+        model: "dall-e-3",
+        prompt: fullPrompt,
+        n: 1,
+        size: "1024x1024",
+        quality: "standard",
+        response_format: "b64_json",
+      });
+
+      const b64 = imageResponse.data?.[0]?.b64_json;
+      if (!b64) {
+        throw new Error("No image data returned from AI");
+      }
+
+      const imageBuffer = Buffer.from(b64, "base64");
+
+      const { ObjectStorageService, objectStorageClient } = await import("./replit_integrations/object_storage");
+      const objService = new ObjectStorageService();
+      const privateDir = objService.getPrivateObjectDir();
+      const imageId = require("crypto").randomUUID();
+      const objectPath = `${privateDir}/sop-media/${imageId}.png`;
+
+      const pathParts = objectPath.startsWith("/") ? objectPath.slice(1).split("/") : objectPath.split("/");
+      const bucketName = pathParts[0];
+      const objectName = pathParts.slice(1).join("/");
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+      await file.save(imageBuffer, { contentType: "image/png" });
+
+      const entityPath = `/objects/sop-media/${imageId}.png`;
+
+      const useWatermark = watermark !== false && settings?.aiImagesWatermarkDefault !== false;
+
+      const media = await storage.createSopMedia({
+        sopId: targetId || null,
+        stepIndex: stepIndex ?? null,
+        placement: targetType === "sop_header" ? "header" : "step",
+        url: entityPath,
+        alt: prompt.slice(0, 200),
+        source: "ai_generated",
+        aiPrompt: prompt,
+        aiStyle: style || null,
+        aiNegativePrompt: negativePrompt || null,
+        aiModel: "dall-e-3",
+        aiWatermarked: useWatermark,
+        metadata: { revisedPrompt: imageResponse.data?.[0]?.revised_prompt },
+        createdBy: user.id,
+      });
+
+      await storage.createAiGenerationEvent({
+        userId: user.id,
+        targetType,
+        targetId: targetId || null,
+        prompt,
+        negativePrompt: negativePrompt || null,
+        style: style || null,
+        model: "dall-e-3",
+        requestedSize: "1024x1024",
+        resultMediaId: media.id,
+        status: "success",
+        errorMessage: null,
+      });
+
+      res.status(201).json(media);
+    } catch (err: any) {
+      console.error("AI image generation error:", err);
+      try {
+        await storage.createAiGenerationEvent({
+          userId: (req.user as User).id,
+          targetType: req.body.targetType || "unknown",
+          targetId: req.body.targetId || null,
+          prompt: req.body.prompt || "",
+          negativePrompt: null,
+          style: null,
+          model: "dall-e-3",
+          requestedSize: "1024x1024",
+          resultMediaId: null,
+          status: "failed",
+          errorMessage: err.message,
+        });
+      } catch (logErr) {
+        console.error("Failed to log AI generation error:", logErr);
+      }
+      res.status(500).json({ message: "AI image generation failed", error: err.message });
+    }
+  });
+
+  app.get("/api/sop-media/:sopId", requireAuth, async (req, res) => {
+    try {
+      const media = await storage.getSopMedia(req.params.sopId);
+      res.json(media);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch SOP media" });
+    }
+  });
+
+  app.delete("/api/sop-media/item/:id", requireAuth, requireRole(["Admin", "Manager"]), async (req, res) => {
+    try {
+      await storage.deleteSopMedia(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete media" });
+    }
+  });
+
+  app.get("/api/ai-image-settings", requireAuth, async (req, res) => {
+    try {
+      const settings = await storage.getCompanySettings();
+      const user = req.user as User;
+      const allowedRoles = (settings?.aiImagesAllowedRoles as string[]) || ["Admin", "Manager"];
+      const canGenerate = user.isMasterAdmin || allowedRoles.includes(user.role);
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dailyUsed = canGenerate ? await storage.getAiGenerationEventsCount(user.id, today) : 0;
+      
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      const monthlyUsed = canGenerate ? await storage.getAiGenerationEventsCountAll(monthStart) : 0;
+
+      res.json({
+        enabled: settings?.aiImagesEnabled ?? true,
+        canGenerate,
+        allowedRoles,
+        dailyLimit: settings?.aiImagesDailyLimit ?? 10,
+        monthlyLimit: settings?.aiImagesMonthlyLimit ?? 200,
+        watermarkDefault: settings?.aiImagesWatermarkDefault ?? true,
+        dailyUsed,
+        monthlyUsed,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch AI image settings" });
+    }
+  });
+
   app.post("/api/ai/address-autocomplete", requireAuth, async (req, res) => {
     try {
       const { query, latitude, longitude } = req.body;

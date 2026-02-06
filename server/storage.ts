@@ -61,7 +61,9 @@ import {
   calendarConnections, type CalendarConnection, type InsertCalendarConnection,
   errorLogs, type ErrorLog, type InsertErrorLog,
   activityLogs, type ActivityLog, type InsertActivityLog,
-  developmentTracker, type DevelopmentTracker, type InsertDevelopmentTracker
+  developmentTracker, type DevelopmentTracker, type InsertDevelopmentTracker,
+  sopMedia, type SopMedia, type InsertSopMedia,
+  aiGenerationEvents, type AiGenerationEvent, type InsertAiGenerationEvent
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull } from "drizzle-orm";
@@ -452,6 +454,14 @@ export interface IStorage {
   createDevelopmentItem(item: InsertDevelopmentTracker): Promise<DevelopmentTracker>;
   updateDevelopmentItem(id: string, updates: Partial<DevelopmentTracker>): Promise<DevelopmentTracker | undefined>;
   deleteDevelopmentItem(id: string): Promise<boolean>;
+
+  getSopMedia(sopId: string): Promise<SopMedia[]>;
+  createSopMedia(media: InsertSopMedia): Promise<SopMedia>;
+  deleteSopMedia(id: string): Promise<boolean>;
+
+  createAiGenerationEvent(event: InsertAiGenerationEvent): Promise<AiGenerationEvent>;
+  getAiGenerationEventsCount(userId: string, since: Date): Promise<number>;
+  getAiGenerationEventsCountAll(since: Date): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2126,6 +2136,40 @@ export class DatabaseStorage implements IStorage {
   async deleteDevelopmentItem(id: string): Promise<boolean> {
     await db.delete(developmentTracker).where(eq(developmentTracker.id, id));
     return true;
+  }
+
+  async getSopMedia(sopId: string): Promise<SopMedia[]> {
+    return await db.select().from(sopMedia).where(eq(sopMedia.sopId, sopId));
+  }
+
+  async createSopMedia(media: InsertSopMedia): Promise<SopMedia> {
+    const [created] = await db.insert(sopMedia).values(media).returning();
+    return created;
+  }
+
+  async deleteSopMedia(id: string): Promise<boolean> {
+    await db.delete(sopMedia).where(eq(sopMedia.id, id));
+    return true;
+  }
+
+  async createAiGenerationEvent(event: InsertAiGenerationEvent): Promise<AiGenerationEvent> {
+    const [created] = await db.insert(aiGenerationEvents).values(event).returning();
+    return created;
+  }
+
+  async getAiGenerationEventsCount(userId: string, since: Date): Promise<number> {
+    const results = await db.select().from(aiGenerationEvents)
+      .where(and(
+        eq(aiGenerationEvents.userId, userId),
+        eq(aiGenerationEvents.status, "success")
+      ));
+    return results.filter(r => r.createdAt && r.createdAt >= since).length;
+  }
+
+  async getAiGenerationEventsCountAll(since: Date): Promise<number> {
+    const results = await db.select().from(aiGenerationEvents)
+      .where(eq(aiGenerationEvents.status, "success"));
+    return results.filter(r => r.createdAt && r.createdAt >= since).length;
   }
 }
 

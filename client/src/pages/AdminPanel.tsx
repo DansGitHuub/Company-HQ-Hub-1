@@ -924,6 +924,98 @@ export default function AdminPanel() {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" /> AI Image Generation
+              </CardTitle>
+              <CardDescription>Control who can generate AI images in the SOP Builder</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Enable AI Image Generation</Label>
+                  <p className="text-xs text-muted-foreground">Allow users to generate images with AI in the SOP Builder</p>
+                </div>
+                <Switch
+                  checked={companySettings?.aiImagesEnabled ?? true}
+                  onCheckedChange={(checked) => updateCompanySettingsMutation.mutate({ aiImagesEnabled: checked })}
+                  data-testid="switch-ai-images-enabled"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Allowed Roles</Label>
+                <p className="text-xs text-muted-foreground">Which roles can use AI image generation</p>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {["Admin", "Manager", "Crew"].map((role) => {
+                    const currentRoles = (companySettings?.aiImagesAllowedRoles as string[]) || ["Admin", "Manager"];
+                    const isSelected = currentRoles.includes(role);
+                    return (
+                      <Badge
+                        key={role}
+                        variant={isSelected ? "default" : "outline"}
+                        className="cursor-pointer"
+                        onClick={() => {
+                          const updated = isSelected
+                            ? currentRoles.filter((r: string) => r !== role)
+                            : [...currentRoles, role];
+                          updateCompanySettingsMutation.mutate({ aiImagesAllowedRoles: updated });
+                        }}
+                        data-testid={`badge-role-${role.toLowerCase()}`}
+                      >
+                        {role}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Daily Limit (per user)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    defaultValue={companySettings?.aiImagesDailyLimit ?? 10}
+                    onBlur={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (val > 0) updateCompanySettingsMutation.mutate({ aiImagesDailyLimit: val });
+                    }}
+                    data-testid="input-daily-limit"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Monthly Limit (company)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={10000}
+                    defaultValue={companySettings?.aiImagesMonthlyLimit ?? 200}
+                    onBlur={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (val > 0) updateCompanySettingsMutation.mutate({ aiImagesMonthlyLimit: val });
+                    }}
+                    data-testid="input-monthly-limit"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>AI Watermark by Default</Label>
+                  <p className="text-xs text-muted-foreground">Add "AI Generated" watermark to images</p>
+                </div>
+                <Switch
+                  checked={companySettings?.aiImagesWatermarkDefault ?? true}
+                  onCheckedChange={(checked) => updateCompanySettingsMutation.mutate({ aiImagesWatermarkDefault: checked })}
+                  data-testid="switch-ai-watermark"
+                />
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {user?.isMasterAdmin && (

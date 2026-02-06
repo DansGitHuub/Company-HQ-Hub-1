@@ -884,6 +884,11 @@ export const companySettings = pgTable("company_settings", {
   logoCornerRadius: integer("logo_corner_radius").default(0),
   companyName: text("company_name").default("Company HQ"),
   sidebarOrder: jsonb("sidebar_order").$type<string[]>(),
+  aiImagesEnabled: boolean("ai_images_enabled").default(true),
+  aiImagesAllowedRoles: text("ai_images_allowed_roles").array().default(sql`ARRAY['Admin', 'Manager']`),
+  aiImagesDailyLimit: integer("ai_images_daily_limit").default(10),
+  aiImagesMonthlyLimit: integer("ai_images_monthly_limit").default(200),
+  aiImagesWatermarkDefault: boolean("ai_images_watermark_default").default(true),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -893,6 +898,11 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).p
   logoCornerRadius: true,
   companyName: true,
   sidebarOrder: true,
+  aiImagesEnabled: true,
+  aiImagesAllowedRoles: true,
+  aiImagesDailyLimit: true,
+  aiImagesMonthlyLimit: true,
+  aiImagesWatermarkDefault: true,
 });
 
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
@@ -1634,3 +1644,54 @@ export const insertDevelopmentTrackerSchema = createInsertSchema(developmentTrac
 
 export type InsertDevelopmentTracker = z.infer<typeof insertDevelopmentTrackerSchema>;
 export type DevelopmentTracker = typeof developmentTracker.$inferSelect;
+
+export const sopMedia = pgTable("sop_media", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  sopId: varchar("sop_id", { length: 36 }).references(() => sops.id, { onDelete: "cascade" }),
+  stepIndex: integer("step_index"),
+  placement: text("placement").notNull().default("header"),
+  url: text("url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  alt: text("alt"),
+  source: text("source").notNull().default("upload"),
+  aiPrompt: text("ai_prompt"),
+  aiStyle: text("ai_style"),
+  aiNegativePrompt: text("ai_negative_prompt"),
+  aiModel: text("ai_model"),
+  aiWatermarked: boolean("ai_watermarked").default(true),
+  metadata: jsonb("metadata"),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSopMediaSchema = createInsertSchema(sopMedia).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSopMedia = z.infer<typeof insertSopMediaSchema>;
+export type SopMedia = typeof sopMedia.$inferSelect;
+
+export const aiGenerationEvents = pgTable("ai_generation_events", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id).notNull(),
+  targetType: text("target_type").notNull(),
+  targetId: varchar("target_id", { length: 36 }),
+  prompt: text("prompt").notNull(),
+  negativePrompt: text("negative_prompt"),
+  style: text("style"),
+  model: text("model"),
+  requestedSize: text("requested_size"),
+  resultMediaId: varchar("result_media_id", { length: 36 }),
+  status: text("status").notNull().default("success"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAiGenerationEventSchema = createInsertSchema(aiGenerationEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAiGenerationEvent = z.infer<typeof insertAiGenerationEventSchema>;
+export type AiGenerationEvent = typeof aiGenerationEvents.$inferSelect;
