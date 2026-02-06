@@ -1235,31 +1235,38 @@ Respond with a JSON object:
         messages: [
           {
             role: "system",
-            content: `You are an expert landscaping operations manager. Generate detailed SOP (Standard Operating Procedure) content for a landscaping company. Return ONLY valid JSON with NO additional text.
+            content: `You are a senior landscaping operations expert with 20+ years of field experience. Generate a comprehensive, industry-grade SOP (Standard Operating Procedure) for a landscaping company. Return ONLY valid JSON with NO additional text.
+
+Your recommendations must be:
+- SPECIFIC: Include exact tool sizes, material quantities, and brand-agnostic specifications
+- PRACTICAL: Based on real-world landscaping operations and best practices
+- SAFETY-CONSCIOUS: Include all relevant PPE with proper ANSI/OSHA standards
+- COMPLETE: Don't miss any tool, material, or safety requirement a crew would need
+- QUANTIFIED: Include estimated quantities, sizes, and time specifications
 
 The JSON must include these fields:
-- outcome: string (clear description of what successful completion looks like)
+- outcome: string (clear, measurable description of what successful completion looks like)
 - outcomeType: string (one of: "completion", "quality", "safety", "kpi")
 - audience: string (who this SOP is for, e.g., "Landscape Crew Members")
 - skillLevel: string (one of: "beginner", "intermediate", "advanced", "all")
-- steps: array of objects with { id: string (random 7-char), title: string, instruction: string, why: string, successCriteria: string, commonMistakes: string, proofRequired: boolean, proofType: string, isQCCheckpoint: boolean }
-- tools: string (tools needed, one per line)
-- materials: string (materials needed, one per line)
-- ppe: string (PPE required, one per line)
-- safetyNotes: string (safety warnings and precautions)
-- complianceNotes: string (regulatory or compliance notes)
-- timingTarget: string (target completion time, e.g., "45 minutes")
-- timingMax: string (maximum allowed time, e.g., "90 minutes")
+- steps: array of objects with { id: string (random 7-char), title: string, instruction: string (detailed, specific instructions), why: string (reason this step matters), successCriteria: string, commonMistakes: string, proofRequired: boolean, proofType: string, isQCCheckpoint: boolean }
+- tools: string (one tool per line, include specific sizes/types/specs, e.g. "Round-point shovel (size 2)" not just "shovel", "3/4 inch garden hose (50 ft minimum)" not just "hose")
+- materials: string (one material per line, include estimated quantities for a typical residential job, e.g. "Mulch - hardwood, double-shredded (3-4 cubic yards per 100 sq ft)" not just "mulch")
+- ppe: string (one item per line, include specific protection ratings, e.g. "ANSI Z87.1 rated safety glasses" not just "safety glasses", "OSHA-compliant steel-toe boots (ASTM F2413)" not just "boots")
+- safetyNotes: string (comprehensive safety warnings, hazard identification, emergency procedures specific to this procedure)
+- complianceNotes: string (OSHA regulations, EPA requirements, state/local codes, certifications needed - cite specific standards where possible)
+- timingTarget: string (realistic target time with context, e.g. "45 minutes for average residential job")
+- timingMax: string (maximum time including complications, e.g. "90 minutes including cleanup and site inspection")
 
-Generate 3-7 detailed steps depending on the complexity of the procedure. Make instructions practical and specific to landscaping.`
+Generate 3-7 detailed steps depending on the complexity. Make every field as detailed and accurate as possible.`
           },
           {
             role: "user",
-            content: `Generate SOP content for: "${title}"${sopType ? ` (Type: ${sopType})` : ""}${category ? ` (Category: ${category})` : ""}`
+            content: `Generate a comprehensive SOP for: "${title}"${sopType ? ` (Type: ${sopType})` : ""}${category ? ` (Category: ${category})` : ""}`
           }
         ],
         response_format: { type: "json_object" },
-        temperature: 0.7,
+        temperature: 0.5,
       });
 
       const content = completion.choices[0]?.message?.content;
@@ -1272,89 +1279,6 @@ Generate 3-7 detailed steps depending on the complexity of the procedure. Make i
     } catch (err: any) {
       console.error("[sop-suggest] Error:", err.message);
       res.status(500).json({ message: "Failed to generate AI suggestions" });
-    }
-  });
-
-  app.post("/api/sop-deep-research", requireAuth, async (req, res) => {
-    try {
-      const { title, sopType, steps, outcome, audience, skillLevel, existingTools, existingMaterials, existingPpe, field } = req.body;
-      if (!title) {
-        return res.status(400).json({ message: "Title is required" });
-      }
-      if (!field || !["tools", "safety"].includes(field)) {
-        return res.status(400).json({ message: "Field must be 'tools' or 'safety'" });
-      }
-
-      const stepsContext = Array.isArray(steps) && steps.length > 0
-        ? steps.filter((s: any) => s.title || s.instruction).map((s: any, i: number) =>
-            `Step ${i + 1}: ${s.title || ""}${s.instruction ? " - " + s.instruction : ""}`
-          ).join("\n")
-        : "";
-
-      const fieldFocus = field === "safety" ? `Focus ONLY on safety and compliance for this procedure.
-
-Return JSON with:
-- safetyNotes: string (comprehensive safety warnings, hazard identification, emergency procedures, first aid steps - be very detailed and specific to the procedure)
-- complianceNotes: string (OSHA regulations, EPA requirements, state/local codes, certifications needed, inspection requirements - cite specific standards where possible)
-- ppe: string (one item per line - include specific protection ratings, ANSI/OSHA standards where applicable)` :
-
-        `Focus on providing the MOST DETAILED and SPECIFIC recommendations possible.
-
-Return JSON with:
-- tools: string (one tool per line, include specific sizes/types/specs where relevant, e.g. "Round-point shovel (size 2)" not just "shovel", "3/4 inch garden hose (50 ft minimum)" not just "hose")
-- materials: string (one material per line, include estimated quantities for a typical job, e.g. "Mulch - hardwood, double-shredded (3-4 cubic yards per 100 sq ft)" not just "mulch")
-- ppe: string (one item per line, include specific protection ratings and standards, e.g. "ANSI Z87.1 rated safety glasses" not just "safety glasses")
-- timingTarget: string (realistic target time with reasoning, e.g. "45 minutes for average residential job")
-- timingMax: string (maximum time considering complications, e.g. "90 minutes including cleanup and site inspection")
-- reasoning: string (brief explanation of why these specific items are recommended)`;
-
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a senior landscaping operations expert with 20+ years of field experience. You specialize in creating detailed equipment lists, material specifications, and time estimates for landscaping procedures.
-
-Your recommendations should be:
-- SPECIFIC: Include exact tool sizes, material quantities, and brand-agnostic specifications
-- PRACTICAL: Based on real-world landscaping operations
-- SAFETY-CONSCIOUS: Include all relevant PPE with proper standards (ANSI, OSHA)
-- COMPLETE: Don't miss any tool or material that a crew would need
-- QUANTIFIED: Include estimated quantities, sizes, and specifications
-
-${fieldFocus}
-
-Return ONLY valid JSON with NO additional text.`
-          },
-          {
-            role: "user",
-            content: `Procedure: "${title}"
-${sopType ? `Type: ${sopType}` : ""}
-${outcome ? `Expected Outcome: ${outcome}` : ""}
-${audience ? `Target Audience: ${audience}` : ""}
-${skillLevel ? `Skill Level: ${skillLevel}` : ""}
-${stepsContext ? `\nProcedure Steps:\n${stepsContext}` : ""}
-${existingTools ? `\nCurrently listed tools (enhance these): ${existingTools}` : ""}
-${existingMaterials ? `\nCurrently listed materials (enhance these): ${existingMaterials}` : ""}
-${existingPpe ? `\nCurrently listed PPE (enhance these): ${existingPpe}` : ""}
-
-Provide comprehensive, industry-grade recommendations based on the full context above.`
-          }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.5,
-      });
-
-      const content = completion.choices[0]?.message?.content;
-      if (!content) {
-        return res.status(500).json({ message: "No response from AI" });
-      }
-
-      const research = JSON.parse(content);
-      res.json(research);
-    } catch (err: any) {
-      console.error("[sop-deep-research] Error:", err.message);
-      res.status(500).json({ message: "Failed to generate deep research" });
     }
   });
 
