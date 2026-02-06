@@ -39,6 +39,9 @@ import {
   plowSites, type PlowSite, type InsertPlowSite,
   plowSiteManagerPermissions, type PlowSiteManagerPermission, type InsertPlowSiteManagerPermission,
   plowSiteImages, type PlowSiteImage, type InsertPlowSiteImage,
+  sitePhotos, type SitePhoto, type InsertSitePhoto,
+  sitePhotoVariants, type SitePhotoVariant, type InsertSitePhotoVariant,
+  siteMapFeatures, type SiteMapFeature, type InsertSiteMapFeature,
   aiAgents, type AiAgent, type InsertAiAgent,
   aiAgentUsageLogs, type AiAgentUsageLog, type InsertAiAgentUsageLog,
   aiAgentSuggestions, type AiAgentSuggestion, type InsertAiAgentSuggestion,
@@ -296,6 +299,27 @@ export interface IStorage {
   createPlowSiteImage(image: InsertPlowSiteImage): Promise<PlowSiteImage>;
   updatePlowSiteImage(id: string, updates: Partial<PlowSiteImage>): Promise<PlowSiteImage | undefined>;
   deletePlowSiteImage(id: string): Promise<boolean>;
+
+  // Site Photos
+  getSitePhotos(siteId: string): Promise<SitePhoto[]>;
+  getSitePhoto(id: string): Promise<SitePhoto | undefined>;
+  createSitePhoto(photo: InsertSitePhoto, createdBy: string): Promise<SitePhoto>;
+  updateSitePhoto(id: string, updates: Partial<SitePhoto>): Promise<SitePhoto | undefined>;
+  deleteSitePhoto(id: string): Promise<boolean>;
+
+  // Site Photo Variants
+  getSitePhotoVariants(photoId: string): Promise<SitePhotoVariant[]>;
+  getSitePhotoVariant(id: string): Promise<SitePhotoVariant | undefined>;
+  createSitePhotoVariant(variant: InsertSitePhotoVariant, createdBy: string): Promise<SitePhotoVariant>;
+  updateSitePhotoVariant(id: string, updates: Partial<SitePhotoVariant>): Promise<SitePhotoVariant | undefined>;
+  deleteSitePhotoVariant(id: string): Promise<boolean>;
+
+  // Site Map Features
+  getSiteMapFeatures(siteId: string): Promise<SiteMapFeature[]>;
+  getSiteMapFeature(id: string): Promise<SiteMapFeature | undefined>;
+  createSiteMapFeature(feature: InsertSiteMapFeature, createdBy: string): Promise<SiteMapFeature>;
+  updateSiteMapFeature(id: string, updates: Partial<SiteMapFeature>): Promise<SiteMapFeature | undefined>;
+  deleteSiteMapFeature(id: string): Promise<boolean>;
   
   // AI Agents
   getAiAgents(): Promise<AiAgent[]>;
@@ -1338,6 +1362,81 @@ export class DatabaseStorage implements IStorage {
   
   async deletePlowSiteImage(id: string): Promise<boolean> {
     await db.delete(plowSiteImages).where(eq(plowSiteImages.id, id));
+    return true;
+  }
+
+  // Site Photos
+  async getSitePhotos(siteId: string): Promise<SitePhoto[]> {
+    return db.select().from(sitePhotos).where(eq(sitePhotos.siteId, siteId));
+  }
+
+  async getSitePhoto(id: string): Promise<SitePhoto | undefined> {
+    const [photo] = await db.select().from(sitePhotos).where(eq(sitePhotos.id, id));
+    return photo || undefined;
+  }
+
+  async createSitePhoto(photo: InsertSitePhoto, createdBy: string): Promise<SitePhoto> {
+    const [created] = await db.insert(sitePhotos).values({ ...photo, createdBy }).returning();
+    return created;
+  }
+
+  async updateSitePhoto(id: string, updates: Partial<SitePhoto>): Promise<SitePhoto | undefined> {
+    const [updated] = await db.update(sitePhotos).set(updates).where(eq(sitePhotos.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteSitePhoto(id: string): Promise<boolean> {
+    await db.delete(sitePhotos).where(eq(sitePhotos.id, id));
+    return true;
+  }
+
+  // Site Photo Variants
+  async getSitePhotoVariants(photoId: string): Promise<SitePhotoVariant[]> {
+    return db.select().from(sitePhotoVariants).where(eq(sitePhotoVariants.photoId, photoId));
+  }
+
+  async getSitePhotoVariant(id: string): Promise<SitePhotoVariant | undefined> {
+    const [variant] = await db.select().from(sitePhotoVariants).where(eq(sitePhotoVariants.id, id));
+    return variant || undefined;
+  }
+
+  async createSitePhotoVariant(variant: InsertSitePhotoVariant, createdBy: string): Promise<SitePhotoVariant> {
+    const [created] = await db.insert(sitePhotoVariants).values({ ...variant, createdBy }).returning();
+    return created;
+  }
+
+  async updateSitePhotoVariant(id: string, updates: Partial<SitePhotoVariant>): Promise<SitePhotoVariant | undefined> {
+    const [updated] = await db.update(sitePhotoVariants).set({ ...updates, updatedAt: new Date() }).where(eq(sitePhotoVariants.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteSitePhotoVariant(id: string): Promise<boolean> {
+    await db.delete(sitePhotoVariants).where(eq(sitePhotoVariants.id, id));
+    return true;
+  }
+
+  // Site Map Features
+  async getSiteMapFeatures(siteId: string): Promise<SiteMapFeature[]> {
+    return db.select().from(siteMapFeatures).where(eq(siteMapFeatures.siteId, siteId));
+  }
+
+  async getSiteMapFeature(id: string): Promise<SiteMapFeature | undefined> {
+    const [feature] = await db.select().from(siteMapFeatures).where(eq(siteMapFeatures.id, id));
+    return feature || undefined;
+  }
+
+  async createSiteMapFeature(feature: InsertSiteMapFeature, createdBy: string): Promise<SiteMapFeature> {
+    const [created] = await db.insert(siteMapFeatures).values({ ...feature, createdBy }).returning();
+    return created;
+  }
+
+  async updateSiteMapFeature(id: string, updates: Partial<SiteMapFeature>): Promise<SiteMapFeature | undefined> {
+    const [updated] = await db.update(siteMapFeatures).set(updates).where(eq(siteMapFeatures.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteSiteMapFeature(id: string): Promise<boolean> {
+    await db.delete(siteMapFeatures).where(eq(siteMapFeatures.id, id));
     return true;
   }
   

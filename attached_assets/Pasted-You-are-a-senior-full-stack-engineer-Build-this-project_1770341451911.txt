@@ -1,0 +1,342 @@
+You are a senior full-stack engineer. Build this project test-first. DO NOT skip tests. If any required test is failing, fix it before moving forward.
+
+PROJECT NAME: CompanyHQ Site Photo Markup + Map Tool (v1)
+
+PRIMARY GOAL
+Build a professional, extremely intuitive site photo markup tool for landscaping/snow operations:
+- Map-first workflow (Google Earth–like 3D option + fast 2D option)
+- Street-level imagery (Street View equivalent where available)
+- Unlimited photos per project/site (within storage plan) with performance for 500+ images
+- Markup/annotation on photos AND on map (pins/lines/polygons)
+- Full edit history: return and edit ANYTHING at ANY TIME
+- Deep zoom on saved images + marked up images without losing clarity
+- Offline markup ability for jobsite photos (must work with no internet):
+  - Users can take/import photos, mark up, and save locally
+  - Later, when online, user can optionally sync to server
+  - Offline can be a separate “Offline Mode” tool inside the same app for simplicity
+- Sharing default internal; easy to share externally when needed (permissioned link)
+
+IMPORTANT REALITY / COST CONTROL REQUIREMENTS
+- Keep Google Cloud costs as low as possible:
+  - Default map/imagery should be non-Google unless user explicitly enables Google.
+  - If Google Street View is enabled, keys must remain server-side and usage must be optional.
+- “Best HD” depends on provider coverage/licensing. Build provider abstraction to swap sources.
+
+DEFAULT PROVIDERS (USE THESE BY DEFAULT)
+Maps:
+- 2D: MapLibre GL JS with OpenStreetMap tiles (or configurable tile URL)
+- 3D Earth alternative: CesiumJS (optional toggle)
+Street-level imagery:
+- Primary: Mapillary (coverage varies; use nearest imagery)
+- Optional fallback: Google Street View Static API (ONLY if admin enables; keep usage minimized)
+Custom imagery sources:
+- Support adding external imagery sources via:
+  - XYZ tile URL templates
+  - WMS / WMTS endpoints
+This is for things like county auditor imagery / Esri services where available. Do not assume redistributing is allowed; store source references and user-captured snapshots when permitted.
+
+NON-NEGOTIABLE PRODUCT RULES
+1) One primary action per screen; advanced options hidden behind “Advanced”.
+2) Save-as-you-go. No data loss.
+3) Every field has placeholder + example + validation.
+4) Default “Simple Mode”; toggle “Advanced Mode”.
+5) Unlimited photos per project. UI must remain fast (virtualized grids).
+6) Users can edit ANYTHING later: photo markup, map features, metadata, ordering, albums.
+7) Zoom must be true zoom:
+   - Deep zoom viewer for images
+   - Annotations must remain crisp and aligned at any zoom
+8) Original image must always remain untouched:
+   - Store original
+   - Store one or more markup “variants” (versions) per photo
+   - Allow making multiple variations easily (e.g., Variant A, Variant B)
+9) Markup lines must be easy and “smooth”:
+   - Provide smoothing/stabilization for freehand pen
+   - Provide assisted shapes: auto-straight line, snap-to-angle, polygon smoothing
+   - Provide “smart curve” option (Bezier-like smoothing)
+10) Professional UI consistent with CompanyHQ (clean, minimal, modern).
+11) Sharing:
+   - Internal-only by default
+   - External share is explicit: create share link with permission + optional expiration
+12) Permissions enforced server-side.
+
+TECH STACK (USE EXACTLY)
+Frontend: React + TypeScript + Tailwind + React Router + React Hook Form + Zod
+Backend: Node.js + Express (or Fastify) + PostgreSQL + Prisma ORM
+Auth: email/password + JWT
+Testing: Vitest (unit), Supertest (API integration), Playwright (E2E)
+Offline: PWA with Service Worker + IndexedDB (Dexie recommended) + background sync strategy
+Deep zoom: OpenSeadragon (or equivalent)
+Annotation canvas: Konva.js (preferred) or Fabric.js; store annotation objects as JSON in normalized coordinates.
+
+UPLOADS / STORAGE
+Implement StorageAdapter:
+- Local filesystem (v1)
+- Structured so S3-compatible can replace later
+Deep zoom:
+- On upload, generate deep zoom tiles (pyramid) OR generate on demand.
+- Persist a manifest (deepzoom_manifest_url) for the viewer.
+Annotations:
+- Always store normalized to original dimensions.
+- Each photo can have multiple variants:
+  - original (immutable)
+  - variants (each with its own annotation set + optional flattened preview)
+
+BUILD ORDER (STRICT)
+PHASE 0: Initialize repo, env example, scripts, lint/format.
+PHASE 1: Prisma schema + migrations + seed.
+PHASE 2: Backend API scaffolding + validation + auth middleware + permissions.
+PHASE 3: Write tests FIRST (Vitest + Supertest + Playwright) to validate spec.
+PHASE 4: Implement backend until tests pass.
+PHASE 5: Implement frontend until Playwright passes.
+PHASE 6: Polish (empty states, error handling, performance, virtualization).
+
+HARD STOP RULE
+If any required test is failing, fix it before moving forward.
+
+============================================================
+DATA MODEL (PRISMA TABLES) — MUST IMPLEMENT
+============================================================
+Use UUID PKs, org scoping everywhere.
+
+users
+user_preferences (include offline defaults)
+projects
+project_members
+albums
+photos (store source + original + deepzoom manifest)
+photo_variants (a “variant” is a markup copy/version track; NOT overwriting)
+photo_annotations (belongs to a variant)
+map_layers
+map_features (GeoJSON + styling + optional linked_photo_id)
+street_views_saved (store provider + params + saved image as a photo optionally)
+imagery_sources (custom XYZ/WMS/WMTS configuration per org/project)
+share_links
+activity_log
+offline_sync_queue (records pending offline changes for sync reconciliation)
+
+============================================================
+ROUTES / SCREENS (MUST EXIST)
+============================================================
+/projects
+/projects/new
+/projects/:id (dashboard)
+/projects/:id/map
+/projects/:id/photos
+/projects/:id/photo/:photoId (deep zoom + variants + annotate)
+/projects/:id/share
+/tools/offline-markup (offline-first mode)
+/settings/profile
+/settings/org (provider keys + imagery sources config)
+
+============================================================
+CORE WORKFLOWS
+============================================================
+
+A) Offline Markup Tool (must work with no internet)
+- User can:
+  - Add photos from device
+  - Create markup variants
+  - Use same annotation tools + deep zoom
+  - Export/share locally (PDF/ZIP) without server
+- When online:
+  - User can select offline items and “Sync to Project”
+  - Conflict resolution: if syncing into an existing photo, create a NEW variant, never overwrite.
+
+B) Online Project Flow
+- Project dashboard:
+  - Tabs: Map / Photos / Share
+  - Primary actions: Add Photos, Add Map Feature, Capture Street Image
+
+C) Add Photos Wizard (v1 sources: upload + URL + email ingest stub)
+Step 1: Choose Source
+- Upload from device
+- Paste URLs (batch)
+- Email import stub: generate a project email alias and instructions; actual parsing can be minimal v1.
+Step 2: Assign Album
+Step 3: Metadata
+Step 4: Review & Import (reorder/remove)
+Must allow going back to any step without losing state.
+
+D) Photo Detail
+- Deep zoom viewer
+- Variant selector:
+  - Original (read-only)
+  - Variants (A/B/C…)
+  - Create new variant from original or from another variant
+- Annotation tools:
+  - Pen (with smoothing)
+  - Arrow
+  - Line (snap-to-angle)
+  - Rect, Circle, Polygon
+  - Text
+  - Blur
+  - Highlight
+  - Measurement (basic: pixel->real units optional if scale known)
+- Save always saves into current variant.
+- Flattened preview image optional for faster browsing.
+
+E) Map Workspace
+- Toggle 2D/3D (MapLibre/Cesium)
+- Layers
+- Draw features
+- Link features to photos
+- Custom imagery sources per project:
+  - Add XYZ/WMS/WMTS source and toggle on/off
+- Export map snapshot (PNG/PDF)
+
+F) Street-level imagery
+- Map click -> fetch nearest Mapillary imagery
+- Save snapshot into project as a photo (source=street_mapillary) with lat/lng metadata
+- Optional: Google SV fallback only if enabled
+
+G) Sharing
+- Default internal only
+- External share link is explicit:
+  - permission: view_only/comment/edit
+  - expiration optional
+- Exports:
+  - PDF report (selected photos + notes + map snapshot)
+  - ZIP images + JSON annotations
+
+============================================================
+API ENDPOINTS (MINIMUM — MUST WORK)
+============================================================
+Auth:
+- POST /api/auth/register
+- POST /api/auth/login
+- GET  /api/auth/me
+
+Prefs:
+- GET /api/preferences/me
+- PUT /api/preferences/me
+
+Projects:
+- GET  /api/projects
+- POST /api/projects
+- GET  /api/projects/:id
+- PUT  /api/projects/:id
+- POST /api/projects/:id/archive
+
+Imagery sources:
+- GET  /api/projects/:id/imagery-sources
+- POST /api/projects/:id/imagery-sources
+- PUT  /api/imagery-sources/:id
+- DELETE /api/imagery-sources/:id
+
+Albums:
+- POST /api/projects/:id/albums
+- PUT  /api/projects/:id/albums/:albumId
+- PUT  /api/projects/:id/albums/reorder
+
+Photos:
+- POST /api/projects/:id/photos/upload (multipart)
+- POST /api/projects/:id/photos/import-urls
+- GET  /api/projects/:id/photos (filters)
+- GET  /api/projects/:id/photos/:photoId
+- PUT  /api/projects/:id/photos/:photoId (metadata, album)
+- DELETE /api/projects/:id/photos/:photoId
+
+Variants / Annotations:
+- POST /api/photos/:photoId/variants (create new variant from original or existing)
+- GET  /api/photos/:photoId/variants
+- PUT  /api/photo-variants/:variantId/set-current
+- GET  /api/photo-variants/:variantId/annotations
+- PUT  /api/photo-variants/:variantId/annotations (replace full set; transactional)
+- POST /api/photo-variants/:variantId/flatten (optional v1.1)
+
+Map:
+- POST /api/projects/:id/map/layers
+- GET  /api/projects/:id/map/layers
+- POST /api/map/layers/:layerId/features
+- PUT  /api/map/features/:featureId
+- DELETE /api/map/features/:featureId
+
+Street imagery:
+- GET  /api/street/nearest?provider=mapillary&lat=..&lng=..
+- POST /api/projects/:id/street/save
+
+Sharing:
+- POST /api/projects/:id/share-links
+- GET  /api/projects/:id/share-links
+- DELETE /api/share-links/:id
+Public:
+- GET /share/:token (public view permission-limited)
+
+Offline Sync:
+- POST /api/offline/sync (accepts a batch of offline operations; server applies and returns mapping + results)
+
+============================================================
+TESTS (WRITE BEFORE IMPLEMENTATION)
+============================================================
+
+A) Contract Tests (API + UI)
+1) Offline markup works without network:
+- Simulate offline mode in Playwright:
+  - Add local photo
+  - Create Variant A
+  - Add annotation (pen with smoothing)
+  - Save
+  - Reload offline tool
+  - Variant + annotation persist from IndexedDB
+
+2) Original remains unchanged:
+- Create variant with annotations; confirm original viewer shows no overlays by default.
+
+3) Multiple variants:
+- Variant A and Variant B differ; switching variants changes overlays; A remains unchanged after editing B.
+
+4) Deep zoom alignment:
+- At 3 zoom levels, annotation remains correctly positioned (same normalized coordinates).
+
+5) Add Photos Wizard backtracking:
+- Upload 2 photos -> album -> tags -> back to source -> add 1 more -> forward -> prior album/tags preserved.
+
+6) Map feature link:
+- Create polygon -> link photo -> reopen -> link persists.
+
+7) Custom imagery source:
+- Add XYZ source -> map renders using it (basic smoke test).
+
+8) Street-level imagery (stubbed):
+- Mapillary nearest endpoint mocked returns entity; saving creates photo record source=street_mapillary.
+
+B) Permissions tests (server enforced)
+- Viewer cannot upload/delete photos
+- Cross-org forbidden
+- Public share token respects permission
+
+C) E2E Happy Path
+- Login manager
+- Create project
+- Upload 3 photos
+- Create variants + annotations
+- Draw map polygon + link to photo
+- Save street snapshot
+- Create internal share link, then external share link
+- Logout + open external share as unauth; confirm view_only access
+
+============================================================
+SEED DATA (MUST PROVIDE)
+============================================================
+Seed 5 users (admin/manager/editor/viewer/trainee) under 1 org.
+Seed 2 projects with albums, photos, map features, and at least 1 street snapshot.
+Seed at least 1 custom imagery source record (disabled by default).
+
+============================================================
+DELIVERABLES (YOU MUST OUTPUT)
+============================================================
+1) “How to run” commands (db, migrate, seed, dev, test)
+2) Completed vs not completed list
+3) Test locations and how to run
+4) Checklist confirming each non-negotiable rule satisfied
+5) Cost-control notes:
+   - Default non-Google providers
+   - Google usage optional and minimized
+   - Keys server-side only
+
+BEGIN NOW.
+First output ONLY:
+- Proposed folder structure
+- Prisma schema draft (models only)
+- Test plan file list (names/paths of test files)
+DO NOT write implementation yet until those are shown.

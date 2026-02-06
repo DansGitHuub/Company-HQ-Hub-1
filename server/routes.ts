@@ -11,7 +11,10 @@ import {
   insertSopExampleSchema, 
   insertFormFolderSchema, 
   insertFormTemplateSchema, 
-  insertPlowSiteImageSchema, 
+  insertPlowSiteImageSchema,
+  insertSitePhotoSchema,
+  insertSitePhotoVariantSchema,
+  insertSiteMapFeatureSchema,
   insertConfiguredIntegrationSchema,
   insertIntegrationResearchSessionSchema,
   type User 
@@ -3549,6 +3552,129 @@ Generate detailed information for this landscaping material.`;
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Error deleting site image" });
+    }
+  });
+
+  // ================== SITE PHOTOS ==================
+
+  app.get("/api/plow-sites/:siteId/site-photos", requireAuth, async (req, res) => {
+    try {
+      const photos = await storage.getSitePhotos(req.params.siteId);
+      res.json(photos);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching site photos" });
+    }
+  });
+
+  app.post("/api/plow-sites/:siteId/site-photos", requirePlowEditAccess, async (req, res) => {
+    try {
+      const parseResult = insertSitePhotoSchema.safeParse({ ...req.body, siteId: req.params.siteId });
+      if (!parseResult.success) return res.status(400).json({ message: "Invalid data", errors: parseResult.error.errors });
+      const photo = await storage.createSitePhoto(parseResult.data, (req.user as User).id);
+      res.status(201).json(photo);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating site photo" });
+    }
+  });
+
+  app.patch("/api/site-photos/:id", requirePlowEditAccess, async (req, res) => {
+    try {
+      const photo = await storage.updateSitePhoto(req.params.id, req.body);
+      if (!photo) return res.status(404).json({ message: "Photo not found" });
+      res.json(photo);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating site photo" });
+    }
+  });
+
+  app.delete("/api/site-photos/:id", requirePlowEditAccess, async (req, res) => {
+    try {
+      await storage.deleteSitePhoto(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting site photo" });
+    }
+  });
+
+  // ================== SITE PHOTO VARIANTS ==================
+
+  app.get("/api/site-photos/:photoId/variants", requireAuth, async (req, res) => {
+    try {
+      const variants = await storage.getSitePhotoVariants(req.params.photoId);
+      res.json(variants);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching variants" });
+    }
+  });
+
+  app.post("/api/site-photos/:photoId/variants", requirePlowEditAccess, async (req, res) => {
+    try {
+      const parseResult = insertSitePhotoVariantSchema.safeParse({ ...req.body, photoId: req.params.photoId });
+      if (!parseResult.success) return res.status(400).json({ message: "Invalid data", errors: parseResult.error.errors });
+      const variant = await storage.createSitePhotoVariant(parseResult.data, (req.user as User).id);
+      res.status(201).json(variant);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating variant" });
+    }
+  });
+
+  app.patch("/api/site-photo-variants/:id", requirePlowEditAccess, async (req, res) => {
+    try {
+      const variant = await storage.updateSitePhotoVariant(req.params.id, req.body);
+      if (!variant) return res.status(404).json({ message: "Variant not found" });
+      res.json(variant);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating variant" });
+    }
+  });
+
+  app.delete("/api/site-photo-variants/:id", requirePlowEditAccess, async (req, res) => {
+    try {
+      await storage.deleteSitePhotoVariant(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting variant" });
+    }
+  });
+
+  // ================== SITE MAP FEATURES ==================
+
+  app.get("/api/plow-sites/:siteId/map-features", requireAuth, async (req, res) => {
+    try {
+      const features = await storage.getSiteMapFeatures(req.params.siteId);
+      res.json(features);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching map features" });
+    }
+  });
+
+  app.post("/api/plow-sites/:siteId/map-features", requirePlowEditAccess, async (req, res) => {
+    try {
+      const parseResult = insertSiteMapFeatureSchema.safeParse({ ...req.body, siteId: req.params.siteId });
+      if (!parseResult.success) return res.status(400).json({ message: "Invalid data", errors: parseResult.error.errors });
+      const feature = await storage.createSiteMapFeature(parseResult.data, (req.user as User).id);
+      res.status(201).json(feature);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating map feature" });
+    }
+  });
+
+  app.patch("/api/site-map-features/:id", requirePlowEditAccess, async (req, res) => {
+    try {
+      const feature = await storage.updateSiteMapFeature(req.params.id, req.body);
+      if (!feature) return res.status(404).json({ message: "Feature not found" });
+      res.json(feature);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating map feature" });
+    }
+  });
+
+  app.delete("/api/site-map-features/:id", requirePlowEditAccess, async (req, res) => {
+    try {
+      await storage.deleteSiteMapFeature(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting map feature" });
     }
   });
 

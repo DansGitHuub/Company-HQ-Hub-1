@@ -1,75 +1,56 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import type { PlowSite, PlowSiteGroup, User } from "@shared/schema";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { PlowSite, PlowSiteGroup, SitePhoto, SitePhotoVariant, SiteMapFeature } from "@shared/schema";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Plus, 
-  MapPin, 
-  Upload, 
-  Trash2, 
-  Edit, 
-  Eye, 
-  Save, 
-  X, 
-  Paintbrush, 
-  Circle, 
-  Square, 
-  ArrowRight, 
-  Type, 
-  Undo, 
-  Redo,
-  Sparkles,
-  Search,
-  ChevronRight,
-  Snowflake,
-  Navigation,
-  Folder,
-  FolderPlus,
-  Home,
-  Building2,
-  Route,
-  Tag,
-  Settings,
-  Loader2,
-  ZoomIn,
-  ZoomOut,
-  Camera,
-  Minus,
-  ChevronUp,
-  ChevronDown,
-  ChevronLeft,
-  Move,
-  RotateCcw,
-  ImagePlus,
-  ArrowUp,
-  ArrowDown
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip, TooltipContent, TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Plus, MapPin, Trash2, Edit, Save, X, Search, Loader2,
+  ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Folder, FolderPlus,
+  Image as ImageIcon, Pencil, ArrowRight, Circle, Square, Type,
+  Undo, Redo, Minus, MoreVertical, Upload, Map, Camera, List,
+  Navigation, Crosshair, Pentagon, MousePointer, PenTool, Eye,
+  ArrowUp, ArrowDown, Menu, Satellite,
 } from "lucide-react";
+import { Stage, Layer, Line, Rect, Circle as KonvaCircle, Arrow as KonvaArrow, Text as KonvaText, Image as KonvaImage } from "react-konva";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 type Annotation = {
   id: string;
-  type: "rect" | "circle" | "line" | "arrow" | "text" | "icon";
-  x: number;
-  y: number;
+  type: "pen" | "arrow" | "line" | "rect" | "circle" | "text";
+  points?: number[];
+  x?: number;
+  y?: number;
   width?: number;
   height?: number;
   radius?: number;
-  endX?: number;
-  endY?: number;
   color: string;
+  strokeWidth: number;
   text?: string;
-  iconType?: string;
-  step?: number;
 };
 
 type Instruction = {
@@ -79,872 +60,113 @@ type Instruction = {
   description: string;
 };
 
-type PlowPermissions = {
-  canEdit: boolean;
-  canView: boolean;
-};
+const PRESET_COLORS = [
+  "#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6",
+  "#8b5cf6", "#ec4899", "#ffffff", "#000000",
+];
+
+const LINE_WIDTHS = [2, 4, 6, 8, 12];
+
+function genId() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function useLoadImage(src: string | null) {
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    if (!src) { setImage(null); return; }
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => setImage(img);
+    img.onerror = () => setImage(null);
+    img.src = src;
+  }, [src]);
+  return image;
+}
 
 export default function PlowSiteMapper() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [selectedSite, setSelectedSite] = useState<PlowSite | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [addressSearch, setAddressSearch] = useState("");
-  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
-  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
-  const [newSiteName, setNewSiteName] = useState("");
-  const [newSiteAddress, setNewSiteAddress] = useState("");
-  const [newSiteGroupId, setNewSiteGroupId] = useState<string | null>(null);
-  const [createStep, setCreateStep] = useState<"info" | "satellite" | "streetview" | "photos" | "confirm">("info");
-  const [isManualEntry, setIsManualEntry] = useState(false);
-  const [satelliteImageUrl, setSatelliteImageUrl] = useState<string | null>(null);
-  const [isLoadingSatellite, setIsLoadingSatellite] = useState(false);
-  const [imageSource, setImageSource] = useState<"satellite" | "upload" | null>(null);
-  const [mapCoordinates, setMapCoordinates] = useState<{ lat: number; lng: number } | null>(null);
-  const [mapZoom, setMapZoom] = useState(19);
-  const [capturedMapImage, setCapturedMapImage] = useState<string | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [mapOffset, setMapOffset] = useState<{ lat: number; lng: number }>({ lat: 0, lng: 0 });
-  const [aspectRatio, setAspectRatio] = useState<"1:1" | "2:3" | "3:4" | "16:9">("16:9");
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
-  const [dragDelta, setDragDelta] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const mapPreviewRef = useRef<HTMLDivElement>(null);
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const googleMapRef = useRef<any>(null);
-  const [mapsApiKey, setMapsApiKey] = useState<string>("");
+
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("map");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string | null>(null);
-  const [newGroupName, setNewGroupName] = useState("");
-  const [newGroupType, setNewGroupType] = useState<string>("custom");
-  const [newGroupColor, setNewGroupColor] = useState("#3b82f6");
-  const [editingGroup, setEditingGroup] = useState<PlowSiteGroup | null>(null);
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [instructions, setInstructions] = useState<Instruction[]>([]);
-  const [currentTool, setCurrentTool] = useState<"select" | "rect" | "circle" | "line" | "arrow" | "text" | "icon">("select");
-  const [currentColor, setCurrentColor] = useState("#ef4444");
-  const [currentIcon, setCurrentIcon] = useState("plow");
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [aiAnalysis, setAiAnalysis] = useState<any>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [streetViewAvailable, setStreetViewAvailable] = useState(false);
-  const [streetViewHeading, setStreetViewHeading] = useState(0);
-  const [streetViewPitch, setStreetViewPitch] = useState(0);
-  const [streetViewFov, setStreetViewFov] = useState(90);
-  const [streetViewOffset, setStreetViewOffset] = useState({ lat: 0, lng: 0 });
-  const [capturedStreetViewImage, setCapturedStreetViewImage] = useState<string | null>(null);
-  const [isCapturingStreetView, setIsCapturingStreetView] = useState(false);
-  const [additionalImages, setAdditionalImages] = useState<Array<{ id: string; title: string; imageBase64: string; type: "streetview" | "upload" }>>([]);
-  const streetViewRef = useRef<HTMLDivElement>(null);
-  const additionalImageInputRef = useRef<HTMLInputElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imageRef = useRef<HTMLImageElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const addressSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get user's location on mount for better address suggestions
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          });
-        },
-        (error) => {
-          console.log("Geolocation not available:", error.message);
-        }
-      );
-    }
-  }, []);
+  const [isCreateSiteOpen, setIsCreateSiteOpen] = useState(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
 
-  // Fetch Google Maps API key on mount
-  useEffect(() => {
-    fetch("/api/maps-config", { credentials: "include" })
-      .then(res => res.json())
-      .then(data => {
-        if (data.apiKey) {
-          setMapsApiKey(data.apiKey);
-        }
-      })
-      .catch(err => console.log("Could not load maps config:", err));
-  }, []);
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
 
-  const analyzeWithAI = async () => {
-    if (!uploadedImage) return;
-    setIsAnalyzing(true);
-    setAiAnalysis(null);
-    try {
-      const res = await fetch("/api/ai/analyze-plow-site", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ imageBase64: uploadedImage }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAiAnalysis(data);
-        toast({ title: "AI Analysis Complete" });
-      } else {
-        toast({ title: "AI analysis failed", variant: "destructive" });
-      }
-    } catch (err) {
-      toast({ title: "AI analysis error", variant: "destructive" });
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const { data: permissions } = useQuery<PlowPermissions>({
+  const permissions = useQuery({
     queryKey: ["/api/plow-site-permissions/my"],
+    queryFn: async () => {
+      const res = await fetch("/api/plow-site-permissions/my", { credentials: "include" });
+      return res.json();
+    },
   });
 
-  const { data: sites = [] } = useQuery<PlowSite[]>({
+  const canEdit = user?.role === "Admin" || user?.isMasterAdmin || permissions.data?.canEdit;
+  const canView = user?.role === "Admin" || user?.isMasterAdmin || user?.role === "Manager" || permissions.data?.canView;
+
+  const { data: sites = [], isLoading: sitesLoading } = useQuery<PlowSite[]>({
     queryKey: ["/api/plow-sites"],
-    enabled: permissions?.canView,
+    enabled: !!canView,
   });
 
   const { data: groups = [] } = useQuery<PlowSiteGroup[]>({
     queryKey: ["/api/plow-site-groups"],
-    enabled: permissions?.canView,
+    enabled: !!canView,
   });
 
-  const createGroup = useMutation({
-    mutationFn: async (data: { name: string; groupType: string; color: string }) => {
-      const res = await fetch("/api/plow-site-groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to create group");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/plow-site-groups"] });
-      setIsGroupDialogOpen(false);
-      setNewGroupName("");
-      setNewGroupType("custom");
-      setNewGroupColor("#3b82f6");
-      toast({ title: "Group created successfully" });
-    },
-    onError: () => toast({ title: "Failed to create group", variant: "destructive" }),
-  });
+  const selectedSite = useMemo(() => sites.find((s) => s.id === selectedSiteId) || null, [sites, selectedSiteId]);
 
-  const updateGroup = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<PlowSiteGroup> }) => {
-      const res = await fetch(`/api/plow-site-groups/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to update group");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/plow-site-groups"] });
-      setEditingGroup(null);
-      toast({ title: "Group updated successfully" });
-    },
-    onError: () => toast({ title: "Failed to update group", variant: "destructive" }),
-  });
-
-  const deleteGroup = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/plow-site-groups/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to delete group");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/plow-site-groups"] });
-      toast({ title: "Group deleted" });
-    },
-    onError: () => toast({ title: "Failed to delete group", variant: "destructive" }),
-  });
-
-  const searchAddresses = useCallback(async (query: string) => {
-    if (query.length < 3) {
-      setAddressSuggestions([]);
-      return;
+  const filteredSites = useMemo(() => {
+    let result = sites;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (s) => s.name.toLowerCase().includes(q) || (s.address && s.address.toLowerCase().includes(q))
+      );
     }
-    setIsSearchingAddress(true);
-    try {
-      const requestBody: { query: string; latitude?: number; longitude?: number } = { query };
-      
-      // Include user's location for better local results
-      if (userLocation) {
-        requestBody.latitude = userLocation.latitude;
-        requestBody.longitude = userLocation.longitude;
-      }
-      
-      const res = await fetch("/api/ai/address-autocomplete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(requestBody),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAddressSuggestions(data.suggestions || []);
-      }
-    } catch (err) {
-      console.error("Address search error:", err);
-    } finally {
-      setIsSearchingAddress(false);
+    if (selectedGroupFilter) {
+      result = result.filter((s) => s.groupId === selectedGroupFilter);
     }
-  }, [userLocation]);
+    return result;
+  }, [sites, searchQuery, selectedGroupFilter]);
 
-  const handleAddressChange = (value: string) => {
-    setNewSiteAddress(value);
-    if (addressSearchTimeoutRef.current) {
-      clearTimeout(addressSearchTimeoutRef.current);
-    }
-    addressSearchTimeoutRef.current = setTimeout(() => {
-      searchAddresses(value);
-    }, 300);
-  };
-
-  const fetchSatelliteImage = async (address: string) => {
-    setIsLoadingSatellite(true);
-    setSatelliteImageUrl(null);
-    setMapCoordinates(null);
-    setCapturedMapImage(null);
-    try {
-      const res = await fetch("/api/address-satellite-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ address }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSatelliteImageUrl(data.imageUrl);
-        if (data.coordinates) {
-          setMapCoordinates(data.coordinates);
-          setMapZoom(19);
-          checkStreetViewAvailability(data.coordinates.lat, data.coordinates.lng);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch satellite image:", err);
-    } finally {
-      setIsLoadingSatellite(false);
-    }
-  };
-
-  const checkStreetViewAvailability = async (lat: number, lng: number) => {
-    try {
-      const res = await fetch("/api/streetview-availability", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ lat, lng }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setStreetViewAvailable(data.available);
-      } else {
-        setStreetViewAvailable(false);
-      }
-    } catch (err) {
-      console.error("Failed to check Street View availability:", err);
-      setStreetViewAvailable(false);
-    }
-  };
-
-  const captureStreetView = async () => {
-    if (!mapCoordinates) return;
-    setIsCapturingStreetView(true);
-    try {
-      const coords = getAdjustedCoordinates();
-      const res = await fetch("/api/capture-streetview-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          lat: coords?.lat || mapCoordinates.lat,
-          lng: coords?.lng || mapCoordinates.lng,
-          heading: Math.round(streetViewHeading),
-          pitch: Math.round(streetViewPitch),
-          fov: Math.round(streetViewFov),
-          width: 640,
-          height: 480,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCapturedStreetViewImage(data.imageBase64);
-        toast({ title: "Street View captured", description: "Image captured successfully" });
-      } else {
-        toast({ title: "Capture failed", description: "Could not capture Street View", variant: "destructive" });
-      }
-    } catch (err) {
-      console.error("Failed to capture Street View:", err);
-      toast({ title: "Error", description: "Failed to capture Street View image", variant: "destructive" });
-    } finally {
-      setIsCapturingStreetView(false);
-    }
-  };
-
-  const handleAdditionalImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const imageBase64 = event.target?.result as string;
-        const id = `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        setAdditionalImages(prev => [
-          ...prev,
-          { id, title: file.name.replace(/\.[^/.]+$/, ""), imageBase64, type: "upload" }
-        ]);
-      };
-      reader.readAsDataURL(file);
+  const groupedSites = useMemo(() => {
+    const map: globalThis.Map<string | null, PlowSite[]> = new globalThis.Map();
+    filteredSites.forEach((s) => {
+      const key = s.groupId || null;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(s);
     });
-    
-    if (e.target) e.target.value = "";
-  };
-
-  const addStreetViewToAdditionalImages = () => {
-    if (!capturedStreetViewImage) return;
-    const id = `sv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    setAdditionalImages(prev => [
-      ...prev,
-      { id, title: `Street View ${Math.round(streetViewHeading)}°`, imageBase64: capturedStreetViewImage, type: "streetview" }
-    ]);
-    setCapturedStreetViewImage(null);
-    toast({ title: "Added", description: "Street View image added to site images" });
-  };
-
-  const addSatelliteToAdditionalImages = () => {
-    if (!capturedMapImage) return;
-    const id = `sat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    setAdditionalImages(prev => [
-      ...prev,
-      { id, title: `Overhead View (Zoom ${mapZoom})`, imageBase64: capturedMapImage, type: "upload" }
-    ]);
-    setCapturedMapImage(null);
-    toast({ title: "Added", description: "Overhead image added to site images" });
-  };
-
-  const removeAdditionalImage = (id: string) => {
-    setAdditionalImages(prev => prev.filter(img => img.id !== id));
-  };
-
-  // Street View navigation - arrows for rotation, forward/backward for walking
-  const moveStreetView = (direction: "forward" | "backward") => {
-    // Move ~10 meters in the direction of current heading
-    const distance = 0.0001; // roughly 10 meters
-    const headingRad = (streetViewHeading * Math.PI) / 180;
-    const multiplier = direction === "forward" ? 1 : -1;
-    setStreetViewOffset(prev => ({
-      lat: prev.lat + Math.cos(headingRad) * distance * multiplier,
-      lng: prev.lng + Math.sin(headingRad) * distance * multiplier
-    }));
-  };
-
-  const getStreetViewCoordinates = () => {
-    if (!mapCoordinates) return null;
-    return {
-      lat: mapCoordinates.lat + streetViewOffset.lat,
-      lng: mapCoordinates.lng + streetViewOffset.lng
-    };
-  };
-
-  const getImageDimensions = () => {
-    // Always use HD quality (scale=2 gives 1280x800 effective resolution)
-    switch (aspectRatio) {
-      case "1:1": return { width: 640, height: 640 };
-      case "2:3": return { width: 426, height: 640 };
-      case "3:4": return { width: 480, height: 640 };
-      case "16:9": return { width: 640, height: 360 };
-      default: return { width: 640, height: 360 };
-    }
-  };
-
-  const getAspectRatioClass = () => {
-    switch (aspectRatio) {
-      case "1:1": return "aspect-square";
-      case "2:3": return "aspect-[2/3]";
-      case "3:4": return "aspect-[3/4]";
-      case "16:9": return "aspect-video";
-      default: return "aspect-video";
-    }
-  };
-
-  const panMap = (direction: "up" | "down" | "left" | "right") => {
-    const panAmount = 0.000125 * Math.pow(2, 19 - mapZoom);
-    setMapOffset(prev => {
-      switch (direction) {
-        case "up": return { ...prev, lat: prev.lat + panAmount };
-        case "down": return { ...prev, lat: prev.lat - panAmount };
-        case "left": return { ...prev, lng: prev.lng - panAmount };
-        case "right": return { ...prev, lng: prev.lng + panAmount };
-        default: return prev;
-      }
-    });
-  };
-
-  const handleMapMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-    setDragStart({ x: e.clientX, y: e.clientY });
-    setDragDelta({ x: 0, y: 0 });
-  };
-
-  const handleMapMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !dragStart) return;
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Use CSS transform for smooth visual feedback
-    setDragDelta({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y
-    });
-  };
-
-  const handleMapMouseUp = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isDragging && (dragDelta.x !== 0 || dragDelta.y !== 0)) {
-      // Convert accumulated pixel movement to lat/lng offset
-      const pixelToLatLng = 0.00002 * Math.pow(2, 19 - mapZoom);
-      setMapOffset(prev => ({
-        lat: prev.lat + dragDelta.y * pixelToLatLng,
-        lng: prev.lng - dragDelta.x * pixelToLatLng
-      }));
-    }
-    setIsDragging(false);
-    setDragStart(null);
-    setDragDelta({ x: 0, y: 0 });
-  };
-
-  const handleMapWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.deltaY < 0) {
-      setMapZoom(prev => Math.min(21, prev + 1));
-    } else {
-      setMapZoom(prev => Math.max(15, prev - 1));
-    }
-  };
-
-  const handleMapTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      e.stopPropagation();
-      setIsDragging(true);
-      setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
-      setDragDelta({ x: 0, y: 0 });
-    }
-  };
-
-  const handleMapTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || !dragStart || e.touches.length !== 1) return;
-    e.preventDefault();
-    e.stopPropagation();
-    
-    setDragDelta({
-      x: e.touches[0].clientX - dragStart.x,
-      y: e.touches[0].clientY - dragStart.y
-    });
-  };
-
-  const handleMapTouchEnd = () => {
-    if (isDragging && (dragDelta.x !== 0 || dragDelta.y !== 0)) {
-      const pixelToLatLng = 0.00002 * Math.pow(2, 19 - mapZoom);
-      setMapOffset(prev => ({
-        lat: prev.lat + dragDelta.y * pixelToLatLng,
-        lng: prev.lng - dragDelta.x * pixelToLatLng
-      }));
-    }
-    setIsDragging(false);
-    setDragStart(null);
-    setDragDelta({ x: 0, y: 0 });
-  };
-
-  const getAdjustedCoordinates = () => {
-    if (!mapCoordinates) return null;
-    return {
-      lat: mapCoordinates.lat + mapOffset.lat,
-      lng: mapCoordinates.lng + mapOffset.lng
-    };
-  };
-
-  const captureMapView = async () => {
-    const coords = getAdjustedCoordinates();
-    if (!coords) return;
-    setIsCapturing(true);
-    
-    const dimensions = getImageDimensions();
-    
-    try {
-      // Fetch the image as base64 to avoid CORS issues on canvas
-      const res = await fetch("/api/capture-satellite-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ 
-          lat: coords.lat,
-          lng: coords.lng,
-          zoom: mapZoom,
-          width: dimensions.width,
-          height: dimensions.height
-        }),
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        if (data.imageBase64) {
-          setCapturedMapImage(data.imageBase64);
-          setUploadedImage(data.imageBase64);
-          setImageSource("satellite");
-          toast({ title: "View captured successfully!" });
-        }
-      } else {
-        toast({ title: "Failed to capture view", variant: "destructive" });
-      }
-    } catch (err) {
-      console.error("Failed to capture map view:", err);
-      toast({ title: "Failed to capture view", variant: "destructive" });
-    } finally {
-      setIsCapturing(false);
-    }
-  };
-
-  const handleAddressSelect = (address: string) => {
-    setNewSiteAddress(address);
-    setAddressSuggestions([]);
-    // Fetch satellite image for the selected address
-    fetchSatelliteImage(address);
-    setCreateStep("satellite");
-  };
-
-  const resetCreateDialog = () => {
-    setNewSiteName("");
-    setNewSiteAddress("");
-    setNewSiteGroupId(null);
-    setUploadedImage(null);
-    setAddressSuggestions([]);
-    setCreateStep("info");
-    setIsManualEntry(false);
-    setSatelliteImageUrl(null);
-    setImageSource(null);
-    setMapCoordinates(null);
-    setMapZoom(19);
-    setCapturedMapImage(null);
-    setIsCapturing(false);
-    setMapOffset({ lat: 0, lng: 0 });
-    setAspectRatio("16:9");
-    setDragDelta({ x: 0, y: 0 });
-    setStreetViewAvailable(false);
-    setStreetViewHeading(0);
-    setStreetViewPitch(0);
-    setStreetViewFov(90);
-    setCapturedStreetViewImage(null);
-    setAdditionalImages([]);
-  };
-
-  const filteredSites = selectedGroupFilter 
-    ? sites.filter(site => site.groupId === selectedGroupFilter)
-    : sites;
-
-  const createSite = useMutation({
-    mutationFn: async (data: { name: string; address?: string; groupId?: string; imageUrl?: string; imageSource?: string }) => {
-      const res = await fetch("/api/plow-sites", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to create site");
-      return res.json();
-    },
-    onSuccess: (site) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/plow-sites"] });
-      setSelectedSite(site);
-      setIsCreateDialogOpen(false);
-      setIsEditing(true);
-      resetCreateDialog();
-      toast({ title: "Site created successfully" });
-    },
-    onError: () => toast({ title: "Failed to create site", variant: "destructive" }),
-  });
-
-  const updateSite = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<PlowSite> }) => {
-      const res = await fetch(`/api/plow-sites/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to update site");
-      return res.json();
-    },
-    onSuccess: (site) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/plow-sites"] });
-      setSelectedSite(site);
-      toast({ title: "Site saved successfully" });
-    },
-    onError: () => toast({ title: "Failed to save site", variant: "destructive" }),
-  });
+    return map;
+  }, [filteredSites]);
 
   const deleteSite = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/plow-sites/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to delete site");
+      await apiRequest("DELETE", `/api/plow-sites/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/plow-sites"] });
-      setSelectedSite(null);
+      if (selectedSiteId) setSelectedSiteId(null);
       toast({ title: "Site deleted" });
     },
     onError: () => toast({ title: "Failed to delete site", variant: "destructive" }),
   });
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setUploadedImage(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleCreateSite = () => {
-    createSite.mutate({
-      name: newSiteName,
-      address: newSiteAddress,
-      groupId: newSiteGroupId || undefined,
-      imageUrl: uploadedImage || undefined,
-      imageSource: imageSource || (uploadedImage ? "upload" : undefined),
-    });
-  };
-
-  const handleCreateGroup = () => {
-    createGroup.mutate({
-      name: newGroupName,
-      groupType: newGroupType,
-      color: newGroupColor,
-    });
-  };
-
-  const getGroupIcon = (groupType: string) => {
-    switch (groupType) {
-      case "residential": return <Home className="h-4 w-4" />;
-      case "commercial": return <Building2 className="h-4 w-4" />;
-      case "route": return <Route className="h-4 w-4" />;
-      default: return <Tag className="h-4 w-4" />;
-    }
-  };
-
-  const handleSaveSite = () => {
-    if (!selectedSite) return;
-    updateSite.mutate({
-      id: selectedSite.id,
-      data: {
-        annotations: annotations as any,
-        instructions: instructions as any,
-        imageUrl: uploadedImage || selectedSite.imageUrl,
-      },
-    });
-    setIsEditing(false);
-  };
-
-  const loadSiteData = useCallback((site: PlowSite) => {
-    setAnnotations((site.annotations as Annotation[]) || []);
-    setInstructions((site.instructions as Instruction[]) || []);
-    if (site.imageUrl) {
-      setUploadedImage(site.imageUrl);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (selectedSite) {
-      loadSiteData(selectedSite);
-    }
-  }, [selectedSite, loadSiteData]);
-
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isEditing || currentTool === "select") return;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setIsDrawing(true);
-    setDrawStart({ x, y });
-  };
-
-  const handleCanvasMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !drawStart || !canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const endX = e.clientX - rect.left;
-    const endY = e.clientY - rect.top;
-
-    const newAnnotation: Annotation = {
-      id: crypto.randomUUID(),
-      type: currentTool as Annotation["type"],
-      x: drawStart.x,
-      y: drawStart.y,
-      color: currentColor,
-    };
-
-    if (currentTool === "rect") {
-      newAnnotation.width = Math.abs(endX - drawStart.x);
-      newAnnotation.height = Math.abs(endY - drawStart.y);
-      newAnnotation.x = Math.min(drawStart.x, endX);
-      newAnnotation.y = Math.min(drawStart.y, endY);
-    } else if (currentTool === "circle") {
-      newAnnotation.radius = Math.sqrt(Math.pow(endX - drawStart.x, 2) + Math.pow(endY - drawStart.y, 2));
-    } else if (currentTool === "line" || currentTool === "arrow") {
-      newAnnotation.endX = endX;
-      newAnnotation.endY = endY;
-    } else if (currentTool === "text") {
-      newAnnotation.text = "Label";
-    } else if (currentTool === "icon") {
-      newAnnotation.iconType = currentIcon;
-    }
-
-    setAnnotations([...annotations, newAnnotation]);
-    setIsDrawing(false);
-    setDrawStart(null);
-  };
-
-  const drawAnnotations = useCallback(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!ctx || !canvas) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (uploadedImage && imageRef.current) {
-      ctx.drawImage(imageRef.current, 0, 0, canvas.width, canvas.height);
-    }
-
-    annotations.forEach((ann) => {
-      ctx.strokeStyle = ann.color;
-      ctx.fillStyle = ann.color + "40";
-      ctx.lineWidth = 3;
-
-      if (ann.type === "rect" && ann.width && ann.height) {
-        ctx.beginPath();
-        ctx.rect(ann.x, ann.y, ann.width, ann.height);
-        ctx.fill();
-        ctx.stroke();
-      } else if (ann.type === "circle" && ann.radius) {
-        ctx.beginPath();
-        ctx.arc(ann.x, ann.y, ann.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-      } else if ((ann.type === "line" || ann.type === "arrow") && ann.endX !== undefined && ann.endY !== undefined) {
-        ctx.beginPath();
-        ctx.moveTo(ann.x, ann.y);
-        ctx.lineTo(ann.endX, ann.endY);
-        ctx.stroke();
-        if (ann.type === "arrow") {
-          const angle = Math.atan2(ann.endY - ann.y, ann.endX - ann.x);
-          ctx.beginPath();
-          ctx.moveTo(ann.endX, ann.endY);
-          ctx.lineTo(ann.endX - 15 * Math.cos(angle - Math.PI / 6), ann.endY - 15 * Math.sin(angle - Math.PI / 6));
-          ctx.lineTo(ann.endX - 15 * Math.cos(angle + Math.PI / 6), ann.endY - 15 * Math.sin(angle + Math.PI / 6));
-          ctx.closePath();
-          ctx.fillStyle = ann.color;
-          ctx.fill();
-        }
-      } else if (ann.type === "text" && ann.text) {
-        ctx.font = "bold 16px Arial";
-        ctx.fillStyle = ann.color;
-        ctx.fillText(ann.text, ann.x, ann.y);
-      } else if (ann.type === "icon") {
-        ctx.font = "24px Arial";
-        ctx.fillStyle = ann.color;
-        const iconEmoji = ann.iconType === "plow" ? "🚜" : ann.iconType === "salt" ? "🧂" : ann.iconType === "shovel" ? "⛏️" : ann.iconType === "warning" ? "⚠️" : "📍";
-        ctx.fillText(iconEmoji, ann.x, ann.y);
-      }
-    });
-  }, [annotations, uploadedImage]);
-
-  useEffect(() => {
-    drawAnnotations();
-  }, [drawAnnotations]);
-
-  useEffect(() => {
-    if (uploadedImage) {
-      const img = new Image();
-      img.onload = () => {
-        imageRef.current = img;
-        drawAnnotations();
-      };
-      img.src = uploadedImage;
-    }
-  }, [uploadedImage, drawAnnotations]);
-
-  // Auto-skip streetview step if street view is not available
-  useEffect(() => {
-    if (createStep === "streetview" && (!streetViewAvailable || !mapCoordinates || !mapsApiKey)) {
-      setCreateStep("photos");
-    }
-  }, [createStep, streetViewAvailable, mapCoordinates, mapsApiKey]);
-
-  const addInstruction = () => {
-    setInstructions([
-      ...instructions,
-      {
-        id: crypto.randomUUID(),
-        step: instructions.length + 1,
-        title: `Step ${instructions.length + 1}`,
-        description: "",
-      },
-    ]);
-  };
-
-  const updateInstruction = (id: string, updates: Partial<Instruction>) => {
-    setInstructions(instructions.map((i) => (i.id === id ? { ...i, ...updates } : i)));
-  };
-
-  const deleteInstruction = (id: string) => {
-    setInstructions(instructions.filter((i) => i.id !== id).map((i, idx) => ({ ...i, step: idx + 1 })));
-  };
-
-  const colors = [
-    { name: "Red", value: "#ef4444" },
-    { name: "Blue", value: "#3b82f6" },
-    { name: "Green", value: "#22c55e" },
-    { name: "Yellow", value: "#eab308" },
-    { name: "Orange", value: "#f97316" },
-    { name: "Purple", value: "#a855f7" },
-  ];
-
-  const icons = [
-    { name: "Plow", value: "plow", emoji: "🚜" },
-    { name: "Salt", value: "salt", emoji: "🧂" },
-    { name: "Shovel", value: "shovel", emoji: "⛏️" },
-    { name: "Warning", value: "warning", emoji: "⚠️" },
-    { name: "Marker", value: "marker", emoji: "📍" },
-  ];
-
-  if (!permissions?.canView) {
+  if (!canView) {
     return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="p-12 text-center">
-            <Snowflake className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
-            <p className="text-muted-foreground">You don't have access to the Plow Site Mapper tool.</p>
+      <div className="flex items-center justify-center h-full p-8" data-testid="no-access">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-6 text-center">
+            <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h2 className="text-xl font-semibold mb-2">No Access</h2>
+            <p className="text-muted-foreground">You don't have permission to view the Site Mapper.</p>
           </CardContent>
         </Card>
       </div>
@@ -952,1162 +174,1638 @@ export default function PlowSiteMapper() {
   }
 
   return (
-    <div className="p-6 space-y-6" data-testid="plow-site-mapper-page">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Snowflake className="h-6 w-6" />
-            Plow Site Mapper
-          </h1>
-          <p className="text-muted-foreground">Create and manage snow removal route maps for your properties</p>
-        </div>
-        {permissions?.canEdit && (
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-create-site">
-                <Plus className="h-4 w-4 mr-2" />
-                New Site
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden pb-20" data-testid="plow-site-mapper">
+      {sidebarOpen && (
+        <aside className="w-80 border-r bg-card flex flex-col shrink-0" data-testid="sidebar">
+          <div className="p-4 border-b space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <MapPin className="h-5 w-5" /> Sites
+              </h2>
+              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)} data-testid="close-sidebar">
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-5xl h-[90vh]">
-              <DialogHeader>
-                <DialogTitle>
-                  {createStep === "info" && "Step 1: Site Details"}
-                  {createStep === "satellite" && "Step 2: Overhead View"}
-                  {createStep === "streetview" && "Step 3: Street View"}
-                  {createStep === "photos" && "Step 4: Additional Photos"}
-                  {createStep === "confirm" && "Step 5: Confirm & Create"}
-                </DialogTitle>
-                <DialogDescription>
-                  {createStep === "info" && "Enter site name and address"}
-                  {createStep === "satellite" && "Use arrows to pan, zoom buttons to adjust view"}
-                  {createStep === "streetview" && "Use arrows to look around, buttons to zoom"}
-                  {createStep === "photos" && "Add any additional reference photos"}
-                  {createStep === "confirm" && "Review your site details"}
-                </DialogDescription>
-              </DialogHeader>
-              
-              {/* Step indicator */}
-              <div className="flex items-center justify-center gap-1 py-2">
-                <div className={`w-6 h-1 rounded ${createStep === "info" ? "bg-primary" : "bg-muted"}`} />
-                <div className={`w-6 h-1 rounded ${createStep === "satellite" ? "bg-primary" : "bg-muted"}`} />
-                <div className={`w-6 h-1 rounded ${createStep === "streetview" ? "bg-primary" : streetViewAvailable ? "bg-muted" : "bg-muted/30"}`} />
-                <div className={`w-6 h-1 rounded ${createStep === "photos" ? "bg-primary" : "bg-muted"}`} />
-                <div className={`w-6 h-1 rounded ${createStep === "confirm" ? "bg-primary" : "bg-muted"}`} />
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search sites..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="search-sites"
+              />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Badge
+                variant={selectedGroupFilter === null ? "default" : "outline"}
+                className="cursor-pointer text-xs"
+                onClick={() => setSelectedGroupFilter(null)}
+                data-testid="filter-all"
+              >
+                All
+              </Badge>
+              {groups.map((g) => (
+                <Badge
+                  key={g.id}
+                  variant={selectedGroupFilter === g.id ? "default" : "outline"}
+                  className="cursor-pointer text-xs"
+                  style={selectedGroupFilter === g.id ? { backgroundColor: g.color || undefined } : {}}
+                  onClick={() => setSelectedGroupFilter(selectedGroupFilter === g.id ? null : g.id)}
+                  data-testid={`filter-group-${g.id}`}
+                >
+                  {g.name}
+                </Badge>
+              ))}
+            </div>
+            {canEdit && (
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => setIsCreateSiteOpen(true)} className="flex-1" data-testid="new-site-btn">
+                  <Plus className="h-4 w-4 mr-1" /> New Site
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setIsCreateGroupOpen(true)} data-testid="new-group-btn">
+                  <FolderPlus className="h-4 w-4" />
+                </Button>
               </div>
-
-              {/* Step 1: Info */}
-              {createStep === "info" && (
-                <div className="space-y-4 py-4">
-                  {/* Toggle between address lookup and manual entry */}
-                  <div className="flex gap-2 p-1 bg-muted rounded-lg">
-                    <Button
-                      variant={!isManualEntry ? "default" : "ghost"}
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setIsManualEntry(false)}
-                    >
-                      <MapPin className="h-4 w-4 mr-2" />
-                      Find Address
-                    </Button>
-                    <Button
-                      variant={isManualEntry ? "default" : "ghost"}
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setIsManualEntry(true)}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Manual Entry
-                    </Button>
-                  </div>
-
-                  <div>
-                    <Label>Site Name</Label>
-                    <Input
-                      value={newSiteName}
-                      onChange={(e) => setNewSiteName(e.target.value)}
-                      placeholder="e.g., Johnson Property"
-                      data-testid="input-site-name"
-                    />
-                  </div>
-
-                  {!isManualEntry ? (
-                    <div className="relative">
-                      <Label>Address</Label>
-                      <div className="relative">
-                        <Input
-                          value={newSiteAddress}
-                          onChange={(e) => handleAddressChange(e.target.value)}
-                          placeholder="Start typing an address..."
-                          data-testid="input-site-address"
-                        />
-                        {isSearchingAddress && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      {addressSuggestions.length > 0 && (
-                        <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                          {addressSuggestions.map((suggestion, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              className="w-full px-3 py-2 text-left text-sm hover:bg-accent cursor-pointer"
-                              onClick={() => handleAddressSelect(suggestion)}
-                              data-testid={`address-suggestion-${idx}`}
-                            >
-                              <MapPin className="h-3 w-3 inline mr-2 text-muted-foreground" />
-                              {suggestion}
-                            </button>
-                          ))}
+            )}
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="p-2 space-y-1">
+              {sitesLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredSites.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8 text-sm">No sites found</p>
+              ) : (
+                <>
+                  {groups.filter((g) => !selectedGroupFilter || g.id === selectedGroupFilter).map((group) => {
+                    const groupSites = groupedSites.get(group.id) || [];
+                    if (groupSites.length === 0) return null;
+                    return (
+                      <div key={group.id} className="mb-2">
+                        <div className="flex items-center gap-2 px-2 py-1">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: group.color || "#6b7280" }} />
+                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{group.name}</span>
+                          <Badge variant="outline" className="text-xs ml-auto">{groupSites.length}</Badge>
                         </div>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Select an address to see satellite imagery
-                      </p>
-                      {newSiteAddress.length > 5 && addressSuggestions.length === 0 && !isSearchingAddress && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-2 w-full"
-                          onClick={() => handleAddressSelect(newSiteAddress)}
-                          data-testid="button-use-typed-address"
-                        >
-                          Use this address
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <div>
-                        <Label>Address (Optional)</Label>
-                        <Input
-                          value={newSiteAddress}
-                          onChange={(e) => setNewSiteAddress(e.target.value)}
-                          placeholder="Enter address manually..."
-                          data-testid="input-site-address-manual"
-                        />
-                      </div>
-                      <div>
-                        <Label>Property Image</Label>
-                        <div className="mt-2 space-y-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="w-full"
-                            data-testid="button-upload-image"
-                          >
-                            <Upload className="h-4 w-4 mr-2" />
-                            Upload Image
-                          </Button>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleImageUpload}
+                        {groupSites.map((site) => (
+                          <SiteCard
+                            key={site.id}
+                            site={site}
+                            isSelected={selectedSiteId === site.id}
+                            onSelect={() => { setSelectedSiteId(site.id); setActiveTab("map"); }}
+                            onDelete={canEdit ? () => deleteSite.mutate(site.id) : undefined}
                           />
-                          {uploadedImage && (
-                            <div className="relative">
-                              <img src={uploadedImage} alt="Preview" className="w-full h-40 object-cover rounded-lg" />
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                className="absolute top-2 right-2"
-                                onClick={() => setUploadedImage(null)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <div>
-                    <Label>Group (Optional)</Label>
-                    <Select value={newSiteGroupId || "none"} onValueChange={(val) => setNewSiteGroupId(val === "none" ? null : val)}>
-                      <SelectTrigger data-testid="select-site-group">
-                        <SelectValue placeholder="Select a group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Group</SelectItem>
-                        {groups.map((group) => (
-                          <SelectItem key={group.id} value={group.id}>
-                            <span className="flex items-center gap-2">
-                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: group.color || "#3b82f6" }} />
-                              {group.name}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Satellite View */}
-              {createStep === "satellite" && (
-                <div className="space-y-3">
-                  <div className="text-sm text-muted-foreground flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    {newSiteAddress}
-                  </div>
-
-                  {isLoadingSatellite ? (
-                    <div className="h-[450px] flex items-center justify-center bg-muted rounded-lg">
-                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                      <span className="ml-2 text-muted-foreground">Loading map...</span>
-                    </div>
-                  ) : mapCoordinates ? (
-                    <div 
-                      ref={mapPreviewRef}
-                      className={`relative rounded-lg overflow-hidden border-2 border-muted select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} h-[450px]`}
-                      onMouseDown={handleMapMouseDown}
-                      onMouseMove={handleMapMouseMove}
-                      onMouseUp={handleMapMouseUp}
-                      onMouseLeave={handleMapMouseUp}
-                      onWheel={handleMapWheel}
-                      onTouchStart={handleMapTouchStart}
-                      onTouchMove={handleMapTouchMove}
-                      onTouchEnd={handleMapTouchEnd}
-                    >
-                      <img 
-                        src={mapsApiKey && getAdjustedCoordinates() ? `https://maps.googleapis.com/maps/api/staticmap?center=${getAdjustedCoordinates()!.lat},${getAdjustedCoordinates()!.lng}&zoom=${mapZoom}&size=640x640&scale=2&maptype=satellite&key=${mapsApiKey}` : satelliteImageUrl || ''}
-                        alt="Satellite view" 
-                        className="w-full h-full object-cover pointer-events-none"
-                        style={{ transform: isDragging ? `translate(${dragDelta.x}px, ${dragDelta.y}px)` : 'none' }}
-                        draggable={false}
-                      />
-                      
-                      {/* Arrow navigation controls */}
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
-                        onClick={(e) => { e.stopPropagation(); panMap("left"); }}
-                        data-testid="button-satellite-left"
-                      >
-                        <ChevronLeft className="h-6 w-6" />
-                      </Button>
-                      
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="absolute right-14 top-1/2 -translate-y-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
-                        onClick={(e) => { e.stopPropagation(); panMap("right"); }}
-                        data-testid="button-satellite-right"
-                      >
-                        <ChevronRight className="h-6 w-6" />
-                      </Button>
-                      
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="absolute top-2 left-1/2 -translate-x-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
-                        onClick={(e) => { e.stopPropagation(); panMap("up"); }}
-                        data-testid="button-satellite-up"
-                      >
-                        <ChevronUp className="h-6 w-6" />
-                      </Button>
-                      
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="absolute bottom-12 left-1/2 -translate-x-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
-                        onClick={(e) => { e.stopPropagation(); panMap("down"); }}
-                        data-testid="button-satellite-down"
-                      >
-                        <ChevronDown className="h-6 w-6" />
-                      </Button>
-                      
-                      {/* Zoom controls */}
-                      <div className="absolute right-2 top-2 flex flex-col gap-1 z-10">
-                        <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/90 shadow-md"
-                          onClick={(e) => { e.stopPropagation(); setMapZoom(Math.min(21, mapZoom + 1)); }} disabled={mapZoom >= 21}>
-                          <ZoomIn className="h-4 w-4" />
-                        </Button>
-                        <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/90 shadow-md"
-                          onClick={(e) => { e.stopPropagation(); setMapZoom(Math.max(15, mapZoom - 1)); }} disabled={mapZoom <= 15}>
-                          <ZoomOut className="h-4 w-4" />
-                        </Button>
-                        <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/90 shadow-md"
-                          onClick={(e) => { e.stopPropagation(); setMapOffset({ lat: 0, lng: 0 }); }} title="Reset">
-                          <RotateCcw className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      {capturedMapImage && (
-                        <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1 z-10">
-                          <Camera className="h-3 w-3" /> Captured
-                        </div>
-                      )}
-                      
-                      <div className="absolute bottom-2 left-2 bg-background/90 text-foreground px-2 py-1 rounded text-xs z-10">
-                        Zoom: {mapZoom}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="h-[450px] flex flex-col items-center justify-center bg-muted rounded-lg gap-3">
-                      <span className="text-muted-foreground">Map not available</span>
-                      <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-                        <Upload className="h-4 w-4 mr-2" /> Upload Image Instead
-                      </Button>
-                    </div>
-                  )}
-
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      handleImageUpload(e);
-                      setImageSource("upload");
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* Step 3: Street View */}
-              {createStep === "streetview" && mapCoordinates && mapsApiKey && (
-                <div className="space-y-3">
-                  <div className="text-sm text-muted-foreground flex items-center gap-1">
-                    <Navigation className="h-4 w-4" />
-                    Street-level view of {newSiteAddress}
-                  </div>
-
-                  <div ref={streetViewRef} className="relative rounded-lg overflow-hidden border-2 border-muted h-[450px]">
-                    <img 
-                      src={`https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${getStreetViewCoordinates()?.lat || mapCoordinates.lat},${getStreetViewCoordinates()?.lng || mapCoordinates.lng}&heading=${Math.round(streetViewHeading)}&pitch=${Math.round(streetViewPitch)}&fov=${Math.round(streetViewFov)}&key=${mapsApiKey}`}
-                      alt="Street View"
-                      className="w-full h-full object-cover"
-                      draggable={false}
-                    />
-                    
-                    {/* Rotate left/right controls */}
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
-                      onClick={() => setStreetViewHeading(prev => (prev - 30 + 360) % 360)}
-                      data-testid="button-streetview-left"
-                      title="Rotate left"
-                    >
-                      <ChevronLeft className="h-6 w-6" />
-                    </Button>
-                    
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="absolute right-14 top-1/2 -translate-y-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
-                      onClick={() => setStreetViewHeading(prev => (prev + 30) % 360)}
-                      data-testid="button-streetview-right"
-                      title="Rotate right"
-                    >
-                      <ChevronRight className="h-6 w-6" />
-                    </Button>
-                    
-                    {/* Walk forward/backward controls */}
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="absolute top-2 left-1/2 -translate-x-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
-                      onClick={() => moveStreetView("forward")}
-                      data-testid="button-streetview-forward"
-                      title="Walk forward"
-                    >
-                      <ChevronUp className="h-6 w-6" />
-                    </Button>
-                    
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="absolute bottom-12 left-1/2 -translate-x-1/2 h-10 w-10 bg-background/90 hover:bg-background shadow-lg z-10"
-                      onClick={() => moveStreetView("backward")}
-                      data-testid="button-streetview-backward"
-                      title="Walk backward"
-                    >
-                      <ChevronDown className="h-6 w-6" />
-                    </Button>
-                    
-                    {/* Zoom and tilt controls */}
-                    <div className="absolute right-2 top-2 flex flex-col gap-1 z-10">
-                      <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/80 shadow-md"
-                        onClick={() => setStreetViewFov(prev => Math.max(30, prev - 15))}
-                        data-testid="button-streetview-zoom-in"
-                        title="Zoom in">
-                        <ZoomIn className="h-4 w-4" />
-                      </Button>
-                      <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/80 shadow-md"
-                        onClick={() => setStreetViewFov(prev => Math.min(120, prev + 15))}
-                        data-testid="button-streetview-zoom-out"
-                        title="Zoom out">
-                        <ZoomOut className="h-4 w-4" />
-                      </Button>
-                      <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/80 shadow-md"
-                        onClick={() => setStreetViewPitch(prev => Math.min(90, prev + 15))}
-                        data-testid="button-streetview-tilt-up"
-                        title="Look up">
-                        <ArrowUp className="h-4 w-4" />
-                      </Button>
-                      <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/80 shadow-md"
-                        onClick={() => setStreetViewPitch(prev => Math.max(-90, prev - 15))}
-                        data-testid="button-streetview-tilt-down"
-                        title="Look down">
-                        <ArrowDown className="h-4 w-4" />
-                      </Button>
-                      <Button variant="secondary" size="icon" className="h-8 w-8 bg-background/80 shadow-md"
-                        onClick={() => { setStreetViewHeading(0); setStreetViewPitch(0); setStreetViewFov(90); setStreetViewOffset({ lat: 0, lng: 0 }); }}
-                        data-testid="button-streetview-reset"
-                        title="Reset view">
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    
-                    {capturedStreetViewImage && (
-                      <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1 z-10">
-                        <Camera className="h-3 w-3" /> Captured
-                      </div>
-                    )}
-                    
-                    <div className="absolute bottom-2 left-2 bg-background/90 text-foreground px-2 py-1 rounded text-xs flex gap-2 z-10">
-                      <span>{Math.round(streetViewHeading)}°</span>
-                      <span>Pitch: {Math.round(streetViewPitch)}°</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 4: Additional Photos */}
-              {createStep === "photos" && (
-                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="flex items-center gap-2 text-base font-medium">
-                      <ImagePlus className="h-5 w-5" />
-                      Review All Photos
-                    </Label>
-                    <Button variant="outline" size="sm" onClick={() => additionalImageInputRef.current?.click()} data-testid="button-add-photos">
-                      <Upload className="h-4 w-4 mr-2" /> Upload More
-                    </Button>
-                    <input
-                      ref={additionalImageInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={handleAdditionalImageUpload}
-                    />
-                  </div>
-
-                  {/* Main Photos Grid - 2 columns for overhead and street view */}
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Overhead Image */}
-                    <div className="space-y-2">
-                      <span className="text-sm font-medium">Overhead View</span>
-                      <div className="relative group">
-                        {capturedMapImage ? (
-                          <img src={capturedMapImage} alt="Overhead" className="w-full h-48 object-cover rounded-lg border" />
-                        ) : (
-                          <div className="w-full h-48 flex items-center justify-center bg-muted rounded-lg border border-dashed">
-                            <p className="text-muted-foreground text-sm">Not captured</p>
-                          </div>
-                        )}
-                        <Button 
-                          variant="secondary" 
-                          size="sm" 
-                          className="absolute bottom-2 right-2 opacity-90"
-                          onClick={() => setCreateStep("satellite")}
-                        >
-                          <Camera className="h-4 w-4 mr-1" /> Recapture
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Street View Image */}
-                    {streetViewAvailable && (
-                      <div className="space-y-2">
-                        <span className="text-sm font-medium">Street View</span>
-                        <div className="relative group">
-                          {capturedStreetViewImage ? (
-                            <img src={capturedStreetViewImage} alt="Street View" className="w-full h-48 object-cover rounded-lg border" />
-                          ) : (
-                            <div className="w-full h-48 flex items-center justify-center bg-muted rounded-lg border border-dashed">
-                              <p className="text-muted-foreground text-sm">Not captured</p>
-                            </div>
-                          )}
-                          <Button 
-                            variant="secondary" 
-                            size="sm" 
-                            className="absolute bottom-2 right-2 opacity-90"
-                            onClick={() => setCreateStep("streetview")}
-                          >
-                            <Camera className="h-4 w-4 mr-1" /> {capturedStreetViewImage ? "Recapture" : "Capture"}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Additional Images */}
-                  {additionalImages.length > 0 && (
-                    <div className="space-y-2">
-                      <span className="text-sm font-medium">Additional Photos ({additionalImages.length})</span>
-                      <div className="grid grid-cols-3 gap-3">
-                        {additionalImages.map((img) => (
-                          <div key={img.id} className="relative group">
-                            <img src={img.imageBase64} alt={img.title} className="w-full h-32 object-cover rounded-lg border" />
-                            <Button 
-                              variant="destructive" 
-                              size="icon"
-                              className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => removeAdditionalImage(img.id)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-2 py-1 rounded-b-lg truncate">
-                              {img.type === "streetview" ? "Street View" : img.title}
-                            </div>
-                          </div>
                         ))}
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Step 5: Confirm */}
-              {createStep === "confirm" && (
-                <div className="space-y-4">
-                  <div className="bg-muted p-4 rounded-lg space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Site Name</Label>
-                        <p className="font-medium">{newSiteName}</p>
-                      </div>
-                      {newSiteGroupId && (
-                        <div>
-                          <Label className="text-muted-foreground text-xs">Group</Label>
-                          <p className="text-sm">{groups.find(g => g.id === newSiteGroupId)?.name || "None"}</p>
+                    );
+                  })}
+                  {(() => {
+                    const ungrouped = groupedSites.get(null) || [];
+                    if (ungrouped.length === 0 || selectedGroupFilter) return null;
+                    return (
+                      <div className="mb-2">
+                        <div className="flex items-center gap-2 px-2 py-1">
+                          <Folder className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Ungrouped</span>
+                          <Badge variant="outline" className="text-xs ml-auto">{ungrouped.length}</Badge>
                         </div>
-                      )}
-                    </div>
-                    {newSiteAddress && (
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Address</Label>
-                        <p className="text-sm">{newSiteAddress}</p>
+                        {ungrouped.map((site) => (
+                          <SiteCard
+                            key={site.id}
+                            site={site}
+                            isSelected={selectedSiteId === site.id}
+                            onSelect={() => { setSelectedSiteId(site.id); setActiveTab("map"); }}
+                            onDelete={canEdit ? () => deleteSite.mutate(site.id) : undefined}
+                          />
+                        ))}
                       </div>
-                    )}
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    {uploadedImage && (
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Main Image</Label>
-                        <img src={uploadedImage} alt="Property" className="w-full h-32 object-cover rounded-lg mt-1" />
-                      </div>
-                    )}
-                    {additionalImages.length > 0 && (
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Additional Images ({additionalImages.length})</Label>
-                        <div className="flex gap-1 mt-1 overflow-x-auto">
-                          {additionalImages.slice(0, 3).map((img) => (
-                            <img key={img.id} src={img.imageBase64} alt={img.title} className="h-32 w-20 object-cover rounded" />
-                          ))}
-                          {additionalImages.length > 3 && (
-                            <div className="h-32 w-20 bg-muted rounded flex items-center justify-center text-sm">
-                              +{additionalImages.length - 3}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                    );
+                  })()}
+                </>
               )}
+            </div>
+          </ScrollArea>
+        </aside>
+      )}
 
-              <DialogFooter className="flex-col sm:flex-row gap-2">
-                {createStep === "info" && (
-                  <>
-                    <Button variant="outline" onClick={() => { setIsCreateDialogOpen(false); resetCreateDialog(); }}>
-                      Cancel
-                    </Button>
-                    {isManualEntry && (
-                      <Button onClick={() => setCreateStep("photos")} disabled={!newSiteName} data-testid="button-next-step">
-                        Continue
-                      </Button>
-                    )}
-                  </>
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {!sidebarOpen && (
+          <div className="border-b p-2 flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} data-testid="open-sidebar">
+              <Menu className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium">{selectedSite?.name || "Site Mapper"}</span>
+          </div>
+        )}
+
+        {!selectedSite ? (
+          <div className="flex-1 flex items-center justify-center" data-testid="no-site-selected">
+            <div className="text-center space-y-4">
+              <MapPin className="h-16 w-16 mx-auto text-muted-foreground/30" />
+              <h2 className="text-xl font-semibold text-muted-foreground">Select a site</h2>
+              <p className="text-sm text-muted-foreground">Choose a site from the sidebar to view its map, photos, and markup.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="border-b px-4 py-2 flex items-center justify-between">
+              <div>
+                <h1 className="text-lg font-semibold" data-testid="site-name">{selectedSite.name}</h1>
+                {selectedSite.address && (
+                  <p className="text-sm text-muted-foreground" data-testid="site-address">{selectedSite.address}</p>
                 )}
-                {createStep === "satellite" && (
-                  <>
-                    <Button variant="outline" onClick={() => setCreateStep("info")}>Back</Button>
-                    <Button
-                      variant="outline"
-                      onClick={captureMapView}
-                      disabled={isCapturing}
-                      data-testid="button-capture-satellite"
-                    >
-                      <Camera className="h-4 w-4 mr-2" /> {isCapturing ? "Capturing..." : capturedMapImage ? "Recapture" : "Capture"}
+              </div>
+              {canEdit && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" data-testid="site-actions">
+                      <MoreVertical className="h-4 w-4" />
                     </Button>
-                    {capturedMapImage && (
-                      <Button 
-                        variant="outline" 
-                        onClick={addSatelliteToAdditionalImages}
-                        data-testid="button-add-satellite"
-                      >
-                        <Plus className="h-4 w-4 mr-2" /> Save & Add Another
-                      </Button>
-                    )}
-                    <Button
-                      onClick={() => setCreateStep(streetViewAvailable ? "streetview" : "photos")}
-                      disabled={!capturedMapImage}
-                      data-testid="button-next-step"
-                    >
-                      Next
-                    </Button>
-                  </>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => deleteSite.mutate(selectedSite.id)} className="text-destructive" data-testid="delete-site-action">
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete Site
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+              <TabsList className="mx-4 mt-2 w-fit">
+                <TabsTrigger value="map" data-testid="tab-map"><Map className="h-4 w-4 mr-1" /> Map</TabsTrigger>
+                <TabsTrigger value="photos" data-testid="tab-photos"><ImageIcon className="h-4 w-4 mr-1" /> Photos</TabsTrigger>
+                <TabsTrigger value="markup" data-testid="tab-markup"><Pencil className="h-4 w-4 mr-1" /> Markup</TabsTrigger>
+                <TabsTrigger value="instructions" data-testid="tab-instructions"><List className="h-4 w-4 mr-1" /> Instructions</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="map" className="flex-1 overflow-hidden m-0 p-0">
+                <MapTab site={selectedSite} canEdit={!!canEdit} />
+              </TabsContent>
+              <TabsContent value="photos" className="flex-1 overflow-auto m-0 p-4">
+                <PhotosTab
+                  site={selectedSite}
+                  canEdit={!!canEdit}
+                  onOpenMarkup={(photoId) => { setSelectedPhotoId(photoId); setActiveTab("markup"); }}
+                />
+              </TabsContent>
+              <TabsContent value="markup" className="flex-1 overflow-hidden m-0 p-0">
+                <MarkupTab
+                  site={selectedSite}
+                  canEdit={!!canEdit}
+                  selectedPhotoId={selectedPhotoId}
+                  onSelectPhoto={setSelectedPhotoId}
+                  selectedVariantId={selectedVariantId}
+                  onSelectVariant={setSelectedVariantId}
+                />
+              </TabsContent>
+              <TabsContent value="instructions" className="flex-1 overflow-auto m-0 p-4">
+                <InstructionsTab site={selectedSite} canEdit={!!canEdit} />
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
+      </main>
+
+      <CreateSiteDialog open={isCreateSiteOpen} onOpenChange={setIsCreateSiteOpen} groups={groups} />
+      <CreateGroupDialog open={isCreateGroupOpen} onOpenChange={setIsCreateGroupOpen} />
+    </div>
+  );
+}
+
+function SiteCard({ site, isSelected, onSelect, onDelete }: {
+  site: PlowSite;
+  isSelected: boolean;
+  onSelect: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors group ${
+        isSelected ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/50"
+      }`}
+      onClick={onSelect}
+      data-testid={`site-card-${site.id}`}
+    >
+      <div className="w-10 h-10 rounded bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+        {site.imageUrl ? (
+          <img src={site.imageUrl} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <MapPin className="h-4 w-4 text-muted-foreground" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{site.name}</p>
+        {site.address && <p className="text-xs text-muted-foreground truncate">{site.address}</p>}
+      </div>
+      {onDelete && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          data-testid={`delete-site-${site.id}`}
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function MapTab({ site, canEdit }: { site: PlowSite; canEdit: boolean }) {
+  const { toast } = useToast();
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const [isSatellite, setIsSatellite] = useState(false);
+  const [drawMode, setDrawMode] = useState<"none" | "marker" | "polyline" | "polygon">("none");
+  const [drawingPoints, setDrawingPoints] = useState<[number, number][]>([]);
+  const [featureName, setFeatureName] = useState("");
+  const [featureColor, setFeatureColor] = useState("#ef4444");
+
+  const hasCoords = site.latitude && site.longitude;
+  const lat = parseFloat(site.latitude || "0");
+  const lng = parseFloat(site.longitude || "0");
+
+  const { data: features = [], isLoading: featuresLoading } = useQuery<SiteMapFeature[]>({
+    queryKey: [`/api/plow-sites/${site.id}/map-features`],
+    enabled: !!hasCoords,
+  });
+
+  const { data: mapsConfig } = useQuery<{ apiKey: string }>({
+    queryKey: ["/api/maps-config"],
+  });
+
+  const createFeature = useMutation({
+    mutationFn: async (data: { name: string; featureType: string; geojson: any; color: string }) => {
+      const res = await apiRequest("POST", `/api/plow-sites/${site.id}/map-features`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/plow-sites/${site.id}/map-features`] });
+      setDrawMode("none");
+      setDrawingPoints([]);
+      setFeatureName("");
+      toast({ title: "Feature saved" });
+    },
+    onError: () => toast({ title: "Failed to save feature", variant: "destructive" }),
+  });
+
+  const deleteFeature = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/site-map-features/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/plow-sites/${site.id}/map-features`] });
+      toast({ title: "Feature deleted" });
+    },
+  });
+
+  const featuresKeyRef = useRef("");
+
+  useEffect(() => {
+    if (!mapContainerRef.current || !hasCoords) return;
+
+    const map = new maplibregl.Map({
+      container: mapContainerRef.current,
+      style: {
+        version: 8,
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            tileSize: 256,
+            attribution: "&copy; OpenStreetMap",
+          },
+        },
+        layers: [{ id: "osm", type: "raster", source: "osm" }],
+      },
+      center: [lng, lat],
+      zoom: 16,
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+    new maplibregl.Marker({ color: "#ef4444" }).setLngLat([lng, lat]).addTo(map);
+
+    mapRef.current = map;
+    return () => { map.remove(); mapRef.current = null; };
+  }, [hasCoords, lat, lng]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !features.length) return;
+    const key = features.map((f) => f.id).sort().join(",");
+    if (key === featuresKeyRef.current) return;
+    featuresKeyRef.current = key;
+
+    const renderFeatures = () => {
+      features.forEach((f) => {
+        if (!f.geojson) return;
+        const sourceId = `feature-${f.id}`;
+        if (map.getSource(sourceId)) return;
+        try {
+          map.addSource(sourceId, { type: "geojson", data: f.geojson as any });
+          const ft = f.featureType;
+          if (ft === "marker") {
+            const coords = (f.geojson as any)?.geometry?.coordinates || [lng, lat];
+            new maplibregl.Marker({ color: f.color || "#3b82f6" })
+              .setLngLat(coords as [number, number])
+              .addTo(map);
+          } else if (ft === "polyline") {
+            map.addLayer({
+              id: sourceId,
+              type: "line",
+              source: sourceId,
+              paint: { "line-color": f.color || "#3b82f6", "line-width": 3 },
+            });
+          } else if (ft === "polygon") {
+            map.addLayer({
+              id: `${sourceId}-fill`,
+              type: "fill",
+              source: sourceId,
+              paint: { "fill-color": f.color || "#3b82f6", "fill-opacity": 0.2 },
+            });
+            map.addLayer({
+              id: `${sourceId}-line`,
+              type: "line",
+              source: sourceId,
+              paint: { "line-color": f.color || "#3b82f6", "line-width": 2 },
+            });
+          }
+        } catch (e) {
+          console.warn("Failed to render feature", f.id, e);
+        }
+      });
+    };
+
+    if (map.loaded()) {
+      renderFeatures();
+    } else {
+      map.on("load", renderFeatures);
+    }
+  }, [features, lng, lat]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !hasCoords) return;
+
+    if (isSatellite && mapsConfig?.apiKey) {
+      const satSourceId = "google-sat";
+      if (!map.getSource(satSourceId)) {
+        map.addSource(satSourceId, {
+          type: "raster",
+          tiles: [
+            `https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}&key=${mapsConfig.apiKey}`,
+          ],
+          tileSize: 256,
+        });
+        map.addLayer({ id: "google-sat-layer", type: "raster", source: satSourceId }, "osm");
+      }
+      map.setLayoutProperty("google-sat-layer", "visibility", "visible");
+      map.setLayoutProperty("osm", "visibility", "none");
+    } else {
+      const map2 = mapRef.current;
+      if (map2) {
+        try {
+          if (map2.getLayer("google-sat-layer")) map2.setLayoutProperty("google-sat-layer", "visibility", "none");
+          map2.setLayoutProperty("osm", "visibility", "visible");
+        } catch {}
+      }
+    }
+  }, [isSatellite, mapsConfig, hasCoords]);
+
+  const handleMapClick = useCallback((e: maplibregl.MapMouseEvent) => {
+    if (drawMode === "none") return;
+    const { lng, lat } = e.lngLat;
+    if (drawMode === "marker") {
+      const geojson = {
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [lng, lat] },
+        properties: {},
+      };
+      createFeature.mutate({ name: featureName || "Marker", featureType: "marker", geojson, color: featureColor });
+    } else {
+      setDrawingPoints((prev) => [...prev, [lng, lat]]);
+    }
+  }, [drawMode, featureName, featureColor, createFeature]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.on("click", handleMapClick);
+    return () => { map.off("click", handleMapClick); };
+  }, [handleMapClick]);
+
+  const finishDrawing = () => {
+    if (drawingPoints.length < 2) return;
+    const ft = drawMode === "polygon" ? "polygon" : "polyline";
+    const coords = ft === "polygon" ? [...drawingPoints, drawingPoints[0]] : drawingPoints;
+    const geojson = {
+      type: "Feature",
+      geometry: {
+        type: ft === "polygon" ? "Polygon" : "LineString",
+        coordinates: ft === "polygon" ? [coords] : coords,
+      },
+      properties: {},
+    };
+    createFeature.mutate({ name: featureName || (ft === "polygon" ? "Polygon" : "Polyline"), featureType: ft, geojson, color: featureColor });
+  };
+
+  if (!hasCoords) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8" data-testid="no-coords">
+        <div className="text-center space-y-2">
+          <Navigation className="h-12 w-12 mx-auto text-muted-foreground/40" />
+          <h3 className="font-medium">No coordinates</h3>
+          <p className="text-sm text-muted-foreground">Enter an address for this site to view the map.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 relative">
+        <div ref={mapContainerRef} className="absolute inset-0" data-testid="map-container" />
+        <div className="absolute top-3 left-3 flex gap-2 z-10">
+          <Button
+            size="sm"
+            variant={isSatellite ? "default" : "secondary"}
+            onClick={() => setIsSatellite(!isSatellite)}
+            data-testid="toggle-satellite"
+          >
+            <Satellite className="h-4 w-4 mr-1" /> Satellite
+          </Button>
+        </div>
+        {canEdit && (
+          <div className="absolute bottom-3 left-3 flex gap-2 z-10">
+            <Button
+              size="sm"
+              variant={drawMode === "marker" ? "default" : "secondary"}
+              onClick={() => setDrawMode(drawMode === "marker" ? "none" : "marker")}
+              data-testid="draw-marker"
+            >
+              <Crosshair className="h-4 w-4 mr-1" /> Marker
+            </Button>
+            <Button
+              size="sm"
+              variant={drawMode === "polyline" ? "default" : "secondary"}
+              onClick={() => { setDrawMode(drawMode === "polyline" ? "none" : "polyline"); setDrawingPoints([]); }}
+              data-testid="draw-polyline"
+            >
+              <PenTool className="h-4 w-4 mr-1" /> Line
+            </Button>
+            <Button
+              size="sm"
+              variant={drawMode === "polygon" ? "default" : "secondary"}
+              onClick={() => { setDrawMode(drawMode === "polygon" ? "none" : "polygon"); setDrawingPoints([]); }}
+              data-testid="draw-polygon"
+            >
+              <Pentagon className="h-4 w-4 mr-1" /> Polygon
+            </Button>
+            {drawingPoints.length >= 2 && (
+              <Button size="sm" onClick={finishDrawing} data-testid="finish-drawing">
+                <Save className="h-4 w-4 mr-1" /> Finish
+              </Button>
+            )}
+          </div>
+        )}
+        {drawMode !== "none" && canEdit && (
+          <div className="absolute top-3 right-14 z-10 bg-card border rounded-lg p-3 space-y-2 w-48">
+            <Input
+              placeholder="Feature name"
+              value={featureName}
+              onChange={(e) => setFeatureName(e.target.value)}
+              className="h-8 text-sm"
+              data-testid="feature-name-input"
+            />
+            <div className="flex gap-1 flex-wrap">
+              {PRESET_COLORS.slice(0, 6).map((c) => (
+                <button
+                  key={c}
+                  className={`w-6 h-6 rounded-full border-2 ${featureColor === c ? "border-foreground" : "border-transparent"}`}
+                  style={{ backgroundColor: c }}
+                  onClick={() => setFeatureColor(c)}
+                  data-testid={`feature-color-${c}`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="w-64 border-l bg-card overflow-auto p-3 space-y-3" data-testid="features-panel">
+        <h3 className="text-sm font-semibold">Map Features</h3>
+        {featuresLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+        ) : features.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No features yet. Use draw tools to add markers, lines, or polygons.</p>
+        ) : (
+          <div className="space-y-1">
+            {features.map((f) => (
+              <div key={f.id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 group" data-testid={`feature-${f.id}`}>
+                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: f.color || "#3b82f6" }} />
+                <span className="text-sm flex-1 truncate">{f.name || f.featureType}</span>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                    onClick={() => deleteFeature.mutate(f.id)}
+                    data-testid={`delete-feature-${f.id}`}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 )}
-                {createStep === "streetview" && (
-                  <>
-                    <Button variant="outline" onClick={() => setCreateStep("satellite")}>Back</Button>
-                    <Button
-                      variant="outline"
-                      onClick={captureStreetView}
-                      disabled={isCapturingStreetView}
-                      data-testid="button-capture-streetview"
-                    >
-                      <Camera className="h-4 w-4 mr-2" /> {isCapturingStreetView ? "Capturing..." : capturedStreetViewImage ? "Recapture" : "Capture"}
-                    </Button>
-                    {capturedStreetViewImage && (
-                      <Button 
-                        variant="outline" 
-                        onClick={addStreetViewToAdditionalImages}
-                        data-testid="button-add-streetview"
-                      >
-                        <Plus className="h-4 w-4 mr-2" /> Save & Add Another
-                      </Button>
-                    )}
-                    <Button
-                      onClick={() => setCreateStep("photos")}
-                      data-testid="button-next-step"
-                    >
-                      {capturedStreetViewImage ? "Next" : "Skip"}
-                    </Button>
-                  </>
-                )}
-                {createStep === "photos" && (
-                  <>
-                    <Button variant="outline" onClick={() => setCreateStep(streetViewAvailable && mapCoordinates ? "streetview" : mapCoordinates ? "satellite" : "info")}>
-                      Back
-                    </Button>
-                    <Button onClick={() => setCreateStep("confirm")} data-testid="button-next-step">
-                      Review Site
-                    </Button>
-                  </>
-                )}
-                {createStep === "confirm" && (
-                  <>
-                    <Button variant="outline" onClick={() => setCreateStep("photos")}>Back</Button>
-                    <Button 
-                      onClick={handleCreateSite} 
-                      disabled={!newSiteName || createSite.isPending} 
-                      data-testid="button-submit-site"
-                    >
-                      Create Site
-                    </Button>
-                  </>
-                )}
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PhotosTab({ site, canEdit, onOpenMarkup }: {
+  site: PlowSite;
+  canEdit: boolean;
+  onOpenMarkup: (photoId: string) => void;
+}) {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: photos = [], isLoading } = useQuery<SitePhoto[]>({
+    queryKey: [`/api/plow-sites/${site.id}/site-photos`],
+  });
+
+  const createPhoto = useMutation({
+    mutationFn: async (data: { imageUrl: string; title: string; source: string; width: number; height: number }) => {
+      const res = await apiRequest("POST", `/api/plow-sites/${site.id}/site-photos`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/plow-sites/${site.id}/site-photos`] });
+      toast({ title: "Photo uploaded" });
+    },
+    onError: () => toast({ title: "Failed to upload photo", variant: "destructive" }),
+  });
+
+  const deletePhoto = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/site-photos/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/plow-sites/${site.id}/site-photos`] });
+      toast({ title: "Photo deleted" });
+    },
+  });
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new window.Image();
+      img.onload = () => {
+        createPhoto.mutate({
+          imageUrl: dataUrl,
+          title: file.name.replace(/\.[^.]+$/, ""),
+          source: "upload",
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        });
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          Photos <Badge variant="outline">{photos.length}</Badge>
+        </h3>
+        {canEdit && (
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileUpload}
+              data-testid="photo-file-input"
+            />
+            <Button size="sm" onClick={() => fileInputRef.current?.click()} data-testid="upload-photo-btn">
+              <Upload className="h-4 w-4 mr-1" /> Upload Photo
+            </Button>
+          </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-1 space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Folder className="h-4 w-4" />
-                  Groups
-                </CardTitle>
-                {permissions?.canEdit && (
-                  <Dialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="sm" data-testid="button-create-group">
-                        <FolderPlus className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Create Group</DialogTitle>
-                        <DialogDescription>Organize your sites into groups</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div>
-                          <Label>Group Name</Label>
-                          <Input
-                            value={newGroupName}
-                            onChange={(e) => setNewGroupName(e.target.value)}
-                            placeholder="e.g., Downtown Route"
-                            data-testid="input-group-name"
-                          />
-                        </div>
-                        <div>
-                          <Label>Type</Label>
-                          <Select value={newGroupType} onValueChange={setNewGroupType}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="residential">
-                                <span className="flex items-center gap-2"><Home className="h-4 w-4" /> Residential</span>
-                              </SelectItem>
-                              <SelectItem value="commercial">
-                                <span className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Commercial</span>
-                              </SelectItem>
-                              <SelectItem value="route">
-                                <span className="flex items-center gap-2"><Route className="h-4 w-4" /> Route</span>
-                              </SelectItem>
-                              <SelectItem value="custom">
-                                <span className="flex items-center gap-2"><Tag className="h-4 w-4" /> Custom</span>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label>Color</Label>
-                          <div className="flex gap-2 mt-2">
-                            {["#3b82f6", "#22c55e", "#eab308", "#f97316", "#ef4444", "#a855f7", "#ec4899"].map((color) => (
-                              <button
-                                key={color}
-                                type="button"
-                                onClick={() => setNewGroupColor(color)}
-                                className={`w-8 h-8 rounded-full transition-all ${newGroupColor === color ? "ring-2 ring-offset-2 ring-primary" : ""}`}
-                                style={{ backgroundColor: color }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsGroupDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleCreateGroup} disabled={!newGroupName || createGroup.isPending}>
-                          Create Group
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-1">
-              <button
-                type="button"
-                onClick={() => setSelectedGroupFilter(null)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                  selectedGroupFilter === null ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
-                }`}
-                data-testid="filter-all-sites"
-              >
-                All Sites ({sites.length})
-              </button>
-              {groups.map((group) => {
-                const groupSiteCount = sites.filter(s => s.groupId === group.id).length;
-                return (
-                  <div key={group.id} className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedGroupFilter(group.id)}
-                      className={`flex-1 text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 ${
-                        selectedGroupFilter === group.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
-                      }`}
-                      data-testid={`filter-group-${group.id}`}
-                    >
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: group.color || "#3b82f6" }} />
-                      {getGroupIcon(group.groupType || "custom")}
-                      <span className="flex-1 truncate">{group.name}</span>
-                      <span className="text-xs text-muted-foreground">({groupSiteCount})</span>
-                    </button>
-                    {permissions?.canEdit && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        onClick={() => deleteGroup.mutate(group.id)}
-                        data-testid={`delete-group-${group.id}`}
-                      >
-                        <Trash2 className="h-3 w-3 text-muted-foreground" />
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Sites</CardTitle>
-              <CardDescription>
-                {selectedGroupFilter ? `${filteredSites.length} in group` : `${sites.length} total`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 max-h-[400px] overflow-y-auto">
-              {filteredSites.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  {selectedGroupFilter ? "No sites in this group" : "No sites yet"}
-                </p>
-              ) : (
-                filteredSites.map((site) => {
-                  const siteGroup = groups.find(g => g.id === site.groupId);
-                  return (
-                    <div
-                      key={site.id}
-                      onClick={() => {
-                        setSelectedSite(site);
-                        setIsEditing(false);
-                      }}
-                      className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                        selectedSite?.id === site.id ? "bg-primary/10 border border-primary" : "bg-muted/50 hover:bg-muted"
-                      }`}
-                      data-testid={`card-site-${site.id}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {siteGroup && (
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: siteGroup.color || "#3b82f6" }} />
-                        )}
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium text-sm">{site.name}</span>
-                      </div>
-                      {site.address && (
-                        <p className="text-xs text-muted-foreground mt-1 ml-6">{site.address}</p>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </CardContent>
-          </Card>
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
+      ) : photos.length === 0 ? (
+        <Card data-testid="no-photos">
+          <CardContent className="py-12 text-center">
+            <ImageIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+            <p className="text-muted-foreground">No photos yet. Upload a photo to get started.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {photos.map((photo) => (
+            <Card key={photo.id} className="overflow-hidden group cursor-pointer" data-testid={`photo-card-${photo.id}`}>
+              <div className="relative aspect-video bg-muted" onClick={() => onOpenMarkup(photo.id)}>
+                <img src={photo.imageUrl} alt={photo.title || ""} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                  <Pencil className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              <CardContent className="p-3 flex items-center justify-between">
+                <p className="text-sm truncate flex-1">{photo.title || "Untitled"}</p>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    onClick={(e) => { e.stopPropagation(); deletePhoto.mutate(photo.id); }}
+                    data-testid={`delete-photo-${photo.id}`}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-        <div className="lg:col-span-3">
-          {selectedSite ? (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>{selectedSite.name}</CardTitle>
-                    {selectedSite.address && <CardDescription>{selectedSite.address}</CardDescription>}
-                  </div>
-                  <div className="flex gap-2">
-                    {permissions?.canEdit && !isEditing && (
-                      <Button variant="outline" onClick={() => setIsEditing(true)} data-testid="button-edit-site">
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </Button>
-                    )}
-                    {isEditing && (
+function MarkupTab({ site, canEdit, selectedPhotoId, onSelectPhoto, selectedVariantId, onSelectVariant }: {
+  site: PlowSite;
+  canEdit: boolean;
+  selectedPhotoId: string | null;
+  onSelectPhoto: (id: string | null) => void;
+  selectedVariantId: string | null;
+  onSelectVariant: (id: string | null) => void;
+}) {
+  const { toast } = useToast();
+  const stageRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const [tool, setTool] = useState<"select" | "pen" | "arrow" | "line" | "rect" | "circle" | "text">("select");
+  const [color, setColor] = useState("#ef4444");
+  const [strokeWidth, setStrokeWidth] = useState(4);
+  const [stageScale, setStageScale] = useState(1);
+  const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
+
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [undoStack, setUndoStack] = useState<Annotation[][]>([]);
+  const [redoStack, setRedoStack] = useState<Annotation[][]>([]);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [currentAnnotation, setCurrentAnnotation] = useState<Annotation | null>(null);
+  const [textInput, setTextInput] = useState<{ x: number; y: number } | null>(null);
+  const [textValue, setTextValue] = useState("");
+
+  const { data: photos = [] } = useQuery<SitePhoto[]>({
+    queryKey: [`/api/plow-sites/${site.id}/site-photos`],
+  });
+
+  const selectedPhoto = photos.find((p) => p.id === selectedPhotoId) || null;
+  const bgImage = useLoadImage(selectedPhoto?.imageUrl || null);
+
+  const imgW = selectedPhoto?.width || bgImage?.naturalWidth || 800;
+  const imgH = selectedPhoto?.height || bgImage?.naturalHeight || 600;
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const obs = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setStageSize({ width, height });
+    });
+    obs.observe(containerRef.current);
+    return () => obs.disconnect();
+  }, []);
+
+  const fitScale = useMemo(() => {
+    if (!imgW || !imgH) return 1;
+    const sx = stageSize.width / imgW;
+    const sy = stageSize.height / imgH;
+    return Math.min(sx, sy, 1);
+  }, [stageSize, imgW, imgH]);
+
+  const displayScale = fitScale * stageScale;
+
+  const { data: variants = [] } = useQuery<SitePhotoVariant[]>({
+    queryKey: [`/api/site-photos/${selectedPhotoId}/variants`],
+    enabled: !!selectedPhotoId,
+  });
+
+  const createVariant = useMutation({
+    mutationFn: async (data: { name: string; annotations: any }) => {
+      const res = await apiRequest("POST", `/api/site-photos/${selectedPhotoId}/variants`, data);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/site-photos/${selectedPhotoId}/variants`] });
+      onSelectVariant(data.id);
+      toast({ title: "Variant created" });
+    },
+  });
+
+  const updateVariant = useMutation({
+    mutationFn: async ({ id, annotations }: { id: string; annotations: any }) => {
+      await apiRequest("PATCH", `/api/site-photo-variants/${id}`, { annotations });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/site-photos/${selectedPhotoId}/variants`] });
+      toast({ title: "Annotations saved" });
+    },
+    onError: () => toast({ title: "Failed to save annotations", variant: "destructive" }),
+  });
+
+  const deleteVariant = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/site-photo-variants/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/site-photos/${selectedPhotoId}/variants`] });
+      onSelectVariant(null);
+      toast({ title: "Variant deleted" });
+    },
+  });
+
+  useEffect(() => {
+    if (!selectedVariantId) {
+      setAnnotations([]);
+      return;
+    }
+    const v = variants.find((v) => v.id === selectedVariantId);
+    if (v?.annotations && Array.isArray(v.annotations)) {
+      setAnnotations(v.annotations as Annotation[]);
+    } else {
+      setAnnotations([]);
+    }
+    setUndoStack([]);
+    setRedoStack([]);
+  }, [selectedVariantId, variants]);
+
+  const pushUndo = () => {
+    setUndoStack((prev) => [...prev, annotations]);
+    setRedoStack([]);
+  };
+
+  const undo = () => {
+    if (undoStack.length === 0) return;
+    const prev = undoStack[undoStack.length - 1];
+    setRedoStack((rs) => [...rs, annotations]);
+    setAnnotations(prev);
+    setUndoStack((us) => us.slice(0, -1));
+  };
+
+  const redo = () => {
+    if (redoStack.length === 0) return;
+    const next = redoStack[redoStack.length - 1];
+    setUndoStack((us) => [...us, annotations]);
+    setAnnotations(next);
+    setRedoStack((rs) => rs.slice(0, -1));
+  };
+
+  const toNorm = (px: number, dim: number) => px / dim;
+
+  const handleMouseDown = (e: any) => {
+    if (tool === "select" || !selectedVariantId) return;
+    const stage = e.target.getStage();
+    const pos = stage.getPointerPosition();
+    if (!pos) return;
+    const x = (pos.x / displayScale);
+    const y = (pos.y / displayScale);
+    const nx = toNorm(x, imgW);
+    const ny = toNorm(y, imgH);
+
+    if (tool === "text") {
+      setTextInput({ x: nx, y: ny });
+      setTextValue("");
+      return;
+    }
+
+    setIsDrawing(true);
+    pushUndo();
+
+    const ann: Annotation = {
+      id: genId(),
+      type: tool,
+      color,
+      strokeWidth,
+    };
+
+    if (tool === "pen") {
+      ann.points = [nx, ny];
+    } else if (tool === "line" || tool === "arrow") {
+      ann.points = [nx, ny, nx, ny];
+    } else if (tool === "rect") {
+      ann.x = nx; ann.y = ny; ann.width = 0; ann.height = 0;
+    } else if (tool === "circle") {
+      ann.x = nx; ann.y = ny; ann.radius = 0;
+    }
+
+    setCurrentAnnotation(ann);
+  };
+
+  const handleMouseMove = (e: any) => {
+    if (!isDrawing || !currentAnnotation) return;
+    const stage = e.target.getStage();
+    const pos = stage.getPointerPosition();
+    if (!pos) return;
+    const x = pos.x / displayScale;
+    const y = pos.y / displayScale;
+    const nx = toNorm(x, imgW);
+    const ny = toNorm(y, imgH);
+
+    const updated = { ...currentAnnotation };
+    if (updated.type === "pen" && updated.points) {
+      updated.points = [...updated.points, nx, ny];
+    } else if ((updated.type === "line" || updated.type === "arrow") && updated.points) {
+      updated.points = [updated.points[0], updated.points[1], nx, ny];
+    } else if (updated.type === "rect") {
+      updated.width = nx - (updated.x || 0);
+      updated.height = ny - (updated.y || 0);
+    } else if (updated.type === "circle") {
+      const dx = nx - (updated.x || 0);
+      const dy = ny - (updated.y || 0);
+      updated.radius = Math.sqrt(dx * dx + dy * dy);
+    }
+    setCurrentAnnotation(updated);
+  };
+
+  const handleMouseUp = () => {
+    if (!isDrawing || !currentAnnotation) return;
+    setIsDrawing(false);
+    setAnnotations((prev) => [...prev, currentAnnotation]);
+    setCurrentAnnotation(null);
+  };
+
+  const addTextAnnotation = () => {
+    if (!textInput || !textValue.trim()) { setTextInput(null); return; }
+    pushUndo();
+    setAnnotations((prev) => [
+      ...prev,
+      { id: genId(), type: "text", x: textInput.x, y: textInput.y, text: textValue.trim(), color, strokeWidth },
+    ]);
+    setTextInput(null);
+    setTextValue("");
+  };
+
+  const saveAnnotations = () => {
+    if (!selectedVariantId) return;
+    updateVariant.mutate({ id: selectedVariantId, annotations });
+  };
+
+  const handleNewVariant = () => {
+    const names = variants.map((v) => v.name);
+    let letter = "A";
+    for (let i = 0; i < 26; i++) {
+      const ch = String.fromCharCode(65 + i);
+      if (!names.includes(ch)) { letter = ch; break; }
+    }
+    createVariant.mutate({ name: letter, annotations: [] });
+  };
+
+  const renderAnnotation = (ann: Annotation, isTemp = false) => {
+    const key = isTemp ? `temp-${ann.id}` : ann.id;
+    const sw = ann.strokeWidth;
+    if (ann.type === "pen" && ann.points) {
+      return (
+        <Line
+          key={key}
+          points={ann.points.map((p, i) => p * (i % 2 === 0 ? imgW : imgH))}
+          stroke={ann.color}
+          strokeWidth={sw}
+          tension={0.3}
+          lineCap="round"
+          lineJoin="round"
+          globalCompositeOperation="source-over"
+        />
+      );
+    }
+    if (ann.type === "line" && ann.points) {
+      return (
+        <Line
+          key={key}
+          points={ann.points.map((p, i) => p * (i % 2 === 0 ? imgW : imgH))}
+          stroke={ann.color}
+          strokeWidth={sw}
+          lineCap="round"
+        />
+      );
+    }
+    if (ann.type === "arrow" && ann.points) {
+      return (
+        <KonvaArrow
+          key={key}
+          points={ann.points.map((p, i) => p * (i % 2 === 0 ? imgW : imgH))}
+          stroke={ann.color}
+          strokeWidth={sw}
+          fill={ann.color}
+          pointerLength={sw * 3}
+          pointerWidth={sw * 3}
+        />
+      );
+    }
+    if (ann.type === "rect") {
+      return (
+        <Rect
+          key={key}
+          x={(ann.x || 0) * imgW}
+          y={(ann.y || 0) * imgH}
+          width={(ann.width || 0) * imgW}
+          height={(ann.height || 0) * imgH}
+          stroke={ann.color}
+          strokeWidth={sw}
+        />
+      );
+    }
+    if (ann.type === "circle") {
+      const r = (ann.radius || 0) * Math.min(imgW, imgH);
+      return (
+        <KonvaCircle
+          key={key}
+          x={(ann.x || 0) * imgW}
+          y={(ann.y || 0) * imgH}
+          radius={r}
+          stroke={ann.color}
+          strokeWidth={sw}
+        />
+      );
+    }
+    if (ann.type === "text") {
+      return (
+        <KonvaText
+          key={key}
+          x={(ann.x || 0) * imgW}
+          y={(ann.y || 0) * imgH}
+          text={ann.text || ""}
+          fill={ann.color}
+          fontSize={sw * 4}
+        />
+      );
+    }
+    return null;
+  };
+
+  if (!selectedPhoto) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8" data-testid="no-photo-selected">
+        <div className="text-center space-y-3">
+          <ImageIcon className="h-16 w-16 mx-auto text-muted-foreground/30" />
+          <h3 className="font-medium text-lg">Select a photo first</h3>
+          <p className="text-sm text-muted-foreground">Go to the Photos tab and click a photo to start marking it up.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="border-b px-4 py-2 flex items-center gap-3 flex-wrap">
+        <Select value={selectedPhotoId || ""} onValueChange={(v) => { onSelectPhoto(v); onSelectVariant(null); }}>
+          <SelectTrigger className="w-48 h-8 text-sm" data-testid="photo-selector">
+            <SelectValue placeholder="Select photo" />
+          </SelectTrigger>
+          <SelectContent>
+            {photos.map((p) => (
+              <SelectItem key={p.id} value={p.id}>{p.title || "Untitled"}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Separator orientation="vertical" className="h-6" />
+
+        <Select value={selectedVariantId || "original"} onValueChange={(v) => onSelectVariant(v === "original" ? null : v)}>
+          <SelectTrigger className="w-40 h-8 text-sm" data-testid="variant-selector">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="original">Original (read-only)</SelectItem>
+            {variants.map((v) => (
+              <SelectItem key={v.id} value={v.id}>Variant {v.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {canEdit && (
+          <>
+            <Button size="sm" variant="outline" onClick={handleNewVariant} className="h-8" data-testid="new-variant-btn">
+              <Plus className="h-3 w-3 mr-1" /> Variant
+            </Button>
+            {selectedVariantId && (
+              <>
+                <Button size="sm" onClick={saveAnnotations} className="h-8" disabled={updateVariant.isPending} data-testid="save-annotations-btn">
+                  <Save className="h-3 w-3 mr-1" /> Save
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => deleteVariant.mutate(selectedVariantId)} className="h-8" data-testid="delete-variant-btn">
+                  <Trash2 className="h-3 w-3 mr-1" /> Delete
+                </Button>
+              </>
+            )}
+          </>
+        )}
+
+        <div className="ml-auto flex items-center gap-1">
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setStageScale((s) => Math.max(0.25, s - 0.25))} data-testid="zoom-out">
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <span className="text-xs w-12 text-center">{Math.round(stageScale * 100)}%</span>
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setStageScale((s) => Math.min(4, s + 0.25))} data-testid="zoom-in">
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {selectedVariantId && canEdit && (
+        <div className="border-b px-4 py-2 flex items-center gap-2 flex-wrap">
+          {([
+            ["select", MousePointer, "Select"],
+            ["pen", PenTool, "Pen"],
+            ["arrow", ArrowRight, "Arrow"],
+            ["line", Minus, "Line"],
+            ["rect", Square, "Rectangle"],
+            ["circle", Circle, "Circle"],
+            ["text", Type, "Text"],
+          ] as const).map(([t, Icon, label]) => (
+            <Tooltip key={t}>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant={tool === t ? "default" : "ghost"}
+                  className="h-8 w-8"
+                  onClick={() => setTool(t)}
+                  data-testid={`tool-${t}`}
+                >
+                  <Icon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{label}</TooltipContent>
+            </Tooltip>
+          ))}
+
+          <Separator orientation="vertical" className="h-6 mx-1" />
+
+          <div className="flex gap-1">
+            {PRESET_COLORS.map((c) => (
+              <button
+                key={c}
+                className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
+                  color === c ? "border-foreground scale-110" : "border-transparent"
+                }`}
+                style={{ backgroundColor: c }}
+                onClick={() => setColor(c)}
+                data-testid={`color-${c}`}
+              />
+            ))}
+          </div>
+
+          <Separator orientation="vertical" className="h-6 mx-1" />
+
+          <Select value={String(strokeWidth)} onValueChange={(v) => setStrokeWidth(Number(v))}>
+            <SelectTrigger className="w-20 h-8 text-sm" data-testid="stroke-width">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LINE_WIDTHS.map((w) => (
+                <SelectItem key={w} value={String(w)}>{w}px</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Separator orientation="vertical" className="h-6 mx-1" />
+
+          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={undo} disabled={undoStack.length === 0} data-testid="undo-btn">
+            <Undo className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={redo} disabled={redoStack.length === 0} data-testid="redo-btn">
+            <Redo className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      <div ref={containerRef} className="flex-1 overflow-auto bg-muted/30 relative" data-testid="markup-canvas-container">
+        {textInput && (
+          <div
+            className="absolute z-50 bg-card border rounded shadow-lg p-2 space-y-2"
+            style={{
+              left: textInput.x * imgW * displayScale + 8,
+              top: textInput.y * imgH * displayScale + 8,
+            }}
+          >
+            <Input
+              value={textValue}
+              onChange={(e) => setTextValue(e.target.value)}
+              placeholder="Enter text..."
+              className="h-8 text-sm w-48"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") addTextAnnotation(); if (e.key === "Escape") setTextInput(null); }}
+              data-testid="text-annotation-input"
+            />
+            <div className="flex gap-1">
+              <Button size="sm" className="h-7" onClick={addTextAnnotation} data-testid="confirm-text">Add</Button>
+              <Button size="sm" variant="ghost" className="h-7" onClick={() => setTextInput(null)}>Cancel</Button>
+            </div>
+          </div>
+        )}
+        <Stage
+          ref={stageRef}
+          width={stageSize.width}
+          height={stageSize.height}
+          scaleX={displayScale}
+          scaleY={displayScale}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onTouchStart={handleMouseDown}
+          onTouchMove={handleMouseMove}
+          onTouchEnd={handleMouseUp}
+          style={{ cursor: tool === "select" ? "default" : "crosshair" }}
+        >
+          <Layer>
+            {bgImage && (
+              <KonvaImage image={bgImage} width={imgW} height={imgH} />
+            )}
+            {annotations.map((ann) => renderAnnotation(ann))}
+            {currentAnnotation && renderAnnotation(currentAnnotation, true)}
+          </Layer>
+        </Stage>
+      </div>
+    </div>
+  );
+}
+
+function InstructionsTab({ site, canEdit }: { site: PlowSite; canEdit: boolean }) {
+  const { toast } = useToast();
+  const [instructions, setInstructions] = useState<Instruction[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (site.instructions && Array.isArray(site.instructions)) {
+      setInstructions(site.instructions as Instruction[]);
+    } else {
+      setInstructions([]);
+    }
+    setDirty(false);
+  }, [site.id]);
+
+  const updateSite = useMutation({
+    mutationFn: async (instructions: Instruction[]) => {
+      await apiRequest("PATCH", `/api/plow-sites/${site.id}`, { instructions });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/plow-sites"] });
+      setDirty(false);
+      toast({ title: "Instructions saved" });
+    },
+    onError: () => toast({ title: "Failed to save instructions", variant: "destructive" }),
+  });
+
+  const addStep = () => {
+    const step = instructions.length + 1;
+    setInstructions((prev) => [...prev, { id: genId(), step, title: "", description: "" }]);
+    setDirty(true);
+  };
+
+  const updateStep = (id: string, updates: Partial<Instruction>) => {
+    setInstructions((prev) => prev.map((inst) => (inst.id === id ? { ...inst, ...updates } : inst)));
+    setDirty(true);
+  };
+
+  const deleteStep = (id: string) => {
+    setInstructions((prev) => {
+      const filtered = prev.filter((i) => i.id !== id);
+      return filtered.map((inst, idx) => ({ ...inst, step: idx + 1 }));
+    });
+    setDirty(true);
+  };
+
+  const moveStep = (id: string, dir: "up" | "down") => {
+    const idx = instructions.findIndex((i) => i.id === id);
+    if (idx < 0) return;
+    const newIdx = dir === "up" ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= instructions.length) return;
+    const newInst = [...instructions];
+    [newInst[idx], newInst[newIdx]] = [newInst[newIdx], newInst[idx]];
+    setInstructions(newInst.map((inst, i) => ({ ...inst, step: i + 1 })));
+    setDirty(true);
+  };
+
+  return (
+    <div className="space-y-4 max-w-3xl mx-auto">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Instructions</h3>
+        {canEdit && (
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={addStep} data-testid="add-instruction-btn">
+              <Plus className="h-4 w-4 mr-1" /> Add Step
+            </Button>
+            {dirty && (
+              <Button
+                size="sm"
+                onClick={() => updateSite.mutate(instructions)}
+                disabled={updateSite.isPending}
+                data-testid="save-instructions-btn"
+              >
+                <Save className="h-4 w-4 mr-1" /> Save
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {instructions.length === 0 ? (
+        <Card data-testid="no-instructions">
+          <CardContent className="py-12 text-center">
+            <List className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+            <p className="text-muted-foreground">No instructions yet. Add steps to guide crews.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {instructions.map((inst) => (
+            <Card key={inst.id} data-testid={`instruction-step-${inst.step}`}>
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex flex-col items-center gap-1 pt-1">
+                    <Badge variant="outline" className="w-8 h-8 flex items-center justify-center text-sm font-bold rounded-full">
+                      {inst.step}
+                    </Badge>
+                    {canEdit && (
                       <>
-                        <Button variant="outline" onClick={() => setIsEditing(false)}>
-                          <X className="h-4 w-4 mr-2" />
-                          Cancel
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => moveStep(inst.id, "up")} disabled={inst.step === 1} data-testid={`move-up-${inst.id}`}>
+                          <ArrowUp className="h-3 w-3" />
                         </Button>
-                        <Button onClick={handleSaveSite} data-testid="button-save-site">
-                          <Save className="h-4 w-4 mr-2" />
-                          Save
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => moveStep(inst.id, "down")} disabled={inst.step === instructions.length} data-testid={`move-down-${inst.id}`}>
+                          <ArrowDown className="h-3 w-3" />
                         </Button>
                       </>
                     )}
-                    {permissions?.canEdit && (
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => deleteSite.mutate(selectedSite.id)}
-                        data-testid="button-delete-site"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    {canEdit ? (
+                      <>
+                        <Input
+                          value={inst.title}
+                          onChange={(e) => updateStep(inst.id, { title: e.target.value })}
+                          placeholder="Step title"
+                          className="font-medium"
+                          data-testid={`instruction-title-${inst.id}`}
+                        />
+                        <Textarea
+                          value={inst.description}
+                          onChange={(e) => updateStep(inst.id, { description: e.target.value })}
+                          placeholder="Description..."
+                          rows={2}
+                          data-testid={`instruction-desc-${inst.id}`}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-medium">{inst.title || "Untitled step"}</p>
+                        {inst.description && <p className="text-sm text-muted-foreground">{inst.description}</p>}
+                      </>
                     )}
                   </div>
+                  {canEdit && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => deleteStep(inst.id)}
+                      data-testid={`delete-instruction-${inst.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="map">
-                  <TabsList>
-                    <TabsTrigger value="map">Map View</TabsTrigger>
-                    <TabsTrigger value="instructions">Instructions ({instructions.length})</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="map" className="space-y-4">
-                    {isEditing && (
-                      <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-lg">
-                        <div className="flex gap-1 border-r pr-2">
-                          <Button
-                            variant={currentTool === "select" ? "default" : "ghost"}
-                            size="sm"
-                            onClick={() => setCurrentTool("select")}
-                          >
-                            <Navigation className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant={currentTool === "rect" ? "default" : "ghost"}
-                            size="sm"
-                            onClick={() => setCurrentTool("rect")}
-                          >
-                            <Square className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant={currentTool === "circle" ? "default" : "ghost"}
-                            size="sm"
-                            onClick={() => setCurrentTool("circle")}
-                          >
-                            <Circle className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant={currentTool === "arrow" ? "default" : "ghost"}
-                            size="sm"
-                            onClick={() => setCurrentTool("arrow")}
-                          >
-                            <ArrowRight className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant={currentTool === "text" ? "default" : "ghost"}
-                            size="sm"
-                            onClick={() => setCurrentTool("text")}
-                          >
-                            <Type className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant={currentTool === "icon" ? "default" : "ghost"}
-                            size="sm"
-                            onClick={() => setCurrentTool("icon")}
-                          >
-                            🚜
-                          </Button>
-                        </div>
-                        <div className="flex gap-1 border-r pr-2">
-                          {colors.map((c) => (
-                            <button
-                              key={c.value}
-                              className={`w-6 h-6 rounded-full border-2 ${currentColor === c.value ? "border-foreground" : "border-transparent"}`}
-                              style={{ backgroundColor: c.value }}
-                              onClick={() => setCurrentColor(c.value)}
-                            />
-                          ))}
-                        </div>
-                        {currentTool === "icon" && (
-                          <div className="flex gap-1">
-                            {icons.map((icon) => (
-                              <Button
-                                key={icon.value}
-                                variant={currentIcon === icon.value ? "default" : "ghost"}
-                                size="sm"
-                                onClick={() => setCurrentIcon(icon.value)}
-                              >
-                                {icon.emoji}
-                              </Button>
-                            ))}
-                          </div>
-                        )}
-                        <div className="flex gap-1 ml-auto">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setAnnotations(annotations.slice(0, -1))}
-                            disabled={annotations.length === 0}
-                          >
-                            <Undo className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => fileInputRef.current?.click()}
-                          >
-                            <Upload className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        {uploadedImage && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={analyzeWithAI}
-                            disabled={isAnalyzing}
-                            className="ml-auto"
-                            data-testid="button-ai-analyze"
-                          >
-                            {isAnalyzing ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Sparkles className="h-4 w-4 mr-2" />
-                            )}
-                            AI Analyze
-                          </Button>
-                        )}
-                      </div>
-                    )}
-
-                    {aiAnalysis && (
-                      <div className="p-4 bg-muted/50 rounded-lg border space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium flex items-center gap-2">
-                            <Sparkles className="h-4 w-4 text-primary" />
-                            AI Analysis Results
-                          </h4>
-                          <Button variant="ghost" size="sm" onClick={() => setAiAnalysis(null)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        {aiAnalysis.suggestedRoute && (
-                          <div>
-                            <p className="text-sm font-medium text-primary">Suggested Route:</p>
-                            <p className="text-sm text-muted-foreground">{aiAnalysis.suggestedRoute}</p>
-                          </div>
-                        )}
-                        {aiAnalysis.driveways?.length > 0 && (
-                          <div>
-                            <p className="text-sm font-medium">Driveways ({aiAnalysis.driveways.length}):</p>
-                            {aiAnalysis.driveways.map((d: any, i: number) => (
-                              <p key={i} className="text-xs text-muted-foreground ml-2">- {d.description} ({d.location})</p>
-                            ))}
-                          </div>
-                        )}
-                        {aiAnalysis.walkways?.length > 0 && (
-                          <div>
-                            <p className="text-sm font-medium">Walkways ({aiAnalysis.walkways.length}):</p>
-                            {aiAnalysis.walkways.map((w: any, i: number) => (
-                              <p key={i} className="text-xs text-muted-foreground ml-2">- {w.description}</p>
-                            ))}
-                          </div>
-                        )}
-                        {aiAnalysis.obstacles?.length > 0 && (
-                          <div>
-                            <p className="text-sm font-medium text-orange-600">Obstacles:</p>
-                            {aiAnalysis.obstacles.map((o: any, i: number) => (
-                              <p key={i} className="text-xs text-muted-foreground ml-2">- {o.description} {o.warning && `(${o.warning})`}</p>
-                            ))}
-                          </div>
-                        )}
-                        {aiAnalysis.specialNotes && (
-                          <div>
-                            <p className="text-sm font-medium">Notes:</p>
-                            <p className="text-xs text-muted-foreground">{aiAnalysis.specialNotes}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="relative border rounded-lg overflow-hidden bg-gray-100">
-                      {uploadedImage ? (
-                        <canvas
-                          ref={canvasRef}
-                          width={800}
-                          height={500}
-                          className="w-full cursor-crosshair"
-                          onMouseDown={handleCanvasMouseDown}
-                          onMouseUp={handleCanvasMouseUp}
-                        />
-                      ) : (
-                        <div className="h-[500px] flex items-center justify-center">
-                          <div className="text-center">
-                            <MapPin className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                            <p className="text-muted-foreground mb-4">No image uploaded yet</p>
-                            {isEditing && (
-                              <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-                                <Upload className="h-4 w-4 mr-2" />
-                                Upload Property Image
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="instructions" className="space-y-4">
-                    {isEditing && (
-                      <Button onClick={addInstruction} variant="outline" data-testid="button-add-instruction">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Step
-                      </Button>
-                    )}
-                    {instructions.length === 0 ? (
-                      <p className="text-muted-foreground text-center py-8">No instructions added yet</p>
-                    ) : (
-                      <div className="space-y-4">
-                        {instructions.map((inst) => (
-                          <Card key={inst.id}>
-                            <CardContent className="p-4">
-                              <div className="flex items-start gap-4">
-                                <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
-                                  {inst.step}
-                                </div>
-                                <div className="flex-1 space-y-2">
-                                  {isEditing ? (
-                                    <>
-                                      <Input
-                                        value={inst.title}
-                                        onChange={(e) => updateInstruction(inst.id, { title: e.target.value })}
-                                        placeholder="Step title"
-                                        className="font-medium"
-                                      />
-                                      <Textarea
-                                        value={inst.description}
-                                        onChange={(e) => updateInstruction(inst.id, { description: e.target.value })}
-                                        placeholder="Describe what to do..."
-                                        rows={2}
-                                      />
-                                    </>
-                                  ) : (
-                                    <>
-                                      <h4 className="font-medium">{inst.title}</h4>
-                                      {inst.description && <p className="text-sm text-muted-foreground">{inst.description}</p>}
-                                    </>
-                                  )}
-                                </div>
-                                {isEditing && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => deleteInstruction(inst.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                  </TabsContent>
-                </Tabs>
               </CardContent>
             </Card>
-          ) : (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Snowflake className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                <h2 className="text-xl font-semibold mb-2">Select or Create a Site</h2>
-                <p className="text-muted-foreground">
-                  Choose a property from the list or create a new one to start mapping snow removal routes.
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          ))}
         </div>
-      </div>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleImageUpload}
-      />
+      )}
     </div>
+  );
+}
+
+function CreateSiteDialog({ open, onOpenChange, groups }: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  groups: PlowSiteGroup[];
+}) {
+  const { toast } = useToast();
+  const [step, setStep] = useState(1);
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [groupId, setGroupId] = useState<string>("");
+  const [geocodeResults, setGeocodeResults] = useState<any[]>([]);
+  const [selectedGeocode, setSelectedGeocode] = useState<any>(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [satelliteUrl, setSatelliteUrl] = useState<string | null>(null);
+  const [isLoadingSat, setIsLoadingSat] = useState(false);
+
+  const resetForm = () => {
+    setStep(1);
+    setName("");
+    setAddress("");
+    setGroupId("");
+    setGeocodeResults([]);
+    setSelectedGeocode(null);
+    setSatelliteUrl(null);
+  };
+
+  useEffect(() => {
+    if (!open) resetForm();
+  }, [open]);
+
+  const handleGeocode = async () => {
+    if (!address.trim()) return;
+    setIsGeocoding(true);
+    try {
+      const res = await apiRequest("POST", "/api/geocode", { address });
+      const data = await res.json();
+      setGeocodeResults(data.results || []);
+      if (data.results?.length > 0) {
+        setSelectedGeocode(data.results[0]);
+      }
+    } catch {
+      toast({ title: "Geocode failed", variant: "destructive" });
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  const handleCaptureSatellite = async () => {
+    if (!selectedGeocode) return;
+    setIsLoadingSat(true);
+    try {
+      const res = await apiRequest("POST", "/api/satellite-image", { address: selectedGeocode.formatted_address || address });
+      const data = await res.json();
+      setSatelliteUrl(data.imageUrl || null);
+    } catch {
+      toast({ title: "Failed to get satellite image", variant: "destructive" });
+    } finally {
+      setIsLoadingSat(false);
+    }
+  };
+
+  useEffect(() => {
+    if (step === 2 && selectedGeocode && !satelliteUrl) {
+      handleCaptureSatellite();
+    }
+  }, [step, selectedGeocode]);
+
+  const createSite = useMutation({
+    mutationFn: async () => {
+      const body: any = {
+        name,
+        address: selectedGeocode?.formatted_address || address || null,
+        groupId: groupId || null,
+        imageUrl: satelliteUrl || null,
+        imageSource: satelliteUrl ? "satellite" : null,
+      };
+      if (selectedGeocode) {
+        body.latitude = String(selectedGeocode.lat);
+        body.longitude = String(selectedGeocode.lng);
+      }
+      const res = await apiRequest("POST", "/api/plow-sites", body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/plow-sites"] });
+      onOpenChange(false);
+      toast({ title: "Site created" });
+    },
+    onError: () => toast({ title: "Failed to create site", variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg" data-testid="create-site-dialog">
+        <DialogHeader>
+          <DialogTitle>Create New Site</DialogTitle>
+          <DialogDescription>
+            {step === 1 && "Enter site details and find its location."}
+            {step === 2 && "Review the overhead satellite view."}
+            {step === 3 && "Review and confirm the new site."}
+          </DialogDescription>
+        </DialogHeader>
+
+        {step === 1 && (
+          <div className="space-y-4">
+            <div>
+              <Label>Site Name *</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Main Street Office" data-testid="create-site-name" />
+            </div>
+            <div>
+              <Label>Address</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="123 Main St, City, State"
+                  onKeyDown={(e) => { if (e.key === "Enter") handleGeocode(); }}
+                  data-testid="create-site-address"
+                />
+                <Button variant="outline" onClick={handleGeocode} disabled={isGeocoding} data-testid="geocode-btn">
+                  {isGeocoding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            {geocodeResults.length > 0 && (
+              <div className="space-y-1 max-h-32 overflow-auto">
+                {geocodeResults.map((r, i) => (
+                  <div
+                    key={i}
+                    className={`p-2 rounded text-sm cursor-pointer transition-colors ${
+                      selectedGeocode === r ? "bg-primary/10 border border-primary/30" : "hover:bg-muted"
+                    }`}
+                    onClick={() => setSelectedGeocode(r)}
+                    data-testid={`geocode-result-${i}`}
+                  >
+                    <MapPin className="h-3 w-3 inline mr-1" />
+                    {r.formatted_address}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div>
+              <Label>Group (optional)</Label>
+              <Select value={groupId} onValueChange={setGroupId}>
+                <SelectTrigger data-testid="create-site-group">
+                  <SelectValue placeholder="No group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No group</SelectItem>
+                  {groups.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="space-y-4">
+            {isLoadingSat ? (
+              <div className="flex items-center justify-center h-48">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : satelliteUrl ? (
+              <div className="rounded-lg overflow-hidden border">
+                <img src={satelliteUrl} alt="Satellite view" className="w-full" data-testid="satellite-preview" />
+              </div>
+            ) : (
+              <div className="h-48 flex items-center justify-center bg-muted rounded-lg">
+                <p className="text-muted-foreground text-sm">No satellite image available</p>
+              </div>
+            )}
+            {selectedGeocode && (
+              <p className="text-sm text-muted-foreground">
+                <MapPin className="h-3 w-3 inline mr-1" />
+                {selectedGeocode.formatted_address} ({selectedGeocode.lat.toFixed(5)}, {selectedGeocode.lng.toFixed(5)})
+              </p>
+            )}
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="space-y-4">
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <span className="font-medium">{name}</span>
+                </div>
+                {selectedGeocode && (
+                  <p className="text-sm text-muted-foreground">{selectedGeocode.formatted_address}</p>
+                )}
+                {groupId && groupId !== "none" && (
+                  <Badge variant="outline">{groups.find((g) => g.id === groupId)?.name}</Badge>
+                )}
+                {satelliteUrl && (
+                  <img src={satelliteUrl} alt="Preview" className="w-full rounded mt-2" />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        <DialogFooter>
+          {step > 1 && (
+            <Button variant="outline" onClick={() => setStep(step - 1)} data-testid="create-site-back">
+              Back
+            </Button>
+          )}
+          {step < 3 ? (
+            <Button onClick={() => setStep(step + 1)} disabled={step === 1 && !name.trim()} data-testid="create-site-next">
+              Next
+            </Button>
+          ) : (
+            <Button onClick={() => createSite.mutate()} disabled={createSite.isPending} data-testid="create-site-submit">
+              {createSite.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Create Site
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreateGroupDialog({ open, onOpenChange }: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const [groupType, setGroupType] = useState("custom");
+  const [color, setColor] = useState("#3b82f6");
+
+  useEffect(() => {
+    if (!open) { setName(""); setGroupType("custom"); setColor("#3b82f6"); }
+  }, [open]);
+
+  const createGroup = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/plow-site-groups", { name, groupType, color });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/plow-site-groups"] });
+      onOpenChange(false);
+      toast({ title: "Group created" });
+    },
+    onError: () => toast({ title: "Failed to create group", variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md" data-testid="create-group-dialog">
+        <DialogHeader>
+          <DialogTitle>Create Group</DialogTitle>
+          <DialogDescription>Organize sites into groups for easy management.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Group Name *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Commercial Properties" data-testid="create-group-name" />
+          </div>
+          <div>
+            <Label>Type</Label>
+            <Select value={groupType} onValueChange={setGroupType}>
+              <SelectTrigger data-testid="create-group-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="custom">Custom</SelectItem>
+                <SelectItem value="residential">Residential</SelectItem>
+                <SelectItem value="commercial">Commercial</SelectItem>
+                <SelectItem value="municipal">Municipal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Color</Label>
+            <div className="flex gap-2 mt-1">
+              {PRESET_COLORS.slice(0, 7).map((c) => (
+                <button
+                  key={c}
+                  className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${
+                    color === c ? "border-foreground scale-110" : "border-transparent"
+                  }`}
+                  style={{ backgroundColor: c }}
+                  onClick={() => setColor(c)}
+                  data-testid={`group-color-${c}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => createGroup.mutate()} disabled={!name.trim() || createGroup.isPending} data-testid="create-group-submit">
+            {createGroup.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+            Create
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

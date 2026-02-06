@@ -1050,6 +1050,86 @@ export const insertPlowSiteImageSchema = createInsertSchema(plowSiteImages).pick
 export type InsertPlowSiteImage = z.infer<typeof insertPlowSiteImageSchema>;
 export type PlowSiteImage = typeof plowSiteImages.$inferSelect;
 
+// Site Photos - enhanced photo management for plow sites
+export const sitePhotos = pgTable("site_photos", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  siteId: varchar("site_id", { length: 36 }).references(() => plowSites.id, { onDelete: "cascade" }).notNull(),
+  imageUrl: text("image_url").notNull(),
+  title: text("title"),
+  source: text("source").default("upload"),
+  width: integer("width"),
+  height: integer("height"),
+  meta: jsonb("meta").default({}),
+  sortOrder: integer("sort_order").default(0),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSitePhotoSchema = createInsertSchema(sitePhotos).pick({
+  siteId: true,
+  imageUrl: true,
+  title: true,
+  source: true,
+  width: true,
+  height: true,
+  meta: true,
+  sortOrder: true,
+});
+
+export type InsertSitePhoto = z.infer<typeof insertSitePhotoSchema>;
+export type SitePhoto = typeof sitePhotos.$inferSelect;
+
+// Site Photo Variants - markup versions of photos (original stays untouched)
+export const sitePhotoVariants = pgTable("site_photo_variants", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  photoId: varchar("photo_id", { length: 36 }).references(() => sitePhotos.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull().default("Variant A"),
+  annotations: jsonb("annotations").default([]),
+  flattenedUrl: text("flattened_url"),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSitePhotoVariantSchema = createInsertSchema(sitePhotoVariants).pick({
+  photoId: true,
+  name: true,
+  annotations: true,
+  flattenedUrl: true,
+});
+
+export type InsertSitePhotoVariant = z.infer<typeof insertSitePhotoVariantSchema>;
+export type SitePhotoVariant = typeof sitePhotoVariants.$inferSelect;
+
+// Site Map Features - GeoJSON features drawn on the map
+export const siteMapFeatures = pgTable("site_map_features", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  siteId: varchar("site_id", { length: 36 }).references(() => plowSites.id, { onDelete: "cascade" }).notNull(),
+  name: text("name"),
+  featureType: text("feature_type").notNull().default("point"),
+  geojson: jsonb("geojson").notNull(),
+  color: text("color").default("#ef4444"),
+  icon: text("icon"),
+  linkedPhotoId: varchar("linked_photo_id", { length: 36 }),
+  sortOrder: integer("sort_order").default(0),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSiteMapFeatureSchema = createInsertSchema(siteMapFeatures).pick({
+  siteId: true,
+  name: true,
+  featureType: true,
+  geojson: true,
+  color: true,
+  icon: true,
+  linkedPhotoId: true,
+  sortOrder: true,
+});
+
+export type InsertSiteMapFeature = z.infer<typeof insertSiteMapFeatureSchema>;
+export type SiteMapFeature = typeof siteMapFeatures.$inferSelect;
+
 // AI Agents - Master Admin controlled autonomous agents
 export const aiAgents = pgTable("ai_agents", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
