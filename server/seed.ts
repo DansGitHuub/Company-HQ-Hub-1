@@ -19,8 +19,56 @@ interface SeedUser {
 }
 
 export async function seedUsers(): Promise<void> {
-  console.log("[seed] Startup check - preserving all existing user data");
-  console.log("[seed] Account check complete (no modifications)");
+  console.log("[seed] Startup check - running account maintenance...");
+  
+  try {
+    // Fix Chapin123 email if incorrect
+    const chapin = await storage.getUserByUsername("Chapin123");
+    if (chapin && chapin.email !== "dan@chapinlandscapes.com") {
+      await storage.updateUser(chapin.id, { email: "dan@chapinlandscapes.com" });
+      console.log("[seed] Fixed Chapin123 email to dan@chapinlandscapes.com");
+    }
+    
+    // Ensure Chapin123 is master admin
+    if (chapin && !chapin.isMasterAdmin) {
+      await storage.updateUser(chapin.id, { isMasterAdmin: true });
+      console.log("[seed] Restored Chapin123 master admin status");
+    }
+
+    // Remove the extra 'admin' account if it exists
+    const adminAccount = await storage.getUserByUsername("admin");
+    if (adminAccount) {
+      await storage.deleteUser(adminAccount.id);
+      console.log("[seed] Removed duplicate admin account");
+    }
+
+    // Ensure no other users have master admin (only Chapin123)
+    const allUsers = await storage.getAllUsers();
+    for (const user of allUsers) {
+      if (user.username !== "Chapin123" && user.isMasterAdmin) {
+        await storage.updateUser(user.id, { isMasterAdmin: false });
+        console.log(`[seed] Removed master admin from ${user.username}`);
+      }
+    }
+
+    // Clean up test accounts created by automated tests
+    const testPrefixes = ["e2eadmin", "testadmin", "testcustomer", "tester", "profile_test_"];
+    const testSuffixes = ["_customer"];
+    for (const user of allUsers) {
+      const isTestAccount = testPrefixes.some(prefix => user.username.startsWith(prefix)) ||
+        testSuffixes.some(suffix => user.username.endsWith(suffix) && user.email?.includes("test")) ||
+        (user.email?.includes("@test.com") && user.username.includes("_customer")) ||
+        (user.email?.includes("@example.com") && user.username !== "Chapin123" && user.username !== "Matt H");
+      if (isTestAccount) {
+        await storage.deleteUser(user.id);
+        console.log(`[seed] Removed test account: ${user.username}`);
+      }
+    }
+  } catch (error) {
+    console.error("[seed] Error during account maintenance:", error);
+  }
+  
+  console.log("[seed] Account maintenance complete");
 }
 
 const SAMPLE_MATERIALS = [
