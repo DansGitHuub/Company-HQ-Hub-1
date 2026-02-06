@@ -130,7 +130,7 @@ function StepTypeSelection({ data, onChange }: { data: SOPBuilderData; onChange:
         {SOP_TYPES.map((type) => (
           <Card
             key={type.value}
-            className={`cursor-pointer transition-all hover:border-primary ${data.sopType === type.value ? "border-primary ring-2 ring-primary/20" : ""}`}
+            className={`cursor-pointer transition-all hover:border-primary hover:shadow-md hover:scale-[1.02] ${data.sopType === type.value ? "border-primary ring-2 ring-primary/20 shadow-sm" : ""}`}
             onClick={() => onChange({ sopType: type.value })}
             data-testid={`sop-type-${type.value}`}
           >
@@ -205,7 +205,7 @@ function StepOutcome({ data, onChange }: { data: SOPBuilderData; onChange: (d: P
           {OUTCOME_TYPES.map((type) => (
             <Card
               key={type.value}
-              className={`cursor-pointer transition-all hover:border-primary p-3 ${data.outcomeType === type.value ? "border-primary ring-2 ring-primary/20" : ""}`}
+              className={`cursor-pointer transition-all hover:border-primary hover:shadow-md hover:scale-[1.01] p-3 ${data.outcomeType === type.value ? "border-primary ring-2 ring-primary/20 shadow-sm" : ""}`}
               onClick={() => onChange({ outcomeType: type.value })}
               data-testid={`outcome-type-${type.value}`}
             >
@@ -254,7 +254,7 @@ function StepAudience({ data, onChange }: { data: SOPBuilderData; onChange: (d: 
           {SKILL_LEVELS.map((level) => (
             <Card
               key={level.value}
-              className={`cursor-pointer transition-all hover:border-primary p-3 ${data.skillLevel === level.value ? "border-primary ring-2 ring-primary/20" : ""}`}
+              className={`cursor-pointer transition-all hover:border-primary hover:shadow-md hover:scale-[1.01] p-3 ${data.skillLevel === level.value ? "border-primary ring-2 ring-primary/20 shadow-sm" : ""}`}
               onClick={() => onChange({ skillLevel: level.value })}
               data-testid={`skill-level-${level.value}`}
             >
@@ -321,7 +321,7 @@ function StepBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: P
             <ClipboardList className="h-10 w-10 text-muted-foreground mb-3" />
             <p className="font-medium">No steps yet</p>
             <p className="text-sm text-muted-foreground mb-4">Start building your SOP by adding the first step</p>
-            <Button onClick={addStep} data-testid="button-add-first-step">
+            <Button onClick={addStep} className="hover:shadow-md hover:brightness-110 transition-all" data-testid="button-add-first-step">
               <Plus className="h-4 w-4 mr-2" /> Add First Step
             </Button>
           </CardContent>
@@ -343,13 +343,13 @@ function StepBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: P
                   <div className="flex items-center gap-1 shrink-0">
                     {step.proofRequired && <Badge variant="secondary" className="text-xs">Proof</Badge>}
                     {step.isQCCheckpoint && <Badge variant="secondary" className="text-xs">QC</Badge>}
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); moveStep(index, "up"); }} disabled={index === 0}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted transition-colors" onClick={(e) => { e.stopPropagation(); moveStep(index, "up"); }} disabled={index === 0}>
                       <ChevronUp className="h-3 w-3" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); moveStep(index, "down"); }} disabled={index === data.steps.length - 1}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted transition-colors" onClick={(e) => { e.stopPropagation(); moveStep(index, "down"); }} disabled={index === data.steps.length - 1}>
                       <ChevronDown className="h-3 w-3" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={(e) => { e.stopPropagation(); removeStep(step.id); }}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10 transition-colors" onClick={(e) => { e.stopPropagation(); removeStep(step.id); }}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
@@ -449,7 +449,7 @@ function StepBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: P
       )}
 
       {data.steps.length > 0 && (
-        <Button variant="outline" onClick={addStep} className="w-full" data-testid="button-add-step">
+        <Button variant="outline" onClick={addStep} className="w-full hover:shadow-md hover:border-primary/50 transition-all" data-testid="button-add-step">
           <Plus className="h-4 w-4 mr-2" /> Add Step
         </Button>
       )}
@@ -838,7 +838,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
   };
 
   return (
-    <div className="space-y-6" data-testid="sop-builder">
+    <div className="space-y-6 pb-20" data-testid="sop-builder">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -847,7 +847,13 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
           </h2>
           <p className="text-muted-foreground text-sm">Step {currentStep + 1} of {WIZARD_STEPS.length}: {WIZARD_STEPS[currentStep].label}</p>
         </div>
-        <Button variant="ghost" size="icon" onClick={onCancel} data-testid="button-exit-builder">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onCancel}
+          className="hover:bg-destructive/10 hover:text-destructive transition-colors"
+          data-testid="button-exit-builder"
+        >
           <X className="h-5 w-5" />
         </Button>
       </div>
@@ -864,7 +870,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
               key={step.id}
               variant={isActive ? "default" : isComplete ? "secondary" : "ghost"}
               size="sm"
-              className="text-xs gap-1"
+              className="text-xs gap-1 transition-all hover:scale-105"
               onClick={() => {
                 if (index <= currentStep || canProceed()) setCurrentStep(index);
               }}
@@ -883,27 +889,43 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mr-16">
         <Button
           variant="outline"
           onClick={handleBack}
           disabled={currentStep === 0}
+          className="hover:bg-muted/80 transition-colors"
           data-testid="button-wizard-back"
         >
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
 
         <div className="flex gap-2">
-          <Button variant="outline" onClick={onCancel} data-testid="button-wizard-exit">
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
+            data-testid="button-wizard-exit"
+          >
             Exit
           </Button>
           {currentStep === WIZARD_STEPS.length - 1 ? (
-            <Button onClick={handleCreate} disabled={isSubmitting || !canProceed()} data-testid="button-wizard-create">
+            <Button
+              onClick={handleCreate}
+              disabled={isSubmitting || !canProceed()}
+              className="hover:brightness-110 hover:shadow-md transition-all"
+              data-testid="button-wizard-create"
+            >
               {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
               Create SOP
             </Button>
           ) : (
-            <Button onClick={handleNext} disabled={!canProceed()} data-testid="button-wizard-next">
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed()}
+              className="hover:brightness-110 hover:shadow-md transition-all"
+              data-testid="button-wizard-next"
+            >
               Next <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           )}
