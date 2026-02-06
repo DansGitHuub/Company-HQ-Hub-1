@@ -65,7 +65,8 @@ import {
   developmentTracker, type DevelopmentTracker, type InsertDevelopmentTracker,
   sopMedia, type SopMedia, type InsertSopMedia,
   aiGenerationEvents, type AiGenerationEvent, type InsertAiGenerationEvent,
-  sopDrafts, type SopDraft, type InsertSopDraft
+  sopDrafts, type SopDraft, type InsertSopDraft,
+  conversations, chatMessages
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull } from "drizzle-orm";
@@ -515,7 +516,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: string): Promise<boolean> {
-    const result = await db.delete(users).where(eq(users.id, id));
+    await db.delete(todoAssignments).where(eq(todoAssignments.userId, id));
+    await db.delete(todoActiveUsers).where(eq(todoActiveUsers.userId, id));
+    await db.delete(userUpdateAcknowledgments).where(eq(userUpdateAcknowledgments.userId, id));
+    await db.delete(savedResources).where(eq(savedResources.userId, id));
+    await db.delete(calendarConnections).where(eq(calendarConnections.userId, id));
+    await db.delete(accessRequests).where(eq(accessRequests.userId, id));
+    await db.delete(articleUpdateNotifications).where(eq(articleUpdateNotifications.userId, id));
+    await db.delete(aiGenerationEvents).where(eq(aiGenerationEvents.userId, id));
+    await db.delete(plowSiteManagerPermissions).where(eq(plowSiteManagerPermissions.userId, id));
+    await db.delete(errorLogs).where(eq(errorLogs.userId, id));
+    await db.delete(activityLogs).where(eq(activityLogs.userId, id));
+    await db.delete(featureRequests).where(eq(featureRequests.userId, id));
+    const userConversations = await db.select({ id: conversations.id }).from(conversations).where(eq(conversations.userId, id));
+    for (const c of userConversations) {
+      await db.delete(chatMessages).where(eq(chatMessages.conversationId, c.id));
+    }
+    await db.delete(conversations).where(eq(conversations.userId, id));
+    await db.delete(customerMessages).where(eq(customerMessages.customerId, id));
+    await db.delete(sopDrafts).where(eq(sopDrafts.ownerId, id));
+    const userThreads = await db.select({ id: messagingThreads.id }).from(messagingThreads).where(eq(messagingThreads.customerId, id));
+    for (const t of userThreads) {
+      await db.delete(threadMessages).where(eq(threadMessages.threadId, t.id));
+    }
+    await db.delete(messagingThreads).where(eq(messagingThreads.customerId, id));
+    await db.update(messagingThreads).set({ assignedEmployeeId: null }).where(eq(messagingThreads.assignedEmployeeId, id));
+    await db.update(workRequests).set({ assignedTo: null }).where(eq(workRequests.assignedTo, id));
+    await db.delete(workRequests).where(eq(workRequests.customerId, id));
+    await db.update(sops).set({ ownerId: null }).where(eq(sops.ownerId, id));
+    await db.update(todos).set({ createdBy: null }).where(eq(todos.createdBy, id));
+    await db.update(customForms).set({ createdBy: null }).where(eq(customForms.createdBy, id));
+    await db.update(customerResources).set({ createdBy: null }).where(eq(customerResources.createdBy, id));
+    await db.update(candidates).set({ userId: null }).where(eq(candidates.userId, id));
+    await db.delete(users).where(eq(users.id, id));
     return true;
   }
 

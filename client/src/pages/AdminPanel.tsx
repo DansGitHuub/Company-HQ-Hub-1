@@ -360,6 +360,7 @@ export default function AdminPanel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/access-requests"] });
       toast({ title: "User deleted" });
     },
   });
@@ -686,6 +687,7 @@ export default function AdminPanel() {
                           <div>
                             <h4 className="font-medium">{requestUser?.name || "Unknown User"}</h4>
                             <p className="text-sm text-muted-foreground">
+                              {requestUser?.username && <span className="mr-2">@{requestUser.username}</span>}
                               Requesting: <Badge variant="outline">{req.requestedRole}</Badge>
                             </p>
                             {req.reason && <p className="text-sm mt-2">{req.reason}</p>}
@@ -721,6 +723,22 @@ export default function AdminPanel() {
                                 {req.status === "approved" ? <CheckCircle className="w-3 h-3 mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
                                 {req.status}
                               </Badge>
+                            )}
+                            {requestUser && !requestUser.isMasterAdmin && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                data-testid={`button-delete-user-${req.id}`}
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to delete the user "${requestUser.name}"? This cannot be undone.`)) {
+                                    deleteUserMutation.mutate(requestUser.id);
+                                  }
+                                }}
+                                disabled={deleteUserMutation.isPending}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             )}
                           </div>
                         </div>
