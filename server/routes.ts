@@ -1268,6 +1268,9 @@ Respond with a JSON object:
         ? `\nAuto-classified as: Super Category="${classification.superCategory}", Main Category="${classification.mainCategory}", Sub Category="${classification.subCategory}", SOP Type="${classification.sopType}" (confidence: ${Math.round(classification.confidence * 100)}%). Use this classification to inform your response, ensuring tools, materials, and safety requirements are specific to this sub-category of landscaping work.`
         : "";
 
+      const existingCategories = await storage.getSopCategories();
+      const categoryNames = existingCategories.map(c => c.name);
+
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
@@ -1283,7 +1286,8 @@ Your recommendations must be:
 - QUANTIFIED: Include estimated quantities, sizes, and time specifications
 
 The JSON must include these fields:
-- outcome: string (clear, measurable description of what successful completion looks like)
+- suggestedTopic: string (the BEST matching topic from this list: ${JSON.stringify(categoryNames)}. If none match well, suggest a new topic name that would be appropriate)
+- outcome: string (a SPECIFIC, measurable, real-world outcome statement for this exact procedure. NOT a generic description of the outcome type. For example, for "Mulch Installation" with outcomeType "quality", write "All landscape beds covered with 3-inch depth of double-shredded hardwood mulch, with clean edges, 3-inch clearance from plant stems, and uniform coverage with no bare spots visible" NOT "The work meets quality standards")
 - outcomeType: string (one of: "completion", "quality", "safety", "kpi")
 - audience: string (who this SOP is for, e.g., "Landscape Crew Members")
 - skillLevel: string (one of: "beginner", "intermediate", "advanced", "all")
@@ -1295,6 +1299,13 @@ The JSON must include these fields:
 - complianceNotes: string (OSHA regulations, EPA requirements, state/local codes, certifications needed - cite specific standards where possible)
 - timingTarget: string (realistic target time with context, e.g. "45 minutes for average residential job")
 - timingMax: string (maximum time including complications, e.g. "90 minutes including cleanup and site inspection")
+- needsMaterialCalculator: boolean (true if this SOP involves mulch, gravel, soil, aggregate, or similar bulk materials where depth/coverage calculations would be useful)
+- calculatorDefaults: object | null (if needsMaterialCalculator is true, include { materialType: string (e.g. "mulch", "gravel", "topsoil"), defaultDepthInches: number (typical recommended depth), coverageNote: string (e.g. "1 cubic yard covers approximately 108 sq ft at 3 inches depth") })
+- imageSuggestions: array of objects with { target: string ("header" or "step_N" where N is the step index starting from 0), prompt: string (a detailed, ready-to-use image generation prompt that describes a professional landscape photography scene showing the specific action or result. Include: setting (outdoor, residential/commercial), lighting (natural daylight), perspective (eye-level, overhead, close-up), specific elements visible, professional quality. Example: "Professional photograph of a landscape crew member using a wheelbarrow to spread dark brown double-shredded hardwood mulch around the base of ornamental shrubs in a residential front yard, natural daylight, eye-level perspective, clean mulch edges visible, showing proper 3-inch depth and clearance from plant stems"), priority: number (1 = most important, 2 = important, 3 = nice to have) }
+  - For SIMPLE SOPs (3-4 steps): suggest 1-2 images (header + most visual step)
+  - For DETAILED SOPs (5+ steps): suggest header + images for steps that would benefit most from visual reference (equipment setup, technique demonstrations, quality checkpoints)
+  - For SAFETY SOPs: suggest images for every step showing proper PPE and technique
+  - Prioritize images that show TECHNIQUE (how to do it) over images that show results
 
 Generate 3-7 detailed steps depending on the complexity. Make every field as detailed and accurate as possible.`
           },
@@ -1314,6 +1325,20 @@ Generate 3-7 detailed steps depending on the complexity. Make every field as det
 
       const suggestions = JSON.parse(content);
       suggestions.classification = classification;
+
+      if (suggestions.suggestedTopic) {
+        const matchedCat = existingCategories.find(
+          c => c.name.toLowerCase() === suggestions.suggestedTopic.toLowerCase()
+        );
+        if (matchedCat) {
+          suggestions.suggestedTopicId = matchedCat.id;
+          suggestions.suggestedTopicName = matchedCat.name;
+        } else {
+          suggestions.suggestedTopicId = null;
+          suggestions.suggestedTopicName = suggestions.suggestedTopic;
+        }
+      }
+
       res.json(suggestions);
     } catch (err: any) {
       console.error("[sop-suggest] Error:", err.message);

@@ -84,6 +84,18 @@ interface SOPClassification {
   matchedOn?: string;
 }
 
+interface MaterialCalculatorData {
+  materialType: string;
+  defaultDepthInches: number;
+  coverageNote: string;
+}
+
+interface ImageSuggestion {
+  target: string;
+  prompt: string;
+  priority: number;
+}
+
 export interface SOPBuilderData {
   title: string;
   category: string;
@@ -106,6 +118,10 @@ export interface SOPBuilderData {
   complianceNotes: string;
   timingTarget: string;
   timingMax: string;
+  needsMaterialCalculator?: boolean;
+  calculatorDefaults?: MaterialCalculatorData | null;
+  calculatorHtml?: string;
+  imageSuggestions?: ImageSuggestion[];
 }
 
 const WIZARD_STEPS = [
@@ -527,7 +543,7 @@ function StepBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: P
         </Card>
       ) : (
         <ScrollArea className="max-h-[400px]">
-          <div className="space-y-2 pr-2">
+          <div className="space-y-2 pr-2 pb-14">
             {data.steps.map((step, index) => (
               <Card key={step.id} className="border">
                 <div
@@ -983,6 +999,89 @@ function AIImageGenerator({
   );
 }
 
+function MaterialCalculatorPopup({ defaults, onConfirm, onCancel }: { defaults: MaterialCalculatorData; onConfirm: (depth: number, html: string) => void; onCancel: () => void }) {
+  const [depth, setDepth] = useState(defaults.defaultDepthInches);
+  const [length, setLength] = useState(10);
+  const [width, setWidth] = useState(10);
+
+  const sqFt = length * width;
+  const cubicYards = (sqFt * depth) / 324;
+  const roundedYards = Math.ceil(cubicYards * 10) / 10;
+
+  const calcHtml = `<div class="sop-calculator" style="background:#f0fdf4;border:2px solid #22c55e;border-radius:12px;padding:16px;margin:16px 0;">
+<h3 style="margin:0 0 8px;color:#16a34a;">📐 ${defaults.materialType.charAt(0).toUpperCase() + defaults.materialType.slice(1)} Calculator</h3>
+<p style="font-size:13px;color:#666;margin:0 0 8px;">${defaults.coverageNote}</p>
+<p style="font-size:13px;margin:0;"><strong>Recommended depth:</strong> ${depth} inches</p>
+<p style="font-size:13px;margin:4px 0;"><strong>Formula:</strong> (Length × Width × Depth) ÷ 324 = Cubic Yards</p>
+<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;">
+<tr style="background:#dcfce7;"><th style="padding:6px;text-align:left;border:1px solid #86efac;">Area (sq ft)</th><th style="padding:6px;text-align:center;border:1px solid #86efac;">@ ${depth}" depth</th></tr>
+<tr><td style="padding:6px;border:1px solid #e5e7eb;">100 sq ft</td><td style="padding:6px;text-align:center;border:1px solid #e5e7eb;">${(100 * depth / 324).toFixed(1)} cu yd</td></tr>
+<tr><td style="padding:6px;border:1px solid #e5e7eb;">250 sq ft</td><td style="padding:6px;text-align:center;border:1px solid #e5e7eb;">${(250 * depth / 324).toFixed(1)} cu yd</td></tr>
+<tr><td style="padding:6px;border:1px solid #e5e7eb;">500 sq ft</td><td style="padding:6px;text-align:center;border:1px solid #e5e7eb;">${(500 * depth / 324).toFixed(1)} cu yd</td></tr>
+<tr><td style="padding:6px;border:1px solid #e5e7eb;">1000 sq ft</td><td style="padding:6px;text-align:center;border:1px solid #e5e7eb;">${(1000 * depth / 324).toFixed(1)} cu yd</td></tr>
+</table>
+</div>`;
+
+  return (
+    <AlertDialog open={true}>
+      <AlertDialogContent className="max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            📐 {defaults.materialType.charAt(0).toUpperCase() + defaults.materialType.slice(1)} Depth Calculator
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Set the depth you want to use for this SOP. A coverage calculator will be added to the SOP content.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-sm">
+            <p className="text-muted-foreground">{defaults.coverageNote}</p>
+          </div>
+          <div>
+            <Label>Depth (inches)</Label>
+            <div className="flex items-center gap-3 mt-1">
+              <Input
+                type="number"
+                value={depth}
+                onChange={(e) => setDepth(parseFloat(e.target.value) || 0)}
+                min={0.5}
+                max={12}
+                step={0.5}
+                className="w-24"
+                data-testid="input-calc-depth"
+              />
+              <span className="text-sm text-muted-foreground">inches (recommended: {defaults.defaultDepthInches}")</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Length (ft)</Label>
+              <Input type="number" value={length} onChange={(e) => setLength(parseFloat(e.target.value) || 0)} min={1} data-testid="input-calc-length" />
+            </div>
+            <div>
+              <Label className="text-xs">Width (ft)</Label>
+              <Input type="number" value={width} onChange={(e) => setWidth(parseFloat(e.target.value) || 0)} min={1} data-testid="input-calc-width" />
+            </div>
+          </div>
+          <Card className="bg-muted/50">
+            <CardContent className="p-3 text-center">
+              <p className="text-xs text-muted-foreground">Quick Preview</p>
+              <p className="text-2xl font-bold text-green-600">{roundedYards} cubic yards</p>
+              <p className="text-xs text-muted-foreground">for {sqFt} sq ft at {depth}" depth</p>
+            </CardContent>
+          </Card>
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onCancel}>Skip Calculator</AlertDialogCancel>
+          <AlertDialogAction onClick={() => onConfirm(depth, calcHtml)} data-testid="btn-add-calculator">
+            Add Calculator to SOP
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void }) {
   return (
     <div className="space-y-6" data-testid="step-media">
@@ -990,6 +1089,64 @@ function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Par
         <h3 className="text-lg font-semibold">Media & Images</h3>
         <p className="text-sm text-muted-foreground">Add images to your SOP header and individual steps using AI generation.</p>
       </div>
+
+      {data.imageSuggestions && data.imageSuggestions.length > 0 && (
+        <Card className="border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-purple-500" /> AI Image Suggestions
+              <Badge variant="outline" className="text-xs ml-auto">{data.imageSuggestions.length} suggestion{data.imageSuggestions.length > 1 ? "s" : ""}</Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">Ready-to-use prompts for image generation. Click to use a prompt below.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 pt-0">
+            {data.imageSuggestions.sort((a, b) => a.priority - b.priority).map((suggestion, idx) => {
+              const isHeader = suggestion.target === "header";
+              const stepIdx = isHeader ? -1 : parseInt(suggestion.target.replace("step_", ""));
+              const stepTitle = !isHeader && data.steps[stepIdx] ? data.steps[stepIdx].title : "";
+              const alreadyHasImage = isHeader ? !!data.headerImage : (data.steps[stepIdx] && !!data.stepImages[data.steps[stepIdx]?.id]);
+
+              return (
+                <div key={idx} className={`p-3 rounded-lg border ${alreadyHasImage ? "border-green-300 bg-green-50/50 dark:border-green-700 dark:bg-green-950/20" : "border-purple-200 dark:border-purple-700"} transition-all`}>
+                  <div className="flex items-start gap-2">
+                    <Badge variant={suggestion.priority === 1 ? "default" : "secondary"} className="shrink-0 text-xs mt-0.5">
+                      {isHeader ? "Header" : `Step ${stepIdx + 1}`}
+                    </Badge>
+                    <div className="flex-1 min-w-0">
+                      {!isHeader && stepTitle && <p className="text-xs font-medium text-muted-foreground mb-1">{stepTitle}</p>}
+                      <p className="text-xs leading-relaxed">{suggestion.prompt}</p>
+                    </div>
+                    {alreadyHasImage ? (
+                      <Badge variant="outline" className="shrink-0 text-xs text-green-600 border-green-300">
+                        <Check className="h-3 w-3 mr-1" /> Done
+                      </Badge>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 text-xs text-purple-600 border-purple-300 hover:bg-purple-50"
+                        onClick={() => {
+                          const promptInput = document.querySelector(`[data-testid="input-ai-prompt"]`) as HTMLTextAreaElement;
+                          if (promptInput) {
+                            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+                            nativeInputValueSetter?.call(promptInput, suggestion.prompt);
+                            promptInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            promptInput.focus();
+                            promptInput.scrollIntoView({ behavior: "smooth", block: "center" });
+                          }
+                        }}
+                        data-testid={`btn-use-suggestion-${idx}`}
+                      >
+                        <Camera className="h-3 w-3 mr-1" /> Use Prompt
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-2">
@@ -1305,6 +1462,10 @@ function generateSOPContent(data: SOPBuilderData): string {
     }
   }
 
+  if (data.calculatorHtml) {
+    html += data.calculatorHtml;
+  }
+
   if (data.safetyNotes) {
     html += `<h2>⚠️ Safety Notes</h2>`;
     html += `<p>${data.safetyNotes.replace(/\n/g, "<br>")}</p>`;
@@ -1462,6 +1623,9 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
     });
   };
 
+  const [showCalculatorPopup, setShowCalculatorPopup] = useState(false);
+  const [pendingCalcDefaults, setPendingCalcDefaults] = useState<MaterialCalculatorData | null>(null);
+
   const handleAiSuggest = async () => {
     if (!data.title.trim()) {
       toast({ title: "Enter a title first", description: "We need a title to generate suggestions.", variant: "destructive" });
@@ -1476,25 +1640,47 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
       });
       const suggestions = await res.json();
       const classification = suggestions.classification || null;
-      setData(prev => ({
-        ...prev,
-        outcome: prev.outcome || suggestions.outcome || "",
-        outcomeType: prev.outcomeType || suggestions.outcomeType || "",
-        audience: prev.audience || suggestions.audience || "",
-        skillLevel: prev.skillLevel || suggestions.skillLevel || "",
-        steps: (prev.steps.length <= 1 && !prev.steps[0]?.title) ? (suggestions.steps || prev.steps) : prev.steps,
-        tools: prev.tools || suggestions.tools || "",
-        materials: prev.materials || suggestions.materials || "",
-        ppe: prev.ppe || suggestions.ppe || "",
-        safetyNotes: prev.safetyNotes || suggestions.safetyNotes || "",
-        complianceNotes: prev.complianceNotes || suggestions.complianceNotes || "",
-        timingTarget: prev.timingTarget || suggestions.timingTarget || "",
-        timingMax: prev.timingMax || suggestions.timingMax || "",
-        classification: classification || prev.classification,
-        superCategory: classification?.superCategory || prev.superCategory || "",
-        subCategory: classification?.subCategory || prev.subCategory || "",
-      }));
-      toast({ title: "AI suggestions applied", description: "Fields have been auto-filled. Review and adjust as needed." });
+
+      setData(prev => {
+        const updates: Partial<SOPBuilderData> = {
+          outcome: prev.outcome || suggestions.outcome || "",
+          outcomeType: prev.outcomeType || suggestions.outcomeType || "",
+          audience: prev.audience || suggestions.audience || "",
+          skillLevel: prev.skillLevel || suggestions.skillLevel || "",
+          steps: (prev.steps.length <= 1 && !prev.steps[0]?.title) ? (suggestions.steps || prev.steps) : prev.steps,
+          tools: prev.tools || suggestions.tools || "",
+          materials: prev.materials || suggestions.materials || "",
+          ppe: prev.ppe || suggestions.ppe || "",
+          safetyNotes: prev.safetyNotes || suggestions.safetyNotes || "",
+          complianceNotes: prev.complianceNotes || suggestions.complianceNotes || "",
+          timingTarget: prev.timingTarget || suggestions.timingTarget || "",
+          timingMax: prev.timingMax || suggestions.timingMax || "",
+          classification: classification || prev.classification,
+          superCategory: classification?.superCategory || prev.superCategory || "",
+          subCategory: classification?.subCategory || prev.subCategory || "",
+          imageSuggestions: suggestions.imageSuggestions || [],
+          needsMaterialCalculator: suggestions.needsMaterialCalculator || false,
+          calculatorDefaults: suggestions.calculatorDefaults || null,
+        };
+
+        if (suggestions.suggestedTopicId && !prev.categoryId) {
+          updates.categoryId = suggestions.suggestedTopicId;
+          updates.category = suggestions.suggestedTopicName || "";
+        }
+
+        return { ...prev, ...updates };
+      });
+
+      if (suggestions.needsMaterialCalculator && suggestions.calculatorDefaults) {
+        setPendingCalcDefaults(suggestions.calculatorDefaults);
+        setShowCalculatorPopup(true);
+      }
+
+      const imgCount = suggestions.imageSuggestions?.length || 0;
+      const topicMsg = suggestions.suggestedTopicId ? ` Topic "${suggestions.suggestedTopicName}" selected.` : (suggestions.suggestedTopicName ? ` Suggested new topic: "${suggestions.suggestedTopicName}".` : "");
+      const imgMsg = imgCount > 0 ? ` ${imgCount} image suggestion${imgCount > 1 ? "s" : ""} ready on the Media tab.` : "";
+      const calcMsg = suggestions.needsMaterialCalculator ? " Material calculator available." : "";
+      toast({ title: "AI suggestions applied", description: `Fields auto-filled.${topicMsg}${imgMsg}${calcMsg} Review and adjust as needed.` });
     } catch (err: any) {
       toast({ title: "AI suggestion failed", description: err.message || "Please try again.", variant: "destructive" });
     } finally {
@@ -1599,6 +1785,22 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {showCalculatorPopup && pendingCalcDefaults && (
+        <MaterialCalculatorPopup
+          defaults={pendingCalcDefaults}
+          onConfirm={(depth, html) => {
+            setData(prev => ({ ...prev, calculatorHtml: html }));
+            setShowCalculatorPopup(false);
+            setPendingCalcDefaults(null);
+            toast({ title: "Calculator added", description: `${pendingCalcDefaults.materialType} calculator at ${depth}" depth will be included in your SOP.` });
+          }}
+          onCancel={() => {
+            setShowCalculatorPopup(false);
+            setPendingCalcDefaults(null);
+          }}
+        />
+      )}
 
       <AlertDialog open={showNavDialog} onOpenChange={setShowNavDialog}>
         <AlertDialogContent>
