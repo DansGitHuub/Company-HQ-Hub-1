@@ -1,4 +1,6 @@
+import React from "react";
 import { toast } from "@/hooks/use-toast";
+import { ToastAction, type ToastActionElement } from "@/components/ui/toast";
 import { getErrorInfo } from "@shared/errorCodes";
 import { ApiError } from "./queryClient";
 
@@ -19,10 +21,22 @@ export function showErrorToast(error: unknown, fallbackTitle?: string) {
 
   if (errorCode) {
     const info = getErrorInfo(errorCode);
+    const copyText = `Error ${errorCode}: ${info.description}`;
+
     toast({
       title: `${fallbackTitle || "Error"} [${errorCode}]`,
       description: `${info.description}\n\nFix: ${info.fix}`,
       variant: "destructive",
+      action: React.createElement(
+        ToastAction,
+        {
+          altText: "Copy error code",
+          onClick: () => {
+            navigator.clipboard.writeText(copyText).catch(() => {});
+          },
+        },
+        "Copy"
+      ) as ToastActionElement,
     });
   } else {
     toast({
