@@ -482,14 +482,15 @@ export default function SOPs() {
           <p className="text-muted-foreground">Standard Operating Procedures & Knowledge Base</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => { setBuilderInitialData(undefined); setShowBuilder(true); }} className="gap-2" data-testid="button-sop-builder">
-            <ClipboardList className="w-4 h-4" /> SOP Builder
+          <Button
+            onClick={() => { setBuilderInitialData(undefined); setShowBuilder(true); }}
+            className="gap-2 px-5 py-2.5 text-sm font-semibold shadow-md hover:shadow-lg hover:brightness-110 transition-all ring-1 ring-primary/20"
+            data-testid="button-sop-builder"
+          >
+            <ClipboardList className="w-5 h-5" /> SOP Builder
           </Button>
           <Button variant="outline" onClick={() => setAiGenerateOpen(true)} className="gap-2" data-testid="button-ai-generate-sop">
             <Sparkles className="w-4 h-4" /> Generate with AI
-          </Button>
-          <Button className="gap-2" onClick={() => setCreateOpen(true)} data-testid="button-new-sop">
-            <Plus className="w-4 h-4" /> New SOP
           </Button>
         </div>
       </div>
