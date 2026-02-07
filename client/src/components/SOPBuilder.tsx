@@ -857,6 +857,44 @@ function AIImageGenerator({
     queryKey: ["/api/ai-image-settings"],
   });
 
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const pollForResult = useCallback(async (jobId: string) => {
+    const maxAttempts = 40;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        const res = await fetch(`/api/sop-media/ai-generate/status/${jobId}`, { credentials: "include" });
+        const data = await res.json();
+        if (data.status === "completed") {
+          setPreview({
+            id: data.result.id,
+            url: data.result.url,
+            alt: data.result.alt || prompt,
+            source: "ai_generated",
+            aiPrompt: prompt,
+            aiStyle: style,
+          });
+          toast({ title: "Image generated successfully" });
+          setIsGenerating(false);
+          return;
+        } else if (data.status === "failed") {
+          toast({ title: "Generation failed", description: data.error || "Unknown error", variant: "destructive", duration: 15000 });
+          setIsGenerating(false);
+          return;
+        } else if (data.status === "not_found") {
+          toast({ title: "Generation failed", description: "Job expired or not found. Please try again.", variant: "destructive", duration: 15000 });
+          setIsGenerating(false);
+          return;
+        }
+      } catch (err) {
+        console.error("Poll error:", err);
+      }
+    }
+    toast({ title: "Generation timed out", description: "The image took too long to generate. Please try again.", variant: "destructive", duration: 15000 });
+    setIsGenerating(false);
+  }, [prompt, style, toast]);
+
   const generateMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/sop-media/ai-generate", {
@@ -869,18 +907,23 @@ function AIImageGenerator({
       return await res.json();
     },
     onSuccess: (data) => {
-      setPreview({
-        id: data.id,
-        url: data.url,
-        alt: data.alt || prompt,
-        source: "ai_generated",
-        aiPrompt: prompt,
-        aiStyle: style,
-      });
-      toast({ title: "Image generated successfully" });
+      if (data.jobId) {
+        setIsGenerating(true);
+        pollForResult(data.jobId);
+      } else if (data.id) {
+        setPreview({
+          id: data.id,
+          url: data.url,
+          alt: data.alt || prompt,
+          source: "ai_generated",
+          aiPrompt: prompt,
+          aiStyle: style,
+        });
+        toast({ title: "Image generated successfully" });
+      }
     },
     onError: (err: any) => {
-      toast({ title: "Generation failed", description: err.message, variant: "destructive", duration: 10000 });
+      toast({ title: "Generation failed", description: err.message, variant: "destructive", duration: 15000 });
     },
   });
 
@@ -972,12 +1015,12 @@ function AIImageGenerator({
 
       <Button
         onClick={() => generateMutation.mutate()}
-        disabled={!prompt.trim() || generateMutation.isPending}
+        disabled={!prompt.trim() || generateMutation.isPending || isGenerating}
         className="w-full"
         data-testid="btn-generate-ai-image"
       >
-        {generateMutation.isPending ? (
-          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating...</>
+        {generateMutation.isPending || isGenerating ? (
+          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {isGenerating ? "Generating image... (up to 60s)" : "Starting..."}</>
         ) : (
           <><Sparkles className="h-4 w-4 mr-2" /> Generate Image</>
         )}

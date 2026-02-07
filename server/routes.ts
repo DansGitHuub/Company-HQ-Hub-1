@@ -1026,6 +1026,15 @@ Respond with a JSON object:
     watermark: z.boolean().optional(),
   });
 
+  const imageJobs = new Map<string, { status: "pending" | "processing" | "completed" | "failed"; result?: any; error?: string; createdAt: number }>();
+
+  setInterval(() => {
+    const now = Date.now();
+    for (const [id, job] of imageJobs) {
+      if (now - job.createdAt > 10 * 60 * 1000) imageJobs.delete(id);
+    }
+  }, 60000);
+
   app.post("/api/sop-media/ai-generate", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;
@@ -1083,103 +1092,130 @@ Respond with a JSON object:
         return res.status(429).json({ message: `Monthly limit reached (${monthlyLimit} images/month)` });
       }
 
-      const stylePrompts: Record<string, string> = {
-        photoreal: "photorealistic, high quality photography, professional, detailed",
-        diagram: "technical diagram, clean lines, labeled, professional schematic",
-        illustration: "simple illustration, clean, educational, clear colors",
-        icon: "flat icon style, minimal, simple shapes, bold colors",
-      };
+      const jobId = crypto.randomUUID();
+      imageJobs.set(jobId, { status: "processing", createdAt: Date.now() });
 
-      const fullPrompt = [
-        `Landscaping/outdoor work context: ${prompt}`,
-        style ? stylePrompts[style] : "",
-        negativePrompt ? `Avoid: ${negativePrompt}` : "",
-        (watermark !== false && settings?.aiImagesWatermarkDefault !== false)
-          ? "Include a small subtle 'AI Generated' text watermark in the bottom-right corner"
-          : "",
-      ].filter(Boolean).join(". ");
+      res.status(202).json({ jobId, status: "processing" });
 
-      const imageResponse = await openai.images.generate({
-        model: "gpt-image-1",
-        prompt: fullPrompt,
-        size: "1024x1024",
-      });
+      (async () => {
+        try {
+          const stylePrompts: Record<string, string> = {
+            photoreal: "photorealistic, high quality photography, professional, detailed",
+            diagram: "technical diagram, clean lines, labeled, professional schematic",
+            illustration: "simple illustration, clean, educational, clear colors",
+            icon: "flat icon style, minimal, simple shapes, bold colors",
+          };
 
-      const b64 = imageResponse.data?.[0]?.b64_json;
-      if (!b64) {
-        throw new Error("No image data returned from AI");
-      }
+          const fullPrompt = [
+            `Landscaping/outdoor work context: ${prompt}`,
+            style ? stylePrompts[style] : "",
+            negativePrompt ? `Avoid: ${negativePrompt}` : "",
+            (watermark !== false && settings?.aiImagesWatermarkDefault !== false)
+              ? "Include a small subtle 'AI Generated' text watermark in the bottom-right corner"
+              : "",
+          ].filter(Boolean).join(". ");
 
-      const imageBuffer = Buffer.from(b64, "base64");
+          const imageResponse = await openai.images.generate({
+            model: "gpt-image-1",
+            prompt: fullPrompt,
+            size: "1024x1024",
+          });
 
-      const { ObjectStorageService, objectStorageClient } = await import("./replit_integrations/object_storage");
-      const objService = new ObjectStorageService();
-      const privateDir = objService.getPrivateObjectDir();
-      const imageId = crypto.randomUUID();
-      const objectPath = `${privateDir}/sop-media/${imageId}.png`;
+          const b64 = imageResponse.data?.[0]?.b64_json;
+          if (!b64) {
+            throw new Error("No image data returned from AI");
+          }
 
-      const pathParts = objectPath.startsWith("/") ? objectPath.slice(1).split("/") : objectPath.split("/");
-      const bucketName = pathParts[0];
-      const objectName = pathParts.slice(1).join("/");
-      const bucket = objectStorageClient.bucket(bucketName);
-      const file = bucket.file(objectName);
-      await file.save(imageBuffer, { contentType: "image/png" });
+          const imageBuffer = Buffer.from(b64, "base64");
 
-      const entityPath = `/objects/sop-media/${imageId}.png`;
+          const { ObjectStorageService, objectStorageClient } = await import("./replit_integrations/object_storage");
+          const objService = new ObjectStorageService();
+          const privateDir = objService.getPrivateObjectDir();
+          const imageId = crypto.randomUUID();
+          const objectPath = `${privateDir}/sop-media/${imageId}.png`;
 
-      const useWatermark = watermark !== false && settings?.aiImagesWatermarkDefault !== false;
+          const pathParts = objectPath.startsWith("/") ? objectPath.slice(1).split("/") : objectPath.split("/");
+          const bucketName = pathParts[0];
+          const objectName = pathParts.slice(1).join("/");
+          const bucket = objectStorageClient.bucket(bucketName);
+          const file = bucket.file(objectName);
+          await file.save(imageBuffer, { contentType: "image/png" });
 
-      const media = await storage.createSopMedia({
-        sopId: targetId || null,
-        stepIndex: stepIndex ?? null,
-        placement: targetType === "sop_header" ? "header" : "step",
-        url: entityPath,
-        alt: prompt.slice(0, 200),
-        source: "ai_generated",
-        aiPrompt: prompt,
-        aiStyle: style || null,
-        aiNegativePrompt: negativePrompt || null,
-        aiModel: "gpt-image-1",
-        aiWatermarked: useWatermark,
-        metadata: { revisedPrompt: imageResponse.data?.[0]?.revised_prompt },
-        createdBy: user.id,
-      });
+          const entityPath = `/objects/sop-media/${imageId}.png`;
+          const useWatermark = watermark !== false && settings?.aiImagesWatermarkDefault !== false;
 
-      await storage.createAiGenerationEvent({
-        userId: user.id,
-        targetType,
-        targetId: targetId || null,
-        prompt,
-        negativePrompt: negativePrompt || null,
-        style: style || null,
-        model: "gpt-image-1",
-        requestedSize: "1024x1024",
-        resultMediaId: media.id,
-        status: "success",
-        errorMessage: null,
-      });
+          const media = await storage.createSopMedia({
+            sopId: targetId || null,
+            stepIndex: stepIndex ?? null,
+            placement: targetType === "sop_header" ? "header" : "step",
+            url: entityPath,
+            alt: prompt.slice(0, 200),
+            source: "ai_generated",
+            aiPrompt: prompt,
+            aiStyle: style || null,
+            aiNegativePrompt: negativePrompt || null,
+            aiModel: "gpt-image-1",
+            aiWatermarked: useWatermark,
+            metadata: { revisedPrompt: imageResponse.data?.[0]?.revised_prompt },
+            createdBy: user.id,
+          });
 
-      res.status(201).json(media);
+          await storage.createAiGenerationEvent({
+            userId: user.id,
+            targetType,
+            targetId: targetId || null,
+            prompt,
+            negativePrompt: negativePrompt || null,
+            style: style || null,
+            model: "gpt-image-1",
+            requestedSize: "1024x1024",
+            resultMediaId: media.id,
+            status: "success",
+            errorMessage: null,
+          });
+
+          imageJobs.set(jobId, { status: "completed", result: media, createdAt: Date.now() });
+        } catch (err: any) {
+          console.error("AI image generation error:", err);
+          try {
+            await storage.createAiGenerationEvent({
+              userId: user.id,
+              targetType,
+              targetId: targetId || null,
+              prompt,
+              negativePrompt: negativePrompt || null,
+              style: style || null,
+              model: "gpt-image-1",
+              requestedSize: "1024x1024",
+              resultMediaId: null,
+              status: "failed",
+              errorMessage: err.message,
+            });
+          } catch (logErr) {
+            console.error("Failed to log AI generation error:", logErr);
+          }
+          imageJobs.set(jobId, { status: "failed", error: err.message, createdAt: Date.now() });
+        }
+      })();
     } catch (err: any) {
-      console.error("AI image generation error:", err);
-      try {
-        await storage.createAiGenerationEvent({
-          userId: (req.user as User).id,
-          targetType: req.body.targetType || "unknown",
-          targetId: req.body.targetId || null,
-          prompt: req.body.prompt || "",
-          negativePrompt: null,
-          style: null,
-          model: "gpt-image-1",
-          requestedSize: "1024x1024",
-          resultMediaId: null,
-          status: "failed",
-          errorMessage: err.message,
-        });
-      } catch (logErr) {
-        console.error("Failed to log AI generation error:", logErr);
-      }
+      console.error("AI image generation setup error:", err);
       res.status(500).json({ message: "AI image generation failed", error: err.message });
+    }
+  });
+
+  app.get("/api/sop-media/ai-generate/status/:jobId", requireAuth, async (req, res) => {
+    const job = imageJobs.get(req.params.jobId);
+    if (!job) {
+      return res.status(404).json({ status: "not_found", message: "Job not found or expired" });
+    }
+    if (job.status === "completed") {
+      res.json({ status: "completed", result: job.result });
+      imageJobs.delete(req.params.jobId);
+    } else if (job.status === "failed") {
+      res.json({ status: "failed", error: job.error });
+      imageJobs.delete(req.params.jobId);
+    } else {
+      res.json({ status: "processing" });
     }
   });
 
