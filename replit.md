@@ -75,7 +75,8 @@ Preferred communication style: Simple, everyday language.
 - **Diagnostic Report System** (Master Admin only): Comprehensive error tracking and system monitoring tool with two viewing modes:
   - **Simple Mode**: Non-technical view showing system health status (Excellent/Good/Needs Attention), quick stats (users, SOPs, materials, jobs, todos), recent issues summary, and recent activity feed.
   - **Advanced Mode**: Full technical details including error counts by severity and feature, system usage breakdowns, error analysis by endpoint and time, detailed error logs with stack traces, activity logs with metadata, and most active users ranking.
-  - **Error Tracking**: Automatic logging of API errors, frontend React errors (via ErrorBoundary), and user actions across all features.
+  - **Error Tracking**: Automatic logging of API errors, frontend React errors (via ErrorBoundary), and user actions across all features. Structured error codes (e.g. IMG-001, AUTH-003, SOP-002) with plain-English descriptions and suggested fixes.
+  - **Error Code System**: Centralized registry in `shared/errorCodes.ts` with 40+ codes across all features (AUTH, IMG, SOP, MAT, JOB, TODO, MSG, EQP, HIRE, FORM, FILE, AI, CAL, PLOW, NET, SYS, USR, EMAIL). Error codes are returned in API responses, stored in error_logs DB, shown in enhanced error toasts with fix suggestions, and displayed in Diagnostic Report. Uses `ApiError` class in `client/src/lib/queryClient.ts` and `showErrorToast` utility in `client/src/lib/errorToast.ts`.
   - **Activity Logging**: Tracks key user actions like create, update, delete operations with feature context and success status.
   - **Report Export**: Download diagnostic reports as JSON for sharing with technical support.
   - **Error Resolution**: Mark errors as resolved with timestamp and resolver tracking.

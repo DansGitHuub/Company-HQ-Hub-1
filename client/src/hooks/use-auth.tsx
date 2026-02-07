@@ -7,6 +7,7 @@ import {
 import { User as SelectUser, InsertUser } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { showErrorToast } from "@/lib/errorToast";
 import { getTheme, applyTheme } from "@/lib/themes";
 
 type Role = "Admin" | "Manager" | "Crew" | "Customer";
@@ -63,11 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/user"], user);
     },
     onError: (error: Error) => {
-      toast({
-        title: "Login failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      showErrorToast(error, "Login failed");
     },
   });
 
@@ -80,11 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/user"], user);
     },
     onError: (error: Error) => {
-      toast({
-        title: "Registration failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      showErrorToast(error, "Registration failed");
     },
   });
 

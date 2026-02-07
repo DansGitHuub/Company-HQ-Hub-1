@@ -15,6 +15,7 @@ import { Search, Plus, Trash2, Edit, Package, ChevronRight, ChevronLeft, FolderP
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { showErrorToast } from "@/lib/errorToast";
 import type { Material, MaterialCategory, CategoryField } from "@shared/schema";
 
 type WizardStep = "name" | "category" | "ai-fill" | "review" | "confirm";
@@ -95,7 +96,7 @@ export default function Materials() {
       setShowCategoryDialog(false);
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      showErrorToast(err, "Error");
     },
   });
 
@@ -111,7 +112,7 @@ export default function Materials() {
       setShowCategoryDialog(false);
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      showErrorToast(err, "Error");
     },
   });
 
@@ -126,7 +127,7 @@ export default function Materials() {
       toast({ title: "Category deleted" });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      showErrorToast(err, "Error");
     },
   });
 
@@ -157,7 +158,7 @@ export default function Materials() {
       resetWizard();
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      showErrorToast(err, "Error");
     },
   });
 
@@ -172,7 +173,7 @@ export default function Materials() {
       setShowEditMaterial(null);
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      showErrorToast(err, "Error");
     },
   });
 
@@ -190,7 +191,7 @@ export default function Materials() {
       setShowBulkMove(false);
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      showErrorToast(err, "Error");
     },
   });
 
@@ -204,7 +205,7 @@ export default function Materials() {
       toast({ title: "Material deleted" });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      showErrorToast(err, "Error");
     },
   });
 
@@ -244,7 +245,7 @@ export default function Materials() {
       
       toast({ title: "AI filled material details" });
     } catch (err: any) {
-      toast({ title: "AI generation failed", description: "You can fill in the details manually", variant: "destructive" });
+      showErrorToast(err, "AI generation failed");
     } finally {
       setIsAiLoading(false);
     }

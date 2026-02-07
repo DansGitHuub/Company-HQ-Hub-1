@@ -1585,6 +1585,7 @@ export type CalendarConnection = typeof calendarConnections.$inferSelect;
 // Error Logs - for tracking application errors
 export const errorLogs = pgTable("error_logs", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  errorCode: text("error_code"), // Structured error code (e.g. IMG-001, AUTH-003, SOP-002)
   errorType: text("error_type").notNull(), // api_error, database_error, auth_error, validation_error, frontend_error
   errorMessage: text("error_message").notNull(),
   stackTrace: text("stack_trace"),

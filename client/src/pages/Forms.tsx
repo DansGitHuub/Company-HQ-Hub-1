@@ -47,6 +47,7 @@ import {
   Pencil
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { showErrorToast } from "@/lib/errorToast";
 import { useAuth } from "@/hooks/use-auth";
 
 type FormFolder = {
@@ -301,7 +302,7 @@ export default function Forms() {
       const formData = await res.json();
       await createFormFromAIMutation.mutateAsync(formData);
     } catch (err) {
-      toast({ title: "AI generation failed", variant: "destructive" });
+      showErrorToast(err, "AI generation failed");
     } finally {
       setAiGenerating(false);
     }
@@ -888,7 +889,7 @@ function FormBuilderDialog({ form, open, onOpenChange }: { form: CustomForm; ope
       setShowAiDialog(false);
       setAiPrompt("");
     } catch (err) {
-      toast({ title: "AI generation failed", variant: "destructive" });
+      showErrorToast(err, "AI generation failed");
     } finally {
       setAiGenerating(false);
     }
@@ -1298,8 +1299,8 @@ function FillFormDialog({ form, open, onOpenChange }: { form: CustomForm; open: 
       toast({ title: "Form submitted successfully" });
       onOpenChange(false);
     },
-    onError: () => {
-      toast({ title: "Error submitting form", variant: "destructive" });
+    onError: (error) => {
+      showErrorToast(error, "Error submitting form");
     },
   });
 

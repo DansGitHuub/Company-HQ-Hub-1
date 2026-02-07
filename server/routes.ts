@@ -789,7 +789,7 @@ Respond with a JSON object:
       const sop = await storage.createSop(body);
       res.status(201).json(sop);
     } catch (err) {
-      res.status(500).json({ message: "Error creating SOP" });
+      res.status(500).json({ message: "Error creating SOP", errorCode: "SOP-001" });
     }
   });
 
@@ -799,7 +799,7 @@ Respond with a JSON object:
       if (!sop) return res.status(404).json({ message: "SOP not found" });
       res.json(sop);
     } catch (err) {
-      res.status(500).json({ message: "Error updating SOP" });
+      res.status(500).json({ message: "Error updating SOP", errorCode: "SOP-001" });
     }
   });
 
@@ -1041,12 +1041,12 @@ Respond with a JSON object:
       
       const settings = await storage.getCompanySettings();
       if (settings && !settings.aiImagesEnabled) {
-        return res.status(403).json({ message: "AI image generation is disabled" });
+        return res.status(403).json({ message: "AI image generation is disabled", errorCode: "IMG-002" });
       }
 
       const allowedRoles = (settings?.aiImagesAllowedRoles as string[]) || ["Admin", "Manager"];
       if (!user.isMasterAdmin && !allowedRoles.includes(user.role)) {
-        return res.status(403).json({ message: "Your role does not have permission to generate AI images" });
+        return res.status(403).json({ message: "Your role does not have permission to generate AI images", errorCode: "IMG-003" });
       }
 
       const parsed = aiImageGenerateSchema.safeParse(req.body);
@@ -1071,7 +1071,7 @@ Respond with a JSON object:
           status: "blocked",
           errorMessage: safetyCheck.reason || "Content policy violation",
         });
-        return res.status(400).json({ message: safetyCheck.reason });
+        return res.status(400).json({ message: safetyCheck.reason, errorCode: "IMG-006" });
       }
 
       const dailyLimit = settings?.aiImagesDailyLimit || 10;
@@ -1081,7 +1081,7 @@ Respond with a JSON object:
       today.setHours(0, 0, 0, 0);
       const dailyCount = await storage.getAiGenerationEventsCount(user.id, today);
       if (dailyCount >= dailyLimit) {
-        return res.status(429).json({ message: `Daily limit reached (${dailyLimit} images/day)` });
+        return res.status(429).json({ message: `Daily limit reached (${dailyLimit} images/day)`, errorCode: "IMG-004" });
       }
 
       const monthStart = new Date();
@@ -1089,7 +1089,7 @@ Respond with a JSON object:
       monthStart.setHours(0, 0, 0, 0);
       const monthlyCount = await storage.getAiGenerationEventsCountAll(monthStart);
       if (monthlyCount >= monthlyLimit) {
-        return res.status(429).json({ message: `Monthly limit reached (${monthlyLimit} images/month)` });
+        return res.status(429).json({ message: `Monthly limit reached (${monthlyLimit} images/month)`, errorCode: "IMG-005" });
       }
 
       const jobId = crypto.randomUUID();
@@ -1209,12 +1209,15 @@ Respond with a JSON object:
           } catch (logErr) {
             console.error("Failed to log AI generation error:", logErr);
           }
-          imageJobs.set(jobId, { status: "failed", error: err.message, createdAt: Date.now() });
+          const errorCode = err.message?.includes("No image data") ? "IMG-007" : 
+                          err.message?.includes("timed out") || err.message?.includes("timeout") ? "IMG-008" :
+                          err.message?.includes("save") || err.message?.includes("storage") ? "IMG-009" : "IMG-001";
+          imageJobs.set(jobId, { status: "failed", error: err.message, errorCode, createdAt: Date.now() });
         }
       })();
     } catch (err: any) {
       console.error("AI image generation setup error:", err);
-      res.status(500).json({ message: "AI image generation failed", error: err.message });
+      res.status(500).json({ message: "AI image generation failed", error: err.message, errorCode: "IMG-001" });
     }
   });
 
@@ -1227,7 +1230,7 @@ Respond with a JSON object:
       res.json({ status: "completed", result: job.result });
       imageJobs.delete(req.params.jobId);
     } else if (job.status === "failed") {
-      res.json({ status: "failed", error: job.error });
+      res.json({ status: "failed", error: job.error, errorCode: (job as any).errorCode || "IMG-001" });
       imageJobs.delete(req.params.jobId);
     } else {
       res.json({ status: "processing" });
@@ -1943,7 +1946,7 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
       const category = await storage.createMaterialCategory({ name: name.trim() });
       res.status(201).json(category);
     } catch (err) {
-      res.status(500).json({ message: "Error creating category" });
+      res.status(500).json({ message: "Error creating category", errorCode: "MAT-002" });
     }
   });
 
@@ -2192,7 +2195,7 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
       res.status(201).json(material);
     } catch (err: any) {
       console.error("[materials] Error creating material:", err);
-      res.status(500).json({ message: "Error creating material", error: err?.message });
+      res.status(500).json({ message: "Error creating material", error: err?.message, errorCode: "MAT-001" });
     }
   });
 
@@ -2625,7 +2628,7 @@ Generate detailed information for this landscaping material.`;
       const job = await storage.createJob(req.body);
       res.status(201).json(job);
     } catch (err) {
-      res.status(500).json({ message: "Error creating job" });
+      res.status(500).json({ message: "Error creating job", errorCode: "JOB-001" });
     }
   });
 
@@ -2770,7 +2773,7 @@ Generate detailed information for this landscaping material.`;
       });
       res.status(201).json(message);
     } catch (err) {
-      res.status(500).json({ message: "Error sending message" });
+      res.status(500).json({ message: "Error sending message", errorCode: "MSG-001" });
     }
   });
 
@@ -3473,7 +3476,7 @@ Generate detailed information for this landscaping material.`;
       const item = await storage.createEquipment(req.body);
       res.status(201).json(item);
     } catch (err) {
-      res.status(500).json({ message: "Error creating equipment" });
+      res.status(500).json({ message: "Error creating equipment", errorCode: "EQP-001" });
     }
   });
 
@@ -3872,7 +3875,7 @@ Generate detailed information for this landscaping material.`;
       res.status(201).json(todo);
     } catch (err) {
       console.error("[TODO] Error creating todo:", err);
-      res.status(500).json({ message: "Error creating todo. Please try again." });
+      res.status(500).json({ message: "Error creating todo. Please try again.", errorCode: "TODO-001" });
     }
   });
 

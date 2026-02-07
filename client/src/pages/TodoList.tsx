@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { showErrorToast } from "@/lib/errorToast";
 import { useAuth } from "@/hooks/use-auth";
 import { format, differenceInDays, differenceInHours, isPast, isToday } from "date-fns";
 import type { Todo, User as UserType } from "@shared/schema";
@@ -173,12 +174,7 @@ export default function TodoList() {
       toast({ title: "Task created successfully" });
     },
     onError: (error: Error) => {
-      toast({
-        title: "Failed to create task",
-        description: error.message || "Please check your input and try again.",
-        variant: "destructive",
-        duration: 30000,
-      });
+      showErrorToast(error, "Failed to create task");
     },
   });
 
@@ -203,12 +199,7 @@ export default function TodoList() {
       toast({ title: "Task updated" });
     },
     onError: (error: Error) => {
-      toast({
-        title: "Failed to update task",
-        description: error.message || "Please check your input and try again.",
-        variant: "destructive",
-        duration: 30000,
-      });
+      showErrorToast(error, "Failed to update task");
     },
   });
 
@@ -225,7 +216,7 @@ export default function TodoList() {
       queryClient.invalidateQueries({ queryKey: ["/api/my-todos"] });
       toast({ title: "Task deleted" });
     },
-    onError: (error: Error) => toast({ title: "Failed to delete task", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => showErrorToast(error, "Failed to delete task"),
   });
 
   const archiveTodo = useMutation({
@@ -245,7 +236,7 @@ export default function TodoList() {
     },
     onError: (error: Error) => {
       setArchiveConfirmTodo(null);
-      toast({ title: "Failed to archive task", description: error.message, variant: "destructive" });
+      showErrorToast(error, "Failed to archive task");
     },
   });
 
@@ -279,7 +270,7 @@ export default function TodoList() {
       queryClient.invalidateQueries({ queryKey: ["/api/my-todos"] });
       toast({ title: "User assigned to task" });
     },
-    onError: (error: Error) => toast({ title: "Assignment failed", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => showErrorToast(error, "Assignment failed"),
   });
 
   const getPriorityColor = (priority: string) => {

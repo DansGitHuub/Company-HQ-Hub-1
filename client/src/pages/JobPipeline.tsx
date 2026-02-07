@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { showErrorToast } from "@/lib/errorToast";
 import { useUpload } from "@/hooks/use-upload";
 import type { Job, JobDocument, JobPipelineTab, JobCategory } from "@shared/schema";
 
@@ -205,7 +206,7 @@ export default function JobPipeline() {
     try {
       const response = await uploadFile(file);
       if (!response) {
-        toast({ title: "Upload failed", variant: "destructive" });
+        showErrorToast(new Error("Upload returned empty response"), "Upload failed");
         return;
       }
       createDocMutation.mutate({
@@ -215,7 +216,7 @@ export default function JobPipeline() {
         url: response.objectPath,
       });
     } catch (error) {
-      toast({ title: "Upload failed", variant: "destructive" });
+      showErrorToast(error, "Upload failed");
     }
     e.target.value = "";
   };

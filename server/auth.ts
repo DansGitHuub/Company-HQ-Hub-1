@@ -89,17 +89,17 @@ export function setupAuth(app: Express) {
       const { username, password, email, name, role } = req.body;
       
       if (!username || !password || !email || !name) {
-        return res.status(400).json({ message: "All fields are required" });
+        return res.status(400).json({ message: "All fields are required", errorCode: "AUTH-005" });
       }
 
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
+        return res.status(400).json({ message: "Username already exists", errorCode: "AUTH-005" });
       }
 
       const existingEmail = await storage.getUserByEmail(email);
       if (existingEmail) {
-        return res.status(400).json({ message: "Email already exists" });
+        return res.status(400).json({ message: "Email already exists", errorCode: "AUTH-005" });
       }
 
       const user = await storage.createUser({
@@ -124,7 +124,7 @@ export function setupAuth(app: Express) {
     passport.authenticate("local", (err: any, user: SelectUser | false, info: any) => {
       if (err) return next(err);
       if (!user) {
-        return res.status(401).json({ message: info?.message || "Login failed" });
+        return res.status(401).json({ message: info?.message || "Login failed", errorCode: "AUTH-001" });
       }
       req.login(user, (loginErr) => {
         if (loginErr) return next(loginErr);

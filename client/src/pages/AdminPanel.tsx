@@ -69,6 +69,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { showErrorToast } from "@/lib/errorToast";
 import type { User, AccessRequest, CompanySettings } from "@shared/schema";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -102,7 +103,7 @@ function TodoActiveUsersManager() {
       queryClient.invalidateQueries({ queryKey: ["/api/todo-active-users"] });
       toast({ title: "User activated for To-Do system" });
     },
-    onError: () => toast({ title: "Failed to activate user", variant: "destructive" }),
+    onError: (error) => showErrorToast(error, "Failed to activate user"),
   });
 
   const deactivateMutation = useMutation({
@@ -117,7 +118,7 @@ function TodoActiveUsersManager() {
       queryClient.invalidateQueries({ queryKey: ["/api/todo-active-users"] });
       toast({ title: "User deactivated from To-Do system" });
     },
-    onError: () => toast({ title: "Failed to deactivate user", variant: "destructive" }),
+    onError: (error) => showErrorToast(error, "Failed to deactivate user"),
   });
 
   const isUserActive = (userId: string) => activeUsers.some(a => a.userId === userId);
@@ -267,8 +268,8 @@ export default function AdminPanel() {
       queryClient.invalidateQueries({ queryKey: ["/api/company-settings"] });
       toast({ title: "Company settings updated" });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to update settings", variant: "destructive" });
+    onError: (error) => {
+      showErrorToast(error, "Failed to update settings");
     },
   });
 
@@ -305,7 +306,7 @@ export default function AdminPanel() {
       setLogoUrl(objectPath);
       await updateCompanySettingsMutation.mutateAsync({ logoUrl: objectPath });
     } catch (err) {
-      toast({ title: "Failed to upload logo", variant: "destructive" });
+      showErrorToast(err, "Failed to upload logo");
     } finally {
       setIsUploading(false);
     }
@@ -350,7 +351,7 @@ export default function AdminPanel() {
       toast({ title: "User updated" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to update user", variant: "destructive" });
+      showErrorToast(error, "Failed to update user");
     },
   });
 
@@ -376,8 +377,8 @@ export default function AdminPanel() {
       setResetPasswordUser(null);
       setNewPassword("");
     },
-    onError: () => {
-      toast({ title: "Failed to reset password", variant: "destructive" });
+    onError: (error) => {
+      showErrorToast(error, "Failed to reset password");
     },
   });
 
@@ -391,7 +392,7 @@ export default function AdminPanel() {
       setShowPassword(false);
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Cannot view password", variant: "destructive" });
+      showErrorToast(error, "Cannot view password");
       setViewPasswordUser(null);
     },
   });
@@ -413,7 +414,7 @@ export default function AdminPanel() {
       toast({ title: "Access request processed" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to process request", variant: "destructive" });
+      showErrorToast(error, "Failed to process request");
     },
   });
 

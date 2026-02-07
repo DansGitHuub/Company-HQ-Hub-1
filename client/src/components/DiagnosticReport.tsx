@@ -37,6 +37,7 @@ import DevelopmentTracker from "./DevelopmentTracker";
 
 interface ErrorLog {
   id: string;
+  errorCode?: string;
   errorType: string;
   errorMessage: string;
   stackTrace?: string;
@@ -409,7 +410,10 @@ function AdvancedReportView({ report }: { report: AdvancedReport }) {
                         >
                           {getSeverityIcon(error.severity || "error")}
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{error.errorMessage}</p>
+                            <p className="text-sm font-medium truncate">
+                              {error.errorCode && <span className="font-mono text-destructive mr-2">[{error.errorCode}]</span>}
+                              {error.errorMessage}
+                            </p>
                             <div className="flex gap-2 text-xs text-muted-foreground">
                               <span>{error.httpMethod} {error.endpoint}</span>
                               {error.statusCode && <span>({error.statusCode})</span>}
@@ -433,6 +437,7 @@ function AdvancedReportView({ report }: { report: AdvancedReport }) {
                       <CollapsibleContent>
                         <div className="p-3 text-xs bg-muted/30 rounded-b-lg space-y-2 mt-1">
                           <div className="grid grid-cols-2 gap-2">
+                            {error.errorCode && <div><span className="text-muted-foreground">Error Code:</span> <span className="font-mono font-bold text-destructive">{error.errorCode}</span></div>}
                             <div><span className="text-muted-foreground">Type:</span> {error.errorType}</div>
                             <div><span className="text-muted-foreground">Feature:</span> {error.feature || "N/A"}</div>
                             <div><span className="text-muted-foreground">User:</span> {error.userRole || "Unknown"}</div>

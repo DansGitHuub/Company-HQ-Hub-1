@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { showErrorToast } from "@/lib/errorToast";
 import {
   Card,
   CardContent,
@@ -167,8 +168,8 @@ export default function MessagingInbox() {
       queryClient.invalidateQueries({ queryKey: ["/api/messaging-threads", selectedThread?.id, "messages"] });
       queryClient.invalidateQueries({ queryKey: ["/api/messaging-threads"] });
     },
-    onError: () => {
-      toast({ title: "Failed to send message", variant: "destructive" });
+    onError: (error) => {
+      showErrorToast(error, "Failed to send message");
     },
   });
 
@@ -598,8 +599,8 @@ function NewThreadDialog({
       setCustomerId("");
       setPriority("normal");
     },
-    onError: () => {
-      toast({ title: "Failed to create conversation", variant: "destructive" });
+    onError: (error) => {
+      showErrorToast(error, "Failed to create conversation");
     },
   });
 

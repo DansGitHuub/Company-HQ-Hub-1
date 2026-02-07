@@ -6,6 +6,7 @@ type ErrorSeverity = "info" | "warning" | "error" | "critical";
 type FeatureType = "sops" | "materials" | "jobs" | "hiring" | "todos" | "equipment" | "forms" | "messages" | "users" | "settings" | "auth" | "calendar" | "plow_sites" | "ai_agents" | "help" | "updates" | "frontend" | "general";
 
 interface ErrorLogOptions {
+  errorCode?: string;
   errorType: string;
   errorMessage: string;
   stackTrace?: string;
@@ -62,6 +63,7 @@ export async function logError(options: ErrorLogOptions): Promise<void> {
     const userInfo = extractUserFromRequest(options.req);
     
     const log: InsertErrorLog = {
+      errorCode: options.errorCode,
       errorType: options.errorType,
       errorMessage: options.errorMessage,
       stackTrace: options.stackTrace,
@@ -108,8 +110,9 @@ export async function logActivity(options: ActivityLogOptions): Promise<void> {
   }
 }
 
-export async function logApiError(error: Error, req: Request, feature: FeatureType, statusCode = 500): Promise<void> {
+export async function logApiError(error: Error, req: Request, feature: FeatureType, statusCode = 500, errorCode?: string): Promise<void> {
   await logError({
+    errorCode: errorCode || deriveErrorCode(feature, statusCode),
     errorType: "api_error",
     errorMessage: error.message,
     stackTrace: error.stack,
@@ -120,11 +123,40 @@ export async function logApiError(error: Error, req: Request, feature: FeatureTy
   });
 }
 
+export function deriveErrorCode(feature: FeatureType, statusCode?: number): string {
+  if (statusCode === 401 || statusCode === 403) return "AUTH-003";
+  if (statusCode === 400) return "SYS-003";
+
+  const featureCodeMap: Record<string, string> = {
+    sops: "SOP-001",
+    materials: "MAT-001",
+    jobs: "JOB-001",
+    hiring: "HIRE-001",
+    todos: "TODO-001",
+    equipment: "EQP-001",
+    forms: "FORM-001",
+    messages: "MSG-001",
+    users: "USR-001",
+    auth: "AUTH-001",
+    calendar: "CAL-001",
+    plow_sites: "PLOW-001",
+    ai_agents: "AI-001",
+    general: "SYS-001",
+    frontend: "SYS-001",
+    settings: "SYS-001",
+    help: "SYS-001",
+    updates: "SYS-001",
+  };
+  return featureCodeMap[feature] || "SYS-001";
+}
+
 export function createErrorMiddleware() {
   return async (err: Error, req: Request, res: any, next: any) => {
     const feature = detectFeatureFromPath(req.path);
+    const errorCode = deriveErrorCode(feature, 500);
     
     await logError({
+      errorCode,
       errorType: "unhandled_error",
       errorMessage: err.message,
       stackTrace: err.stack,
@@ -134,7 +166,10 @@ export function createErrorMiddleware() {
       req,
     });
     
-    next(err);
+    res.status(500).json({
+      message: "An unexpected error occurred",
+      errorCode,
+    });
   };
 }
 

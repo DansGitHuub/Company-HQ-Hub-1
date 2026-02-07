@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { showErrorToast } from "@/lib/errorToast";
+import { getErrorInfo } from "@shared/errorCodes";
 import type { SopCategory } from "@shared/schema";
 import {
   ArrowLeft,
@@ -283,8 +285,8 @@ function StepIdentity({ data, onChange, categories, onAiSuggest, isAiSuggesting 
       setShowNewTopic(false);
       toast({ title: "Topic created", description: `"${newCat.name}" has been added.` });
     },
-    onError: () => {
-      toast({ title: "Failed to create topic", variant: "destructive" });
+    onError: (error) => {
+      showErrorToast(error, "Failed to create topic");
     },
   });
 
@@ -879,11 +881,13 @@ function AIImageGenerator({
           setIsGenerating(false);
           return;
         } else if (data.status === "failed") {
-          toast({ title: "Generation failed", description: data.error || "Unknown error", variant: "destructive", duration: 15000 });
+          const code = data.errorCode || "IMG-001";
+          const info = getErrorInfo(code);
+          toast({ title: `Generation failed [${code}]`, description: `${info.description}\n\nFix: ${info.fix}`, variant: "destructive", duration: 15000 });
           setIsGenerating(false);
           return;
         } else if (data.status === "not_found") {
-          toast({ title: "Generation failed", description: "Job expired or not found. Please try again.", variant: "destructive", duration: 15000 });
+          toast({ title: "Generation failed [IMG-008]", description: "Job expired or not found. Please try again.", variant: "destructive", duration: 15000 });
           setIsGenerating(false);
           return;
         }
@@ -923,7 +927,7 @@ function AIImageGenerator({
       }
     },
     onError: (err: any) => {
-      toast({ title: "Generation failed", description: err.message, variant: "destructive", duration: 15000 });
+      showErrorToast(err, "Generation failed");
     },
   });
 
@@ -1775,7 +1779,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
       const calcMsg = suggestions.needsMaterialCalculator ? " Material calculator available." : "";
       toast({ title: "AI suggestions applied", description: `Fields auto-filled.${topicMsg}${imgMsg}${calcMsg} Review and adjust as needed.` });
     } catch (err: any) {
-      toast({ title: "AI suggestion failed", description: err.message || "Please try again.", variant: "destructive" });
+      showErrorToast(err, "AI suggestion failed");
     } finally {
       setIsAiSuggesting(false);
     }

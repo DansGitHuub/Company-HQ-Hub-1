@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { showErrorToast } from "@/lib/errorToast";
 import { useUpload } from "@/hooks/use-upload";
 import type { Candidate, CandidateDocument, CandidateRating, CandidateJobType, CandidateWorkType } from "@shared/schema";
 
@@ -203,7 +204,7 @@ export default function Hiring() {
     try {
       const response = await uploadFile(file);
       if (!response) {
-        toast({ title: "Upload failed", variant: "destructive" });
+        showErrorToast(new Error("Upload returned empty response"), "Upload failed");
         return;
       }
       createDocMutation.mutate({
@@ -214,7 +215,7 @@ export default function Hiring() {
         requiresAcknowledgment: newDocRequiresAck,
       });
     } catch (error) {
-      toast({ title: "Upload failed", variant: "destructive" });
+      showErrorToast(error, "Upload failed");
     }
     e.target.value = "";
   };

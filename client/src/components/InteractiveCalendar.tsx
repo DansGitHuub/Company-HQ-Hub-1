@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { showErrorToast } from "@/lib/errorToast";
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
@@ -234,7 +235,7 @@ function CreateEventDialog({
       resetForm();
     },
     onError: (err: any) => {
-      toast({ title: "Failed to create event", description: err.message, variant: "destructive" });
+      showErrorToast(err, "Failed to create event");
     }
   });
   
@@ -478,7 +479,7 @@ export default function InteractiveCalendar() {
       window.location.href = data.url;
     },
     onError: (err: any) => {
-      toast({ title: "Connection failed", description: err.message, variant: "destructive" });
+      showErrorToast(err, "Connection failed");
     }
   });
   
