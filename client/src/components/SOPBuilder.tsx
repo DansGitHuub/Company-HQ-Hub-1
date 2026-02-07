@@ -1643,8 +1643,8 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
 
       setData(prev => {
         const updates: Partial<SOPBuilderData> = {
-          outcome: prev.outcome || suggestions.outcome || "",
-          outcomeType: prev.outcomeType || suggestions.outcomeType || "",
+          outcome: suggestions.outcome || prev.outcome || "",
+          outcomeType: suggestions.outcomeType || prev.outcomeType || "",
           audience: prev.audience || suggestions.audience || "",
           skillLevel: prev.skillLevel || suggestions.skillLevel || "",
           steps: (prev.steps.length <= 1 && !prev.steps[0]?.title) ? (suggestions.steps || prev.steps) : prev.steps,
