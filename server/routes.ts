@@ -1360,15 +1360,36 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
       suggestions.classification = classification;
 
       if (suggestions.suggestedTopic) {
-        const matchedCat = existingCategories.find(
-          c => c.name.toLowerCase() === suggestions.suggestedTopic.toLowerCase()
+        const suggested = suggestions.suggestedTopic.toLowerCase().trim();
+        let matchedCat = existingCategories.find(
+          c => c.name.toLowerCase() === suggested
         );
+        if (!matchedCat) {
+          matchedCat = existingCategories.find(
+            c => suggested.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(suggested)
+          );
+        }
+        if (!matchedCat) {
+          const suggestedWords = suggested.split(/[\s&,]+/).filter(w => w.length > 2);
+          let bestMatch: typeof existingCategories[0] | null = null;
+          let bestScore = 0;
+          for (const cat of existingCategories) {
+            const catWords = cat.name.toLowerCase().split(/[\s&,]+/).filter(w => w.length > 2);
+            const score = suggestedWords.filter(w => catWords.some(cw => cw.includes(w) || w.includes(cw))).length;
+            if (score > bestScore) {
+              bestScore = score;
+              bestMatch = cat;
+            }
+          }
+          if (bestMatch && bestScore > 0) matchedCat = bestMatch;
+        }
         if (matchedCat) {
           suggestions.suggestedTopicId = matchedCat.id;
           suggestions.suggestedTopicName = matchedCat.name;
         } else {
-          suggestions.suggestedTopicId = null;
-          suggestions.suggestedTopicName = suggestions.suggestedTopic;
+          const emergencyCat = existingCategories.find(c => c.name === "Emergency & Exception");
+          suggestions.suggestedTopicId = emergencyCat?.id || null;
+          suggestions.suggestedTopicName = emergencyCat?.name || suggestions.suggestedTopic;
         }
       }
 

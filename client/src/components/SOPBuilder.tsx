@@ -1663,7 +1663,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
           calculatorDefaults: suggestions.calculatorDefaults || null,
         };
 
-        if (suggestions.suggestedTopicId && !prev.categoryId) {
+        if (suggestions.suggestedTopicId) {
           updates.categoryId = suggestions.suggestedTopicId;
           updates.category = suggestions.suggestedTopicName || "";
         }
