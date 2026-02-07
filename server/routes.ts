@@ -1170,18 +1170,34 @@ Respond with a JSON object:
             throw new Error("No image data returned from AI");
           }
 
-          const { ObjectStorageService, objectStorageClient } = await import("./replit_integrations/object_storage");
-          const objService = new ObjectStorageService();
-          const privateDir = objService.getPrivateObjectDir();
+          const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+          if (!privateDir) throw new Error("PRIVATE_OBJECT_DIR not set");
           const imageId = crypto.randomUUID();
           const objectPath = `${privateDir}/sop-media/${imageId}.png`;
-
           const pathParts = objectPath.startsWith("/") ? objectPath.slice(1).split("/") : objectPath.split("/");
           const bucketName = pathParts[0];
           const objectName = pathParts.slice(1).join("/");
-          const bucket = objectStorageClient.bucket(bucketName);
-          const file = bucket.file(objectName);
-          await file.save(imageBuffer, { contentType: "image/png" });
+
+          const SIDECAR = "http://127.0.0.1:1106";
+          const signRes = await fetch(`${SIDECAR}/object-storage/signed-object-url`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              bucket_name: bucketName,
+              object_name: objectName,
+              method: "PUT",
+              expires_at: new Date(Date.now() + 900 * 1000).toISOString(),
+            }),
+          });
+          if (!signRes.ok) throw new Error(`Failed to get upload URL (${signRes.status})`);
+          const { signed_url } = await signRes.json() as { signed_url: string };
+
+          const uploadRes = await fetch(signed_url, {
+            method: "PUT",
+            headers: { "Content-Type": "image/png" },
+            body: imageBuffer,
+          });
+          if (!uploadRes.ok) throw new Error(`Failed to upload image (${uploadRes.status})`);
 
           const entityPath = `/objects/sop-media/${imageId}.png`;
           const useWatermark = watermark !== false && settings?.aiImagesWatermarkDefault !== false;
