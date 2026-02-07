@@ -1327,13 +1327,21 @@ The JSON must include these fields:
     proofType: string (if proofRequired: "photo", "measurement_log", "supervisor_signoff", "customer_approval", or "checklist"),
     isQCCheckpoint: boolean (true for steps where work must be inspected before proceeding — typically grading, compaction, layout verification, final walkthrough) }
 - tools: string (one tool per line, include specific sizes/types/specs, e.g. "Round-point shovel (size 2)" not just "shovel", "3/4 inch garden hose (50 ft minimum)" not just "hose")
-- materials: string (one material per line, include estimated quantities for a typical residential job, e.g. "Mulch - hardwood, double-shredded (3-4 cubic yards per 100 sq ft)" not just "mulch")
+- materials: string (one material per line, include estimated quantities for a typical residential job. USE CORRECT UNITS OF MEASURE for each material type:
+  * BULK materials (mulch, gravel, soil, sand, aggregate, topsoil, compost): use cubic yards (e.g. "Mulch - hardwood, double-shredded (3-4 cubic yards per 100 sq ft)")
+  * PIPE and TUBING (PVC, irrigation pipe, drain tile, corrugated pipe, poly pipe, drip line): use linear feet (e.g. "PVC pipe - Schedule 40, 1 inch (100 linear feet)")
+  * WIRE and CABLE (low-voltage wire, irrigation wire): use linear feet or rolls
+  * FLAT materials (sod, landscape fabric, geotextile, filter fabric): use square feet or square yards
+  * INDIVIDUAL items (fittings, valves, heads, nozzles, clamps, stakes, emitters): use each/quantity (e.g. "Spray heads - Rain Bird 1804 (12 each)")
+  * LIQUID materials (herbicide, adhesive, primer, cement, sealant): use gallons or ounces
+  * BAGGED materials (concrete mix, polymeric sand, fertilizer): use bags with weight (e.g. "Polymeric sand - 50 lb bags (2 bags per 100 sq ft)")
+  NEVER use cubic yards for pipe, wire, fittings, or anything that is not a bulk fill material.)
 - ppe: string (one item per line, include specific protection ratings, e.g. "ANSI Z87.1 rated safety glasses" not just "safety glasses", "OSHA-compliant steel-toe boots (ASTM F2413)" not just "boots")
 - safetyNotes: string (comprehensive safety warnings, hazard identification, emergency procedures specific to this procedure)
 - complianceNotes: string (OSHA regulations, EPA requirements, state/local codes, certifications needed - cite specific standards where possible)
 - timingTarget: string (realistic target time with context, e.g. "45 minutes for average residential job")
 - timingMax: string (maximum time including complications, e.g. "90 minutes including cleanup and site inspection")
-- needsMaterialCalculator: boolean (true if this SOP involves mulch, gravel, soil, aggregate, or similar bulk materials where depth/coverage calculations would be useful)
+- needsMaterialCalculator: boolean (true ONLY if this SOP involves bulk fill materials like mulch, gravel, soil, aggregate, topsoil, compost, or sand where depth/area/coverage calculations would be useful. Set to FALSE for irrigation, plumbing, electrical, pipe, PVC, wiring, fittings, or any non-bulk materials)
 - calculatorDefaults: object | null (if needsMaterialCalculator is true, include { materialType: string (e.g. "mulch", "gravel", "topsoil"), defaultDepthInches: number (typical recommended depth), coverageNote: string (e.g. "1 cubic yard covers approximately 108 sq ft at 3 inches depth") })
 - imageSuggestions: array of objects with { target: string ("header" or "step_N" where N is the step index starting from 0), prompt: string (a detailed, ready-to-use image generation prompt describing a professional landscape photography scene. Include: setting, lighting (natural daylight), perspective, specific tools/materials/techniques visible. Focus on showing the TECHNIQUE being performed, not just a finished result), priority: number (1 = most important, 2 = important, 3 = nice to have) }
   IMAGE PLACEMENT RULES:
