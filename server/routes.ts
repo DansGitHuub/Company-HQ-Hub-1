@@ -1117,26 +1117,49 @@ Respond with a JSON object:
 
           const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
           const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1";
-          const imageApiRes = await fetch(`${baseURL}/images/generations`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-              model: "gpt-image-1",
-              prompt: fullPrompt,
-              size: "1024x1024",
-            }),
-          });
 
-          if (!imageApiRes.ok) {
-            const errBody = await imageApiRes.text();
-            throw new Error(`Image API error ${imageApiRes.status}: ${errBody}`);
+          let imageResponseData: { data?: { b64_json?: string; revised_prompt?: string }[] } | null = null;
+          const maxRetries = 2;
+          for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+              if (attempt > 0) {
+                console.log(`[ai-image] Retry attempt ${attempt} for job ${jobId}`);
+                await new Promise(r => setTimeout(r, 2000 * attempt));
+              }
+              const imageApiRes = await fetch(`${baseURL}/images/generations`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                  model: "gpt-image-1",
+                  prompt: fullPrompt,
+                  size: "1024x1024",
+                }),
+              });
+
+              if (!imageApiRes.ok) {
+                const errBody = await imageApiRes.text();
+                if (attempt < maxRetries && (imageApiRes.status >= 500 || imageApiRes.status === 429)) {
+                  console.error(`[ai-image] Attempt ${attempt + 1} failed (${imageApiRes.status}), retrying...`);
+                  continue;
+                }
+                throw new Error(`Image API error ${imageApiRes.status}: ${errBody}`);
+              }
+
+              imageResponseData = await imageApiRes.json() as { data?: { b64_json?: string; revised_prompt?: string }[] };
+              break;
+            } catch (fetchErr: any) {
+              if (attempt < maxRetries && (fetchErr.message?.includes("fetch") || fetchErr.code === "ECONNREFUSED" || fetchErr.code === "ECONNRESET")) {
+                console.error(`[ai-image] Attempt ${attempt + 1} network error, retrying...`, fetchErr.message);
+                continue;
+              }
+              throw fetchErr;
+            }
           }
 
-          const imageResponseData = await imageApiRes.json() as { data?: { b64_json?: string; revised_prompt?: string }[] };
-          const b64 = imageResponseData.data?.[0]?.b64_json;
+          const b64 = imageResponseData?.data?.[0]?.b64_json;
           if (!b64) {
             throw new Error("No image data returned from AI");
           }
