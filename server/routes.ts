@@ -1115,10 +1115,8 @@ Respond with a JSON object:
               : "",
           ].filter(Boolean).join(". ");
 
-          const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-          const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1";
-
-          let imageResponseData: { data?: { b64_json?: string; revised_prompt?: string }[] } | null = null;
+          let imageBuffer: Buffer | null = null;
+          let revisedPrompt: string | undefined;
           const maxRetries = 2;
           for (let attempt = 0; attempt <= maxRetries; attempt++) {
             try {
@@ -1126,45 +1124,33 @@ Respond with a JSON object:
                 console.log(`[ai-image] Retry attempt ${attempt} for job ${jobId}`);
                 await new Promise(r => setTimeout(r, 2000 * attempt));
               }
-              const imageApiRes = await fetch(`${baseURL}/images/generations`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${apiKey}`,
-                },
-                body: JSON.stringify({
-                  model: "gpt-image-1",
-                  prompt: fullPrompt,
-                  size: "1024x1024",
-                }),
+              const response = await openai.images.generate({
+                model: "gpt-image-1",
+                prompt: fullPrompt,
+                size: "1024x1024",
               });
-
-              if (!imageApiRes.ok) {
-                const errBody = await imageApiRes.text();
-                if (attempt < maxRetries && (imageApiRes.status >= 500 || imageApiRes.status === 429)) {
-                  console.error(`[ai-image] Attempt ${attempt + 1} failed (${imageApiRes.status}), retrying...`);
-                  continue;
-                }
-                throw new Error(`Image API error ${imageApiRes.status}: ${errBody}`);
+              const b64 = response.data?.[0]?.b64_json;
+              revisedPrompt = (response.data?.[0] as any)?.revised_prompt;
+              if (!b64) {
+                throw new Error("No image data returned from AI");
               }
-
-              imageResponseData = await imageApiRes.json() as { data?: { b64_json?: string; revised_prompt?: string }[] };
+              imageBuffer = Buffer.from(b64, "base64");
               break;
-            } catch (fetchErr: any) {
-              if (attempt < maxRetries && (fetchErr.message?.includes("fetch") || fetchErr.code === "ECONNREFUSED" || fetchErr.code === "ECONNRESET")) {
-                console.error(`[ai-image] Attempt ${attempt + 1} network error, retrying...`, fetchErr.message);
+            } catch (genErr: any) {
+              const isRetryable = genErr.status >= 500 || genErr.status === 429 || 
+                genErr.code === "ECONNREFUSED" || genErr.code === "ECONNRESET" ||
+                genErr.message?.includes("fetch") || genErr.message?.includes("ECONNREFUSED");
+              if (attempt < maxRetries && isRetryable) {
+                console.error(`[ai-image] Attempt ${attempt + 1} failed, retrying...`, genErr.message);
                 continue;
               }
-              throw fetchErr;
+              throw genErr;
             }
           }
 
-          const b64 = imageResponseData?.data?.[0]?.b64_json;
-          if (!b64) {
+          if (!imageBuffer) {
             throw new Error("No image data returned from AI");
           }
-
-          const imageBuffer = Buffer.from(b64, "base64");
 
           const { ObjectStorageService, objectStorageClient } = await import("./replit_integrations/object_storage");
           const objService = new ObjectStorageService();
@@ -1194,7 +1180,7 @@ Respond with a JSON object:
             aiNegativePrompt: negativePrompt || null,
             aiModel: "gpt-image-1",
             aiWatermarked: useWatermark,
-            metadata: { revisedPrompt: imageResponseData.data?.[0]?.revised_prompt },
+            metadata: { revisedPrompt },
             createdBy: user.id,
           });
 
