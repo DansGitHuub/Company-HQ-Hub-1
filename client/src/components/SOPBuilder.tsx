@@ -823,18 +823,26 @@ const AI_STYLES = [
 function AIImageGenerator({ 
   targetType, 
   stepIndex,
-  onImageGenerated 
+  onImageGenerated,
+  initialPrompt 
 }: { 
   targetType: "sop_header" | "sop_step";
   stepIndex?: number;
   onImageGenerated: (media: SOPMediaItem) => void;
+  initialPrompt?: string;
 }) {
   const { toast } = useToast();
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(initialPrompt || "");
   const [style, setStyle] = useState<string>("photoreal");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [preview, setPreview] = useState<SOPMediaItem | null>(null);
   const [internalUseOnly, setInternalUseOnly] = useState(true);
+
+  useEffect(() => {
+    if (initialPrompt) {
+      setPrompt(initialPrompt);
+    }
+  }, [initialPrompt]);
 
   const { data: aiSettings } = useQuery<{
     enabled: boolean;
@@ -1102,6 +1110,8 @@ function MaterialCalculatorPopup({ defaults, onConfirm, onCancel }: { defaults: 
 }
 
 function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void }) {
+  const [suggestionPrompts, setSuggestionPrompts] = useState<Record<string, string>>({});
+
   return (
     <div className="space-y-6" data-testid="step-media">
       <div>
@@ -1145,14 +1155,13 @@ function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Par
                         variant="outline"
                         className="shrink-0 text-xs text-purple-600 border-purple-300 hover:bg-purple-50"
                         onClick={() => {
-                          const promptInput = document.querySelector(`[data-testid="input-ai-prompt"]`) as HTMLTextAreaElement;
-                          if (promptInput) {
-                            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-                            nativeInputValueSetter?.call(promptInput, suggestion.prompt);
-                            promptInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            promptInput.focus();
-                            promptInput.scrollIntoView({ behavior: "smooth", block: "center" });
-                          }
+                          const target = suggestion.target;
+                          setSuggestionPrompts(prev => ({ ...prev, [target]: suggestion.prompt }));
+                          setTimeout(() => {
+                            const targetId = isHeader ? "header-generator" : `step-generator-${stepIdx}`;
+                            const el = document.getElementById(targetId);
+                            if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                          }, 100);
                         }}
                         data-testid={`btn-use-suggestion-${idx}`}
                       >
@@ -1203,10 +1212,13 @@ function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Par
               </Button>
             </div>
           ) : (
-            <AIImageGenerator
-              targetType="sop_header"
-              onImageGenerated={(media) => onChange({ headerImage: media })}
-            />
+            <div id="header-generator">
+              <AIImageGenerator
+                targetType="sop_header"
+                onImageGenerated={(media) => onChange({ headerImage: media })}
+                initialPrompt={suggestionPrompts["header"]}
+              />
+            </div>
           )}
         </CardContent>
       </Card>
@@ -1254,13 +1266,16 @@ function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Par
                     )}
                   </div>
                 ) : (
-                  <AIImageGenerator
-                    targetType="sop_step"
-                    stepIndex={idx}
-                    onImageGenerated={(media) => {
-                      onChange({ stepImages: { ...data.stepImages, [step.id]: media } });
-                    }}
-                  />
+                  <div id={`step-generator-${idx}`}>
+                    <AIImageGenerator
+                      targetType="sop_step"
+                      stepIndex={idx}
+                      onImageGenerated={(media) => {
+                        onChange({ stepImages: { ...data.stepImages, [step.id]: media } });
+                      }}
+                      initialPrompt={suggestionPrompts[`step_${idx}`]}
+                    />
+                  </div>
                 )}
               </div>
             ))}
