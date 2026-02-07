@@ -231,9 +231,21 @@ function StepIdentity({ data, onChange, categories, onAiSuggest, isAiSuggesting 
         subCategory: classification.subCategory || "",
       };
       if (classification.mainCategory && classification.confidence >= 0.5 && categories.length > 0) {
-        const matchedCat = categories.find(c =>
-          c.name.toLowerCase() === classification.mainCategory.toLowerCase()
-        );
+        const classToTopicMap: Record<string, string> = {
+          "maintenance & service": "property maintenance & services",
+          "emergency & exceptions": "emergency & exception",
+        };
+        const mappedName = classToTopicMap[classification.mainCategory.toLowerCase()] || classification.mainCategory.toLowerCase();
+        let matchedCat = categories.find(c => c.name.toLowerCase() === mappedName);
+        if (!matchedCat) {
+          matchedCat = categories.find(c => c.name.toLowerCase() === classification.mainCategory.toLowerCase());
+        }
+        if (!matchedCat) {
+          matchedCat = categories.find(c =>
+            c.name.toLowerCase().includes(classification.mainCategory.toLowerCase()) ||
+            classification.mainCategory.toLowerCase().includes(c.name.toLowerCase())
+          );
+        }
         if (matchedCat) {
           updates.categoryId = matchedCat.id;
           updates.category = matchedCat.name;

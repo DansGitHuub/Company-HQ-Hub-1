@@ -1383,9 +1383,39 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
         suggestions.outcome = `Successfully complete the ${title} procedure following all steps in this SOP, ensuring quality standards are met and the work is done safely and efficiently.`;
       }
 
-      if (suggestions.suggestedTopic) {
+      let matchedCat: typeof existingCategories[0] | undefined = undefined;
+
+      const classificationToTopicMap: Record<string, string> = {
+        "installation & construction": "Installation & Construction",
+        "maintenance & service": "Property Maintenance & Services",
+        "equipment, vehicles & tools": "Equipment, Vehicles & Tools",
+        "materials & inventory": "Materials & Inventory",
+        "safety & risk management": "Safety & Risk Management",
+        "office & administration": "Office & Administration",
+        "sales & estimating": "Sales & Estimating",
+        "hiring & hr": "Hiring & HR",
+        "technology & systems": "Technology & Systems",
+        "management & leadership": "Management & Leadership",
+        "emergency & exceptions": "Emergency & Exception",
+      };
+
+      if (classification && classification.mainCategory && classification.confidence >= 0.5) {
+        const mappedName = classificationToTopicMap[classification.mainCategory.toLowerCase()];
+        if (mappedName) {
+          matchedCat = existingCategories.find(
+            c => c.name.toLowerCase() === mappedName.toLowerCase()
+          );
+        }
+        if (!matchedCat) {
+          matchedCat = existingCategories.find(
+            c => c.name.toLowerCase() === classification.mainCategory.toLowerCase()
+          );
+        }
+      }
+
+      if (!matchedCat && suggestions.suggestedTopic) {
         const suggested = suggestions.suggestedTopic.toLowerCase().trim();
-        let matchedCat = existingCategories.find(
+        matchedCat = existingCategories.find(
           c => c.name.toLowerCase() === suggested
         );
         if (!matchedCat) {
@@ -1407,14 +1437,17 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
           }
           if (bestMatch && bestScore > 0) matchedCat = bestMatch;
         }
-        if (matchedCat) {
-          suggestions.suggestedTopicId = matchedCat.id;
-          suggestions.suggestedTopicName = matchedCat.name;
-        } else {
-          const emergencyCat = existingCategories.find(c => c.name === "Emergency & Exception");
-          suggestions.suggestedTopicId = emergencyCat?.id || null;
-          suggestions.suggestedTopicName = emergencyCat?.name || suggestions.suggestedTopic;
-        }
+      }
+
+      if (matchedCat) {
+        suggestions.suggestedTopicId = matchedCat.id;
+        suggestions.suggestedTopicName = matchedCat.name;
+        console.log(`[sop-suggest] Topic matched: "${matchedCat.name}" (id: ${matchedCat.id})`);
+      } else {
+        const emergencyCat = existingCategories.find(c => c.name === "Emergency & Exception");
+        suggestions.suggestedTopicId = emergencyCat?.id || null;
+        suggestions.suggestedTopicName = emergencyCat?.name || suggestions.suggestedTopic || "Emergency & Exception";
+        console.log(`[sop-suggest] No topic match, falling back to Emergency & Exception`);
       }
 
       res.json(suggestions);
