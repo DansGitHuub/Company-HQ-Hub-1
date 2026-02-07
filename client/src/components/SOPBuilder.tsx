@@ -23,9 +23,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, ApiError } from "@/lib/queryClient";
 import { showErrorToast } from "@/lib/errorToast";
-import { getErrorInfo } from "@shared/errorCodes";
 import type { SopCategory } from "@shared/schema";
 import {
   ArrowLeft,
@@ -882,12 +881,11 @@ function AIImageGenerator({
           return;
         } else if (data.status === "failed") {
           const code = data.errorCode || "IMG-001";
-          const info = getErrorInfo(code);
-          toast({ title: `Generation failed [${code}]`, description: `${info.description}\n\nFix: ${info.fix}`, variant: "destructive", duration: 15000 });
+          showErrorToast(new ApiError(500, data.error || "Image generation failed", code, data.error), "Generation failed");
           setIsGenerating(false);
           return;
         } else if (data.status === "not_found") {
-          toast({ title: "Generation failed [IMG-008]", description: "Job expired or not found. Please try again.", variant: "destructive", duration: 15000 });
+          showErrorToast(new ApiError(404, "Job expired or not found. Please try again.", "IMG-008"), "Generation failed");
           setIsGenerating(false);
           return;
         }
