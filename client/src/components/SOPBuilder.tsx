@@ -218,7 +218,7 @@ function StepIdentity({ data, onChange, categories, onAiSuggest, isAiSuggesting 
 
   const classifyTitle = useCallback(async (title: string) => {
     if (title.trim().length < 3) {
-      onChange({ classification: null, superCategory: "", subCategory: "" });
+      onChange({ classification: null, superCategory: "", subCategory: "", categoryId: "", category: "" });
       return;
     }
     setIsClassifying(true);
