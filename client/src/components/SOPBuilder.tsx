@@ -1651,10 +1651,26 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
       const suggestions = await res.json();
       const classification = suggestions.classification || null;
 
+      const validOutcomeTypes = ["completion", "quality", "safety", "kpi"];
+      let resolvedOutcomeType = suggestions.outcomeType || "";
+      if (resolvedOutcomeType && !validOutcomeTypes.includes(resolvedOutcomeType)) {
+        const lower = resolvedOutcomeType.toLowerCase();
+        if (lower.includes("quality")) resolvedOutcomeType = "quality";
+        else if (lower.includes("safety")) resolvedOutcomeType = "safety";
+        else if (lower.includes("kpi") || lower.includes("measur")) resolvedOutcomeType = "kpi";
+        else resolvedOutcomeType = "completion";
+      }
+      if (!resolvedOutcomeType) {
+        const title = data.title.toLowerCase();
+        if (title.includes("safety") || title.includes("emergency") || title.includes("hazard")) resolvedOutcomeType = "safety";
+        else if (title.includes("quality") || title.includes("inspection") || title.includes("check")) resolvedOutcomeType = "quality";
+        else resolvedOutcomeType = "completion";
+      }
+
       setData(prev => {
         const updates: Partial<SOPBuilderData> = {
           outcome: suggestions.outcome || prev.outcome || "",
-          outcomeType: suggestions.outcomeType || prev.outcomeType || "",
+          outcomeType: resolvedOutcomeType || prev.outcomeType || "completion",
           audience: prev.audience || suggestions.audience || "",
           skillLevel: prev.skillLevel || suggestions.skillLevel || "",
           steps: (prev.steps.length <= 1 && !prev.steps[0]?.title) ? (suggestions.steps || prev.steps) : prev.steps,

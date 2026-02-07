@@ -1365,6 +1365,24 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
       const suggestions = JSON.parse(content);
       suggestions.classification = classification;
 
+      const validOutcomeTypes = ["completion", "quality", "safety", "kpi"];
+      if (!suggestions.outcomeType || !validOutcomeTypes.includes(suggestions.outcomeType)) {
+        const ot = (suggestions.outcomeType || "").toLowerCase();
+        if (ot.includes("quality")) suggestions.outcomeType = "quality";
+        else if (ot.includes("safety")) suggestions.outcomeType = "safety";
+        else if (ot.includes("kpi") || ot.includes("measur")) suggestions.outcomeType = "kpi";
+        else {
+          const t = title.toLowerCase();
+          if (t.includes("safety") || t.includes("emergency") || t.includes("hazard") || t.includes("ppe")) suggestions.outcomeType = "safety";
+          else if (t.includes("quality") || t.includes("inspection") || t.includes("audit")) suggestions.outcomeType = "quality";
+          else suggestions.outcomeType = "completion";
+        }
+      }
+
+      if (!suggestions.outcome || suggestions.outcome.trim().length === 0) {
+        suggestions.outcome = `Successfully complete the ${title} procedure following all steps in this SOP, ensuring quality standards are met and the work is done safely and efficiently.`;
+      }
+
       if (suggestions.suggestedTopic) {
         const suggested = suggestions.suggestedTopic.toLowerCase().trim();
         let matchedCat = existingCategories.find(
