@@ -199,6 +199,9 @@ const SYNONYMS: Record<string, string[]> = {
     "concrete", "stamped concrete", "natural stone", "bluestone", "travertine", "cobblestone",
     "stepping stones", "fire pit", "firepit", "outdoor kitchen", "seat wall", "seatwall",
     "pillar", "column", "steps", "staircase", "landing", "curbing", "edging stone",
+    "polymeric sand", "polymeric", "joint sand", "paver sand", "jointing sand",
+    "paver sealer", "sealer", "sealing", "paver base", "paver edging", "edge restraint",
+    "soldier course", "border", "herringbone", "running bond", "basket weave",
   ],
   "softscape install": [
     "planting", "mulch install", "bed install", "trees", "shrubs", "perennials", "annuals",

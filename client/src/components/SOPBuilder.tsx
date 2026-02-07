@@ -225,17 +225,27 @@ function StepIdentity({ data, onChange, categories, onAiSuggest, isAiSuggesting 
     try {
       const res = await apiRequest("POST", "/api/sop-classify", { title });
       const classification = await res.json();
-      onChange({
+      const updates: Partial<SOPBuilderData> = {
         classification,
         superCategory: classification.superCategory || "",
         subCategory: classification.subCategory || "",
-      });
+      };
+      if (classification.mainCategory && classification.confidence >= 0.5 && categories.length > 0) {
+        const matchedCat = categories.find(c =>
+          c.name.toLowerCase() === classification.mainCategory.toLowerCase()
+        );
+        if (matchedCat) {
+          updates.categoryId = matchedCat.id;
+          updates.category = matchedCat.name;
+        }
+      }
+      onChange(updates);
     } catch {
       onChange({ classification: null });
     } finally {
       setIsClassifying(false);
     }
-  }, [onChange]);
+  }, [onChange, categories]);
 
   const handleTitleChange = useCallback((title: string) => {
     onChange({ title });
