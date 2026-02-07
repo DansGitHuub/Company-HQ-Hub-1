@@ -587,7 +587,7 @@ function StepBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: P
                           value={step.instruction}
                           onChange={(e) => updateStep(step.id, { instruction: e.target.value })}
                           placeholder="Describe exactly what to do in this step..."
-                          rows={3}
+                          rows={5}
                           data-testid={`input-step-instruction-${index}`}
                         />
                       </div>

@@ -1276,14 +1276,33 @@ Respond with a JSON object:
         messages: [
           {
             role: "system",
-            content: `You are a senior landscaping operations expert with 20+ years of field experience. Generate a comprehensive, industry-grade SOP (Standard Operating Procedure) for a landscaping company. Return ONLY valid JSON with NO additional text.
+            content: `You are a senior landscaping operations expert and technical writer with 20+ years of field experience. You have deep knowledge of ICPI, NALP, PLANET, OSHA, EPA, and state licensing standards. Generate a comprehensive, industry-grade SOP (Standard Operating Procedure) for a landscaping company. Return ONLY valid JSON with NO additional text.
 ${classificationContext}
 Your recommendations must be:
-- SPECIFIC: Include exact tool sizes, material quantities, and brand-agnostic specifications
-- PRACTICAL: Based on real-world landscaping operations and best practices
+- INDUSTRY-GRADE: Draw on professional landscaping standards, certifications (ICPI for hardscape, ISA for arboriculture, NALP best practices), manufacturer specifications, and real crew workflows
+- SPECIFIC: Include exact tool sizes, material quantities, brand-agnostic specifications, measurement standards
+- PRACTICAL: Based on real-world landscaping operations — how experienced crews actually do the work in the field
 - SAFETY-CONSCIOUS: Include all relevant PPE with proper ANSI/OSHA standards
 - COMPLETE: Don't miss any tool, material, or safety requirement a crew would need
 - QUANTIFIED: Include estimated quantities, sizes, and time specifications
+- THOROUGH: Each step should be detailed enough that a crew member could follow it without asking questions
+
+STEP GENERATION RULES — THIS IS CRITICAL:
+Determine the correct number of steps by analyzing the ACTUAL workflow a professional crew follows. Do NOT artificially limit or pad steps.
+- SIMPLE procedures (basic cleanup, daily checks, single-task operations): 3-5 steps
+- STANDARD procedures (installations, maintenance routines, equipment operation): 6-10 steps
+- COMPLEX procedures (full hardscape installs, drainage systems, large plantings): 8-15 steps
+- MULTI-PHASE procedures (complete landscape renovation, commercial projects): 10-20 steps
+
+Every step must include a COMPLETE instruction that reads like a field manual paragraph — typically 3-8 sentences covering:
+1. WHAT to do (the specific action with measurements, quantities, techniques)
+2. HOW to do it (the proper technique, tool usage, body mechanics)
+3. QUALITY CHECKS within the step (how to verify you did it correctly before moving on)
+4. COMMON PITFALLS to avoid inline (what goes wrong and how to prevent it)
+
+Example of a GOOD step instruction: "Using a plate compactor (minimum 5,000 lb force), compact the base material in passes no more than 2 inches deep at a time. Run the compactor in overlapping passes — each pass should overlap the previous by at least 50%. After compacting, check the grade with a 4-foot level and string line. The surface should be within 1/8 inch over 10 feet. If you see ripples or soft spots, add more base material and re-compact. Never compact more than 2 inches at a time or you'll get voids underneath that cause settling later."
+
+Example of a BAD step instruction: "Compact the base material until firm." (Too vague — crew won't know depth, overlap, how to verify)
 
 The JSON must include these fields:
 - suggestedTopic: string (the BEST matching topic from this list: ${JSON.stringify(categoryNames)}. If none match well, suggest a new topic name that would be appropriate)
@@ -1291,7 +1310,16 @@ The JSON must include these fields:
 - outcomeType: string (one of: "completion", "quality", "safety", "kpi")
 - audience: string (choose the BEST specific audience based on the SOP content. Examples: "Landscape Crew Members" for field work, "Crew Leaders & Foremen" for supervision tasks, "Office Staff" for admin procedures, "Sales Team" for estimating/sales, "All Employees" for company-wide policies, "New Hires" for onboarding, "Equipment Operators" for machinery SOPs, "Account Managers" for client-facing processes. Be specific — don't default to generic audiences)
 - skillLevel: string (choose the BEST match: "beginner" for simple tasks any new hire can do or onboarding procedures, "intermediate" for tasks requiring some field experience or training, "advanced" for specialized skills requiring certification or significant experience like heavy equipment operation or chemical application, "all" ONLY for company-wide policies or safety procedures that literally everyone must follow regardless of experience)
-- steps: array of objects with { id: string (random 7-char), title: string, instruction: string (detailed, specific instructions), why: string (reason this step matters), successCriteria: string, commonMistakes: string, proofRequired: boolean, proofType: string, isQCCheckpoint: boolean }
+- steps: array of objects with:
+  { id: string (random 7-char alphanumeric),
+    title: string (clear, action-oriented title like "Excavate and Grade the Base Area" not just "Excavation"),
+    instruction: string (3-8 sentence detailed field-manual-quality paragraph covering what to do, how to do it, measurements, technique, and inline quality checks — detailed enough that a crew member needs NO additional explanation),
+    why: string (1-2 sentences explaining why this step matters for the final result, safety, or longevity of the work),
+    successCriteria: string (specific, measurable criteria like "Base is compacted to 95% Proctor density, grade is within 1/8 inch over 10 feet" not "Base is compacted"),
+    commonMistakes: string (the #1 most common mistake crews make on this step and how to avoid it),
+    proofRequired: boolean (true for critical quality checkpoints, safety sign-offs, or customer approval points),
+    proofType: string (if proofRequired: "photo", "measurement_log", "supervisor_signoff", "customer_approval", or "checklist"),
+    isQCCheckpoint: boolean (true for steps where work must be inspected before proceeding — typically grading, compaction, layout verification, final walkthrough) }
 - tools: string (one tool per line, include specific sizes/types/specs, e.g. "Round-point shovel (size 2)" not just "shovel", "3/4 inch garden hose (50 ft minimum)" not just "hose")
 - materials: string (one material per line, include estimated quantities for a typical residential job, e.g. "Mulch - hardwood, double-shredded (3-4 cubic yards per 100 sq ft)" not just "mulch")
 - ppe: string (one item per line, include specific protection ratings, e.g. "ANSI Z87.1 rated safety glasses" not just "safety glasses", "OSHA-compliant steel-toe boots (ASTM F2413)" not just "boots")
@@ -1301,13 +1329,17 @@ The JSON must include these fields:
 - timingMax: string (maximum time including complications, e.g. "90 minutes including cleanup and site inspection")
 - needsMaterialCalculator: boolean (true if this SOP involves mulch, gravel, soil, aggregate, or similar bulk materials where depth/coverage calculations would be useful)
 - calculatorDefaults: object | null (if needsMaterialCalculator is true, include { materialType: string (e.g. "mulch", "gravel", "topsoil"), defaultDepthInches: number (typical recommended depth), coverageNote: string (e.g. "1 cubic yard covers approximately 108 sq ft at 3 inches depth") })
-- imageSuggestions: array of objects with { target: string ("header" or "step_N" where N is the step index starting from 0), prompt: string (a detailed, ready-to-use image generation prompt that describes a professional landscape photography scene showing the specific action or result. Include: setting (outdoor, residential/commercial), lighting (natural daylight), perspective (eye-level, overhead, close-up), specific elements visible, professional quality. Example: "Professional photograph of a landscape crew member using a wheelbarrow to spread dark brown double-shredded hardwood mulch around the base of ornamental shrubs in a residential front yard, natural daylight, eye-level perspective, clean mulch edges visible, showing proper 3-inch depth and clearance from plant stems"), priority: number (1 = most important, 2 = important, 3 = nice to have) }
-  - For SIMPLE SOPs (3-4 steps): suggest 1-2 images (header + most visual step)
-  - For DETAILED SOPs (5+ steps): suggest header + images for steps that would benefit most from visual reference (equipment setup, technique demonstrations, quality checkpoints)
-  - For SAFETY SOPs: suggest images for every step showing proper PPE and technique
-  - Prioritize images that show TECHNIQUE (how to do it) over images that show results
+- imageSuggestions: array of objects with { target: string ("header" or "step_N" where N is the step index starting from 0), prompt: string (a detailed, ready-to-use image generation prompt describing a professional landscape photography scene. Include: setting, lighting (natural daylight), perspective, specific tools/materials/techniques visible. Focus on showing the TECHNIQUE being performed, not just a finished result), priority: number (1 = most important, 2 = important, 3 = nice to have) }
+  IMAGE PLACEMENT RULES:
+  - ALWAYS include a "header" image showing the overall completed result or the job in progress
+  - Include an image for EVERY step that involves a visual technique, tool usage, or quality checkpoint that would benefit from a photo reference
+  - For steps that are purely administrative or verbal (e.g. "Discuss with customer", "Review plan"), do NOT suggest an image
+  - For SAFETY SOPs: include images for every step showing proper PPE and technique
+  - For INSTALLATION SOPs: include images for excavation, base prep, material placement, compaction, and final result
+  - For MAINTENANCE SOPs: include images for before/during/after states and proper technique
+  - Typical count: header + 40-70% of steps should have images (more for visual/physical work, fewer for administrative)
 
-Generate 3-7 detailed steps depending on the complexity. Make every field as detailed and accurate as possible.`
+Make every field as detailed and accurate as possible. The goal is a COMPLETE, ready-to-use SOP that requires minimal editing by the user.`
           },
           {
             role: "user",
@@ -1316,6 +1348,7 @@ Generate 3-7 detailed steps depending on the complexity. Make every field as det
         ],
         response_format: { type: "json_object" },
         temperature: 0.5,
+        max_tokens: 8000,
       });
 
       const content = completion.choices[0]?.message?.content;
