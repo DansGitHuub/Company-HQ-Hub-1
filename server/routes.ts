@@ -1115,13 +1115,28 @@ Respond with a JSON object:
               : "",
           ].filter(Boolean).join(". ");
 
-          const imageResponse = await openai.images.generate({
-            model: "gpt-image-1",
-            prompt: fullPrompt,
-            size: "1024x1024",
+          const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+          const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1";
+          const imageApiRes = await fetch(`${baseURL}/images/generations`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: "gpt-image-1",
+              prompt: fullPrompt,
+              size: "1024x1024",
+            }),
           });
 
-          const b64 = imageResponse.data?.[0]?.b64_json;
+          if (!imageApiRes.ok) {
+            const errBody = await imageApiRes.text();
+            throw new Error(`Image API error ${imageApiRes.status}: ${errBody}`);
+          }
+
+          const imageResponseData = await imageApiRes.json() as { data?: { b64_json?: string; revised_prompt?: string }[] };
+          const b64 = imageResponseData.data?.[0]?.b64_json;
           if (!b64) {
             throw new Error("No image data returned from AI");
           }
@@ -1156,7 +1171,7 @@ Respond with a JSON object:
             aiNegativePrompt: negativePrompt || null,
             aiModel: "gpt-image-1",
             aiWatermarked: useWatermark,
-            metadata: { revisedPrompt: imageResponse.data?.[0]?.revised_prompt },
+            metadata: { revisedPrompt: imageResponseData.data?.[0]?.revised_prompt },
             createdBy: user.id,
           });
 
