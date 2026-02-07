@@ -18,6 +18,8 @@ interface SeedUser {
   isMasterAdmin?: boolean;
 }
 
+const CHAPIN_LOCKED_PASSWORD = "PassW0rd123";
+
 export async function seedUsers(): Promise<void> {
   console.log("[seed] Startup check - running account maintenance...");
   
@@ -33,6 +35,29 @@ export async function seedUsers(): Promise<void> {
     if (chapin && !chapin.isMasterAdmin) {
       await storage.updateUser(chapin.id, { isMasterAdmin: true });
       console.log("[seed] Restored Chapin123 master admin status");
+    }
+
+    // Ensure Chapin123 role is always Admin
+    if (chapin && chapin.role !== "Admin") {
+      await storage.updateUser(chapin.id, { role: "Admin" });
+      console.log("[seed] Restored Chapin123 Admin role");
+    }
+
+    // Ensure Chapin123 is always active
+    if (chapin && !chapin.isActive) {
+      await storage.updateUser(chapin.id, { isActive: true });
+      console.log("[seed] Restored Chapin123 active status");
+    }
+
+    // Verify Chapin123 password works — re-hash if it doesn't
+    if (chapin) {
+      const { comparePasswords: cmp } = await import("./auth");
+      const passwordValid = await cmp(CHAPIN_LOCKED_PASSWORD, chapin.password);
+      if (!passwordValid) {
+        const newHash = await hashPassword(CHAPIN_LOCKED_PASSWORD);
+        await storage.updateUser(chapin.id, { password: newHash });
+        console.log("[seed] Restored Chapin123 password");
+      }
     }
 
     // Remove the extra 'admin' account if it exists
