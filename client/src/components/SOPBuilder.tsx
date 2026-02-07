@@ -1505,7 +1505,7 @@ function generateSOPContent(data: SOPBuilderData): string {
 
 interface SOPBuilderProps {
   categories: SopCategory[];
-  onComplete: (sopData: { title: string; category: string; categoryId: string; content: string }) => void;
+  onComplete: (sopData: { title: string; category: string; categoryId: string; content: string; superCategory?: string; subCategory?: string; sopType?: string }) => void;
   onCancel: () => void;
   isSubmitting: boolean;
   initialData?: SOPBuilderData & { draftId?: number };
@@ -1733,6 +1733,9 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
       category: data.category,
       categoryId: data.categoryId,
       content,
+      superCategory: data.superCategory || undefined,
+      subCategory: data.subCategory || undefined,
+      sopType: data.sopType || undefined,
     });
   };
 

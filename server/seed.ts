@@ -84,13 +84,27 @@ const SAMPLE_MATERIALS = [
   { name: 'Black Plastic Edging', categoryName: 'Landscape', unitOfMeasure: 'box', description: 'Flexible landscape edging for clean bed lines.' },
 ];
 
+const REQUIRED_SOP_TOPICS = [
+  { name: 'Installation & Construction', sortOrder: 1 },
+  { name: 'Property Maintenance & Services', sortOrder: 2 },
+  { name: 'Equipment, Vehicles & Tools', sortOrder: 3 },
+  { name: 'Materials & Inventory', sortOrder: 4 },
+  { name: 'Safety & Risk Management', sortOrder: 5 },
+  { name: 'Office & Administration', sortOrder: 6 },
+  { name: 'Sales & Estimating', sortOrder: 7 },
+  { name: 'Hiring & HR', sortOrder: 8 },
+  { name: 'Technology & Systems', sortOrder: 9 },
+  { name: 'Management & Leadership', sortOrder: 10 },
+  { name: 'Emergency & Exception', sortOrder: 11 },
+];
+
 const SAMPLE_SOPS = [
-  { title: 'Safety Equipment Requirements', content: 'All crew members must wear appropriate PPE including safety glasses, steel-toe boots, gloves, and hearing protection when operating equipment.', category: 'Onboarding & Basics' },
-  { title: 'Proper Mulch Installation', content: 'Apply mulch 2-4 inches deep around plants. Keep mulch 2-3 inches away from plant stems and tree trunks to prevent rot.', category: 'Softscape' },
-  { title: 'Paver Installation Guide', content: 'Excavate area to proper depth, install base material, compact, add sand layer, lay pavers in pattern, fill joints with polymeric sand.', category: 'Hardscape' },
-  { title: 'Lawn Mowing Best Practices', content: 'Never remove more than 1/3 of grass blade height. Mow when grass is dry. Alternate mowing patterns to prevent soil compaction.', category: 'Lawn Maintenance' },
-  { title: 'Equipment Pre-Start Checklist', content: 'Before starting any equipment: Check fuel, oil, and coolant levels. Inspect for damage or loose parts. Test safety features.', category: 'Vehicles & Equipment' },
-  { title: 'Customer Communication Standards', content: 'Always greet customers professionally. Explain work being done. Address concerns promptly. Leave property cleaner than you found it.', category: 'Onboarding & Basics' },
+  { title: 'Safety Equipment Requirements', content: 'All crew members must wear appropriate PPE including safety glasses, steel-toe boots, gloves, and hearing protection when operating equipment.', category: 'Safety & Risk Management' },
+  { title: 'Proper Mulch Installation', content: 'Apply mulch 2-4 inches deep around plants. Keep mulch 2-3 inches away from plant stems and tree trunks to prevent rot.', category: 'Installation & Construction' },
+  { title: 'Paver Installation Guide', content: 'Excavate area to proper depth, install base material, compact, add sand layer, lay pavers in pattern, fill joints with polymeric sand.', category: 'Installation & Construction' },
+  { title: 'Lawn Mowing Best Practices', content: 'Never remove more than 1/3 of grass blade height. Mow when grass is dry. Alternate mowing patterns to prevent soil compaction.', category: 'Property Maintenance & Services' },
+  { title: 'Equipment Pre-Start Checklist', content: 'Before starting any equipment: Check fuel, oil, and coolant levels. Inspect for damage or loose parts. Test safety features.', category: 'Equipment, Vehicles & Tools' },
+  { title: 'Customer Communication Standards', content: 'Always greet customers professionally. Explain work being done. Address concerns promptly. Leave property cleaner than you found it.', category: 'Office & Administration' },
 ];
 
 const DEFAULT_MATERIAL_CATEGORIES = [
@@ -285,8 +299,36 @@ export async function seedMaterialCategories(): Promise<void> {
   }
 }
 
+async function seedSopTopics(): Promise<void> {
+  try {
+    const existing = await storage.getSopCategories();
+    const existingNames = new Set(existing.map(c => c.name));
+    const requiredNames = new Set(REQUIRED_SOP_TOPICS.map(t => t.name));
+
+    for (const topic of REQUIRED_SOP_TOPICS) {
+      if (!existingNames.has(topic.name)) {
+        await storage.createSopCategory({ name: topic.name, sortOrder: topic.sortOrder });
+        console.log(`[seed] Added SOP topic: ${topic.name}`);
+      }
+    }
+
+    for (const cat of existing) {
+      if (!requiredNames.has(cat.name)) {
+        const sopsInCategory = (await storage.getSops()).filter(s => s.categoryId === cat.id);
+        if (sopsInCategory.length === 0) {
+          await storage.deleteSopCategory(cat.id);
+          console.log(`[seed] Removed non-standard empty SOP topic: ${cat.name}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[seed] Error seeding SOP topics:", error);
+  }
+}
+
 export async function seedSampleData(): Promise<void> {
   try {
+    await seedSopTopics();
     await seedMaterialCategories();
     
     const existingMaterials = await storage.getMaterials();
