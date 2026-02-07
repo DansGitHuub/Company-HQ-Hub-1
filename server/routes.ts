@@ -1118,30 +1118,48 @@ Respond with a JSON object:
           let imageBuffer: Buffer | null = null;
           let revisedPrompt: string | undefined;
           const maxRetries = 2;
+          const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+          const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1";
           for (let attempt = 0; attempt <= maxRetries; attempt++) {
             try {
               if (attempt > 0) {
                 console.log(`[ai-image] Retry attempt ${attempt} for job ${jobId}`);
                 await new Promise(r => setTimeout(r, 2000 * attempt));
               }
-              const response = await openai.images.generate({
-                model: "gpt-image-1",
-                prompt: fullPrompt,
-                size: "1024x1024",
+              const imageApiRes = await fetch(`${baseURL}/images/generations`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(apiKey ? { "Authorization": `Bearer ${apiKey}` } : {}),
+                },
+                body: JSON.stringify({
+                  model: "gpt-image-1",
+                  prompt: fullPrompt,
+                  size: "1024x1024",
+                }),
               });
-              const b64 = response.data?.[0]?.b64_json;
-              revisedPrompt = (response.data?.[0] as any)?.revised_prompt;
+              if (!imageApiRes.ok) {
+                const errBody = await imageApiRes.text();
+                const statusCode = imageApiRes.status;
+                if (attempt < maxRetries && (statusCode >= 500 || statusCode === 429)) {
+                  console.error(`[ai-image] Attempt ${attempt + 1} failed (${statusCode}), retrying...`);
+                  continue;
+                }
+                throw new Error(`Image API error ${statusCode}: ${errBody}`);
+              }
+              const imageResponseData = await imageApiRes.json() as any;
+              const b64 = imageResponseData?.data?.[0]?.b64_json;
+              revisedPrompt = imageResponseData?.data?.[0]?.revised_prompt;
               if (!b64) {
                 throw new Error("No image data returned from AI");
               }
               imageBuffer = Buffer.from(b64, "base64");
               break;
             } catch (genErr: any) {
-              const isRetryable = genErr.status >= 500 || genErr.status === 429 || 
-                genErr.code === "ECONNREFUSED" || genErr.code === "ECONNRESET" ||
-                genErr.message?.includes("fetch") || genErr.message?.includes("ECONNREFUSED");
+              const isRetryable = genErr.code === "ECONNREFUSED" || genErr.code === "ECONNRESET" ||
+                genErr.message?.includes("fetch failed") || genErr.message?.includes("ECONNREFUSED");
               if (attempt < maxRetries && isRetryable) {
-                console.error(`[ai-image] Attempt ${attempt + 1} failed, retrying...`, genErr.message);
+                console.error(`[ai-image] Attempt ${attempt + 1} network error, retrying...`, genErr.message);
                 continue;
               }
               throw genErr;
