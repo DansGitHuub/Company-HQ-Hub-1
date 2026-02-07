@@ -564,8 +564,8 @@ function StepBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: P
           </CardContent>
         </Card>
       ) : (
-        <ScrollArea className="max-h-[400px]">
-          <div className="space-y-2 pr-2 pb-14">
+        <div className="border rounded-lg bg-muted/20">
+          <div className="overflow-y-auto max-h-[calc(100vh-350px)] min-h-[200px] p-2 space-y-2">
             {data.steps.map((step, index) => (
               <Card key={step.id} className="border">
                 <div
@@ -609,7 +609,7 @@ function StepBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: P
                           value={step.instruction}
                           onChange={(e) => updateStep(step.id, { instruction: e.target.value })}
                           placeholder="Describe exactly what to do in this step..."
-                          rows={5}
+                          rows={4}
                           data-testid={`input-step-instruction-${index}`}
                         />
                       </div>
@@ -681,14 +681,11 @@ function StepBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: P
                 )}
               </Card>
             ))}
+            <Button variant="outline" onClick={addStep} className="w-full hover:shadow-md hover:border-primary/50 transition-all" data-testid="button-add-step">
+              <Plus className="h-4 w-4 mr-2" /> Add Step
+            </Button>
           </div>
-        </ScrollArea>
-      )}
-
-      {data.steps.length > 0 && (
-        <Button variant="outline" onClick={addStep} className="w-full hover:shadow-md hover:border-primary/50 transition-all" data-testid="button-add-step">
-          <Plus className="h-4 w-4 mr-2" /> Add Step
-        </Button>
+        </div>
       )}
     </div>
   );
