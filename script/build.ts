@@ -23,7 +23,6 @@ const allowlist = [
   "multer",
   "nanoid",
   "nodemailer",
-  "openai",
   "p-limit",
   "p-retry",
   "passport",
