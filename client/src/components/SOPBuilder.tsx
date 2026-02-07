@@ -880,7 +880,7 @@ function AIImageGenerator({
       toast({ title: "Image generated successfully" });
     },
     onError: (err: any) => {
-      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
+      toast({ title: "Generation failed", description: err.message, variant: "destructive", duration: 10000 });
     },
   });
 

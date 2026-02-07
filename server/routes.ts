@@ -1115,7 +1115,7 @@ Respond with a JSON object:
       const { ObjectStorageService, objectStorageClient } = await import("./replit_integrations/object_storage");
       const objService = new ObjectStorageService();
       const privateDir = objService.getPrivateObjectDir();
-      const imageId = require("crypto").randomUUID();
+      const imageId = crypto.randomUUID();
       const objectPath = `${privateDir}/sop-media/${imageId}.png`;
 
       const pathParts = objectPath.startsWith("/") ? objectPath.slice(1).split("/") : objectPath.split("/");
