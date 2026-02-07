@@ -1287,7 +1287,7 @@ Your recommendations must be:
 
 The JSON must include these fields:
 - suggestedTopic: string (the BEST matching topic from this list: ${JSON.stringify(categoryNames)}. If none match well, suggest a new topic name that would be appropriate)
-- outcome: string (a SPECIFIC, measurable, real-world outcome statement for this exact procedure. NOT a generic description of the outcome type. For example, for "Mulch Installation" with outcomeType "quality", write "All landscape beds covered with 3-inch depth of double-shredded hardwood mulch, with clean edges, 3-inch clearance from plant stems, and uniform coverage with no bare spots visible" NOT "The work meets quality standards")
+- outcome: string (Write 1-5 sentences that describe the desired outcome AND explain WHY this SOP is important to know, understand, and follow. Start with a specific, measurable outcome statement, then explain the real-world consequences of doing it right vs wrong. For example, for "Mulch Installation": "All landscape beds covered with 3-inch depth of double-shredded hardwood mulch, with clean edges, 3-inch clearance from plant stems, and uniform coverage with no bare spots visible. Proper mulch depth suppresses weeds, retains soil moisture, and regulates root temperature — reducing plant loss and callback rates. Mulch piled against stems causes crown rot and kills plants, leading to costly replacements and unhappy customers." NOT a generic statement like "The work meets quality standards.")
 - outcomeType: string (one of: "completion", "quality", "safety", "kpi")
 - audience: string (who this SOP is for, e.g., "Landscape Crew Members")
 - skillLevel: string (one of: "beginner", "intermediate", "advanced", "all")
