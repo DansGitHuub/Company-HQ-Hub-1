@@ -37,7 +37,8 @@ import {
   CheckSquare,
   Snowflake,
   Bell,
-  Brain
+  Brain,
+  Calculator
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -134,6 +135,11 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
     title: "Tools",
     description: "Access specialized tools like the Plow Site Mapper for snow removal.",
     tips: ["Map plow routes", "Organize sites by group", "AI-powered analysis"]
+  },
+  calculator: {
+    title: "Calculator",
+    description: "Material calculators, unit converters, and sizing tools for landscape work.",
+    tips: ["Calculate mulch, soil, gravel quantities", "Convert units", "Size lighting & irrigation systems"]
   },
   customer_portal: {
     title: "Customer Portal",
@@ -321,10 +327,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     integrations: { icon: Settings, label: "Integrations", href: "/integrations" },
     admin: { icon: Shield, label: "Admin Panel", href: "/admin" },
     tools: { icon: Snowflake, label: "Tools", href: "/tools/plow-mapper" },
+    calculator: { icon: Calculator, label: "Calculator", href: "/tools/calculator" },
   };
 
   // Default order for internal roles (help always at very bottom for all roles)
-  const teamDefaultIds = ["dashboard", "sops", "testing", "materials", "equipment", "hiring", "jobs", "education"];
+  const teamDefaultIds = ["dashboard", "sops", "testing", "materials", "equipment", "hiring", "jobs", "education", "calculator"];
   const adminExtraIds = ["hq", "marketing", "forms", "tools", "integrations", "admin"];
   const bottomIds = ["help"]; // Always shown at bottom for all roles
 

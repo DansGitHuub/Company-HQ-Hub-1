@@ -36,6 +36,7 @@ import MessagingInbox from "@/pages/MessagingInbox";
 import ProcessAuditor from "@/pages/ProcessAuditor";
 import IntegrationWizard from "@/pages/IntegrationWizard";
 import TestingKnowledge from "@/pages/TestingKnowledge";
+import CalculatorPage from "@/pages/Calculator";
 import NotFound from "@/pages/not-found";
 
 function AppRoutes() {
@@ -90,6 +91,7 @@ function AppRoutes() {
         <Route path="/communications" component={MessagingInbox} />
         <Route path="/tools/process-auditor" component={ProcessAuditor} />
         <Route path="/tools/integration-wizard" component={IntegrationWizard} />
+        <Route path="/tools/calculator" component={CalculatorPage} />
         <Route path="/testing" component={TestingKnowledge} />
         <Route component={NotFound} />
       </Switch>
