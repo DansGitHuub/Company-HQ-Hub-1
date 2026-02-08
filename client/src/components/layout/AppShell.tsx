@@ -37,8 +37,7 @@ import {
   CheckSquare,
   Snowflake,
   Bell,
-  Brain,
-  Calculator
+  Brain
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -133,13 +132,8 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
   },
   tools: {
     title: "Tools",
-    description: "Access specialized tools like the Plow Site Mapper for snow removal.",
-    tips: ["Map plow routes", "Organize sites by group", "AI-powered analysis"]
-  },
-  calculator: {
-    title: "Calculator",
-    description: "Material calculators, unit converters, and sizing tools for landscape work.",
-    tips: ["Calculate mulch, soil, gravel quantities", "Convert units", "Size lighting & irrigation systems"]
+    description: "Access specialized tools for landscape work.",
+    tips: ["Material calculators & converters", "Map plow routes", "AI-powered analysis"]
   },
   customer_portal: {
     title: "Customer Portal",
@@ -326,13 +320,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     inbox: { icon: Mail, label: "Messages", href: "/inbox" },
     integrations: { icon: Settings, label: "Integrations", href: "/integrations" },
     admin: { icon: Shield, label: "Admin Panel", href: "/admin" },
-    tools: { icon: Snowflake, label: "Tools", href: "/tools/plow-mapper" },
-    calculator: { icon: Calculator, label: "Calculator", href: "/tools/calculator" },
+    tools: { icon: Snowflake, label: "Tools", href: "/tools" },
   };
 
   // Default order for internal roles (help always at very bottom for all roles)
-  const teamDefaultIds = ["dashboard", "sops", "testing", "materials", "equipment", "hiring", "jobs", "education", "calculator"];
-  const adminExtraIds = ["hq", "marketing", "forms", "tools", "integrations", "admin"];
+  const teamDefaultIds = ["dashboard", "sops", "testing", "materials", "equipment", "hiring", "jobs", "education", "tools"];
+  const adminExtraIds = ["hq", "marketing", "forms", "integrations", "admin"];
   const bottomIds = ["help"]; // Always shown at bottom for all roles
 
   const getNavItems = () => {
@@ -349,7 +342,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (effectiveRole === "Admin") {
       allowedIds = [...teamDefaultIds, ...adminExtraIds];
     } else if (effectiveRole === "Manager") {
-      allowedIds = [...teamDefaultIds, "tools"];
+      allowedIds = [...teamDefaultIds];
     } else {
       // Crew role
       allowedIds = teamDefaultIds;
@@ -419,7 +412,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         className="flex-1 py-6 px-3 space-y-1 overflow-y-auto"
       >
         {displayNav.map((item) => {
-          const isActive = location === item.href;
+          const isActive = item.href === "/tools" ? location.startsWith("/tools") : location === item.href;
           const helpContent = menuHelpContent[item.id];
           const showTodoBadge = item.id === "todos" && todoActiveStatus?.isActive && todoActiveStatus.unreadCount > 0;
           return (
@@ -544,7 +537,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-wrap justify-center gap-2">
             {tiles.map((item) => {
               const Icon = item.icon;
-              const isActive = location === item.href;
+              const isActive = item.href === "/tools" ? location.startsWith("/tools") : location === item.href;
               return (
                 <button
                   type="button"
@@ -582,7 +575,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex flex-wrap justify-center gap-2">
               {tiles.map((item) => {
                 const Icon = item.icon;
-                const isActive = location === item.href;
+                const isActive = item.href === "/tools" ? location.startsWith("/tools") : location === item.href;
                 return (
                   <button
                     type="button"
@@ -617,7 +610,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-1 px-3 py-2 bg-card/80 backdrop-blur-sm rounded-full shadow-lg border border-border">
             {tiles.map((item) => {
               const Icon = item.icon;
-              const isActive = location === item.href;
+              const isActive = item.href === "/tools" ? location.startsWith("/tools") : location === item.href;
               return (
                 <button
                   type="button"

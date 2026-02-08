@@ -37,6 +37,7 @@ import ProcessAuditor from "@/pages/ProcessAuditor";
 import IntegrationWizard from "@/pages/IntegrationWizard";
 import TestingKnowledge from "@/pages/TestingKnowledge";
 import CalculatorPage from "@/pages/Calculator";
+import Tools from "@/pages/Tools";
 import NotFound from "@/pages/not-found";
 
 function AppRoutes() {
@@ -88,10 +89,11 @@ function AppRoutes() {
         <Route path="/search" component={SearchPage} />
         <Route path="/todos" component={TodoList} />
         <Route path="/tools/plow-mapper" component={PlowSiteMapper} />
-        <Route path="/communications" component={MessagingInbox} />
         <Route path="/tools/process-auditor" component={ProcessAuditor} />
         <Route path="/tools/integration-wizard" component={IntegrationWizard} />
         <Route path="/tools/calculator" component={CalculatorPage} />
+        <Route path="/tools" component={Tools} />
+        <Route path="/communications" component={MessagingInbox} />
         <Route path="/testing" component={TestingKnowledge} />
         <Route component={NotFound} />
       </Switch>
