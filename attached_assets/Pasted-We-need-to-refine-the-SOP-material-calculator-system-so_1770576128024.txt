@@ -1,0 +1,63 @@
+We need to refine the SOP “material calculator” system so it is situation-specific and not generic.
+
+GOAL:
+When an SOP needs a calculator, it must choose the correct calculator type based on the SOP context (ex: retaining wall base course) and produce realistic default inputs + multiple preset options. Do NOT default to 10’ x 10’ unless that is actually the most common scenario for that specific task.
+
+REQUIREMENTS:
+1) Add a “Calculator Template Library” with multiple calculator types, each with:
+   - calculatorType (string)
+   - whatItAppliesTo (short)
+   - requiredInputs (list)
+   - optionalInputs (list)
+   - formulas (text)
+   - recommendedDefaultPresets (2–4 presets, each with realistic starter numbers)
+   - outputFields (list)
+   - notes (text)
+
+2) Add “Calculator Selection Logic”:
+   - Based on SOP title + steps + materials + product/manufacturer, select the best calculatorType.
+   - If uncertain, select the top 2 and present them as options (primary + alternative).
+
+3) Presets must match the job type:
+   - Retaining wall base course: start with “wall length” and “base trench width/depth” (NOT area like 10x10).
+   - Mulch/soil/gravel bed: start with area OR length x width (area-based is OK here).
+   - Polymeric sand: start with paver area + joint width + paver thickness assumptions (and allow selecting paver size).
+   - Fertilizer/herbicide/insecticide: start with lawn/bed area + label rate units (lbs/1,000 sq ft, oz/gal, etc.) and output total product needed.
+
+4) Manufacturer-aware:
+   - If SOP mentions a brand/product line (Versa-Lok, Unilock, Techo-Bloc, Belgard, Roundup QuikPRO, etc.), store it in calculator metadata and adjust defaults to match typical usage patterns for that category.
+   - Add a field: productOrManufacturer (string) so we can display “Assumptions based on ____”.
+
+5) Output must be practical:
+   - Show total quantity + unit (cubic yards, tons, bags, gallons, lbs)
+   - Show “how to measure onsite” guidance (one short paragraph)
+   - Show assumptions clearly in plain English
+
+6) UI behavior:
+   - The calculator should not force a single example. It should offer presets like:
+     - Small / Typical / Large (or Residential / Commercial)
+   - User can edit any input.
+
+IMPLEMENTATION TASKS:
+A) Update the AI suggestion output for calculators so it returns:
+   - calculatorType
+   - presets[] with realistic defaults
+   - assumptions[]
+   - outputUnits
+   - productOrManufacturer
+B) Update the calculator UI rendering so it uses presets and the selected calculatorType instead of generic 10x10.
+C) Ensure existing simple calculators (mulch/soil/gravel) still work.
+
+EXAMPLE EXPECTED BEHAVIOR:
+SOP: “Set base course for Versa-Lok retaining wall”
+Calculator should default to:
+- wallLengthFeet (ex: 25 ft typical preset)
+- trenchWidthFeet (ex: blockDepth + 6–12 inches)
+- baseDepthInches (ex: 6 in compacted base + optional leveling pad)
+Outputs:
+- base aggregate cubic yards (and optionally tons)
+- excavation volume
+- geotextile area if applicable
+Plus 2–3 presets (ex: 15 ft, 25 ft, 50 ft wall).
+
+Do not give generic 10x10 defaults for retaining walls.

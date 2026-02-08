@@ -1438,8 +1438,43 @@ The JSON must include these fields:
 - complianceNotes: string (OSHA regulations, EPA requirements, state/local codes, certifications needed - cite specific standards where possible)
 - timingTarget: string (realistic target time with context, e.g. "45 minutes for average residential job")
 - timingMax: string (maximum time including complications, e.g. "90 minutes including cleanup and site inspection")
-- needsMaterialCalculator: boolean (true ONLY if this SOP involves bulk fill materials like mulch, gravel, soil, aggregate, topsoil, compost, or sand where depth/area/coverage calculations would be useful. Set to FALSE for irrigation, plumbing, electrical, pipe, PVC, wiring, fittings, or any non-bulk materials)
-- calculatorDefaults: object | null (if needsMaterialCalculator is true, include { materialType: string (e.g. "mulch", "gravel", "topsoil"), defaultDepthInches: number (typical recommended depth), coverageNote: string (e.g. "1 cubic yard covers approximately 108 sq ft at 3 inches depth") })
+- needsMaterialCalculator: boolean (true if this SOP involves measurable materials where quantity calculations would be useful. This includes:
+  * BULK materials (mulch, gravel, soil, aggregate, topsoil, compost, sand) → calculatorType: "area_volume"
+  * LINEAR/TRENCH materials (retaining wall base, footing aggregate, french drain gravel, trench backfill) → calculatorType: "linear_volume"
+  * CHEMICALS (fertilizer, herbicide, insecticide, pesticide, pre-emergent, fungicide) → calculatorType: "chemical_rate"
+  * POLYMERIC SAND / JOINT SAND → calculatorType: "polymeric_sand"
+  * BAGGED MATERIALS (concrete mix, bagged mulch, bagged soil) → calculatorType: "bag_count"
+  Set to FALSE for irrigation fittings, pipe runs, wiring, electrical, or items counted by quantity not volume/weight)
+- calculatorDefaults: object | null (if needsMaterialCalculator is true, include ALL of these fields:
+  { materialType: string (e.g. "base aggregate", "mulch", "fertilizer", "polymeric sand"),
+    calculatorType: string (one of: "area_volume", "linear_volume", "chemical_rate", "polymeric_sand", "bag_count"),
+    defaultDepthInches: number (typical recommended depth, or 0 if not applicable),
+    coverageNote: string (e.g. "1 cubic yard covers approximately 108 sq ft at 3 inches depth"),
+    productOrManufacturer: string | null (if SOP mentions a brand like "Versa-Lok", "Techo-Bloc", "Roundup QuikPRO", include it here. Otherwise null),
+    assumptions: string[] (list of 2-4 plain-English assumptions, e.g. ["Trench width = block depth + 6 inches on each side", "6 inches compacted base depth per ICPI standards"]),
+    measurementGuide: string (one short paragraph explaining how to measure onsite, e.g. "Run a tape measure along the planned wall face. Measure trench width from the back of the block face plus 12 inches. Use a story pole to verify base depth at 4-foot intervals."),
+    outputUnits: string (primary output unit: "cubic yards", "tons", "lbs", "bags", "gallons"),
+    presets: array of 2-4 objects, each with { label: string, values: object }.
+      CRITICAL: presets must use input keys that match the calculatorType:
+      * area_volume: keys are "length", "width", "depth"
+      * linear_volume: keys are "wallLength", "trenchWidth", "baseDepth"
+      * chemical_rate: keys are "area", "rate", "bagSize"
+      * polymeric_sand: keys are "area", "jointWidth", "paverThickness", "bagSize"
+      * bag_count: keys are "area", "depth", "bagCoverage"
+      Example for linear_volume (retaining wall):
+        presets: [
+          { label: "Small (15 ft wall)", values: { wallLength: 15, trenchWidth: 24, baseDepth: 6 } },
+          { label: "Typical (25 ft wall)", values: { wallLength: 25, trenchWidth: 24, baseDepth: 6 } },
+          { label: "Large (50 ft wall)", values: { wallLength: 50, trenchWidth: 30, baseDepth: 8 } }
+        ]
+      Example for area_volume (mulch bed):
+        presets: [
+          { label: "Small Bed", values: { length: 10, width: 8, depth: 3 } },
+          { label: "Typical Residential", values: { length: 25, width: 12, depth: 3 } },
+          { label: "Large Property", values: { length: 50, width: 20, depth: 3 } }
+        ]
+      DO NOT use generic 10x10 defaults. Presets must be realistic for the specific SOP task.
+  })
 - imageSuggestions: array of objects with { target: string ("header" or "step_N" where N is the step index starting from 0), prompt: string (a detailed, ready-to-use image generation prompt describing a professional landscape photography scene. Include: setting, lighting (natural daylight), perspective, specific tools/materials/techniques visible. Focus on showing the TECHNIQUE being performed, not just a finished result), priority: number (1 = most important, 2 = important, 3 = nice to have) }
   IMAGE PLACEMENT RULES:
   - ALWAYS include a "header" image showing the overall completed result or the job in progress

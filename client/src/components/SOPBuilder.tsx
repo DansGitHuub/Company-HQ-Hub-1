@@ -85,11 +85,130 @@ interface SOPClassification {
   matchedOn?: string;
 }
 
+interface CalculatorPreset {
+  label: string;
+  values: Record<string, number>;
+}
+
 interface MaterialCalculatorData {
   materialType: string;
   defaultDepthInches: number;
   coverageNote: string;
+  calculatorType?: string;
+  presets?: CalculatorPreset[];
+  assumptions?: string[];
+  outputUnits?: string;
+  productOrManufacturer?: string;
+  measurementGuide?: string;
 }
+
+type CalcType = "area_volume" | "linear_volume" | "chemical_rate" | "polymeric_sand" | "bag_count";
+
+interface CalculatorTemplate {
+  type: CalcType;
+  label: string;
+  inputs: { key: string; label: string; unit: string; defaultValue: number; min?: number; max?: number; step?: number }[];
+  calculate: (vals: Record<string, number>) => { label: string; value: string }[];
+}
+
+const CALCULATOR_TEMPLATES: Record<CalcType, CalculatorTemplate> = {
+  area_volume: {
+    type: "area_volume",
+    label: "Area-Based Volume Calculator",
+    inputs: [
+      { key: "length", label: "Length", unit: "ft", defaultValue: 20, min: 1, step: 1 },
+      { key: "width", label: "Width", unit: "ft", defaultValue: 10, min: 1, step: 1 },
+      { key: "depth", label: "Depth", unit: "in", defaultValue: 3, min: 0.5, max: 24, step: 0.5 },
+    ],
+    calculate: (v) => {
+      const sqFt = v.length * v.width;
+      const cubicYards = (sqFt * v.depth) / 324;
+      const tons = cubicYards * 1.4;
+      return [
+        { label: "Area", value: `${sqFt.toLocaleString()} sq ft` },
+        { label: "Volume", value: `${(Math.ceil(cubicYards * 10) / 10).toFixed(1)} cubic yards` },
+        { label: "Weight (approx)", value: `${(Math.ceil(tons * 10) / 10).toFixed(1)} tons` },
+      ];
+    },
+  },
+  linear_volume: {
+    type: "linear_volume",
+    label: "Linear Volume Calculator",
+    inputs: [
+      { key: "wallLength", label: "Wall / Trench Length", unit: "ft", defaultValue: 25, min: 1, step: 1 },
+      { key: "trenchWidth", label: "Trench Width", unit: "in", defaultValue: 24, min: 6, max: 72, step: 1 },
+      { key: "baseDepth", label: "Base Depth", unit: "in", defaultValue: 6, min: 1, max: 24, step: 0.5 },
+    ],
+    calculate: (v) => {
+      const trenchWidthFt = v.trenchWidth / 12;
+      const baseDepthFt = v.baseDepth / 12;
+      const cubicFt = v.wallLength * trenchWidthFt * baseDepthFt;
+      const cubicYards = cubicFt / 27;
+      const tons = cubicYards * 1.4;
+      const excavationCuYd = (v.wallLength * trenchWidthFt * (baseDepthFt + 0.5)) / 27;
+      return [
+        { label: "Base Aggregate", value: `${(Math.ceil(cubicYards * 10) / 10).toFixed(1)} cubic yards` },
+        { label: "Weight (approx)", value: `${(Math.ceil(tons * 10) / 10).toFixed(1)} tons` },
+        { label: "Excavation Volume", value: `${(Math.ceil(excavationCuYd * 10) / 10).toFixed(1)} cubic yards` },
+        { label: "Geotextile Area", value: `${Math.ceil(v.wallLength * (trenchWidthFt + 2))} sq ft` },
+      ];
+    },
+  },
+  chemical_rate: {
+    type: "chemical_rate",
+    label: "Chemical / Fertilizer Rate Calculator",
+    inputs: [
+      { key: "area", label: "Treatment Area", unit: "sq ft", defaultValue: 5000, min: 100, step: 100 },
+      { key: "rate", label: "Application Rate", unit: "lbs/1000 sq ft", defaultValue: 4, min: 0.1, max: 50, step: 0.1 },
+      { key: "bagSize", label: "Bag/Container Size", unit: "lbs", defaultValue: 50, min: 1, step: 1 },
+    ],
+    calculate: (v) => {
+      const totalProduct = (v.area / 1000) * v.rate;
+      const bags = Math.ceil(totalProduct / v.bagSize);
+      return [
+        { label: "Total Product Needed", value: `${(Math.ceil(totalProduct * 10) / 10).toFixed(1)} lbs` },
+        { label: "Bags/Containers", value: `${bags} × ${v.bagSize} lb bags` },
+        { label: "Coverage per Bag", value: `${Math.floor((v.bagSize / v.rate) * 1000).toLocaleString()} sq ft` },
+      ];
+    },
+  },
+  polymeric_sand: {
+    type: "polymeric_sand",
+    label: "Polymeric Sand Calculator",
+    inputs: [
+      { key: "area", label: "Paver Area", unit: "sq ft", defaultValue: 200, min: 10, step: 10 },
+      { key: "jointWidth", label: "Joint Width", unit: "in", defaultValue: 0.25, min: 0.0625, max: 1, step: 0.0625 },
+      { key: "paverThickness", label: "Paver Thickness", unit: "in", defaultValue: 2.375, min: 1, max: 4, step: 0.125 },
+      { key: "bagSize", label: "Bag Size", unit: "lbs", defaultValue: 50, min: 25, max: 55, step: 5 },
+    ],
+    calculate: (v) => {
+      const coveragePerBag = v.bagSize / (v.jointWidth * v.paverThickness * 0.08);
+      const bags = Math.ceil(v.area / coveragePerBag);
+      return [
+        { label: "Bags Needed", value: `${bags} × ${v.bagSize} lb bags` },
+        { label: "Total Weight", value: `${bags * v.bagSize} lbs` },
+        { label: "Coverage per Bag", value: `~${Math.floor(coveragePerBag)} sq ft` },
+      ];
+    },
+  },
+  bag_count: {
+    type: "bag_count",
+    label: "Bagged Material Calculator",
+    inputs: [
+      { key: "area", label: "Coverage Area", unit: "sq ft", defaultValue: 100, min: 1, step: 10 },
+      { key: "depth", label: "Depth", unit: "in", defaultValue: 2, min: 0.5, max: 12, step: 0.5 },
+      { key: "bagCoverage", label: "Bag Coverage", unit: "sq ft per bag", defaultValue: 8, min: 1, max: 100, step: 1 },
+    ],
+    calculate: (v) => {
+      const bags = Math.ceil(v.area / v.bagCoverage);
+      const cubicYards = (v.area * v.depth) / 324;
+      return [
+        { label: "Bags Needed", value: `${bags} bags` },
+        { label: "Volume", value: `${(Math.ceil(cubicYards * 10) / 10).toFixed(1)} cubic yards` },
+      ];
+    },
+  },
+};
 
 interface ImageSuggestion {
   target: string;
@@ -1092,81 +1211,157 @@ function AIImageGenerator({
   );
 }
 
+function resolveCalcType(defaults: MaterialCalculatorData): CalcType {
+  const ct = defaults.calculatorType?.toLowerCase() || "";
+  if (ct in CALCULATOR_TEMPLATES) return ct as CalcType;
+  const mt = defaults.materialType?.toLowerCase() || "";
+  if (mt.includes("wall") || mt.includes("trench") || mt.includes("base course") || mt.includes("footing") || mt.includes("retaining")) return "linear_volume";
+  if (mt.includes("fertilizer") || mt.includes("herbicide") || mt.includes("insecticide") || mt.includes("chemical") || mt.includes("pesticide")) return "chemical_rate";
+  if (mt.includes("polymeric") || mt.includes("paver sand") || mt.includes("joint sand")) return "polymeric_sand";
+  if (mt.includes("bag")) return "bag_count";
+  return "area_volume";
+}
+
+function buildCalcHtml(title: string, values: Record<string, number>, results: { label: string; value: string }[], assumptions: string[], manufacturer: string | undefined, measureGuide: string | undefined, coverageNote: string): string {
+  let html = `<div class="sop-calculator" style="background:#f0fdf4;border:2px solid #22c55e;border-radius:12px;padding:16px;margin:16px 0;">`;
+  html += `<h3 style="margin:0 0 8px;color:#16a34a;">📐 ${title}</h3>`;
+  if (manufacturer) html += `<p style="font-size:12px;color:#888;margin:0 0 6px;"><em>Assumptions based on ${manufacturer}</em></p>`;
+  if (coverageNote) html += `<p style="font-size:13px;color:#666;margin:0 0 8px;">${coverageNote}</p>`;
+  html += `<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;">`;
+  html += `<tr style="background:#dcfce7;"><th style="padding:6px;text-align:left;border:1px solid #86efac;">Measurement</th><th style="padding:6px;text-align:center;border:1px solid #86efac;">Result</th></tr>`;
+  results.forEach(r => {
+    html += `<tr><td style="padding:6px;border:1px solid #e5e7eb;">${r.label}</td><td style="padding:6px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">${r.value}</td></tr>`;
+  });
+  html += `</table>`;
+  if (assumptions.length > 0) {
+    html += `<div style="margin-top:10px;font-size:12px;color:#666;"><strong>Assumptions:</strong><ul style="margin:4px 0;padding-left:18px;">`;
+    assumptions.forEach(a => html += `<li>${a}</li>`);
+    html += `</ul></div>`;
+  }
+  if (measureGuide) html += `<div style="margin-top:8px;padding:8px;background:#ecfdf5;border-radius:6px;font-size:12px;"><strong>How to measure onsite:</strong> ${measureGuide}</div>`;
+  html += `</div>`;
+  return html;
+}
+
 function MaterialCalculatorPopup({ defaults, onConfirm, onCancel }: { defaults: MaterialCalculatorData; onConfirm: (depth: number, html: string) => void; onCancel: () => void }) {
-  const [depth, setDepth] = useState(defaults.defaultDepthInches);
-  const [length, setLength] = useState(10);
-  const [width, setWidth] = useState(10);
+  const calcType = resolveCalcType(defaults);
+  const template = CALCULATOR_TEMPLATES[calcType];
+  const presets = defaults.presets && defaults.presets.length > 0 ? defaults.presets : [
+    { label: "Default", values: Object.fromEntries(template.inputs.map(i => [i.key, i.defaultValue])) },
+  ];
 
-  const sqFt = length * width;
-  const cubicYards = (sqFt * depth) / 324;
-  const roundedYards = Math.ceil(cubicYards * 10) / 10;
+  const initialValues: Record<string, number> = {};
+  template.inputs.forEach(inp => {
+    const presetVal = presets[0]?.values?.[inp.key];
+    initialValues[inp.key] = presetVal != null ? presetVal : inp.defaultValue;
+  });
 
-  const calcHtml = `<div class="sop-calculator" style="background:#f0fdf4;border:2px solid #22c55e;border-radius:12px;padding:16px;margin:16px 0;">
-<h3 style="margin:0 0 8px;color:#16a34a;">📐 ${defaults.materialType.charAt(0).toUpperCase() + defaults.materialType.slice(1)} Calculator</h3>
-<p style="font-size:13px;color:#666;margin:0 0 8px;">${defaults.coverageNote}</p>
-<p style="font-size:13px;margin:0;"><strong>Recommended depth:</strong> ${depth} inches</p>
-<p style="font-size:13px;margin:4px 0;"><strong>Formula:</strong> (Length × Width × Depth) ÷ 324 = Cubic Yards</p>
-<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;">
-<tr style="background:#dcfce7;"><th style="padding:6px;text-align:left;border:1px solid #86efac;">Area (sq ft)</th><th style="padding:6px;text-align:center;border:1px solid #86efac;">@ ${depth}" depth</th></tr>
-<tr><td style="padding:6px;border:1px solid #e5e7eb;">100 sq ft</td><td style="padding:6px;text-align:center;border:1px solid #e5e7eb;">${(100 * depth / 324).toFixed(1)} cu yd</td></tr>
-<tr><td style="padding:6px;border:1px solid #e5e7eb;">250 sq ft</td><td style="padding:6px;text-align:center;border:1px solid #e5e7eb;">${(250 * depth / 324).toFixed(1)} cu yd</td></tr>
-<tr><td style="padding:6px;border:1px solid #e5e7eb;">500 sq ft</td><td style="padding:6px;text-align:center;border:1px solid #e5e7eb;">${(500 * depth / 324).toFixed(1)} cu yd</td></tr>
-<tr><td style="padding:6px;border:1px solid #e5e7eb;">1000 sq ft</td><td style="padding:6px;text-align:center;border:1px solid #e5e7eb;">${(1000 * depth / 324).toFixed(1)} cu yd</td></tr>
-</table>
-</div>`;
+  const [values, setValues] = useState<Record<string, number>>(initialValues);
+  const [activePreset, setActivePreset] = useState(0);
+
+  const results = template.calculate(values);
+  const assumptions = defaults.assumptions || [];
+  const matLabel = defaults.materialType ? defaults.materialType.charAt(0).toUpperCase() + defaults.materialType.slice(1) : template.label;
+  const calcTitle = `${matLabel} Calculator`;
+
+  const applyPreset = (idx: number) => {
+    setActivePreset(idx);
+    const p = presets[idx];
+    if (!p) return;
+    const next = { ...values };
+    template.inputs.forEach(inp => {
+      if (p.values[inp.key] != null) next[inp.key] = p.values[inp.key];
+    });
+    setValues(next);
+  };
+
+  const calcHtml = buildCalcHtml(calcTitle, values, results, assumptions, defaults.productOrManufacturer, defaults.measurementGuide, defaults.coverageNote);
 
   return (
     <AlertDialog open={true}>
-      <AlertDialogContent className="max-w-md">
+      <AlertDialogContent className="max-w-lg">
         <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            📐 {defaults.materialType.charAt(0).toUpperCase() + defaults.materialType.slice(1)} Depth Calculator
+          <AlertDialogTitle className="flex items-center gap-2" data-testid="calc-title">
+            📐 {calcTitle}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            Set the depth you want to use for this SOP. A coverage calculator will be added to the SOP content.
+            Adjust the inputs below for your specific job. A calculator will be embedded in the SOP content.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="space-y-4 py-2">
+          {defaults.productOrManufacturer && (
+            <p className="text-xs text-muted-foreground italic">Assumptions based on {defaults.productOrManufacturer}</p>
+          )}
           <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-sm">
             <p className="text-muted-foreground">{defaults.coverageNote}</p>
           </div>
-          <div>
-            <Label>Depth (inches)</Label>
-            <div className="flex items-center gap-3 mt-1">
-              <Input
-                type="number"
-                value={depth}
-                onChange={(e) => setDepth(parseFloat(e.target.value) || 0)}
-                min={0.5}
-                max={12}
-                step={0.5}
-                className="w-24"
-                data-testid="input-calc-depth"
-              />
-              <span className="text-sm text-muted-foreground">inches (recommended: {defaults.defaultDepthInches}")</span>
+
+          {presets.length > 1 && (
+            <div>
+              <Label className="text-xs mb-1 block">Presets</Label>
+              <div className="flex flex-wrap gap-2">
+                {presets.map((p, i) => (
+                  <Button
+                    key={i}
+                    size="sm"
+                    variant={activePreset === i ? "default" : "outline"}
+                    onClick={() => applyPreset(i)}
+                    data-testid={`preset-${i}`}
+                  >
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Length (ft)</Label>
-              <Input type="number" value={length} onChange={(e) => setLength(parseFloat(e.target.value) || 0)} min={1} data-testid="input-calc-length" />
-            </div>
-            <div>
-              <Label className="text-xs">Width (ft)</Label>
-              <Input type="number" value={width} onChange={(e) => setWidth(parseFloat(e.target.value) || 0)} min={1} data-testid="input-calc-width" />
-            </div>
+            {template.inputs.map(inp => (
+              <div key={inp.key}>
+                <Label className="text-xs">{inp.label} ({inp.unit})</Label>
+                <Input
+                  type="number"
+                  value={values[inp.key] ?? inp.defaultValue}
+                  onChange={(e) => setValues(prev => ({ ...prev, [inp.key]: parseFloat(e.target.value) || 0 }))}
+                  min={inp.min}
+                  max={inp.max}
+                  step={inp.step}
+                  data-testid={`input-calc-${inp.key}`}
+                />
+              </div>
+            ))}
           </div>
+
           <Card className="bg-muted/50">
-            <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">Quick Preview</p>
-              <p className="text-2xl font-bold text-green-600">{roundedYards} cubic yards</p>
-              <p className="text-xs text-muted-foreground">for {sqFt} sq ft at {depth}" depth</p>
+            <CardContent className="p-3 space-y-1">
+              <p className="text-xs text-muted-foreground text-center mb-2">Results</p>
+              {results.map((r, i) => (
+                <div key={i} className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">{r.label}</span>
+                  <span className="text-sm font-bold text-green-600" data-testid={`result-${i}`}>{r.value}</span>
+                </div>
+              ))}
             </CardContent>
           </Card>
+
+          {assumptions.length > 0 && (
+            <div className="text-xs text-muted-foreground space-y-0.5">
+              <p className="font-medium">Assumptions:</p>
+              <ul className="list-disc pl-4">
+                {assumptions.map((a, i) => <li key={i}>{a}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {defaults.measurementGuide && (
+            <div className="p-2 rounded bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 text-xs">
+              <strong>How to measure onsite:</strong> {defaults.measurementGuide}
+            </div>
+          )}
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel}>Skip Calculator</AlertDialogCancel>
-          <AlertDialogAction onClick={() => onConfirm(depth, calcHtml)} data-testid="btn-add-calculator">
+          <AlertDialogAction onClick={() => onConfirm(values[template.inputs[0].key] || 0, calcHtml)} data-testid="btn-add-calculator">
             Add Calculator to SOP
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -1911,11 +2106,11 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
       {showCalculatorPopup && pendingCalcDefaults && (
         <MaterialCalculatorPopup
           defaults={pendingCalcDefaults}
-          onConfirm={(depth, html) => {
+          onConfirm={(_val, html) => {
             setData(prev => ({ ...prev, calculatorHtml: html }));
             setShowCalculatorPopup(false);
             setPendingCalcDefaults(null);
-            toast({ title: "Calculator added", description: `${pendingCalcDefaults.materialType} calculator at ${depth}" depth will be included in your SOP.` });
+            toast({ title: "Calculator added", description: `${pendingCalcDefaults.materialType} calculator will be included in your SOP.` });
           }}
           onCancel={() => {
             setShowCalculatorPopup(false);

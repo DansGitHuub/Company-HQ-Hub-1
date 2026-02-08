@@ -1,0 +1,56 @@
+We still do NOT see images in the SOP Builder after UI URL normalization. This is now a server/storage delivery issue.
+
+GOAL:
+Make AI-generated SOP images always return a browser-loadable image URL, and add strong logging so we can prove where it breaks.
+
+FILES INVOLVED:
+server/routes.ts
+server/replit_integrations/object_storage/routes.ts
+server/replit_integrations/object_storage/objectStorage.ts
+server/storage.ts
+shared/schema.ts
+client/src/components/SOPBuilder.tsx
+
+TASK 1 — ADD SERVER LOGGING (NO GUESSING):
+In the POST /api/sop-media/ai-generate route AND in the GET /api/sop-media/ai-generate/status/:jobId route:
+- Log (console.log) the request body, the returned jobId, and the final “result url” that the status route returns when completed.
+- Log any errors including provider response fields.
+
+TASK 2 — ENSURE THE RESULT URL IS A REAL IMAGE URL:
+When the job completes, return:
+{
+  id,
+  url,
+  alt,
+  contentType
+}
+Where:
+- contentType must be "image/png" or "image/jpeg"
+- url must be directly loadable by a browser <img src="..."> with NO special headers.
+
+IMPORTANT:
+If the app currently returns a storage path like "/objects/..." or "/api/objects/...", change it so the status route returns a FULL https URL (signed or public), OR make /api/objects/... publicly accessible.
+
+TASK 3 — FIX OBJECT FETCH ROUTE FOR <img> TAGS:
+In server/replit_integrations/object_storage/routes.ts (or wherever /api/objects is implemented):
+- Ensure GET /api/objects/* returns the raw bytes of the image with correct Content-Type.
+- It must NOT return JSON for images.
+- It must NOT require auth headers that <img> cannot send.
+- If auth is required for security, implement a signed URL system and return https signed URLs from the status route instead.
+
+TASK 4 — ADD A ONE-CLICK TEST ENDPOINT:
+Add GET /api/debug/ai-image-smoke-test
+It should:
+- Generate ONE small test image (or copy a known small placeholder png) into object storage
+- Return JSON with:
+  { ok: true, url: "<the exact image url>", contentType: "image/png" }
+Then we can paste that url into the browser and confirm it loads.
+
+TASK 5 — FRONTEND USES URL DIRECTLY:
+In client/src/components/SOPBuilder.tsx, when preview/result comes back, do not “rewrite” URLs beyond the resolveImageSrc helper.
+If server returns https URL, the frontend must use it directly.
+
+DELIVERABLE:
+After changes, provide:
+1) The exact log output when generating an image (job start + job completed + final url)
+2) The exact returned JSON from /api/debug/ai-image-smoke-test
