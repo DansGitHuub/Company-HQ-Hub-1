@@ -282,11 +282,10 @@ const OUTCOME_TYPES = [
 function resolveImageSrc(url: string) {
   if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  if (url.startsWith("/api/objects/")) return url;
-  if (url.startsWith("/objects/")) return `/api/objects${url.slice("/objects".length)}`;
-  if (url.startsWith("objects/")) return `/api/${url}`;
-  if (url.startsWith("/")) return `/api/objects${url}`;
-  return `/api/objects/${url}`;
+  if (url.startsWith("/objects/")) return url;
+  if (url.startsWith("objects/")) return `/${url}`;
+  if (url.startsWith("/api/objects/")) return url.replace("/api/objects/", "/objects/");
+  return `/objects/${url}`;
 }
 
 function asMultilineText(value: any): string {

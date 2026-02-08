@@ -1094,6 +1094,7 @@ Respond with a JSON object:
 
       const jobId = crypto.randomUUID();
       imageJobs.set(jobId, { status: "processing", createdAt: Date.now() });
+      console.log(`[AI-IMG] Job ${jobId} started | prompt="${prompt}" style=${style || "default"} target=${targetType}/${targetId || "new"}`);
 
       res.status(202).json({ jobId, status: "processing" });
 
@@ -1200,6 +1201,7 @@ Respond with a JSON object:
           if (!uploadRes.ok) throw new Error(`Failed to upload image (${uploadRes.status})`);
 
           const entityPath = `/objects/sop-media/${imageId}.png`;
+          console.log(`[AI-IMG] Job ${jobId} uploaded | objectPath=${objectPath} entityPath=${entityPath} size=${imageBuffer.length} bytes`);
           const useWatermark = watermark !== false && settings?.aiImagesWatermarkDefault !== false;
 
           const media = await storage.createSopMedia({
@@ -1232,9 +1234,10 @@ Respond with a JSON object:
             errorMessage: null,
           });
 
+          console.log(`[AI-IMG] Job ${jobId} completed | mediaId=${media.id} url=${media.url}`);
           imageJobs.set(jobId, { status: "completed", result: media, createdAt: Date.now() });
         } catch (err: any) {
-          console.error("AI image generation error:", err);
+          console.error(`[AI-IMG] Job ${jobId} FAILED:`, err.message);
           try {
             await storage.createAiGenerationEvent({
               userId: user.id,
@@ -1270,13 +1273,93 @@ Respond with a JSON object:
       return res.status(404).json({ status: "not_found", message: "Job not found or expired" });
     }
     if (job.status === "completed") {
+      console.log(`[AI-IMG] Status poll ${req.params.jobId} → completed | url=${job.result?.url}`);
       res.json({ status: "completed", result: job.result });
       imageJobs.delete(req.params.jobId);
     } else if (job.status === "failed") {
+      console.log(`[AI-IMG] Status poll ${req.params.jobId} → failed | error=${job.error}`);
       res.json({ status: "failed", error: job.error, errorCode: (job as any).errorCode || "IMG-001" });
       imageJobs.delete(req.params.jobId);
     } else {
       res.json({ status: "processing" });
+    }
+  });
+
+  app.get("/api/debug/ai-image-smoke-test", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    if (!user?.isMasterAdmin) {
+      return res.status(403).json({ ok: false, error: "Master Admin only" });
+    }
+    try {
+      const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+      if (!privateDir) return res.status(500).json({ ok: false, error: "PRIVATE_OBJECT_DIR not set" });
+
+      const testId = `smoke-test-${Date.now()}`;
+      const objectPath = `${privateDir}/sop-media/${testId}.png`;
+      const pathParts = objectPath.startsWith("/") ? objectPath.slice(1).split("/") : objectPath.split("/");
+      const bucketName = pathParts[0];
+      const objectName = pathParts.slice(1).join("/");
+
+      const { createCanvas } = await import("canvas").catch(() => ({ createCanvas: null }));
+      let imageBuffer: Buffer;
+      if (createCanvas) {
+        const canvas = createCanvas(200, 200);
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#4CAF50";
+        ctx.fillRect(0, 0, 200, 200);
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 20px sans-serif";
+        ctx.fillText("SMOKE TEST", 30, 105);
+        imageBuffer = canvas.toBuffer("image/png");
+      } else {
+        const pngHeader = Buffer.from([
+          0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+          0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+          0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+          0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+          0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
+          0x54, 0x08, 0xD7, 0x63, 0xF8, 0x4F, 0x00, 0x00,
+          0x00, 0x01, 0x01, 0x00, 0x05, 0x18, 0xD8, 0x4D,
+          0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44,
+          0xAE, 0x42, 0x60, 0x82,
+        ]);
+        imageBuffer = pngHeader;
+      }
+
+      const SIDECAR = "http://127.0.0.1:1106";
+      const signRes = await fetch(`${SIDECAR}/object-storage/signed-object-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bucket_name: bucketName,
+          object_name: objectName,
+          method: "PUT",
+          expires_at: new Date(Date.now() + 900 * 1000).toISOString(),
+        }),
+      });
+      if (!signRes.ok) return res.status(500).json({ ok: false, error: `Signed URL failed (${signRes.status})` });
+      const { signed_url } = await signRes.json() as { signed_url: string };
+
+      const uploadRes = await fetch(signed_url, {
+        method: "PUT",
+        headers: { "Content-Type": "image/png" },
+        body: imageBuffer,
+      });
+      if (!uploadRes.ok) return res.status(500).json({ ok: false, error: `Upload failed (${uploadRes.status})` });
+
+      const servingUrl = `/objects/sop-media/${testId}.png`;
+      console.log(`[AI-IMG] Smoke test OK | objectPath=${objectPath} servingUrl=${servingUrl} size=${imageBuffer.length}`);
+
+      res.json({
+        ok: true,
+        url: servingUrl,
+        fullUrl: `${req.protocol}://${req.get("host")}${servingUrl}`,
+        contentType: "image/png",
+        size: imageBuffer.length,
+      });
+    } catch (err: any) {
+      console.error("[AI-IMG] Smoke test FAILED:", err);
+      res.status(500).json({ ok: false, error: err.message });
     }
   });
 
