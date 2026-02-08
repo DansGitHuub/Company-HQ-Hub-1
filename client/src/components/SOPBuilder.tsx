@@ -53,6 +53,7 @@ import {
   Camera,
   Palette,
   Clock,
+  ZoomIn,
 } from "lucide-react";
 
 interface SOPStep {
@@ -297,6 +298,51 @@ function asMultilineText(value: any): string {
     if (Array.isArray((value as any).list)) return (value as any).list.map((v: any) => String(v)).join("\n");
   }
   return String(value);
+}
+
+function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm cursor-zoom-out"
+      onClick={onClose}
+      data-testid="image-lightbox"
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/40 rounded-full p-2 transition-colors"
+        data-testid="lightbox-close"
+      >
+        <X className="h-6 w-6" />
+      </button>
+      <img
+        src={src}
+        alt={alt}
+        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        data-testid="lightbox-image"
+      />
+      {alt && (
+        <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm bg-black/50 px-4 py-1.5 rounded-full max-w-[80vw] truncate">
+          {alt}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ClickableImage({ src, alt, className, testId }: { src: string; alt: string; className: string; testId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <div className="relative group cursor-zoom-in" onClick={() => setOpen(true)}>
+        <img src={src} alt={alt} className={className} data-testid={testId} />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-md flex items-center justify-center">
+          <ZoomIn className="h-6 w-6 text-white opacity-0 group-hover:opacity-80 transition-opacity drop-shadow-lg" />
+        </div>
+      </div>
+      {open && <ImageLightbox src={src} alt={alt} onClose={() => setOpen(false)} />}
+    </>
+  );
 }
 
 function generateId() {
@@ -1177,13 +1223,13 @@ function AIImageGenerator({
         <Card data-testid="ai-preview">
           <CardContent className="p-3 space-y-3">
             <div className="relative">
-              <img
+              <ClickableImage
                 src={resolveImageSrc(preview.url)}
                 alt={preview.alt}
                 className="w-full rounded-md border max-h-64 object-contain bg-muted"
-                data-testid="ai-preview-image"
+                testId="ai-preview-image"
               />
-              <Badge className="absolute top-2 left-2 bg-purple-600 text-white text-xs" data-testid="badge-ai">
+              <Badge className="absolute top-2 left-2 bg-purple-600 text-white text-xs pointer-events-none" data-testid="badge-ai">
                 <Sparkles className="h-3 w-3 mr-1" /> AI
               </Badge>
             </div>
@@ -1463,14 +1509,14 @@ function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Par
           {data.headerImage ? (
             <div className="space-y-2">
               <div className="relative">
-                <img
+                <ClickableImage
                   src={resolveImageSrc(data.headerImage.url)}
                   alt={data.headerImage.alt}
                   className="w-full rounded-md border max-h-48 object-contain bg-muted"
-                  data-testid="header-image-preview"
+                  testId="header-image-preview"
                 />
                 {data.headerImage.source === "ai_generated" && (
-                  <Badge className="absolute top-2 left-2 bg-purple-600 text-white text-xs">
+                  <Badge className="absolute top-2 left-2 bg-purple-600 text-white text-xs pointer-events-none">
                     <Sparkles className="h-3 w-3 mr-1" /> AI
                   </Badge>
                 )}
@@ -1529,14 +1575,14 @@ function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Par
                 </div>
                 {data.stepImages[step.id] ? (
                   <div className="relative">
-                    <img
+                    <ClickableImage
                       src={resolveImageSrc(data.stepImages[step.id].url)}
                       alt={data.stepImages[step.id].alt}
                       className="w-full rounded border max-h-36 object-contain bg-muted"
-                      data-testid={`step-image-preview-${idx}`}
+                      testId={`step-image-preview-${idx}`}
                     />
                     {data.stepImages[step.id].source === "ai_generated" && (
-                      <Badge className="absolute top-1 left-1 bg-purple-600 text-white text-[10px]">
+                      <Badge className="absolute top-1 left-1 bg-purple-600 text-white text-[10px] pointer-events-none">
                         <Sparkles className="h-2.5 w-2.5 mr-0.5" /> AI
                       </Badge>
                     )}
@@ -1699,20 +1745,20 @@ function StepReview({ data }: { data: SOPBuilderData }) {
             <div className="flex flex-wrap gap-2">
               {data.headerImage && (
                 <div className="relative w-20 h-20 rounded border overflow-hidden">
-                  <img src={resolveImageSrc(data.headerImage.url)} alt="Header" className="w-full h-full object-cover" />
+                  <ClickableImage src={resolveImageSrc(data.headerImage.url)} alt="Header" className="w-full h-full object-cover" testId="review-header-thumb" />
                   {data.headerImage.source === "ai_generated" && (
-                    <Badge className="absolute top-0.5 left-0.5 bg-purple-600 text-white text-[8px] px-1 py-0"><Sparkles className="h-2 w-2" /></Badge>
+                    <Badge className="absolute top-0.5 left-0.5 bg-purple-600 text-white text-[8px] px-1 py-0 pointer-events-none"><Sparkles className="h-2 w-2" /></Badge>
                   )}
-                  <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] text-center">Header</span>
+                  <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] text-center pointer-events-none">Header</span>
                 </div>
               )}
               {data.steps.map((step, idx) => data.stepImages[step.id] ? (
                 <div key={step.id} className="relative w-20 h-20 rounded border overflow-hidden">
-                  <img src={resolveImageSrc(data.stepImages[step.id].url)} alt={`Step ${idx+1}`} className="w-full h-full object-cover" />
+                  <ClickableImage src={resolveImageSrc(data.stepImages[step.id].url)} alt={`Step ${idx+1}`} className="w-full h-full object-cover" testId={`review-step-thumb-${idx}`} />
                   {data.stepImages[step.id].source === "ai_generated" && (
-                    <Badge className="absolute top-0.5 left-0.5 bg-purple-600 text-white text-[8px] px-1 py-0"><Sparkles className="h-2 w-2" /></Badge>
+                    <Badge className="absolute top-0.5 left-0.5 bg-purple-600 text-white text-[8px] px-1 py-0 pointer-events-none"><Sparkles className="h-2 w-2" /></Badge>
                   )}
-                  <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] text-center">Step {idx+1}</span>
+                  <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] text-center pointer-events-none">Step {idx+1}</span>
                 </div>
               ) : null)}
             </div>
