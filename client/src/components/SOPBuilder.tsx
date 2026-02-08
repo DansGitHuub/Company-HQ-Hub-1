@@ -1050,15 +1050,34 @@ function AIImageGenerator({
   });
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [genPhase, setGenPhase] = useState<"sending" | "creating" | "uploading" | "finishing">("sending");
+  const [genProgress, setGenProgress] = useState(0);
+
+  const PHASE_LABELS: Record<string, { label: string; percent: number }> = {
+    sending: { label: "Sending prompt to AI...", percent: 10 },
+    creating: { label: "AI is creating your image...", percent: 40 },
+    uploading: { label: "Uploading to storage...", percent: 75 },
+    finishing: { label: "Almost done...", percent: 90 },
+  };
 
   const pollForResult = useCallback(async (jobId: string) => {
     const maxAttempts = 40;
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(r => setTimeout(r, 3000));
+
+      if (i === 1) { setGenPhase("creating"); setGenProgress(30); }
+      else if (i === 3) setGenProgress(45);
+      else if (i === 5) setGenProgress(55);
+      else if (i === 8) setGenProgress(65);
+      else if (i === 12) setGenProgress(70);
+
       try {
         const res = await fetch(`/api/sop-media/ai-generate/status/${jobId}`, { credentials: "include" });
         const data = await res.json();
         if (data.status === "completed") {
+          setGenPhase("finishing");
+          setGenProgress(95);
+          await new Promise(r => setTimeout(r, 400));
           setPreview({
             id: data.result.id,
             url: data.result.url,
@@ -1067,17 +1086,21 @@ function AIImageGenerator({
             aiPrompt: prompt,
             aiStyle: style,
           });
+          setGenProgress(100);
           toast({ title: "Image generated successfully" });
           setIsGenerating(false);
+          setGenProgress(0);
           return;
         } else if (data.status === "failed") {
           const code = data.errorCode || "IMG-001";
           showErrorToast(new ApiError(500, data.error || "Image generation failed", code, data.error), "Generation failed");
           setIsGenerating(false);
+          setGenProgress(0);
           return;
         } else if (data.status === "not_found") {
           showErrorToast(new ApiError(404, "Job expired or not found. Please try again.", "IMG-008"), "Generation failed");
           setIsGenerating(false);
+          setGenProgress(0);
           return;
         }
       } catch (err) {
@@ -1086,6 +1109,7 @@ function AIImageGenerator({
     }
     toast({ title: "Generation timed out", description: "The image took too long to generate. Please try again.", variant: "destructive", duration: 15000 });
     setIsGenerating(false);
+    setGenProgress(0);
   }, [prompt, style, toast]);
 
   const generateMutation = useMutation({
@@ -1102,6 +1126,8 @@ function AIImageGenerator({
     onSuccess: (data) => {
       if (data.jobId) {
         setIsGenerating(true);
+        setGenPhase("sending");
+        setGenProgress(15);
         pollForResult(data.jobId);
       } else if (data.id) {
         setPreview({
@@ -1206,18 +1232,33 @@ function AIImageGenerator({
         <Label htmlFor="internal-use" className="text-xs cursor-pointer">Internal training use only</Label>
       </div>
 
-      <Button
-        onClick={() => generateMutation.mutate()}
-        disabled={!prompt.trim() || generateMutation.isPending || isGenerating}
-        className="w-full"
-        data-testid="btn-generate-ai-image"
-      >
-        {generateMutation.isPending || isGenerating ? (
-          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {isGenerating ? "Generating image... (up to 60s)" : "Starting..."}</>
-        ) : (
-          <><Sparkles className="h-4 w-4 mr-2" /> Generate Image</>
-        )}
-      </Button>
+      {(generateMutation.isPending || isGenerating) ? (
+        <div className="w-full space-y-2" data-testid="ai-gen-status">
+          <div className="flex items-center gap-2 text-sm font-medium text-purple-700 dark:text-purple-300">
+            <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+            <span>{generateMutation.isPending ? "Sending request..." : PHASE_LABELS[genPhase]?.label || "Processing..."}</span>
+          </div>
+          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+            <div
+              className="h-full bg-purple-500 rounded-full transition-all duration-700 ease-out"
+              style={{ width: `${generateMutation.isPending ? 5 : genProgress}%` }}
+              data-testid="ai-gen-progress-bar"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            {genProgress < 40 ? "This usually takes 15–30 seconds" : genProgress < 70 ? "Hang tight, almost there..." : "Wrapping up..."}
+          </p>
+        </div>
+      ) : (
+        <Button
+          onClick={() => generateMutation.mutate()}
+          disabled={!prompt.trim()}
+          className="w-full"
+          data-testid="btn-generate-ai-image"
+        >
+          <Sparkles className="h-4 w-4 mr-2" /> Generate Image
+        </Button>
+      )}
 
       {preview && (
         <Card data-testid="ai-preview">
