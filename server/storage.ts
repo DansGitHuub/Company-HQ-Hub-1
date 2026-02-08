@@ -66,6 +66,9 @@ import {
   sopMedia, type SopMedia, type InsertSopMedia,
   aiGenerationEvents, type AiGenerationEvent, type InsertAiGenerationEvent,
   sopDrafts, type SopDraft, type InsertSopDraft,
+  sopQuizzes, type SopQuiz, type InsertSopQuiz,
+  sopQuizQuestions, type SopQuizQuestion, type InsertSopQuizQuestion,
+  userQuizAttempts, type UserQuizAttempt, type InsertUserQuizAttempt,
   conversations, chatMessages
 } from "@shared/schema";
 import { db, pool } from "./db";
@@ -474,6 +477,23 @@ export interface IStorage {
   getSopDraft(id: string): Promise<SopDraft | undefined>;
   upsertSopDraft(draft: InsertSopDraft & { id?: string }): Promise<SopDraft>;
   deleteSopDraft(id: string): Promise<boolean>;
+
+  // SOP Quizzes
+  getSopQuizzes(sopId: string): Promise<SopQuiz[]>;
+  getSopQuiz(id: string): Promise<SopQuiz | undefined>;
+  createSopQuiz(quiz: InsertSopQuiz): Promise<SopQuiz>;
+  deleteSopQuiz(id: string): Promise<boolean>;
+  deleteSopQuizzesBySop(sopId: string): Promise<boolean>;
+
+  // Quiz Questions
+  getQuizQuestions(quizId: string): Promise<SopQuizQuestion[]>;
+  createQuizQuestion(question: InsertSopQuizQuestion): Promise<SopQuizQuestion>;
+  createQuizQuestionsBatch(questions: InsertSopQuizQuestion[]): Promise<SopQuizQuestion[]>;
+
+  // Quiz Attempts
+  getUserQuizAttempts(userId: string, quizId?: string): Promise<UserQuizAttempt[]>;
+  createQuizAttempt(attempt: InsertUserQuizAttempt): Promise<UserQuizAttempt>;
+  getAllQuizAttempts(quizId: string): Promise<UserQuizAttempt[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2281,6 +2301,70 @@ export class DatabaseStorage implements IStorage {
   async deleteSopDraft(id: string): Promise<boolean> {
     const result = await db.delete(sopDrafts).where(eq(sopDrafts.id, id));
     return (result?.rowCount ?? 0) > 0;
+  }
+
+  async getSopQuizzes(sopId: string): Promise<SopQuiz[]> {
+    return await db.select().from(sopQuizzes)
+      .where(eq(sopQuizzes.sopId, sopId))
+      .orderBy(sopQuizzes.skillLevel);
+  }
+
+  async getSopQuiz(id: string): Promise<SopQuiz | undefined> {
+    const [quiz] = await db.select().from(sopQuizzes).where(eq(sopQuizzes.id, id));
+    return quiz || undefined;
+  }
+
+  async createSopQuiz(quiz: InsertSopQuiz): Promise<SopQuiz> {
+    const [created] = await db.insert(sopQuizzes).values(quiz).returning();
+    return created;
+  }
+
+  async deleteSopQuiz(id: string): Promise<boolean> {
+    const result = await db.delete(sopQuizzes).where(eq(sopQuizzes.id, id));
+    return (result?.rowCount ?? 0) > 0;
+  }
+
+  async deleteSopQuizzesBySop(sopId: string): Promise<boolean> {
+    const result = await db.delete(sopQuizzes).where(eq(sopQuizzes.sopId, sopId));
+    return (result?.rowCount ?? 0) >= 0;
+  }
+
+  async getQuizQuestions(quizId: string): Promise<SopQuizQuestion[]> {
+    return await db.select().from(sopQuizQuestions)
+      .where(eq(sopQuizQuestions.quizId, quizId))
+      .orderBy(sopQuizQuestions.sortOrder);
+  }
+
+  async createQuizQuestion(question: InsertSopQuizQuestion): Promise<SopQuizQuestion> {
+    const [created] = await db.insert(sopQuizQuestions).values(question).returning();
+    return created;
+  }
+
+  async createQuizQuestionsBatch(questions: InsertSopQuizQuestion[]): Promise<SopQuizQuestion[]> {
+    if (questions.length === 0) return [];
+    return await db.insert(sopQuizQuestions).values(questions).returning();
+  }
+
+  async getUserQuizAttempts(userId: string, quizId?: string): Promise<UserQuizAttempt[]> {
+    if (quizId) {
+      return await db.select().from(userQuizAttempts)
+        .where(and(eq(userQuizAttempts.userId, userId), eq(userQuizAttempts.quizId, quizId)))
+        .orderBy(desc(userQuizAttempts.completedAt));
+    }
+    return await db.select().from(userQuizAttempts)
+      .where(eq(userQuizAttempts.userId, userId))
+      .orderBy(desc(userQuizAttempts.completedAt));
+  }
+
+  async createQuizAttempt(attempt: InsertUserQuizAttempt): Promise<UserQuizAttempt> {
+    const [created] = await db.insert(userQuizAttempts).values(attempt).returning();
+    return created;
+  }
+
+  async getAllQuizAttempts(quizId: string): Promise<UserQuizAttempt[]> {
+    return await db.select().from(userQuizAttempts)
+      .where(eq(userQuizAttempts.quizId, quizId))
+      .orderBy(desc(userQuizAttempts.completedAt));
   }
 }
 

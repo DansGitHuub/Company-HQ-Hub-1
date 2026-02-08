@@ -822,6 +822,220 @@ Respond with a JSON object:
     }
   });
 
+  // SOP Quiz Generation
+  app.post("/api/sops/:id/generate-quiz", requireAuth, async (req, res) => {
+    try {
+      const userRole = (req.user as any)?.role;
+      if (userRole !== "Admin" && userRole !== "Manager") {
+        return res.status(403).json({ message: "Only Admins and Managers can generate quizzes" });
+      }
+
+      const sop = await storage.getSop(req.params.id as string);
+      if (!sop) return res.status(404).json({ message: "SOP not found" });
+
+      await storage.deleteSopQuizzesBySop(sop.id);
+
+      const skillLevels = ["beginner", "intermediate", "advanced"];
+      const skillDescriptions: Record<string, string> = {
+        beginner: "New to landscaping, needs detailed guidance. Questions should cover basic terminology, fundamental safety, and step-by-step comprehension.",
+        intermediate: "Has some experience, knows basics. Questions should test practical application, troubleshooting, and efficiency improvements.",
+        advanced: "Experienced professional. Questions should cover edge cases, optimization, quality standards, and mentoring scenarios."
+      };
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a training quiz generator for landscape installation and maintenance companies. Generate quiz questions based on Standard Operating Procedures (SOPs). Return valid JSON only.`
+          },
+          {
+            role: "user",
+            content: `Based on this SOP, generate quiz questions for employee training.
+
+SOP Title: ${sop.title}
+SOP Type: ${sop.sopType || "standard"}
+SOP Content:
+${sop.content}
+
+Generate a JSON object with this exact structure:
+{
+  "standardQuestions": [
+    {
+      "question": "text of question",
+      "options": ["option A", "option B", "option C", "option D"],
+      "correctIndex": 0,
+      "explanation": "why this is the correct answer"
+    }
+  ],
+  "skillLevels": {
+    "beginner": [/* 8-10 questions */],
+    "intermediate": [/* 8-10 questions */],
+    "advanced": [/* 8-10 questions */]
+  }
+}
+
+Rules:
+- "standardQuestions" should contain 2-3 universal safety/compliance questions that apply to ALL skill levels
+- Each skill level should have 8-10 ADDITIONAL questions specific to that level
+- ${skillDescriptions.beginner}
+- ${skillDescriptions.intermediate}
+- ${skillDescriptions.advanced}
+- Each question must have exactly 4 options
+- correctIndex is 0-based (0=first option, 3=last option)
+- Questions must directly relate to the SOP content
+- Include practical, real-world scenarios relevant to landscaping
+- Provide brief explanations for correct answers`
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+      });
+
+      const responseText = completion.choices[0]?.message?.content || "{}";
+      let quizData: any;
+      try {
+        quizData = JSON.parse(responseText);
+      } catch {
+        return res.status(500).json({ message: "Failed to parse AI quiz response" });
+      }
+
+      const standardQuestions = quizData.standardQuestions || [];
+      const createdQuizzes: any[] = [];
+
+      for (const level of skillLevels) {
+        const levelQuestions = quizData.skillLevels?.[level] || [];
+        const allQuestions = [...standardQuestions, ...levelQuestions];
+
+        const quiz = await storage.createSopQuiz({
+          sopId: sop.id,
+          skillLevel: level,
+          title: `${sop.title} - ${level.charAt(0).toUpperCase() + level.slice(1)} Quiz`,
+          description: skillDescriptions[level],
+          questionCount: allQuestions.length,
+        });
+
+        const questionsToInsert = allQuestions.map((q: any, index: number) => ({
+          quizId: quiz.id,
+          question: q.question,
+          options: q.options,
+          correctIndex: q.correctIndex,
+          isStandard: index < standardQuestions.length,
+          explanation: q.explanation || null,
+          sortOrder: index,
+        }));
+
+        if (questionsToInsert.length > 0) {
+          await storage.createQuizQuestionsBatch(questionsToInsert);
+        }
+
+        createdQuizzes.push({ ...quiz, questions: questionsToInsert });
+      }
+
+      res.status(201).json(createdQuizzes);
+    } catch (err: any) {
+      console.error("[QUIZ] Generation error:", err);
+      res.status(500).json({ message: "Error generating quiz", errorCode: "SOP-003" });
+    }
+  });
+
+  // Get quizzes for an SOP
+  app.get("/api/sops/:id/quizzes", requireAuth, async (req, res) => {
+    try {
+      const quizzes = await storage.getSopQuizzes(req.params.id as string);
+      res.json(quizzes);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching quizzes" });
+    }
+  });
+
+  // Get quiz with questions
+  app.get("/api/quizzes/:id", requireAuth, async (req, res) => {
+    try {
+      const quiz = await storage.getSopQuiz(req.params.id as string);
+      if (!quiz) return res.status(404).json({ message: "Quiz not found" });
+      const questions = await storage.getQuizQuestions(quiz.id);
+      res.json({ ...quiz, questions });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching quiz" });
+    }
+  });
+
+  // Submit quiz attempt
+  app.post("/api/quizzes/:id/attempts", requireAuth, async (req, res) => {
+    try {
+      const quiz = await storage.getSopQuiz(req.params.id as string);
+      if (!quiz) return res.status(404).json({ message: "Quiz not found" });
+
+      const { answers } = req.body;
+      if (!answers || !Array.isArray(answers)) {
+        return res.status(400).json({ message: "Answers array is required" });
+      }
+
+      const questions = await storage.getQuizQuestions(quiz.id);
+      if (answers.length !== questions.length) {
+        return res.status(400).json({ message: `Expected ${questions.length} answers, got ${answers.length}` });
+      }
+
+      let score = 0;
+      const gradedAnswers = questions.map((question, index) => {
+        const answer = answers[index] ?? -1;
+        const isCorrect = answer === question.correctIndex;
+        if (isCorrect) score++;
+        return {
+          questionId: question.id,
+          selectedIndex: answer,
+          correctIndex: question.correctIndex,
+          isCorrect,
+        };
+      });
+
+      const totalQuestions = questions.length;
+      const passed = totalQuestions > 0 && (score / totalQuestions) >= 0.7;
+
+      const attempt = await storage.createQuizAttempt({
+        quizId: quiz.id,
+        userId: (req.user as any).id,
+        score,
+        totalQuestions,
+        passed,
+        answers: gradedAnswers,
+      });
+
+      res.status(201).json(attempt);
+    } catch (err) {
+      res.status(500).json({ message: "Error submitting quiz attempt" });
+    }
+  });
+
+  // Get current user's quiz attempts
+  app.get("/api/quiz-attempts/me", requireAuth, async (req, res) => {
+    try {
+      const quizId = req.query.quizId as string | undefined;
+      const attempts = await storage.getUserQuizAttempts((req.user as any).id, quizId);
+      res.json(attempts);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching quiz attempts" });
+    }
+  });
+
+  // Get all SOPs that have quizzes (for Testing & Knowledge page)
+  app.get("/api/quiz-catalog", requireAuth, async (req, res) => {
+    try {
+      const allSops = await storage.getSops();
+      const catalog = [];
+      for (const sop of allSops) {
+        const quizzes = await storage.getSopQuizzes(sop.id);
+        if (quizzes.length > 0) {
+          catalog.push({ sop, quizzes });
+        }
+      }
+      res.json(catalog);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching quiz catalog" });
+    }
+  });
+
   // SOP Categories
   app.get("/api/sop-categories", requireAuth, async (req, res) => {
     try {

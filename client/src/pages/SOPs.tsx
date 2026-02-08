@@ -20,8 +20,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import SOPBuilder, { type SOPBuilderData } from "@/components/SOPBuilder";
-import type { Sop, SopCategory, SopTemplate, SopExample, SopDraft } from "@shared/schema";
-import { Clock, PlayCircle } from "lucide-react";
+import type { Sop, SopCategory, SopTemplate, SopExample, SopDraft, SopQuiz } from "@shared/schema";
+import { Clock, PlayCircle, Brain } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function SOPs() {
@@ -56,6 +56,33 @@ export default function SOPs() {
     queryKey: ["/api/sop-drafts"],
   });
   
+  const [quizGenerating, setQuizGenerating] = useState(false);
+
+  const { data: sopQuizzes = {} } = useQuery<Record<string, SopQuiz[]>>({
+    queryKey: ["/api/sop-quizzes-map"],
+    queryFn: async () => {
+      if (!selectedSOP) return {};
+      const res = await apiRequest("GET", `/api/sops/${selectedSOP.id}/quizzes`);
+      const quizzes = await res.json();
+      return { [selectedSOP.id]: quizzes };
+    },
+    enabled: !!selectedSOP,
+  });
+
+  const handleGenerateQuiz = async (sopId: string) => {
+    setQuizGenerating(true);
+    try {
+      await apiRequest("POST", `/api/sops/${sopId}/generate-quiz`);
+      queryClient.invalidateQueries({ queryKey: ["/api/sop-quizzes-map"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quiz-catalog"] });
+      toast({ title: "Quiz Generated!", description: "3 skill-level quizzes have been created for this SOP." });
+    } catch (err: any) {
+      toast({ title: "Quiz generation failed", description: err.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setQuizGenerating(false);
+    }
+  };
+
   // Templates & Examples state
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [exampleDialogOpen, setExampleDialogOpen] = useState(false);
@@ -421,6 +448,77 @@ export default function SOPs() {
               <div dangerouslySetInnerHTML={{ __html: selectedSOP.content }} />
             </CardContent>
           </Card>
+
+          {(user?.role === "Admin" || user?.role === "Manager") && (
+            <Card data-testid="card-quiz-section">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Brain className="h-5 w-5" />
+                  Training Quiz
+                </CardTitle>
+                <CardDescription>
+                  Generate skill-level quizzes from this SOP for employee training
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const quizzes = sopQuizzes[selectedSOP.id] || [];
+                  if (quizzes.length > 0) {
+                    return (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-3 gap-3">
+                          {quizzes.map((quiz) => (
+                            <div key={quiz.id} className="p-3 border rounded-lg text-center" data-testid={`quiz-level-${quiz.skillLevel}`}>
+                              <Badge variant="outline" className="mb-2 capitalize">{quiz.skillLevel}</Badge>
+                              <p className="text-sm font-medium" data-testid={`text-quiz-count-${quiz.skillLevel}`}>{quiz.questionCount} questions</p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleGenerateQuiz(selectedSOP.id)}
+                            disabled={quizGenerating}
+                            data-testid="button-regenerate-quiz"
+                          >
+                            {quizGenerating ? (
+                              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Regenerating...</>
+                            ) : (
+                              <><Sparkles className="h-4 w-4 mr-2" /> Regenerate Quiz</>
+                            )}
+                          </Button>
+                          <a href="/testing">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              data-testid="button-view-quizzes"
+                            >
+                              <ExternalLink className="h-4 w-4 mr-2" /> View in Testing & Knowledge
+                            </Button>
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <Button
+                      onClick={() => handleGenerateQuiz(selectedSOP.id)}
+                      disabled={quizGenerating}
+                      className="w-full"
+                      data-testid="button-generate-quiz"
+                    >
+                      {quizGenerating ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating Quiz (this may take a moment)...</>
+                      ) : (
+                        <><Sparkles className="h-4 w-4 mr-2" /> Generate Training Quiz</>
+                      )}
+                    </Button>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     );

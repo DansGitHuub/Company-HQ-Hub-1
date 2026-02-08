@@ -31,7 +31,7 @@ Preferred communication style: Simple, everyday language.
 - **Database**: PostgreSQL
 - **ORM**: Drizzle ORM with drizzle-zod for schema validation
 - **Schema**: Shared between frontend and backend (`shared/schema.ts`)
-- **Key Models**: Users (role-based), SOPs, Materials, Material Categories, Category Fields, Hiring Candidates, Marketing Campaigns, Jobs, Customer Messages, Work Requests, Custom Forms, Equipment, Customer Resources.
+- **Key Models**: Users (role-based), SOPs, Materials, Material Categories, Category Fields, Hiring Candidates, Marketing Campaigns, Jobs, Customer Messages, Work Requests, Custom Forms, Equipment, Customer Resources, SOP Quizzes, Quiz Questions, Quiz Attempts.
 
 ### Core Features
 - **Role-Based Access Control (RBAC)**: Differentiated access for Admin, Manager, Crew, and Customer roles, including a Master Admin for critical operations.
@@ -51,6 +51,15 @@ Preferred communication style: Simple, everyday language.
 - **Communications Center**: Internal messaging system with threaded conversations (inspired by Zendesk/Salesforce), role-based access control, assignment system, status workflow (open, in_progress, resolved, closed), priority levels (low, normal, high, urgent), internal notes visible only to staff, admin supervision with employee/customer filters, and unread tracking per role. Customers see only their threads, employees see assigned conversations, admins can view/filter all.
 - **Materials Catalog Manager**: Comprehensive materials management with 8 specialized categories (Aggregates & Gravel, Mulch & Soil, Trees & Shrubs, Perennials & Annuals, Hardscape & Pavers, Landscape, Chemicals & Fertilizer, Other), AI-powered 5-step material creation wizard (Name → Category → AI Auto-Fill → Review → Confirm), category-specific custom fields, bulk operations (select all, move to category), easy category management (add, rename, delete), search/filter/sort capabilities, and role-based access.
 - **Interactive To-Do List**: Task management system with add/edit/delete functionality, priority levels (low, medium, high, urgent), status tracking (pending, in_progress, completed), due dates, user assignments, read/unread status, filtering by status and priority, notification badges in sidebar for unread tasks, and admin-controlled user activation.
+- **Testing & Knowledge Center**: AI-powered quiz generation system for employee training and SOP comprehension testing.
+  - **AI Quiz Generation**: Generates skill-level-appropriate quizzes (beginner, intermediate, advanced) from SOP content using OpenAI
+  - **Standard Questions**: 2-3 universal safety/compliance questions shared across all skill levels
+  - **Skill-Specific Questions**: 8-10 additional questions per skill level with varying difficulty
+  - **Quiz Taking**: Interactive multiple-choice quiz interface with immediate grading and pass/fail scoring (70% threshold)
+  - **Result Tracking**: Score history per user per quiz with best score tracking
+  - **Explanations**: Post-quiz explanations for correct answers to reinforce learning
+  - **Admin/Manager Controls**: Generate Quiz button on SOP detail view, quiz regeneration, role-restricted quiz creation
+  - **Quiz Catalog**: Browse all SOPs with available quizzes, progress tracking across skill levels
 - **Plow Site Mapper**: Snow removal route planning tool with Google Maps integration for accurate address lookup, interactive satellite imagery with zoom controls, AI-powered property analysis, site grouping with organizational categories, multi-step site creation workflow (Info → Image Selection → Confirmation), canvas-based markup tools for annotating property images, and instruction management for plow crews.
 - **AI Agents System** (Master Admin only): Autonomous AI agents that analyze and improve various systems. Features include:
   - **Agent Management**: On/off toggles for each agent, manual run triggers, and scheduling options (manual, daily, weekly, monthly).

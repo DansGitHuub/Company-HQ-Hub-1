@@ -1735,3 +1735,58 @@ export const insertSopDraftSchema = createInsertSchema(sopDrafts).omit({
 
 export type InsertSopDraft = z.infer<typeof insertSopDraftSchema>;
 export type SopDraft = typeof sopDrafts.$inferSelect;
+
+export const sopQuizzes = pgTable("sop_quizzes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  sopId: varchar("sop_id", { length: 36 }).references(() => sops.id, { onDelete: "cascade" }).notNull(),
+  skillLevel: text("skill_level").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  questionCount: integer("question_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSopQuizSchema = createInsertSchema(sopQuizzes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSopQuiz = z.infer<typeof insertSopQuizSchema>;
+export type SopQuiz = typeof sopQuizzes.$inferSelect;
+
+export const sopQuizQuestions = pgTable("sop_quiz_questions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  quizId: varchar("quiz_id", { length: 36 }).references(() => sopQuizzes.id, { onDelete: "cascade" }).notNull(),
+  question: text("question").notNull(),
+  options: jsonb("options").notNull(),
+  correctIndex: integer("correct_index").notNull(),
+  isStandard: boolean("is_standard").notNull().default(false),
+  explanation: text("explanation"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const insertSopQuizQuestionSchema = createInsertSchema(sopQuizQuestions).omit({
+  id: true,
+});
+
+export type InsertSopQuizQuestion = z.infer<typeof insertSopQuizQuestionSchema>;
+export type SopQuizQuestion = typeof sopQuizQuestions.$inferSelect;
+
+export const userQuizAttempts = pgTable("user_quiz_attempts", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  quizId: varchar("quiz_id", { length: 36 }).references(() => sopQuizzes.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id).notNull(),
+  score: integer("score").notNull(),
+  totalQuestions: integer("total_questions").notNull(),
+  passed: boolean("passed").notNull().default(false),
+  answers: jsonb("answers").notNull(),
+  completedAt: timestamp("completed_at").defaultNow(),
+});
+
+export const insertUserQuizAttemptSchema = createInsertSchema(userQuizAttempts).omit({
+  id: true,
+  completedAt: true,
+});
+
+export type InsertUserQuizAttempt = z.infer<typeof insertUserQuizAttemptSchema>;
+export type UserQuizAttempt = typeof userQuizAttempts.$inferSelect;
