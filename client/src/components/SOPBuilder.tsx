@@ -349,7 +349,7 @@ function StepTypeSelection({ data, onChange }: { data: SOPBuilderData; onChange:
   );
 }
 
-function StepIdentity({ data, onChange, categories, onAiSuggest, isAiSuggesting }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void; categories: SopCategory[]; onAiSuggest?: () => void; isAiSuggesting?: boolean }) {
+function StepIdentity({ data, onChange, categories, onAiSuggest, isAiSuggesting, aiApplied }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void; categories: SopCategory[]; onAiSuggest?: () => void; isAiSuggesting?: boolean; aiApplied?: boolean }) {
   const { toast } = useToast();
   const [showNewTopic, setShowNewTopic] = useState(false);
   const [newTopicName, setNewTopicName] = useState("");
@@ -493,15 +493,21 @@ function StepIdentity({ data, onChange, categories, onAiSuggest, isAiSuggesting 
 
           {onAiSuggest && data.title.trim().length >= 3 && (
             <Button
-              variant="outline"
-              size="sm"
+              variant={aiApplied ? "outline" : "default"}
+              size="default"
               onClick={onAiSuggest}
               disabled={isAiSuggesting}
-              className="mt-2 gap-2 text-purple-600 border-purple-300 hover:bg-purple-50 hover:border-purple-400 dark:text-purple-400 dark:border-purple-600 dark:hover:bg-purple-900/20"
+              className={`mt-3 gap-2 px-5 py-2.5 text-sm font-semibold shadow-sm transition-all ${
+                aiApplied
+                  ? "text-green-600 border-green-400 bg-green-50 hover:bg-green-100 hover:border-green-500 dark:text-green-400 dark:border-green-600 dark:bg-green-950/30 dark:hover:bg-green-900/40"
+                  : "bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md border-purple-600 dark:bg-purple-700 dark:hover:bg-purple-600"
+              }`}
               data-testid="btn-ai-suggest"
             >
               {isAiSuggesting ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> AI is filling in fields...</>
+              ) : aiApplied ? (
+                <><Check className="h-4 w-4" /> AI Applied — Run Again</>
               ) : (
                 <><Sparkles className="h-4 w-4" /> Auto-fill with AI</>
               )}
@@ -1278,8 +1284,8 @@ function MaterialCalculatorPopup({ defaults, onConfirm, onCancel }: { defaults: 
 
   return (
     <AlertDialog open={true}>
-      <AlertDialogContent className="max-w-lg">
-        <AlertDialogHeader>
+      <AlertDialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+        <AlertDialogHeader className="shrink-0">
           <AlertDialogTitle className="flex items-center gap-2" data-testid="calc-title">
             📐 {calcTitle}
           </AlertDialogTitle>
@@ -1287,7 +1293,7 @@ function MaterialCalculatorPopup({ defaults, onConfirm, onCancel }: { defaults: 
             Adjust the inputs below for your specific job. A calculator will be embedded in the SOP content.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-2 overflow-y-auto flex-1 min-h-0 pr-1">
           {defaults.productOrManufacturer && (
             <p className="text-xs text-muted-foreground italic">Assumptions based on {defaults.productOrManufacturer}</p>
           )}
@@ -1358,7 +1364,7 @@ function MaterialCalculatorPopup({ defaults, onConfirm, onCancel }: { defaults: 
             </div>
           )}
         </div>
-        <AlertDialogFooter>
+        <AlertDialogFooter className="shrink-0">
           <AlertDialogCancel onClick={onCancel}>Skip Calculator</AlertDialogCancel>
           <AlertDialogAction onClick={() => onConfirm(values[template.inputs[0].key] || 0, calcHtml)} data-testid="btn-add-calculator">
             Add Calculator to SOP
@@ -1420,8 +1426,18 @@ function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Par
                           setTimeout(() => {
                             const targetId = isHeader ? "header-generator" : `step-generator-${stepIdx}`;
                             const el = document.getElementById(targetId);
-                            if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-                          }, 100);
+                            if (el) {
+                              const scrollContainer = el.closest('[class*="overflow-y-auto"]');
+                              if (scrollContainer) {
+                                const containerRect = scrollContainer.getBoundingClientRect();
+                                const elRect = el.getBoundingClientRect();
+                                const offset = elRect.top - containerRect.top + scrollContainer.scrollTop - containerRect.height / 3;
+                                scrollContainer.scrollTo({ top: offset, behavior: "smooth" });
+                              } else {
+                                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                              }
+                            }
+                          }, 150);
                         }}
                         data-testid={`btn-use-suggestion-${idx}`}
                       >
@@ -1844,6 +1860,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
   const [showNavDialog, setShowNavDialog] = useState(false);
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
   const [isAiSuggesting, setIsAiSuggesting] = useState(false);
+  const [aiSuggestionsApplied, setAiSuggestionsApplied] = useState(false);
 
   const isDirty = useMemo(() => {
     const base = initialData || INITIAL_DATA;
@@ -1993,6 +2010,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
       const topicMsg = suggestions.suggestedTopicId ? ` Topic "${suggestions.suggestedTopicName}" selected.` : (suggestions.suggestedTopicName ? ` Suggested new topic: "${suggestions.suggestedTopicName}".` : "");
       const imgMsg = imgCount > 0 ? ` ${imgCount} image suggestion${imgCount > 1 ? "s" : ""} ready on the Media tab.` : "";
       const calcMsg = suggestions.needsMaterialCalculator ? " Material calculator available." : "";
+      setAiSuggestionsApplied(true);
       toast({ title: "AI suggestions applied", description: `Fields auto-filled.${topicMsg}${imgMsg}${calcMsg} Review and adjust as needed.` });
     } catch (err: any) {
       showErrorToast(err, "AI suggestion failed");
@@ -2057,7 +2075,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
   const renderStep = () => {
     switch (currentStep) {
       case 0: return <StepTypeSelection data={data} onChange={updateData} />;
-      case 1: return <StepIdentity data={data} onChange={updateData} categories={categories} onAiSuggest={handleAiSuggest} isAiSuggesting={isAiSuggesting} />;
+      case 1: return <StepIdentity data={data} onChange={updateData} categories={categories} onAiSuggest={handleAiSuggest} isAiSuggesting={isAiSuggesting} aiApplied={aiSuggestionsApplied} />;
       case 2: return <StepOutcome data={data} onChange={updateData} />;
       case 3: return <StepAudience data={data} onChange={updateData} />;
       case 4: return <StepBuilder data={data} onChange={updateData} />;
