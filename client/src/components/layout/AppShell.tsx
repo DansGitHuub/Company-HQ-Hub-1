@@ -312,7 +312,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     dashboard: { icon: LayoutDashboard, label: "Dashboard", href: "/" },
     applicant_portal: { icon: ClipboardCheck, label: "My Application", href: "/applicant" },
     sops: { icon: BookOpen, label: "SOP Library", href: "/sops" },
-    testing: { icon: Brain, label: "Testing & Knowledge", href: "/testing" },
+    testing: { icon: Brain, label: "Testing", href: "/testing" },
     materials: { icon: Hammer, label: "Materials", href: "/materials" },
     equipment: { icon: Truck, label: "Equipment", href: "/equipment" },
     todos: { icon: CheckSquare, label: "To-Do List", href: "/todos" },
