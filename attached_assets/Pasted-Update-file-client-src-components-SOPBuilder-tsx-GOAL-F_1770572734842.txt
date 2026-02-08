@@ -1,0 +1,48 @@
+Update file: client/src/components/SOPBuilder.tsx
+
+GOAL:
+Fix error "t.tools.split is not a function" by normalizing tools/materials/ppe to a string, even if they come in as arrays/objects from AI suggestions.
+
+1) Add this helper function near the top of the file (after resolveImageSrc, before generateId):
+
+function asMultilineText(value: any): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(v => String(v)).join("\n");
+  // If AI returns { items: [...] } or something similar, try best effort:
+  if (typeof value === "object") {
+    if (Array.isArray((value as any).items)) return (value as any).items.map((v: any) => String(v)).join("\n");
+    if (Array.isArray((value as any).list)) return (value as any).list.map((v: any) => String(v)).join("\n");
+  }
+  return String(value);
+}
+
+2) In handleAiSuggest(), inside the setData(prev => { ... }) updates object, replace these three lines:
+
+tools: prev.tools || suggestions.tools || "",
+materials: prev.materials || suggestions.materials || "",
+ppe: prev.ppe || suggestions.ppe || "",
+
+WITH these (normalize the suggestion values):
+
+tools: asMultilineText(prev.tools || suggestions.tools || ""),
+materials: asMultilineText(prev.materials || suggestions.materials || ""),
+ppe: asMultilineText(prev.ppe || suggestions.ppe || ""),
+
+3) In generateSOPContent(data), change the "Before You Start" section to normalize the values before splitting:
+Replace:
+if (data.tools) { ... data.tools.split("\n") ... }
+if (data.materials) { ... data.materials.split("\n") ... }
+if (data.ppe) { ... data.ppe.split("\n") ... }
+
+WITH:
+const toolsText = asMultilineText(data.tools);
+const materialsText = asMultilineText(data.materials);
+const ppeText = asMultilineText(data.ppe);
+
+Then use toolsText/materialsText/ppeText in the split calls:
+toolsText.split("\n")
+materialsText.split("\n")
+ppeText.split("\n")
+
+Do not change anything else.

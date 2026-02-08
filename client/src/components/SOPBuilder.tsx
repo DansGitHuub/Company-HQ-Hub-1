@@ -170,6 +170,17 @@ function resolveImageSrc(url: string) {
   return `/api/objects/${url}`;
 }
 
+function asMultilineText(value: any): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(v => String(v)).join("\n");
+  if (typeof value === "object") {
+    if (Array.isArray((value as any).items)) return (value as any).items.map((v: any) => String(v)).join("\n");
+    if (Array.isArray((value as any).list)) return (value as any).list.map((v: any) => String(v)).join("\n");
+  }
+  return String(value);
+}
+
 function generateId() {
   return Math.random().toString(36).substring(2, 9);
 }
@@ -1534,19 +1545,22 @@ function generateSOPContent(data: SOPBuilderData): string {
 
   if (data.tools || data.materials || data.ppe) {
     html += `<h2>Before You Start</h2>`;
-    if (data.tools) {
+    const toolsText = asMultilineText(data.tools);
+    const materialsText = asMultilineText(data.materials);
+    const ppeText = asMultilineText(data.ppe);
+    if (toolsText) {
       html += `<h3>Tools Required</h3><ul>`;
-      data.tools.split("\n").filter(Boolean).forEach(t => html += `<li>${t.trim()}</li>`);
+      toolsText.split("\n").filter(Boolean).forEach(t => html += `<li>${t.trim()}</li>`);
       html += `</ul>`;
     }
-    if (data.materials) {
+    if (materialsText) {
       html += `<h3>Materials Needed</h3><ul>`;
-      data.materials.split("\n").filter(Boolean).forEach(m => html += `<li>${m.trim()}</li>`);
+      materialsText.split("\n").filter(Boolean).forEach(m => html += `<li>${m.trim()}</li>`);
       html += `</ul>`;
     }
-    if (data.ppe) {
+    if (ppeText) {
       html += `<h3>PPE Required</h3><ul>`;
-      data.ppe.split("\n").filter(Boolean).forEach(p => html += `<li>${p.trim()}</li>`);
+      ppeText.split("\n").filter(Boolean).forEach(p => html += `<li>${p.trim()}</li>`);
       html += `</ul>`;
     }
   }
@@ -1753,9 +1767,9 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
           audience: prev.audience || suggestions.audience || "",
           skillLevel: prev.skillLevel || suggestions.skillLevel || "",
           steps: (prev.steps.length <= 1 && !prev.steps[0]?.title) ? (suggestions.steps || prev.steps) : prev.steps,
-          tools: prev.tools || suggestions.tools || "",
-          materials: prev.materials || suggestions.materials || "",
-          ppe: prev.ppe || suggestions.ppe || "",
+          tools: asMultilineText(prev.tools || suggestions.tools || ""),
+          materials: asMultilineText(prev.materials || suggestions.materials || ""),
+          ppe: asMultilineText(prev.ppe || suggestions.ppe || ""),
           safetyNotes: prev.safetyNotes || suggestions.safetyNotes || "",
           complianceNotes: prev.complianceNotes || suggestions.complianceNotes || "",
           timingTarget: prev.timingTarget || suggestions.timingTarget || "",
