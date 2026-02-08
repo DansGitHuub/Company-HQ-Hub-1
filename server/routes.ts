@@ -1214,6 +1214,54 @@ Rules:
     }
   });
 
+  app.post("/api/ai/equipment-research", requireAuth, async (req, res) => {
+    try {
+      const { equipmentName, manufacturer, model } = req.body;
+      if (!equipmentName && !manufacturer) {
+        return res.status(400).json({ message: "Equipment name or manufacturer is required" });
+      }
+
+      const equipmentDesc = [equipmentName, manufacturer, model].filter(Boolean).join(" ");
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert equipment maintenance specialist for landscape and outdoor power equipment. Given equipment details, provide OEM-style maintenance recommendations based on your knowledge of typical manufacturer specifications for this type of equipment.
+
+Return JSON with these fields:
+- maintenanceSchedule: string[] - Key maintenance schedule items (e.g., "Change engine oil every 50 hours or annually")
+- recommendations: string[] - Best practice recommendations for maintaining this equipment
+- warnings: string[] - Safety warnings and cautions specific to this equipment type
+- intervals: array of {task: string, interval: string} - Specific maintenance tasks with their recommended intervals (e.g., {task: "Check/replace air filter", interval: "Every 25 hours"})
+- source: string - Brief note like "Based on typical OEM specifications for [equipment type]"
+
+Provide practical, accurate maintenance information. Include at least 5-8 maintenance intervals. Focus on the most important maintenance tasks that prevent breakdowns and extend equipment life.`
+          },
+          {
+            role: "user",
+            content: `Provide maintenance specifications for: ${equipmentDesc}`
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 2048,
+      });
+
+      const result = JSON.parse(completion.choices[0]?.message?.content || "{}");
+      res.json({
+        maintenanceSchedule: result.maintenanceSchedule || [],
+        recommendations: result.recommendations || [],
+        warnings: result.warnings || [],
+        intervals: result.intervals || [],
+        source: result.source || `Based on typical specifications for ${equipmentDesc}`,
+      });
+    } catch (err: any) {
+      console.error("Equipment research error:", err);
+      res.status(500).json({ message: "AI research failed", error: err.message });
+    }
+  });
+
   const BLOCKED_KEYWORDS = [
     "nude", "nudity", "naked", "sexual", "porn", "erotic", "gore", "violence", "blood",
     "hate", "extremism", "terrorist", "illegal", "drug", "weapon", "bomb", "kill",

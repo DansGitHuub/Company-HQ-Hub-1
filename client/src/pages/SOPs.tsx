@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import SOPBuilder, { type SOPBuilderData } from "@/components/SOPBuilder";
 import type { Sop, SopCategory, SopTemplate, SopExample, SopDraft, SopQuiz } from "@shared/schema";
-import { Clock, PlayCircle, Brain } from "lucide-react";
+import { Clock, PlayCircle, Brain, Printer } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function SOPs() {
@@ -443,6 +443,34 @@ export default function SOPs() {
             </div>
           </div>
           
+          {(selectedSOP.sopType === "quality" || selectedSOP.sopType === "maintenance") && (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const printWindow = window.open("", "_blank");
+                  if (printWindow) {
+                    printWindow.document.write(`<!DOCTYPE html><html><head><title>${selectedSOP.title}</title><style>
+                      body { font-family: Arial, sans-serif; padding: 24px; max-width: 800px; margin: 0 auto; }
+                      h1 { font-size: 22px; border-bottom: 2px solid #333; padding-bottom: 8px; }
+                      h2 { font-size: 18px; margin-top: 20px; }
+                      h3 { font-size: 15px; margin-top: 16px; }
+                      table { width: 100%; border-collapse: collapse; }
+                      th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; font-size: 13px; }
+                      th { background: #f5f5f5; }
+                      @media print { body { padding: 0; } }
+                    </style></head><body><h1>${selectedSOP.title}</h1>${selectedSOP.content}</body></html>`);
+                    printWindow.document.close();
+                    printWindow.print();
+                  }
+                }}
+                data-testid="button-export-checklist"
+              >
+                <Printer className="h-4 w-4 mr-2" /> Export / Print
+              </Button>
+            </div>
+          )}
           <Card className="min-h-[60vh]">
             <CardContent className="p-8 prose prose-slate dark:prose-invert max-w-none">
               <div dangerouslySetInnerHTML={{ __html: selectedSOP.content }} />

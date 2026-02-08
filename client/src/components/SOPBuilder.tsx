@@ -54,6 +54,13 @@ import {
   Palette,
   Clock,
   ZoomIn,
+  Search,
+  Download,
+  BookOpen,
+  Cog,
+  ListChecks,
+  BookOpenCheck,
+  GraduationCap,
 } from "lucide-react";
 
 interface SOPStep {
@@ -217,6 +224,47 @@ interface ImageSuggestion {
   priority: number;
 }
 
+interface QCChecklistItem {
+  id: string;
+  category: string;
+  item: string;
+  acceptanceCriteria: string;
+  checkType: "pass_fail" | "yes_no" | "measurement" | "visual";
+  required: boolean;
+}
+
+interface MaintenanceTask {
+  id: string;
+  taskName: string;
+  frequency: string;
+  procedure: string;
+  notes: string;
+}
+
+interface EquipmentInfo {
+  name: string;
+  manufacturer: string;
+  model: string;
+  serialNumber: string;
+}
+
+interface OEMResearchResult {
+  maintenanceSchedule: string[];
+  recommendations: string[];
+  warnings: string[];
+  intervals: { task: string; interval: string }[];
+  source: string;
+}
+
+interface TrainingSection {
+  id: string;
+  chapterTitle: string;
+  learningObjectives: string;
+  content: string;
+  keyTakeaways: string;
+  practiceExercise: string;
+}
+
 export interface SOPBuilderData {
   title: string;
   category: string;
@@ -243,6 +291,15 @@ export interface SOPBuilderData {
   calculatorDefaults?: MaterialCalculatorData | null;
   calculatorHtml?: string;
   imageSuggestions?: ImageSuggestion[];
+  qcChecklist?: QCChecklistItem[];
+  qcCategories?: string[];
+  equipment?: EquipmentInfo;
+  maintenanceTasks?: MaintenanceTask[];
+  maintenanceType?: string;
+  oemResearch?: OEMResearchResult | null;
+  trainingSections?: TrainingSection[];
+  trainingDuration?: string;
+  trainingPrerequisites?: string;
 }
 
 const WIZARD_STEPS = [
@@ -875,6 +932,628 @@ function StepBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: P
             ))}
             <Button variant="outline" onClick={addStep} className="w-full hover:shadow-md hover:border-primary/50 transition-all" data-testid="button-add-step">
               <Plus className="h-4 w-4 mr-2" /> Add Step
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const QC_CHECK_TYPES = [
+  { value: "pass_fail", label: "Pass / Fail" },
+  { value: "yes_no", label: "Yes / No" },
+  { value: "measurement", label: "Measurement" },
+  { value: "visual", label: "Visual Inspection" },
+];
+
+function QualityChecklistBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void }) {
+  const checklist = data.qcChecklist || [];
+  const categories = data.qcCategories || ["General"];
+  const [newCategory, setNewCategory] = useState("");
+
+  const addItem = () => {
+    const item: QCChecklistItem = {
+      id: generateId(),
+      category: categories[0] || "General",
+      item: "",
+      acceptanceCriteria: "",
+      checkType: "pass_fail",
+      required: true,
+    };
+    onChange({ qcChecklist: [...checklist, item] });
+  };
+
+  const updateItem = (id: string, updates: Partial<QCChecklistItem>) => {
+    onChange({ qcChecklist: checklist.map(c => c.id === id ? { ...c, ...updates } : c) });
+  };
+
+  const removeItem = (id: string) => {
+    onChange({ qcChecklist: checklist.filter(c => c.id !== id) });
+  };
+
+  const addCategory = () => {
+    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
+      onChange({ qcCategories: [...categories, newCategory.trim()] });
+      setNewCategory("");
+    }
+  };
+
+  const removeCategory = (cat: string) => {
+    if (categories.length <= 1) return;
+    onChange({
+      qcCategories: categories.filter(c => c !== cat),
+      qcChecklist: checklist.map(c => c.category === cat ? { ...c, category: categories[0] } : c),
+    });
+  };
+
+  const groupedItems = categories.map(cat => ({
+    category: cat,
+    items: checklist.filter(c => c.category === cat),
+  }));
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-semibold flex items-center gap-2"><ListChecks className="h-5 w-5" /> Quality Control Checklist</h3>
+        <p className="text-sm text-muted-foreground">Create inspection checkpoints that can be exported as a printable checklist.</p>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Checklist Categories</CardTitle>
+          <CardDescription className="text-xs">Group your checks into categories for better organization</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {categories.map(cat => (
+              <Badge key={cat} variant="secondary" className="flex items-center gap-1 px-3 py-1" data-testid={`badge-qc-category-${cat}`}>
+                {cat}
+                {categories.length > 1 && (
+                  <button onClick={() => removeCategory(cat)} className="ml-1 hover:text-destructive">
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </Badge>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              placeholder="New category name..."
+              className="flex-1"
+              onKeyDown={(e) => e.key === "Enter" && addCategory()}
+              data-testid="input-new-qc-category"
+            />
+            <Button size="sm" onClick={addCategory} disabled={!newCategory.trim()} data-testid="button-add-qc-category">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="space-y-4">
+        {groupedItems.map(group => (
+          <Card key={group.category}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Check className="h-4 w-4" /> {group.category}
+                <Badge variant="outline" className="text-xs ml-auto">{group.items.length} item{group.items.length !== 1 ? "s" : ""}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {group.items.map((item, idx) => (
+                <div key={item.id} className="border rounded-lg p-3 space-y-2" data-testid={`qc-item-${item.id}`}>
+                  <div className="flex items-start gap-2">
+                    <Badge variant="outline" className="shrink-0 mt-1">{idx + 1}</Badge>
+                    <div className="flex-1 space-y-2">
+                      <Input
+                        value={item.item}
+                        onChange={(e) => updateItem(item.id, { item: e.target.value })}
+                        placeholder="What to check (e.g., Edge cuts are clean and uniform)"
+                        data-testid={`input-qc-item-${idx}`}
+                      />
+                      <Input
+                        value={item.acceptanceCriteria}
+                        onChange={(e) => updateItem(item.id, { acceptanceCriteria: e.target.value })}
+                        placeholder="Acceptance criteria (e.g., No gaps wider than 1/4 inch)"
+                        data-testid={`input-qc-criteria-${idx}`}
+                      />
+                      <div className="flex gap-2 items-center">
+                        <Select value={item.checkType} onValueChange={(v: any) => updateItem(item.id, { checkType: v })}>
+                          <SelectTrigger className="w-40" data-testid={`select-check-type-${idx}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {QC_CHECK_TYPES.map(ct => (
+                              <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="flex items-center gap-1">
+                          <Switch
+                            checked={item.required}
+                            onCheckedChange={(v) => updateItem(item.id, { required: v })}
+                          />
+                          <Label className="text-xs">Required</Label>
+                        </div>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" className="shrink-0 text-destructive hover:bg-destructive/10" onClick={() => removeItem(item.id)} data-testid={`button-remove-qc-item-${idx}`}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  const item: QCChecklistItem = { id: generateId(), category: group.category, item: "", acceptanceCriteria: "", checkType: "pass_fail", required: true };
+                  onChange({ qcChecklist: [...checklist, item] });
+                }}
+                data-testid={`button-add-qc-item-${group.category}`}
+              >
+                <Plus className="h-4 w-4 mr-2" /> Add Check to {group.category}
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {checklist.length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-8">
+            <ListChecks className="h-10 w-10 text-muted-foreground mb-3" />
+            <p className="font-medium">No checklist items yet</p>
+            <p className="text-sm text-muted-foreground mb-4">Start building your quality control checklist</p>
+            <Button onClick={addItem} data-testid="button-add-first-qc-item">
+              <Plus className="h-4 w-4 mr-2" /> Add First Checklist Item
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+const MAINTENANCE_TYPES = [
+  { value: "preventive", label: "Preventive Maintenance", description: "Scheduled maintenance to prevent failures" },
+  { value: "corrective", label: "Corrective Maintenance", description: "Repairs after a failure or issue" },
+  { value: "predictive", label: "Predictive Maintenance", description: "Based on condition monitoring data" },
+  { value: "seasonal", label: "Seasonal Maintenance", description: "Start/end of season preparation" },
+  { value: "daily", label: "Daily Checks", description: "Pre-operation daily inspections" },
+];
+
+const FREQUENCY_OPTIONS = [
+  "Before each use", "Daily", "Weekly", "Bi-weekly", "Monthly", "Quarterly", "Semi-annually", "Annually", "As needed", "Per manufacturer spec",
+];
+
+function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void }) {
+  const { toast } = useToast();
+  const tasks = data.maintenanceTasks || [];
+  const equipment = data.equipment || { name: "", manufacturer: "", model: "", serialNumber: "" };
+  const [isResearching, setIsResearching] = useState(false);
+
+  const addTask = () => {
+    const task: MaintenanceTask = { id: generateId(), taskName: "", frequency: "As needed", procedure: "", notes: "" };
+    onChange({ maintenanceTasks: [...tasks, task] });
+  };
+
+  const updateTask = (id: string, updates: Partial<MaintenanceTask>) => {
+    onChange({ maintenanceTasks: tasks.map(t => t.id === id ? { ...t, ...updates } : t) });
+  };
+
+  const removeTask = (id: string) => {
+    onChange({ maintenanceTasks: tasks.filter(t => t.id !== id) });
+  };
+
+  const handleResearch = async () => {
+    if (!equipment.name && !equipment.manufacturer && !equipment.model) {
+      toast({ title: "Equipment info needed", description: "Please fill in at least the equipment name or manufacturer and model.", variant: "destructive" });
+      return;
+    }
+    setIsResearching(true);
+    try {
+      const res = await apiRequest("POST", "/api/ai/equipment-research", {
+        equipmentName: equipment.name,
+        manufacturer: equipment.manufacturer,
+        model: equipment.model,
+      });
+      const result = await res.json();
+      onChange({ oemResearch: result });
+      if (result.intervals && result.intervals.length > 0) {
+        const newTasks: MaintenanceTask[] = result.intervals.map((interval: any) => ({
+          id: generateId(),
+          taskName: interval.task,
+          frequency: interval.interval,
+          procedure: "",
+          notes: "Based on OEM recommendation",
+        }));
+        onChange({
+          oemResearch: result,
+          maintenanceTasks: [...tasks, ...newTasks],
+        });
+      }
+      toast({ title: "Research complete", description: `Found ${result.intervals?.length || 0} maintenance recommendations.` });
+    } catch (err: any) {
+      showErrorToast(err, "Research failed");
+    } finally {
+      setIsResearching(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-semibold flex items-center gap-2"><Cog className="h-5 w-5" /> Maintenance Procedure</h3>
+        <p className="text-sm text-muted-foreground">Define equipment details, maintenance tasks, and use AI to find OEM recommendations.</p>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Maintenance Type</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {MAINTENANCE_TYPES.map(mt => (
+              <div
+                key={mt.value}
+                className={`p-3 border rounded-lg cursor-pointer transition-all hover:border-primary ${data.maintenanceType === mt.value ? "border-primary ring-2 ring-primary/20 bg-primary/5" : ""}`}
+                onClick={() => onChange({ maintenanceType: mt.value })}
+                data-testid={`maintenance-type-${mt.value}`}
+              >
+                <p className="font-medium text-sm">{mt.label}</p>
+                <p className="text-xs text-muted-foreground">{mt.description}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Wrench className="h-4 w-4" /> Equipment Information
+          </CardTitle>
+          <CardDescription className="text-xs">Enter equipment details to enable AI-powered OEM research</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Equipment Name *</Label>
+              <Input
+                value={equipment.name}
+                onChange={(e) => onChange({ equipment: { ...equipment, name: e.target.value } })}
+                placeholder="e.g., Zero-Turn Mower"
+                data-testid="input-equipment-name"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Manufacturer</Label>
+              <Input
+                value={equipment.manufacturer}
+                onChange={(e) => onChange({ equipment: { ...equipment, manufacturer: e.target.value } })}
+                placeholder="e.g., John Deere"
+                data-testid="input-equipment-manufacturer"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Model</Label>
+              <Input
+                value={equipment.model}
+                onChange={(e) => onChange({ equipment: { ...equipment, model: e.target.value } })}
+                placeholder="e.g., Z930M"
+                data-testid="input-equipment-model"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Serial Number</Label>
+              <Input
+                value={equipment.serialNumber}
+                onChange={(e) => onChange({ equipment: { ...equipment, serialNumber: e.target.value } })}
+                placeholder="Optional"
+                data-testid="input-equipment-serial"
+              />
+            </div>
+          </div>
+          <Button
+            onClick={handleResearch}
+            disabled={isResearching || (!equipment.name && !equipment.manufacturer)}
+            className="w-full"
+            variant="default"
+            data-testid="button-ai-research"
+          >
+            {isResearching ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Researching OEM Documentation...</>
+            ) : (
+              <><Search className="h-4 w-4 mr-2" /> AI Research — Find OEM Maintenance Specs</>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {data.oemResearch && (
+        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-blue-500" /> OEM Research Results
+              <Badge variant="outline" className="text-xs ml-auto text-blue-600">{data.oemResearch.source}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.oemResearch.recommendations.length > 0 && (
+              <div>
+                <p className="text-xs font-medium mb-1">Recommendations</p>
+                <ul className="text-xs space-y-1">
+                  {data.oemResearch.recommendations.map((r, i) => (
+                    <li key={i} className="flex gap-2"><Check className="h-3 w-3 text-green-500 shrink-0 mt-0.5" /> {r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {data.oemResearch.warnings.length > 0 && (
+              <div>
+                <p className="text-xs font-medium mb-1">Warnings</p>
+                <ul className="text-xs space-y-1">
+                  {data.oemResearch.warnings.map((w, i) => (
+                    <li key={i} className="flex gap-2"><AlertTriangle className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" /> {w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {data.oemResearch.maintenanceSchedule.length > 0 && (
+              <div>
+                <p className="text-xs font-medium mb-1">Maintenance Schedule</p>
+                <ul className="text-xs space-y-1">
+                  {data.oemResearch.maintenanceSchedule.map((s, i) => (
+                    <li key={i} className="flex gap-2"><Cog className="h-3 w-3 text-blue-500 shrink-0 mt-0.5" /> {s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" /> Maintenance Tasks
+            <Badge variant="outline" className="text-xs ml-auto">{tasks.length} task{tasks.length !== 1 ? "s" : ""}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {tasks.length === 0 ? (
+            <div className="text-center py-6">
+              <Cog className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground mb-3">No maintenance tasks yet. Add them manually or use AI Research above.</p>
+              <Button onClick={addTask} data-testid="button-add-first-maintenance-task">
+                <Plus className="h-4 w-4 mr-2" /> Add First Task
+              </Button>
+            </div>
+          ) : (
+            <>
+              {tasks.map((task, idx) => (
+                <div key={task.id} className="border rounded-lg p-3 space-y-2" data-testid={`maintenance-task-${idx}`}>
+                  <div className="flex items-start gap-2">
+                    <Badge variant="outline" className="shrink-0 mt-1">{idx + 1}</Badge>
+                    <div className="flex-1 space-y-2">
+                      <Input
+                        value={task.taskName}
+                        onChange={(e) => updateTask(task.id, { taskName: e.target.value })}
+                        placeholder="Task name (e.g., Change engine oil)"
+                        data-testid={`input-task-name-${idx}`}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Select value={task.frequency} onValueChange={(v) => updateTask(task.id, { frequency: v })}>
+                          <SelectTrigger data-testid={`select-frequency-${idx}`}>
+                            <SelectValue placeholder="Frequency" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {FREQUENCY_OPTIONS.map(f => (
+                              <SelectItem key={f} value={f}>{f}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Textarea
+                        value={task.procedure}
+                        onChange={(e) => updateTask(task.id, { procedure: e.target.value })}
+                        placeholder="Step-by-step procedure for this task..."
+                        rows={2}
+                        data-testid={`input-task-procedure-${idx}`}
+                      />
+                      <Input
+                        value={task.notes}
+                        onChange={(e) => updateTask(task.id, { notes: e.target.value })}
+                        placeholder="Additional notes or OEM references..."
+                        data-testid={`input-task-notes-${idx}`}
+                      />
+                    </div>
+                    <Button variant="ghost" size="icon" className="shrink-0 text-destructive hover:bg-destructive/10" onClick={() => removeTask(task.id)} data-testid={`button-remove-task-${idx}`}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              <Button variant="outline" className="w-full" onClick={addTask} data-testid="button-add-maintenance-task">
+                <Plus className="h-4 w-4 mr-2" /> Add Task
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function TrainingGuideBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void }) {
+  const sections = data.trainingSections || [];
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+
+  const addSection = () => {
+    const section: TrainingSection = {
+      id: generateId(),
+      chapterTitle: "",
+      learningObjectives: "",
+      content: "",
+      keyTakeaways: "",
+      practiceExercise: "",
+    };
+    onChange({ trainingSections: [...sections, section] });
+    setExpandedSection(section.id);
+  };
+
+  const updateSection = (id: string, updates: Partial<TrainingSection>) => {
+    onChange({ trainingSections: sections.map(s => s.id === id ? { ...s, ...updates } : s) });
+  };
+
+  const removeSection = (id: string) => {
+    onChange({ trainingSections: sections.filter(s => s.id !== id) });
+    if (expandedSection === id) setExpandedSection(null);
+  };
+
+  const moveSection = (index: number, direction: "up" | "down") => {
+    const newIndex = direction === "up" ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= sections.length) return;
+    const newSections = [...sections];
+    [newSections[index], newSections[newIndex]] = [newSections[newIndex], newSections[index]];
+    onChange({ trainingSections: newSections });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-semibold flex items-center gap-2"><GraduationCap className="h-5 w-5" /> Training Guide Chapters</h3>
+        <p className="text-sm text-muted-foreground">Build your training guide as a series of chapters. Each chapter has learning objectives, content, key takeaways, and practice exercises.</p>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Training Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Estimated Duration</Label>
+              <Input
+                value={data.trainingDuration || ""}
+                onChange={(e) => onChange({ trainingDuration: e.target.value })}
+                placeholder="e.g., 2 hours, 1 day, 1 week"
+                data-testid="input-training-duration"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Prerequisites</Label>
+              <Input
+                value={data.trainingPrerequisites || ""}
+                onChange={(e) => onChange({ trainingPrerequisites: e.target.value })}
+                placeholder="e.g., Basic lawn care knowledge"
+                data-testid="input-training-prerequisites"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {sections.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-8">
+            <BookOpen className="h-10 w-10 text-muted-foreground mb-3" />
+            <p className="font-medium">No chapters yet</p>
+            <p className="text-sm text-muted-foreground mb-4">Build your training guide by adding chapters</p>
+            <Button onClick={addSection} data-testid="button-add-first-chapter">
+              <Plus className="h-4 w-4 mr-2" /> Add First Chapter
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="border rounded-lg bg-muted/20">
+          <div className="overflow-y-auto max-h-[calc(100vh-400px)] min-h-[200px] p-2 space-y-2">
+            {sections.map((section, index) => (
+              <Card key={section.id} className="border" data-testid={`training-chapter-${index}`}>
+                <div
+                  className="flex items-center gap-2 p-3 cursor-pointer hover:bg-muted/50"
+                  onClick={() => setExpandedSection(expandedSection === section.id ? null : section.id)}
+                >
+                  <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Badge className="shrink-0 bg-primary/10 text-primary border-primary/20">Ch. {index + 1}</Badge>
+                  <span className="font-medium text-sm truncate flex-1">
+                    {section.chapterTitle || `Chapter ${index + 1} (untitled)`}
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); moveSection(index, "up"); }} disabled={index === 0}>
+                      <ChevronUp className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); moveSection(index, "down"); }} disabled={index === sections.length - 1}>
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); removeSection(section.id); }}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+                {expandedSection === section.id && (
+                  <CardContent className="pt-0 pb-4 space-y-3 border-t">
+                    <div className="grid grid-cols-1 gap-3 pt-3">
+                      <div>
+                        <Label className="text-xs flex items-center gap-1"><BookOpen className="h-3 w-3" /> Chapter Title *</Label>
+                        <Input
+                          value={section.chapterTitle}
+                          onChange={(e) => updateSection(section.id, { chapterTitle: e.target.value })}
+                          placeholder="e.g., Introduction to Lawn Care Equipment"
+                          data-testid={`input-chapter-title-${index}`}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs flex items-center gap-1"><Target className="h-3 w-3" /> Learning Objectives</Label>
+                        <Textarea
+                          value={section.learningObjectives}
+                          onChange={(e) => updateSection(section.id, { learningObjectives: e.target.value })}
+                          placeholder="What will the trainee learn? (one per line)&#10;- Identify all mower components&#10;- Perform basic safety checks"
+                          rows={3}
+                          data-testid={`input-chapter-objectives-${index}`}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs flex items-center gap-1"><FileText className="h-3 w-3" /> Chapter Content</Label>
+                        <Textarea
+                          value={section.content}
+                          onChange={(e) => updateSection(section.id, { content: e.target.value })}
+                          placeholder="The main instructional content for this chapter..."
+                          rows={6}
+                          data-testid={`input-chapter-content-${index}`}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs flex items-center gap-1"><Lightbulb className="h-3 w-3" /> Key Takeaways</Label>
+                        <Textarea
+                          value={section.keyTakeaways}
+                          onChange={(e) => updateSection(section.id, { keyTakeaways: e.target.value })}
+                          placeholder="Main points to remember (one per line)&#10;- Always wear PPE&#10;- Check fuel before starting"
+                          rows={3}
+                          data-testid={`input-chapter-takeaways-${index}`}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs flex items-center gap-1"><BookOpenCheck className="h-3 w-3" /> Practice Exercise</Label>
+                        <Textarea
+                          value={section.practiceExercise}
+                          onChange={(e) => updateSection(section.id, { practiceExercise: e.target.value })}
+                          placeholder="A hands-on exercise for the trainee to apply what they learned..."
+                          rows={3}
+                          data-testid={`input-chapter-exercise-${index}`}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            ))}
+            <Button variant="outline" onClick={addSection} className="w-full" data-testid="button-add-chapter">
+              <Plus className="h-4 w-4 mr-2" /> Add Chapter
             </Button>
           </div>
         </div>
@@ -1643,9 +2322,124 @@ function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Par
   );
 }
 
-function StepReview({ data }: { data: SOPBuilderData }) {
-  const completedSteps = data.steps.filter(s => s.title && s.instruction).length;
+function ReviewTypeContent({ data }: { data: SOPBuilderData }) {
+  if (data.sopType === "quality") {
+    const checklist = data.qcChecklist || [];
+    const filledItems = checklist.filter(c => c.item).length;
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2"><ListChecks className="h-4 w-4" /> Quality Checklist ({filledItems} items)</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {filledItems > 0 ? (
+            <ul className="space-y-1 text-sm">
+              {checklist.filter(c => c.item).map((c, i) => (
+                <li key={c.id} className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">{c.category}</Badge>
+                  <span>{c.item}</span>
+                  {c.required && <Badge variant="secondary" className="text-xs">Required</Badge>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">No checklist items added</p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
 
+  if (data.sopType === "maintenance") {
+    const tasks = data.maintenanceTasks || [];
+    const equipment = data.equipment;
+    return (
+      <>
+        {equipment && (equipment.name || equipment.manufacturer) && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2"><Cog className="h-4 w-4" /> Equipment</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 text-sm">
+              <p>{[equipment.name, equipment.manufacturer, equipment.model].filter(Boolean).join(" — ")}</p>
+              {data.oemResearch && <Badge variant="secondary" className="text-xs mt-1">OEM Research Applied</Badge>}
+            </CardContent>
+          </Card>
+        )}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2"><Wrench className="h-4 w-4" /> Maintenance Tasks ({tasks.filter(t => t.taskName).length})</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {tasks.filter(t => t.taskName).length > 0 ? (
+              <ul className="space-y-1 text-sm">
+                {tasks.filter(t => t.taskName).map(t => (
+                  <li key={t.id} className="flex items-center gap-2">
+                    <span>{t.taskName}</span>
+                    <Badge variant="outline" className="text-xs">{t.frequency}</Badge>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">No tasks added</p>
+            )}
+          </CardContent>
+        </Card>
+      </>
+    );
+  }
+
+  if (data.sopType === "training") {
+    const sections = data.trainingSections || [];
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2"><GraduationCap className="h-4 w-4" /> Training Guide ({sections.filter(s => s.chapterTitle).length} chapters)</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {data.trainingDuration && <p className="text-xs text-muted-foreground mb-2">Duration: {data.trainingDuration}</p>}
+          {sections.filter(s => s.chapterTitle).length > 0 ? (
+            <ol className="space-y-1 list-decimal list-inside text-sm">
+              {sections.filter(s => s.chapterTitle).map(s => (
+                <li key={s.id}>{s.chapterTitle}</li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm text-muted-foreground">No chapters added</p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const completedSteps = data.steps.filter(s => s.title && s.instruction).length;
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">Steps ({completedSteps} of {data.steps.length})</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {data.steps.length > 0 ? (
+          <ol className="space-y-1 list-decimal list-inside">
+            {data.steps.map((step) => (
+              <li key={step.id} className="text-sm">
+                <span className={step.title ? "" : "text-muted-foreground italic"}>
+                  {step.title || "Untitled step"}
+                </span>
+                {step.proofRequired && <Badge variant="secondary" className="ml-2 text-xs">Proof</Badge>}
+                {step.isQCCheckpoint && <Badge variant="secondary" className="ml-1 text-xs">QC</Badge>}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-sm text-muted-foreground">No steps added</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StepReview({ data }: { data: SOPBuilderData }) {
   return (
     <div className="space-y-4">
       <div>
@@ -1723,28 +2517,7 @@ function StepReview({ data }: { data: SOPBuilderData }) {
         </Card>
       )}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Steps ({completedSteps} of {data.steps.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {data.steps.length > 0 ? (
-            <ol className="space-y-1 list-decimal list-inside">
-              {data.steps.map((step) => (
-                <li key={step.id} className="text-sm">
-                  <span className={step.title ? "" : "text-muted-foreground italic"}>
-                    {step.title || "Untitled step"}
-                  </span>
-                  {step.proofRequired && <Badge variant="secondary" className="ml-2 text-xs">Proof</Badge>}
-                  {step.isQCCheckpoint && <Badge variant="secondary" className="ml-1 text-xs">QC</Badge>}
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="text-sm text-muted-foreground">No steps added</p>
-          )}
-        </CardContent>
-      </Card>
+      <ReviewTypeContent data={data} />
 
       {(data.tools || data.materials || data.ppe) && (
         <Card>
@@ -1805,10 +2578,10 @@ function StepReview({ data }: { data: SOPBuilderData }) {
 }
 
 function generateSOPContent(data: SOPBuilderData): string {
-  let html = "";
-
   const sopTypeLabel = SOP_TYPES.find(t => t.value === data.sopType)?.label || "";
   const skillLabel = SKILL_LEVELS.find(l => l.value === data.skillLevel)?.label || "";
+
+  let html = "";
 
   if (data.headerImage) {
     const imgSrc = resolveImageSrc(data.headerImage.url);
@@ -1839,38 +2612,42 @@ function generateSOPContent(data: SOPBuilderData): string {
     const toolsText = asMultilineText(data.tools);
     const materialsText = asMultilineText(data.materials);
     const ppeText = asMultilineText(data.ppe);
-    if (toolsText) {
-      html += `<h3>Tools Required</h3><ul>`;
-      toolsText.split("\n").filter(Boolean).forEach(t => html += `<li>${t.trim()}</li>`);
-      html += `</ul>`;
-    }
-    if (materialsText) {
-      html += `<h3>Materials Needed</h3><ul>`;
-      materialsText.split("\n").filter(Boolean).forEach(m => html += `<li>${m.trim()}</li>`);
-      html += `</ul>`;
-    }
-    if (ppeText) {
-      html += `<h3>PPE Required</h3><ul>`;
-      ppeText.split("\n").filter(Boolean).forEach(p => html += `<li>${p.trim()}</li>`);
-      html += `</ul>`;
-    }
+    if (toolsText) { html += `<h3>Tools Required</h3><ul>`; toolsText.split("\n").filter(Boolean).forEach(t => html += `<li>${t.trim()}</li>`); html += `</ul>`; }
+    if (materialsText) { html += `<h3>Materials Needed</h3><ul>`; materialsText.split("\n").filter(Boolean).forEach(m => html += `<li>${m.trim()}</li>`); html += `</ul>`; }
+    if (ppeText) { html += `<h3>PPE Required</h3><ul>`; ppeText.split("\n").filter(Boolean).forEach(p => html += `<li>${p.trim()}</li>`); html += `</ul>`; }
   }
 
-  if (data.calculatorHtml) {
-    html += data.calculatorHtml;
-  }
+  if (data.calculatorHtml) html += data.calculatorHtml;
 
   if (data.safetyNotes) {
     html += `<h2>⚠️ Safety Notes</h2>`;
     html += `<p>${data.safetyNotes.replace(/\n/g, "<br>")}</p>`;
   }
 
+  if (data.sopType === "quality") {
+    html += generateQualityContent(data);
+  } else if (data.sopType === "maintenance") {
+    html += generateMaintenanceContent(data);
+  } else if (data.sopType === "training") {
+    html += generateTrainingContent(data);
+  } else {
+    html += generateStandardSteps(data);
+  }
+
+  if (data.complianceNotes) {
+    html += `<h2>Compliance</h2>`;
+    html += `<p>${data.complianceNotes.replace(/\n/g, "<br>")}</p>`;
+  }
+
+  return html;
+}
+
+function generateStandardSteps(data: SOPBuilderData): string {
+  let html = "";
   if (data.steps.length > 0) {
-    html += `<h2>Procedure Steps</h2>`;
-    html += `<ol>`;
+    html += `<h2>Procedure Steps</h2><ol>`;
     data.steps.forEach((step, i) => {
-      html += `<li>`;
-      html += `<strong>${step.title || `Step ${i + 1}`}</strong>`;
+      html += `<li><strong>${step.title || `Step ${i + 1}`}</strong>`;
       if (step.instruction) html += `<p>${step.instruction.replace(/\n/g, "<br>")}</p>`;
       if (data.stepImages[step.id]) {
         const stepImg = data.stepImages[step.id];
@@ -1888,12 +2665,185 @@ function generateSOPContent(data: SOPBuilderData): string {
     });
     html += `</ol>`;
   }
+  return html;
+}
 
-  if (data.complianceNotes) {
-    html += `<h2>Compliance</h2>`;
-    html += `<p>${data.complianceNotes.replace(/\n/g, "<br>")}</p>`;
+function generateQualityContent(data: SOPBuilderData): string {
+  let html = "";
+  const checklist = data.qcChecklist || [];
+  const categories = data.qcCategories || ["General"];
+
+  if (checklist.length > 0) {
+    html += `<h2>✅ Quality Control Checklist</h2>`;
+    html += `<div class="qc-checklist" style="margin:16px 0;">`;
+
+    for (const cat of categories) {
+      const items = checklist.filter(c => c.category === cat);
+      if (items.length === 0) continue;
+
+      html += `<h3>${cat}</h3>`;
+      html += `<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:14px;">`;
+      html += `<thead><tr style="background:#f5f5f5;border-bottom:2px solid #ddd;">`;
+      html += `<th style="padding:8px;text-align:left;width:30px;">#</th>`;
+      html += `<th style="padding:8px;text-align:left;">Inspection Item</th>`;
+      html += `<th style="padding:8px;text-align:left;">Acceptance Criteria</th>`;
+      html += `<th style="padding:8px;text-align:center;width:100px;">Check Type</th>`;
+      html += `<th style="padding:8px;text-align:center;width:80px;">Result</th>`;
+      html += `</tr></thead><tbody>`;
+
+      items.forEach((item, idx) => {
+        const checkLabel = QC_CHECK_TYPES.find(t => t.value === item.checkType)?.label || item.checkType;
+        html += `<tr style="border-bottom:1px solid #eee;">`;
+        html += `<td style="padding:8px;">${idx + 1}</td>`;
+        html += `<td style="padding:8px;">${item.item}${item.required ? ' <span style="color:red;">*</span>' : ""}</td>`;
+        html += `<td style="padding:8px;font-size:13px;color:#555;">${item.acceptanceCriteria}</td>`;
+        html += `<td style="padding:8px;text-align:center;font-size:12px;">${checkLabel}</td>`;
+        html += `<td style="padding:8px;text-align:center;">☐</td>`;
+        html += `</tr>`;
+      });
+
+      html += `</tbody></table>`;
+    }
+
+    html += `<div style="margin-top:24px;padding:12px;border:1px solid #ddd;border-radius:6px;">`;
+    html += `<p><strong>Inspector Name:</strong> ____________________</p>`;
+    html += `<p><strong>Date:</strong> ____________________</p>`;
+    html += `<p><strong>Signature:</strong> ____________________</p>`;
+    html += `<p><strong>Notes:</strong></p><p style="border-bottom:1px solid #ccc;padding:8px 0;">&nbsp;</p>`;
+    html += `<p style="border-bottom:1px solid #ccc;padding:8px 0;">&nbsp;</p>`;
+    html += `</div>`;
+    html += `</div>`;
   }
 
+  html += generateStandardSteps(data);
+  return html;
+}
+
+function generateMaintenanceContent(data: SOPBuilderData): string {
+  let html = "";
+  const equipment = data.equipment;
+  const tasks = data.maintenanceTasks || [];
+  const maintenanceTypeLabel = MAINTENANCE_TYPES.find(t => t.value === data.maintenanceType)?.label || "";
+
+  if (equipment && (equipment.name || equipment.manufacturer)) {
+    html += `<h2>🔧 Equipment Information</h2>`;
+    html += `<table style="width:100%;border-collapse:collapse;margin:8px 0;">`;
+    if (equipment.name) html += `<tr><td style="padding:6px;font-weight:bold;width:140px;">Equipment:</td><td style="padding:6px;">${equipment.name}</td></tr>`;
+    if (equipment.manufacturer) html += `<tr><td style="padding:6px;font-weight:bold;">Manufacturer:</td><td style="padding:6px;">${equipment.manufacturer}</td></tr>`;
+    if (equipment.model) html += `<tr><td style="padding:6px;font-weight:bold;">Model:</td><td style="padding:6px;">${equipment.model}</td></tr>`;
+    if (equipment.serialNumber) html += `<tr><td style="padding:6px;font-weight:bold;">Serial Number:</td><td style="padding:6px;">${equipment.serialNumber}</td></tr>`;
+    if (maintenanceTypeLabel) html += `<tr><td style="padding:6px;font-weight:bold;">Maintenance Type:</td><td style="padding:6px;">${maintenanceTypeLabel}</td></tr>`;
+    html += `</table>`;
+  }
+
+  if (data.oemResearch) {
+    html += `<h2>📋 OEM Recommendations</h2>`;
+    html += `<p style="font-size:12px;color:#666;"><em>${data.oemResearch.source}</em></p>`;
+    if (data.oemResearch.warnings.length > 0) {
+      html += `<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:12px;margin:8px 0;">`;
+      html += `<strong>⚠️ Warnings:</strong><ul>`;
+      data.oemResearch.warnings.forEach(w => html += `<li>${w}</li>`);
+      html += `</ul></div>`;
+    }
+    if (data.oemResearch.recommendations.length > 0) {
+      html += `<h3>Recommendations</h3><ul>`;
+      data.oemResearch.recommendations.forEach(r => html += `<li>${r}</li>`);
+      html += `</ul>`;
+    }
+  }
+
+  if (tasks.length > 0) {
+    html += `<h2>🔧 Maintenance Tasks</h2>`;
+    html += `<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:14px;">`;
+    html += `<thead><tr style="background:#f0f7ff;border-bottom:2px solid #ccc;">`;
+    html += `<th style="padding:8px;text-align:left;">#</th>`;
+    html += `<th style="padding:8px;text-align:left;">Task</th>`;
+    html += `<th style="padding:8px;text-align:left;">Frequency</th>`;
+    html += `<th style="padding:8px;text-align:left;">Procedure</th>`;
+    html += `<th style="padding:8px;text-align:center;width:60px;">Done</th>`;
+    html += `</tr></thead><tbody>`;
+    tasks.forEach((task, idx) => {
+      html += `<tr style="border-bottom:1px solid #eee;">`;
+      html += `<td style="padding:8px;">${idx + 1}</td>`;
+      html += `<td style="padding:8px;font-weight:500;">${task.taskName}</td>`;
+      html += `<td style="padding:8px;font-size:13px;">${task.frequency}</td>`;
+      html += `<td style="padding:8px;font-size:13px;">${task.procedure.replace(/\n/g, "<br>")}</td>`;
+      html += `<td style="padding:8px;text-align:center;">☐</td>`;
+      html += `</tr>`;
+    });
+    html += `</tbody></table>`;
+
+    html += `<div style="margin-top:24px;padding:12px;border:1px solid #ddd;border-radius:6px;">`;
+    html += `<p><strong>Performed By:</strong> ____________________</p>`;
+    html += `<p><strong>Date:</strong> ____________________</p>`;
+    html += `<p><strong>Hours / Mileage:</strong> ____________________</p>`;
+    html += `<p><strong>Next Service Due:</strong> ____________________</p>`;
+    html += `<p><strong>Notes:</strong></p><p style="border-bottom:1px solid #ccc;padding:8px 0;">&nbsp;</p>`;
+    html += `</div>`;
+  }
+
+  html += generateStandardSteps(data);
+  return html;
+}
+
+function generateTrainingContent(data: SOPBuilderData): string {
+  let html = "";
+  const sections = data.trainingSections || [];
+
+  html += `<div class="training-guide" style="margin:16px 0;">`;
+
+  if (data.trainingDuration || data.trainingPrerequisites) {
+    html += `<div style="background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:16px;margin-bottom:20px;">`;
+    html += `<h3 style="margin-top:0;">📚 Training Guide Overview</h3>`;
+    if (data.trainingDuration) html += `<p><strong>Estimated Duration:</strong> ${data.trainingDuration}</p>`;
+    if (data.trainingPrerequisites) html += `<p><strong>Prerequisites:</strong> ${data.trainingPrerequisites}</p>`;
+    if (sections.length > 0) {
+      html += `<p><strong>Table of Contents:</strong></p><ol>`;
+      sections.forEach(s => { if (s.chapterTitle) html += `<li>${s.chapterTitle}</li>`; });
+      html += `</ol>`;
+    }
+    html += `</div>`;
+  }
+
+  sections.forEach((section, idx) => {
+    html += `<div class="training-chapter" style="margin-bottom:32px;page-break-before:${idx > 0 ? "always" : "auto"};">`;
+    html += `<div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:16px 20px;border-radius:8px 8px 0 0;">`;
+    html += `<h2 style="margin:0;color:white;">Chapter ${idx + 1}: ${section.chapterTitle || "Untitled"}</h2>`;
+    html += `</div>`;
+
+    if (section.learningObjectives) {
+      html += `<div style="background:#f0fdf4;border-left:4px solid #22c55e;padding:12px 16px;margin:12px 0;border-radius:0 6px 6px 0;">`;
+      html += `<strong>🎯 Learning Objectives</strong><ul>`;
+      section.learningObjectives.split("\n").filter(Boolean).forEach(obj => html += `<li>${obj.replace(/^[-•]\s*/, "")}</li>`);
+      html += `</ul></div>`;
+    }
+
+    if (section.content) {
+      html += `<div style="padding:16px 0;line-height:1.7;">`;
+      html += `${section.content.replace(/\n/g, "<br>")}`;
+      html += `</div>`;
+    }
+
+    if (section.keyTakeaways) {
+      html += `<div style="background:#fefce8;border-left:4px solid #eab308;padding:12px 16px;margin:12px 0;border-radius:0 6px 6px 0;">`;
+      html += `<strong>💡 Key Takeaways</strong><ul>`;
+      section.keyTakeaways.split("\n").filter(Boolean).forEach(kt => html += `<li>${kt.replace(/^[-•]\s*/, "")}</li>`);
+      html += `</ul></div>`;
+    }
+
+    if (section.practiceExercise) {
+      html += `<div style="background:#eff6ff;border-left:4px solid #3b82f6;padding:12px 16px;margin:12px 0;border-radius:0 6px 6px 0;">`;
+      html += `<strong>✏️ Practice Exercise</strong>`;
+      html += `<p>${section.practiceExercise.replace(/\n/g, "<br>")}</p>`;
+      html += `</div>`;
+    }
+
+    html += `</div>`;
+  });
+
+  html += `</div>`;
+
+  html += generateStandardSteps(data);
   return html;
 }
 
@@ -1929,6 +2879,15 @@ const INITIAL_DATA: SOPBuilderData = {
   complianceNotes: "",
   timingTarget: "",
   timingMax: "",
+  qcChecklist: [],
+  qcCategories: ["General"],
+  equipment: { name: "", manufacturer: "", model: "", serialNumber: "" },
+  maintenanceTasks: [],
+  maintenanceType: "",
+  oemResearch: null,
+  trainingSections: [],
+  trainingDuration: "",
+  trainingPrerequisites: "",
 };
 
 export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitting, initialData, onSaveDraft, isSavingDraft }: SOPBuilderProps) {
@@ -2110,7 +3069,12 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
       case 1: return !!data.title && !!data.categoryId;
       case 2: return !!data.outcomeType && !!data.outcome;
       case 3: return !!data.skillLevel;
-      case 4: return data.steps.length > 0 && data.steps.some(s => s.title && s.instruction);
+      case 4: {
+        if (data.sopType === "quality") return (data.qcChecklist || []).length > 0 && (data.qcChecklist || []).some(c => c.item);
+        if (data.sopType === "maintenance") return (data.maintenanceTasks || []).length > 0 && (data.maintenanceTasks || []).some(t => t.taskName);
+        if (data.sopType === "training") return (data.trainingSections || []).length > 0 && (data.trainingSections || []).some(s => s.chapterTitle);
+        return data.steps.length > 0 && data.steps.some(s => s.title && s.instruction);
+      }
       case 5: return true;
       case 6: return true;
       case 7: {
@@ -2159,7 +3123,12 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
       case 1: return <StepIdentity data={data} onChange={updateData} categories={categories} onAiSuggest={handleAiSuggest} isAiSuggesting={isAiSuggesting} aiApplied={aiSuggestionsApplied} />;
       case 2: return <StepOutcome data={data} onChange={updateData} />;
       case 3: return <StepAudience data={data} onChange={updateData} />;
-      case 4: return <StepBuilder data={data} onChange={updateData} />;
+      case 4: {
+        if (data.sopType === "quality") return <QualityChecklistBuilder data={data} onChange={updateData} />;
+        if (data.sopType === "maintenance") return <MaintenanceBuilder data={data} onChange={updateData} />;
+        if (data.sopType === "training") return <TrainingGuideBuilder data={data} onChange={updateData} />;
+        return <StepBuilder data={data} onChange={updateData} />;
+      }
       case 5: return <StepMedia data={data} onChange={updateData} />;
       case 6: return <StepToolsMaterials data={data} onChange={updateData} />;
       case 7: return <StepSafety data={data} onChange={updateData} />;
@@ -2254,7 +3223,9 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
             <ClipboardList className="h-6 w-6" />
             SOP Builder
           </h2>
-          <p className="text-muted-foreground text-sm">Step {currentStep + 1} of {WIZARD_STEPS.length}: {WIZARD_STEPS[currentStep].label}</p>
+          <p className="text-muted-foreground text-sm">Step {currentStep + 1} of {WIZARD_STEPS.length}: {currentStep === 4 ? (
+            data.sopType === "quality" ? "Checklist" : data.sopType === "maintenance" ? "Maintenance Tasks" : data.sopType === "training" ? "Chapters" : "Steps"
+          ) : WIZARD_STEPS[currentStep].label}</p>
         </div>
         <Button
           variant="ghost"
@@ -2287,7 +3258,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
               data-testid={`wizard-step-${step.id}`}
             >
               {isComplete ? <Check className="h-3 w-3" /> : <Icon className="h-3 w-3" />}
-              {step.label}
+              {index === 4 ? (data.sopType === "quality" ? "Checklist" : data.sopType === "maintenance" ? "Maintenance" : data.sopType === "training" ? "Chapters" : step.label) : step.label}
             </div>
           );
         })}
