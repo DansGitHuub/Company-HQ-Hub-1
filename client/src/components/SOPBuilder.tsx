@@ -160,6 +160,16 @@ const OUTCOME_TYPES = [
   { value: "kpi", label: "Measurable KPI", example: "e.g., Complete 5 properties per route per day" },
 ];
 
+function resolveImageSrc(url: string) {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.startsWith("/api/objects/")) return url;
+  if (url.startsWith("/objects/")) return `/api/objects${url.slice("/objects".length)}`;
+  if (url.startsWith("objects/")) return `/api/${url}`;
+  if (url.startsWith("/")) return `/api/objects${url}`;
+  return `/api/objects/${url}`;
+}
+
 function generateId() {
   return Math.random().toString(36).substring(2, 9);
 }
@@ -1033,7 +1043,7 @@ function AIImageGenerator({
           <CardContent className="p-3 space-y-3">
             <div className="relative">
               <img
-                src={`/api/objects${preview.url.replace("/objects", "")}`}
+                src={resolveImageSrc(preview.url)}
                 alt={preview.alt}
                 className="w-full rounded-md border max-h-64 object-contain bg-muted"
                 data-testid="ai-preview-image"
@@ -1233,7 +1243,7 @@ function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Par
             <div className="space-y-2">
               <div className="relative">
                 <img
-                  src={`/api/objects${data.headerImage.url.replace("/objects", "")}`}
+                  src={resolveImageSrc(data.headerImage.url)}
                   alt={data.headerImage.alt}
                   className="w-full rounded-md border max-h-48 object-contain bg-muted"
                   data-testid="header-image-preview"
@@ -1299,7 +1309,7 @@ function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Par
                 {data.stepImages[step.id] ? (
                   <div className="relative">
                     <img
-                      src={`/api/objects${data.stepImages[step.id].url.replace("/objects", "")}`}
+                      src={resolveImageSrc(data.stepImages[step.id].url)}
                       alt={data.stepImages[step.id].alt}
                       className="w-full rounded border max-h-36 object-contain bg-muted"
                       data-testid={`step-image-preview-${idx}`}
@@ -1468,7 +1478,7 @@ function StepReview({ data }: { data: SOPBuilderData }) {
             <div className="flex flex-wrap gap-2">
               {data.headerImage && (
                 <div className="relative w-20 h-20 rounded border overflow-hidden">
-                  <img src={`/api/objects${data.headerImage.url.replace("/objects", "")}`} alt="Header" className="w-full h-full object-cover" />
+                  <img src={resolveImageSrc(data.headerImage.url)} alt="Header" className="w-full h-full object-cover" />
                   {data.headerImage.source === "ai_generated" && (
                     <Badge className="absolute top-0.5 left-0.5 bg-purple-600 text-white text-[8px] px-1 py-0"><Sparkles className="h-2 w-2" /></Badge>
                   )}
@@ -1477,7 +1487,7 @@ function StepReview({ data }: { data: SOPBuilderData }) {
               )}
               {data.steps.map((step, idx) => data.stepImages[step.id] ? (
                 <div key={step.id} className="relative w-20 h-20 rounded border overflow-hidden">
-                  <img src={`/api/objects${data.stepImages[step.id].url.replace("/objects", "")}`} alt={`Step ${idx+1}`} className="w-full h-full object-cover" />
+                  <img src={resolveImageSrc(data.stepImages[step.id].url)} alt={`Step ${idx+1}`} className="w-full h-full object-cover" />
                   {data.stepImages[step.id].source === "ai_generated" && (
                     <Badge className="absolute top-0.5 left-0.5 bg-purple-600 text-white text-[8px] px-1 py-0"><Sparkles className="h-2 w-2" /></Badge>
                   )}
@@ -1499,7 +1509,7 @@ function generateSOPContent(data: SOPBuilderData): string {
   const skillLabel = SKILL_LEVELS.find(l => l.value === data.skillLevel)?.label || "";
 
   if (data.headerImage) {
-    const imgSrc = `/api/objects${data.headerImage.url.replace("/objects", "")}`;
+    const imgSrc = resolveImageSrc(data.headerImage.url);
     html += `<div class="sop-header-image" style="margin-bottom:16px;text-align:center;">`;
     html += `<img src="${imgSrc}" alt="${data.headerImage.alt || ""}" style="max-width:100%;max-height:300px;border-radius:8px;" />`;
     if (data.headerImage.source === "ai_generated") {
@@ -1559,7 +1569,7 @@ function generateSOPContent(data: SOPBuilderData): string {
       if (step.instruction) html += `<p>${step.instruction.replace(/\n/g, "<br>")}</p>`;
       if (data.stepImages[step.id]) {
         const stepImg = data.stepImages[step.id];
-        const imgSrc = `/api/objects${stepImg.url.replace("/objects", "")}`;
+        const imgSrc = resolveImageSrc(stepImg.url);
         html += `<div style="margin:8px 0;"><img src="${imgSrc}" alt="${stepImg.alt || ""}" style="max-width:100%;max-height:200px;border-radius:6px;border:1px solid #eee;" />`;
         if (stepImg.source === "ai_generated") html += `<span style="font-size:10px;color:#888;"> AI Generated</span>`;
         html += `</div>`;
