@@ -1510,21 +1510,15 @@ function StepMedia({ data, onChange }: { data: SOPBuilderData; onChange: (d: Par
                         onClick={() => {
                           const target = suggestion.target;
                           setSuggestionPrompts(prev => ({ ...prev, [target]: suggestion.prompt }));
-                          setTimeout(() => {
-                            const targetId = isHeader ? "header-generator" : `step-generator-${stepIdx}`;
-                            const el = document.getElementById(targetId);
-                            if (el) {
-                              const scrollContainer = el.closest('[class*="overflow-y-auto"]');
-                              if (scrollContainer) {
-                                const containerRect = scrollContainer.getBoundingClientRect();
-                                const elRect = el.getBoundingClientRect();
-                                const offset = elRect.top - containerRect.top + scrollContainer.scrollTop - containerRect.height / 3;
-                                scrollContainer.scrollTo({ top: offset, behavior: "smooth" });
-                              } else {
+                          requestAnimationFrame(() => {
+                            setTimeout(() => {
+                              const targetId = isHeader ? "header-generator" : `step-generator-${stepIdx}`;
+                              const el = document.getElementById(targetId);
+                              if (el) {
                                 el.scrollIntoView({ behavior: "smooth", block: "center" });
                               }
-                            }
-                          }, 150);
+                            }, 200);
+                          });
                         }}
                         data-testid={`btn-use-suggestion-${idx}`}
                       >
