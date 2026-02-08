@@ -6,6 +6,13 @@ Company HQ is an all-in-one management dashboard designed for landscape installa
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Layout & UI Rules
+- **Bottom padding**: All page content has `pb-24` via the AppShell content wrapper to prevent overlap with the floating assistant button (fixed at bottom-right, z-50).
+- **Button placement**: Navigation buttons (Back/Next, wizards) should be centered (`justify-center max-w-lg mx-auto`) — never pushed to the far right edge where the floating assistant icon sits.
+- **Sidebar items**: Keep sidebar labels short (1-2 words max) so they render consistently. Long labels cause size mismatches.
+- **Floating elements**: The floating AI/Help assistant button occupies `bottom-6 right-6` (approximately 80px from bottom-right corner). No interactive content should be placed in that zone.
+- **Tools section**: All tools live under `/tools` with a hub page at `/tools`. Sub-tools use `/tools/{tool-name}` routes. The sidebar "Tools" item highlights for any `/tools/*` path.
+
 ## System Architecture
 
 ### Frontend

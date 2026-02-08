@@ -1209,7 +1209,7 @@ export default function CalculatorPage() {
         </Card>
       )}
 
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex items-center justify-center gap-4 pt-2 max-w-lg mx-auto">
         <Button
           variant="outline"
           onClick={goBack}

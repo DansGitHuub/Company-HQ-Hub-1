@@ -887,7 +887,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <TileNavigation />
             </div>
           )}
-          <div className={cn("p-4 md:p-8", isTileView && "pt-4")}>
+          <div className={cn("p-4 md:p-8 pb-24", isTileView && "pt-4")}>
             {children}
           </div>
         </div>
