@@ -70,6 +70,16 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
     description: "Store and organize Standard Operating Procedures for any process.",
     tips: ["Organize by category", "Add detailed steps", "Team can reference anytime"]
   },
+  testing: {
+    title: "Quizzes",
+    description: "Take quizzes generated from SOPs to test and build your knowledge.",
+    tips: ["Quizzes are auto-generated from SOPs", "Track your scores over time", "Retake to improve"]
+  },
+  todos: {
+    title: "To-Do List",
+    description: "Manage tasks with priorities, due dates, and assignments.",
+    tips: ["Set priorities and due dates", "Assign tasks to team members", "Track completion status"]
+  },
   materials: {
     title: "Materials Catalog",
     description: "Track inventory, stock levels, pricing, and supplier info.",
