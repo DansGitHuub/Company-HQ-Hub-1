@@ -873,7 +873,7 @@ export default function CalculatorPage() {
                   data-testid={`button-intent-${i.id}`}
                   onClick={() => setState(s => ({ ...s, intent: i.id, category: undefined, task: undefined, presetId: undefined, productId: undefined, values: {} }))}
                   className={`text-left rounded-xl border p-4 transition-all
-                    ${state.intent === i.id ? "border-primary bg-primary/10 ring-2 ring-primary" : "border-border hover:border-primary/50 hover:bg-accent"}
+                    ${state.intent === i.id ? "border-primary bg-primary/10 ring-2 ring-primary" : "border-border hover:border-primary hover:bg-accent hover:shadow-md hover:scale-[1.02]"}
                   `}
                 >
                   <div className="flex items-center justify-between">
@@ -910,7 +910,7 @@ export default function CalculatorPage() {
                   data-testid={`button-category-${c.id}`}
                   onClick={() => setState(s => ({ ...s, category: c.id, task: undefined, presetId: undefined, productId: undefined, values: {} }))}
                   className={`text-left rounded-xl border p-4 transition-all
-                    ${state.category === c.id ? "border-primary bg-primary/10 ring-2 ring-primary" : "border-border hover:border-primary/50 hover:bg-accent"}
+                    ${state.category === c.id ? "border-primary bg-primary/10 ring-2 ring-primary" : "border-border hover:border-primary hover:bg-accent hover:shadow-md hover:scale-[1.02]"}
                   `}
                 >
                   <div className="flex items-center justify-between">
@@ -939,7 +939,7 @@ export default function CalculatorPage() {
                   data-testid={`button-task-${t.key}`}
                   onClick={() => setState(s => ({ ...s, task: t.key, presetId: undefined, productId: undefined, values: {} }))}
                   className={`text-left rounded-xl border p-4 transition-all
-                    ${state.task === t.key ? "border-primary bg-primary/10 ring-2 ring-primary" : "border-border hover:border-primary/50 hover:bg-accent"}
+                    ${state.task === t.key ? "border-primary bg-primary/10 ring-2 ring-primary" : "border-border hover:border-primary hover:bg-accent hover:shadow-md hover:scale-[1.02]"}
                   `}
                 >
                   <div className="flex items-center justify-between">
@@ -966,7 +966,7 @@ export default function CalculatorPage() {
                 data-testid="button-product-none"
                 onClick={() => setState(s => ({ ...s, productId: undefined }))}
                 className={`text-left rounded-xl border p-4 transition-all
-                  ${!state.productId ? "border-primary bg-primary/10 ring-2 ring-primary" : "border-border hover:border-primary/50 hover:bg-accent"}
+                  ${!state.productId ? "border-primary bg-primary/10 ring-2 ring-primary" : "border-border hover:border-primary hover:bg-accent hover:shadow-md hover:scale-[1.02]"}
                 `}
               >
                 <div className="flex items-center justify-between">
@@ -982,7 +982,7 @@ export default function CalculatorPage() {
                   data-testid={`button-product-${p.id}`}
                   onClick={() => setState(s => ({ ...s, productId: p.id }))}
                   className={`text-left rounded-xl border p-4 transition-all
-                    ${state.productId === p.id ? "border-primary bg-primary/10 ring-2 ring-primary" : "border-border hover:border-primary/50 hover:bg-accent"}
+                    ${state.productId === p.id ? "border-primary bg-primary/10 ring-2 ring-primary" : "border-border hover:border-primary hover:bg-accent hover:shadow-md hover:scale-[1.02]"}
                   `}
                 >
                   <div className="flex items-center justify-between">
@@ -1012,7 +1012,7 @@ export default function CalculatorPage() {
                   data-testid={`button-preset-${p.id}`}
                   onClick={() => applyPreset(p.id)}
                   className={`text-left rounded-xl border p-4 transition-all
-                    ${state.presetId === p.id ? "border-primary bg-primary/10 ring-2 ring-primary" : "border-border hover:border-primary/50 hover:bg-accent"}
+                    ${state.presetId === p.id ? "border-primary bg-primary/10 ring-2 ring-primary" : "border-border hover:border-primary hover:bg-accent hover:shadow-md hover:scale-[1.02]"}
                   `}
                 >
                   <div className="flex items-center justify-between">
