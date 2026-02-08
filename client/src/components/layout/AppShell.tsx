@@ -709,7 +709,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="relative gap-2 h-10"
+                        className="relative gap-2 h-10 hover:bg-accent hover:scale-105 transition-all"
                         data-testid="button-todo-header"
                       >
                         <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-600 shadow-md shadow-emerald-500/30">
@@ -736,7 +736,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="relative gap-2 h-10"
+                      className="relative gap-2 h-10 hover:bg-accent hover:scale-105 transition-all"
                       data-testid="button-communications-header"
                     >
                       <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 shadow-md shadow-amber-500/30">
@@ -761,7 +761,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="relative gap-2 h-10"
+                    className="relative gap-2 h-10 hover:bg-accent hover:scale-105 transition-all"
                     onClick={() => setIsUpdatesOpen(true)}
                     data-testid="button-updates-header"
                   >
@@ -790,8 +790,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         size="sm"
                         onClick={() => setIsTileView(!isTileView)}
                         className={cn(
-                          "gap-2 transition-colors h-10",
-                          isTileView && "bg-primary text-primary-foreground"
+                          "gap-2 transition-all h-10 hover:scale-105",
+                          isTileView ? "bg-primary text-primary-foreground" : "hover:bg-accent"
                         )}
                         data-testid="button-tile-view-toggle"
                       >
@@ -819,7 +819,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         <Button
                           variant={tileLayout === "grid" ? "secondary" : "ghost"}
                           size="sm"
-                          className="gap-1 h-8 px-2"
+                          className="gap-1 h-8 px-2 hover:scale-105 transition-all"
                           onClick={() => setTileLayout("grid")}
                           aria-label="Switch to grid layout"
                           aria-pressed={tileLayout === "grid"}
@@ -838,7 +838,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         <Button
                           variant={tileLayout === "radial" ? "secondary" : "ghost"}
                           size="sm"
-                          className="gap-1 h-8 px-2"
+                          className="gap-1 h-8 px-2 hover:scale-105 transition-all"
                           onClick={() => setTileLayout("radial")}
                           aria-label="Switch to radial layout"
                           aria-pressed={tileLayout === "radial"}
@@ -857,7 +857,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         <Button
                           variant={tileLayout === "dock" ? "secondary" : "ghost"}
                           size="sm"
-                          className="gap-1 h-8 px-2"
+                          className="gap-1 h-8 px-2 hover:scale-105 transition-all"
                           onClick={() => setTileLayout("dock")}
                           aria-label="Switch to dock layout"
                           aria-pressed={tileLayout === "dock"}

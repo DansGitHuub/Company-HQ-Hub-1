@@ -1,109 +1,59 @@
 # Company HQ - Landscape Management Dashboard
 
 ## Overview
-Company HQ is an all-in-one management dashboard designed for landscape installation and maintenance businesses. It centralizes tools for managing SOPs, inventory, hiring, marketing, job tracking, customer education, and employee management. The platform features role-based access control (Admin, Manager, Crew, Customer) and aims to streamline operations and enhance productivity for landscaping companies.
+Company HQ is an all-in-one management dashboard for landscape installation and maintenance businesses. It centralizes SOPs, inventory, hiring, marketing, job tracking, customer education, and employee management. The platform features role-based access control (Admin, Manager, Crew, Customer) and aims to streamline operations and enhance productivity for landscaping companies.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
-## Layout & UI Rules
-- **Bottom padding**: All page content has `pb-24` via the AppShell content wrapper to prevent overlap with the floating assistant button (fixed at bottom-right, z-50).
-- **Button placement**: Navigation buttons (Back/Next, wizards) should be centered (`justify-center max-w-lg mx-auto`) — never pushed to the far right edge where the floating assistant icon sits.
-- **Sidebar items**: Keep sidebar labels short (1-2 words max) so they render consistently. Long labels cause size mismatches.
-- **Floating elements**: The floating AI/Help assistant button occupies `bottom-6 right-6` (approximately 80px from bottom-right corner). No interactive content should be placed in that zone.
-- **Tools section**: All tools live under `/tools` with a hub page at `/tools`. Sub-tools use `/tools/{tool-name}` routes. The sidebar "Tools" item highlights for any `/tools/*` path.
-
 ## System Architecture
 
-### Frontend
-- **Framework**: React with TypeScript
-- **State Management**: React Query for server state, React Context for local state
-- **UI**: shadcn/ui, Radix UI, Tailwind CSS v4 for styling
-- **Features**: Framer Motion for animations, @hello-pangea/dnd for drag & drop, Recharts for data visualization, React Hook Form with Zod for form handling.
-- **Theming**: 8 landscape-inspired themes with unique visual characteristics:
-  - Each theme has distinct colors, border radius, shadows, and sidebar styles
-  - Button styles: solid, outline, or soft depending on theme
-  - Sidebar styles: solid, glass (blur), or gradient depending on theme
-  - Input styles: minimal, bordered, or filled depending on theme
+### UI/UX Decisions
+- **Theming**: 8 landscape-inspired themes with distinct colors, border radius, shadows, and sidebar/button/input styles.
 - **Navigation**: Traditional sidebar and "Tile View" with Grid, Radial, and Dock layouts.
+- **Hover Effects**: Consistent hover effects across all clickable elements, categorized by type.
+- **Layout Rules**: Strict guidelines for bottom padding, button placement, sidebar item length, and exclusion zones for floating elements.
 
-### Backend
-- **Runtime**: Node.js with Express
-- **Language**: TypeScript
-- **API**: RESTful JSON API
+### Technical Implementation
+- **Frontend**: React with TypeScript, React Query for server state, React Context for local state, shadcn/ui, Radix UI, Tailwind CSS v4, Framer Motion for animations, @hello-pangea/dnd for drag & drop, Recharts for data visualization, React Hook Form with Zod.
+- **Backend**: Node.js with Express, TypeScript, RESTful JSON API.
 - **Authentication**: Passport.js local strategy, Express-session with PostgreSQL store, scrypt for password hashing.
-- **AI Assistant**: OpenAI integration for AI chat, streaming responses via SSE, conversation history stored per user.
+- **Data Storage**: PostgreSQL, Drizzle ORM with drizzle-zod, shared schema (`shared/schema.ts`).
+- **Build System**: Vite for frontend, esbuild for backend.
 
-### Data Storage
-- **Database**: PostgreSQL
-- **ORM**: Drizzle ORM with drizzle-zod for schema validation
-- **Schema**: Shared between frontend and backend (`shared/schema.ts`)
-- **Key Models**: Users (role-based), SOPs, Materials, Material Categories, Category Fields, Hiring Candidates, Marketing Campaigns, Jobs, Customer Messages, Work Requests, Custom Forms, Equipment, Customer Resources, SOP Quizzes, Quiz Questions, Quiz Attempts.
-
-### Core Features
-- **Role-Based Access Control (RBAC)**: Differentiated access for Admin, Manager, Crew, and Customer roles, including a Master Admin for critical operations.
-- **Access Request System**: Users can request role upgrades, managed by Admins.
-- **Registration Security**: Public registrations default to Customer role.
-- **Build System**: Vite for frontend, esbuild for backend production build.
-- **Help System**: Interactive walkthroughs, role-specific FAQs, and an Admin "Test My Software" preview mode.
-- **User Profiles**: Customizable profiles with picture uploads (Replit Object Storage).
-- **Form Builder**: Admin-only dynamic form creation with various field types, draft/published workflow, and AI-powered form generation.
-- **Employee Portal**: Dedicated section for employee-specific information like payroll, time off, and personal details.
-- **Equipment Tracker**: Manage equipment, schedule recurring maintenance, log activities, and receive email reminders.
-- **Customer Hub / Resource Library**: Centralized educational content (guides, instructions, documents) with categorisation, admin management, and user bookmarking.
-- **Company Branding**: Admin configurable logo (Replit Object Storage) and company name with live preview.
-- **Enhanced Hiring Pipeline**: Detailed candidate management, job type/work type filtering, 3-dot rating, document uploads, and acknowledgment tracking.
-- **Enhanced Job Pipeline**: Tabbed interface for job types, detailed job cards with location, deadlines, estimated hours, and document uploads.
-- **Global Search**: Role-based search functionality across key modules (SOPs, Materials, Jobs, Candidates, Users).
-- **Communications Center**: Internal messaging system with threaded conversations (inspired by Zendesk/Salesforce), role-based access control, assignment system, status workflow (open, in_progress, resolved, closed), priority levels (low, normal, high, urgent), internal notes visible only to staff, admin supervision with employee/customer filters, and unread tracking per role. Customers see only their threads, employees see assigned conversations, admins can view/filter all.
-- **Materials Catalog Manager**: Comprehensive materials management with 8 specialized categories (Aggregates & Gravel, Mulch & Soil, Trees & Shrubs, Perennials & Annuals, Hardscape & Pavers, Landscape, Chemicals & Fertilizer, Other), AI-powered 5-step material creation wizard (Name → Category → AI Auto-Fill → Review → Confirm), category-specific custom fields, bulk operations (select all, move to category), easy category management (add, rename, delete), search/filter/sort capabilities, and role-based access.
-- **Interactive To-Do List**: Task management system with add/edit/delete functionality, priority levels (low, medium, high, urgent), status tracking (pending, in_progress, completed), due dates, user assignments, read/unread status, filtering by status and priority, notification badges in sidebar for unread tasks, and admin-controlled user activation.
-- **Testing & Knowledge Center**: AI-powered quiz generation system for employee training and SOP comprehension testing.
-  - **AI Quiz Generation**: Generates skill-level-appropriate quizzes (beginner, intermediate, advanced) from SOP content using OpenAI
-  - **Standard Questions**: 2-3 universal safety/compliance questions shared across all skill levels
-  - **Skill-Specific Questions**: 8-10 additional questions per skill level with varying difficulty
-  - **Quiz Taking**: Interactive multiple-choice quiz interface with immediate grading and pass/fail scoring (70% threshold)
-  - **Result Tracking**: Score history per user per quiz with best score tracking
-  - **Explanations**: Post-quiz explanations for correct answers to reinforce learning
-  - **Admin/Manager Controls**: Generate Quiz button on SOP detail view, quiz regeneration, role-restricted quiz creation
-  - **Quiz Catalog**: Browse all SOPs with available quizzes, progress tracking across skill levels
-- **Plow Site Mapper**: Snow removal route planning tool with Google Maps integration for accurate address lookup, interactive satellite imagery with zoom controls, AI-powered property analysis, site grouping with organizational categories, multi-step site creation workflow (Info → Image Selection → Confirmation), canvas-based markup tools for annotating property images, and instruction management for plow crews.
-- **AI Agents System** (Master Admin only): Autonomous AI agents that analyze and improve various systems. Features include:
-  - **Agent Management**: On/off toggles for each agent, manual run triggers, and scheduling options (manual, daily, weekly, monthly).
-  - **Available Agents**: Forms Manager (form improvements), SOP Assistant (SOP enhancements), Communication Optimizer (messaging improvements), Hiring Helper (hiring pipeline optimization).
-  - **Cost Tracking**: Real-time cost tracking per agent, monthly cost projection, next billing date display, and cost breakdown by agent.
-  - **AI Suggestions**: Each agent generates detailed improvement suggestions with cost estimates and priority levels. Suggestions can be marked as implemented or dismissed.
-  - **Security**: Master Admin access only - hidden from other users entirely.
-- **Update Notification System**: Role-based app update announcements with bell icon button in header, popup showing new features/improvements/fixes, user acknowledgment tracking, and mark-all-read functionality. Admins can create/edit/delete updates with version numbers, categories (feature, improvement, fix, security), and role-based visibility.
-- **Help Articles System**: Database-backed searchable help articles with role-based filtering (15 comprehensive articles covering all platform features). Categories organize articles, and users can search across titles, summaries, and content. Integrated into the Help page alongside existing walkthrough features. Includes article feedback/reporting system:
-  - **Report Issues**: Users can report outdated, incorrect, unclear, or missing information in articles
-  - **Admin Reports Center**: "Help Reports" tab in Admin Panel for reviewing and resolving article reports
-  - **User Notifications**: When admins resolve reports and update articles, users with sufficient role level receive notifications
-  - **Report Status Workflow**: pending → in_progress → resolved/dismissed
-- **Floating Assistant Button**: Combined access point (sparkle icon) in bottom-right corner that opens a menu with AI Assistant chat and Help Center navigation options. Replaces standalone chat button for better discoverability.
-- **Interactive Calendar**: Clickable calendar in the header that opens a mini calendar view with external calendar connection management:
-  - **Mini Calendar**: Monthly view with day navigation
-  - **Calendar Connections**: Connect to Google Calendar, Apple Calendar, Samsung Calendar, or Outlook
-  - **Connection Wizard**: Step-by-step flow to connect external calendars (Select provider → Authorize → Complete)
-  - **Connection Status**: Visual indicators showing connected, pending, or error states
-  - **Fix Connection**: One-click repair button for broken connections
-  - **Connection Management**: Add and remove calendar connections easily
-- **Diagnostic Report System** (Master Admin only): Comprehensive error tracking and system monitoring tool with two viewing modes:
-  - **Simple Mode**: Non-technical view showing system health status (Excellent/Good/Needs Attention), quick stats (users, SOPs, materials, jobs, todos), recent issues summary, and recent activity feed.
-  - **Advanced Mode**: Full technical details including error counts by severity and feature, system usage breakdowns, error analysis by endpoint and time, detailed error logs with stack traces, activity logs with metadata, and most active users ranking.
-  - **Error Tracking**: Automatic logging of API errors, frontend React errors (via ErrorBoundary), and user actions across all features. Structured error codes (e.g. IMG-001, AUTH-003, SOP-002) with plain-English descriptions and suggested fixes.
-  - **Error Code System**: Centralized registry in `shared/errorCodes.ts` with 40+ codes across all features (AUTH, IMG, SOP, MAT, JOB, TODO, MSG, EQP, HIRE, FORM, FILE, AI, CAL, PLOW, NET, SYS, USR, EMAIL). Error codes are returned in API responses, stored in error_logs DB, shown in enhanced error toasts with fix suggestions, and displayed in Diagnostic Report. Uses `ApiError` class in `client/src/lib/queryClient.ts` and `showErrorToast` utility in `client/src/lib/errorToast.ts`.
-  - **Activity Logging**: Tracks key user actions like create, update, delete operations with feature context and success status.
-  - **Report Export**: Download diagnostic reports as JSON for sharing with technical support.
-  - **Error Resolution**: Mark errors as resolved with timestamp and resolver tracking.
-  - **Development Tracker**: Track incomplete features and systems with status, priority, percent complete, remaining work, blockers, suggestions, and additional setup info. Pre-seeded with items like Calendar Integration, Hiring Pipeline, Job Pipeline, Equipment Automation, and Customer Portal. Supports CRUD operations for managing development progress.
-  - **Security**: Master Admin access only - hidden from other users entirely.
+### Feature Specifications
+- **Role-Based Access Control (RBAC)**: Admin, Manager, Crew, Customer, and Master Admin roles with differentiated access and an access request system. Public registrations default to Customer.
+- **AI Assistant**: OpenAI integration for AI chat with streaming responses and per-user conversation history.
+- **Core Modules**:
+    - **SOP Management**: Centralized management of SOPs with AI-powered quiz generation for training.
+    - **Inventory Management**: Comprehensive materials catalog manager with AI-powered creation wizard and category-specific fields.
+    - **Hiring Pipeline**: Detailed candidate management with filtering, rating, and document uploads.
+    - **Marketing Campaigns**: Tools for managing marketing efforts.
+    - **Job Tracking**: Tabbed interface for job types, detailed job cards with location, deadlines, and document uploads.
+    - **Customer Hub / Resource Library**: Centralized educational content with categorization and user bookmarking.
+    - **Employee Management**: Employee Portal for payroll, time off, and personal details.
+    - **Equipment Tracker**: Management, maintenance scheduling, activity logging, and email reminders.
+- **Admin Tools**:
+    - **Form Builder**: Dynamic form creation with AI-powered generation.
+    - **Company Branding**: Configurable logo and name with live preview.
+    - **Help System**: Interactive walkthroughs, role-specific FAQs, and Admin "Test My Software" preview mode.
+    - **Global Search**: Role-based search across key modules.
+    - **Communications Center**: Internal messaging system with threaded conversations, role-based access, assignment workflow, and unread tracking.
+    - **Plow Site Mapper**: Snow removal route planning with Google Maps integration, AI-powered property analysis, and canvas-based markup tools.
+    - **AI Agents System (Master Admin)**: Autonomous AI agents for system analysis and improvement with cost tracking and suggestion management.
+    - **Update Notification System**: Role-based app updates with acknowledgment tracking.
+    - **Help Articles System**: Searchable, categorized help articles with user feedback/reporting system.
+    - **Diagnostic Report System (Master Admin)**: Comprehensive error tracking, system monitoring, activity logging, and development progress tracker.
+- **User Tools**:
+    - **User Profiles**: Customizable with picture uploads.
+    - **Interactive To-Do List**: Task management with priorities, statuses, due dates, assignments, and notifications.
+    - **Interactive Calendar**: Mini calendar view with external calendar connection management (Google, Apple, Samsung, Outlook).
+    - **Floating Assistant Button**: Combined access point for AI Assistant and Help Center.
 
 ## External Dependencies
 
 ### Database
 - PostgreSQL
-- connect-pg-simple
 
 ### Frontend Libraries
 - @tanstack/react-query
@@ -127,11 +77,7 @@ Preferred communication style: Simple, everyday language.
 - TypeScript
 
 ### APIs / Services
-- OpenAI (for AI Assistant)
-- Replit Object Storage (for file uploads like profile pictures, company logos)
-- Resend (for email reminders, e.g., maintenance)
-
-### Environment Variables
-- `DATABASE_URL`
-- `SESSION_SECRET`
-- `GOOGLE_MAPS_API_KEY` (for Plow Site Mapper address lookup and satellite imagery)
+- OpenAI (AI Assistant, quiz generation, property analysis)
+- Replit Object Storage (profile pictures, company logos)
+- Resend (email reminders)
+- Google Maps API (Plow Site Mapper)
