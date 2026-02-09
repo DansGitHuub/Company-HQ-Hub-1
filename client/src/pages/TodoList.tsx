@@ -82,6 +82,7 @@ export default function TodoList() {
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [assignDropdownOpen, setAssignDropdownOpen] = useState(false);
+  const [assignSearch, setAssignSearch] = useState("");
   const [editingTodo, setEditingTodo] = useState<TodoWithDetails | null>(null);
   const [toggledTodos, setToggledTodos] = useState<Set<string>>(new Set());
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
@@ -647,7 +648,7 @@ export default function TodoList() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) setAssignDropdownOpen(false); }}>
+      <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) { setAssignDropdownOpen(false); setAssignSearch(""); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add New Task</DialogTitle>
@@ -749,8 +750,17 @@ export default function TodoList() {
                         </div>
                       </div>
                     )}
+                    <div className="p-2 border-b">
+                      <Input
+                        placeholder="Search names..."
+                        value={assignSearch}
+                        onChange={(e) => setAssignSearch(e.target.value)}
+                        className="h-8 text-sm"
+                        data-testid="input-assign-search"
+                      />
+                    </div>
                     <div className="max-h-40 overflow-y-auto p-1">
-                      {assignableUsers.length > 0 ? assignableUsers.map((u) => {
+                      {assignableUsers.length > 0 ? assignableUsers.filter(u => u.name.toLowerCase().includes(assignSearch.toLowerCase())).map((u) => {
                         const isSelected = newTodo.assignedUserIds.includes(u.id);
                         return (
                           <label
