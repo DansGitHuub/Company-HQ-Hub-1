@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Edit2, Calendar, Clock, User, AlertCircle, CheckCircle2, Circle, ChevronDown, ChevronUp, Users, Archive, History, Timer, PauseCircle, X } from "lucide-react";
+import { Plus, Trash2, Edit2, Calendar, Clock, User, AlertCircle, CheckCircle2, Circle, ChevronDown, ChevronUp, Users, Archive, History, Timer, PauseCircle, X, Copy, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -248,6 +248,20 @@ export default function TodoList() {
       setArchiveConfirmTodo(null);
       showErrorToast(error, "Failed to archive task");
     },
+  });
+
+  const restoreTodo = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/todos/${id}/restore`, { method: "PATCH", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to restore task");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-todos"] });
+      toast({ title: "Task restored", description: "The task has been moved back to On Hold." });
+    },
+    onError: (error: Error) => showErrorToast(error, "Failed to restore task"),
   });
 
   const markAsRead = useMutation({
@@ -561,6 +575,40 @@ export default function TodoList() {
                           <Archive className="w-4 h-4 text-muted-foreground" />
                         </Button>
                       )}
+                      {todo.status === "archived" && (canDelete(todo) || isAdmin) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            restoreTodo.mutate(todo.id);
+                          }}
+                          data-testid={`button-restore-${todo.id}`}
+                          title="Restore task"
+                        >
+                          <RotateCcw className="w-4 h-4 text-blue-500" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNewTodo({
+                            title: `${todo.title} (Copy)`,
+                            description: todo.description || "",
+                            priority: todo.priority || "medium",
+                            status: "on_hold",
+                            dueDate: "",
+                            assignedUserIds: [],
+                          });
+                          setAddDialogOpen(true);
+                        }}
+                        data-testid={`button-copy-${todo.id}`}
+                        title="Copy task"
+                      >
+                        <Copy className="w-4 h-4 text-muted-foreground" />
+                      </Button>
                       <button onClick={() => handleTodoClick(todo)} data-testid={`button-expand-${todo.id}`}>
                         {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                       </button>

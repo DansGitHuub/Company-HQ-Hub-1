@@ -4431,6 +4431,29 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
+  app.patch("/api/todos/:id/restore", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const todo = await storage.getTodo(req.params.id as string);
+      if (!todo) return res.status(404).json({ message: "Todo not found" });
+      if (todo.status !== "archived") {
+        return res.status(400).json({ message: "Only archived tasks can be restored" });
+      }
+      const updated = await storage.updateTodo(req.params.id as string, { status: "on_hold" });
+      await storage.createTodoHistory({
+        todoId: todo.id,
+        changedBy: user.id,
+        changeType: "status_change",
+        fieldChanged: "status",
+        oldValue: "archived",
+        newValue: "on_hold",
+      });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Error restoring todo" });
+    }
+  });
+
   app.get("/api/todos/:id/history", requireAuth, async (req, res) => {
     try {
       const history = await storage.getTodoHistory(req.params.id as string);
