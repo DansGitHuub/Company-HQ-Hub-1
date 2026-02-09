@@ -3023,6 +3023,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
 
   const confirmNavigation = () => {
     setShowNavDialog(false);
+    onCancel();
     if (pendingNavPath) {
       navigate(pendingNavPath);
     }
@@ -3258,24 +3259,24 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
         />
       )}
 
-      <AlertDialog open={showNavDialog} onOpenChange={setShowNavDialog}>
+      <AlertDialog open={showNavDialog} onOpenChange={(open) => { setShowNavDialog(open); if (!open) setPendingNavPath(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
             <AlertDialogDescription>
-              You have unsaved changes in the SOP Builder. If you navigate away now, your progress will be lost. Would you like to save to drafts first?
+              You have unsaved work in the SOP Builder. If you navigate away now, all your progress will be lost. You can also save to drafts to continue later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingNavPath(null)} data-testid="btn-nav-stay">Stay Here</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setPendingNavPath(null)} data-testid="btn-nav-stay">Keep Working</AlertDialogCancel>
             {onSaveDraft && (
               <Button
                 variant="outline"
-                onClick={() => { setShowNavDialog(false); handleSaveDraft(); }}
+                onClick={() => { setShowNavDialog(false); handleSaveDraft(); setPendingNavPath(null); }}
                 disabled={isSavingDraft}
                 data-testid="btn-nav-save-draft"
               >
-                <Clock className="h-4 w-4 mr-2" /> Save & Leave
+                <Clock className="h-4 w-4 mr-2" /> Save to Drafts
               </Button>
             )}
             <AlertDialogAction
@@ -3283,7 +3284,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="btn-nav-leave"
             >
-              Leave Without Saving
+              Discard & Leave
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
