@@ -2903,25 +2903,16 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
   const [aiSuggestionsApplied, setAiSuggestionsApplied] = useState(false);
 
   const isDirty = useMemo(() => {
-    const base = initialData || INITIAL_DATA;
-    return data.title !== base.title || 
-      data.sopType !== base.sopType || 
-      data.categoryId !== base.categoryId ||
-      data.outcome !== base.outcome ||
-      data.outcomeType !== base.outcomeType ||
-      data.audience !== base.audience ||
-      data.skillLevel !== base.skillLevel ||
-      data.tools !== base.tools ||
-      data.materials !== base.materials ||
-      data.ppe !== base.ppe ||
-      data.safetyNotes !== base.safetyNotes ||
-      data.complianceNotes !== base.complianceNotes ||
-      data.timingTarget !== base.timingTarget ||
-      data.timingMax !== base.timingMax ||
-      data.headerImage !== base.headerImage ||
-      Object.keys(data.stepImages).length > 0 ||
-      data.steps.some(s => s.title || s.instruction);
-  }, [data, initialData]);
+    if (aiSuggestionsApplied) return true;
+    if (currentStep > 1) return true;
+    if (initialData) {
+      const base = initialData;
+      return data.title !== base.title || 
+        data.outcome !== base.outcome ||
+        data.steps.some(s => s.title || s.instruction);
+    }
+    return false;
+  }, [data, initialData, aiSuggestionsApplied, currentStep]);
 
   useEffect(() => {
     if (!isDirty) return;
