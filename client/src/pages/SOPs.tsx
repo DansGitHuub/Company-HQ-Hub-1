@@ -45,6 +45,8 @@ export default function SOPs() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [movingSopId, setMovingSopId] = useState<string | null>(null);
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [copyingSopId, setCopyingSopId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
   const [searchContentToo, setSearchContentToo] = useState(false);
@@ -160,16 +162,20 @@ export default function SOPs() {
   });
 
   const copyMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, categoryId, categoryName }: { id: string; categoryId: string; categoryName: string }) => {
       const res = await fetch(`/api/sops/${id}/copy`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({ categoryId, categoryName }),
       });
       if (!res.ok) throw new Error("Failed to copy SOP");
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sops"] });
+      setCopyDialogOpen(false);
+      setCopyingSopId(null);
       toast({ title: "SOP copied" });
     },
   });
@@ -476,8 +482,8 @@ export default function SOPs() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => copyMutation.mutate(selectedSOP.id)}>
-                    <Copy className="w-4 h-4 mr-2" /> Duplicate
+                  <DropdownMenuItem onClick={() => { setCopyingSopId(selectedSOP.id); setCopyDialogOpen(true); }}>
+                    <Copy className="w-4 h-4 mr-2" /> Copy to...
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => { setMovingSopId(selectedSOP.id); setMoveDialogOpen(true); }}>
                     <Move className="w-4 h-4 mr-2" /> Move
@@ -598,6 +604,31 @@ export default function SOPs() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setMoveDialogOpen(false)}>Cancel</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Copy SOP To...</DialogTitle>
+              <DialogDescription>Select the topic to copy this SOP to.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {categories.map(cat => (
+                <Button
+                  key={cat.id}
+                  variant="outline"
+                  className="w-full justify-start"
+                  disabled={copyMutation.isPending}
+                  onClick={() => copyingSopId && copyMutation.mutate({ id: copyingSopId, categoryId: cat.id, categoryName: cat.name })}
+                >
+                  {cat.name}
+                </Button>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCopyDialogOpen(false)}>Cancel</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -803,7 +834,7 @@ export default function SOPs() {
                   onSearchChange={(value) => setCategorySearch(prev => ({ ...prev, [category.id]: value }))}
                   onCreateSop={() => { setCreateCategoryId(category.id); setCreateOpen(true); }}
                   onSelectSop={setSelectedSOP}
-                  onCopySop={(id) => copyMutation.mutate(id)}
+                  onCopySop={(id) => { setCopyingSopId(id); setCopyDialogOpen(true); }}
                   onMoveSop={(id) => { setMovingSopId(id); setMoveDialogOpen(true); }}
                   onArchiveSop={handleArchive}
                   onDeleteSop={(id) => {
@@ -836,7 +867,7 @@ export default function SOPs() {
                         key={sop.id}
                         sop={sop}
                         onSelect={() => setSelectedSOP(sop)}
-                        onCopy={() => copyMutation.mutate(sop.id)}
+                        onCopy={() => { setCopyingSopId(sop.id); setCopyDialogOpen(true); }}
                         onMove={() => { setMovingSopId(sop.id); setMoveDialogOpen(true); }}
                         onArchive={() => handleArchive(sop)}
                         onDelete={() => {
@@ -1185,6 +1216,32 @@ export default function SOPs() {
         </DialogContent>
       </Dialog>
 
+      {/* Copy SOP Dialog */}
+      <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Copy SOP To...</DialogTitle>
+            <DialogDescription>Select the topic to copy this SOP to.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {categories.map(cat => (
+              <Button
+                key={cat.id}
+                variant="outline"
+                className="w-full justify-start"
+                disabled={copyMutation.isPending}
+                onClick={() => copyingSopId && copyMutation.mutate({ id: copyingSopId, categoryId: cat.id, categoryName: cat.name })}
+              >
+                {cat.name}
+              </Button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCopyDialogOpen(false)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* AI Generate Dialog */}
       <Dialog open={aiGenerateOpen} onOpenChange={setAiGenerateOpen}>
         <DialogContent>
@@ -1417,7 +1474,7 @@ function SopListItem({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCopy(); }}>
-            <Copy className="h-4 w-4 mr-2" /> Copy
+            <Copy className="h-4 w-4 mr-2" /> Copy to...
           </DropdownMenuItem>
           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onMove(); }}>
             <Move className="h-4 w-4 mr-2" /> Move

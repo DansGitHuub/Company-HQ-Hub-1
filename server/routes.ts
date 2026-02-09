@@ -814,7 +814,8 @@ Respond with a JSON object:
 
   app.post("/api/sops/:id/copy", requireAuth, async (req, res) => {
     try {
-      const sop = await storage.copySop(req.params.id as string);
+      const { categoryId, categoryName } = req.body || {};
+      const sop = await storage.copySop(req.params.id as string, categoryId, categoryName);
       if (!sop) return res.status(404).json({ message: "SOP not found" });
       res.status(201).json(sop);
     } catch (err) {

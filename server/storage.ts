@@ -102,7 +102,7 @@ export interface IStorage {
   createSop(sop: InsertSop): Promise<Sop>;
   updateSop(id: string, updates: Partial<Sop>): Promise<Sop | undefined>;
   deleteSop(id: string): Promise<boolean>;
-  copySop(id: string): Promise<Sop | undefined>;
+  copySop(id: string, targetCategoryId?: string, targetCategoryName?: string): Promise<Sop | undefined>;
   
   // SOP Templates
   getSopTemplates(): Promise<SopTemplate[]>;
@@ -655,13 +655,13 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  async copySop(id: string): Promise<Sop | undefined> {
+  async copySop(id: string, targetCategoryId?: string, targetCategoryName?: string): Promise<Sop | undefined> {
     const originalSop = await this.getSop(id);
     if (!originalSop) return undefined;
     const [newSop] = await db.insert(sops).values({
       title: `${originalSop.title} (Copy)`,
-      category: originalSop.category,
-      categoryId: originalSop.categoryId,
+      category: targetCategoryName || originalSop.category,
+      categoryId: targetCategoryId || originalSop.categoryId,
       content: originalSop.content,
       ownerId: originalSop.ownerId,
     }).returning();
