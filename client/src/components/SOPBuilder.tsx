@@ -3296,9 +3296,16 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
             <ClipboardList className="h-6 w-6" />
             SOP Builder
           </h2>
-          <p className="text-muted-foreground text-sm">Step {currentStep + 1} of {WIZARD_STEPS.length}: {currentStep === 4 ? (
-            data.sopType === "quality" ? "Checklist" : data.sopType === "maintenance" ? "Maintenance Tasks" : data.sopType === "training" ? "Chapters" : "Steps"
-          ) : WIZARD_STEPS[currentStep].label}</p>
+          <p className="text-muted-foreground text-sm flex items-center gap-2 flex-wrap">
+            <span>Step {currentStep + 1} of {WIZARD_STEPS.length}: {currentStep === 4 ? (
+              data.sopType === "quality" ? "Checklist" : data.sopType === "maintenance" ? "Maintenance Tasks" : data.sopType === "training" ? "Chapters" : "Steps"
+            ) : WIZARD_STEPS[currentStep].label}</span>
+            {data.sopType && currentStep > 0 && (
+              <Badge variant="secondary" className="text-xs" data-testid="badge-sop-type">
+                {SOP_TYPES.find(t => t.value === data.sopType)?.icon} {SOP_TYPES.find(t => t.value === data.sopType)?.label}
+              </Badge>
+            )}
+          </p>
         </div>
         <Button
           variant="ghost"
