@@ -37,7 +37,8 @@ import {
   CheckSquare,
   Snowflake,
   Bell,
-  Brain
+  Brain,
+  FormInput
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -327,6 +328,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     hq: { icon: Building2, label: "Company HQ", href: "/hq" },
     marketing: { icon: Megaphone, label: "Marketing", href: "/marketing" },
     forms: { icon: FileText, label: "Forms", href: "/forms" },
+    form_builder_1: { icon: FormInput, label: "Form Builder 1", href: "/form-builder-1" },
     inbox: { icon: Mail, label: "Messages", href: "/inbox" },
     integrations: { icon: Settings, label: "Integrations", href: "/integrations" },
     admin: { icon: Shield, label: "Admin Panel", href: "/admin" },
@@ -335,7 +337,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Default order for internal roles (help always at very bottom for all roles)
   const teamDefaultIds = ["dashboard", "sops", "testing", "materials", "equipment", "hiring", "jobs", "education", "tools"];
-  const adminExtraIds = ["hq", "marketing", "forms", "integrations", "admin"];
+  const adminExtraIds = ["hq", "marketing", "forms", "form_builder_1", "integrations", "admin"];
   const bottomIds = ["help"]; // Always shown at bottom for all roles
 
   const getNavItems = () => {
