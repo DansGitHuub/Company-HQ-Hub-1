@@ -577,6 +577,30 @@ export default function SOPs() {
             </Card>
           )}
         </div>
+
+        <Dialog open={moveDialogOpen} onOpenChange={setMoveDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Move SOP</DialogTitle>
+              <DialogDescription>Select the topic to move this SOP to.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {categories.map(cat => (
+                <Button
+                  key={cat.id}
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => movingSopId && handleMove(movingSopId, cat.id)}
+                >
+                  {cat.name}
+                </Button>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setMoveDialogOpen(false)}>Cancel</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
