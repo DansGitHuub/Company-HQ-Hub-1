@@ -494,7 +494,7 @@ export default function SOPs() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     onClick={() => {
-                      if (confirm("Are you sure you want to delete this SOP?")) {
+                      if (confirm(`Are you sure you want to delete "${selectedSOP.title}"?`)) {
                         deleteMutation.mutate(selectedSOP.id);
                       }
                     }}
@@ -908,7 +908,8 @@ export default function SOPs() {
                   onMoveSop={(id) => { setMovingSopId(id); setMoveDialogOpen(true); }}
                   onArchiveSop={handleArchive}
                   onDeleteSop={(id) => {
-                    if (confirm("Are you sure you want to delete this SOP?")) {
+                    const sopToDelete = sops.find(s => s.id === id);
+                    if (confirm(`Are you sure you want to delete "${sopToDelete?.title || "this SOP"}"?`)) {
                       deleteMutation.mutate(id);
                     }
                   }}
@@ -941,7 +942,7 @@ export default function SOPs() {
                         onMove={() => { setMovingSopId(sop.id); setMoveDialogOpen(true); }}
                         onArchive={() => handleArchive(sop)}
                         onDelete={() => {
-                          if (confirm("Are you sure you want to delete this SOP?")) {
+                          if (confirm(`Are you sure you want to delete "${sop.title}"?`)) {
                             deleteMutation.mutate(sop.id);
                           }
                         }}
