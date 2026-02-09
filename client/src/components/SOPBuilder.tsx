@@ -252,7 +252,7 @@ interface OEMResearchResult {
   maintenanceSchedule: string[];
   recommendations: string[];
   warnings: string[];
-  intervals: { task: string; interval: string }[];
+  intervals: { task: string; interval: string; procedure?: string; notes?: string }[];
   source: string;
 }
 
@@ -324,8 +324,8 @@ const SOP_TYPES = [
 ];
 
 const SKILL_LEVELS = [
-  { value: "beginner", label: "Beginner", description: "New to landscaping, needs detailed guidance" },
-  { value: "intermediate", label: "Intermediate", description: "Some experience, knows basics" },
+  { value: "beginner", label: "Beginner & Above", description: "New to landscaping, needs detailed guidance" },
+  { value: "intermediate", label: "Intermediate & Above", description: "Some experience, knows basics" },
   { value: "advanced", label: "Advanced", description: "Experienced, just needs key steps" },
   { value: "all", label: "All Levels", description: "Written for everyone to follow" },
 ];
@@ -1164,19 +1164,20 @@ function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange
       const result = await res.json();
       onChange({ oemResearch: result });
       if (result.intervals && result.intervals.length > 0) {
+        const validFrequencies = FREQUENCY_OPTIONS;
         const newTasks: MaintenanceTask[] = result.intervals.map((interval: any) => ({
           id: generateId(),
-          taskName: interval.task,
-          frequency: interval.interval,
-          procedure: "",
-          notes: "Based on OEM recommendation",
+          taskName: interval.task || "",
+          frequency: validFrequencies.includes(interval.interval) ? interval.interval : "As needed",
+          procedure: interval.procedure || "",
+          notes: interval.notes || "Based on OEM recommendation",
         }));
         onChange({
           oemResearch: result,
           maintenanceTasks: [...tasks, ...newTasks],
         });
       }
-      toast({ title: "Research complete", description: `Found ${result.intervals?.length || 0} maintenance recommendations.` });
+      toast({ title: "Research complete", description: `Found ${result.intervals?.length || 0} maintenance tasks with detailed procedures.` });
     } catch (err: any) {
       showErrorToast(err, "Research failed");
     } finally {
@@ -1249,7 +1250,7 @@ function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange
               />
             </div>
             <div>
-              <Label className="text-xs">Serial Number</Label>
+              <Label className="text-xs">Serial/VIN Number</Label>
               <Input
                 value={equipment.serialNumber}
                 onChange={(e) => onChange({ equipment: { ...equipment, serialNumber: e.target.value } })}
@@ -1340,16 +1341,20 @@ function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange
                   <div className="flex items-start gap-2">
                     <Badge variant="outline" className="shrink-0 mt-1">{idx + 1}</Badge>
                     <div className="flex-1 space-y-2">
-                      <Input
-                        value={task.taskName}
-                        onChange={(e) => updateTask(task.id, { taskName: e.target.value })}
-                        placeholder="Task name (e.g., Change engine oil)"
-                        data-testid={`input-task-name-${idx}`}
-                      />
-                      <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs mb-1 block">Task Name</Label>
+                        <Input
+                          value={task.taskName}
+                          onChange={(e) => updateTask(task.id, { taskName: e.target.value })}
+                          placeholder="Task name (e.g., Change engine oil)"
+                          data-testid={`input-task-name-${idx}`}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1 block">Recurring Interval</Label>
                         <Select value={task.frequency} onValueChange={(v) => updateTask(task.id, { frequency: v })}>
                           <SelectTrigger data-testid={`select-frequency-${idx}`}>
-                            <SelectValue placeholder="Frequency" />
+                            <SelectValue placeholder="Select interval..." />
                           </SelectTrigger>
                           <SelectContent>
                             {FREQUENCY_OPTIONS.map(f => (
@@ -1358,19 +1363,25 @@ function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange
                           </SelectContent>
                         </Select>
                       </div>
-                      <Textarea
-                        value={task.procedure}
-                        onChange={(e) => updateTask(task.id, { procedure: e.target.value })}
-                        placeholder="Step-by-step procedure for this task..."
-                        rows={2}
-                        data-testid={`input-task-procedure-${idx}`}
-                      />
-                      <Input
-                        value={task.notes}
-                        onChange={(e) => updateTask(task.id, { notes: e.target.value })}
-                        placeholder="Additional notes or OEM references..."
-                        data-testid={`input-task-notes-${idx}`}
-                      />
+                      <div>
+                        <Label className="text-xs mb-1 block">Step-by-Step Procedure</Label>
+                        <Textarea
+                          value={task.procedure}
+                          onChange={(e) => updateTask(task.id, { procedure: e.target.value })}
+                          placeholder="Detailed step-by-step procedure for this task..."
+                          rows={4}
+                          data-testid={`input-task-procedure-${idx}`}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1 block">Notes & OEM References</Label>
+                        <Input
+                          value={task.notes}
+                          onChange={(e) => updateTask(task.id, { notes: e.target.value })}
+                          placeholder="Tips, common mistakes to avoid, OEM references..."
+                          data-testid={`input-task-notes-${idx}`}
+                        />
+                      </div>
                     </div>
                     <Button variant="ghost" size="icon" className="shrink-0 text-destructive hover:bg-destructive/10" onClick={() => removeTask(task.id)} data-testid={`button-remove-task-${idx}`}>
                       <Trash2 className="h-4 w-4" />
@@ -2731,7 +2742,7 @@ function generateMaintenanceContent(data: SOPBuilderData): string {
     if (equipment.name) html += `<tr><td style="padding:6px;font-weight:bold;width:140px;">Equipment:</td><td style="padding:6px;">${equipment.name}</td></tr>`;
     if (equipment.manufacturer) html += `<tr><td style="padding:6px;font-weight:bold;">Manufacturer:</td><td style="padding:6px;">${equipment.manufacturer}</td></tr>`;
     if (equipment.model) html += `<tr><td style="padding:6px;font-weight:bold;">Model:</td><td style="padding:6px;">${equipment.model}</td></tr>`;
-    if (equipment.serialNumber) html += `<tr><td style="padding:6px;font-weight:bold;">Serial Number:</td><td style="padding:6px;">${equipment.serialNumber}</td></tr>`;
+    if (equipment.serialNumber) html += `<tr><td style="padding:6px;font-weight:bold;">Serial/VIN Number:</td><td style="padding:6px;">${equipment.serialNumber}</td></tr>`;
     if (maintenanceTypeLabel) html += `<tr><td style="padding:6px;font-weight:bold;">Maintenance Type:</td><td style="padding:6px;">${maintenanceTypeLabel}</td></tr>`;
     html += `</table>`;
   }

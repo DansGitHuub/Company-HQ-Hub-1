@@ -1228,24 +1228,30 @@ Rules:
         messages: [
           {
             role: "system",
-            content: `You are an expert equipment maintenance specialist for landscape and outdoor power equipment. Given equipment details, provide OEM-style maintenance recommendations based on your knowledge of typical manufacturer specifications for this type of equipment.
+            content: `You are an expert equipment maintenance specialist for landscape and outdoor power equipment. Given equipment details, provide comprehensive OEM-style maintenance recommendations based on your knowledge of typical manufacturer specifications for this type of equipment.
+
+Your goal is to provide ALL the information a landscaping company and its employees need to keep this equipment running smoothly, lasting as long as possible, and maintaining maximum resale value.
 
 Return JSON with these fields:
 - maintenanceSchedule: string[] - Key maintenance schedule items (e.g., "Change engine oil every 50 hours or annually")
 - recommendations: string[] - Best practice recommendations for maintaining this equipment
 - warnings: string[] - Safety warnings and cautions specific to this equipment type
-- intervals: array of {task: string, interval: string} - Specific maintenance tasks with their recommended intervals (e.g., {task: "Check/replace air filter", interval: "Every 25 hours"})
+- intervals: array of objects, each with:
+  - task: string - The maintenance task name (e.g., "Change engine oil")
+  - interval: string - MUST be one of these exact values: "Before each use", "Daily", "Weekly", "Bi-weekly", "Monthly", "Quarterly", "Semi-annually", "Annually", "As needed", "Per manufacturer spec"
+  - procedure: string - Detailed step-by-step procedure for performing this task. Include specific instructions like fluid types, quantities, torque specs, part numbers if known, proper techniques, what to look for during inspection, and disposal instructions. Write it so someone with basic mechanical knowledge can follow it. Use numbered steps separated by newlines.
+  - notes: string - Important tips, OEM references, common mistakes to avoid, or signs that something needs attention sooner than the scheduled interval.
 - source: string - Brief note like "Based on typical OEM specifications for [equipment type]"
 
-Provide practical, accurate maintenance information. Include at least 5-8 maintenance intervals. Focus on the most important maintenance tasks that prevent breakdowns and extend equipment life.`
+Provide practical, accurate maintenance information. Include at least 5-8 maintenance intervals. Focus on the most important maintenance tasks that prevent breakdowns, extend equipment life, and maintain resale value. Be thorough in the procedures — these will be followed by field crews.`
           },
           {
             role: "user",
-            content: `Provide maintenance specifications for: ${equipmentDesc}`
+            content: `Provide comprehensive maintenance specifications and detailed procedures for: ${equipmentDesc}`
           }
         ],
         response_format: { type: "json_object" },
-        max_tokens: 2048,
+        max_tokens: 4096,
       });
 
       const result = JSON.parse(completion.choices[0]?.message?.content || "{}");
