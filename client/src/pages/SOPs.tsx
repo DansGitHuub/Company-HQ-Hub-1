@@ -49,7 +49,7 @@ export default function SOPs() {
   
   // SOP Builder state
   const [showBuilder, setShowBuilder] = useState(false);
-  const [builderInitialData, setBuilderInitialData] = useState<(SOPBuilderData & { draftId?: number }) | undefined>(undefined);
+  const [builderInitialData, setBuilderInitialData] = useState<(SOPBuilderData & { draftId?: string }) | undefined>(undefined);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   const { data: drafts = [] } = useQuery<SopDraft[]>({
@@ -584,9 +584,11 @@ export default function SOPs() {
         onSaveDraft={async (draftData) => {
           setIsSavingDraft(true);
           try {
-            await apiRequest("POST", "/api/sop-drafts", draftData);
+            const res = await apiRequest("POST", "/api/sop-drafts", draftData);
+            const savedDraft = await res.json();
             queryClient.invalidateQueries({ queryKey: ["/api/sop-drafts"] });
-            toast({ title: "Saved to drafts", description: "You can resume this SOP later from your drafts." });
+            const isUpdate = !!draftData.draftId;
+            toast({ title: isUpdate ? "Draft updated" : "Saved to drafts", description: isUpdate ? "Your draft has been updated." : "You can resume this SOP later from your drafts." });
             setShowBuilder(false);
             setBuilderInitialData(undefined);
           } catch {
@@ -778,7 +780,7 @@ export default function SOPs() {
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              setBuilderInitialData({ ...draftData, draftId: Number(draft.id) });
+                              setBuilderInitialData({ ...draftData, draftId: draft.id });
                               setShowBuilder(true);
                             }}
                             className="gap-1"

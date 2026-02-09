@@ -2992,8 +2992,8 @@ interface SOPBuilderProps {
   onComplete: (sopData: { title: string; category: string; categoryId: string; content: string; superCategory?: string; subCategory?: string; sopType?: string }) => void;
   onCancel: () => void;
   isSubmitting: boolean;
-  initialData?: SOPBuilderData & { draftId?: number };
-  onSaveDraft?: (draftData: { title: string; categoryId: string; sopType: string; currentStep: number; data: SOPBuilderData; draftId?: number }) => void;
+  initialData?: SOPBuilderData & { draftId?: string };
+  onSaveDraft?: (draftData: { title: string; categoryId: string; sopType: string; currentStep: number; data: SOPBuilderData; draftId?: string }) => void;
   isSavingDraft?: boolean;
 }
 
@@ -3035,7 +3035,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
   const [, navigate] = useLocation();
   const [currentStep, setCurrentStep] = useState(0);
   const [data, setData] = useState<SOPBuilderData>(initialData || { ...INITIAL_DATA, steps: [createEmptyStep()] });
-  const [draftId, setDraftId] = useState<number | undefined>(initialData?.draftId);
+  const [draftId, setDraftId] = useState<string | undefined>(initialData?.draftId);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showNavDialog, setShowNavDialog] = useState(false);
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
