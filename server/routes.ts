@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, hashPassword, comparePasswords } from "./auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
-import { sendMaintenanceReminderEmail } from "./email";
+import { sendMaintenanceReminderEmail, sendSOPEmail } from "./email";
 import OpenAI from "openai";
 import { 
   insertSopTemplateSchema, 
@@ -819,6 +819,20 @@ Respond with a JSON object:
       res.status(201).json(sop);
     } catch (err) {
       res.status(500).json({ message: "Error copying SOP" });
+    }
+  });
+
+  app.post("/api/sop-email", requireAuth, async (req, res) => {
+    try {
+      const { sopId, toEmail } = req.body;
+      if (!sopId || !toEmail) return res.status(400).json({ message: "Missing sopId or toEmail" });
+      const sop = await storage.getSop(sopId);
+      if (!sop) return res.status(404).json({ message: "SOP not found" });
+      await sendSOPEmail(toEmail, sop.title, sop.category || "", sop.content, sop.lastUpdated || undefined);
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Error sending SOP email:", err);
+      res.status(500).json({ message: err.message || "Failed to send email" });
     }
   });
 

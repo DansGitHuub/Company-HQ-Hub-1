@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import SOPBuilder, { type SOPBuilderData } from "@/components/SOPBuilder";
 import type { Sop, SopCategory, SopTemplate, SopExample, SopDraft, SopQuiz } from "@shared/schema";
-import { Clock, PlayCircle, Brain, Printer } from "lucide-react";
+import { Clock, PlayCircle, Brain, Printer, Download, Mail, Eye, EyeOff, Bold, Italic, Underline, Heading2, Heading3, List, ToggleLeft, ToggleRight, SearchCheck } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function SOPs() {
@@ -46,6 +46,8 @@ export default function SOPs() {
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [movingSopId, setMovingSopId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [searchContentToo, setSearchContentToo] = useState(false);
   
   // SOP Builder state
   const [showBuilder, setShowBuilder] = useState(false);
@@ -407,9 +409,65 @@ export default function SOPs() {
                 Last updated: {selectedSOP.lastUpdated ? new Date(selectedSOP.lastUpdated).toLocaleDateString() : "N/A"}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button variant="outline" onClick={() => setEditingSOP(selectedSOP)} data-testid="button-edit-sop">
                 <Edit className="w-4 h-4 mr-2" /> Edit
+              </Button>
+              <Button variant="outline" onClick={() => {
+                const printWindow = window.open("", "_blank");
+                if (printWindow) {
+                  printWindow.document.write(`<!DOCTYPE html><html><head><title>${selectedSOP.title}</title><style>
+                    body { font-family: Arial, sans-serif; padding: 24px; max-width: 800px; margin: 0 auto; color: #1f2937; }
+                    h1 { font-size: 24px; border-bottom: 2px solid #166534; padding-bottom: 8px; color: #166534; }
+                    h2 { font-size: 18px; margin-top: 20px; color: #166534; }
+                    h3 { font-size: 15px; margin-top: 16px; }
+                    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+                    th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-size: 13px; }
+                    th { background: #f0fdf4; color: #166534; }
+                    img { max-width: 100%; height: auto; margin: 12px 0; border-radius: 8px; }
+                    ul, ol { padding-left: 20px; }
+                    li { margin-bottom: 4px; }
+                    @media print { body { padding: 0; } }
+                  </style></head><body><h1>${selectedSOP.title}</h1><p style="color:#6b7280;font-size:12px;margin-bottom:16px;">Category: ${selectedSOP.category || "Uncategorized"} | Last updated: ${selectedSOP.lastUpdated ? new Date(selectedSOP.lastUpdated).toLocaleDateString() : "N/A"}</p>${selectedSOP.content}</body></html>`);
+                  printWindow.document.close();
+                  printWindow.print();
+                }
+              }} data-testid="button-print-sop">
+                <Printer className="w-4 h-4 mr-2" /> Print
+              </Button>
+              <Button variant="outline" onClick={() => {
+                const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${selectedSOP.title}</title><style>
+                  body { font-family: Arial, sans-serif; padding: 24px; max-width: 800px; margin: 0 auto; color: #1f2937; }
+                  h1 { font-size: 24px; border-bottom: 2px solid #166534; padding-bottom: 8px; color: #166534; }
+                  h2 { font-size: 18px; margin-top: 20px; color: #166534; }
+                  h3 { font-size: 15px; margin-top: 16px; }
+                  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+                  th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-size: 13px; }
+                  th { background: #f0fdf4; color: #166534; }
+                  img { max-width: 100%; height: auto; margin: 12px 0; border-radius: 8px; }
+                </style></head><body><h1>${selectedSOP.title}</h1><p style="color:#6b7280;font-size:12px;margin-bottom:16px;">Category: ${selectedSOP.category || "Uncategorized"} | Last updated: ${selectedSOP.lastUpdated ? new Date(selectedSOP.lastUpdated).toLocaleDateString() : "N/A"}</p>${selectedSOP.content}</body></html>`;
+                const blob = new Blob([fullHtml], { type: "text/html" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${selectedSOP.title.replace(/[^a-zA-Z0-9]/g, "_")}.html`;
+                a.click();
+                URL.revokeObjectURL(url);
+                toast({ title: "SOP downloaded" });
+              }} data-testid="button-download-sop">
+                <Download className="w-4 h-4 mr-2" /> Download
+              </Button>
+              <Button variant="outline" onClick={() => {
+                const email = prompt("Enter email address to send this SOP to:");
+                if (!email || !email.includes("@")) {
+                  if (email) toast({ title: "Please enter a valid email address", variant: "destructive" });
+                  return;
+                }
+                apiRequest("POST", "/api/sop-email", { sopId: selectedSOP.id, toEmail: email })
+                  .then(() => toast({ title: "SOP sent!", description: `Emailed to ${email}` }))
+                  .catch(() => toast({ title: "Failed to send email", variant: "destructive" }));
+              }} data-testid="button-email-sop">
+                <Mail className="w-4 h-4 mr-2" /> Email
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -419,7 +477,7 @@ export default function SOPs() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => copyMutation.mutate(selectedSOP.id)}>
-                    <Copy className="w-4 h-4 mr-2" /> Copy
+                    <Copy className="w-4 h-4 mr-2" /> Duplicate
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => { setMovingSopId(selectedSOP.id); setMoveDialogOpen(true); }}>
                     <Move className="w-4 h-4 mr-2" /> Move
@@ -442,35 +500,6 @@ export default function SOPs() {
               </DropdownMenu>
             </div>
           </div>
-          
-          {(selectedSOP.sopType === "quality" || selectedSOP.sopType === "maintenance") && (
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const printWindow = window.open("", "_blank");
-                  if (printWindow) {
-                    printWindow.document.write(`<!DOCTYPE html><html><head><title>${selectedSOP.title}</title><style>
-                      body { font-family: Arial, sans-serif; padding: 24px; max-width: 800px; margin: 0 auto; }
-                      h1 { font-size: 22px; border-bottom: 2px solid #333; padding-bottom: 8px; }
-                      h2 { font-size: 18px; margin-top: 20px; }
-                      h3 { font-size: 15px; margin-top: 16px; }
-                      table { width: 100%; border-collapse: collapse; }
-                      th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; font-size: 13px; }
-                      th { background: #f5f5f5; }
-                      @media print { body { padding: 0; } }
-                    </style></head><body><h1>${selectedSOP.title}</h1>${selectedSOP.content}</body></html>`);
-                    printWindow.document.close();
-                    printWindow.print();
-                  }
-                }}
-                data-testid="button-export-checklist"
-              >
-                <Printer className="h-4 w-4 mr-2" /> Export / Print
-              </Button>
-            </div>
-          )}
           <Card className="min-h-[60vh]">
             <CardContent className="p-8 prose prose-slate dark:prose-invert max-w-none">
               <div dangerouslySetInnerHTML={{ __html: selectedSOP.content }} />
@@ -621,6 +650,86 @@ export default function SOPs() {
             <Sparkles className="w-4 h-4" /> Generate with AI
           </Button>
         </div>
+      </div>
+
+      <div className="relative">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 max-w-xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search all SOPs..."
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+              className="pl-9 pr-20"
+              data-testid="input-global-sop-search"
+            />
+            {globalSearch && (
+              <Button variant="ghost" size="sm" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 px-2 text-muted-foreground" onClick={() => setGlobalSearch("")} data-testid="button-clear-global-search">
+                <X className="w-3 h-3" />
+              </Button>
+            )}
+          </div>
+          <Button
+            variant={searchContentToo ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setSearchContentToo(!searchContentToo)}
+            className="gap-1 text-xs whitespace-nowrap"
+            data-testid="button-toggle-content-search"
+          >
+            <SearchCheck className="w-3.5 h-3.5" />
+            {searchContentToo ? "Title + Content" : "Title Only"}
+          </Button>
+        </div>
+
+        {globalSearch.trim() && (() => {
+          const q = globalSearch.toLowerCase();
+          const results = sops.filter(sop =>
+            sop.title.toLowerCase().includes(q) ||
+            (searchContentToo && sop.content.toLowerCase().includes(q))
+          );
+          return (
+            <Card className="mt-3 mb-4" data-testid="card-global-search-results">
+              <CardHeader className="py-3 pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Search className="w-4 h-4" />
+                  {results.length} result{results.length !== 1 ? "s" : ""} for "{globalSearch}"
+                  <span className="text-xs text-muted-foreground font-normal">({searchContentToo ? "searching titles & content" : "searching titles only"})</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {results.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No SOPs found matching your search.</p>
+                ) : (
+                  <div className="divide-y">
+                    {results.map(sop => {
+                      const cat = categories.find(c => c.id === sop.categoryId);
+                      return (
+                        <div
+                          key={sop.id}
+                          className="py-2 px-1 flex items-center justify-between cursor-pointer hover:bg-muted/50 rounded transition-colors"
+                          onClick={() => { setSelectedSOP(sop); setGlobalSearch(""); }}
+                          data-testid={`search-result-${sop.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            <div>
+                              <p className="text-sm font-medium">{sop.title}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {cat?.name || sop.category || "Uncategorized"}
+                                {sop.isArchived && " · Archived"}
+                              </p>
+                            </div>
+                          </div>
+                          <ArrowLeft className="w-3 h-3 text-muted-foreground rotate-180" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -1755,11 +1864,12 @@ function SOPEditor({
 }) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
   const [title, setTitle] = useState(sop.title);
   const [categoryId, setCategoryId] = useState(sop.categoryId || "");
   const [content, setContent] = useState(sop.content);
   const [uploading, setUploading] = useState(false);
+  const [showSource, setShowSource] = useState(false);
 
   const handleFileUpload = async (file: File) => {
     setUploading(true);
@@ -1767,145 +1877,80 @@ function SOPEditor({
       const urlRes = await fetch("/api/uploads/request-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: file.name,
-          size: file.size,
-          contentType: file.type,
-        }),
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
         credentials: "include",
       });
-      
       if (!urlRes.ok) throw new Error("Failed to get upload URL");
       const { uploadURL, objectPath } = await urlRes.json();
-      
-      const uploadRes = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
-      
+      const uploadRes = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
       if (!uploadRes.ok) throw new Error("Upload failed");
-      
-      let insertHtml: string;
+
       if (file.type.startsWith("image/")) {
-        insertHtml = `\n<img src="${objectPath}" alt="${file.name}" style="max-width: 100%; height: auto; margin: 1rem 0;" />\n`;
+        document.execCommand("insertHTML", false, `<img src="${objectPath}" alt="${file.name}" style="max-width: 100%; height: auto; margin: 1rem 0;" />`);
       } else {
-        insertHtml = `\n<p><a href="${objectPath}" target="_blank" rel="noopener">📄 ${file.name}</a></p>\n`;
+        document.execCommand("insertHTML", false, `<p><a href="${objectPath}" target="_blank" rel="noopener">📄 ${file.name}</a></p>`);
       }
-      
-      setContent(content + insertHtml);
+      syncContent();
       toast({ title: "File uploaded successfully" });
-    } catch (err) {
+    } catch {
       toast({ title: "Upload failed", variant: "destructive" });
     } finally {
       setUploading(false);
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      handleFileUpload(e.target.files[0]);
+  const syncContent = () => {
+    if (editorRef.current) {
+      setContent(editorRef.current.innerHTML);
     }
   };
 
-  const insertLink = () => {
-    const url = prompt("Enter URL:");
-    if (url) {
-      const text = prompt("Enter link text:", url);
-      const linkTag = `<a href="${url}" target="_blank" rel="noopener">${text || url}</a>`;
-      insertAtCursor(linkTag);
-    }
-  };
-
-  const insertAtCursor = (insertText: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      setContent(content + insertText);
-      return;
-    }
-    
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const newContent = content.substring(0, start) + insertText + content.substring(end);
-    setContent(newContent);
-    
-    setTimeout(() => {
-      textarea.selectionStart = textarea.selectionEnd = start + insertText.length;
-      textarea.focus();
-    }, 0);
-  };
-
-  const formatText = (tag: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      toast({ title: "Editor not ready", variant: "destructive" });
-      return;
-    }
-    
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    
-    if (start === end) {
-      const placeholder = tag === "h2" || tag === "h3" ? "Heading" : "text";
-      const formatted = `<${tag}>${placeholder}</${tag}>`;
-      insertAtCursor(formatted);
-      return;
-    }
-    
-    const selectedText = content.substring(start, end);
-    const formatted = `<${tag}>${selectedText}</${tag}>`;
-    const newContent = content.substring(0, start) + formatted + content.substring(end);
-    setContent(newContent);
-    
-    setTimeout(() => {
-      textarea.selectionStart = start;
-      textarea.selectionEnd = start + formatted.length;
-      textarea.focus();
-    }, 0);
-  };
-
-  const insertListItem = () => {
-    insertAtCursor("\n<li></li>");
+  const execFormat = (cmd: string, value?: string) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, value);
+    syncContent();
   };
 
   const handleSave = () => {
+    const finalContent = editorRef.current?.innerHTML || content;
     const category = categories.find(c => c.id === categoryId);
     onSave({ 
       title, 
       category: category?.name || sop.category, 
       categoryId: categoryId || undefined,
-      content 
+      content: finalContent
     });
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-4xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onCancel} className="pl-0 gap-2 text-muted-foreground hover:text-foreground">
-          <X className="w-4 h-4" /> Cancel
+          <ArrowLeft className="w-4 h-4" /> Back to SOP
         </Button>
-        <Button onClick={handleSave} disabled={isSaving} data-testid="button-save-sop">
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-          Save Changes
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onCancel}>Cancel</Button>
+          <Button onClick={handleSave} disabled={isSaving} data-testid="button-save-sop">
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+            Save Changes
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-4">
-        <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-2">
-            <Label htmlFor="editTitle">Title</Label>
-            <Input 
-              id="editTitle"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="text-xl font-bold"
-              data-testid="input-sop-title"
-            />
-          </div>
-          <div>
-            <Label htmlFor="editCategory">Topic</Label>
+        <div>
+          <Badge variant="outline" className="mb-2">{categories.find(c => c.id === categoryId)?.name || sop.category}</Badge>
+          <Input 
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="text-4xl font-heading font-bold border-none shadow-none px-0 h-auto focus-visible:ring-0 bg-transparent"
+            placeholder="SOP Title"
+            data-testid="input-sop-title"
+          />
+          <div className="flex items-center gap-3 mt-2">
+            <Label className="text-xs text-muted-foreground">Topic:</Label>
             <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger>
+              <SelectTrigger className="w-[200px] h-8 text-sm">
                 <SelectValue placeholder="Select topic" />
               </SelectTrigger>
               <SelectContent>
@@ -1918,67 +1963,82 @@ function SOPEditor({
         </div>
 
         <Card>
-          <CardHeader className="py-3 border-b">
-            <div className="flex gap-2 flex-wrap items-center">
-              <span className="text-xs text-muted-foreground mr-2">Format:</span>
-              <Button variant="outline" size="sm" onClick={() => formatText("strong")} title="Bold">
-                <strong>B</strong>
+          <CardHeader className="py-2 border-b">
+            <div className="flex gap-1 flex-wrap items-center">
+              <span className="text-xs text-muted-foreground mr-1">Format:</span>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => execFormat("bold")} title="Bold">
+                <Bold className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => formatText("em")} title="Italic">
-                <em>I</em>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => execFormat("italic")} title="Italic">
+                <Italic className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => formatText("u")} title="Underline">
-                <u>U</u>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => execFormat("underline")} title="Underline">
+                <Underline className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => formatText("h2")} title="Heading 2">
+              <div className="border-l mx-1 h-5" />
+              <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={() => execFormat("formatBlock", "h2")} title="Heading 2">
                 H2
               </Button>
-              <Button variant="outline" size="sm" onClick={() => formatText("h3")} title="Heading 3">
+              <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={() => execFormat("formatBlock", "h3")} title="Heading 3">
                 H3
               </Button>
-              <Button variant="outline" size="sm" onClick={insertListItem} title="List Item">
-                •
+              <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs" onClick={() => execFormat("formatBlock", "p")} title="Normal text">
+                P
               </Button>
-              <div className="border-l mx-2 h-6" />
-              <span className="text-xs text-muted-foreground mr-2">Insert:</span>
-              <Button variant="outline" size="sm" onClick={insertLink} title="Insert Link">
-                <Link2 className="h-4 w-4" />
+              <div className="border-l mx-1 h-5" />
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => execFormat("insertUnorderedList")} title="Bullet list">
+                <List className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Upload Image or Document">
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              <div className="border-l mx-1 h-5" />
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => {
+                const url = prompt("Enter URL:");
+                if (url) execFormat("createLink", url);
+              }} title="Insert Link">
+                <Link2 className="h-3.5 w-3.5" />
               </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                onChange={handleFileChange}
-                className="hidden"
-                accept="image/*,.pdf,.doc,.docx,.txt"
-              />
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Upload Image">
+                {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+              </Button>
+              <input ref={fileInputRef} type="file" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} className="hidden" accept="image/*,.pdf,.doc,.docx,.txt" />
+              <div className="border-l mx-1 h-5" />
+              <Button variant="ghost" size="sm" className="h-7 px-1.5 text-xs gap-1" onClick={() => setShowSource(!showSource)} title={showSource ? "Visual editor" : "View HTML source"}>
+                {showSource ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                {showSource ? "Visual" : "Source"}
+              </Button>
             </div>
           </CardHeader>
-          <CardContent className="p-4">
-            <Textarea
-              ref={textareaRef}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="min-h-[400px] font-mono text-sm"
-              placeholder="Enter your procedure content here. Select text and use the toolbar to format, or type HTML directly."
-              data-testid="textarea-sop-content"
-            />
-            <p className="text-xs text-muted-foreground mt-2">
-              Tip: Select text and click a format button, or type HTML directly. Supports images, PDFs, and documents.
-            </p>
+          <CardContent className="p-0">
+            {showSource ? (
+              <Textarea
+                value={content}
+                onChange={(e) => {
+                  setContent(e.target.value);
+                  if (editorRef.current) editorRef.current.innerHTML = e.target.value;
+                }}
+                className="min-h-[500px] font-mono text-sm rounded-none border-0 focus-visible:ring-0"
+                data-testid="textarea-sop-source"
+              />
+            ) : (
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                dangerouslySetInnerHTML={{ __html: content }}
+                onInput={syncContent}
+                onBlur={syncContent}
+                className="min-h-[500px] p-8 prose prose-slate dark:prose-invert max-w-none focus:outline-none [&_img]:cursor-pointer [&_img]:hover:outline [&_img]:hover:outline-2 [&_img]:hover:outline-primary/50 [&_img]:hover:outline-offset-2"
+                data-testid="editor-sop-content"
+              />
+            )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm">Preview</CardTitle>
-          </CardHeader>
-          <CardContent className="prose prose-slate dark:prose-invert max-w-none">
-            <div dangerouslySetInnerHTML={{ __html: content }} />
-          </CardContent>
-        </Card>
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={isSaving} data-testid="button-save-sop-bottom">
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+            Save Changes
+          </Button>
+        </div>
       </div>
     </div>
   );

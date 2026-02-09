@@ -85,6 +85,56 @@ export async function sendPasswordRecoveryEmail(toEmail: string, recoveryToken: 
   return data;
 }
 
+export async function sendSOPEmail(
+  toEmail: string,
+  sopTitle: string,
+  sopCategory: string,
+  sopContent: string,
+  lastUpdated?: string
+) {
+  const { client, fromEmail } = await getResendClient();
+
+  const senderEmail = 'Company HQ <noreply@chapinlandscapes.com>';
+  const appUrl = process.env.REPLIT_DEV_DOMAIN ? 'https://' + process.env.REPLIT_DEV_DOMAIN : 'http://localhost:5000';
+
+  const { data, error } = await client.emails.send({
+    from: senderEmail,
+    to: toEmail,
+    subject: `SOP: ${sopTitle}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
+        <div style="background-color: #166534; padding: 20px; text-align: center;">
+          <h1 style="color: white; margin: 0;">Company HQ</h1>
+          <p style="color: #bbf7d0; margin: 4px 0 0 0; font-size: 14px;">Standard Operating Procedure</p>
+        </div>
+        <div style="padding: 30px; background-color: #f9fafb;">
+          <div style="margin-bottom: 16px;">
+            <span style="background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">${sopCategory || "Uncategorized"}</span>
+          </div>
+          <h2 style="color: #166534; margin: 0 0 8px 0; font-size: 24px; border-bottom: 2px solid #166534; padding-bottom: 8px;">${sopTitle}</h2>
+          <p style="color: #6b7280; font-size: 12px; margin-bottom: 24px;">Last updated: ${lastUpdated ? new Date(lastUpdated).toLocaleDateString() : "N/A"}</p>
+          <div style="background: white; padding: 24px; border-radius: 8px; border: 1px solid #e5e7eb;">
+            ${sopContent}
+          </div>
+          <div style="text-align: center; margin-top: 24px;">
+            <a href="${appUrl}/sops" style="background-color: #166534; color: white; padding: 10px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">View in Company HQ</a>
+          </div>
+        </div>
+        <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+          <p>Company HQ - Landscape Management</p>
+        </div>
+      </div>
+    `
+  });
+
+  if (error) {
+    console.error('Error sending SOP email:', error);
+    throw new Error('Failed to send SOP email');
+  }
+
+  return data;
+}
+
 export async function sendMaintenanceReminderEmail(
   toEmail: string, 
   equipmentName: string, 
