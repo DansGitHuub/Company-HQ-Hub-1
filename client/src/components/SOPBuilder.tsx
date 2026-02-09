@@ -246,6 +246,9 @@ interface EquipmentInfo {
   manufacturer: string;
   model: string;
   serialNumber: string;
+  year: string;
+  engineType: string;
+  fuelType: string;
 }
 
 interface OEMResearchResult {
@@ -1118,26 +1121,25 @@ function QualityChecklistBuilder({ data, onChange }: { data: SOPBuilderData; onC
   );
 }
 
-const MAINTENANCE_TYPES = [
-  { value: "preventive", label: "Preventive Maintenance", description: "Scheduled maintenance to prevent failures" },
-  { value: "corrective", label: "Corrective Maintenance", description: "Repairs after a failure or issue" },
-  { value: "predictive", label: "Predictive Maintenance", description: "Based on condition monitoring data" },
-  { value: "seasonal", label: "Seasonal Maintenance", description: "Start/end of season preparation" },
-  { value: "daily", label: "Daily Checks", description: "Pre-operation daily inspections" },
+const MAINTENANCE_FOCUS = [
+  { value: "specific_task", label: "Specific Task Procedure", description: "Detailed procedure for the task described in your SOP title (e.g., 'Washing a Truck' → step-by-step washing procedure)", icon: "🎯" },
+  { value: "full_schedule", label: "Full Equipment Schedule", description: "Comprehensive maintenance schedule with all OEM-recommended tasks, intervals, and specs for the equipment", icon: "📋" },
 ];
 
-const FREQUENCY_OPTIONS = [
+const FREQUENCY_PRESETS = [
   "Before each use", "Daily", "Weekly", "Bi-weekly", "Monthly", "Quarterly", "Semi-annually", "Annually", "As needed", "Per manufacturer spec",
 ];
 
 function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: Partial<SOPBuilderData>) => void }) {
   const { toast } = useToast();
   const tasks = data.maintenanceTasks || [];
-  const equipment = data.equipment || { name: "", manufacturer: "", model: "", serialNumber: "" };
+  const equipment = data.equipment || { name: "", manufacturer: "", model: "", serialNumber: "", year: "", engineType: "", fuelType: "" };
+  const maintenanceFocus = data.maintenanceType || "";
   const [isResearching, setIsResearching] = useState(false);
+  const [showFrequencyCustom, setShowFrequencyCustom] = useState<Record<string, boolean>>({});
 
   const addTask = () => {
-    const task: MaintenanceTask = { id: generateId(), taskName: "", frequency: "As needed", procedure: "", notes: "" };
+    const task: MaintenanceTask = { id: generateId(), taskName: "", frequency: "", procedure: "", notes: "" };
     onChange({ maintenanceTasks: [...tasks, task] });
   };
 
@@ -1154,21 +1156,28 @@ function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange
       toast({ title: "Equipment info needed", description: "Please fill in at least the equipment name or manufacturer and model.", variant: "destructive" });
       return;
     }
+    if (!maintenanceFocus) {
+      toast({ title: "Select a focus", description: "Please choose 'Specific Task' or 'Full Equipment Schedule' above before running AI research.", variant: "destructive" });
+      return;
+    }
     setIsResearching(true);
     try {
       const res = await apiRequest("POST", "/api/ai/equipment-research", {
         equipmentName: equipment.name,
         manufacturer: equipment.manufacturer,
         model: equipment.model,
+        year: equipment.year,
+        engineType: equipment.engineType,
+        fuelType: equipment.fuelType,
+        sopTitle: data.title,
+        maintenanceFocus,
       });
       const result = await res.json();
-      onChange({ oemResearch: result });
       if (result.intervals && result.intervals.length > 0) {
-        const validFrequencies = FREQUENCY_OPTIONS;
         const newTasks: MaintenanceTask[] = result.intervals.map((interval: any) => ({
           id: generateId(),
           taskName: interval.task || "",
-          frequency: validFrequencies.includes(interval.interval) ? interval.interval : "As needed",
+          frequency: interval.interval || "",
           procedure: interval.procedure || "",
           notes: interval.notes || "Based on OEM recommendation",
         }));
@@ -1176,6 +1185,8 @@ function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange
           oemResearch: result,
           maintenanceTasks: [...tasks, ...newTasks],
         });
+      } else {
+        onChange({ oemResearch: result });
       }
       toast({ title: "Research complete", description: `Found ${result.intervals?.length || 0} maintenance tasks with detailed procedures.` });
     } catch (err: any) {
@@ -1189,24 +1200,31 @@ function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange
     <div className="space-y-4">
       <div>
         <h3 className="text-lg font-semibold flex items-center gap-2"><Cog className="h-5 w-5" /> Maintenance Procedure</h3>
-        <p className="text-sm text-muted-foreground">Define equipment details, maintenance tasks, and use AI to find OEM recommendations.</p>
+        <p className="text-sm text-muted-foreground">
+          {data.title ? (
+            <>SOP: <span className="font-medium">{data.title}</span> — Choose your focus and equipment details below.</>
+          ) : (
+            "Define equipment details, maintenance tasks, and use AI to find OEM recommendations."
+          )}
+        </p>
       </div>
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Maintenance Type</CardTitle>
+          <CardTitle className="text-sm">What are you building?</CardTitle>
+          <CardDescription className="text-xs">This determines what the AI generates for you</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {MAINTENANCE_TYPES.map(mt => (
+            {MAINTENANCE_FOCUS.map(mf => (
               <div
-                key={mt.value}
-                className={`p-3 border rounded-lg cursor-pointer transition-all hover:border-primary ${data.maintenanceType === mt.value ? "border-primary ring-2 ring-primary/20 bg-primary/5" : ""}`}
-                onClick={() => onChange({ maintenanceType: mt.value })}
-                data-testid={`maintenance-type-${mt.value}`}
+                key={mf.value}
+                className={`p-3 border rounded-lg cursor-pointer transition-all hover:border-primary hover:bg-accent hover:shadow-md hover:scale-[1.02] ${maintenanceFocus === mf.value ? "border-primary ring-2 ring-primary/20 bg-primary/5" : ""}`}
+                onClick={() => onChange({ maintenanceType: mf.value })}
+                data-testid={`maintenance-focus-${mf.value}`}
               >
-                <p className="font-medium text-sm">{mt.label}</p>
-                <p className="text-xs text-muted-foreground">{mt.description}</p>
+                <p className="font-medium text-sm">{mf.icon} {mf.label}</p>
+                <p className="text-xs text-muted-foreground mt-1">{mf.description}</p>
               </div>
             ))}
           </div>
@@ -1218,7 +1236,7 @@ function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange
           <CardTitle className="text-sm flex items-center gap-2">
             <Wrench className="h-4 w-4" /> Equipment Information
           </CardTitle>
-          <CardDescription className="text-xs">Enter equipment details to enable AI-powered OEM research</CardDescription>
+          <CardDescription className="text-xs">The more details you provide, the more accurate the AI recommendations will be</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -1227,16 +1245,16 @@ function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange
               <Input
                 value={equipment.name}
                 onChange={(e) => onChange({ equipment: { ...equipment, name: e.target.value } })}
-                placeholder="e.g., Zero-Turn Mower"
+                placeholder="e.g., Silverado 3500 HD"
                 data-testid="input-equipment-name"
               />
             </div>
             <div>
-              <Label className="text-xs">Manufacturer</Label>
+              <Label className="text-xs">Manufacturer *</Label>
               <Input
                 value={equipment.manufacturer}
                 onChange={(e) => onChange({ equipment: { ...equipment, manufacturer: e.target.value } })}
-                placeholder="e.g., John Deere"
+                placeholder="e.g., Chevrolet"
                 data-testid="input-equipment-manufacturer"
               />
             </div>
@@ -1245,8 +1263,35 @@ function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange
               <Input
                 value={equipment.model}
                 onChange={(e) => onChange({ equipment: { ...equipment, model: e.target.value } })}
-                placeholder="e.g., Z930M"
+                placeholder="e.g., 3500 HD LTZ"
                 data-testid="input-equipment-model"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Year</Label>
+              <Input
+                value={equipment.year}
+                onChange={(e) => onChange({ equipment: { ...equipment, year: e.target.value } })}
+                placeholder="e.g., 2022"
+                data-testid="input-equipment-year"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Engine / Power Type</Label>
+              <Input
+                value={equipment.engineType}
+                onChange={(e) => onChange({ equipment: { ...equipment, engineType: e.target.value } })}
+                placeholder="e.g., Duramax 6.6L V8 Turbo Diesel"
+                data-testid="input-equipment-engine"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Fuel Type</Label>
+              <Input
+                value={equipment.fuelType}
+                onChange={(e) => onChange({ equipment: { ...equipment, fuelType: e.target.value } })}
+                placeholder="e.g., Diesel, Gasoline, Electric"
+                data-testid="input-equipment-fuel"
               />
             </div>
             <div>
@@ -1254,14 +1299,14 @@ function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange
               <Input
                 value={equipment.serialNumber}
                 onChange={(e) => onChange({ equipment: { ...equipment, serialNumber: e.target.value } })}
-                placeholder="Optional"
+                placeholder="Optional — helps identify exact configuration"
                 data-testid="input-equipment-serial"
               />
             </div>
           </div>
           <Button
             onClick={handleResearch}
-            disabled={isResearching || (!equipment.name && !equipment.manufacturer)}
+            disabled={isResearching || (!equipment.name && !equipment.manufacturer) || !maintenanceFocus}
             className="w-full"
             variant="default"
             data-testid="button-ai-research"
@@ -1269,9 +1314,12 @@ function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange
             {isResearching ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Researching OEM Documentation...</>
             ) : (
-              <><Search className="h-4 w-4 mr-2" /> AI Research — Find OEM Maintenance Specs</>
+              <><Search className="h-4 w-4 mr-2" /> AI Research — {maintenanceFocus === "specific_task" ? `Find Procedure for "${data.title || "This Task"}"` : "Find OEM Maintenance Schedule"}</>
             )}
           </Button>
+          {!maintenanceFocus && (
+            <p className="text-xs text-amber-600 text-center">Select a focus above to enable AI Research</p>
+          )}
         </CardContent>
       </Card>
 
@@ -1352,16 +1400,35 @@ function MaintenanceBuilder({ data, onChange }: { data: SOPBuilderData; onChange
                       </div>
                       <div>
                         <Label className="text-xs mb-1 block">Recurring Interval</Label>
-                        <Select value={task.frequency} onValueChange={(v) => updateTask(task.id, { frequency: v })}>
-                          <SelectTrigger data-testid={`select-frequency-${idx}`}>
-                            <SelectValue placeholder="Select interval..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {FREQUENCY_OPTIONS.map(f => (
-                              <SelectItem key={f} value={f}>{f}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {showFrequencyCustom[task.id] || (task.frequency && !FREQUENCY_PRESETS.includes(task.frequency)) ? (
+                          <div className="flex gap-2">
+                            <Input
+                              value={task.frequency}
+                              onChange={(e) => updateTask(task.id, { frequency: e.target.value })}
+                              placeholder="e.g., Every 7,500 miles or 250 hours"
+                              data-testid={`input-frequency-custom-${idx}`}
+                            />
+                            <Button variant="ghost" size="sm" className="shrink-0 text-xs" onClick={() => { setShowFrequencyCustom(prev => ({ ...prev, [task.id]: false })); updateTask(task.id, { frequency: "" }); }}>
+                              Presets
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <Select value={task.frequency} onValueChange={(v) => updateTask(task.id, { frequency: v })}>
+                              <SelectTrigger data-testid={`select-frequency-${idx}`}>
+                                <SelectValue placeholder="Select interval..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {FREQUENCY_PRESETS.map(f => (
+                                  <SelectItem key={f} value={f}>{f}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button variant="ghost" size="sm" className="shrink-0 text-xs" onClick={() => setShowFrequencyCustom(prev => ({ ...prev, [task.id]: true }))}>
+                              Custom
+                            </Button>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <Label className="text-xs mb-1 block">Step-by-Step Procedure</Label>
@@ -2734,7 +2801,7 @@ function generateMaintenanceContent(data: SOPBuilderData): string {
   let html = "";
   const equipment = data.equipment;
   const tasks = data.maintenanceTasks || [];
-  const maintenanceTypeLabel = MAINTENANCE_TYPES.find(t => t.value === data.maintenanceType)?.label || "";
+  const maintenanceTypeLabel = MAINTENANCE_FOCUS.find((t: { value: string; label: string }) => t.value === data.maintenanceType)?.label || "";
 
   if (equipment && (equipment.name || equipment.manufacturer)) {
     html += `<h2>🔧 Equipment Information</h2>`;
@@ -2742,8 +2809,11 @@ function generateMaintenanceContent(data: SOPBuilderData): string {
     if (equipment.name) html += `<tr><td style="padding:6px;font-weight:bold;width:140px;">Equipment:</td><td style="padding:6px;">${equipment.name}</td></tr>`;
     if (equipment.manufacturer) html += `<tr><td style="padding:6px;font-weight:bold;">Manufacturer:</td><td style="padding:6px;">${equipment.manufacturer}</td></tr>`;
     if (equipment.model) html += `<tr><td style="padding:6px;font-weight:bold;">Model:</td><td style="padding:6px;">${equipment.model}</td></tr>`;
-    if (equipment.serialNumber) html += `<tr><td style="padding:6px;font-weight:bold;">Serial/VIN Number:</td><td style="padding:6px;">${equipment.serialNumber}</td></tr>`;
-    if (maintenanceTypeLabel) html += `<tr><td style="padding:6px;font-weight:bold;">Maintenance Type:</td><td style="padding:6px;">${maintenanceTypeLabel}</td></tr>`;
+    if (equipment.year) html += `<tr><td style="padding:6px;font-weight:bold;">Year:</td><td style="padding:6px;">${equipment.year}</td></tr>`;
+    if (equipment.engineType) html += `<tr><td style="padding:6px;font-weight:bold;">Engine:</td><td style="padding:6px;">${equipment.engineType}</td></tr>`;
+    if (equipment.fuelType) html += `<tr><td style="padding:6px;font-weight:bold;">Fuel Type:</td><td style="padding:6px;">${equipment.fuelType}</td></tr>`;
+    if (equipment.serialNumber) html += `<tr><td style="padding:6px;font-weight:bold;">Serial/VIN:</td><td style="padding:6px;">${equipment.serialNumber}</td></tr>`;
+    if (maintenanceTypeLabel) html += `<tr><td style="padding:6px;font-weight:bold;">Focus:</td><td style="padding:6px;">${maintenanceTypeLabel}</td></tr>`;
     html += `</table>`;
   }
 
@@ -2892,7 +2962,7 @@ const INITIAL_DATA: SOPBuilderData = {
   timingMax: "",
   qcChecklist: [],
   qcCategories: ["General"],
-  equipment: { name: "", manufacturer: "", model: "", serialNumber: "" },
+  equipment: { name: "", manufacturer: "", model: "", serialNumber: "", year: "", engineType: "", fuelType: "" },
   maintenanceTasks: [],
   maintenanceType: "",
   oemResearch: null,

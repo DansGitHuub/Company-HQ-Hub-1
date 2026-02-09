@@ -1216,39 +1216,62 @@ Rules:
 
   app.post("/api/ai/equipment-research", requireAuth, async (req, res) => {
     try {
-      const { equipmentName, manufacturer, model } = req.body;
+      const { equipmentName, manufacturer, model, year, engineType, fuelType, sopTitle, maintenanceFocus } = req.body;
       if (!equipmentName && !manufacturer) {
         return res.status(400).json({ message: "Equipment name or manufacturer is required" });
       }
 
-      const equipmentDesc = [equipmentName, manufacturer, model].filter(Boolean).join(" ");
+      const equipmentParts = [year, manufacturer, equipmentName, model].filter(Boolean);
+      const equipmentDesc = equipmentParts.join(" ");
+      const engineInfo = [engineType, fuelType].filter(Boolean).join(", ");
+
+      const isSpecificTask = maintenanceFocus === "specific_task";
+
+      const systemPrompt = isSpecificTask
+        ? `You are an expert equipment maintenance and operations specialist. You are creating a detailed procedure for ONE SPECIFIC TASK on a piece of equipment.
+
+The user's SOP is titled "${sopTitle || "Equipment Task"}". Your job is to create a detailed, step-by-step procedure for EXACTLY this task — nothing else. Do NOT generate a full maintenance schedule. Focus only on the specific task described in the title.
+
+${engineInfo ? `IMPORTANT: This equipment has: ${engineInfo}. Use this to provide the correct specifications (fluids, filters, parts, capacities, etc.) for this EXACT engine/power configuration.` : ""}
+
+Return JSON with these fields:
+- maintenanceSchedule: string[] - 2-3 key points about when/how often this specific task should be performed, with specific mileage, hours, or time intervals from OEM specs
+- recommendations: string[] - Best practices specific to performing this task on this equipment
+- warnings: string[] - Safety warnings specific to this task
+- intervals: array with 1-3 objects (break the task into sub-steps if needed), each with:
+  - task: string - The task or sub-task name
+  - interval: string - Specific OEM-recommended interval. Use exact manufacturer specs like "Every 7,500 miles", "Every 500 engine hours", "Every 200 hours or annually", "Before each wash", etc. Be specific, not generic.
+  - procedure: string - Comprehensive step-by-step procedure with numbered steps. Include specific products, quantities, part numbers, techniques, tools needed, and proper methods. Write for field crew with basic mechanical knowledge.
+  - notes: string - OEM references, common mistakes, pro tips, and signs of problems.
+- source: string - Brief note about the specification source
+
+Be extremely specific to the equipment and task. If the title says "Washing a Truck", provide a professional vehicle washing procedure. If it says "Oil Change", provide the specific oil change procedure with correct oil type, filter, and capacity for this exact engine.`
+        : `You are an expert equipment maintenance specialist. Given equipment details, provide a COMPREHENSIVE OEM-style maintenance schedule covering ALL routine maintenance tasks for this equipment.
+
+${engineInfo ? `CRITICAL: This equipment has: ${engineInfo}. You MUST use this information to provide the CORRECT specifications. For example, a diesel engine needs different oil, filters, and maintenance intervals than a gasoline engine. Get the specs right for this exact engine configuration.` : ""}
+
+Return JSON with these fields:
+- maintenanceSchedule: string[] - Key maintenance schedule items with SPECIFIC intervals (e.g., "Change engine oil every 7,500 miles or 250 hours using Dexos2 5W-30", NOT just "Change engine oil annually")
+- recommendations: string[] - Best practice recommendations for maintaining this equipment
+- warnings: string[] - Safety warnings and cautions specific to this equipment type
+- intervals: array of objects (include 5-10 maintenance tasks), each with:
+  - task: string - The maintenance task name (e.g., "Engine Oil & Filter Change")
+  - interval: string - SPECIFIC OEM-recommended interval. Use manufacturer specs like "Every 7,500 miles or 250 engine hours", "Every 500 hours", "Every 45,000 miles", "Every 2 years or 30,000 miles", etc. Use miles, hours, or specific time+usage combinations. NEVER use generic terms like "Annually" or "Monthly" when a specific mileage/hours spec exists.
+  - procedure: string - Detailed step-by-step procedure with numbered steps. Include specific fluid types and capacities, filter part numbers, torque specs, proper techniques, inspection criteria, and disposal instructions. Be thorough — field crews will follow these procedures.
+  - notes: string - Important tips, OEM part numbers, common mistakes to avoid, signs that service is needed sooner, and cross-references to other maintenance tasks.
+- source: string - Brief note like "Based on OEM specifications for ${equipmentDesc}"
+
+Focus on accuracy. Include the most critical maintenance tasks that prevent breakdowns, extend equipment life, and maintain resale value. Every interval should reference specific manufacturer recommendations, not generic time periods.`;
+
+      const userPrompt = isSpecificTask
+        ? `Create a detailed procedure for the task "${sopTitle}" on this equipment: ${equipmentDesc}${engineInfo ? ` (Engine: ${engineInfo})` : ""}`
+        : `Provide comprehensive OEM maintenance specifications and detailed procedures for: ${equipmentDesc}${engineInfo ? ` (Engine: ${engineInfo})` : ""}`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
-          {
-            role: "system",
-            content: `You are an expert equipment maintenance specialist for landscape and outdoor power equipment. Given equipment details, provide comprehensive OEM-style maintenance recommendations based on your knowledge of typical manufacturer specifications for this type of equipment.
-
-Your goal is to provide ALL the information a landscaping company and its employees need to keep this equipment running smoothly, lasting as long as possible, and maintaining maximum resale value.
-
-Return JSON with these fields:
-- maintenanceSchedule: string[] - Key maintenance schedule items (e.g., "Change engine oil every 50 hours or annually")
-- recommendations: string[] - Best practice recommendations for maintaining this equipment
-- warnings: string[] - Safety warnings and cautions specific to this equipment type
-- intervals: array of objects, each with:
-  - task: string - The maintenance task name (e.g., "Change engine oil")
-  - interval: string - MUST be one of these exact values: "Before each use", "Daily", "Weekly", "Bi-weekly", "Monthly", "Quarterly", "Semi-annually", "Annually", "As needed", "Per manufacturer spec"
-  - procedure: string - Detailed step-by-step procedure for performing this task. Include specific instructions like fluid types, quantities, torque specs, part numbers if known, proper techniques, what to look for during inspection, and disposal instructions. Write it so someone with basic mechanical knowledge can follow it. Use numbered steps separated by newlines.
-  - notes: string - Important tips, OEM references, common mistakes to avoid, or signs that something needs attention sooner than the scheduled interval.
-- source: string - Brief note like "Based on typical OEM specifications for [equipment type]"
-
-Provide practical, accurate maintenance information. Include at least 5-8 maintenance intervals. Focus on the most important maintenance tasks that prevent breakdowns, extend equipment life, and maintain resale value. Be thorough in the procedures — these will be followed by field crews.`
-          },
-          {
-            role: "user",
-            content: `Provide comprehensive maintenance specifications and detailed procedures for: ${equipmentDesc}`
-          }
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
         ],
         response_format: { type: "json_object" },
         max_tokens: 4096,
@@ -1260,7 +1283,7 @@ Provide practical, accurate maintenance information. Include at least 5-8 mainte
         recommendations: result.recommendations || [],
         warnings: result.warnings || [],
         intervals: result.intervals || [],
-        source: result.source || `Based on typical specifications for ${equipmentDesc}`,
+        source: result.source || `Based on OEM specifications for ${equipmentDesc}`,
       });
     } catch (err: any) {
       console.error("Equipment research error:", err);

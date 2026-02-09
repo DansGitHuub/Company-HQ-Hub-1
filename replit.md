@@ -25,7 +25,7 @@ Preferred communication style: Simple, everyday language.
 - **Role-Based Access Control (RBAC)**: Admin, Manager, Crew, Customer, and Master Admin roles with differentiated access and an access request system. Public registrations default to Customer.
 - **AI Assistant**: OpenAI integration for AI chat with streaming responses and per-user conversation history.
 - **Core Modules**:
-    - **SOP Management**: Centralized management of SOPs with AI-powered quiz generation for training.
+    - **SOP Management**: Centralized management of SOPs with AI-powered quiz generation for training. Maintenance SOPs have two focus modes: "Specific Task Procedure" (generates procedure for the exact task in the SOP title) and "Full Equipment Schedule" (comprehensive OEM maintenance schedule). Equipment info includes Year, Engine/Power Type, and Fuel Type for accurate AI specs. Intervals support both preset options and custom freeform text (e.g., "Every 7,500 miles").
     - **Inventory Management**: Comprehensive materials catalog manager with AI-powered creation wizard and category-specific fields.
     - **Hiring Pipeline**: Detailed candidate management with filtering, rating, and document uploads.
     - **Marketing Campaigns**: Tools for managing marketing efforts.
