@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Edit2, Calendar, Clock, User, AlertCircle, CheckCircle2, Circle, ChevronDown, ChevronUp, Users, Archive, History, Timer } from "lucide-react";
+import { Plus, Trash2, Edit2, Calendar, Clock, User, AlertCircle, CheckCircle2, Circle, ChevronDown, ChevronUp, Users, Archive, History, Timer, PauseCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -94,7 +94,7 @@ export default function TodoList() {
     title: "",
     description: "",
     priority: "medium",
-    status: "pending",
+    status: "on_hold",
     dueDate: "",
     assignedUserIds: [] as string[],
   });
@@ -141,9 +141,17 @@ export default function TodoList() {
   const displayTodos = isAdmin ? allTodos : myTodos;
 
   const filteredTodos = displayTodos.filter(todo => {
-    if (filterStatus === "archived") return todo.status === "archived";
-    if (filterStatus !== "all" && todo.status !== filterStatus) return false;
-    if (filterStatus === "all" && todo.status === "archived") return false;
+    if (filterStatus === "everything") {
+      // show everything including archived
+    } else if (filterStatus === "archived") {
+      if (todo.status !== "archived") return false;
+    } else if (filterStatus === "all") {
+      if (todo.status === "archived") return false;
+    } else if (filterStatus === "on_hold") {
+      if (todo.status !== "pending" && todo.status !== "on_hold") return false;
+    } else if (filterStatus !== "all" && todo.status !== filterStatus) {
+      return false;
+    }
     if (filterPriority !== "all" && todo.priority !== filterPriority) return false;
     return true;
   });
@@ -170,7 +178,7 @@ export default function TodoList() {
       queryClient.invalidateQueries({ queryKey: ["/api/my-todos"] });
       queryClient.invalidateQueries({ queryKey: ["/api/todos/unread-count"] });
       setAddDialogOpen(false);
-      setNewTodo({ title: "", description: "", priority: "medium", status: "pending", dueDate: "", assignedUserIds: [] });
+      setNewTodo({ title: "", description: "", priority: "medium", status: "on_hold", dueDate: "", assignedUserIds: [] });
       toast({ title: "Task created successfully" });
     },
     onError: (error: Error) => {
@@ -288,6 +296,8 @@ export default function TodoList() {
       case "completed": return <CheckCircle2 className="w-5 h-5 text-green-500" />;
       case "archived": return <Archive className="w-5 h-5 text-gray-400" />;
       case "in_progress": return <Clock className="w-5 h-5 text-blue-500" />;
+      case "on_hold": return <PauseCircle className="w-5 h-5 text-amber-500" />;
+      case "pending": return <PauseCircle className="w-5 h-5 text-amber-500" />;
       default: return <Circle className="w-5 h-5 text-gray-400" />;
     }
   };
@@ -315,7 +325,7 @@ export default function TodoList() {
   }, [toggledTodos]);
 
   const handleToggleStatus = (todo: Todo) => {
-    const nextStatus = todo.status === "completed" ? "pending" : "completed";
+    const nextStatus = todo.status === "completed" ? "on_hold" : "completed";
     updateTodo.mutate({ id: todo.id, data: { status: nextStatus } });
   };
 
@@ -376,8 +386,9 @@ export default function TodoList() {
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="everything">All</SelectItem>
             <SelectItem value="all">All Active</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="on_hold">On Hold</SelectItem>
             <SelectItem value="in_progress">In Progress</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
             <SelectItem value="archived">Archived</SelectItem>
@@ -446,7 +457,7 @@ export default function TodoList() {
                             {todo.priority || "medium"}
                           </Badge>
                           <Badge variant="outline" className="text-xs">
-                            {todo.status === "archived" ? "archived" : todo.status || "pending"}
+                            {todo.status === "archived" ? "archived" : todo.status === "pending" || todo.status === "on_hold" ? "on hold" : todo.status || "on hold"}
                           </Badge>
                           {todo.dueDate && (
                             <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -795,7 +806,7 @@ function EditTodoForm({
   const [title, setTitle] = useState(todo.title);
   const [description, setDescription] = useState(todo.description || "");
   const [priority, setPriority] = useState(todo.priority || "medium");
-  const [status, setStatus] = useState(todo.status || "pending");
+  const [status, setStatus] = useState(todo.status === "pending" ? "on_hold" : (todo.status || "on_hold"));
   const [dueDate, setDueDate] = useState(todo.dueDate ? format(new Date(todo.dueDate), "yyyy-MM-dd") : "");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -856,7 +867,7 @@ function EditTodoForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="on_hold">On Hold</SelectItem>
               <SelectItem value="in_progress">In Progress</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
             </SelectContent>
