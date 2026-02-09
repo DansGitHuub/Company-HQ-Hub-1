@@ -4508,6 +4508,18 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
+  app.delete("/api/todos/:todoId/assignments/:userId", requireAuth, async (req, res) => {
+    try {
+      const assignments = await storage.getTodoAssignments(req.params.todoId as string);
+      const match = assignments.find(a => a.userId === req.params.userId);
+      if (!match) return res.status(404).json({ message: "Assignment not found" });
+      await storage.deleteTodoAssignment(match.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error removing assignment" });
+    }
+  });
+
   app.post("/api/todos/:id/mark-read", requireAuth, async (req, res) => {
     try {
       const user = req.user as User;

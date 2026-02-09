@@ -283,6 +283,23 @@ export default function TodoList() {
     onError: (error: Error) => showErrorToast(error, "Assignment failed"),
   });
 
+  const unassignUser = useMutation({
+    mutationFn: async ({ todoId, userId }: { todoId: string; userId: string }) => {
+      const res = await fetch(`/api/todos/${todoId}/assignments/${userId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to remove user");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-todos"] });
+      toast({ title: "User removed from task" });
+    },
+    onError: (error: Error) => showErrorToast(error, "Failed to remove user"),
+  });
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "urgent": return "bg-red-500";
@@ -830,35 +847,72 @@ export default function TodoList() {
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Assign User to Task</DialogTitle>
+            <DialogTitle>Manage Assignments</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
-            {(() => {
-              const selectedTodo = displayTodos.find(t => t.id === selectedTodoId);
-              const alreadyAssigned = new Set(selectedTodo?.assignedUsers?.map(a => a.userId) || []);
-              const availableUsers = assignableUsers.filter(u => !alreadyAssigned.has(u.id));
-              if (availableUsers.length === 0) {
-                return <p className="text-sm text-muted-foreground text-center py-4">All active users are already assigned to this task.</p>;
-              }
-              return availableUsers.map((u) => (
-                <Button
-                  key={u.id}
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    if (selectedTodoId) {
-                      assignUser.mutate({ todoId: selectedTodoId, userId: u.id });
-                      setAssignDialogOpen(false);
-                    }
-                  }}
-                  data-testid={`button-assign-user-${u.id}`}
-                >
-                  <User className="w-4 h-4 mr-2" />
-                  {u.name} ({u.role})
-                </Button>
-              ));
-            })()}
-          </div>
+          {(() => {
+            const selectedTodo = displayTodos.find(t => t.id === selectedTodoId);
+            const currentlyAssigned = selectedTodo?.assignedUsers || [];
+            const alreadyAssigned = new Set(currentlyAssigned.map(a => a.userId));
+            const availableUsers = assignableUsers.filter(u => !alreadyAssigned.has(u.id));
+            return (
+              <div className="space-y-4">
+                {currentlyAssigned.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Currently Assigned</p>
+                    <div className="space-y-1">
+                      {currentlyAssigned.map((a) => (
+                        <div key={a.userId} className="flex items-center justify-between px-3 py-2 rounded-md border bg-muted/30">
+                          <span className="text-sm flex items-center gap-2">
+                            <User className="w-4 h-4" />
+                            {a.name}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              if (selectedTodoId) {
+                                unassignUser.mutate({ todoId: selectedTodoId, userId: a.userId });
+                              }
+                            }}
+                            data-testid={`button-unassign-${a.userId}`}
+                          >
+                            <X className="w-3 h-3 mr-1" /> Remove
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {availableUsers.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Add User</p>
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {availableUsers.map((u) => (
+                        <Button
+                          key={u.id}
+                          variant="outline"
+                          className="w-full justify-start"
+                          onClick={() => {
+                            if (selectedTodoId) {
+                              assignUser.mutate({ todoId: selectedTodoId, userId: u.id });
+                            }
+                          }}
+                          data-testid={`button-assign-user-${u.id}`}
+                        >
+                          <User className="w-4 h-4 mr-2" />
+                          {u.name} ({u.role})
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {currentlyAssigned.length === 0 && availableUsers.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">No users available to assign.</p>
+                )}
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>
