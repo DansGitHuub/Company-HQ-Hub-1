@@ -1889,11 +1889,18 @@ function SOPEditor({
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef(sop.content);
   const [title, setTitle] = useState(sop.title);
   const [categoryId, setCategoryId] = useState(sop.categoryId || "");
-  const [content, setContent] = useState(sop.content);
+  const [sourceContent, setSourceContent] = useState(sop.content);
   const [uploading, setUploading] = useState(false);
   const [showSource, setShowSource] = useState(false);
+
+  useEffect(() => {
+    if (editorRef.current && !showSource) {
+      editorRef.current.innerHTML = contentRef.current;
+    }
+  }, [showSource]);
 
   const handleFileUpload = async (file: File) => {
     setUploading(true);
@@ -1909,12 +1916,13 @@ function SOPEditor({
       const uploadRes = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
       if (!uploadRes.ok) throw new Error("Upload failed");
 
+      editorRef.current?.focus();
       if (file.type.startsWith("image/")) {
         document.execCommand("insertHTML", false, `<img src="${objectPath}" alt="${file.name}" style="max-width: 100%; height: auto; margin: 1rem 0;" />`);
       } else {
         document.execCommand("insertHTML", false, `<p><a href="${objectPath}" target="_blank" rel="noopener">📄 ${file.name}</a></p>`);
       }
-      syncContent();
+      contentRef.current = editorRef.current?.innerHTML || contentRef.current;
       toast({ title: "File uploaded successfully" });
     } catch {
       toast({ title: "Upload failed", variant: "destructive" });
@@ -1923,20 +1931,14 @@ function SOPEditor({
     }
   };
 
-  const syncContent = () => {
-    if (editorRef.current) {
-      setContent(editorRef.current.innerHTML);
-    }
-  };
-
   const execFormat = (cmd: string, value?: string) => {
     editorRef.current?.focus();
     document.execCommand(cmd, false, value);
-    syncContent();
+    contentRef.current = editorRef.current?.innerHTML || contentRef.current;
   };
 
   const handleSave = () => {
-    const finalContent = editorRef.current?.innerHTML || content;
+    const finalContent = editorRef.current?.innerHTML || contentRef.current;
     const category = categories.find(c => c.id === categoryId);
     onSave({ 
       title, 
@@ -2034,22 +2036,36 @@ function SOPEditor({
           <CardContent className="p-0">
             {showSource ? (
               <Textarea
-                value={content}
+                value={sourceContent}
                 onChange={(e) => {
-                  setContent(e.target.value);
-                  if (editorRef.current) editorRef.current.innerHTML = e.target.value;
+                  setSourceContent(e.target.value);
+                  contentRef.current = e.target.value;
                 }}
                 className="min-h-[500px] font-mono text-sm rounded-none border-0 focus-visible:ring-0"
                 data-testid="textarea-sop-source"
               />
             ) : (
               <div
-                ref={editorRef}
+                ref={(el) => {
+                  editorRef.current = el;
+                  if (el && !el.dataset.initialized) {
+                    el.innerHTML = contentRef.current;
+                    el.dataset.initialized = "true";
+                  }
+                }}
                 contentEditable
                 suppressContentEditableWarning
-                dangerouslySetInnerHTML={{ __html: content }}
-                onInput={syncContent}
-                onBlur={syncContent}
+                onInput={() => {
+                  if (editorRef.current) {
+                    contentRef.current = editorRef.current.innerHTML;
+                  }
+                }}
+                onBlur={() => {
+                  if (editorRef.current) {
+                    contentRef.current = editorRef.current.innerHTML;
+                    setSourceContent(editorRef.current.innerHTML);
+                  }
+                }}
                 className="min-h-[500px] p-8 prose prose-slate dark:prose-invert max-w-none focus:outline-none [&_img]:cursor-pointer [&_img]:hover:outline [&_img]:hover:outline-2 [&_img]:hover:outline-primary/50 [&_img]:hover:outline-offset-2"
                 data-testid="editor-sop-content"
               />
