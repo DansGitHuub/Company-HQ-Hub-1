@@ -61,6 +61,7 @@ import {
   ListChecks,
   BookOpenCheck,
   GraduationCap,
+  Pencil,
 } from "lucide-react";
 
 interface SOPStep {
@@ -2576,37 +2577,124 @@ function ReviewTypeContent({ data }: { data: SOPBuilderData }) {
   );
 }
 
-function StepReview({ data }: { data: SOPBuilderData }) {
+function EditableField({ label, value, onChange, multiline, placeholder, testId }: {
+  label: string; value: string; onChange: (v: string) => void; multiline?: boolean; placeholder?: string; testId?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) inputRef.current.focus();
+  }, [editing]);
+
+  if (editing) {
+    const save = () => { onChange(draft); setEditing(false); };
+    const cancel = () => { setDraft(value); setEditing(false); };
+    return (
+      <div className="space-y-1" data-testid={testId ? `${testId}-editing` : undefined}>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        {multiline ? (
+          <Textarea ref={inputRef as React.RefObject<HTMLTextAreaElement>} value={draft} onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === "Escape") cancel(); }}
+            placeholder={placeholder} rows={3} className="text-sm" />
+        ) : (
+          <Input ref={inputRef as React.RefObject<HTMLInputElement>} value={draft} onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") cancel(); }}
+            placeholder={placeholder} className="text-sm h-8" />
+        )}
+        <div className="flex gap-1">
+          <Button size="sm" variant="default" onClick={save} className="h-6 text-xs px-2" data-testid={testId ? `${testId}-save` : undefined}><Check className="h-3 w-3 mr-1" /> Save</Button>
+          <Button size="sm" variant="ghost" onClick={cancel} className="h-6 text-xs px-2" data-testid={testId ? `${testId}-cancel` : undefined}><X className="h-3 w-3 mr-1" /> Cancel</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="group cursor-pointer" onClick={() => { setDraft(value); setEditing(true); }} data-testid={testId}>
+      <p className="text-xs text-muted-foreground flex items-center gap-1">
+        {label}
+        <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+      </p>
+      <p className={`text-sm ${value ? "font-medium" : "text-muted-foreground italic"}`}>
+        {value || placeholder || "Not set"}
+      </p>
+    </div>
+  );
+}
+
+function StepReview({ data, setData, categories }: { data: SOPBuilderData; setData: React.Dispatch<React.SetStateAction<SOPBuilderData>>; categories: SopCategory[] }) {
+  const updateField = useCallback((field: keyof SOPBuilderData, value: any) => {
+    setData(prev => ({ ...prev, [field]: value }));
+  }, [setData]);
+
+  const updateStep = useCallback((stepId: string, field: keyof SOPStep, value: any) => {
+    setData(prev => ({
+      ...prev,
+      steps: prev.steps.map(s => s.id === stepId ? { ...s, [field]: value } : s),
+    }));
+  }, [setData]);
+
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-semibold">Review Your SOP</h3>
-        <p className="text-sm text-muted-foreground">Review everything before creating your SOP.</p>
+        <h3 className="text-lg font-semibold">Review & Edit Your SOP</h3>
+        <p className="text-sm text-muted-foreground">Click any field to edit it directly. Changes are saved instantly.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <Card>
+        <Card className="hover:border-primary/40 transition-colors">
           <CardContent className="p-3">
-            <p className="text-xs text-muted-foreground">Title</p>
-            <p className="font-medium text-sm">{data.title || "Not set"}</p>
+            <EditableField label="Title" value={data.title} onChange={v => updateField("title", v)} placeholder="Enter SOP title" testId="review-edit-title" />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:border-primary/40 transition-colors">
           <CardContent className="p-3">
             <p className="text-xs text-muted-foreground">Topic</p>
-            <p className="font-medium text-sm">{data.category || "Not set"}</p>
+            <Select value={data.categoryId} onValueChange={v => {
+              const cat = categories.find(c => String(c.id) === v);
+              if (cat) setData(prev => ({ ...prev, categoryId: v, category: cat.name }));
+            }}>
+              <SelectTrigger className="h-8 text-sm" data-testid="review-edit-topic">
+                <SelectValue placeholder="Select topic" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map(c => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:border-primary/40 transition-colors">
           <CardContent className="p-3">
             <p className="text-xs text-muted-foreground">Type</p>
-            <p className="font-medium text-sm">{SOP_TYPES.find(t => t.value === data.sopType)?.label || "Not set"}</p>
+            <Select value={data.sopType} onValueChange={v => updateField("sopType", v)}>
+              <SelectTrigger className="h-8 text-sm" data-testid="review-edit-type">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                {SOP_TYPES.map(t => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:border-primary/40 transition-colors">
           <CardContent className="p-3">
             <p className="text-xs text-muted-foreground">Skill Level</p>
-            <p className="font-medium text-sm">{SKILL_LEVELS.find(l => l.value === data.skillLevel)?.label || "Not set"}</p>
+            <Select value={data.skillLevel} onValueChange={v => updateField("skillLevel", v)}>
+              <SelectTrigger className="h-8 text-sm" data-testid="review-edit-skill">
+                <SelectValue placeholder="Select level" />
+              </SelectTrigger>
+              <SelectContent>
+                {SKILL_LEVELS.map(l => (
+                  <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
       </div>
@@ -2645,41 +2733,53 @@ function StepReview({ data }: { data: SOPBuilderData }) {
         </Card>
       )}
 
-      {data.outcome && (
-        <Card>
-          <CardContent className="p-3">
-            <p className="text-xs text-muted-foreground">Desired Outcome</p>
-            <p className="text-sm">{data.outcome}</p>
-          </CardContent>
-        </Card>
-      )}
+      <Card className="hover:border-primary/40 transition-colors">
+        <CardContent className="p-3">
+          <EditableField label="Desired Outcome" value={data.outcome} onChange={v => updateField("outcome", v)} multiline placeholder="Describe the desired outcome" testId="review-edit-outcome" />
+        </CardContent>
+      </Card>
 
       <ReviewTypeContent data={data} />
 
-      {(data.tools || data.materials || data.ppe) && (
+      {data.sopType !== "quality" && data.sopType !== "maintenance" && data.sopType !== "training" && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Tools, Materials & PPE</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" /> Steps ({data.steps.filter(s => s.title).length})
+              <span className="text-xs text-muted-foreground font-normal ml-auto">Click to edit</span>
+            </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0 text-sm space-y-1">
-            {data.tools && <p><span className="font-medium">Tools:</span> {data.tools.split("\n").filter(Boolean).join(", ")}</p>}
-            {data.materials && <p><span className="font-medium">Materials:</span> {data.materials.split("\n").filter(Boolean).join(", ")}</p>}
-            {data.ppe && <p><span className="font-medium">PPE:</span> {data.ppe.split("\n").filter(Boolean).join(", ")}</p>}
+          <CardContent className="pt-0 space-y-2">
+            {data.steps.map((step, idx) => (
+              <div key={step.id} className="p-2 rounded border hover:border-primary/40 transition-colors space-y-1" data-testid={`review-step-${idx}`}>
+                <EditableField label={`Step ${idx + 1} Title`} value={step.title} onChange={v => updateStep(step.id, "title", v)} placeholder="Step title" testId={`review-edit-step-title-${idx}`} />
+                <EditableField label="Instructions" value={step.instruction} onChange={v => updateStep(step.id, "instruction", v)} multiline placeholder="Step instructions" testId={`review-edit-step-instr-${idx}`} />
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
 
-      {(data.safetyNotes || data.complianceNotes) && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Safety & Compliance</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 text-sm space-y-1">
-            {data.safetyNotes && <p>{data.safetyNotes}</p>}
-            {data.complianceNotes && <p className="text-muted-foreground">{data.complianceNotes}</p>}
-          </CardContent>
-        </Card>
-      )}
+      <Card className="hover:border-primary/40 transition-colors">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Tools, Materials & PPE</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0 space-y-2">
+          <EditableField label="Tools" value={data.tools} onChange={v => updateField("tools", v)} multiline placeholder="List tools (one per line)" testId="review-edit-tools" />
+          <EditableField label="Materials" value={data.materials} onChange={v => updateField("materials", v)} multiline placeholder="List materials (one per line)" testId="review-edit-materials" />
+          <EditableField label="PPE" value={data.ppe} onChange={v => updateField("ppe", v)} multiline placeholder="List PPE (one per line)" testId="review-edit-ppe" />
+        </CardContent>
+      </Card>
+
+      <Card className="hover:border-primary/40 transition-colors">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Safety & Compliance</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0 space-y-2">
+          <EditableField label="Safety Notes" value={data.safetyNotes} onChange={v => updateField("safetyNotes", v)} multiline placeholder="Safety notes" testId="review-edit-safety" />
+          <EditableField label="Compliance Notes" value={data.complianceNotes} onChange={v => updateField("complianceNotes", v)} multiline placeholder="Compliance notes" testId="review-edit-compliance" />
+        </CardContent>
+      </Card>
 
       {(data.headerImage || Object.keys(data.stepImages).length > 0) && (
         <Card>
@@ -3264,7 +3364,7 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
       case 5: return <StepMedia data={data} onChange={updateData} />;
       case 6: return <StepToolsMaterials data={data} onChange={updateData} />;
       case 7: return <StepSafety data={data} onChange={updateData} />;
-      case 8: return <StepReview data={data} />;
+      case 8: return <StepReview data={data} setData={setData} categories={categories} />;
       default: return null;
     }
   };
