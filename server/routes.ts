@@ -1820,12 +1820,13 @@ The JSON must include these fields:
   * BAGGED MATERIALS (concrete mix, bagged mulch, bagged soil) → calculatorType: "bag_count"
   Set to FALSE for irrigation fittings, pipe runs, wiring, electrical, or items counted by quantity not volume/weight)
 - calculatorDefaults: object | null (if needsMaterialCalculator is true, include ALL of these fields:
-  { materialType: string (e.g. "base aggregate", "mulch", "fertilizer", "polymeric sand"),
+  { materialType: string (e.g. "base aggregate", "mulch", "fertilizer", "polymeric sand" — be SPECIFIC about the exact material, not generic. Use "hardwood mulch" not just "mulch", "crushed limestone" not just "gravel"),
     calculatorType: string (one of: "area_volume", "linear_volume", "chemical_rate", "polymeric_sand", "bag_count"),
     defaultDepthInches: number (typical recommended depth, or 0 if not applicable),
-    coverageNote: string (e.g. "1 cubic yard covers approximately 108 sq ft at 3 inches depth"),
-    productOrManufacturer: string | null (if SOP mentions a brand like "Versa-Lok", "Techo-Bloc", "Roundup QuikPRO", include it here. Otherwise null),
-    assumptions: string[] (list of 2-4 plain-English assumptions, e.g. ["Trench width = block depth + 6 inches on each side", "6 inches compacted base depth per ICPI standards"]),
+    densityTonsPerCubicYard: number (the weight density of this SPECIFIC material in tons per cubic yard. This is CRITICAL for accurate weight calculations. Common values: hardwood mulch=0.45, topsoil=1.1, compost=0.6, sand=1.35, pea gravel=1.4, crushed stone=1.35, river rock=1.5, base aggregate=1.35, lava rock=0.5, fill dirt=1.15. Use the value for the EXACT material type, not a generic average. For chemicals/bags, use 0),
+    coverageNote: string (e.g. "1 cubic yard of hardwood mulch covers approximately 108 sq ft at 3 inches depth" — include the SPECIFIC material name, not generic),
+    productOrManufacturer: string | null (if SOP mentions a specific brand like "Versa-Lok", "Techo-Bloc", "Roundup QuikPRO", include it here and tailor calculations to that product's specifications. Otherwise null),
+    assumptions: string[] (list of 2-4 plain-English assumptions. Include the material density assumption, e.g. ["Hardwood mulch at 0.45 tons per cubic yard", "Standard 3-inch depth per industry best practice"]),
     measurementGuide: string (one short paragraph explaining how to measure onsite, e.g. "Run a tape measure along the planned wall face. Measure trench width from the back of the block face plus 12 inches. Use a story pole to verify base depth at 4-foot intervals."),
     outputUnits: string (primary output unit: "cubic yards", "tons", "lbs", "bags", "gallons"),
     presets: array of 2-4 objects, each with { label: string, values: object }.

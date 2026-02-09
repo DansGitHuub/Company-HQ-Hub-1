@@ -108,15 +108,57 @@ interface MaterialCalculatorData {
   outputUnits?: string;
   productOrManufacturer?: string;
   measurementGuide?: string;
+  densityTonsPerCubicYard?: number;
 }
 
 type CalcType = "area_volume" | "linear_volume" | "chemical_rate" | "polymeric_sand" | "bag_count";
+
+const MATERIAL_DENSITY_DEFAULTS: Record<string, { density: number; label: string }> = {
+  "mulch": { density: 0.4, label: "Mulch (industry avg)" },
+  "hardwood mulch": { density: 0.45, label: "Hardwood mulch" },
+  "cedar mulch": { density: 0.35, label: "Cedar mulch" },
+  "pine bark mulch": { density: 0.35, label: "Pine bark mulch" },
+  "rubber mulch": { density: 0.65, label: "Rubber mulch" },
+  "topsoil": { density: 1.1, label: "Topsoil (industry avg)" },
+  "garden soil": { density: 1.0, label: "Garden soil" },
+  "compost": { density: 0.6, label: "Compost (industry avg)" },
+  "sand": { density: 1.35, label: "Sand (industry avg)" },
+  "mason sand": { density: 1.3, label: "Mason sand" },
+  "concrete sand": { density: 1.4, label: "Concrete sand" },
+  "pea gravel": { density: 1.4, label: "Pea gravel" },
+  "crushed stone": { density: 1.35, label: "Crushed stone" },
+  "crushed limestone": { density: 1.35, label: "Crushed limestone" },
+  "crushed granite": { density: 1.4, label: "Crushed granite" },
+  "river rock": { density: 1.5, label: "River rock" },
+  "base aggregate": { density: 1.35, label: "Base aggregate (ICPI spec)" },
+  "gravel": { density: 1.4, label: "Gravel (industry avg)" },
+  "decomposed granite": { density: 1.35, label: "Decomposed granite" },
+  "lava rock": { density: 0.5, label: "Lava rock" },
+  "marble chips": { density: 1.4, label: "Marble chips" },
+  "playground mulch": { density: 0.3, label: "Playground mulch" },
+  "soil amendment": { density: 0.8, label: "Soil amendment blend" },
+  "fill dirt": { density: 1.15, label: "Fill dirt" },
+  "clay": { density: 1.3, label: "Clay" },
+};
+
+function getMaterialDensity(materialType: string, aiDensity?: number): { density: number; source: string } {
+  if (aiDensity && aiDensity > 0.1 && aiDensity < 3.0) {
+    return { density: aiDensity, source: `${materialType} (OEM/product-specific)` };
+  }
+  const key = materialType.toLowerCase().trim();
+  for (const [matKey, matData] of Object.entries(MATERIAL_DENSITY_DEFAULTS)) {
+    if (key.includes(matKey) || matKey.includes(key)) {
+      return { density: matData.density, source: matData.label };
+    }
+  }
+  return { density: 1.35, source: "General aggregate (industry default)" };
+}
 
 interface CalculatorTemplate {
   type: CalcType;
   label: string;
   inputs: { key: string; label: string; unit: string; defaultValue: number; min?: number; max?: number; step?: number }[];
-  calculate: (vals: Record<string, number>) => { label: string; value: string }[];
+  calculate: (vals: Record<string, number>, density?: number) => { label: string; value: string }[];
 }
 
 const CALCULATOR_TEMPLATES: Record<CalcType, CalculatorTemplate> = {
@@ -128,10 +170,10 @@ const CALCULATOR_TEMPLATES: Record<CalcType, CalculatorTemplate> = {
       { key: "width", label: "Width", unit: "ft", defaultValue: 10, min: 1, step: 1 },
       { key: "depth", label: "Depth", unit: "in", defaultValue: 3, min: 0.5, max: 24, step: 0.5 },
     ],
-    calculate: (v) => {
+    calculate: (v, density = 1.35) => {
       const sqFt = v.length * v.width;
       const cubicYards = (sqFt * v.depth) / 324;
-      const tons = cubicYards * 1.4;
+      const tons = cubicYards * density;
       return [
         { label: "Area", value: `${sqFt.toLocaleString()} sq ft` },
         { label: "Volume", value: `${(Math.ceil(cubicYards * 10) / 10).toFixed(1)} cubic yards` },
@@ -147,12 +189,12 @@ const CALCULATOR_TEMPLATES: Record<CalcType, CalculatorTemplate> = {
       { key: "trenchWidth", label: "Trench Width", unit: "in", defaultValue: 24, min: 6, max: 72, step: 1 },
       { key: "baseDepth", label: "Base Depth", unit: "in", defaultValue: 6, min: 1, max: 24, step: 0.5 },
     ],
-    calculate: (v) => {
+    calculate: (v, density = 1.35) => {
       const trenchWidthFt = v.trenchWidth / 12;
       const baseDepthFt = v.baseDepth / 12;
       const cubicFt = v.wallLength * trenchWidthFt * baseDepthFt;
       const cubicYards = cubicFt / 27;
-      const tons = cubicYards * 1.4;
+      const tons = cubicYards * density;
       const excavationCuYd = (v.wallLength * trenchWidthFt * (baseDepthFt + 0.5)) / 27;
       return [
         { label: "Base Aggregate", value: `${(Math.ceil(cubicYards * 10) / 10).toFixed(1)} cubic yards` },
@@ -2071,10 +2113,10 @@ function resolveCalcType(defaults: MaterialCalculatorData): CalcType {
   return "area_volume";
 }
 
-function buildCalcHtml(title: string, values: Record<string, number>, results: { label: string; value: string }[], assumptions: string[], manufacturer: string | undefined, measureGuide: string | undefined, coverageNote: string): string {
+function buildCalcHtml(title: string, values: Record<string, number>, results: { label: string; value: string }[], assumptions: string[], manufacturer: string | undefined, measureGuide: string | undefined, coverageNote: string, densityBasis?: string): string {
   let html = `<div class="sop-calculator" style="background:#f0fdf4;border:2px solid #22c55e;border-radius:12px;padding:16px;margin:16px 0;">`;
   html += `<h3 style="margin:0 0 8px;color:#16a34a;">📐 ${title}</h3>`;
-  if (manufacturer) html += `<p style="font-size:12px;color:#888;margin:0 0 6px;"><em>Assumptions based on ${manufacturer}</em></p>`;
+  if (manufacturer) html += `<p style="font-size:12px;color:#888;margin:0 0 6px;"><em>Calculations based on ${manufacturer} specifications</em></p>`;
   if (coverageNote) html += `<p style="font-size:13px;color:#666;margin:0 0 8px;">${coverageNote}</p>`;
   html += `<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;">`;
   html += `<tr style="background:#dcfce7;"><th style="padding:6px;text-align:left;border:1px solid #86efac;">Measurement</th><th style="padding:6px;text-align:center;border:1px solid #86efac;">Result</th></tr>`;
@@ -2082,6 +2124,9 @@ function buildCalcHtml(title: string, values: Record<string, number>, results: {
     html += `<tr><td style="padding:6px;border:1px solid #e5e7eb;">${r.label}</td><td style="padding:6px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">${r.value}</td></tr>`;
   });
   html += `</table>`;
+  if (densityBasis) {
+    html += `<div style="margin-top:8px;padding:6px 8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:11px;color:#1d4ed8;">Weight based on: ${densityBasis}</div>`;
+  }
   if (assumptions.length > 0) {
     html += `<div style="margin-top:10px;font-size:12px;color:#666;"><strong>Assumptions:</strong><ul style="margin:4px 0;padding-left:18px;">`;
     assumptions.forEach(a => html += `<li>${a}</li>`);
@@ -2108,7 +2153,11 @@ function MaterialCalculatorPopup({ defaults, onConfirm, onCancel }: { defaults: 
   const [values, setValues] = useState<Record<string, number>>(initialValues);
   const [activePreset, setActivePreset] = useState(0);
 
-  const results = template.calculate(values);
+  const densityInfo = (calcType === "area_volume" || calcType === "linear_volume")
+    ? getMaterialDensity(defaults.materialType || "", defaults.densityTonsPerCubicYard)
+    : null;
+
+  const results = template.calculate(values, densityInfo?.density);
   const assumptions = defaults.assumptions || [];
   const matLabel = defaults.materialType ? defaults.materialType.charAt(0).toUpperCase() + defaults.materialType.slice(1) : template.label;
   const calcTitle = `${matLabel} Calculator`;
@@ -2124,7 +2173,8 @@ function MaterialCalculatorPopup({ defaults, onConfirm, onCancel }: { defaults: 
     setValues(next);
   };
 
-  const calcHtml = buildCalcHtml(calcTitle, values, results, assumptions, defaults.productOrManufacturer, defaults.measurementGuide, defaults.coverageNote);
+  const densityBasisStr = densityInfo ? `${densityInfo.source} — ${densityInfo.density} tons/yd³` : undefined;
+  const calcHtml = buildCalcHtml(calcTitle, values, results, assumptions, defaults.productOrManufacturer, defaults.measurementGuide, defaults.coverageNote, densityBasisStr);
 
   return (
     <AlertDialog open={true}>
@@ -2192,6 +2242,15 @@ function MaterialCalculatorPopup({ defaults, onConfirm, onCancel }: { defaults: 
               ))}
             </CardContent>
           </Card>
+
+          {densityInfo && (
+            <div className="p-2 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800" data-testid="calc-basis">
+              <p className="text-xs font-medium text-blue-700 dark:text-blue-300">Calculation Basis</p>
+              <p className="text-xs text-blue-600 dark:text-blue-400">
+                Weight based on: {densityInfo.source} — {densityInfo.density} tons per cubic yard
+              </p>
+            </div>
+          )}
 
           {assumptions.length > 0 && (
             <div className="text-xs text-muted-foreground space-y-0.5">
