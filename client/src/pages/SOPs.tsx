@@ -738,29 +738,42 @@ export default function SOPs() {
 
         {globalSearch.trim() && (() => {
           const q = globalSearch.toLowerCase();
-          const results = sops.filter(sop =>
+          const sopResults = sops.filter(sop =>
             sop.title.toLowerCase().includes(q) ||
             (searchContentToo && sop.content.toLowerCase().includes(q))
           );
+          const draftResults = drafts.filter(d =>
+            d.title.toLowerCase().includes(q) ||
+            (searchContentToo && typeof d.data === "object" && d.data && JSON.stringify(d.data).toLowerCase().includes(q))
+          );
+          const templateResults = templates.filter(t =>
+            t.name.toLowerCase().includes(q) ||
+            (searchContentToo && t.content.toLowerCase().includes(q))
+          );
+          const exampleResults = examples.filter(ex =>
+            ex.title.toLowerCase().includes(q) ||
+            (searchContentToo && (ex.content || "").toLowerCase().includes(q))
+          );
+          const totalCount = sopResults.length + draftResults.length + templateResults.length + exampleResults.length;
           return (
             <Card className="mt-3 mb-4" data-testid="card-global-search-results">
               <CardHeader className="py-3 pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Search className="w-4 h-4" />
-                  {results.length} result{results.length !== 1 ? "s" : ""} for "{globalSearch}"
+                  {totalCount} result{totalCount !== 1 ? "s" : ""} for "{globalSearch}"
                   <span className="text-xs text-muted-foreground font-normal">({searchContentToo ? "searching titles & content" : "searching titles only"})</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                {results.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No SOPs found matching your search.</p>
+                {totalCount === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">Nothing found matching your search.</p>
                 ) : (
                   <div className="divide-y">
-                    {results.map(sop => {
+                    {sopResults.map(sop => {
                       const cat = categories.find(c => c.id === sop.categoryId);
                       return (
                         <div
-                          key={sop.id}
+                          key={`sop-${sop.id}`}
                           className="py-2 px-1 flex items-center justify-between cursor-pointer hover:bg-muted/50 rounded transition-colors"
                           onClick={() => { setSelectedSOP(sop); setGlobalSearch(""); }}
                           data-testid={`search-result-${sop.id}`}
@@ -775,10 +788,67 @@ export default function SOPs() {
                               </p>
                             </div>
                           </div>
-                          <ArrowLeft className="w-3 h-3 text-muted-foreground rotate-180" />
+                          <Badge variant="outline" className="text-[10px] ml-2">SOP</Badge>
                         </div>
                       );
                     })}
+                    {draftResults.map(draft => (
+                      <div
+                        key={`draft-${draft.id}`}
+                        className="py-2 px-1 flex items-center justify-between cursor-pointer hover:bg-muted/50 rounded transition-colors"
+                        onClick={() => {
+                          setGlobalSearch("");
+                          setBuilderInitialData({ ...(draft.data as any), draftId: draft.id });
+                          setShowBuilder(true);
+                        }}
+                        data-testid={`search-result-draft-${draft.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Clock className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium">{draft.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Step {(draft.currentStep || 0) + 1} · {draft.updatedAt ? new Date(draft.updatedAt).toLocaleDateString() : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] ml-2 border-amber-300 text-amber-600">Draft</Badge>
+                      </div>
+                    ))}
+                    {templateResults.map(tmpl => (
+                      <div
+                        key={`tmpl-${tmpl.id}`}
+                        className="py-2 px-1 flex items-center justify-between cursor-pointer hover:bg-muted/50 rounded transition-colors"
+                        onClick={() => { setGlobalSearch(""); setActiveTab("templates"); }}
+                        data-testid={`search-result-tmpl-${tmpl.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <LayoutTemplate className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium">{tmpl.name}</p>
+                            <p className="text-xs text-muted-foreground">Template</p>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] ml-2 border-blue-300 text-blue-600">Template</Badge>
+                      </div>
+                    ))}
+                    {exampleResults.map(ex => (
+                      <div
+                        key={`ex-${ex.id}`}
+                        className="py-2 px-1 flex items-center justify-between cursor-pointer hover:bg-muted/50 rounded transition-colors"
+                        onClick={() => { setGlobalSearch(""); setActiveTab("examples"); }}
+                        data-testid={`search-result-ex-${ex.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <BookMarked className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium">{ex.title}</p>
+                            <p className="text-xs text-muted-foreground">Example</p>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] ml-2 border-purple-300 text-purple-600">Example</Badge>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
