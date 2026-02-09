@@ -1,0 +1,1095 @@
+/**
+FORM BUILDER 1 — SINGLE-FILE TEMPLATE (Replit-ready)
+===================================================
+Paste this entire file into: server.js
+Then run:
+  npm init -y
+  npm i express
+Click Run.
+
+What this creates:
+- Left menu with a new tab: "Form Builder 1"
+- 8.5" x 11" page canvas with minimal margins
+- Drag & drop from palette to page (palette items never disappear)
+- Click to select, drag to move, resize with handles
+- Multi-page forms (add unlimited pages)
+- Archive folder (soft-delete) + restore
+- Share button: copies link + opens email draft
+- Export target selector: PDF (via print) + Word/Excel stubs (hooks included)
+- English <-> Spanish toggle: flips labels without copy/paste
+- Proper inputs: email, phone, date, time, appointment (future), file/photo upload, etc.
+- Integrations list expanded (not just your examples)
+
+Notes:
+- This is a template foundation. It’s built to be safe to paste/run in one file.
+- PDF Export: uses print-to-PDF via browser print dialog (reliable in a single-file setup).
+- Word/Excel: stubbed with clear TODO hooks (because true layout-to-docx/xlsx needs a bigger pipeline).
+*/
+
+import express from "express";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const app = express();
+app.use(express.json({ limit: "25mb" }));
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const DATA_PATH = path.join(__dirname, "formbuilder1.data.json");
+
+function loadData() {
+  try {
+    return JSON.parse(fs.readFileSync(DATA_PATH, "utf8"));
+  } catch {
+    return { forms: [], archived: [] };
+  }
+}
+function saveData(data) {
+  fs.writeFileSync(DATA_PATH, JSON.stringify(data, null, 2));
+}
+
+// --- API ---
+app.get("/api/forms", (req, res) => {
+  res.json(loadData());
+});
+
+app.post("/api/forms/save", (req, res) => {
+  const { form } = req.body || {};
+  if (!form?.id) return res.status(400).json({ error: "Missing form.id" });
+
+  const data = loadData();
+  const idx = data.forms.findIndex((f) => f.id === form.id);
+  const now = new Date().toISOString();
+
+  const toSave = { ...form, updatedAt: now };
+  if (!toSave.createdAt) toSave.createdAt = now;
+
+  if (idx >= 0) data.forms[idx] = toSave;
+  else data.forms.unshift(toSave);
+
+  saveData(data);
+  res.json({ ok: true });
+});
+
+app.post("/api/forms/archive", (req, res) => {
+  const { formId } = req.body || {};
+  const data = loadData();
+  const idx = data.forms.findIndex((f) => f.id === formId);
+  if (idx < 0) return res.status(404).json({ error: "Form not found" });
+
+  const [form] = data.forms.splice(idx, 1);
+  data.archived.unshift({ ...form, archivedAt: new Date().toISOString() });
+  saveData(data);
+  res.json({ ok: true });
+});
+
+app.post("/api/forms/restore", (req, res) => {
+  const { formId } = req.body || {};
+  const data = loadData();
+  const idx = data.archived.findIndex((f) => f.id === formId);
+  if (idx < 0) return res.status(404).json({ error: "Archived form not found" });
+
+  const [form] = data.archived.splice(idx, 1);
+  const restored = { ...form };
+  delete restored.archivedAt;
+  data.forms.unshift(restored);
+  saveData(data);
+  res.json({ ok: true });
+});
+
+// --- UI ---
+app.get(["/", "/form-builder-1"], (req, res) => {
+  res.type("html").send(UI_HTML);
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Form Builder 1 running on http://localhost:${PORT}`));
+
+const UI_HTML = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Form Builder 1</title>
+
+  <!-- Interact.js (drag/resize) -->
+  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#f6f6f6; --panel:#fff; --border:#e6e6e6; --text:#111; --muted:#666;
+      --black:#0b0b0b;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,Arial;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+    .shell{display:flex;height:100vh}
+
+    /* LEFT MENU (tabs layout) */
+    .leftMenu{
+      width:260px;background:var(--panel);border-right:1px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:10px
+    }
+    .brand{font-weight:900;letter-spacing:.2px}
+    .nav{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+    .nav a{
+      display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);
+      border-radius:12px;text-decoration:none;color:var(--text);background:#fff
+    }
+    .nav a.active{border-color:#111;background:#111;color:#fff}
+    .nav small{color:var(--muted)}
+    .spacer{flex:1}
+
+    /* MAIN */
+    .main{flex:1;display:flex;flex-direction:column;min-width:0}
+    .topBar{
+      background:var(--panel);border-bottom:1px solid var(--border);padding:10px 12px;
+      display:flex;gap:10px;align-items:center;flex-wrap:wrap
+    }
+    .topBar .grow{flex:1;min-width:220px}
+    input, select, button{font:inherit}
+    .formName{
+      width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:12px
+    }
+    .pillRow{display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:12px;padding:6px;background:#fff}
+    .pillLabel{font-size:12px;color:var(--muted);margin-right:4px}
+    .pill{
+      border:1px solid var(--border);background:#fff;border-radius:999px;padding:6px 10px;cursor:pointer;font-size:12px
+    }
+    .pill.active{border-color:#111}
+    .btn{
+      border:1px solid #111;background:#111;color:#fff;border-radius:12px;padding:10px 12px;cursor:pointer
+    }
+    .btn.secondary{background:#fff;color:#111}
+    .btn.danger{border-color:#b00020;background:#b00020}
+    .btn.small{padding:8px 10px;font-size:12px;border-radius:10px}
+
+    .content{
+      flex:1;display:grid;grid-template-columns:320px 1fr 320px;gap:10px;padding:10px;min-height:0
+    }
+    .panel{
+      background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:10px;overflow:auto;min-height:0
+    }
+    .panelTitle{font-weight:900;margin-bottom:10px}
+    .groupTitle{font-size:13px;color:var(--muted);margin:12px 0 8px}
+    .paletteItem{
+      border:1px solid var(--border);border-radius:12px;padding:8px 10px;background:#fff;cursor:grab;margin-bottom:8px
+    }
+
+    /* CANVAS */
+    .canvasWrap{overflow:auto;border-radius:16px}
+    .pageTabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:0 0 10px}
+    .pageTab{
+      border:1px solid var(--border);background:#fff;border-radius:999px;padding:8px 10px;cursor:pointer
+    }
+    .pageTab.active{border-color:#111}
+    .pageTab.add{border-style:dashed}
+    .pageStage{display:flex;justify-content:center;padding-bottom:30px}
+
+    /* 8.5x11 at ~96dpi => 816x1056 */
+    .page{
+      width:816px;height:1056px;background:#fff;border:1px solid #ddd;border-radius:12px;position:relative;
+      padding:24px; /* minimal-ish margin (~0.25") */
+    }
+    .dropHint{
+      position:absolute;inset:10px;border:2px dashed transparent;border-radius:10px;pointer-events:none
+    }
+    .page.over .dropHint{border-color:#111}
+
+    .field{
+      position:absolute;left:0;top:0;width:240px;height:56px;border:1px solid #999;border-radius:12px;background:rgba(255,255,255,.92);
+      padding:8px;overflow:hidden
+    }
+    .field.selected{border:2px solid #111}
+    .fieldLabel{font-size:12px;font-weight:900;margin-bottom:6px}
+    .field input,.field select,.field textarea{
+      width:100%;border:1px solid var(--border);border-radius:10px;padding:6px 8px
+    }
+    .field textarea{height:100%;resize:none}
+    .muted{color:var(--muted);font-size:13px}
+
+    /* resize handles */
+    .handle{
+      position:absolute;width:10px;height:10px;background:#111;border-radius:999px;right:6px;bottom:6px;cursor:nwse-resize
+    }
+
+    /* LISTS */
+    .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+    .card{border:1px solid var(--border);border-radius:16px;padding:12px;background:#fff;cursor:pointer}
+    .cardTitle{font-weight:900;margin-bottom:6px}
+    .cardMeta{color:var(--muted);font-size:12px}
+
+    /* PRINT */
+    @media print{
+      body{background:#fff;overflow:visible}
+      .leftMenu,.topBar,.panel.palette,.panel.props,.pageTabs{display:none!important}
+      .content{grid-template-columns:1fr;padding:0}
+      .page{border:none;border-radius:0}
+      @page{size:letter;margin:0.25in}
+    }
+  </style>
+</head>
+
+<body>
+<div class="shell">
+  <!-- LEFT MENU -->
+  <aside class="leftMenu">
+    <div class="brand">CompanyHQ</div>
+    <small class="muted">Main Menu</small>
+
+    <nav class="nav" id="mainNav">
+      <a href="#" data-view="dashboard"><b>Dashboard</b></a>
+      <a href="#" data-view="jobs"><b>Jobs</b></a>
+      <a href="#" data-view="customers"><b>Customers</b></a>
+
+      <!-- NEW TAB: matches the same nav item style -->
+      <a href="/form-builder-1" class="active" data-view="builder"><b>Form Builder 1</b></a>
+
+      <a href="#" data-view="settings"><b>Settings</b></a>
+    </nav>
+
+    <div class="spacer"></div>
+    <small class="muted">This is a self-contained template.</small>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <header class="topBar">
+      <div class="grow">
+        <input id="formName" class="formName" placeholder="Untitled Form" />
+      </div>
+
+      <div class="pillRow">
+        <span class="pillLabel">Language</span>
+        <button class="pill" id="langEn">English</button>
+        <button class="pill" id="langEs">Español</button>
+      </div>
+
+      <div class="pillRow">
+        <span class="pillLabel">Export</span>
+        <select id="exportTarget">
+          <option value="pdf">PDF</option>
+          <option value="docx">Word (DOCX)</option>
+          <option value="xlsx">Excel (XLSX)</option>
+        </select>
+      </div>
+
+      <button class="btn secondary" id="btnForms">Forms</button>
+      <button class="btn secondary" id="btnArchived">Archived</button>
+      <button class="btn" id="btnSave">Save</button>
+      <button class="btn" id="btnShare">Share</button>
+      <button class="btn" id="btnExport">Export</button>
+      <button class="btn danger" id="btnArchive">Archive</button>
+    </header>
+
+    <section class="content">
+      <!-- PALETTE -->
+      <div class="panel palette">
+        <div class="panelTitle">Add Fields</div>
+        <div id="palette"></div>
+      </div>
+
+      <!-- CANVAS -->
+      <div class="canvasWrap">
+        <div class="pageTabs" id="pageTabs"></div>
+        <div class="pageStage">
+          <div class="page" id="page">
+            <div class="dropHint"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROPERTIES -->
+      <div class="panel props">
+        <div class="panelTitle">Properties</div>
+        <div id="propsEmpty" class="muted">Select a field to edit.</div>
+
+        <div id="props" style="display:none">
+          <div style="margin-bottom:10px">
+            <div class="muted" style="margin-bottom:6px">Label</div>
+            <input id="propLabel" />
+          </div>
+
+          <div style="margin-bottom:10px">
+            <div class="muted" style="margin-bottom:6px">Help Text</div>
+            <input id="propHelp" />
+          </div>
+
+          <label style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+            <input type="checkbox" id="propRequired" />
+            Required
+          </label>
+
+          <div id="propOptionsWrap" style="display:none;margin-bottom:10px">
+            <div class="muted" style="margin-bottom:6px">Options</div>
+            <div id="propOptions"></div>
+            <button class="btn small secondary" id="btnAddOption" type="button">+ Add Option</button>
+          </div>
+
+          <div id="propFutureWrap" style="display:none;margin-bottom:10px">
+            <label style="display:flex;gap:8px;align-items:center">
+              <input type="checkbox" id="propFutureOnly" />
+              Future-only date/time (Appointment)
+            </label>
+          </div>
+
+          <button class="btn danger" id="btnDelete" style="width:100%">Delete Field</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- FORMS / ARCHIVED overlay views -->
+    <div id="overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);padding:24px;overflow:auto">
+      <div style="background:#fff;border-radius:16px;padding:14px;border:1px solid #eee;max-width:1100px;margin:0 auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px">
+          <div style="font-weight:900;font-size:18px" id="overlayTitle">Forms</div>
+          <button class="btn secondary" id="btnCloseOverlay">Close</button>
+        </div>
+        <div class="cards" id="overlayCards"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* =======================
+   DATA MODEL
+======================= */
+const PALETTE_GROUPS = [
+  { id:"standard", title:"1. Standard Form Items", items:[
+    "Header/Subheader","Full Name","Email","Address","Phone","Short Text","Long Text",
+    "Dropdown","Single Choice","Multiple Choice","Number","Date Picker","Time","File Upload","Image",
+    "Paragraph","Captcha","Submit Button"
+  ]},
+  { id:"survey", title:"2. Survey & Data Items", items:[
+    "Input Table","Star Rating","Scale Rating","Spinner","Fill In The Blank","Signature"
+  ]},
+  { id:"payments", title:"3. Payment Processing Items", items:[
+    "Product List","Payment Gateway","Purchase Order","Shipping & Tax","Coupons/Promo Codes","Payment Authorization"
+  ]},
+  { id:"widgets", title:"4. Advanced Widgets", items:[
+    "Appointment","Configurable List","Multiple Text Fields","Take Photo","Unique ID","Form Calculation",
+    "Loom Video Recorder","Draw Board","Geolocation","Terms & Conditions"
+  ]},
+  { id:"layout", title:"5. Page Layout Structure", items:[
+    "Page Break","Section Collapse","Divider"
+  ]},
+  { id:"behind", title:"6. Behind-the-Scenes Features", items:[
+    "Conditional Logic","Input Masking","Hidden Fields","Pre-populate Fields","Translation","Custom CSS"
+  ]},
+  { id:"post", title:"7. Post Submission & Automation", items:[
+    "Autoresponder Email","Notification Email","Thank You Page","PDF Converter","Approval Flows"
+  ]},
+  { id:"integrations", title:"8. Integrations (expanded)", items:[
+    "CRM: Salesforce","CRM: HubSpot","CRM: Zoho","CRM: Pipedrive","CRM: Microsoft Dynamics",
+    "Cloud Storage: Google Drive","Cloud Storage: Dropbox","Cloud Storage: OneDrive","Cloud Storage: Box","Cloud Storage: SharePoint",
+    "Project Mgmt: Trello","Project Mgmt: Asana","Project Mgmt: Monday.com","Project Mgmt: ClickUp","Project Mgmt: Jira",
+    "Email Marketing: Mailchimp","Email Marketing: Constant Contact","Email Marketing: Klaviyo","Email Marketing: ActiveCampaign",
+    "Accounting: QuickBooks","Accounting: Xero",
+    "Payments: Stripe","Payments: PayPal","Payments: Square",
+    "E-Sign: DocuSign","E-Sign: Dropbox Sign",
+    "Calendar: Google Calendar","Calendar: Outlook Calendar",
+    "SMS: Twilio","Chat: Slack","Chat: Microsoft Teams",
+    "Automation: Zapier","Automation: Make.com","Automation: n8n",
+    "Webhooks","REST API","GraphQL API"
+  ]}
+];
+
+const FIELD_TYPE_MAP = {
+  "Header/Subheader":"header",
+  "Full Name":"fullName",
+  "Email":"email",
+  "Address":"address",
+  "Phone":"phone",
+  "Short Text":"shortText",
+  "Long Text":"longText",
+  "Dropdown":"dropdown",
+  "Single Choice":"singleChoice",
+  "Multiple Choice":"multipleChoice",
+  "Number":"number",
+  "Date Picker":"date",
+  "Time":"time",
+  "File Upload":"file",
+  "Image":"image",
+  "Paragraph":"paragraph",
+  "Captcha":"captcha",
+  "Submit Button":"submit",
+  "Input Table":"table",
+  "Star Rating":"starRating",
+  "Scale Rating":"scaleRating",
+  "Spinner":"spinner",
+  "Fill In The Blank":"fillBlank",
+  "Signature":"signature",
+  "Product List":"productList",
+  "Payment Gateway":"paymentGateway",
+  "Purchase Order":"purchaseOrder",
+  "Shipping & Tax":"shippingTax",
+  "Coupons/Promo Codes":"coupons",
+  "Payment Authorization":"paymentAuth",
+  "Appointment":"appointment",
+  "Configurable List":"configList",
+  "Multiple Text Fields":"multiText",
+  "Take Photo":"takePhoto",
+  "Unique ID":"uniqueId",
+  "Form Calculation":"calculation",
+  "Loom Video Recorder":"loomRecorder",
+  "Draw Board":"drawBoard",
+  "Geolocation":"geolocation",
+  "Terms & Conditions":"terms",
+  "Page Break":"pageBreak",
+  "Section Collapse":"section",
+  "Divider":"divider",
+  "Conditional Logic":"conditionalLogic",
+  "Input Masking":"inputMasking",
+  "Hidden Fields":"hidden",
+  "Pre-populate Fields":"prepopulate",
+  "Translation":"translation",
+  "Custom CSS":"customCss",
+  "Autoresponder Email":"autoresponder",
+  "Notification Email":"notification",
+  "Thank You Page":"thankYou",
+  "PDF Converter":"pdfConverter",
+  "Approval Flows":"approvalFlows"
+};
+
+function uuid(){
+  return (crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+"-"+Math.random());
+}
+
+function defaultSpanish(label){
+  const map = {
+    "Header/Subheader":"Encabezado/Subtítulo",
+    "Full Name":"Nombre completo",
+    "Email":"Correo electrónico",
+    "Address":"Dirección",
+    "Phone":"Teléfono",
+    "Short Text":"Texto corto",
+    "Long Text":"Texto largo",
+    "Dropdown":"Desplegable",
+    "Single Choice":"Selección única",
+    "Multiple Choice":"Selección múltiple",
+    "Number":"Número",
+    "Date Picker":"Selector de fecha",
+    "Time":"Hora",
+    "File Upload":"Subir archivo",
+    "Image":"Imagen",
+    "Paragraph":"Párrafo",
+    "Captcha":"Captcha",
+    "Submit Button":"Enviar",
+    "Signature":"Firma",
+    "Appointment":"Cita"
+  };
+  return map[label] || label;
+}
+
+function newForm(){
+  const id = uuid();
+  const now = new Date().toISOString();
+  return {
+    id,
+    name:"Untitled Form",
+    createdAt: now,
+    updatedAt: now,
+    language:"en",
+    exportTarget:"pdf",
+    pages:[{ id: uuid(), fields:[] }],
+  };
+}
+
+function newField(paletteLabel){
+  const type = FIELD_TYPE_MAP[paletteLabel] || "shortText";
+  const id = uuid();
+  const labelEn = paletteLabel;
+  const labelEs = defaultSpanish(paletteLabel);
+
+  // default size and position inside the page padding area
+  return {
+    id,
+    type,
+    x: 30, y: 30,
+    w: 320, h: (type==="header"||type==="paragraph") ? 90 : 62,
+    required: false,
+    label: { en: labelEn, es: labelEs },
+    help: { en:"", es:"" },
+    options: ["dropdown","singleChoice","multipleChoice"].includes(type)
+      ? [{en:"Option 1",es:"Opción 1"},{en:"Option 2",es:"Opción 2"}] : [],
+    rules: { futureOnly: type==="appointment" }
+  };
+}
+
+/* =======================
+   STATE
+======================= */
+let store = { forms:[], archived:[] };
+let form = newForm();
+let activePageIndex = 0;
+let selectedFieldId = null;
+
+/* =======================
+   DOM
+======================= */
+const elPalette = document.getElementById("palette");
+const elPage = document.getElementById("page");
+const elTabs = document.getElementById("pageTabs");
+
+const elFormName = document.getElementById("formName");
+const elExportTarget = document.getElementById("exportTarget");
+
+const btnSave = document.getElementById("btnSave");
+const btnShare = document.getElementById("btnShare");
+const btnExport = document.getElementById("btnExport");
+const btnArchive = document.getElementById("btnArchive");
+const btnForms = document.getElementById("btnForms");
+const btnArchived = document.getElementById("btnArchived");
+
+const btnLangEn = document.getElementById("langEn");
+const btnLangEs = document.getElementById("langEs");
+
+const propsEmpty = document.getElementById("propsEmpty");
+const props = document.getElementById("props");
+const propLabel = document.getElementById("propLabel");
+const propHelp = document.getElementById("propHelp");
+const propRequired = document.getElementById("propRequired");
+const propOptionsWrap = document.getElementById("propOptionsWrap");
+const propOptions = document.getElementById("propOptions");
+const btnAddOption = document.getElementById("btnAddOption");
+const propFutureWrap = document.getElementById("propFutureWrap");
+const propFutureOnly = document.getElementById("propFutureOnly");
+const btnDelete = document.getElementById("btnDelete");
+
+const overlay = document.getElementById("overlay");
+const overlayTitle = document.getElementById("overlayTitle");
+const overlayCards = document.getElementById("overlayCards");
+const btnCloseOverlay = document.getElementById("btnCloseOverlay");
+
+/* =======================
+   RENDER
+======================= */
+function renderPalette(){
+  elPalette.innerHTML = "";
+  PALETTE_GROUPS.forEach(g => {
+    const title = document.createElement("div");
+    title.className = "groupTitle";
+    title.textContent = g.title;
+    elPalette.appendChild(title);
+
+    g.items.forEach(label => {
+      const item = document.createElement("div");
+      item.className = "paletteItem";
+      item.textContent = label;
+      item.draggable = true;
+      item.dataset.paletteLabel = label;
+      item.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", label);
+      });
+      elPalette.appendChild(item);
+    });
+  });
+}
+
+function renderTabs(){
+  elTabs.innerHTML = "";
+  form.pages.forEach((p, idx) => {
+    const b = document.createElement("button");
+    b.className = "pageTab" + (idx===activePageIndex ? " active" : "");
+    b.textContent = "Page " + (idx+1);
+    b.onclick = () => { activePageIndex = idx; selectedFieldId = null; renderAll(); };
+    elTabs.appendChild(b);
+  });
+  const add = document.createElement("button");
+  add.className = "pageTab add";
+  add.textContent = "+ Add Page";
+  add.onclick = () => {
+    form.pages.push({ id: uuid(), fields:[] });
+    activePageIndex = form.pages.length - 1;
+    selectedFieldId = null;
+    renderAll();
+  };
+  elTabs.appendChild(add);
+}
+
+function fieldLabel(field){
+  const lang = form.language;
+  return (field.label && field.label[lang]) ? field.label[lang] : field.type;
+}
+
+function renderField(field){
+  const node = document.createElement("div");
+  node.className = "field" + (field.id===selectedFieldId ? " selected" : "");
+  node.dataset.fieldId = field.id;
+  node.style.transform = "translate(" + field.x + "px," + field.y + "px)";
+  node.style.width = field.w + "px";
+  node.style.height = field.h + "px";
+
+  node.addEventListener("mousedown", (e) => {
+    e.stopPropagation();
+    selectedFieldId = field.id;
+    renderAll();
+  });
+
+  const label = document.createElement("div");
+  label.className = "fieldLabel";
+  label.textContent = fieldLabel(field);
+
+  const inputWrap = document.createElement("div");
+  inputWrap.style.height = "calc(100% - 22px)";
+
+  const input = buildPreviewInput(field);
+  inputWrap.appendChild(input);
+
+  const handle = document.createElement("div");
+  handle.className = "handle";
+  handle.title = "Resize";
+
+  node.appendChild(label);
+  node.appendChild(inputWrap);
+  node.appendChild(handle);
+
+  // interact.js: draggable + resizable
+  interact(node)
+    .draggable({
+      listeners: {
+        move (event) {
+          const fid = node.dataset.fieldId;
+          const f = getField(fid);
+          if(!f) return;
+          f.x += event.dx;
+          f.y += event.dy;
+          clampFieldToPage(f);
+          node.style.transform = "translate(" + f.x + "px," + f.y + "px)";
+        },
+        end() { renderProps(); }
+      }
+    })
+    .resizable({
+      edges: { right: true, bottom: true },
+      listeners: {
+        move (event) {
+          const fid = node.dataset.fieldId;
+          const f = getField(fid);
+          if(!f) return;
+          f.w = Math.max(120, Math.round(event.rect.width));
+          f.h = Math.max(42, Math.round(event.rect.height));
+          clampFieldToPage(f);
+          node.style.width = f.w + "px";
+          node.style.height = f.h + "px";
+          node.style.transform = "translate(" + f.x + "px," + f.y + "px)";
+        },
+        end() { renderProps(); }
+      }
+    });
+
+  return node;
+}
+
+function buildPreviewInput(field){
+  const t = field.type;
+  let el;
+
+  if (t==="header"){
+    el = document.createElement("div");
+    el.className = "muted";
+    el.style.fontWeight = "900";
+    el.style.fontSize = "18px";
+    el.textContent = "Header / Subheader";
+    return el;
+  }
+
+  if (t==="paragraph"){
+    el = document.createElement("div");
+    el.className = "muted";
+    el.textContent = "Paragraph text…";
+    return el;
+  }
+
+  if (t==="longText"){
+    el = document.createElement("textarea");
+    el.placeholder = "Long answer";
+    return el;
+  }
+
+  if (t==="dropdown" || t==="singleChoice" || t==="multipleChoice"){
+    el = document.createElement("select");
+    (field.options || []).forEach(o => {
+      const opt = document.createElement("option");
+      opt.textContent = (o && o[form.language]) ? o[form.language] : "Option";
+      el.appendChild(opt);
+    });
+    return el;
+  }
+
+  if (t==="email"){ el = document.createElement("input"); el.type="email"; el.placeholder="name@email.com"; return el; }
+  if (t==="phone"){ el = document.createElement("input"); el.type="tel"; el.placeholder="(555) 555-5555"; return el; }
+  if (t==="number"){ el = document.createElement("input"); el.type="number"; el.placeholder="0"; return el; }
+  if (t==="date"){ el = document.createElement("input"); el.type="date"; return el; }
+  if (t==="time"){ el = document.createElement("input"); el.type="time"; return el; }
+  if (t==="appointment"){ el = document.createElement("input"); el.type="datetime-local"; return el; }
+  if (t==="file"){ el = document.createElement("input"); el.type="file"; return el; }
+  if (t==="image" || t==="takePhoto"){ el = document.createElement("input"); el.type="file"; el.accept="image/*"; return el; }
+  if (t==="signature"){
+    el = document.createElement("div");
+    el.className = "muted";
+    el.style.border = "1px dashed var(--border)";
+    el.style.borderRadius = "10px";
+    el.style.padding = "10px";
+    el.textContent = "[Signature pad placeholder]";
+    return el;
+  }
+
+  // default short text
+  el = document.createElement("input");
+  el.type = "text";
+  el.placeholder = "Short answer";
+  return el;
+}
+
+function renderPage(){
+  elPage.classList.remove("over");
+  elPage.innerHTML = '<div class="dropHint"></div>';
+  const p = form.pages[activePageIndex];
+  p.fields.forEach(f => elPage.appendChild(renderField(f)));
+}
+
+function renderProps(){
+  const f = getSelectedField();
+  if(!f){
+    propsEmpty.style.display = "";
+    props.style.display = "none";
+    return;
+  }
+  propsEmpty.style.display = "none";
+  props.style.display = "";
+
+  // label/help are bilingual but edit current language
+  const lang = form.language;
+
+  propLabel.value = (f.label && f.label[lang]) ? f.label[lang] : "";
+  propHelp.value = (f.help && f.help[lang]) ? f.help[lang] : "";
+  propRequired.checked = !!f.required;
+
+  // options
+  const hasOptions = ["dropdown","singleChoice","multipleChoice"].includes(f.type);
+  propOptionsWrap.style.display = hasOptions ? "" : "none";
+  if(hasOptions){
+    propOptions.innerHTML = "";
+    (f.options || []).forEach((o, idx) => {
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.gap = "8px";
+      row.style.marginBottom = "8px";
+
+      const inp = document.createElement("input");
+      inp.value = (o && o[lang]) ? o[lang] : "";
+      inp.oninput = () => {
+        if(!f.options) f.options = [];
+        f.options[idx] = { ...(f.options[idx]||{}), [lang]: inp.value };
+        renderPage();
+      };
+
+      const del = document.createElement("button");
+      del.className = "btn small secondary";
+      del.textContent = "×";
+      del.onclick = () => {
+        f.options.splice(idx, 1);
+        renderProps();
+        renderPage();
+      };
+
+      row.appendChild(inp);
+      row.appendChild(del);
+      propOptions.appendChild(row);
+    });
+  }
+
+  // appointment future-only
+  propFutureWrap.style.display = (f.type==="appointment") ? "" : "none";
+  propFutureOnly.checked = !!(f.rules && f.rules.futureOnly);
+}
+
+function renderAll(){
+  // top controls
+  elFormName.value = form.name;
+  elExportTarget.value = form.exportTarget;
+
+  btnLangEn.classList.toggle("active", form.language==="en");
+  btnLangEs.classList.toggle("active", form.language==="es");
+
+  renderTabs();
+  renderPage();
+  renderProps();
+}
+
+function clampFieldToPage(f){
+  // page padding is 24px; keep fields inside the content area
+  const pad = 24;
+  const maxX = (816 - pad*2) - f.w;
+  const maxY = (1056 - pad*2) - f.h;
+  f.x = Math.max(pad, Math.min(pad + maxX, f.x));
+  f.y = Math.max(pad, Math.min(pad + maxY, f.y));
+}
+
+function getField(id){
+  const p = form.pages[activePageIndex];
+  return p.fields.find(x => x.id === id);
+}
+function getSelectedField(){
+  if(!selectedFieldId) return null;
+  return getField(selectedFieldId);
+}
+
+/* =======================
+   EVENTS
+======================= */
+elFormName.addEventListener("input", () => {
+  form.name = elFormName.value || "Untitled Form";
+});
+
+elExportTarget.addEventListener("change", () => {
+  form.exportTarget = elExportTarget.value;
+});
+
+btnLangEn.onclick = () => { form.language = "en"; renderAll(); };
+btnLangEs.onclick = () => { form.language = "es"; renderAll(); };
+
+elPage.addEventListener("mousedown", () => {
+  selectedFieldId = null;
+  renderAll();
+});
+
+elPage.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  elPage.classList.add("over");
+});
+elPage.addEventListener("dragleave", () => elPage.classList.remove("over"));
+
+elPage.addEventListener("drop", (e) => {
+  e.preventDefault();
+  elPage.classList.remove("over");
+  const label = e.dataTransfer.getData("text/plain");
+  if(!label) return;
+
+  const p = form.pages[activePageIndex];
+  const f = newField(label);
+
+  // place at cursor relative to page
+  const rect = elPage.getBoundingClientRect();
+  const x = Math.round(e.clientX - rect.left);
+  const y = Math.round(e.clientY - rect.top);
+  f.x = x;
+  f.y = y;
+  clampFieldToPage(f);
+
+  p.fields.push(f);
+  selectedFieldId = f.id;
+  renderAll();
+});
+
+// Properties editing
+propLabel.oninput = () => {
+  const f = getSelectedField(); if(!f) return;
+  const lang = form.language;
+  f.label = f.label || {};
+  f.label[lang] = propLabel.value;
+  renderPage();
+};
+propHelp.oninput = () => {
+  const f = getSelectedField(); if(!f) return;
+  const lang = form.language;
+  f.help = f.help || {};
+  f.help[lang] = propHelp.value;
+};
+propRequired.onchange = () => {
+  const f = getSelectedField(); if(!f) return;
+  f.required = propRequired.checked;
+};
+
+btnAddOption.onclick = () => {
+  const f = getSelectedField(); if(!f) return;
+  if(!f.options) f.options = [];
+  f.options.push({ en:"Option", es:"Opción" });
+  renderProps();
+  renderPage();
+};
+
+propFutureOnly.onchange = () => {
+  const f = getSelectedField(); if(!f) return;
+  f.rules = f.rules || {};
+  f.rules.futureOnly = propFutureOnly.checked;
+};
+
+btnDelete.onclick = () => {
+  const p = form.pages[activePageIndex];
+  p.fields = p.fields.filter(x => x.id !== selectedFieldId);
+  selectedFieldId = null;
+  renderAll();
+};
+
+// Save / Archive / Share / Export
+btnSave.onclick = async () => {
+  form.updatedAt = new Date().toISOString();
+  await fetch("/api/forms/save", {
+    method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ form })
+  });
+  await refreshStore();
+  toast("Saved");
+};
+
+btnArchive.onclick = async () => {
+  await fetch("/api/forms/archive", {
+    method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ formId: form.id })
+  });
+  await refreshStore();
+  form = newForm();
+  activePageIndex = 0;
+  selectedFieldId = null;
+  renderAll();
+  toast("Archived");
+};
+
+btnShare.onclick = () => {
+  const url = location.origin + "/form-builder-1?formId=" + encodeURIComponent(form.id);
+  navigator.clipboard?.writeText(url).catch(()=>{});
+  window.open("mailto:?subject=" + encodeURIComponent(form.name) + "&body=" + encodeURIComponent(url), "_blank");
+  toast("Share link copied");
+};
+
+btnExport.onclick = () => {
+  if(form.exportTarget === "pdf"){
+    // best single-file approach: browser print -> Save as PDF
+    window.print();
+    return;
+  }
+  if(form.exportTarget === "docx"){
+    alert("DOCX export stub. Hook: convert schema -> docx with a server-side pipeline.");
+    return;
+  }
+  if(form.exportTarget === "xlsx"){
+    alert("XLSX export stub. Hook: convert schema -> xlsx with a server-side pipeline.");
+    return;
+  }
+};
+
+// Forms / Archived overlays
+btnForms.onclick = () => openOverlay("Forms", store.forms, "forms");
+btnArchived.onclick = () => openOverlay("Archived", store.archived, "archived");
+btnCloseOverlay.onclick = closeOverlay;
+
+async function refreshStore(){
+  const res = await fetch("/api/forms");
+  store = await res.json();
+
+  // load formId if provided
+  const params = new URLSearchParams(location.search);
+  const id = params.get("formId");
+  if(id){
+    const found = store.forms.find(f => f.id === id);
+    if(found){
+      form = found;
+      activePageIndex = 0;
+      selectedFieldId = null;
+    }
+  }
+}
+
+function openOverlay(title, list, mode){
+  overlayTitle.textContent = title;
+  overlayCards.innerHTML = "";
+  overlay.style.display = "";
+
+  list.forEach(f => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const t = document.createElement("div");
+    t.className = "cardTitle";
+    t.textContent = f.name;
+
+    const m1 = document.createElement("div");
+    m1.className = "cardMeta";
+    m1.textContent = "Updated: " + new Date(f.updatedAt).toLocaleString();
+
+    const m2 = document.createElement("div");
+    m2.className = "cardMeta";
+    m2.textContent = "Pages: " + (f.pages ? f.pages.length : 0);
+
+    const actions = document.createElement("div");
+    actions.style.display = "flex";
+    actions.style.gap = "8px";
+    actions.style.marginTop = "10px";
+
+    const openBtn = document.createElement("button");
+    openBtn.className = "btn small";
+    openBtn.textContent = "Open";
+    openBtn.onclick = () => {
+      form = JSON.parse(JSON.stringify(f));
+      activePageIndex = 0;
+      selectedFieldId = null;
+      closeOverlay();
+      renderAll();
+    };
+
+    actions.appendChild(openBtn);
+
+    if(mode==="archived"){
+      const restoreBtn = document.createElement("button");
+      restoreBtn.className = "btn small secondary";
+      restoreBtn.textContent = "Restore";
+      restoreBtn.onclick = async () => {
+        await fetch("/api/forms/restore", {
+          method:"POST", headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ formId: f.id })
+        });
+        await refreshStore();
+        openOverlay("Archived", store.archived, "archived");
+      };
+      actions.appendChild(restoreBtn);
+    }
+
+    card.appendChild(t);
+    card.appendChild(m1);
+    card.appendChild(m2);
+    card.appendChild(actions);
+    overlayCards.appendChild(card);
+  });
+}
+function closeOverlay(){ overlay.style.display = "none"; }
+
+/* Toast (simple) */
+let toastTimer=null;
+function toast(msg){
+  let el = document.getElementById("toast");
+  if(!el){
+    el = document.createElement("div");
+    el.id="toast";
+    el.style.position="fixed";
+    el.style.bottom="18px";
+    el.style.left="50%";
+    el.style.transform="translateX(-50%)";
+    el.style.background="#111";
+    el.style.color="#fff";
+    el.style.padding="10px 12px";
+    el.style.borderRadius="12px";
+    el.style.zIndex="9999";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.display="";
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{ el.style.display="none"; }, 1400);
+}
+
+/* =======================
+   INIT
+======================= */
+renderPalette();
+refreshStore().then(() => {
+  // if URL has formId and found, refreshStore already loaded it
+  // otherwise start new
+  elFormName.value = form.name;
+  renderAll();
+});
+</script>
+</body>
+</html>`;

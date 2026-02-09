@@ -1790,3 +1790,26 @@ export const insertUserQuizAttemptSchema = createInsertSchema(userQuizAttempts).
 
 export type InsertUserQuizAttempt = z.infer<typeof insertUserQuizAttemptSchema>;
 export type UserQuizAttempt = typeof userQuizAttempts.$inferSelect;
+
+export const builderForms = pgTable("builder_forms", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().default("Untitled Form"),
+  language: text("language").notNull().default("en"),
+  exportTarget: text("export_target").notNull().default("pdf"),
+  pages: jsonb("pages").notNull().default(sql`'[]'::jsonb`),
+  archived: boolean("archived").notNull().default(false),
+  archivedAt: timestamp("archived_at"),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBuilderFormSchema = createInsertSchema(builderForms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  archivedAt: true,
+});
+
+export type InsertBuilderForm = z.infer<typeof insertBuilderFormSchema>;
+export type BuilderForm = typeof builderForms.$inferSelect;

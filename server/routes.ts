@@ -17,6 +17,7 @@ import {
   insertSiteMapFeatureSchema,
   insertConfiguredIntegrationSchema,
   insertIntegrationResearchSessionSchema,
+  insertBuilderFormSchema,
   type User 
 } from "@shared/schema";
 import { z } from "zod";
@@ -3809,6 +3810,105 @@ Generate detailed information for this landscaping material.`;
       res.sendStatus(204);
     } catch (err) {
       res.status(500).json({ message: "Error deleting template" });
+    }
+  });
+
+  // Builder Forms (Form Builder 1)
+  app.get("/api/builder-forms", requireAuth, async (req, res) => {
+    try {
+      const archived = req.query.archived === "true";
+      const forms = await storage.getBuilderForms(archived);
+      res.json(forms);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching builder forms" });
+    }
+  });
+
+  app.get("/api/builder-forms/:id", requireAuth, async (req, res) => {
+    try {
+      const form = await storage.getBuilderForm(req.params.id);
+      if (!form) return res.status(404).json({ message: "Form not found" });
+      res.json(form);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching builder form" });
+    }
+  });
+
+  app.post("/api/builder-forms", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const validated = insertBuilderFormSchema.parse({
+        name: req.body.name || "Untitled Form",
+        language: req.body.language || "en",
+        exportTarget: req.body.exportTarget || "pdf",
+        pages: req.body.pages || [],
+        archived: false,
+        createdBy: user.id,
+      });
+      const form = await storage.createBuilderForm(validated);
+      res.status(201).json(form);
+    } catch (err: any) {
+      if (err?.name === "ZodError") {
+        return res.status(400).json({ message: "Invalid form data", errors: err.errors });
+      }
+      res.status(500).json({ message: "Error creating builder form" });
+    }
+  });
+
+  app.patch("/api/builder-forms/:id", requireAuth, async (req, res) => {
+    try {
+      const updateSchema = z.object({
+        name: z.string().optional(),
+        language: z.string().optional(),
+        exportTarget: z.string().optional(),
+        pages: z.any().optional(),
+        archived: z.boolean().optional(),
+        archivedAt: z.any().optional(),
+      });
+      const validated = updateSchema.parse(req.body);
+      const form = await storage.updateBuilderForm(req.params.id, validated);
+      if (!form) return res.status(404).json({ message: "Form not found" });
+      res.json(form);
+    } catch (err: any) {
+      if (err?.name === "ZodError") {
+        return res.status(400).json({ message: "Invalid form data", errors: err.errors });
+      }
+      res.status(500).json({ message: "Error updating builder form" });
+    }
+  });
+
+  app.post("/api/builder-forms/:id/archive", requireAuth, async (req, res) => {
+    try {
+      const form = await storage.updateBuilderForm(req.params.id, {
+        archived: true,
+        archivedAt: new Date(),
+      });
+      if (!form) return res.status(404).json({ message: "Form not found" });
+      res.json(form);
+    } catch (err) {
+      res.status(500).json({ message: "Error archiving form" });
+    }
+  });
+
+  app.post("/api/builder-forms/:id/restore", requireAuth, async (req, res) => {
+    try {
+      const form = await storage.updateBuilderForm(req.params.id, {
+        archived: false,
+        archivedAt: null,
+      });
+      if (!form) return res.status(404).json({ message: "Form not found" });
+      res.json(form);
+    } catch (err) {
+      res.status(500).json({ message: "Error restoring form" });
+    }
+  });
+
+  app.delete("/api/builder-forms/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteBuilderForm(req.params.id);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting builder form" });
     }
   });
 

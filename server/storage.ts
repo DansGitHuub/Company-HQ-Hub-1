@@ -69,6 +69,7 @@ import {
   sopQuizzes, type SopQuiz, type InsertSopQuiz,
   sopQuizQuestions, type SopQuizQuestion, type InsertSopQuizQuestion,
   userQuizAttempts, type UserQuizAttempt, type InsertUserQuizAttempt,
+  builderForms, type BuilderForm, type InsertBuilderForm,
   conversations, chatMessages
 } from "@shared/schema";
 import { db, pool } from "./db";
@@ -219,6 +220,13 @@ export interface IStorage {
   createFormTemplate(template: InsertFormTemplate): Promise<FormTemplate>;
   updateFormTemplate(id: string, updates: Partial<FormTemplate>): Promise<FormTemplate | undefined>;
   deleteFormTemplate(id: string): Promise<boolean>;
+  
+  // Builder Forms
+  getBuilderForms(archived?: boolean): Promise<BuilderForm[]>;
+  getBuilderForm(id: string): Promise<BuilderForm | undefined>;
+  createBuilderForm(form: InsertBuilderForm): Promise<BuilderForm>;
+  updateBuilderForm(id: string, updates: Partial<BuilderForm>): Promise<BuilderForm | undefined>;
+  deleteBuilderForm(id: string): Promise<boolean>;
   
   // Equipment
   getEquipment(): Promise<Equipment[]>;
@@ -1113,6 +1121,34 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFormTemplate(id: string): Promise<boolean> {
     await db.delete(formTemplates).where(eq(formTemplates.id, id));
+    return true;
+  }
+
+  // Builder Forms methods
+  async getBuilderForms(archived?: boolean): Promise<BuilderForm[]> {
+    if (archived !== undefined) {
+      return db.select().from(builderForms).where(eq(builderForms.archived, archived)).orderBy(desc(builderForms.updatedAt));
+    }
+    return db.select().from(builderForms).orderBy(desc(builderForms.updatedAt));
+  }
+
+  async getBuilderForm(id: string): Promise<BuilderForm | undefined> {
+    const [form] = await db.select().from(builderForms).where(eq(builderForms.id, id));
+    return form || undefined;
+  }
+
+  async createBuilderForm(form: InsertBuilderForm): Promise<BuilderForm> {
+    const [newForm] = await db.insert(builderForms).values(form).returning();
+    return newForm;
+  }
+
+  async updateBuilderForm(id: string, updates: Partial<BuilderForm>): Promise<BuilderForm | undefined> {
+    const [form] = await db.update(builderForms).set({ ...updates, updatedAt: new Date() }).where(eq(builderForms.id, id)).returning();
+    return form || undefined;
+  }
+
+  async deleteBuilderForm(id: string): Promise<boolean> {
+    await db.delete(builderForms).where(eq(builderForms.id, id));
     return true;
   }
 
