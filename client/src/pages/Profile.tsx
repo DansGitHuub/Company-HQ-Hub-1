@@ -253,7 +253,7 @@ export default function Profile() {
             <div>
               <CardTitle className="text-xl">{displayProfile?.name}</CardTitle>
               <CardDescription>@{displayProfile?.username}</CardDescription>
-              <Badge className="mt-2" variant="outline">{displayProfile?.role}</Badge>
+              <Badge className="mt-2" variant="outline">{displayProfile?.isMasterAdmin ? "Master Admin" : displayProfile?.role}</Badge>
             </div>
           </div>
         </CardHeader>
@@ -351,7 +351,7 @@ export default function Profile() {
           </div>
           <div className="flex justify-between items-center py-2 border-b">
             <span className="text-muted-foreground">Role</span>
-            <Badge variant="outline">{displayProfile?.role}</Badge>
+            <Badge variant="outline">{displayProfile?.isMasterAdmin ? "Master Admin" : displayProfile?.role}</Badge>
           </div>
           <div className="flex justify-between items-center py-2">
             <span className="text-muted-foreground">Member Since</span>

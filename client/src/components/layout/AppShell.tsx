@@ -502,7 +502,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div className="flex flex-col items-start">
                 <span className="font-semibold text-sm">{user?.name || "User"}</span>
                 <span className="text-xs text-muted-foreground">
-                  {previewRole ? `Viewing: ${previewRole}` : (user?.role || "N/A")}
+                  {previewRole ? `Viewing: ${previewRole}` : (user?.isMasterAdmin ? "Master Admin" : (user?.role || "N/A"))}
                 </span>
               </div>
             </Button>
