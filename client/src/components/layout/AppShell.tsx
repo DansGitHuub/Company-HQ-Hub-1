@@ -126,6 +126,11 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
     description: "Build custom forms for applications, surveys, and data collection.",
     tips: ["Drag-and-drop builder", "Multiple field types", "Review submissions"]
   },
+  form_builder_1: {
+    title: "Builder 1",
+    description: "Advanced form builder with drag-and-drop canvas and custom fields.",
+    tips: ["Drag fields onto the canvas", "Multi-page support", "Export to PDF or Word"]
+  },
   inbox: {
     title: "Messages",
     description: "View and respond to customer messages and inquiries.",
