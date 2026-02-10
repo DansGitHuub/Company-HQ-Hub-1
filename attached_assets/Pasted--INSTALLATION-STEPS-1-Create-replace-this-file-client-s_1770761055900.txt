@@ -1,0 +1,2489 @@
+/* ===== INSTALLATION_STEPS =====
+1) Create/replace this file:
+   client/src/pages/FormBuilder1.tsx
+2) Confirm the route + sidebar are already wired (per your setup):
+   - client/src/App.tsx includes: <Route path="/form-builder-1" component={FormBuilder1} />
+   - AppShell sidebar already has a tab pointing to "/form-builder-1"
+3) Confirm shadcn/ui components exist at these import paths (typical in CompanyHQ):
+   - "@/components/ui/button"
+   - "@/components/ui/card"
+   - "@/components/ui/input"
+   - "@/components/ui/textarea"
+   - "@/components/ui/select"
+   - "@/components/ui/tabs"
+   - "@/components/ui/badge"
+   - "@/components/ui/checkbox"
+   - "@/components/ui/switch"
+   If any path differs, update imports below to match your project.
+4) Run the app in Replit:
+   - Frontend dev: usual CompanyHQ command (e.g. `npm run dev`)
+5) Visit:
+   - /form-builder-1
+*/
+
+/* ===== CODE ===== */
+
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+
+// shadcn/ui (adjust paths if your project differs)
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+
+/**
+ * Form Builder 1 (v1) — Single-file page
+ * - Admin/Master Admin: Build mode (templates)
+ * - Everyone: Use mode (fill templates assigned to their role)
+ * - Storage v1: localStorage
+ * - DB/API ready later: adapter stub included
+ *
+ * IMPORTANT v1 limitation:
+ * - Submissions saved locally are only visible on the same device/browser.
+ */
+
+// -----------------------------
+// Constants
+// -----------------------------
+
+const PURPOSE_TYPES_DEFAULT = [
+  "Hiring",
+  "HR",
+  "Customer Request",
+  "Safety",
+  "Operations",
+  "Training",
+  "Finance",
+  "General",
+  "Other",
+] as const;
+
+type PurposeType = (typeof PURPOSE_TYPES_DEFAULT)[number];
+
+type Role = "Customer" | "Crew" | "Manager" | "Admin";
+type UserLevel = "Master Admin" | Role;
+
+type TemplateStatus = "Draft" | "Active" | "On Hold" | "Archived";
+
+const LS_KEYS = {
+  templates: "companyhq_formbuilder1_templates_v1",
+  submissions: "companyhq_formbuilder1_submissions_v1",
+} as const;
+
+// Letter size canvas (approx @ 96dpi)
+const LETTER = {
+  w: 816,
+  h: 1056,
+  pad: 24, // minimal-ish margins
+};
+
+const USE_API = false; // v1: localStorage only. Flip later when endpoints exist.
+
+// -----------------------------
+// Palette definitions
+// -----------------------------
+
+type PaletteGroup = { id: string; title: string; items: string[] };
+
+const PALETTE_GROUPS: PaletteGroup[] = [
+  {
+    id: "standard",
+    title: "1. Standard Form Items",
+    items: [
+      "Header/Subheader",
+      "Full Name",
+      "Email",
+      "Address",
+      "Phone",
+      "Short Text",
+      "Long Text",
+      "Dropdown",
+      "Single Choice",
+      "Multiple Choice",
+      "Number",
+      "Date Picker",
+      "Time",
+      "File Upload",
+      "Image",
+      "Paragraph",
+      "Captcha",
+      "Submit Button",
+    ],
+  },
+  {
+    id: "survey",
+    title: "2. Survey & Data Items",
+    items: ["Input Table", "Star Rating", "Scale Rating", "Spinner", "Fill In The Blank", "Signature"],
+  },
+  {
+    id: "payments",
+    title: "3. Payment Processing Items",
+    items: [
+      "Product List",
+      "Payment Gateway",
+      "Purchase Order",
+      "Shipping & Tax",
+      "Coupons/Promo Codes",
+      "Payment Authorization",
+    ],
+  },
+  {
+    id: "widgets",
+    title: "4. Advanced Widgets",
+    items: [
+      "Appointment",
+      "Configurable List",
+      "Multiple Text Fields",
+      "Take Photo",
+      "Unique ID",
+      "Form Calculation",
+      "Loom Video Recorder",
+      "Draw Board",
+      "Geolocation",
+      "Terms & Conditions",
+    ],
+  },
+  { id: "layout", title: "5. Page Layout Structure", items: ["Page Break", "Section Collapse", "Divider"] },
+  {
+    id: "behind",
+    title: "6. Behind-the-Scenes Features",
+    items: ["Conditional Logic", "Input Masking", "Hidden Fields", "Pre-populate Fields", "Translation", "Custom CSS"],
+  },
+  {
+    id: "post",
+    title: "7. Post Submission & Automation",
+    items: ["Autoresponder Email", "Notification Email", "Thank You Page", "PDF Converter", "Approval Flows"],
+  },
+  {
+    id: "integrations",
+    title: "8. Integrations (expanded)",
+    items: [
+      "CRM: Salesforce",
+      "CRM: HubSpot",
+      "CRM: Zoho",
+      "CRM: Pipedrive",
+      "CRM: Microsoft Dynamics",
+      "Cloud Storage: Google Drive",
+      "Cloud Storage: Dropbox",
+      "Cloud Storage: OneDrive",
+      "Cloud Storage: Box",
+      "Cloud Storage: SharePoint",
+      "Project Mgmt: Trello",
+      "Project Mgmt: Asana",
+      "Project Mgmt: Monday.com",
+      "Project Mgmt: ClickUp",
+      "Project Mgmt: Jira",
+      "Email Marketing: Mailchimp",
+      "Email Marketing: Constant Contact",
+      "Email Marketing: Klaviyo",
+      "Email Marketing: ActiveCampaign",
+      "Accounting: QuickBooks",
+      "Accounting: Xero",
+      "Payments: Stripe",
+      "Payments: PayPal",
+      "Payments: Square",
+      "E-Sign: DocuSign",
+      "E-Sign: Dropbox Sign",
+      "Calendar: Google Calendar",
+      "Calendar: Outlook Calendar",
+      "SMS: Twilio",
+      "Chat: Slack",
+      "Chat: Microsoft Teams",
+      "Automation: Zapier",
+      "Automation: Make.com",
+      "Automation: n8n",
+      "Webhooks",
+      "REST API",
+      "GraphQL API",
+    ],
+  },
+];
+
+type FieldType =
+  | "header"
+  | "paragraph"
+  | "divider"
+  | "pageBreak"
+  | "fullName"
+  | "email"
+  | "address"
+  | "phone"
+  | "shortText"
+  | "longText"
+  | "dropdown"
+  | "singleChoice"
+  | "multipleChoice"
+  | "number"
+  | "date"
+  | "time"
+  | "appointment"
+  | "file"
+  | "image"
+  | "signature"
+  | "captcha"
+  | "submit"
+  | "unknown";
+
+const FIELD_TYPE_MAP: Record<string, FieldType> = {
+  "Header/Subheader": "header",
+  Paragraph: "paragraph",
+  Divider: "divider",
+  "Page Break": "pageBreak",
+  "Full Name": "fullName",
+  Email: "email",
+  Address: "address",
+  Phone: "phone",
+  "Short Text": "shortText",
+  "Long Text": "longText",
+  Dropdown: "dropdown",
+  "Single Choice": "singleChoice",
+  "Multiple Choice": "multipleChoice",
+  Number: "number",
+  "Date Picker": "date",
+  Time: "time",
+  Appointment: "appointment",
+  "File Upload": "file",
+  Image: "image",
+  Signature: "signature",
+  Captcha: "captcha",
+  "Submit Button": "submit",
+  // everything else is kept as "unknown" for v1 (still placeable)
+};
+
+type Lang = "en" | "es";
+
+const UI_TEXT: Record<Lang, Record<string, string>> = {
+  en: {
+    useForms: "Use Forms",
+    buildForms: "Build Forms",
+    templates: "Templates",
+    submissions: "Submissions",
+    myCompleted: "My Completed Forms",
+    adminInbox: "Admin Submissions Inbox",
+    search: "Search",
+    purpose: "Purpose Type",
+    status: "Status",
+    roles: "Allowed Roles",
+    save: "Save",
+    duplicate: "Duplicate",
+    archive: "Archive",
+    restore: "Restore",
+    hold: "On Hold",
+    activate: "Set Active",
+    draft: "Set Draft",
+    share: "Share",
+    print: "Print / PDF",
+    fill: "Fill",
+    submit: "Submit",
+    required: "Required",
+    language: "Language",
+    english: "English",
+    spanish: "Spanish",
+    addPage: "Add Page",
+    page: "Page",
+    properties: "Properties",
+    label: "Label",
+    help: "Help Text",
+    options: "Options",
+    futureOnly: "Future-only date/time",
+    notAllowed: "You don't have access to Build Forms.",
+    onHoldBlocked: "This form is On Hold and cannot be used.",
+    archivedBlocked: "This form is Archived and cannot be used.",
+    chooseTemplate: "Choose a template",
+    noTemplates: "No templates yet. Admins can create one in Build Forms.",
+    noAllowedTemplates: "No forms assigned to your role yet.",
+    saved: "Saved",
+    copiedLink: "Link copied",
+    submitted: "Submitted",
+    invalid: "Please fix the highlighted fields.",
+    appointmentFuture: "Appointment must be in the future.",
+  },
+  es: {
+    useForms: "Usar formularios",
+    buildForms: "Crear formularios",
+    templates: "Plantillas",
+    submissions: "Envíos",
+    myCompleted: "Mis formularios completados",
+    adminInbox: "Bandeja de envíos (Admin)",
+    search: "Buscar",
+    purpose: "Tipo de propósito",
+    status: "Estado",
+    roles: "Roles permitidos",
+    save: "Guardar",
+    duplicate: "Duplicar",
+    archive: "Archivar",
+    restore: "Restaurar",
+    hold: "En espera",
+    activate: "Activar",
+    draft: "Borrador",
+    share: "Compartir",
+    print: "Imprimir / PDF",
+    fill: "Completar",
+    submit: "Enviar",
+    required: "Requerido",
+    language: "Idioma",
+    english: "Inglés",
+    spanish: "Español",
+    addPage: "Agregar página",
+    page: "Página",
+    properties: "Propiedades",
+    label: "Etiqueta",
+    help: "Texto de ayuda",
+    options: "Opciones",
+    futureOnly: "Solo fecha/hora futura",
+    notAllowed: "No tienes acceso para crear formularios.",
+    onHoldBlocked: "Este formulario está en espera y no se puede usar.",
+    archivedBlocked: "Este formulario está archivado y no se puede usar.",
+    chooseTemplate: "Elige una plantilla",
+    noTemplates: "Aún no hay plantillas. Los admins pueden crear una en Crear formularios.",
+    noAllowedTemplates: "Aún no hay formularios asignados a tu rol.",
+    saved: "Guardado",
+    copiedLink: "Enlace copiado",
+    submitted: "Enviado",
+    invalid: "Corrige los campos marcados.",
+    appointmentFuture: "La cita debe ser en el futuro.",
+  },
+};
+
+function t(lang: Lang, key: string) {
+  return UI_TEXT[lang][key] ?? key;
+}
+
+// -----------------------------
+// Types: Templates & Submissions
+// -----------------------------
+
+type Option = { id: string; label: Record<Lang, string> };
+
+type FormField = {
+  id: string;
+  type: FieldType;
+  paletteLabel: string; // original label so it stays human-friendly
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  required: boolean;
+  label: Record<Lang, string>;
+  help: Record<Lang, string>;
+  options?: Option[]; // for dropdown/single/multi
+  rules?: {
+    futureOnly?: boolean; // for appointment
+  };
+};
+
+type FormPage = {
+  id: string;
+  fields: FormField[];
+};
+
+type FormTemplate = {
+  id: string;
+  name: string;
+  purposeType: PurposeType;
+  status: TemplateStatus;
+  allowed: {
+    masterAdmin: boolean;
+    admin: boolean;
+    manager: boolean;
+    crew: boolean;
+    customer: boolean;
+  };
+  createdAt: string;
+  updatedAt: string;
+  pages: FormPage[];
+};
+
+type Submission = {
+  id: string;
+  templateId: string;
+  templateName: string;
+  purposeType: PurposeType;
+  submittedAt: string;
+  submittedBy: {
+    userId?: string | number;
+    name?: string;
+    role?: Role;
+    isMasterAdmin?: boolean;
+  };
+  valuesByFieldId: Record<string, any>;
+};
+
+// -----------------------------
+// Helpers
+// -----------------------------
+
+function uid() {
+  // crypto.randomUUID is available in modern browsers
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? // @ts-ignore
+      crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function clampToCanvas(f: Pick<FormField, "x" | "y" | "w" | "h">) {
+  const minW = 120;
+  const minH = 42;
+  const w = Math.max(minW, Math.round(f.w));
+  const h = Math.max(minH, Math.round(f.h));
+  const maxX = LETTER.w - LETTER.pad - w;
+  const maxY = LETTER.h - LETTER.pad - h;
+  const x = Math.min(Math.max(LETTER.pad, Math.round(f.x)), maxX);
+  const y = Math.min(Math.max(LETTER.pad, Math.round(f.y)), maxY);
+  return { x, y, w, h };
+}
+
+function isAdminOrMaster(user: any) {
+  return user?.isMasterAdmin === true || user?.role === "Admin";
+}
+
+function userLevel(user: any): UserLevel {
+  if (user?.isMasterAdmin === true) return "Master Admin";
+  const r = user?.role as Role | undefined;
+  return r ?? "Customer";
+}
+
+function canUserUseTemplate(user: any, tpl: FormTemplate) {
+  // Archived templates are not usable by anyone in Use mode
+  if (tpl.status === "Archived") return false;
+
+  const lvl = userLevel(user);
+  if (lvl === "Master Admin") return tpl.allowed.masterAdmin || tpl.allowed.admin || true; // master sees all, but keep allowed logic lenient
+  if (lvl === "Admin") return tpl.allowed.admin || true; // admins can use any; keep allow true
+  if (lvl === "Manager") return tpl.allowed.manager;
+  if (lvl === "Crew") return tpl.allowed.crew;
+  return tpl.allowed.customer;
+}
+
+function canUserSeeTemplateInLibrary(user: any, tpl: FormTemplate) {
+  // Archived hidden from non-admins; admins see in Build library only
+  const admin = isAdminOrMaster(user);
+  if (tpl.status === "Archived") return admin; // only admins see archived in Build
+  // everyone sees only allowed ones in Use library
+  if (!admin) return canUserUseTemplate(user, tpl);
+  return true;
+}
+
+function defaultAllowedAll(): FormTemplate["allowed"] {
+  return { masterAdmin: true, admin: true, manager: true, crew: true, customer: true };
+}
+
+function makeNewTemplate(): FormTemplate {
+  const now = new Date().toISOString();
+  return {
+    id: uid(),
+    name: "Untitled Form",
+    purposeType: "General",
+    status: "Draft",
+    allowed: defaultAllowedAll(),
+    createdAt: now,
+    updatedAt: now,
+    pages: [{ id: uid(), fields: [] }],
+  };
+}
+
+function makeFieldFromPalette(label: string): FormField {
+  const type = FIELD_TYPE_MAP[label] ?? "unknown";
+  const base = {
+    id: uid(),
+    type,
+    paletteLabel: label,
+    x: LETTER.pad + 16,
+    y: LETTER.pad + 16,
+    w: 340,
+    h: type === "header" || type === "paragraph" ? 90 : 62,
+    required: false,
+    label: { en: label, es: label }, // v1: simple; you can refine Spanish labels later
+    help: { en: "", es: "" },
+    rules: { futureOnly: type === "appointment" },
+  } as FormField;
+
+  if (type === "dropdown" || type === "singleChoice" || type === "multipleChoice") {
+    base.options = [
+      { id: uid(), label: { en: "Option 1", es: "Opción 1" } },
+      { id: uid(), label: { en: "Option 2", es: "Opción 2" } },
+    ];
+  }
+  return base;
+}
+
+function safeJsonParse<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+// -----------------------------
+// Storage Adapter (v1 localStorage, v2 API)
+// -----------------------------
+
+const storage = {
+  async loadTemplates(): Promise<FormTemplate[]> {
+    if (USE_API) {
+      // TODO(v2): Replace with fetch("/api/forms/templates") etc.
+      return safeJsonParse<FormTemplate[]>(localStorage.getItem(LS_KEYS.templates), []);
+    }
+    return safeJsonParse<FormTemplate[]>(localStorage.getItem(LS_KEYS.templates), []);
+  },
+
+  async saveTemplates(templates: FormTemplate[]): Promise<void> {
+    if (USE_API) {
+      // TODO(v2): POST to backend
+      localStorage.setItem(LS_KEYS.templates, JSON.stringify(templates));
+      return;
+    }
+    localStorage.setItem(LS_KEYS.templates, JSON.stringify(templates));
+  },
+
+  async loadSubmissions(): Promise<Submission[]> {
+    return safeJsonParse<Submission[]>(localStorage.getItem(LS_KEYS.submissions), []);
+  },
+
+  async saveSubmissions(subs: Submission[]): Promise<void> {
+    localStorage.setItem(LS_KEYS.submissions, JSON.stringify(subs));
+  },
+};
+
+// -----------------------------
+// Mini toast (no extra deps)
+// -----------------------------
+
+function useToast() {
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!msg) return;
+    const t = window.setTimeout(() => setMsg(null), 1400);
+    return () => window.clearTimeout(t);
+  }, [msg]);
+  return {
+    toast: (m: string) => setMsg(m),
+    ToastNode: msg ? (
+      <div className="fixed bottom-5 left-1/2 z-[9999] -translate-x-1/2 rounded-xl bg-black px-3 py-2 text-sm text-white shadow-lg">
+        {msg}
+      </div>
+    ) : null,
+  };
+}
+
+// -----------------------------
+// Drag & Resize (no extra libs)
+// -----------------------------
+
+type DragState =
+  | { kind: "none" }
+  | { kind: "move"; fieldId: string; startX: number; startY: number; originX: number; originY: number }
+  | { kind: "resize"; fieldId: string; startX: number; startY: number; originW: number; originH: number };
+
+function FormBuilder1() {
+  const { user } = useAuth();
+  const admin = isAdminOrMaster(user);
+
+  const [lang, setLang] = useState<Lang>("en");
+  const [mode, setMode] = useState<"use" | "build">("use");
+
+  const { toast, ToastNode } = useToast();
+
+  const [templates, setTemplates] = useState<FormTemplate[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+
+  // Build mode state
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+  const [activePageIndex, setActivePageIndex] = useState(0);
+  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
+
+  // Use mode state
+  const [useSelectedTemplateId, setUseSelectedTemplateId] = useState<string | null>(null);
+  const [fillValues, setFillValues] = useState<Record<string, any>>({});
+  const [fillErrors, setFillErrors] = useState<Record<string, string>>({});
+
+  const [search, setSearch] = useState("");
+  const [purposeFilter, setPurposeFilter] = useState<PurposeType | "All">("All");
+  const [statusFilter, setStatusFilter] = useState<TemplateStatus | "All">("All");
+
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<DragState>({ kind: "none" });
+
+  // Load stored data
+  useEffect(() => {
+    (async () => {
+      const [tpls, subs] = await Promise.all([storage.loadTemplates(), storage.loadSubmissions()]);
+      setTemplates(tpls);
+      setSubmissions(subs);
+    })();
+  }, []);
+
+  // Parse share URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const templateId = params.get("templateId");
+    const view = params.get("view"); // "use" | "build" optional
+    if (view === "build" && admin) setMode("build");
+    if (view === "use") setMode("use");
+    if (templateId) {
+      setMode("use");
+      setUseSelectedTemplateId(templateId);
+    }
+  }, [admin]);
+
+  // keep selected template valid
+  useEffect(() => {
+    if (activeTemplateId && !templates.some((t) => t.id === activeTemplateId)) {
+      setActiveTemplateId(null);
+      setSelectedFieldId(null);
+      setActivePageIndex(0);
+    }
+    if (useSelectedTemplateId && !templates.some((t) => t.id === useSelectedTemplateId)) {
+      setUseSelectedTemplateId(null);
+      setFillValues({});
+      setFillErrors({});
+    }
+  }, [templates, activeTemplateId, useSelectedTemplateId]);
+
+  const activeTemplate = useMemo(
+    () => templates.find((t) => t.id === activeTemplateId) ?? null,
+    [templates, activeTemplateId]
+  );
+
+  const activePage = useMemo(() => {
+    if (!activeTemplate) return null;
+    return activeTemplate.pages[activePageIndex] ?? activeTemplate.pages[0] ?? null;
+  }, [activeTemplate, activePageIndex]);
+
+  const selectedField = useMemo(() => {
+    if (!activePage || !selectedFieldId) return null;
+    return activePage.fields.find((f) => f.id === selectedFieldId) ?? null;
+  }, [activePage, selectedFieldId]);
+
+  const useTemplate = useMemo(
+    () => templates.find((t) => t.id === useSelectedTemplateId) ?? null,
+    [templates, useSelectedTemplateId]
+  );
+
+  // Filters
+  const filteredTemplatesForBuild = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return templates
+      .filter((tpl) => admin || tpl.status !== "Archived")
+      .filter((tpl) => (purposeFilter === "All" ? true : tpl.purposeType === purposeFilter))
+      .filter((tpl) => (statusFilter === "All" ? true : tpl.status === statusFilter))
+      .filter((tpl) => (q ? tpl.name.toLowerCase().includes(q) || tpl.purposeType.toLowerCase().includes(q) : true))
+      .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  }, [templates, search, purposeFilter, statusFilter, admin]);
+
+  const filteredTemplatesForUse = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return templates
+      .filter((tpl) => canUserSeeTemplateInLibrary(user, tpl))
+      .filter((tpl) => tpl.status !== "Archived") // hide archived from use view
+      .filter((tpl) => (purposeFilter === "All" ? true : tpl.purposeType === purposeFilter))
+      .filter((tpl) => (statusFilter === "All" ? true : tpl.status === statusFilter))
+      .filter((tpl) => (q ? tpl.name.toLowerCase().includes(q) || tpl.purposeType.toLowerCase().includes(q) : true))
+      .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  }, [templates, search, purposeFilter, statusFilter, user]);
+
+  // Submissions views
+  const mySubmissions = useMemo(() => {
+    const meName = user?.name ?? user?.username ?? "User";
+    return submissions
+      .filter((s) => (s.submittedBy?.name ?? "") === meName)
+      .sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : -1));
+  }, [submissions, user]);
+
+  const adminInbox = useMemo(() => {
+    if (!admin) return [];
+    return submissions.sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : -1));
+  }, [submissions, admin]);
+
+  // -----------------------------
+  // Mutators
+  // -----------------------------
+
+  async function persistTemplates(next: FormTemplate[]) {
+    setTemplates(next);
+    await storage.saveTemplates(next);
+    toast(t(lang, "saved"));
+  }
+
+  async function persistSubmissions(next: Submission[]) {
+    setSubmissions(next);
+    await storage.saveSubmissions(next);
+    toast(t(lang, "submitted"));
+  }
+
+  function updateActiveTemplate(patch: Partial<FormTemplate>) {
+    if (!activeTemplate) return;
+    const updated: FormTemplate = { ...activeTemplate, ...patch, updatedAt: new Date().toISOString() };
+    const next = templates.map((t) => (t.id === updated.id ? updated : t));
+    void persistTemplates(next);
+  }
+
+  function updateActivePageFields(updateFn: (fields: FormField[]) => FormField[]) {
+    if (!activeTemplate || !activePage) return;
+    const pages = activeTemplate.pages.map((p, idx) => (idx === activePageIndex ? { ...p, fields: updateFn(p.fields) } : p));
+    updateActiveTemplate({ pages });
+  }
+
+  function createTemplate() {
+    const tpl = makeNewTemplate();
+    const next = [tpl, ...templates];
+    void persistTemplates(next);
+    setActiveTemplateId(tpl.id);
+    setSelectedFieldId(null);
+    setActivePageIndex(0);
+  }
+
+  function duplicateTemplate(templateId: string) {
+    const src = templates.find((t) => t.id === templateId);
+    if (!src) return;
+    const now = new Date().toISOString();
+    const dup: FormTemplate = {
+      ...src,
+      id: uid(),
+      name: `${src.name} (Copy)`,
+      status: "Draft",
+      createdAt: now,
+      updatedAt: now,
+      pages: src.pages.map((p) => ({
+        ...p,
+        id: uid(),
+        fields: p.fields.map((f) => ({ ...f, id: uid() })),
+      })),
+    };
+    const next = [dup, ...templates];
+    void persistTemplates(next);
+    setActiveTemplateId(dup.id);
+    setSelectedFieldId(null);
+    setActivePageIndex(0);
+  }
+
+  function setTemplateStatus(templateId: string, status: TemplateStatus) {
+    const tpl = templates.find((t) => t.id === templateId);
+    if (!tpl) return;
+    const next = templates.map((t) =>
+      t.id === templateId ? { ...t, status, updatedAt: new Date().toISOString() } : t
+    );
+    void persistTemplates(next);
+  }
+
+  function archiveTemplate(templateId: string) {
+    setTemplateStatus(templateId, "Archived");
+    if (activeTemplateId === templateId) {
+      setActiveTemplateId(null);
+      setSelectedFieldId(null);
+      setActivePageIndex(0);
+    }
+  }
+
+  function restoreTemplate(templateId: string) {
+    // restore to Draft by default
+    setTemplateStatus(templateId, "Draft");
+  }
+
+  function addPage() {
+    if (!activeTemplate) return;
+    const pages = [...activeTemplate.pages, { id: uid(), fields: [] as FormField[] }];
+    updateActiveTemplate({ pages });
+    setActivePageIndex(pages.length - 1);
+    setSelectedFieldId(null);
+  }
+
+  function addFieldFromPalette(paletteLabel: string) {
+    if (!activeTemplate || !activePage) return;
+    const f = makeFieldFromPalette(paletteLabel);
+    const { x, y, w, h } = clampToCanvas(f);
+    const field = { ...f, x, y, w, h };
+    updateActivePageFields((fields) => [...fields, field]);
+    setSelectedFieldId(field.id);
+  }
+
+  function deleteSelectedField() {
+    if (!selectedFieldId) return;
+    updateActivePageFields((fields) => fields.filter((f) => f.id !== selectedFieldId));
+    setSelectedFieldId(null);
+  }
+
+  // -----------------------------
+  // Share / Print
+  // -----------------------------
+
+  async function shareTemplate(templateId: string) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", "use");
+    url.searchParams.set("templateId", templateId);
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      toast(t(lang, "copiedLink"));
+    } catch {
+      // fallback: open mailto
+      window.open(
+        `mailto:?subject=${encodeURIComponent("CompanyHQ Form")}&body=${encodeURIComponent(url.toString())}`,
+        "_blank"
+      );
+    }
+  }
+
+  function printCurrent() {
+    // v1: user prints page. Browser "Save as PDF" is reliable.
+    window.print();
+  }
+
+  // -----------------------------
+  // Use mode: Fill & submit
+  // -----------------------------
+
+  function resetFill(template: FormTemplate | null) {
+    setFillValues({});
+    setFillErrors({});
+    if (!template) return;
+    // no auto-fill; future: prepopulate hooks
+  }
+
+  function validateAndSubmit(template: FormTemplate) {
+    const errors: Record<string, string> = {};
+    const values = fillValues;
+
+    // status checks
+    if (template.status === "On Hold") {
+      toast(t(lang, "onHoldBlocked"));
+      return;
+    }
+    if (template.status === "Archived") {
+      toast(t(lang, "archivedBlocked"));
+      return;
+    }
+
+    // role access checks
+    if (!canUserUseTemplate(user, template)) {
+      toast(t(lang, "notAllowed"));
+      return;
+    }
+
+    // validate fields
+    for (const page of template.pages) {
+      for (const field of page.fields) {
+        const v = values[field.id];
+
+        if (field.required) {
+          const empty =
+            v === undefined ||
+            v === null ||
+            v === "" ||
+            (Array.isArray(v) && v.length === 0);
+          if (empty) errors[field.id] = t(lang, "required");
+        }
+
+        if (field.type === "appointment" && field.rules?.futureOnly && v) {
+          const dt = new Date(v).getTime();
+          if (!Number.isFinite(dt) || dt <= Date.now()) {
+            errors[field.id] = t(lang, "appointmentFuture");
+          }
+        }
+      }
+    }
+
+    setFillErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast(t(lang, "invalid"));
+      return;
+    }
+
+    const sub: Submission = {
+      id: uid(),
+      templateId: template.id,
+      templateName: template.name,
+      purposeType: template.purposeType,
+      submittedAt: new Date().toISOString(),
+      submittedBy: {
+        // these fields vary by your actual user shape; keep safe
+        userId: user?.id,
+        name: user?.name ?? user?.username ?? "User",
+        role: user?.role,
+        isMasterAdmin: user?.isMasterAdmin === true,
+      },
+      valuesByFieldId: values,
+    };
+
+    void persistSubmissions([sub, ...submissions]);
+    // reset after submit
+    setFillValues({});
+    setFillErrors({});
+  }
+
+  // -----------------------------
+  // Drag / Resize handlers (Build mode)
+  // -----------------------------
+
+  function onFieldPointerDownMove(e: React.PointerEvent, fieldId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!admin) return;
+
+    setSelectedFieldId(fieldId);
+
+    const field = activePage?.fields.find((f) => f.id === fieldId);
+    if (!field) return;
+
+    dragRef.current = {
+      kind: "move",
+      fieldId,
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: field.x,
+      originY: field.y,
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function onFieldPointerDownResize(e: React.PointerEvent, fieldId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!admin) return;
+
+    setSelectedFieldId(fieldId);
+
+    const field = activePage?.fields.find((f) => f.id === fieldId);
+    if (!field) return;
+
+    dragRef.current = {
+      kind: "resize",
+      fieldId,
+      startX: e.clientX,
+      startY: e.clientY,
+      originW: field.w,
+      originH: field.h,
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function onCanvasPointerMove(e: React.PointerEvent) {
+    const st = dragRef.current;
+    if (st.kind === "none") return;
+    if (!activePage) return;
+
+    if (st.kind === "move") {
+      const dx = e.clientX - st.startX;
+      const dy = e.clientY - st.startY;
+      updateActivePageFields((fields) =>
+        fields.map((f) => {
+          if (f.id !== st.fieldId) return f;
+          const next = clampToCanvas({ x: st.originX + dx, y: st.originY + dy, w: f.w, h: f.h });
+          return { ...f, x: next.x, y: next.y };
+        })
+      );
+    } else if (st.kind === "resize") {
+      const dx = e.clientX - st.startX;
+      const dy = e.clientY - st.startY;
+      updateActivePageFields((fields) =>
+        fields.map((f) => {
+          if (f.id !== st.fieldId) return f;
+          const next = clampToCanvas({ x: f.x, y: f.y, w: st.originW + dx, h: st.originH + dy });
+          return { ...f, w: next.w, h: next.h };
+        })
+      );
+    }
+  }
+
+  function onCanvasPointerUp() {
+    dragRef.current = { kind: "none" };
+  }
+
+  // -----------------------------
+  // Drop from palette onto canvas (Build)
+  // -----------------------------
+
+  function onPaletteDragStart(e: React.DragEvent, paletteLabel: string) {
+    e.dataTransfer.setData("text/plain", paletteLabel);
+  }
+
+  function onCanvasDragOver(e: React.DragEvent) {
+    if (!admin) return;
+    e.preventDefault();
+  }
+
+  function onCanvasDrop(e: React.DragEvent) {
+    if (!admin) return;
+    e.preventDefault();
+    const paletteLabel = e.dataTransfer.getData("text/plain");
+    if (!paletteLabel) return;
+    if (!activeTemplate || !activePage) return;
+
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const base = makeFieldFromPalette(paletteLabel);
+
+    if (rect) {
+      base.x = Math.round(e.clientX - rect.left);
+      base.y = Math.round(e.clientY - rect.top);
+    }
+    const clamped = clampToCanvas(base);
+    const field: FormField = { ...base, ...clamped };
+
+    updateActivePageFields((fields) => [...fields, field]);
+    setSelectedFieldId(field.id);
+  }
+
+  // -----------------------------
+  // Render helpers
+  // -----------------------------
+
+  function statusBadge(status: TemplateStatus) {
+    const map: Record<TemplateStatus, { variant: "default" | "secondary" | "destructive"; label: string }> = {
+      Draft: { variant: "secondary", label: "Draft" },
+      Active: { variant: "default", label: "Active" },
+      "On Hold": { variant: "secondary", label: "On Hold" },
+      Archived: { variant: "destructive", label: "Archived" },
+    };
+    const s = map[status];
+    // shadcn Badge variants may differ; fallback to default styling
+    return (
+      <Badge className="ml-2" variant={s.variant as any}>
+        {s.label}
+      </Badge>
+    );
+  }
+
+  function roleKeyToLabel(k: keyof FormTemplate["allowed"]) {
+    switch (k) {
+      case "masterAdmin":
+        return "Master Admin";
+      case "admin":
+        return "Admin";
+      case "manager":
+        return "Manager";
+      case "crew":
+        return "Crew";
+      case "customer":
+        return "Customer";
+      default:
+        return k;
+    }
+  }
+
+  // -----------------------------
+  // UI: Header
+  // -----------------------------
+
+  return (
+    <div className="p-4">
+      {ToastNode}
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold">Form Builder 1</h1>
+          <Badge variant="secondary" className="ml-2">
+            v1 (local storage)
+          </Badge>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2">
+            <span className="text-xs text-muted-foreground">{t(lang, "language")}</span>
+            <Button
+              variant={lang === "en" ? "default" : "secondary"}
+              size="sm"
+              onClick={() => setLang("en")}
+            >
+              {t(lang, "english")}
+            </Button>
+            <Button
+              variant={lang === "es" ? "default" : "secondary"}
+              size="sm"
+              onClick={() => setLang("es")}
+            >
+              {t(lang, "spanish")}
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2">
+            <span className="text-xs text-muted-foreground">Mode</span>
+            <Button variant={mode === "use" ? "default" : "secondary"} size="sm" onClick={() => setMode("use")}>
+              {t(lang, "useForms")}
+            </Button>
+            <Button
+              variant={mode === "build" ? "default" : "secondary"}
+              size="sm"
+              onClick={() => setMode("build")}
+              disabled={!admin}
+              title={!admin ? t(lang, "notAllowed") : undefined}
+            >
+              {t(lang, "buildForms")}
+            </Button>
+          </div>
+
+          <Button variant="secondary" onClick={printCurrent}>
+            {t(lang, "print")}
+          </Button>
+        </div>
+      </div>
+
+      {/* Filters (shared) */}
+      <Card className="mb-4">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div className="md:col-span-2">
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={`${t(lang, "search")}…`}
+              />
+            </div>
+            <div>
+              <Select value={purposeFilter} onValueChange={(v) => setPurposeFilter(v as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t(lang, "purpose")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All</SelectItem>
+                  {PURPOSE_TYPES_DEFAULT.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t(lang, "status")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All</SelectItem>
+                  {(["Draft", "Active", "On Hold", "Archived"] as TemplateStatus[]).map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {mode === "use" ? (
+        <UseMode
+          lang={lang}
+          user={user}
+          admin={admin}
+          templates={filteredTemplatesForUse}
+          allTemplates={templates}
+          useTemplate={useTemplate}
+          useSelectedTemplateId={useSelectedTemplateId}
+          setUseSelectedTemplateId={(id) => {
+            setUseSelectedTemplateId(id);
+            resetFill(templates.find((t) => t.id === id) ?? null);
+          }}
+          fillValues={fillValues}
+          setFillValues={setFillValues}
+          fillErrors={fillErrors}
+          setFillErrors={setFillErrors}
+          onSubmit={() => useTemplate && validateAndSubmit(useTemplate)}
+          onShare={(id) => void shareTemplate(id)}
+          submissions={submissions}
+          mySubmissions={mySubmissions}
+          adminInbox={adminInbox}
+        />
+      ) : (
+        <BuildMode
+          lang={lang}
+          user={user}
+          admin={admin}
+          templates={filteredTemplatesForBuild}
+          activeTemplate={activeTemplate}
+          activeTemplateId={activeTemplateId}
+          setActiveTemplateId={(id) => {
+            setActiveTemplateId(id);
+            setSelectedFieldId(null);
+            setActivePageIndex(0);
+          }}
+          createTemplate={createTemplate}
+          duplicateTemplate={duplicateTemplate}
+          archiveTemplate={archiveTemplate}
+          restoreTemplate={restoreTemplate}
+          setTemplateStatus={setTemplateStatus}
+          updateActiveTemplate={updateActiveTemplate}
+          activePageIndex={activePageIndex}
+          setActivePageIndex={(idx) => {
+            setActivePageIndex(idx);
+            setSelectedFieldId(null);
+          }}
+          addPage={addPage}
+          activePage={activePage}
+          selectedField={selectedField}
+          selectedFieldId={selectedFieldId}
+          setSelectedFieldId={setSelectedFieldId}
+          addFieldFromPalette={addFieldFromPalette}
+          onPaletteDragStart={onPaletteDragStart}
+          onCanvasDragOver={onCanvasDragOver}
+          onCanvasDrop={onCanvasDrop}
+          canvasRef={canvasRef}
+          onCanvasPointerMove={onCanvasPointerMove}
+          onCanvasPointerUp={onCanvasPointerUp}
+          onFieldPointerDownMove={onFieldPointerDownMove}
+          onFieldPointerDownResize={onFieldPointerDownResize}
+          deleteSelectedField={deleteSelectedField}
+          onShare={(id) => void shareTemplate(id)}
+        />
+      )}
+    </div>
+  );
+}
+
+// -----------------------------
+// Use Mode Component
+// -----------------------------
+
+function UseMode(props: {
+  lang: Lang;
+  user: any;
+  admin: boolean;
+  templates: FormTemplate[];
+  allTemplates: FormTemplate[];
+  useTemplate: FormTemplate | null;
+  useSelectedTemplateId: string | null;
+  setUseSelectedTemplateId: (id: string | null) => void;
+  fillValues: Record<string, any>;
+  setFillValues: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  fillErrors: Record<string, string>;
+  setFillErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  onSubmit: () => void;
+  onShare: (id: string) => void;
+  submissions: Submission[];
+  mySubmissions: Submission[];
+  adminInbox: Submission[];
+}) {
+  const {
+    lang,
+    user,
+    admin,
+    templates,
+    allTemplates,
+    useTemplate,
+    useSelectedTemplateId,
+    setUseSelectedTemplateId,
+    fillValues,
+    setFillValues,
+    fillErrors,
+    onSubmit,
+    onShare,
+    mySubmissions,
+    adminInbox,
+  } = props;
+
+  const hasAllowedTemplates = templates.length > 0;
+
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>{t(lang, "templates")}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!hasAllowedTemplates ? (
+            <div className="text-sm text-muted-foreground">
+              {t(lang, "noAllowedTemplates")}
+              <div className="mt-2">
+                <span className="text-xs">
+                  {t(lang, "noTemplates")}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {templates.map((tpl) => {
+                const usable = canUserUseTemplate(user, tpl) && tpl.status !== "On Hold";
+                return (
+                  <button
+                    key={tpl.id}
+                    className={[
+                      "w-full rounded-xl border p-3 text-left transition",
+                      useSelectedTemplateId === tpl.id ? "border-black bg-black text-white" : "bg-white hover:bg-gray-50",
+                    ].join(" ")}
+                    onClick={() => setUseSelectedTemplateId(tpl.id)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-semibold">{tpl.name}</div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{tpl.purposeType}</Badge>
+                        <Badge variant={tpl.status === "Active" ? "default" : "secondary"}>{tpl.status}</Badge>
+                      </div>
+                    </div>
+                    <div className="mt-1 text-xs opacity-80">
+                      Roles: {allowedRolesSummary(tpl)}
+                    </div>
+                    {!usable && (
+                      <div className="mt-2 text-xs text-red-600">
+                        {tpl.status === "On Hold" ? t(lang, "onHoldBlocked") : t(lang, "notAllowed")}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {useSelectedTemplateId && (
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => onShare(useSelectedTemplateId)}
+              >
+                {t(lang, "share")}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {t(lang, "fill")}{" "}
+              <span className="text-muted-foreground">
+                {useTemplate ? `— ${useTemplate.name}` : ""}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!useTemplate ? (
+              <div className="text-sm text-muted-foreground">{t(lang, "chooseTemplate")}</div>
+            ) : (
+              <FillRenderer
+                lang={lang}
+                user={user}
+                template={useTemplate}
+                fillValues={fillValues}
+                setFillValues={setFillValues}
+                fillErrors={fillErrors}
+              />
+            )}
+
+            {useTemplate && (
+              <div className="mt-4 flex gap-2">
+                <Button onClick={onSubmit} disabled={useTemplate.status !== "Active" && useTemplate.status !== "Draft"}>
+                  {t(lang, "submit")}
+                </Button>
+                <Button variant="secondary" onClick={() => window.print()}>
+                  {t(lang, "print")}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Tabs defaultValue="mine">
+          <TabsList>
+            <TabsTrigger value="mine">{t(lang, "myCompleted")}</TabsTrigger>
+            {admin && <TabsTrigger value="admin">{t(lang, "adminInbox")}</TabsTrigger>}
+          </TabsList>
+
+          <TabsContent value="mine">
+            <Card>
+              <CardContent className="pt-6">
+                <SubmissionsList submissions={mySubmissions} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {admin && (
+            <TabsContent value="admin">
+              <Card>
+                <CardContent className="pt-6">
+                  <SubmissionsList submissions={adminInbox} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+        </Tabs>
+      </div>
+    </div>
+  );
+}
+
+function allowedRolesSummary(tpl: FormTemplate) {
+  const parts: string[] = [];
+  if (tpl.allowed.masterAdmin) parts.push("Master");
+  if (tpl.allowed.admin) parts.push("Admin");
+  if (tpl.allowed.manager) parts.push("Manager");
+  if (tpl.allowed.crew) parts.push("Crew");
+  if (tpl.allowed.customer) parts.push("Customer");
+  return parts.join(", ");
+}
+
+function SubmissionsList({ submissions }: { submissions: Submission[] }) {
+  if (!submissions.length) {
+    return <div className="text-sm text-muted-foreground">No submissions yet (v1 local).</div>;
+  }
+  return (
+    <div className="space-y-2">
+      {submissions.map((s) => (
+        <div key={s.id} className="rounded-xl border bg-white p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="font-semibold">{s.templateName}</div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{s.purposeType}</Badge>
+              <span className="text-xs text-muted-foreground">{new Date(s.submittedAt).toLocaleString()}</span>
+            </div>
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            By: {s.submittedBy?.name ?? "User"} ({s.submittedBy?.isMasterAdmin ? "Master Admin" : s.submittedBy?.role ?? "Customer"})
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// -----------------------------
+// Fill Renderer (Use Mode)
+// -----------------------------
+
+function FillRenderer(props: {
+  lang: Lang;
+  user: any;
+  template: FormTemplate;
+  fillValues: Record<string, any>;
+  setFillValues: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  fillErrors: Record<string, string>;
+}) {
+  const { lang, user, template, fillValues, setFillValues, fillErrors } = props;
+
+  const canUse = canUserUseTemplate(user, template);
+  const blockedReason =
+    template.status === "On Hold"
+      ? t(lang, "onHoldBlocked")
+      : template.status === "Archived"
+      ? t(lang, "archivedBlocked")
+      : !canUse
+      ? t(lang, "notAllowed")
+      : null;
+
+  if (blockedReason) {
+    return (
+      <div className="rounded-xl border bg-white p-4">
+        <div className="text-sm text-red-600">{blockedReason}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {template.pages.map((page, idx) => (
+        <div key={page.id} className="rounded-xl border bg-white p-4">
+          <div className="mb-2 text-sm font-semibold text-muted-foreground">
+            {t(lang, "page")} {idx + 1}
+          </div>
+
+          <div className="space-y-3">
+            {page.fields
+              .filter((f) => f.type !== "divider" && f.type !== "pageBreak") // v1: ignore layout-only widgets in fill
+              .map((field) => (
+                <FillField
+                  key={field.id}
+                  lang={lang}
+                  field={field}
+                  value={fillValues[field.id]}
+                  error={fillErrors[field.id]}
+                  onChange={(v) => setFillValues((prev) => ({ ...prev, [field.id]: v }))}
+                />
+              ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FillField(props: {
+  lang: Lang;
+  field: FormField;
+  value: any;
+  error?: string;
+  onChange: (v: any) => void;
+}) {
+  const { lang, field, value, error, onChange } = props;
+
+  const label = field.label?.[lang] ?? field.paletteLabel;
+  const help = field.help?.[lang] ?? "";
+
+  const common = (
+    <>
+      <div className="flex items-center gap-2">
+        <div className="text-sm font-semibold">{label}</div>
+        {field.required && <Badge variant="secondary">Required</Badge>}
+      </div>
+      {help ? <div className="text-xs text-muted-foreground">{help}</div> : null}
+    </>
+  );
+
+  const errNode = error ? <div className="text-xs text-red-600">{error}</div> : null;
+
+  switch (field.type) {
+    case "header":
+      return (
+        <div className="rounded-xl border bg-white p-3">
+          <div className="text-lg font-bold">{label}</div>
+          {help ? <div className="mt-1 text-sm text-muted-foreground">{help}</div> : null}
+        </div>
+      );
+
+    case "paragraph":
+      return (
+        <div className="rounded-xl border bg-white p-3">
+          <div className="text-sm text-muted-foreground">{label}</div>
+        </div>
+      );
+
+    case "email":
+      return (
+        <div className="space-y-1">
+          {common}
+          <Input
+            type="email"
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            className={error ? "border-red-500" : ""}
+          />
+          {errNode}
+        </div>
+      );
+
+    case "phone":
+      return (
+        <div className="space-y-1">
+          {common}
+          <Input
+            type="tel"
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            className={error ? "border-red-500" : ""}
+          />
+          {errNode}
+        </div>
+      );
+
+    case "number":
+      return (
+        <div className="space-y-1">
+          {common}
+          <Input
+            type="number"
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            className={error ? "border-red-500" : ""}
+          />
+          {errNode}
+        </div>
+      );
+
+    case "date":
+      return (
+        <div className="space-y-1">
+          {common}
+          <Input
+            type="date"
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            className={error ? "border-red-500" : ""}
+          />
+          {errNode}
+        </div>
+      );
+
+    case "time":
+      return (
+        <div className="space-y-1">
+          {common}
+          <Input
+            type="time"
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            className={error ? "border-red-500" : ""}
+          />
+          {errNode}
+        </div>
+      );
+
+    case "appointment":
+      return (
+        <div className="space-y-1">
+          {common}
+          <Input
+            type="datetime-local"
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            className={error ? "border-red-500" : ""}
+          />
+          {errNode}
+        </div>
+      );
+
+    case "file":
+      return (
+        <div className="space-y-1">
+          {common}
+          <Input
+            type="file"
+            onChange={(e) => {
+              const file = (e.target as HTMLInputElement).files?.[0] ?? null;
+              onChange(file ? { name: file.name, size: file.size, type: file.type } : null);
+            }}
+            className={error ? "border-red-500" : ""}
+          />
+          <div className="text-xs text-muted-foreground">v1 stores file metadata only (not the file).</div>
+          {errNode}
+        </div>
+      );
+
+    case "image":
+      return (
+        <div className="space-y-1">
+          {common}
+          <Input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = (e.target as HTMLInputElement).files?.[0] ?? null;
+              onChange(file ? { name: file.name, size: file.size, type: file.type } : null);
+            }}
+            className={error ? "border-red-500" : ""}
+          />
+          <div className="text-xs text-muted-foreground">v1 stores image metadata only (not the image).</div>
+          {errNode}
+        </div>
+      );
+
+    case "dropdown":
+    case "singleChoice":
+      return (
+        <div className="space-y-1">
+          {common}
+          <Select value={value ?? ""} onValueChange={(v) => onChange(v)}>
+            <SelectTrigger className={error ? "border-red-500" : ""}>
+              <SelectValue placeholder="Select…" />
+            </SelectTrigger>
+            <SelectContent>
+              {(field.options ?? []).map((opt) => (
+                <SelectItem key={opt.id} value={opt.id}>
+                  {opt.label?.[lang] ?? "Option"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errNode}
+        </div>
+      );
+
+    case "multipleChoice":
+      return (
+        <div className="space-y-1">
+          {common}
+          <div className="space-y-2 rounded-xl border bg-white p-3">
+            {(field.options ?? []).map((opt) => {
+              const arr: string[] = Array.isArray(value) ? value : [];
+              const checked = arr.includes(opt.id);
+              return (
+                <label key={opt.id} className="flex cursor-pointer items-center gap-2">
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={(c) => {
+                      const next = new Set(arr);
+                      if (c) next.add(opt.id);
+                      else next.delete(opt.id);
+                      onChange(Array.from(next));
+                    }}
+                  />
+                  <span className="text-sm">{opt.label?.[lang] ?? "Option"}</span>
+                </label>
+              );
+            })}
+          </div>
+          {errNode}
+        </div>
+      );
+
+    case "longText":
+      return (
+        <div className="space-y-1">
+          {common}
+          <Textarea
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            className={error ? "border-red-500" : ""}
+          />
+          {errNode}
+        </div>
+      );
+
+    default:
+      return (
+        <div className="space-y-1">
+          {common}
+          <Input
+            type="text"
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            className={error ? "border-red-500" : ""}
+          />
+          {errNode}
+        </div>
+      );
+  }
+}
+
+// -----------------------------
+// Build Mode Component
+// -----------------------------
+
+function BuildMode(props: {
+  lang: Lang;
+  user: any;
+  admin: boolean;
+  templates: FormTemplate[];
+  activeTemplate: FormTemplate | null;
+  activeTemplateId: string | null;
+  setActiveTemplateId: (id: string | null) => void;
+  createTemplate: () => void;
+  duplicateTemplate: (id: string) => void;
+  archiveTemplate: (id: string) => void;
+  restoreTemplate: (id: string) => void;
+  setTemplateStatus: (id: string, s: TemplateStatus) => void;
+  updateActiveTemplate: (patch: Partial<FormTemplate>) => void;
+  activePageIndex: number;
+  setActivePageIndex: (idx: number) => void;
+  addPage: () => void;
+  activePage: FormPage | null;
+  selectedField: FormField | null;
+  selectedFieldId: string | null;
+  setSelectedFieldId: (id: string | null) => void;
+  addFieldFromPalette: (label: string) => void;
+  onPaletteDragStart: (e: React.DragEvent, label: string) => void;
+  onCanvasDragOver: (e: React.DragEvent) => void;
+  onCanvasDrop: (e: React.DragEvent) => void;
+  canvasRef: React.RefObject<HTMLDivElement>;
+  onCanvasPointerMove: (e: React.PointerEvent) => void;
+  onCanvasPointerUp: () => void;
+  onFieldPointerDownMove: (e: React.PointerEvent, id: string) => void;
+  onFieldPointerDownResize: (e: React.PointerEvent, id: string) => void;
+  deleteSelectedField: () => void;
+  onShare: (id: string) => void;
+}) {
+  const {
+    lang,
+    admin,
+    templates,
+    activeTemplate,
+    activeTemplateId,
+    setActiveTemplateId,
+    createTemplate,
+    duplicateTemplate,
+    archiveTemplate,
+    restoreTemplate,
+    setTemplateStatus,
+    updateActiveTemplate,
+    activePageIndex,
+    setActivePageIndex,
+    addPage,
+    activePage,
+    selectedField,
+    setSelectedFieldId,
+    addFieldFromPalette,
+    onPaletteDragStart,
+    onCanvasDragOver,
+    onCanvasDrop,
+    canvasRef,
+    onCanvasPointerMove,
+    onCanvasPointerUp,
+    onFieldPointerDownMove,
+    onFieldPointerDownResize,
+    deleteSelectedField,
+    onShare,
+  } = props;
+
+  if (!admin) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-sm text-muted-foreground">{t(lang, "notAllowed")}</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_1fr_380px]">
+      {/* Left: Templates */}
+      <Card className="h-fit">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>{t(lang, "templates")}</span>
+            <Button size="sm" onClick={createTemplate}>
+              + New
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {!templates.length ? (
+            <div className="text-sm text-muted-foreground">{t(lang, "noTemplates")}</div>
+          ) : (
+            templates.map((tpl) => (
+              <button
+                key={tpl.id}
+                className={[
+                  "w-full rounded-xl border p-3 text-left transition",
+                  activeTemplateId === tpl.id ? "border-black bg-black text-white" : "bg-white hover:bg-gray-50",
+                ].join(" ")}
+                onClick={() => setActiveTemplateId(tpl.id)}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-semibold">{tpl.name}</div>
+                  <Badge variant="secondary">{tpl.purposeType}</Badge>
+                </div>
+                <div className="mt-1 text-xs opacity-80">
+                  <span>Status: {tpl.status}</span>
+                </div>
+              </button>
+            ))
+          )}
+
+          {activeTemplate && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="secondary" size="sm" onClick={() => onShare(activeTemplate.id)}>
+                {t(lang, "share")}
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => duplicateTemplate(activeTemplate.id)}>
+                {t(lang, "duplicate")}
+              </Button>
+              {activeTemplate.status !== "Archived" ? (
+                <Button variant="destructive" size="sm" onClick={() => archiveTemplate(activeTemplate.id)}>
+                  {t(lang, "archive")}
+                </Button>
+              ) : (
+                <Button variant="secondary" size="sm" onClick={() => restoreTemplate(activeTemplate.id)}>
+                  {t(lang, "restore")}
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Center: Builder */}
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Builder</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!activeTemplate ? (
+              <div className="text-sm text-muted-foreground">Select a template or create a new one.</div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="md:col-span-2">
+                    <div className="text-xs text-muted-foreground">Template Name</div>
+                    <Input
+                      value={activeTemplate.name}
+                      onChange={(e) => updateActiveTemplate({ name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">{t(lang, "purpose")}</div>
+                    <Select
+                      value={activeTemplate.purposeType}
+                      onValueChange={(v) => updateActiveTemplate({ purposeType: v as PurposeType })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PURPOSE_TYPES_DEFAULT.map((p) => (
+                          <SelectItem key={p} value={p}>
+                            {p}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div>
+                    <div className="text-xs text-muted-foreground">{t(lang, "status")}</div>
+                    <Select
+                      value={activeTemplate.status}
+                      onValueChange={(v) => updateActiveTemplate({ status: v as TemplateStatus })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(["Draft", "Active", "On Hold", "Archived"] as TemplateStatus[]).map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <div className="text-xs text-muted-foreground">{t(lang, "roles")}</div>
+                    <div className="flex flex-wrap gap-3 rounded-xl border bg-white p-3">
+                      <RoleToggle
+                        label="Master Admin"
+                        checked={activeTemplate.allowed.masterAdmin}
+                        onChange={(v) => updateActiveTemplate({ allowed: { ...activeTemplate.allowed, masterAdmin: v } })}
+                      />
+                      <RoleToggle
+                        label="Admin"
+                        checked={activeTemplate.allowed.admin}
+                        onChange={(v) => updateActiveTemplate({ allowed: { ...activeTemplate.allowed, admin: v } })}
+                      />
+                      <RoleToggle
+                        label="Manager"
+                        checked={activeTemplate.allowed.manager}
+                        onChange={(v) => updateActiveTemplate({ allowed: { ...activeTemplate.allowed, manager: v } })}
+                      />
+                      <RoleToggle
+                        label="Crew"
+                        checked={activeTemplate.allowed.crew}
+                        onChange={(v) => updateActiveTemplate({ allowed: { ...activeTemplate.allowed, crew: v } })}
+                      />
+                      <RoleToggle
+                        label="Customer"
+                        checked={activeTemplate.allowed.customer}
+                        onChange={(v) => updateActiveTemplate({ allowed: { ...activeTemplate.allowed, customer: v } })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {activeTemplate.pages.map((p, idx) => (
+                      <Button
+                        key={p.id}
+                        variant={idx === activePageIndex ? "default" : "secondary"}
+                        size="sm"
+                        onClick={() => setActivePageIndex(idx)}
+                      >
+                        {t(lang, "page")} {idx + 1}
+                      </Button>
+                    ))}
+                    <Button variant="secondary" size="sm" onClick={addPage}>
+                      + {t(lang, "addPage")}
+                    </Button>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground">
+                    Drag fields from palette onto the page • Click to select • Drag to move • Handle to resize
+                  </div>
+                </div>
+
+                {/* Canvas */}
+                <div className="w-full overflow-auto rounded-xl border bg-gray-50 p-3">
+                  <div
+                    ref={canvasRef}
+                    className="relative bg-white shadow-sm"
+                    style={{ width: LETTER.w, height: LETTER.h, padding: LETTER.pad, borderRadius: 12, border: "1px solid #e5e7eb" }}
+                    onPointerMove={onCanvasPointerMove}
+                    onPointerUp={onCanvasPointerUp}
+                    onPointerLeave={onCanvasPointerUp}
+                    onDragOver={onCanvasDragOver}
+                    onDrop={onCanvasDrop}
+                    onMouseDown={() => setSelectedFieldId(null)}
+                  >
+                    {/* active page fields */}
+                    {(activePage?.fields ?? []).map((field) => (
+                      <BuilderField
+                        key={field.id}
+                        lang={lang}
+                        field={field}
+                        selected={selectedField?.id === field.id}
+                        onPointerDownMove={(e) => onFieldPointerDownMove(e, field.id)}
+                        onPointerDownResize={(e) => onFieldPointerDownResize(e, field.id)}
+                        onSelect={() => setSelectedFieldId(field.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Palette */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Add Fields</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {PALETTE_GROUPS.map((g) => (
+                <div key={g.id} className="rounded-xl border bg-white p-3">
+                  <div className="mb-2 text-xs font-semibold text-muted-foreground">{g.title}</div>
+                  <div className="flex flex-col gap-2">
+                    {g.items.map((label) => (
+                      <div
+                        key={label}
+                        draggable
+                        onDragStart={(e) => onPaletteDragStart(e, label)}
+                        className="cursor-grab rounded-xl border bg-white px-3 py-2 text-sm hover:bg-gray-50 active:cursor-grabbing"
+                        onDoubleClick={() => addFieldFromPalette(label)}
+                        title="Drag to canvas or double-click to add"
+                      >
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Right: Properties */}
+      <Card className="h-fit">
+        <CardHeader>
+          <CardTitle>{t(lang, "properties")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!activeTemplate ? (
+            <div className="text-sm text-muted-foreground">Select a template.</div>
+          ) : !selectedField ? (
+            <div className="text-sm text-muted-foreground">Select a field on the page.</div>
+          ) : (
+            <>
+              <div>
+                <div className="text-xs text-muted-foreground">{t(lang, "label")} ({lang.toUpperCase()})</div>
+                <Input
+                  value={selectedField.label?.[lang] ?? selectedField.paletteLabel}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    updateField(selectedField.id, (f) => ({
+                      ...f,
+                      label: { ...f.label, [lang]: v },
+                    }));
+                  }}
+                />
+              </div>
+
+              <div>
+                <div className="text-xs text-muted-foreground">{t(lang, "help")} ({lang.toUpperCase()})</div>
+                <Input
+                  value={selectedField.help?.[lang] ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    updateField(selectedField.id, (f) => ({
+                      ...f,
+                      help: { ...f.help, [lang]: v },
+                    }));
+                  }}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={selectedField.required}
+                  onCheckedChange={(c) => updateField(selectedField.id, (f) => ({ ...f, required: !!c }))}
+                />
+                <span className="text-sm">{t(lang, "required")}</span>
+              </div>
+
+              {["dropdown", "singleChoice", "multipleChoice"].includes(selectedField.type) && (
+                <OptionsEditor
+                  lang={lang}
+                  field={selectedField}
+                  onChange={(nextOptions) =>
+                    updateField(selectedField.id, (f) => ({ ...f, options: nextOptions }))
+                  }
+                />
+              )}
+
+              {selectedField.type === "appointment" && (
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={!!selectedField.rules?.futureOnly}
+                    onCheckedChange={(v) =>
+                      updateField(selectedField.id, (f) => ({ ...f, rules: { ...f.rules, futureOnly: v } }))
+                    }
+                  />
+                  <span className="text-sm">{t(lang, "futureOnly")}</span>
+                </div>
+              )}
+
+              <Button variant="destructive" onClick={deleteSelectedField}>
+                Delete Field
+              </Button>
+            </>
+          )}
+
+          {/* local updateField uses parent closures; implemented via custom event */}
+          <UpdateFieldBridge
+            selectedField={selectedField}
+          />
+        </CardContent>
+      </Card>
+
+      {/* local function bridge: uses window dispatch to avoid prop drilling updateActivePageFields into OptionsEditor */}
+      <script />
+    </div>
+  );
+
+  // Updates a field in the active page
+  function updateField(fieldId: string, updater: (f: FormField) => FormField) {
+    // We don't have direct access to updateActivePageFields here; use a DOM CustomEvent bridge
+    window.dispatchEvent(
+      new CustomEvent("__FB1_UPDATE_FIELD__", { detail: { fieldId, updater } })
+    );
+  }
+}
+
+function RoleToggle(props: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  const { label, checked, onChange } = props;
+  return (
+    <label className="flex cursor-pointer items-center gap-2">
+      <Checkbox checked={checked} onCheckedChange={(c) => onChange(!!c)} />
+      <span className="text-sm">{label}</span>
+    </label>
+  );
+}
+
+function BuilderField(props: {
+  lang: Lang;
+  field: FormField;
+  selected: boolean;
+  onPointerDownMove: (e: React.PointerEvent) => void;
+  onPointerDownResize: (e: React.PointerEvent) => void;
+  onSelect: () => void;
+}) {
+  const { lang, field, selected, onPointerDownMove, onPointerDownResize, onSelect } = props;
+  const label = field.label?.[lang] ?? field.paletteLabel;
+
+  return (
+    <div
+      className={[
+        "absolute rounded-xl border bg-white/95 p-2 shadow-sm",
+        selected ? "border-black ring-2 ring-black/10" : "border-gray-400",
+      ].join(" ")}
+      style={{
+        transform: `translate(${field.x}px, ${field.y}px)`,
+        width: field.w,
+        height: field.h,
+        overflow: "hidden",
+        touchAction: "none",
+      }}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+        onSelect();
+      }}
+      onPointerDown={onPointerDownMove}
+    >
+      <div className="mb-1 text-xs font-semibold">{label}</div>
+      <div className="pointer-events-none">
+        <FieldPreview type={field.type} />
+      </div>
+
+      {/* resize handle */}
+      <div
+        className="absolute bottom-1 right-1 h-3 w-3 cursor-nwse-resize rounded-full bg-black"
+        onPointerDown={(e) => onPointerDownResize(e)}
+        title="Resize"
+      />
+    </div>
+  );
+}
+
+function FieldPreview({ type }: { type: FieldType }) {
+  switch (type) {
+    case "header":
+      return <div className="text-sm font-bold text-muted-foreground">Header / Subheader</div>;
+    case "paragraph":
+      return <div className="text-xs text-muted-foreground">Paragraph…</div>;
+    case "email":
+      return <div className="text-xs text-muted-foreground">email input</div>;
+    case "phone":
+      return <div className="text-xs text-muted-foreground">phone input</div>;
+    case "number":
+      return <div className="text-xs text-muted-foreground">number input</div>;
+    case "date":
+      return <div className="text-xs text-muted-foreground">date picker</div>;
+    case "time":
+      return <div className="text-xs text-muted-foreground">time picker</div>;
+    case "appointment":
+      return <div className="text-xs text-muted-foreground">appointment (date+time)</div>;
+    case "file":
+      return <div className="text-xs text-muted-foreground">file upload</div>;
+    case "image":
+      return <div className="text-xs text-muted-foreground">image upload</div>;
+    case "dropdown":
+      return <div className="text-xs text-muted-foreground">dropdown</div>;
+    case "singleChoice":
+      return <div className="text-xs text-muted-foreground">single choice</div>;
+    case "multipleChoice":
+      return <div className="text-xs text-muted-foreground">multiple choice</div>;
+    case "longText":
+      return <div className="text-xs text-muted-foreground">long text</div>;
+    default:
+      return <div className="text-xs text-muted-foreground">[{type}]</div>;
+  }
+}
+
+function OptionsEditor(props: { lang: Lang; field: FormField; onChange: (opts: Option[]) => void }) {
+  const { lang, field, onChange } = props;
+  const opts = field.options ?? [];
+
+  return (
+    <div className="rounded-xl border bg-white p-3">
+      <div className="mb-2 text-xs font-semibold text-muted-foreground">{t(lang, "options")}</div>
+      <div className="space-y-2">
+        {opts.map((opt, idx) => (
+          <div key={opt.id} className="flex gap-2">
+            <Input
+              value={opt.label?.[lang] ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                const next = opts.map((o, i) => (i === idx ? { ...o, label: { ...o.label, [lang]: v } } : o));
+                onChange(next);
+              }}
+            />
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const next = opts.filter((_, i) => i !== idx);
+                onChange(next);
+              }}
+            >
+              ×
+            </Button>
+          </div>
+        ))}
+      </div>
+      <Button
+        className="mt-2"
+        variant="secondary"
+        onClick={() => onChange([...opts, { id: uid(), label: { en: "Option", es: "Opción" } }])}
+      >
+        + Add Option
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * UpdateFieldBridge:
+ * Because this is a single file and we kept BuildMode props manageable,
+ * we bridge field updates via a window CustomEvent to update the active page fields.
+ *
+ * This component installs an event listener once.
+ */
+function UpdateFieldBridge({ selectedField }: { selectedField: FormField | null }) {
+  // Listener is installed at the page level using a singleton guard.
+  useEffect(() => {
+    const key = "__FB1_BRIDGE_INSTALLED__";
+    // @ts-ignore
+    if (window[key]) return;
+    // @ts-ignore
+    window[key] = true;
+
+    const handler = (evt: Event) => {
+      const e = evt as CustomEvent;
+      if (!e.detail?.fieldId || !e.detail?.updater) return;
+
+      // We can't access state directly here; we rely on the parent component using the same event name.
+      // This is implemented below via a second listener that is installed by the main component.
+    };
+
+    window.addEventListener("__FB1_UPDATE_FIELD__", handler as any);
+    return () => window.removeEventListener("__FB1_UPDATE_FIELD__", handler as any);
+  }, []);
+
+  return null;
+}
+
+// -----------------------------
+// Hook-up the CustomEvent update mechanism at module scope
+// (Works because this page is mounted once; v1 simple approach)
+// -----------------------------
+
+let __fb1_updateFieldHandlerInstalled = false;
+
+function installUpdateFieldHandler(setTemplatesRef: () => {
+  templates: FormTemplate[];
+  setTemplates: React.Dispatch<React.SetStateAction<FormTemplate[]>>;
+  activeTemplateId: string | null;
+  activePageIndex: number;
+}) {
+  if (__fb1_updateFieldHandlerInstalled) return;
+  __fb1_updateFieldHandlerInstalled = true;
+
+  window.addEventListener("__FB1_UPDATE_FIELD__", (evt: Event) => {
+    const e = evt as CustomEvent;
+    const fieldId = e.detail?.fieldId as string | undefined;
+    const updater = e.detail?.updater as ((f: FormField) => FormField) | undefined;
+    if (!fieldId || !updater) return;
+
+    const { templates, setTemplates, activeTemplateId, activePageIndex } = setTemplatesRef();
+    if (!activeTemplateId) return;
+
+    const tpl = templates.find((t) => t.id === activeTemplateId);
+    if (!tpl) return;
+
+    const pages = tpl.pages.map((p, idx) => {
+      if (idx !== activePageIndex) return p;
+      return { ...p, fields: p.fields.map((f) => (f.id === fieldId ? updater(f) : f)) };
+    });
+
+    const updated: FormTemplate = { ...tpl, pages, updatedAt: new Date().toISOString() };
+    const next = templates.map((t) => (t.id === updated.id ? updated : t));
+    setTemplates(next);
+    localStorage.setItem(LS_KEYS.templates, JSON.stringify(next));
+  });
+}
+
+// Patch: install handler when component mounts (without changing render flow)
+(function patchInstallHandler() {
+  // no-op placeholder; actual installation happens inside the exported component via a wrapper below
+})();
+
+// -----------------------------
+// Export default with handler installed
+// -----------------------------
+
+export default function FormBuilder1PageWrapper() {
+  // We need access to templates + active state inside handler. We'll mirror minimal state here and render FormBuilder1.
+  // This wrapper pattern stays inside the single file and avoids project-wide changes.
+
+  const [templatesMirror, setTemplatesMirror] = useState<FormTemplate[]>([]);
+  const [activeTemplateIdMirror, setActiveTemplateIdMirror] = useState<string | null>(null);
+  const [activePageIndexMirror, setActivePageIndexMirror] = useState<number>(0);
+
+  // Keep mirror updated via storage reads; FormBuilder1 maintains its own state,
+  // but the handler needs the latest snapshot. We'll sync periodically and also on focus.
+  useEffect(() => {
+    const sync = async () => {
+      const tpls = await storage.loadTemplates();
+      setTemplatesMirror(tpls);
+    };
+    void sync();
+    const onFocus = () => void sync();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
+  useEffect(() => {
+    installUpdateFieldHandler(() => ({
+      templates: templatesMirror,
+      setTemplates: setTemplatesMirror,
+      activeTemplateId: activeTemplateIdMirror,
+      activePageIndex: activePageIndexMirror,
+    }));
+  }, [templatesMirror, activeTemplateIdMirror, activePageIndexMirror]);
+
+  // Render the real page; we tap into its internal state via a very small bridge:
+  // We listen for another event to update mirrors.
+  useEffect(() => {
+    const handler = (evt: Event) => {
+      const e = evt as CustomEvent;
+      if (typeof e.detail?.activeTemplateId !== "undefined") setActiveTemplateIdMirror(e.detail.activeTemplateId);
+      if (typeof e.detail?.activePageIndex !== "undefined") setActivePageIndexMirror(e.detail.activePageIndex);
+      if (Array.isArray(e.detail?.templates)) setTemplatesMirror(e.detail.templates);
+    };
+    window.addEventListener("__FB1_MIRROR__", handler as any);
+    return () => window.removeEventListener("__FB1_MIRROR__", handler as any);
+  }, []);
+
+  return <FormBuilder1MirrorEmitter />;
+}
+
+/**
+ * FormBuilder1MirrorEmitter:
+ * This component renders the actual FormBuilder1 and emits mirror snapshots so the update bridge can work.
+ * v1 compromise to keep everything in ONE file without forcing a heavy refactor.
+ */
+function FormBuilder1MirrorEmitter() {
+  // Render the actual FormBuilder1, but we need to emit templates/active selection updates.
+  // We'll do that by wrapping and using a small interval to read localStorage (reliable and simple).
+
+  // NOTE: This is intentionally simple for v1; DB/api later will remove the need for these bridges.
+  const inner = <FormBuilder1 />;
+
+  useEffect(() => {
+    const emit = () => {
+      const templates = safeJsonParse<FormTemplate[]>(localStorage.getItem(LS_KEYS.templates), []);
+      const activeTemplateId = (window as any).__FB1_ACTIVE_TEMPLATE_ID__ ?? null;
+      const activePageIndex = (window as any).__FB1_ACTIVE_PAGE_INDEX__ ?? 0;
+      window.dispatchEvent(
+        new CustomEvent("__FB1_MIRROR__", { detail: { templates, activeTemplateId, activePageIndex } })
+      );
+    };
+    emit();
+    const t = window.setInterval(emit, 800);
+    return () => window.clearInterval(t);
+  }, []);
+
+  // Patch: expose internal selection hints from localStorage-driven events
+  // We monkey-patch history state changes by listening for storage updates is overkill;
+  // instead, we set these globals from within FormBuilder1 by a micro listener below.
+  useEffect(() => {
+    const handler = (evt: Event) => {
+      const e = evt as CustomEvent;
+      (window as any).__FB1_ACTIVE_TEMPLATE_ID__ = e.detail?.activeTemplateId ?? null;
+      (window as any).__FB1_ACTIVE_PAGE_INDEX__ = e.detail?.activePageIndex ?? 0;
+    };
+    window.addEventListener("__FB1_HINTS__", handler as any);
+    return () => window.removeEventListener("__FB1_HINTS__", handler as any);
+  }, []);
+
+  return <>{inner}</>;
+}
+
+/* ===== POST_INSTALL_CHECKLIST =====
+✅ 1) Navigation:
+   - Click “Form Builder 1” in the sidebar -> /form-builder-1 loads.
+✅ 2) Auth:
+   - As Master Admin or Admin: Build Forms mode is enabled.
+   - As Manager/Crew/Customer: Build Forms mode button is disabled.
+✅ 3) Templates:
+   - In Build mode: create a template, set Purpose Type, allowed roles, status.
+   - Drag fields from palette onto the page, move and resize them.
+   - Refresh the browser -> template persists (localStorage).
+✅ 4) Role access:
+   - Set a template allowed only for Crew; log in as Crew -> see it in Use mode.
+   - Log in as Customer -> it should not appear.
+✅ 5) On Hold / Archived:
+   - Mark a template On Hold -> it appears but cannot be submitted in Use mode.
+   - Archive it -> hidden from non-admins; visible for admins in Build list.
+✅ 6) Sharing:
+   - Click Share -> link copies to clipboard.
+   - Open link in a new tab -> Use mode opens the template.
+✅ 7) Submissions:
+   - Fill and submit -> appears in “My Completed Forms”
+   - If Admin on same device/browser -> appears in “Admin Submissions Inbox”
+✅ 8) Print/PDF:
+   - Click Print / PDF -> browser print dialog opens -> Save as PDF works.
+
+Known v1 limitations (expected):
+- Submissions/templates are local-only. Cross-device and true workflow assignment require DB + API (v2).
+- Some advanced palette items are placeable but render as generic inputs in v1 (expand later).
+*/
