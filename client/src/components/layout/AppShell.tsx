@@ -328,7 +328,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     hq: { icon: Building2, label: "Company HQ", href: "/hq" },
     marketing: { icon: Megaphone, label: "Marketing", href: "/marketing" },
     forms: { icon: FileText, label: "Forms", href: "/forms" },
-    form_builder_1: { icon: FormInput, label: "Form Builder 1", href: "/form-builder-1" },
+    form_builder_1: { icon: FormInput, label: "Builder 1", href: "/form-builder-1" },
     inbox: { icon: Mail, label: "Messages", href: "/inbox" },
     integrations: { icon: Settings, label: "Integrations", href: "/integrations" },
     admin: { icon: Shield, label: "Admin Panel", href: "/admin" },
