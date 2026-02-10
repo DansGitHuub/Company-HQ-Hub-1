@@ -1370,7 +1370,7 @@ function FillRenderer(props: {
   return (
     <div className="space-y-4">
       {template.pages.map((page, idx) => (
-        <div key={page.id} className="rounded-xl border bg-white p-4">
+        <div key={page.id} className="rounded-xl border bg-white p-4" data-testid={`fill-page-${page.id}`}>
           <div className="mb-2 text-sm font-semibold text-muted-foreground">
             {t(lang, "page")} {idx + 1}
           </div>
@@ -1436,7 +1436,7 @@ function FillField(props: {
       return (
         <div className="space-y-1">
           {common}
-          <Input type="email" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} />
+          <Input type="email" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} data-testid={`input-fill-${field.id}`} />
           {errNode}
         </div>
       );
@@ -1444,7 +1444,7 @@ function FillField(props: {
       return (
         <div className="space-y-1">
           {common}
-          <Input type="tel" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} />
+          <Input type="tel" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} data-testid={`input-fill-${field.id}`} />
           {errNode}
         </div>
       );
@@ -1452,7 +1452,7 @@ function FillField(props: {
       return (
         <div className="space-y-1">
           {common}
-          <Input type="number" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} />
+          <Input type="number" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} data-testid={`input-fill-${field.id}`} />
           {errNode}
         </div>
       );
@@ -1460,7 +1460,7 @@ function FillField(props: {
       return (
         <div className="space-y-1">
           {common}
-          <Input type="date" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} />
+          <Input type="date" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} data-testid={`input-fill-${field.id}`} />
           {errNode}
         </div>
       );
@@ -1468,7 +1468,7 @@ function FillField(props: {
       return (
         <div className="space-y-1">
           {common}
-          <Input type="time" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} />
+          <Input type="time" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} data-testid={`input-fill-${field.id}`} />
           {errNode}
         </div>
       );
@@ -1476,7 +1476,7 @@ function FillField(props: {
       return (
         <div className="space-y-1">
           {common}
-          <Input type="datetime-local" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} />
+          <Input type="datetime-local" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} data-testid={`input-fill-${field.id}`} />
           {errNode}
         </div>
       );
@@ -1491,6 +1491,7 @@ function FillField(props: {
               onChange(file ? { name: file.name, size: file.size, type: file.type } : null);
             }}
             className={error ? "border-red-500" : ""}
+            data-testid={`input-fill-${field.id}`}
           />
           <div className="text-xs text-muted-foreground">v1 stores file metadata only (not the file).</div>
           {errNode}
@@ -1508,6 +1509,7 @@ function FillField(props: {
               onChange(file ? { name: file.name, size: file.size, type: file.type } : null);
             }}
             className={error ? "border-red-500" : ""}
+            data-testid={`input-fill-${field.id}`}
           />
           <div className="text-xs text-muted-foreground">v1 stores image metadata only (not the image).</div>
           {errNode}
@@ -1519,7 +1521,7 @@ function FillField(props: {
         <div className="space-y-1">
           {common}
           <Select value={value ?? ""} onValueChange={(v) => onChange(v)}>
-            <SelectTrigger className={error ? "border-red-500" : ""}>
+            <SelectTrigger className={error ? "border-red-500" : ""} data-testid={`select-fill-${field.id}`}>
               <SelectValue placeholder="Select…" />
             </SelectTrigger>
             <SelectContent>
@@ -1551,6 +1553,7 @@ function FillField(props: {
                       else next.delete(opt.id);
                       onChange(Array.from(next));
                     }}
+                    data-testid={`checkbox-fill-${field.id}-${opt.id}`}
                   />
                   <span className="text-sm">{opt.label?.[lang] ?? "Option"}</span>
                 </label>
@@ -1564,7 +1567,7 @@ function FillField(props: {
       return (
         <div className="space-y-1">
           {common}
-          <Textarea value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} />
+          <Textarea value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} data-testid={`input-fill-${field.id}`} />
           {errNode}
         </div>
       );
@@ -1572,7 +1575,7 @@ function FillField(props: {
       return (
         <div className="space-y-1">
           {common}
-          <Input type="text" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} />
+          <Input type="text" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={error ? "border-red-500" : ""} data-testid={`input-fill-${field.id}`} />
           {errNode}
         </div>
       );
@@ -1960,6 +1963,7 @@ function BuildMode(props: {
                     onCheckedChange={(v) =>
                       updateField(selectedField.id, (f) => ({ ...f, rules: { ...f.rules, futureOnly: v } }))
                     }
+                    data-testid="switch-future-only"
                   />
                   <span className="text-sm">{t(lang, "futureOnly")}</span>
                 </div>
@@ -1980,7 +1984,7 @@ function RoleToggle(props: { label: string; checked: boolean; onChange: (v: bool
   const { label, checked, onChange } = props;
   return (
     <label className="flex cursor-pointer items-center gap-2">
-      <Checkbox checked={checked} onCheckedChange={(c) => onChange(!!c)} />
+      <Checkbox checked={checked} onCheckedChange={(c) => onChange(!!c)} data-testid={`checkbox-role-${label.toLowerCase().replace(/\s+/g, "-")}`} />
       <span className="text-sm">{label}</span>
     </label>
   );
@@ -2025,6 +2029,7 @@ function BuilderField(props: {
         className="absolute bottom-1 right-1 h-3 w-3 cursor-nwse-resize rounded-full bg-black"
         onPointerDown={(e) => onPointerDownResize(e)}
         title="Resize"
+        data-testid={`handle-resize-${field.id}`}
       />
     </div>
   );
@@ -2082,6 +2087,7 @@ function OptionsEditor(props: { lang: Lang; field: FormField; onChange: (opts: O
                 const next = opts.map((o, i) => (i === idx ? { ...o, label: { ...o.label, [lang]: v } } : o));
                 onChange(next);
               }}
+              data-testid={`input-option-${opt.id}`}
             />
             <Button
               variant="secondary"
@@ -2089,6 +2095,7 @@ function OptionsEditor(props: { lang: Lang; field: FormField; onChange: (opts: O
                 const next = opts.filter((_, i) => i !== idx);
                 onChange(next);
               }}
+              data-testid={`button-remove-option-${opt.id}`}
             >
               ×
             </Button>
@@ -2099,6 +2106,7 @@ function OptionsEditor(props: { lang: Lang; field: FormField; onChange: (opts: O
         className="mt-2"
         variant="secondary"
         onClick={() => onChange([...opts, { id: uid(), label: { en: "Option", es: "Opción" } }])}
+        data-testid="button-add-option"
       >
         + Add Option
       </Button>
