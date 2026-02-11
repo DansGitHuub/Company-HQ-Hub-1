@@ -240,22 +240,27 @@ function BuildNewForm() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {[
-          { label: "Blank Form", desc: "Start from a completely empty form", icon: FileText },
-          { label: "Job Application", desc: "Hiring and recruitment forms", icon: FileText },
-          { label: "Customer Intake", desc: "Gather info from new customers", icon: FileText },
-          { label: "Safety Checklist", desc: "Daily safety and compliance checks", icon: CheckCircle2 },
-          { label: "Work Order", desc: "Job assignments and task tracking", icon: FileText },
-          { label: "Feedback Survey", desc: "Collect feedback from employees or clients", icon: FileText },
+          { label: "Sales & Marketing", desc: "Proposals, lead capture, campaign tracking, and client outreach forms", num: 1 },
+          { label: "Estimating & Pre-Construction", desc: "Bid sheets, site assessments, material takeoffs, and project scoping", num: 2 },
+          { label: "Production & Field Operations", desc: "Work orders, daily logs, crew assignments, and job site checklists", num: 3 },
+          { label: "Maintenance Operations", desc: "Service schedules, inspection reports, and recurring maintenance tasks", num: 4 },
+          { label: "HR & Employees", desc: "Applications, onboarding, time-off requests, and performance reviews", num: 5 },
+          { label: "Finance & Accounting", desc: "Invoices, expense reports, purchase orders, and budget tracking", num: 6 },
+          { label: "Equipment & Assets", desc: "Equipment logs, asset tracking, maintenance records, and checkout forms", num: 7 },
+          { label: "Compliance & Legal", desc: "Safety audits, incident reports, permits, and regulatory checklists", num: 8 },
+          { label: "Customer Experience & Retention", desc: "Surveys, feedback forms, warranty claims, and follow-up checklists", num: 9 },
+          { label: "Management & Strategy", desc: "Meeting agendas, goal tracking, KPI reports, and planning worksheets", num: 10 },
+          { label: "Misc & Other", desc: "General-purpose forms that don't fit into a specific category", num: 11 },
         ].map((item) => (
           <Card
             key={item.label}
             className="cursor-pointer transition-all hover:border-primary hover:shadow-md hover:scale-[1.02]"
-            data-testid={`card-template-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+            data-testid={`card-category-${item.num}`}
           >
             <CardContent className="p-5">
               <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-emerald-100 p-2 mt-0.5">
-                  <item.icon className="h-5 w-5 text-emerald-700" />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-sm font-bold text-emerald-700">
+                  {item.num}
                 </div>
                 <div>
                   <div className="font-semibold">{item.label}</div>
