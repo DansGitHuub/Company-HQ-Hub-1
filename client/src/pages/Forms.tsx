@@ -49,10 +49,10 @@ export default function Forms() {
     <div className="p-6 max-w-5xl mx-auto" data-testid="forms-page">
       <button
         onClick={() => setView("home")}
-        className="mb-4 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        className="mb-6 inline-flex items-center gap-2.5 rounded-xl border bg-white px-4 py-2.5 text-sm font-medium text-foreground shadow-sm hover:bg-muted/60 hover:shadow-md transition-all"
         data-testid="button-back"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ArrowLeft className="h-5 w-5" />
         Back to Forms
       </button>
 
