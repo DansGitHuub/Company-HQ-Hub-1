@@ -20,7 +20,6 @@ import Materials from "@/pages/Materials";
 import Hiring from "@/pages/Hiring";
 import Marketing from "@/pages/Marketing";
 import Forms from "@/pages/Forms";
-import FormBuilder1 from "@/pages/FormBuilder1";
 import Integrations from "@/pages/Integrations";
 import Education from "@/pages/Education";
 import EmployeePortal from "@/pages/EmployeePortal";
@@ -77,7 +76,6 @@ function AppRoutes() {
         <Route path="/hiring" component={Hiring} />
         <Route path="/marketing" component={Marketing} />
         <Route path="/forms" component={Forms} />
-        <Route path="/form-builder-1" component={FormBuilder1} />
         <Route path="/integrations" component={Integrations} />
         <Route path="/education" component={Education} />
         <Route path="/profile" component={Profile} />
