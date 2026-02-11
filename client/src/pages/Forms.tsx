@@ -250,7 +250,8 @@ function BuildNewForm() {
           { label: "Compliance & Legal", desc: "Safety audits, incident reports, permits, and regulatory checklists", num: 8 },
           { label: "Customer Experience & Retention", desc: "Surveys, feedback forms, warranty claims, and follow-up checklists", num: 9 },
           { label: "Management & Strategy", desc: "Meeting agendas, goal tracking, KPI reports, and planning worksheets", num: 10 },
-          { label: "Misc & Other", desc: "General-purpose forms that don't fit into a specific category", num: 11 },
+          { label: "Checklists", desc: "Step-by-step task lists, daily routines, quality checks, and verification forms", num: 11 },
+          { label: "Misc & Other", desc: "General-purpose forms that don't fit into a specific category", num: 12 },
         ].map((item) => (
           <Card
             key={item.label}
