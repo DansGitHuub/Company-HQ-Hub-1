@@ -56,7 +56,7 @@ export default function Forms() {
         Back to Forms
       </button>
 
-      {view === "build-new" && <BuildNewForm />}
+      {view === "build-new" && <BuildNewForm hoveredId={hoveredId} setHoveredId={setHoveredId} />}
       {view === "form-library" && <FormLibrary />}
       {view === "update-existing" && <UpdateExisting />}
       {view === "form-drafts" && <FormDrafts />}
@@ -229,7 +229,7 @@ function EmptyState({ icon: Icon, message, submessage }: { icon: React.ElementTy
   );
 }
 
-function BuildNewForm() {
+function BuildNewForm({ hoveredId, setHoveredId }: { hoveredId: string | null; setHoveredId: (id: string | null) => void }) {
   return (
     <div data-testid="view-build-new">
       <SectionHeader
@@ -240,37 +240,40 @@ function BuildNewForm() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {[
-          { label: "Sales & Marketing", desc: "Proposals, lead capture, campaign tracking, and client outreach forms", num: 1 },
-          { label: "Estimating & Pre-Construction", desc: "Bid sheets, site assessments, material takeoffs, and project scoping", num: 2 },
-          { label: "Production & Field Operations", desc: "Work orders, daily logs, crew assignments, and job site checklists", num: 3 },
-          { label: "Maintenance Operations", desc: "Service schedules, inspection reports, and recurring maintenance tasks", num: 4 },
-          { label: "HR & Employees", desc: "Applications, onboarding, time-off requests, and performance reviews", num: 5 },
-          { label: "Finance & Accounting", desc: "Invoices, expense reports, purchase orders, and budget tracking", num: 6 },
-          { label: "Equipment & Assets", desc: "Equipment logs, asset tracking, maintenance records, and checkout forms", num: 7 },
-          { label: "Compliance & Legal", desc: "Safety audits, incident reports, permits, and regulatory checklists", num: 8 },
-          { label: "Customer Experience & Retention", desc: "Surveys, feedback forms, warranty claims, and follow-up checklists", num: 9 },
-          { label: "Management & Strategy", desc: "Meeting agendas, goal tracking, KPI reports, and planning worksheets", num: 10 },
-          { label: "Checklists", desc: "Step-by-step task lists, daily routines, quality checks, and verification forms", num: 11 },
-          { label: "Misc & Other", desc: "General-purpose forms that don't fit into a specific category", num: 12 },
-        ].map((item) => (
-          <Card
-            key={item.label}
-            className="cursor-pointer transition-all hover:border-primary hover:shadow-md hover:scale-[1.02]"
-            data-testid={`card-category-${item.num}`}
-          >
-            <CardContent className="p-5">
+          { label: "Sales & Marketing", desc: "Proposals, lead capture, campaign tracking, and client outreach forms", num: 1, gradient: "from-emerald-500 to-emerald-700", hoverGradient: "from-emerald-600 to-emerald-800" },
+          { label: "Estimating & Pre-Construction", desc: "Bid sheets, site assessments, material takeoffs, and project scoping", num: 2, gradient: "from-blue-500 to-blue-700", hoverGradient: "from-blue-600 to-blue-800" },
+          { label: "Production & Field Operations", desc: "Work orders, daily logs, crew assignments, and job site checklists", num: 3, gradient: "from-orange-500 to-orange-700", hoverGradient: "from-orange-600 to-orange-800" },
+          { label: "Maintenance Operations", desc: "Service schedules, inspection reports, and recurring maintenance tasks", num: 4, gradient: "from-teal-500 to-teal-700", hoverGradient: "from-teal-600 to-teal-800" },
+          { label: "HR & Employees", desc: "Applications, onboarding, time-off requests, and performance reviews", num: 5, gradient: "from-violet-500 to-violet-700", hoverGradient: "from-violet-600 to-violet-800" },
+          { label: "Finance & Accounting", desc: "Invoices, expense reports, purchase orders, and budget tracking", num: 6, gradient: "from-amber-500 to-amber-700", hoverGradient: "from-amber-600 to-amber-800" },
+          { label: "Equipment & Assets", desc: "Equipment logs, asset tracking, maintenance records, and checkout forms", num: 7, gradient: "from-cyan-500 to-cyan-700", hoverGradient: "from-cyan-600 to-cyan-800" },
+          { label: "Compliance & Legal", desc: "Safety audits, incident reports, permits, and regulatory checklists", num: 8, gradient: "from-red-500 to-red-700", hoverGradient: "from-red-600 to-red-800" },
+          { label: "Customer Experience & Retention", desc: "Surveys, feedback forms, warranty claims, and follow-up checklists", num: 9, gradient: "from-pink-500 to-pink-700", hoverGradient: "from-pink-600 to-pink-800" },
+          { label: "Management & Strategy", desc: "Meeting agendas, goal tracking, KPI reports, and planning worksheets", num: 10, gradient: "from-indigo-500 to-indigo-700", hoverGradient: "from-indigo-600 to-indigo-800" },
+          { label: "Checklists", desc: "Step-by-step task lists, daily routines, quality checks, and verification forms", num: 11, gradient: "from-lime-500 to-lime-700", hoverGradient: "from-lime-600 to-lime-800" },
+          { label: "Misc & Other", desc: "General-purpose forms that don't fit into a specific category", num: 12, gradient: "from-slate-500 to-slate-700", hoverGradient: "from-slate-600 to-slate-800" },
+        ].map((item) => {
+          const isHovered = hoveredId === `cat-${item.num}`;
+          return (
+            <button
+              key={item.label}
+              className={`rounded-2xl bg-gradient-to-br ${isHovered ? item.hoverGradient : item.gradient} p-5 text-white text-left transition-all duration-200 ${isHovered ? "scale-[1.02] shadow-xl" : "shadow-lg"}`}
+              onMouseEnter={() => setHoveredId(`cat-${item.num}`)}
+              onMouseLeave={() => setHoveredId(null)}
+              data-testid={`card-category-${item.num}`}
+            >
               <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-sm font-bold text-emerald-700">
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/20 text-sm font-bold transition-transform duration-200 ${isHovered ? "scale-110" : ""}`}>
                   {item.num}
                 </div>
                 <div>
                   <div className="font-semibold">{item.label}</div>
-                  <div className="text-sm text-muted-foreground mt-0.5">{item.desc}</div>
+                  <div className="text-sm text-white/80 mt-0.5">{item.desc}</div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
