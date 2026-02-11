@@ -1,4 +1,8 @@
 import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   FilePlus2,
   Library,
@@ -7,13 +11,73 @@ import {
   Share2,
   Package,
   XCircle,
+  ArrowLeft,
+  Search,
+  Filter,
+  Plus,
+  FileText,
+  Clock,
+  CheckCircle2,
+  Send,
+  Link2,
+  Mail,
+  Copy,
+  Archive,
+  RotateCcw,
+  Layers,
 } from "lucide-react";
 
+type View =
+  | "home"
+  | "build-new"
+  | "form-library"
+  | "update-existing"
+  | "form-drafts"
+  | "share-forms"
+  | "build-packet"
+  | "discontinued";
+
 export default function Forms() {
+  const [view, setView] = useState<View>("home");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
+  if (view === "home") {
+    return <FormsHome onNavigate={setView} hoveredId={hoveredId} setHoveredId={setHoveredId} />;
+  }
+
+  return (
+    <div className="p-6 max-w-5xl mx-auto" data-testid="forms-page">
+      <button
+        onClick={() => setView("home")}
+        className="mb-4 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        data-testid="button-back"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Forms
+      </button>
+
+      {view === "build-new" && <BuildNewForm />}
+      {view === "form-library" && <FormLibrary />}
+      {view === "update-existing" && <UpdateExisting />}
+      {view === "form-drafts" && <FormDrafts />}
+      {view === "share-forms" && <ShareForms />}
+      {view === "build-packet" && <BuildPacket />}
+      {view === "discontinued" && <DiscontinuedForms />}
+    </div>
+  );
+}
+
+function FormsHome({
+  onNavigate,
+  hoveredId,
+  setHoveredId,
+}: {
+  onNavigate: (view: View) => void;
+  hoveredId: string | null;
+  setHoveredId: (id: string | null) => void;
+}) {
   const topButton = {
-    id: "build-new",
+    id: "build-new" as View,
     label: "Build a New Form",
     description: "Create a form from scratch with our step-by-step builder",
     icon: FilePlus2,
@@ -21,7 +85,14 @@ export default function Forms() {
     hoverColor: "from-emerald-600 to-emerald-800",
   };
 
-  const gridButtons = [
+  const gridButtons: {
+    id: View;
+    label: string;
+    description: string;
+    icon: React.ElementType;
+    color: string;
+    hoverColor: string;
+  }[] = [
     {
       id: "form-library",
       label: "Form Library",
@@ -77,6 +148,7 @@ export default function Forms() {
       <h1 className="text-2xl font-bold mb-6" data-testid="text-forms-title">Forms</h1>
 
       <button
+        onClick={() => onNavigate(topButton.id)}
         className={`w-full mb-6 rounded-2xl bg-gradient-to-br ${
           hoveredId === topButton.id ? topButton.hoverColor : topButton.color
         } p-8 text-white text-left transition-all duration-200 ${
@@ -100,9 +172,10 @@ export default function Forms() {
       </button>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {gridButtons.map((btn, index) => (
+        {gridButtons.map((btn) => (
           <button
             key={btn.id}
+            onClick={() => onNavigate(btn.id)}
             className={`rounded-2xl bg-gradient-to-br ${
               hoveredId === btn.id ? btn.hoverColor : btn.color
             } p-6 text-white text-left transition-all duration-200 ${
@@ -126,6 +199,276 @@ export default function Forms() {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function SectionHeader({ icon: Icon, title, description }: { icon: React.ElementType; title: string; description: string }) {
+  return (
+    <div className="mb-6">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="rounded-xl bg-primary/10 p-2.5">
+          <Icon className="h-6 w-6 text-primary" />
+        </div>
+        <h1 className="text-2xl font-bold" data-testid="text-section-title">{title}</h1>
+      </div>
+      <p className="text-muted-foreground ml-[52px]">{description}</p>
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon, message, submessage }: { icon: React.ElementType; message: string; submessage?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="empty-state">
+      <div className="rounded-2xl bg-muted/50 p-5 mb-4">
+        <Icon className="h-10 w-10 text-muted-foreground/60" />
+      </div>
+      <p className="text-lg font-medium text-muted-foreground">{message}</p>
+      {submessage && <p className="mt-1 text-sm text-muted-foreground/70">{submessage}</p>}
+    </div>
+  );
+}
+
+function BuildNewForm() {
+  return (
+    <div data-testid="view-build-new">
+      <SectionHeader
+        icon={FilePlus2}
+        title="Build a New Form"
+        description="Create a custom form step by step. Choose a form type to get started."
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[
+          { label: "Blank Form", desc: "Start from a completely empty form", icon: FileText },
+          { label: "Job Application", desc: "Hiring and recruitment forms", icon: FileText },
+          { label: "Customer Intake", desc: "Gather info from new customers", icon: FileText },
+          { label: "Safety Checklist", desc: "Daily safety and compliance checks", icon: CheckCircle2 },
+          { label: "Work Order", desc: "Job assignments and task tracking", icon: FileText },
+          { label: "Feedback Survey", desc: "Collect feedback from employees or clients", icon: FileText },
+        ].map((item) => (
+          <Card
+            key={item.label}
+            className="cursor-pointer transition-all hover:border-primary hover:shadow-md hover:scale-[1.02]"
+            data-testid={`card-template-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+          >
+            <CardContent className="p-5">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-emerald-100 p-2 mt-0.5">
+                  <item.icon className="h-5 w-5 text-emerald-700" />
+                </div>
+                <div>
+                  <div className="font-semibold">{item.label}</div>
+                  <div className="text-sm text-muted-foreground mt-0.5">{item.desc}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FormLibrary() {
+  return (
+    <div data-testid="view-form-library">
+      <SectionHeader
+        icon={Library}
+        title="Form Library"
+        description="Browse, search, and manage all your published forms in one place."
+      />
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search forms by name or category…" className="pl-9" data-testid="input-search-library" />
+        </div>
+        <Button variant="outline" className="gap-2" data-testid="button-filter-library">
+          <Filter className="h-4 w-4" />
+          Filter
+        </Button>
+      </div>
+
+      <EmptyState
+        icon={Library}
+        message="Your form library is empty"
+        submessage="Build your first form and it will appear here once published."
+      />
+    </div>
+  );
+}
+
+function UpdateExisting() {
+  return (
+    <div data-testid="view-update-existing">
+      <SectionHeader
+        icon={RefreshCw}
+        title="Update an Existing Form"
+        description="Select a published form to edit its fields, settings, or layout."
+      />
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search for a form to update…" className="pl-9" data-testid="input-search-update" />
+        </div>
+      </div>
+
+      <EmptyState
+        icon={RefreshCw}
+        message="No forms available to update"
+        submessage="Published forms will appear here so you can make changes."
+      />
+    </div>
+  );
+}
+
+function FormDrafts() {
+  return (
+    <div data-testid="view-form-drafts">
+      <SectionHeader
+        icon={FileEdit}
+        title="Form Drafts"
+        description="Pick up where you left off. Your unfinished forms are saved here."
+      />
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search drafts…" className="pl-9" data-testid="input-search-drafts" />
+        </div>
+      </div>
+
+      <EmptyState
+        icon={Clock}
+        message="No drafts yet"
+        submessage="When you start building a form and save it as a draft, it will show up here."
+      />
+    </div>
+  );
+}
+
+function ShareForms() {
+  return (
+    <div data-testid="view-share-forms">
+      <SectionHeader
+        icon={Share2}
+        title="Share Forms"
+        description="Send forms to employees, customers, or anyone who needs to fill them out."
+      />
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search forms to share…" className="pl-9" data-testid="input-search-share" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        {[
+          { label: "Copy Link", desc: "Get a shareable link to the form", icon: Link2 },
+          { label: "Email Form", desc: "Send directly via email", icon: Mail },
+          { label: "Duplicate & Share", desc: "Make a copy and share it separately", icon: Copy },
+        ].map((item) => (
+          <Card
+            key={item.label}
+            className="cursor-pointer transition-all hover:border-primary hover:shadow-md hover:scale-[1.02]"
+            data-testid={`card-share-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+          >
+            <CardContent className="p-5 flex items-start gap-3">
+              <div className="rounded-lg bg-cyan-100 p-2 mt-0.5">
+                <item.icon className="h-5 w-5 text-cyan-700" />
+              </div>
+              <div>
+                <div className="font-semibold">{item.label}</div>
+                <div className="text-sm text-muted-foreground mt-0.5">{item.desc}</div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <EmptyState
+        icon={Send}
+        message="No forms to share yet"
+        submessage="Build and publish a form first, then you can share it from here."
+      />
+    </div>
+  );
+}
+
+function BuildPacket() {
+  return (
+    <div data-testid="view-build-packet">
+      <SectionHeader
+        icon={Package}
+        title="Build a Packet"
+        description="Bundle multiple forms together into a single packet for onboarding, safety training, or any multi-form workflow."
+      />
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <Button className="gap-2" data-testid="button-new-packet">
+          <Plus className="h-4 w-4" />
+          Create New Packet
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        {[
+          { label: "New Hire Packet", desc: "Combine all onboarding forms into one packet" },
+          { label: "Safety Packet", desc: "Bundle safety checklists and compliance forms" },
+          { label: "Customer Packet", desc: "Group customer intake and agreement forms" },
+          { label: "Custom Packet", desc: "Pick and choose any forms to bundle together" },
+        ].map((item) => (
+          <Card
+            key={item.label}
+            className="cursor-pointer transition-all hover:border-primary hover:shadow-md hover:scale-[1.02]"
+            data-testid={`card-packet-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+          >
+            <CardContent className="p-5 flex items-start gap-3">
+              <div className="rounded-lg bg-rose-100 p-2 mt-0.5">
+                <Layers className="h-5 w-5 text-rose-700" />
+              </div>
+              <div>
+                <div className="font-semibold">{item.label}</div>
+                <div className="text-sm text-muted-foreground mt-0.5">{item.desc}</div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <EmptyState
+        icon={Package}
+        message="No packets created yet"
+        submessage="Create a packet to bundle multiple forms together."
+      />
+    </div>
+  );
+}
+
+function DiscontinuedForms() {
+  return (
+    <div data-testid="view-discontinued">
+      <SectionHeader
+        icon={XCircle}
+        title="Discontinued Forms"
+        description="Forms that have been retired or archived. You can restore them if needed."
+      />
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search discontinued forms…" className="pl-9" data-testid="input-search-discontinued" />
+        </div>
+      </div>
+
+      <EmptyState
+        icon={Archive}
+        message="No discontinued forms"
+        submessage="When you retire a form, it will be moved here for safekeeping."
+      />
     </div>
   );
 }
