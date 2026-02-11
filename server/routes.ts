@@ -3813,6 +3813,80 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
+  // Form Builder Wizard - AI auto-fill
+  app.post("/api/form-builder/ai-fill", requireAuth, async (req, res) => {
+    try {
+      const { title, category } = req.body;
+      if (!title) {
+        return res.status(400).json({ message: "Title is required" });
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a senior business operations expert specializing in landscape installation and maintenance companies. You help create professional, well-structured business forms. Return ONLY valid JSON with NO additional text.
+
+Given a form title and category, generate comprehensive form builder data. Your output should be practical, industry-specific, and immediately usable.
+
+The JSON must include these fields:
+- title: string (the refined form title — clean it up if needed but keep the user's intent)
+- category: string (the category provided)
+- outcome: string (2-3 sentences describing what this form achieves when filled out properly and why it matters to the business)
+- outcomeType: string (one of: "data_collection", "approval", "compliance", "communication", "tracking")
+- audience: string (who fills out this form — be specific, e.g. "Crew Leaders", "Office Staff", "New Hires", "Customers", "Account Managers")
+- audienceRoles: string[] (array of roles from: "Admin", "Manager", "Crew", "Customer" — who should have access)
+- sections: array of objects, each with:
+  - title: string (section heading)
+  - description: string (brief explanation of what this section captures)
+  - fields: array of objects, each with:
+    - label: string (the field label)
+    - type: string (one of: "text", "textarea", "number", "email", "phone", "date", "time", "select", "checkbox", "radio", "file", "signature", "address")
+    - required: boolean
+    - placeholder: string (example or hint text)
+    - options: string[] (only for select, checkbox, radio types — provide relevant options)
+    - helpText: string (optional guidance for the person filling it out)
+- toolsAndMedia: object with:
+  - enablePhotos: boolean (should the form support photo attachments?)
+  - enableFileUpload: boolean (should the form support file uploads?)
+  - enableSignature: boolean (does the form need a signature capture?)
+  - enableGeolocation: boolean (should location be captured?)
+  - suggestedIllustrations: string[] (list of visual aids or diagrams that would help, e.g. "Site layout diagram", "Equipment checklist icon")
+- externalConnections: object with:
+  - sendsEmail: boolean (does completing this form trigger an email notification?)
+  - emailRecipients: string (who gets notified — e.g. "Office Manager", "HR Department", "Customer")
+  - sendsToCalendar: boolean (does this create a calendar event?)
+  - requiresApproval: boolean (does someone need to sign off on this form?)
+  - approver: string (who approves — e.g. "Manager", "Admin", "Supervisor")
+  - integratesWithCRM: boolean (does this connect to customer records?)
+
+SECTION GENERATION RULES:
+- Generate 3-8 sections depending on form complexity
+- Each section should have 2-6 fields
+- Use appropriate field types — don't make everything a text field
+- Include practical placeholder text that helps the user understand what to enter
+- For select/radio/checkbox fields, provide realistic options specific to the landscaping industry
+- Think about what information a landscape company actually needs to collect`
+          },
+          {
+            role: "user",
+            content: `Generate form builder data for:\nTitle: "${title}"\nCategory: "${category}"`
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+      });
+
+      const raw = completion.choices[0]?.message?.content || "{}";
+      const parsed = JSON.parse(raw);
+      res.json(parsed);
+    } catch (err: any) {
+      console.error("[form-builder/ai-fill] Error:", err.message);
+      res.status(500).json({ message: "Failed to generate form data" });
+    }
+  });
+
   // Builder Forms (Form Builder 1)
   app.get("/api/builder-forms", requireAuth, async (req, res) => {
     try {

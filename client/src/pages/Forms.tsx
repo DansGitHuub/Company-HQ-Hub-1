@@ -1,8 +1,19 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   FilePlus2,
   Library,
@@ -12,6 +23,7 @@ import {
   Package,
   XCircle,
   ArrowLeft,
+  ArrowRight,
   Search,
   Filter,
   Plus,
@@ -23,13 +35,30 @@ import {
   Mail,
   Copy,
   Archive,
-  RotateCcw,
   Layers,
+  Loader2,
+  Sparkles,
+  Target,
+  Users,
+  LayoutList,
+  Image,
+  Globe,
+  ClipboardCheck,
+  Trash2,
+  GripVertical,
+  Camera,
+  Upload,
+  PenTool,
+  MapPin,
+  Check,
 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 type View =
   | "home"
   | "build-new"
+  | "build-wizard"
   | "form-library"
   | "update-existing"
   | "form-drafts"
@@ -37,26 +66,172 @@ type View =
   | "build-packet"
   | "discontinued";
 
+type FormFieldDef = {
+  label: string;
+  type: string;
+  required: boolean;
+  placeholder: string;
+  options?: string[];
+  helpText?: string;
+};
+
+type FormSection = {
+  title: string;
+  description: string;
+  fields: FormFieldDef[];
+};
+
+type ToolsAndMedia = {
+  enablePhotos: boolean;
+  enableFileUpload: boolean;
+  enableSignature: boolean;
+  enableGeolocation: boolean;
+  suggestedIllustrations: string[];
+};
+
+type ExternalConnections = {
+  sendsEmail: boolean;
+  emailRecipients: string;
+  sendsToCalendar: boolean;
+  requiresApproval: boolean;
+  approver: string;
+  integratesWithCRM: boolean;
+};
+
+type WizardData = {
+  title: string;
+  category: string;
+  outcome: string;
+  outcomeType: string;
+  audience: string;
+  audienceRoles: string[];
+  sections: FormSection[];
+  toolsAndMedia: ToolsAndMedia;
+  externalConnections: ExternalConnections;
+};
+
+const EMPTY_WIZARD: WizardData = {
+  title: "",
+  category: "",
+  outcome: "",
+  outcomeType: "data_collection",
+  audience: "",
+  audienceRoles: [],
+  sections: [],
+  toolsAndMedia: {
+    enablePhotos: false,
+    enableFileUpload: false,
+    enableSignature: false,
+    enableGeolocation: false,
+    suggestedIllustrations: [],
+  },
+  externalConnections: {
+    sendsEmail: false,
+    emailRecipients: "",
+    sendsToCalendar: false,
+    requiresApproval: false,
+    approver: "",
+    integratesWithCRM: false,
+  },
+};
+
+const WIZARD_STEPS = [
+  { num: 1, key: "identify", label: "Identify", desc: "Form Title & Topic", icon: FileText },
+  { num: 2, key: "outcome", label: "Outcome", desc: "What We're Trying to Achieve", icon: Target },
+  { num: 3, key: "audience", label: "Audience", desc: "Who This Form Is Meant For", icon: Users },
+  { num: 4, key: "sections", label: "Steps / Sections", desc: "Breakdown of Different Sections", icon: LayoutList },
+  { num: 5, key: "tools", label: "Tools & Media", desc: "Added Features & Illustrations", icon: Image },
+  { num: 6, key: "connections", label: "External Connections", desc: "Is Any Info Sent Out", icon: Globe },
+  { num: 7, key: "review", label: "Final Review", desc: "Confirm Form & Take Action", icon: ClipboardCheck },
+] as const;
+
+const OUTCOME_TYPES = [
+  { value: "data_collection", label: "Data Collection" },
+  { value: "approval", label: "Approval / Sign-off" },
+  { value: "compliance", label: "Compliance / Audit" },
+  { value: "communication", label: "Communication" },
+  { value: "tracking", label: "Tracking / Logging" },
+];
+
+const FIELD_TYPES = [
+  "text", "textarea", "number", "email", "phone", "date", "time",
+  "select", "checkbox", "radio", "file", "signature", "address",
+];
+
+const CATEGORIES = [
+  { label: "Sales & Marketing", num: 1, gradient: "from-emerald-500 to-emerald-700", hoverGradient: "from-emerald-600 to-emerald-800" },
+  { label: "Estimating & Pre-Construction", num: 2, gradient: "from-blue-500 to-blue-700", hoverGradient: "from-blue-600 to-blue-800" },
+  { label: "Production & Field Operations", num: 3, gradient: "from-orange-500 to-orange-700", hoverGradient: "from-orange-600 to-orange-800" },
+  { label: "Maintenance Operations", num: 4, gradient: "from-teal-500 to-teal-700", hoverGradient: "from-teal-600 to-teal-800" },
+  { label: "HR & Employees", num: 5, gradient: "from-violet-500 to-violet-700", hoverGradient: "from-violet-600 to-violet-800" },
+  { label: "Finance & Accounting", num: 6, gradient: "from-amber-500 to-amber-700", hoverGradient: "from-amber-600 to-amber-800" },
+  { label: "Equipment & Assets", num: 7, gradient: "from-cyan-500 to-cyan-700", hoverGradient: "from-cyan-600 to-cyan-800" },
+  { label: "Compliance & Legal", num: 8, gradient: "from-red-500 to-red-700", hoverGradient: "from-red-600 to-red-800" },
+  { label: "Customer Experience & Retention", num: 9, gradient: "from-pink-500 to-pink-700", hoverGradient: "from-pink-600 to-pink-800" },
+  { label: "Management & Strategy", num: 10, gradient: "from-indigo-500 to-indigo-700", hoverGradient: "from-indigo-600 to-indigo-800" },
+  { label: "Checklists", num: 11, gradient: "from-lime-500 to-lime-700", hoverGradient: "from-lime-600 to-lime-800" },
+  { label: "Misc & Other", num: 12, gradient: "from-slate-500 to-slate-700", hoverGradient: "from-slate-600 to-slate-800" },
+];
+
 export default function Forms() {
   const [view, setView] = useState<View>("home");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [wizardData, setWizardData] = useState<WizardData>({ ...EMPTY_WIZARD });
+  const [wizardStep, setWizardStep] = useState(0);
+
+  function startWizard(category: string) {
+    setSelectedCategory(category);
+    setWizardData({ ...EMPTY_WIZARD, category });
+    setWizardStep(0);
+    setView("build-wizard");
+  }
 
   if (view === "home") {
     return <FormsHome onNavigate={setView} hoveredId={hoveredId} setHoveredId={setHoveredId} />;
   }
 
+  const handleBack = () => {
+    if (view === "build-wizard") {
+      if (wizardStep > 0) {
+        setWizardStep(wizardStep - 1);
+        return;
+      }
+      setView("build-new");
+      return;
+    }
+    setView("home");
+  };
+
+  const backLabel = view === "build-wizard"
+    ? (wizardStep > 0 ? `Back to Step ${wizardStep}` : "Back to Categories")
+    : "Back to Forms";
+
   return (
     <div className="p-6 max-w-5xl mx-auto" data-testid="forms-page">
       <button
-        onClick={() => setView("home")}
+        onClick={handleBack}
         className="mb-6 inline-flex items-center gap-2.5 rounded-xl border bg-white px-4 py-2.5 text-sm font-medium text-foreground shadow-sm hover:bg-muted/60 hover:shadow-md transition-all"
         data-testid="button-back"
       >
         <ArrowLeft className="h-5 w-5" />
-        Back to Forms
+        {backLabel}
       </button>
 
-      {view === "build-new" && <BuildNewForm hoveredId={hoveredId} setHoveredId={setHoveredId} />}
+      {view === "build-new" && <BuildNewForm hoveredId={hoveredId} setHoveredId={setHoveredId} onSelectCategory={startWizard} />}
+      {view === "build-wizard" && (
+        <FormWizard
+          data={wizardData}
+          setData={setWizardData}
+          step={wizardStep}
+          setStep={setWizardStep}
+          onFinish={() => {
+            setView("home");
+            setWizardData({ ...EMPTY_WIZARD });
+            setWizardStep(0);
+          }}
+        />
+      )}
       {view === "form-library" && <FormLibrary />}
       {view === "update-existing" && <UpdateExisting />}
       {view === "form-drafts" && <FormDrafts />}
@@ -93,75 +268,26 @@ function FormsHome({
     color: string;
     hoverColor: string;
   }[] = [
-    {
-      id: "form-library",
-      label: "Form Library",
-      description: "Browse and manage all your published forms",
-      icon: Library,
-      color: "from-blue-500 to-blue-700",
-      hoverColor: "from-blue-600 to-blue-800",
-    },
-    {
-      id: "update-existing",
-      label: "Update an Existing Form",
-      description: "Edit and modify forms that are already in use",
-      icon: RefreshCw,
-      color: "from-violet-500 to-violet-700",
-      hoverColor: "from-violet-600 to-violet-800",
-    },
-    {
-      id: "form-drafts",
-      label: "Form Drafts",
-      description: "Continue working on forms you haven't finished yet",
-      icon: FileEdit,
-      color: "from-amber-500 to-amber-700",
-      hoverColor: "from-amber-600 to-amber-800",
-    },
-    {
-      id: "share-forms",
-      label: "Share Forms",
-      description: "Send forms to employees, customers, or external contacts",
-      icon: Share2,
-      color: "from-cyan-500 to-cyan-700",
-      hoverColor: "from-cyan-600 to-cyan-800",
-    },
-    {
-      id: "build-packet",
-      label: "Build a Packet",
-      description: "Bundle multiple forms together into a single packet",
-      icon: Package,
-      color: "from-rose-500 to-rose-700",
-      hoverColor: "from-rose-600 to-rose-800",
-    },
-    {
-      id: "discontinued",
-      label: "Discontinued Forms",
-      description: "View and restore forms that have been retired",
-      icon: XCircle,
-      color: "from-slate-500 to-slate-700",
-      hoverColor: "from-slate-600 to-slate-800",
-    },
+    { id: "form-library", label: "Form Library", description: "Browse and manage all your published forms", icon: Library, color: "from-blue-500 to-blue-700", hoverColor: "from-blue-600 to-blue-800" },
+    { id: "update-existing", label: "Update an Existing Form", description: "Edit and modify forms that are already in use", icon: RefreshCw, color: "from-violet-500 to-violet-700", hoverColor: "from-violet-600 to-violet-800" },
+    { id: "form-drafts", label: "Form Drafts", description: "Continue working on forms you haven't finished yet", icon: FileEdit, color: "from-amber-500 to-amber-700", hoverColor: "from-amber-600 to-amber-800" },
+    { id: "share-forms", label: "Share Forms", description: "Send forms to employees, customers, or external contacts", icon: Share2, color: "from-cyan-500 to-cyan-700", hoverColor: "from-cyan-600 to-cyan-800" },
+    { id: "build-packet", label: "Build a Packet", description: "Bundle multiple forms together into a single packet", icon: Package, color: "from-rose-500 to-rose-700", hoverColor: "from-rose-600 to-rose-800" },
+    { id: "discontinued", label: "Discontinued Forms", description: "View and restore forms that have been retired", icon: XCircle, color: "from-slate-500 to-slate-700", hoverColor: "from-slate-600 to-slate-800" },
   ];
 
   return (
     <div className="p-6 max-w-4xl mx-auto" data-testid="forms-page">
       <h1 className="text-2xl font-bold mb-6" data-testid="text-forms-title">Forms</h1>
-
       <button
         onClick={() => onNavigate(topButton.id)}
-        className={`w-full mb-6 rounded-2xl bg-gradient-to-br ${
-          hoveredId === topButton.id ? topButton.hoverColor : topButton.color
-        } p-8 text-white text-left transition-all duration-200 ${
-          hoveredId === topButton.id ? "scale-[1.01] shadow-xl" : "shadow-lg"
-        }`}
+        className={`w-full mb-6 rounded-2xl bg-gradient-to-br ${hoveredId === topButton.id ? topButton.hoverColor : topButton.color} p-8 text-white text-left transition-all duration-200 ${hoveredId === topButton.id ? "scale-[1.01] shadow-xl" : "shadow-lg"}`}
         onMouseEnter={() => setHoveredId(topButton.id)}
         onMouseLeave={() => setHoveredId(null)}
         data-testid={`button-${topButton.id}`}
       >
         <div className="flex items-center gap-4">
-          <div className={`rounded-xl bg-white/20 p-4 transition-transform duration-200 ${
-            hoveredId === topButton.id ? "scale-110" : ""
-          }`}>
+          <div className={`rounded-xl bg-white/20 p-4 transition-transform duration-200 ${hoveredId === topButton.id ? "scale-110" : ""}`}>
             <topButton.icon className="h-8 w-8" />
           </div>
           <div>
@@ -170,25 +296,18 @@ function FormsHome({
           </div>
         </div>
       </button>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {gridButtons.map((btn) => (
           <button
             key={btn.id}
             onClick={() => onNavigate(btn.id)}
-            className={`rounded-2xl bg-gradient-to-br ${
-              hoveredId === btn.id ? btn.hoverColor : btn.color
-            } p-6 text-white text-left transition-all duration-200 ${
-              hoveredId === btn.id ? "scale-[1.02] shadow-xl" : "shadow-lg"
-            }`}
+            className={`rounded-2xl bg-gradient-to-br ${hoveredId === btn.id ? btn.hoverColor : btn.color} p-6 text-white text-left transition-all duration-200 ${hoveredId === btn.id ? "scale-[1.02] shadow-xl" : "shadow-lg"}`}
             onMouseEnter={() => setHoveredId(btn.id)}
             onMouseLeave={() => setHoveredId(null)}
             data-testid={`button-${btn.id}`}
           >
             <div className="flex items-center gap-4">
-              <div className={`rounded-xl bg-white/20 p-3 transition-transform duration-200 ${
-                hoveredId === btn.id ? "scale-110" : ""
-              }`}>
+              <div className={`rounded-xl bg-white/20 p-3 transition-transform duration-200 ${hoveredId === btn.id ? "scale-110" : ""}`}>
                 <btn.icon className="h-6 w-6" />
               </div>
               <div>
@@ -229,34 +348,29 @@ function EmptyState({ icon: Icon, message, submessage }: { icon: React.ElementTy
   );
 }
 
-function BuildNewForm({ hoveredId, setHoveredId }: { hoveredId: string | null; setHoveredId: (id: string | null) => void }) {
+function BuildNewForm({
+  hoveredId,
+  setHoveredId,
+  onSelectCategory,
+}: {
+  hoveredId: string | null;
+  setHoveredId: (id: string | null) => void;
+  onSelectCategory: (category: string) => void;
+}) {
   return (
     <div data-testid="view-build-new">
       <SectionHeader
         icon={FilePlus2}
         title="Build a New Form"
-        description="Create a custom form step by step. Choose a form type to get started."
+        description="Create a custom form step by step. Choose a category to get started."
       />
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[
-          { label: "Sales & Marketing", desc: "Proposals, lead capture, campaign tracking, and client outreach forms", num: 1, gradient: "from-emerald-500 to-emerald-700", hoverGradient: "from-emerald-600 to-emerald-800" },
-          { label: "Estimating & Pre-Construction", desc: "Bid sheets, site assessments, material takeoffs, and project scoping", num: 2, gradient: "from-blue-500 to-blue-700", hoverGradient: "from-blue-600 to-blue-800" },
-          { label: "Production & Field Operations", desc: "Work orders, daily logs, crew assignments, and job site checklists", num: 3, gradient: "from-orange-500 to-orange-700", hoverGradient: "from-orange-600 to-orange-800" },
-          { label: "Maintenance Operations", desc: "Service schedules, inspection reports, and recurring maintenance tasks", num: 4, gradient: "from-teal-500 to-teal-700", hoverGradient: "from-teal-600 to-teal-800" },
-          { label: "HR & Employees", desc: "Applications, onboarding, time-off requests, and performance reviews", num: 5, gradient: "from-violet-500 to-violet-700", hoverGradient: "from-violet-600 to-violet-800" },
-          { label: "Finance & Accounting", desc: "Invoices, expense reports, purchase orders, and budget tracking", num: 6, gradient: "from-amber-500 to-amber-700", hoverGradient: "from-amber-600 to-amber-800" },
-          { label: "Equipment & Assets", desc: "Equipment logs, asset tracking, maintenance records, and checkout forms", num: 7, gradient: "from-cyan-500 to-cyan-700", hoverGradient: "from-cyan-600 to-cyan-800" },
-          { label: "Compliance & Legal", desc: "Safety audits, incident reports, permits, and regulatory checklists", num: 8, gradient: "from-red-500 to-red-700", hoverGradient: "from-red-600 to-red-800" },
-          { label: "Customer Experience & Retention", desc: "Surveys, feedback forms, warranty claims, and follow-up checklists", num: 9, gradient: "from-pink-500 to-pink-700", hoverGradient: "from-pink-600 to-pink-800" },
-          { label: "Management & Strategy", desc: "Meeting agendas, goal tracking, KPI reports, and planning worksheets", num: 10, gradient: "from-indigo-500 to-indigo-700", hoverGradient: "from-indigo-600 to-indigo-800" },
-          { label: "Checklists", desc: "Step-by-step task lists, daily routines, quality checks, and verification forms", num: 11, gradient: "from-lime-500 to-lime-700", hoverGradient: "from-lime-600 to-lime-800" },
-          { label: "Misc & Other", desc: "General-purpose forms that don't fit into a specific category", num: 12, gradient: "from-slate-500 to-slate-700", hoverGradient: "from-slate-600 to-slate-800" },
-        ].map((item) => {
+        {CATEGORIES.map((item) => {
           const isHovered = hoveredId === `cat-${item.num}`;
           return (
             <button
               key={item.label}
+              onClick={() => onSelectCategory(item.label)}
               className={`rounded-2xl bg-gradient-to-br ${isHovered ? item.hoverGradient : item.gradient} p-5 text-white text-left transition-all duration-200 ${isHovered ? "scale-[1.02] shadow-xl" : "shadow-lg"}`}
               onMouseEnter={() => setHoveredId(`cat-${item.num}`)}
               onMouseLeave={() => setHoveredId(null)}
@@ -268,7 +382,6 @@ function BuildNewForm({ hoveredId, setHoveredId }: { hoveredId: string | null; s
                 </div>
                 <div>
                   <div className="font-semibold">{item.label}</div>
-                  <div className="text-sm text-white/80 mt-0.5">{item.desc}</div>
                 </div>
               </div>
             </button>
@@ -279,31 +392,676 @@ function BuildNewForm({ hoveredId, setHoveredId }: { hoveredId: string | null; s
   );
 }
 
+function FormWizard({
+  data,
+  setData,
+  step,
+  setStep,
+  onFinish,
+}: {
+  data: WizardData;
+  setData: React.Dispatch<React.SetStateAction<WizardData>>;
+  step: number;
+  setStep: React.Dispatch<React.SetStateAction<number>>;
+  onFinish: () => void;
+}) {
+  const { toast } = useToast();
+  const [isAiFilling, setIsAiFilling] = useState(false);
+  const currentStep = WIZARD_STEPS[step];
+
+  const update = useCallback((patch: Partial<WizardData>) => {
+    setData((prev) => ({ ...prev, ...patch }));
+  }, [setData]);
+
+  const runAiFill = async () => {
+    if (!data.title.trim()) {
+      toast({ title: "Enter a form title first", variant: "destructive" });
+      return;
+    }
+    setIsAiFilling(true);
+    try {
+      const res = await apiRequest("POST", "/api/form-builder/ai-fill", {
+        title: data.title,
+        category: data.category,
+      });
+      const ai: WizardData = await res.json();
+      setData((prev) => ({
+        ...prev,
+        title: ai.title || prev.title,
+        outcome: ai.outcome || prev.outcome,
+        outcomeType: ai.outcomeType || prev.outcomeType,
+        audience: ai.audience || prev.audience,
+        audienceRoles: ai.audienceRoles?.length ? ai.audienceRoles : prev.audienceRoles,
+        sections: ai.sections?.length ? ai.sections : prev.sections,
+        toolsAndMedia: ai.toolsAndMedia || prev.toolsAndMedia,
+        externalConnections: ai.externalConnections || prev.externalConnections,
+      }));
+      toast({ title: "AI filled all steps!", description: "Review each step and make any changes you'd like." });
+    } catch (err) {
+      toast({ title: "AI generation failed", description: "You can fill in the fields manually.", variant: "destructive" });
+    } finally {
+      setIsAiFilling(false);
+    }
+  };
+
+  const canProceed = () => {
+    switch (step) {
+      case 0: return data.title.trim().length > 0;
+      case 1: return data.outcome.trim().length > 0;
+      case 2: return data.audience.trim().length > 0;
+      case 3: return data.sections.length > 0;
+      default: return true;
+    }
+  };
+
+  const goNext = () => {
+    if (step < WIZARD_STEPS.length - 1) setStep(step + 1);
+  };
+
+  return (
+    <div data-testid="view-build-wizard">
+      <div className="mb-2 flex items-center gap-2">
+        <Badge variant="secondary">{data.category}</Badge>
+      </div>
+
+      <div className="mb-6 flex items-center gap-1 overflow-x-auto pb-2">
+        {WIZARD_STEPS.map((s, idx) => {
+          const isActive = idx === step;
+          const isDone = idx < step;
+          return (
+            <button
+              key={s.key}
+              onClick={() => { if (idx <= step) setStep(idx); }}
+              className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+                isActive
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : isDone
+                    ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 cursor-pointer"
+                    : "bg-muted text-muted-foreground"
+              }`}
+              disabled={idx > step}
+              data-testid={`wizard-step-${s.key}`}
+            >
+              <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                isActive ? "bg-white text-primary" : isDone ? "bg-emerald-600 text-white" : "bg-muted-foreground/20"
+              }`}>
+                {isDone ? <Check className="h-3.5 w-3.5" /> : s.num}
+              </div>
+              <span className="hidden sm:inline">{s.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mb-2">
+        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-300"
+            style={{ width: `${((step + 1) / WIZARD_STEPS.length) * 100}%` }}
+          />
+        </div>
+        <div className="mt-1 text-xs text-muted-foreground text-right">
+          Step {step + 1} of {WIZARD_STEPS.length}
+        </div>
+      </div>
+
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            {currentStep && <currentStep.icon className="h-6 w-6 text-primary" />}
+            <div>
+              <h2 className="text-xl font-bold" data-testid="text-wizard-step-title">{currentStep?.label}</h2>
+              <p className="text-sm text-muted-foreground">{currentStep?.desc}</p>
+            </div>
+          </div>
+
+          {step === 0 && <StepIdentify data={data} update={update} onAiFill={runAiFill} isAiFilling={isAiFilling} />}
+          {step === 1 && <StepOutcome data={data} update={update} />}
+          {step === 2 && <StepAudience data={data} update={update} />}
+          {step === 3 && <StepSections data={data} update={update} />}
+          {step === 4 && <StepToolsMedia data={data} update={update} />}
+          {step === 5 && <StepConnections data={data} update={update} />}
+          {step === 6 && <StepReview data={data} onFinish={onFinish} />}
+        </CardContent>
+      </Card>
+
+      <div className="flex items-center justify-between">
+        <Button
+          variant="outline"
+          onClick={() => step > 0 && setStep(step - 1)}
+          disabled={step === 0}
+          className="gap-2"
+          data-testid="button-wizard-prev"
+        >
+          <ArrowLeft className="h-4 w-4" /> Previous
+        </Button>
+
+        {step < WIZARD_STEPS.length - 1 ? (
+          <Button
+            onClick={goNext}
+            disabled={!canProceed()}
+            className="gap-2"
+            data-testid="button-wizard-next"
+          >
+            Next <ArrowRight className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button onClick={onFinish} className="gap-2" data-testid="button-wizard-finish">
+            <CheckCircle2 className="h-4 w-4" /> Save Form
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StepIdentify({
+  data,
+  update,
+  onAiFill,
+  isAiFilling,
+}: {
+  data: WizardData;
+  update: (p: Partial<WizardData>) => void;
+  onAiFill: () => void;
+  isAiFilling: boolean;
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <Label>Form Title *</Label>
+        <Input
+          value={data.title}
+          onChange={(e) => update({ title: e.target.value })}
+          placeholder="e.g. New Employee Onboarding Checklist"
+          className="mt-1"
+          data-testid="input-form-title"
+        />
+        <p className="text-xs text-muted-foreground mt-1">Give your form a clear, descriptive name</p>
+      </div>
+
+      <div>
+        <Label>Category</Label>
+        <div className="mt-1 flex items-center gap-2">
+          <Badge variant="secondary" className="text-sm">{data.category}</Badge>
+          <span className="text-xs text-muted-foreground">Selected from the previous page</span>
+        </div>
+      </div>
+
+      <div className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-5">
+        <div className="flex items-start gap-3">
+          <Sparkles className="h-6 w-6 text-primary mt-0.5" />
+          <div className="flex-1">
+            <div className="font-semibold">AI Auto-Fill</div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Enter a form title above, then click the button to have AI automatically fill in all remaining steps — outcome, audience, sections, fields, and more. You can review and edit everything afterward.
+            </p>
+            <Button
+              onClick={onAiFill}
+              disabled={isAiFilling || !data.title.trim()}
+              className="mt-3 gap-2"
+              data-testid="button-ai-fill"
+            >
+              {isAiFilling ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Generating…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" /> Auto-Fill with AI
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StepOutcome({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <Label>What does this form achieve? *</Label>
+        <Textarea
+          value={data.outcome}
+          onChange={(e) => update({ outcome: e.target.value })}
+          placeholder="Describe the purpose and desired result of this form…"
+          rows={4}
+          className="mt-1"
+          data-testid="input-outcome"
+        />
+      </div>
+      <div>
+        <Label>Outcome Type</Label>
+        <Select value={data.outcomeType} onValueChange={(v) => update({ outcomeType: v })}>
+          <SelectTrigger className="mt-1" data-testid="select-outcome-type">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {OUTCOME_TYPES.map((t) => (
+              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
+function StepAudience({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  const toggleRole = (role: string) => {
+    const roles = data.audienceRoles.includes(role)
+      ? data.audienceRoles.filter((r) => r !== role)
+      : [...data.audienceRoles, role];
+    update({ audienceRoles: roles });
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <Label>Who fills out this form? *</Label>
+        <Input
+          value={data.audience}
+          onChange={(e) => update({ audience: e.target.value })}
+          placeholder="e.g. Crew Leaders, New Hires, Customers"
+          className="mt-1"
+          data-testid="input-audience"
+        />
+        <p className="text-xs text-muted-foreground mt-1">Describe the specific audience in your own words</p>
+      </div>
+      <div>
+        <Label>Access Roles</Label>
+        <p className="text-xs text-muted-foreground mb-2">Which system roles should be able to access this form?</p>
+        <div className="flex flex-wrap gap-3">
+          {["Admin", "Manager", "Crew", "Customer"].map((role) => (
+            <label key={role} className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={data.audienceRoles.includes(role)}
+                onCheckedChange={() => toggleRole(role)}
+                data-testid={`checkbox-role-${role.toLowerCase()}`}
+              />
+              <span className="text-sm">{role}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StepSections({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  const addSection = () => {
+    update({
+      sections: [
+        ...data.sections,
+        { title: "", description: "", fields: [{ label: "", type: "text", required: false, placeholder: "", options: [], helpText: "" }] },
+      ],
+    });
+  };
+
+  const updateSection = (idx: number, patch: Partial<FormSection>) => {
+    const next = data.sections.map((s, i) => (i === idx ? { ...s, ...patch } : s));
+    update({ sections: next });
+  };
+
+  const removeSection = (idx: number) => {
+    update({ sections: data.sections.filter((_, i) => i !== idx) });
+  };
+
+  const addField = (sIdx: number) => {
+    const section = data.sections[sIdx];
+    updateSection(sIdx, {
+      fields: [...section.fields, { label: "", type: "text", required: false, placeholder: "", options: [], helpText: "" }],
+    });
+  };
+
+  const updateField = (sIdx: number, fIdx: number, patch: Partial<FormFieldDef>) => {
+    const section = data.sections[sIdx];
+    const fields = section.fields.map((f, i) => (i === fIdx ? { ...f, ...patch } : f));
+    updateSection(sIdx, { fields });
+  };
+
+  const removeField = (sIdx: number, fIdx: number) => {
+    const section = data.sections[sIdx];
+    updateSection(sIdx, { fields: section.fields.filter((_, i) => i !== fIdx) });
+  };
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-muted-foreground">
+        Break your form into logical sections. Each section can have multiple fields.
+      </p>
+
+      {data.sections.map((section, sIdx) => (
+        <Card key={sIdx} className="border-l-4 border-l-primary">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 space-y-2">
+                <Input
+                  value={section.title}
+                  onChange={(e) => updateSection(sIdx, { title: e.target.value })}
+                  placeholder={`Section ${sIdx + 1} title`}
+                  className="font-semibold"
+                  data-testid={`input-section-title-${sIdx}`}
+                />
+                <Input
+                  value={section.description}
+                  onChange={(e) => updateSection(sIdx, { description: e.target.value })}
+                  placeholder="Brief description of this section…"
+                  className="text-sm"
+                  data-testid={`input-section-desc-${sIdx}`}
+                />
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => removeSection(sIdx)} data-testid={`button-remove-section-${sIdx}`}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+
+            <div className="space-y-2 pl-3 border-l-2 border-muted">
+              {section.fields.map((field, fIdx) => (
+                <div key={fIdx} className="flex items-start gap-2 rounded-lg bg-muted/30 p-2">
+                  <GripVertical className="h-4 w-4 mt-2.5 text-muted-foreground/40 shrink-0" />
+                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-[1fr_120px_auto] gap-2">
+                    <Input
+                      value={field.label}
+                      onChange={(e) => updateField(sIdx, fIdx, { label: e.target.value })}
+                      placeholder="Field label"
+                      className="text-sm"
+                      data-testid={`input-field-label-${sIdx}-${fIdx}`}
+                    />
+                    <Select value={field.type} onValueChange={(v) => updateField(sIdx, fIdx, { type: v })}>
+                      <SelectTrigger className="text-sm" data-testid={`select-field-type-${sIdx}-${fIdx}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FIELD_TYPES.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <Checkbox
+                          checked={field.required}
+                          onCheckedChange={(c) => updateField(sIdx, fIdx, { required: !!c })}
+                          data-testid={`checkbox-required-${sIdx}-${fIdx}`}
+                        />
+                        <span className="text-xs">Req</span>
+                      </label>
+                      <Button variant="ghost" size="sm" onClick={() => removeField(sIdx, fIdx)} className="h-8 w-8 p-0" data-testid={`button-remove-field-${sIdx}-${fIdx}`}>
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <Button variant="ghost" size="sm" onClick={() => addField(sIdx)} className="gap-1 text-xs" data-testid={`button-add-field-${sIdx}`}>
+                <Plus className="h-3.5 w-3.5" /> Add Field
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+
+      <Button variant="outline" onClick={addSection} className="gap-2 w-full" data-testid="button-add-section">
+        <Plus className="h-4 w-4" /> Add Section
+      </Button>
+    </div>
+  );
+}
+
+function StepToolsMedia({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  const tm = data.toolsAndMedia;
+  const setTm = (patch: Partial<ToolsAndMedia>) => update({ toolsAndMedia: { ...tm, ...patch } });
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-muted-foreground">
+        Enable additional features and media capabilities for this form.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {[
+          { key: "enablePhotos" as const, label: "Photo Attachments", desc: "Allow photo uploads within the form", icon: Camera },
+          { key: "enableFileUpload" as const, label: "File Uploads", desc: "Allow document and file attachments", icon: Upload },
+          { key: "enableSignature" as const, label: "Signature Capture", desc: "Include a signature field", icon: PenTool },
+          { key: "enableGeolocation" as const, label: "Geolocation", desc: "Capture the user's location automatically", icon: MapPin },
+        ].map((item) => (
+          <Card key={item.key} className={`transition-all ${tm[item.key] ? "border-primary bg-primary/5" : ""}`}>
+            <CardContent className="p-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className={`rounded-lg p-2 ${tm[item.key] ? "bg-primary/10" : "bg-muted"}`}>
+                  <item.icon className={`h-5 w-5 ${tm[item.key] ? "text-primary" : "text-muted-foreground"}`} />
+                </div>
+                <div>
+                  <div className="font-medium text-sm">{item.label}</div>
+                  <div className="text-xs text-muted-foreground">{item.desc}</div>
+                </div>
+              </div>
+              <Switch
+                checked={tm[item.key]}
+                onCheckedChange={(v) => setTm({ [item.key]: v })}
+                data-testid={`switch-${item.key}`}
+              />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {tm.suggestedIllustrations.length > 0 && (
+        <div>
+          <Label>AI-Suggested Illustrations</Label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {tm.suggestedIllustrations.map((ill, idx) => (
+              <Badge key={idx} variant="secondary" className="text-sm">{ill}</Badge>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StepConnections({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  const ec = data.externalConnections;
+  const setEc = (patch: Partial<ExternalConnections>) => update({ externalConnections: { ...ec, ...patch } });
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-muted-foreground">
+        Configure what happens when this form is submitted — notifications, approvals, and integrations.
+      </p>
+
+      <div className="space-y-4">
+        <Card className={`transition-all ${ec.sendsEmail ? "border-primary bg-primary/5" : ""}`}>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Mail className={`h-5 w-5 ${ec.sendsEmail ? "text-primary" : "text-muted-foreground"}`} />
+                <div>
+                  <div className="font-medium text-sm">Email Notification</div>
+                  <div className="text-xs text-muted-foreground">Send an email when this form is submitted</div>
+                </div>
+              </div>
+              <Switch checked={ec.sendsEmail} onCheckedChange={(v) => setEc({ sendsEmail: v })} data-testid="switch-sends-email" />
+            </div>
+            {ec.sendsEmail && (
+              <Input
+                value={ec.emailRecipients}
+                onChange={(e) => setEc({ emailRecipients: e.target.value })}
+                placeholder="e.g. Office Manager, HR Department"
+                className="text-sm"
+                data-testid="input-email-recipients"
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className={`transition-all ${ec.sendsToCalendar ? "border-primary bg-primary/5" : ""}`}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Clock className={`h-5 w-5 ${ec.sendsToCalendar ? "text-primary" : "text-muted-foreground"}`} />
+                <div>
+                  <div className="font-medium text-sm">Calendar Event</div>
+                  <div className="text-xs text-muted-foreground">Create a calendar event from this submission</div>
+                </div>
+              </div>
+              <Switch checked={ec.sendsToCalendar} onCheckedChange={(v) => setEc({ sendsToCalendar: v })} data-testid="switch-calendar" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={`transition-all ${ec.requiresApproval ? "border-primary bg-primary/5" : ""}`}>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className={`h-5 w-5 ${ec.requiresApproval ? "text-primary" : "text-muted-foreground"}`} />
+                <div>
+                  <div className="font-medium text-sm">Requires Approval</div>
+                  <div className="text-xs text-muted-foreground">Someone must review and approve submissions</div>
+                </div>
+              </div>
+              <Switch checked={ec.requiresApproval} onCheckedChange={(v) => setEc({ requiresApproval: v })} data-testid="switch-approval" />
+            </div>
+            {ec.requiresApproval && (
+              <Input
+                value={ec.approver}
+                onChange={(e) => setEc({ approver: e.target.value })}
+                placeholder="e.g. Manager, Supervisor, Admin"
+                className="text-sm"
+                data-testid="input-approver"
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className={`transition-all ${ec.integratesWithCRM ? "border-primary bg-primary/5" : ""}`}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Globe className={`h-5 w-5 ${ec.integratesWithCRM ? "text-primary" : "text-muted-foreground"}`} />
+                <div>
+                  <div className="font-medium text-sm">CRM Integration</div>
+                  <div className="text-xs text-muted-foreground">Link submissions to customer records</div>
+                </div>
+              </div>
+              <Switch checked={ec.integratesWithCRM} onCheckedChange={(v) => setEc({ integratesWithCRM: v })} data-testid="switch-crm" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function StepReview({ data, onFinish }: { data: WizardData; onFinish: () => void }) {
+  const totalFields = data.sections.reduce((sum, s) => sum + s.fields.length, 0);
+
+  return (
+    <div className="space-y-5" data-testid="wizard-review">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground mb-1">Form Title</div>
+            <div className="font-semibold" data-testid="review-title">{data.title || "—"}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground mb-1">Category</div>
+            <Badge variant="secondary">{data.category}</Badge>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardContent className="p-4">
+          <div className="text-xs text-muted-foreground mb-1">Outcome</div>
+          <div className="text-sm" data-testid="review-outcome">{data.outcome || "—"}</div>
+          <Badge variant="outline" className="mt-2">
+            {OUTCOME_TYPES.find((t) => t.value === data.outcomeType)?.label || data.outcomeType}
+          </Badge>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4">
+          <div className="text-xs text-muted-foreground mb-1">Audience</div>
+          <div className="text-sm font-medium">{data.audience || "—"}</div>
+          <div className="flex gap-1 mt-2">
+            {data.audienceRoles.map((r) => (
+              <Badge key={r} variant="secondary">{r}</Badge>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4">
+          <div className="text-xs text-muted-foreground mb-1">Sections & Fields</div>
+          <div className="text-sm font-medium">{data.sections.length} sections, {totalFields} fields</div>
+          <div className="mt-2 space-y-1">
+            {data.sections.map((s, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-sm">
+                <span className="font-medium">{s.title || `Section ${idx + 1}`}</span>
+                <span className="text-muted-foreground">— {s.fields.length} fields</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground mb-2">Tools & Media</div>
+            <div className="flex flex-wrap gap-2">
+              {data.toolsAndMedia.enablePhotos && <Badge>Photos</Badge>}
+              {data.toolsAndMedia.enableFileUpload && <Badge>File Upload</Badge>}
+              {data.toolsAndMedia.enableSignature && <Badge>Signature</Badge>}
+              {data.toolsAndMedia.enableGeolocation && <Badge>Geolocation</Badge>}
+              {!data.toolsAndMedia.enablePhotos && !data.toolsAndMedia.enableFileUpload && !data.toolsAndMedia.enableSignature && !data.toolsAndMedia.enableGeolocation && (
+                <span className="text-sm text-muted-foreground">None enabled</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground mb-2">External Connections</div>
+            <div className="flex flex-wrap gap-2">
+              {data.externalConnections.sendsEmail && <Badge>Email</Badge>}
+              {data.externalConnections.sendsToCalendar && <Badge>Calendar</Badge>}
+              {data.externalConnections.requiresApproval && <Badge>Approval</Badge>}
+              {data.externalConnections.integratesWithCRM && <Badge>CRM</Badge>}
+              {!data.externalConnections.sendsEmail && !data.externalConnections.sendsToCalendar && !data.externalConnections.requiresApproval && !data.externalConnections.integratesWithCRM && (
+                <span className="text-sm text-muted-foreground">None configured</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 function FormLibrary() {
   return (
     <div data-testid="view-form-library">
-      <SectionHeader
-        icon={Library}
-        title="Form Library"
-        description="Browse, search, and manage all your published forms in one place."
-      />
-
+      <SectionHeader icon={Library} title="Form Library" description="Browse, search, and manage all your published forms in one place." />
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search forms by name or category…" className="pl-9" data-testid="input-search-library" />
         </div>
         <Button variant="outline" className="gap-2" data-testid="button-filter-library">
-          <Filter className="h-4 w-4" />
-          Filter
+          <Filter className="h-4 w-4" /> Filter
         </Button>
       </div>
-
-      <EmptyState
-        icon={Library}
-        message="Your form library is empty"
-        submessage="Build your first form and it will appear here once published."
-      />
+      <EmptyState icon={Library} message="Your form library is empty" submessage="Build your first form and it will appear here once published." />
     </div>
   );
 }
@@ -311,24 +1069,14 @@ function FormLibrary() {
 function UpdateExisting() {
   return (
     <div data-testid="view-update-existing">
-      <SectionHeader
-        icon={RefreshCw}
-        title="Update an Existing Form"
-        description="Select a published form to edit its fields, settings, or layout."
-      />
-
+      <SectionHeader icon={RefreshCw} title="Update an Existing Form" description="Select a published form to edit its fields, settings, or layout." />
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search for a form to update…" className="pl-9" data-testid="input-search-update" />
         </div>
       </div>
-
-      <EmptyState
-        icon={RefreshCw}
-        message="No forms available to update"
-        submessage="Published forms will appear here so you can make changes."
-      />
+      <EmptyState icon={RefreshCw} message="No forms available to update" submessage="Published forms will appear here so you can make changes." />
     </div>
   );
 }
@@ -336,24 +1084,14 @@ function UpdateExisting() {
 function FormDrafts() {
   return (
     <div data-testid="view-form-drafts">
-      <SectionHeader
-        icon={FileEdit}
-        title="Form Drafts"
-        description="Pick up where you left off. Your unfinished forms are saved here."
-      />
-
+      <SectionHeader icon={FileEdit} title="Form Drafts" description="Pick up where you left off. Your unfinished forms are saved here." />
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search drafts…" className="pl-9" data-testid="input-search-drafts" />
         </div>
       </div>
-
-      <EmptyState
-        icon={Clock}
-        message="No drafts yet"
-        submessage="When you start building a form and save it as a draft, it will show up here."
-      />
+      <EmptyState icon={Clock} message="No drafts yet" submessage="When you start building a form and save it as a draft, it will show up here." />
     </div>
   );
 }
@@ -361,34 +1099,22 @@ function FormDrafts() {
 function ShareForms() {
   return (
     <div data-testid="view-share-forms">
-      <SectionHeader
-        icon={Share2}
-        title="Share Forms"
-        description="Send forms to employees, customers, or anyone who needs to fill them out."
-      />
-
+      <SectionHeader icon={Share2} title="Share Forms" description="Send forms to employees, customers, or anyone who needs to fill them out." />
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search forms to share…" className="pl-9" data-testid="input-search-share" />
         </div>
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         {[
           { label: "Copy Link", desc: "Get a shareable link to the form", icon: Link2 },
           { label: "Email Form", desc: "Send directly via email", icon: Mail },
           { label: "Duplicate & Share", desc: "Make a copy and share it separately", icon: Copy },
         ].map((item) => (
-          <Card
-            key={item.label}
-            className="cursor-pointer transition-all hover:border-primary hover:shadow-md hover:scale-[1.02]"
-            data-testid={`card-share-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-          >
+          <Card key={item.label} className="cursor-pointer transition-all hover:border-primary hover:shadow-md hover:scale-[1.02]" data-testid={`card-share-${item.label.toLowerCase().replace(/\s+/g, "-")}`}>
             <CardContent className="p-5 flex items-start gap-3">
-              <div className="rounded-lg bg-cyan-100 p-2 mt-0.5">
-                <item.icon className="h-5 w-5 text-cyan-700" />
-              </div>
+              <div className="rounded-lg bg-cyan-100 p-2 mt-0.5"><item.icon className="h-5 w-5 text-cyan-700" /></div>
               <div>
                 <div className="font-semibold">{item.label}</div>
                 <div className="text-sm text-muted-foreground mt-0.5">{item.desc}</div>
@@ -397,12 +1123,7 @@ function ShareForms() {
           </Card>
         ))}
       </div>
-
-      <EmptyState
-        icon={Send}
-        message="No forms to share yet"
-        submessage="Build and publish a form first, then you can share it from here."
-      />
+      <EmptyState icon={Send} message="No forms to share yet" submessage="Build and publish a form first, then you can share it from here." />
     </div>
   );
 }
@@ -410,19 +1131,10 @@ function ShareForms() {
 function BuildPacket() {
   return (
     <div data-testid="view-build-packet">
-      <SectionHeader
-        icon={Package}
-        title="Build a Packet"
-        description="Bundle multiple forms together into a single packet for onboarding, safety training, or any multi-form workflow."
-      />
-
+      <SectionHeader icon={Package} title="Build a Packet" description="Bundle multiple forms together into a single packet for onboarding, safety training, or any multi-form workflow." />
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <Button className="gap-2" data-testid="button-new-packet">
-          <Plus className="h-4 w-4" />
-          Create New Packet
-        </Button>
+        <Button className="gap-2" data-testid="button-new-packet"><Plus className="h-4 w-4" /> Create New Packet</Button>
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         {[
           { label: "New Hire Packet", desc: "Combine all onboarding forms into one packet" },
@@ -430,15 +1142,9 @@ function BuildPacket() {
           { label: "Customer Packet", desc: "Group customer intake and agreement forms" },
           { label: "Custom Packet", desc: "Pick and choose any forms to bundle together" },
         ].map((item) => (
-          <Card
-            key={item.label}
-            className="cursor-pointer transition-all hover:border-primary hover:shadow-md hover:scale-[1.02]"
-            data-testid={`card-packet-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-          >
+          <Card key={item.label} className="cursor-pointer transition-all hover:border-primary hover:shadow-md hover:scale-[1.02]" data-testid={`card-packet-${item.label.toLowerCase().replace(/\s+/g, "-")}`}>
             <CardContent className="p-5 flex items-start gap-3">
-              <div className="rounded-lg bg-rose-100 p-2 mt-0.5">
-                <Layers className="h-5 w-5 text-rose-700" />
-              </div>
+              <div className="rounded-lg bg-rose-100 p-2 mt-0.5"><Layers className="h-5 w-5 text-rose-700" /></div>
               <div>
                 <div className="font-semibold">{item.label}</div>
                 <div className="text-sm text-muted-foreground mt-0.5">{item.desc}</div>
@@ -447,12 +1153,7 @@ function BuildPacket() {
           </Card>
         ))}
       </div>
-
-      <EmptyState
-        icon={Package}
-        message="No packets created yet"
-        submessage="Create a packet to bundle multiple forms together."
-      />
+      <EmptyState icon={Package} message="No packets created yet" submessage="Create a packet to bundle multiple forms together." />
     </div>
   );
 }
@@ -460,24 +1161,14 @@ function BuildPacket() {
 function DiscontinuedForms() {
   return (
     <div data-testid="view-discontinued">
-      <SectionHeader
-        icon={XCircle}
-        title="Discontinued Forms"
-        description="Forms that have been retired or archived. You can restore them if needed."
-      />
-
+      <SectionHeader icon={XCircle} title="Discontinued Forms" description="Forms that have been retired or archived. You can restore them if needed." />
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search discontinued forms…" className="pl-9" data-testid="input-search-discontinued" />
         </div>
       </div>
-
-      <EmptyState
-        icon={Archive}
-        message="No discontinued forms"
-        submessage="When you retire a form, it will be moved here for safekeeping."
-      />
+      <EmptyState icon={Archive} message="No discontinued forms" submessage="When you retire a form, it will be moved here for safekeeping." />
     </div>
   );
 }
