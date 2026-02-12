@@ -3980,9 +3980,19 @@ SECTION GENERATION RULES:
     try {
       const user = req.user as User;
       const validated = insertBuilderFormSchema.parse({
-        name: req.body.name || "Untitled Form",
+        name: req.body.name || req.body.title || "Untitled Form",
+        category: req.body.category || "",
+        purpose: req.body.purpose || "",
         language: req.body.language || "en",
         exportTarget: req.body.exportTarget || "pdf",
+        status: req.body.status || "published",
+        outcome: req.body.outcome || "",
+        outcomeType: req.body.outcomeType || "data_collection",
+        audience: req.body.audience || "",
+        audienceRoles: req.body.audienceRoles || [],
+        sections: req.body.sections || [],
+        toolsAndMedia: req.body.toolsAndMedia || {},
+        externalConnections: req.body.externalConnections || {},
         pages: req.body.pages || [],
         archived: false,
         createdBy: user.id,
@@ -3993,6 +4003,7 @@ SECTION GENERATION RULES:
       if (err?.name === "ZodError") {
         return res.status(400).json({ message: "Invalid form data", errors: err.errors });
       }
+      console.error("[builder-forms] Create error:", err.message);
       res.status(500).json({ message: "Error creating builder form" });
     }
   });

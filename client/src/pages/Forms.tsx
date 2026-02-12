@@ -56,8 +56,9 @@ import {
   Briefcase,
   ChevronRight,
 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
 type View =
   | "home"
@@ -503,11 +504,28 @@ export default function Forms() {
           setStep={setWizardStep}
           titlePlaceholder={titlePlaceholder}
           purpose={selectedPurpose}
-          onFinish={() => {
-            setView("home");
-            setWizardData({ ...EMPTY_WIZARD });
-            setWizardStep(0);
-            setSelectedPurpose(null);
+          onFinish={async () => {
+            try {
+              await apiRequest("POST", "/api/builder-forms", {
+                name: wizardData.title || "Untitled Form",
+                category: wizardData.category,
+                purpose: wizardData.purpose,
+                outcome: wizardData.outcome,
+                outcomeType: wizardData.outcomeType,
+                audience: wizardData.audience,
+                audienceRoles: wizardData.audienceRoles,
+                sections: wizardData.sections,
+                toolsAndMedia: wizardData.toolsAndMedia,
+                externalConnections: wizardData.externalConnections,
+              });
+              queryClient.invalidateQueries({ queryKey: ["/api/builder-forms"] });
+              setView("form-library");
+              setWizardData({ ...EMPTY_WIZARD });
+              setWizardStep(0);
+              setSelectedPurpose(null);
+            } catch {
+              // toast handled below
+            }
           }}
         />
       )}
@@ -757,10 +775,11 @@ function FormWizard({
   setStep: React.Dispatch<React.SetStateAction<number>>;
   titlePlaceholder: string;
   purpose: PurposeOption | null;
-  onFinish: () => void;
+  onFinish: () => void | Promise<void>;
 }) {
   const { toast } = useToast();
   const [isAiFilling, setIsAiFilling] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const currentStep = WIZARD_STEPS[step];
 
   const update = useCallback((patch: Partial<WizardData>) => {
@@ -913,8 +932,27 @@ function FormWizard({
             Next <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
-          <Button onClick={onFinish} className="gap-2" data-testid="button-wizard-finish">
-            <CheckCircle2 className="h-4 w-4" /> Save Form
+          <Button
+            onClick={async () => {
+              setIsSaving(true);
+              try {
+                await onFinish();
+                toast({ title: "Form saved!", description: "Your form has been saved to the Form Library." });
+              } catch {
+                toast({ title: "Failed to save form", variant: "destructive" });
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+            disabled={isSaving}
+            className="gap-2"
+            data-testid="button-wizard-finish"
+          >
+            {isSaving ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</>
+            ) : (
+              <><CheckCircle2 className="h-4 w-4" /> Save Form</>
+            )}
           </Button>
         )}
       </div>
@@ -1547,19 +1585,98 @@ function StepReview({ data, onFinish }: { data: WizardData; onFinish: () => void
 }
 
 function FormLibrary() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const { data: forms = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/builder-forms"],
+    queryFn: async () => {
+      const res = await fetch("/api/builder-forms?archived=false", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load forms");
+      return res.json();
+    },
+  });
+
+  const filtered = forms.filter((f: any) => {
+    const matchSearch = !searchTerm || f.name?.toLowerCase().includes(searchTerm.toLowerCase()) || f.category?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchCategory = !categoryFilter || f.category === categoryFilter;
+    return matchSearch && matchCategory;
+  });
+
+  const categories = [...new Set(forms.map((f: any) => f.category).filter(Boolean))];
+
   return (
     <div data-testid="view-form-library">
       <SectionHeader icon={Library} title="Form Library" description="Browse, search, and manage all your published forms in one place." />
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search forms by name or category..." className="pl-9" data-testid="input-search-library" />
+          <Input
+            placeholder="Search forms by name or category..."
+            className="pl-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            data-testid="input-search-library"
+          />
         </div>
-        <Button variant="outline" className="gap-2" data-testid="button-filter-library">
-          <Filter className="h-4 w-4" /> Filter
-        </Button>
+        {categories.length > 0 && (
+          <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v === "all" ? "" : v)}>
+            <SelectTrigger className="w-[200px]" data-testid="select-category-filter">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
-      <EmptyState icon={Library} message="Your form library is empty" submessage="Build your first form and it will appear here once published." />
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={Library} message="Your form library is empty" submessage="Build your first form and it will appear here once published." />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filtered.map((form: any) => {
+            const sectionCount = Array.isArray(form.sections) ? form.sections.length : 0;
+            const fieldCount = Array.isArray(form.sections)
+              ? form.sections.reduce((sum: number, s: any) => sum + (Array.isArray(s.fields) ? s.fields.length : 0), 0)
+              : 0;
+            return (
+              <Card key={form.id} className="transition-all hover:shadow-md hover:border-primary/40" data-testid={`card-form-${form.id}`}>
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-base truncate" data-testid={`text-form-name-${form.id}`}>{form.name}</div>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {form.category && <Badge variant="secondary" className="text-xs">{form.category}</Badge>}
+                        {form.purpose && <Badge variant="outline" className="text-xs">{form.purpose}</Badge>}
+                      </div>
+                      {form.outcome && (
+                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{form.outcome}</p>
+                      )}
+                      <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
+                        <span>{sectionCount} section{sectionCount !== 1 ? "s" : ""}</span>
+                        <span>{fieldCount} field{fieldCount !== 1 ? "s" : ""}</span>
+                        {form.createdAt && (
+                          <span>{new Date(form.createdAt).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-primary/10 p-2 shrink-0">
+                      <FileText className="h-5 w-5 text-primary" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
