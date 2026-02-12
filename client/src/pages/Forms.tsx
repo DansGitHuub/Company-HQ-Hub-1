@@ -159,29 +159,32 @@ const FIELD_TYPES = [
 ];
 
 const CATEGORIES = [
-  { label: "Sales & Marketing", num: 1, gradient: "from-emerald-500 to-emerald-700", hoverGradient: "from-emerald-600 to-emerald-800" },
-  { label: "Estimating & Pre-Construction", num: 2, gradient: "from-blue-500 to-blue-700", hoverGradient: "from-blue-600 to-blue-800" },
-  { label: "Production & Field Operations", num: 3, gradient: "from-orange-500 to-orange-700", hoverGradient: "from-orange-600 to-orange-800" },
-  { label: "Maintenance Operations", num: 4, gradient: "from-teal-500 to-teal-700", hoverGradient: "from-teal-600 to-teal-800" },
-  { label: "HR & Employees", num: 5, gradient: "from-violet-500 to-violet-700", hoverGradient: "from-violet-600 to-violet-800" },
-  { label: "Finance & Accounting", num: 6, gradient: "from-amber-500 to-amber-700", hoverGradient: "from-amber-600 to-amber-800" },
-  { label: "Equipment & Assets", num: 7, gradient: "from-cyan-500 to-cyan-700", hoverGradient: "from-cyan-600 to-cyan-800" },
-  { label: "Compliance & Legal", num: 8, gradient: "from-red-500 to-red-700", hoverGradient: "from-red-600 to-red-800" },
-  { label: "Customer Experience & Retention", num: 9, gradient: "from-pink-500 to-pink-700", hoverGradient: "from-pink-600 to-pink-800" },
-  { label: "Management & Strategy", num: 10, gradient: "from-indigo-500 to-indigo-700", hoverGradient: "from-indigo-600 to-indigo-800" },
-  { label: "Checklists", num: 11, gradient: "from-lime-500 to-lime-700", hoverGradient: "from-lime-600 to-lime-800" },
-  { label: "Misc & Other", num: 12, gradient: "from-slate-500 to-slate-700", hoverGradient: "from-slate-600 to-slate-800" },
+  { label: "Sales & Marketing", num: 1, description: "Proposals, lead tracking, and customer outreach forms", placeholder: "e.g. New Lead Intake Form", gradient: "from-emerald-500 to-emerald-700", hoverGradient: "from-emerald-600 to-emerald-800" },
+  { label: "Estimating & Pre-Construction", num: 2, description: "Site assessments, project bids, and measurement sheets", placeholder: "e.g. Job Site Assessment Worksheet", gradient: "from-blue-500 to-blue-700", hoverGradient: "from-blue-600 to-blue-800" },
+  { label: "Production & Field Operations", num: 3, description: "Daily crew logs, installation checklists, and job reports", placeholder: "e.g. Daily Crew Production Log", gradient: "from-orange-500 to-orange-700", hoverGradient: "from-orange-600 to-orange-800" },
+  { label: "Maintenance Operations", num: 4, description: "Service schedules, property visit logs, and maintenance records", placeholder: "e.g. Weekly Property Maintenance Report", gradient: "from-teal-500 to-teal-700", hoverGradient: "from-teal-600 to-teal-800" },
+  { label: "HR & Employees", num: 5, description: "Onboarding, time-off requests, and employee evaluations", placeholder: "e.g. New Employee Onboarding Checklist", gradient: "from-violet-500 to-violet-700", hoverGradient: "from-violet-600 to-violet-800" },
+  { label: "Finance & Accounting", num: 6, description: "Expense reports, purchase orders, and invoice tracking", placeholder: "e.g. Expense Reimbursement Request", gradient: "from-amber-500 to-amber-700", hoverGradient: "from-amber-600 to-amber-800" },
+  { label: "Equipment & Assets", num: 7, description: "Equipment logs, maintenance tracking, and asset inventories", placeholder: "e.g. Equipment Inspection Checklist", gradient: "from-cyan-500 to-cyan-700", hoverGradient: "from-cyan-600 to-cyan-800" },
+  { label: "Compliance & Legal", num: 8, description: "Safety audits, incident reports, and regulatory filings", placeholder: "e.g. Workplace Safety Incident Report", gradient: "from-red-500 to-red-700", hoverGradient: "from-red-600 to-red-800" },
+  { label: "Customer Experience & Retention", num: 9, description: "Satisfaction surveys, feedback forms, and follow-up trackers", placeholder: "e.g. Customer Satisfaction Survey", gradient: "from-pink-500 to-pink-700", hoverGradient: "from-pink-600 to-pink-800" },
+  { label: "Management & Strategy", num: 10, description: "Meeting agendas, goal tracking, and performance reviews", placeholder: "e.g. Quarterly Business Review Template", gradient: "from-indigo-500 to-indigo-700", hoverGradient: "from-indigo-600 to-indigo-800" },
+  { label: "Checklists", num: 11, description: "Quick-reference checklists for daily tasks and inspections", placeholder: "e.g. Morning Truck & Trailer Checklist", gradient: "from-lime-500 to-lime-700", hoverGradient: "from-lime-600 to-lime-800" },
+  { label: "Misc & Other", num: 12, description: "General forms that don't fit neatly into other categories", placeholder: "e.g. Vendor Contact Information Sheet", gradient: "from-slate-500 to-slate-700", hoverGradient: "from-slate-600 to-slate-800" },
 ];
 
 export default function Forms() {
   const [view, setView] = useState<View>("home");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [titlePlaceholder, setTitlePlaceholder] = useState("");
   const [wizardData, setWizardData] = useState<WizardData>({ ...EMPTY_WIZARD });
   const [wizardStep, setWizardStep] = useState(0);
 
   function startWizard(category: string) {
     setSelectedCategory(category);
+    const cat = CATEGORIES.find((c) => c.label === category);
+    setTitlePlaceholder(cat?.placeholder || "e.g. My Custom Form");
     setWizardData({ ...EMPTY_WIZARD, category });
     setWizardStep(0);
     setView("build-wizard");
@@ -225,6 +228,7 @@ export default function Forms() {
           setData={setWizardData}
           step={wizardStep}
           setStep={setWizardStep}
+          titlePlaceholder={titlePlaceholder}
           onFinish={() => {
             setView("home");
             setWizardData({ ...EMPTY_WIZARD });
@@ -382,6 +386,7 @@ function BuildNewForm({
                 </div>
                 <div>
                   <div className="font-semibold">{item.label}</div>
+                  <div className="text-xs text-white/75 mt-0.5">{item.description}</div>
                 </div>
               </div>
             </button>
@@ -397,12 +402,14 @@ function FormWizard({
   setData,
   step,
   setStep,
+  titlePlaceholder,
   onFinish,
 }: {
   data: WizardData;
   setData: React.Dispatch<React.SetStateAction<WizardData>>;
   step: number;
   setStep: React.Dispatch<React.SetStateAction<number>>;
+  titlePlaceholder: string;
   onFinish: () => void;
 }) {
   const { toast } = useToast();
@@ -515,7 +522,7 @@ function FormWizard({
             </div>
           </div>
 
-          {step === 0 && <StepIdentify data={data} update={update} onAiFill={runAiFill} isAiFilling={isAiFilling} />}
+          {step === 0 && <StepIdentify data={data} update={update} onAiFill={runAiFill} isAiFilling={isAiFilling} titlePlaceholder={titlePlaceholder} />}
           {step === 1 && <StepOutcome data={data} update={update} />}
           {step === 2 && <StepAudience data={data} update={update} />}
           {step === 3 && <StepSections data={data} update={update} />}
@@ -560,11 +567,13 @@ function StepIdentify({
   update,
   onAiFill,
   isAiFilling,
+  titlePlaceholder,
 }: {
   data: WizardData;
   update: (p: Partial<WizardData>) => void;
   onAiFill: () => void;
   isAiFilling: boolean;
+  titlePlaceholder: string;
 }) {
   return (
     <div className="space-y-5">
@@ -573,7 +582,7 @@ function StepIdentify({
         <Input
           value={data.title}
           onChange={(e) => update({ title: e.target.value })}
-          placeholder="e.g. New Employee Onboarding Checklist"
+          placeholder={titlePlaceholder}
           className="mt-1"
           data-testid="input-form-title"
         />
