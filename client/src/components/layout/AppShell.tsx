@@ -437,7 +437,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_2px_4px_rgba(0,0,0,0.3)] border-sidebar-primary/50"
                       : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_2px_4px_rgba(0,0,0,0.2)] hover:border-white/10"
                   )}
-                  onClick={() => setIsMobileOpen(false)}
+                  onClick={() => {
+                    if (location === item.href) {
+                      window.dispatchEvent(new CustomEvent("forms-nav-reset"));
+                    }
+                    setIsMobileOpen(false);
+                  }}
                 >
                   <div className="relative">
                     <item.icon className="h-5 w-5" />
@@ -538,6 +543,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const tiles = displayNav.filter(item => item.id !== "help");
     
     const handleTileClick = (href: string) => {
+      if (location === href) {
+        window.dispatchEvent(new CustomEvent("forms-nav-reset"));
+      }
       navigate(href);
     };
 

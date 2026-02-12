@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,7 @@ type View =
   | "build-wizard"
   | "form-library"
   | "form-detail"
+  | "form-fill"
   | "update-existing"
   | "form-drafts"
   | "share-forms"
@@ -438,6 +440,18 @@ export default function Forms() {
   const [wizardData, setWizardData] = useState<WizardData>({ ...EMPTY_WIZARD });
   const [wizardStep, setWizardStep] = useState(0);
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
+  useEffect(() => {
+    const resetHandler = () => {
+      setView("home");
+      setSelectedFormId(null);
+      setSelectedCategory("");
+      setSelectedPurpose(null);
+      setWizardStep(0);
+      setWizardData({ ...EMPTY_WIZARD });
+    };
+    window.addEventListener("forms-nav-reset", resetHandler);
+    return () => window.removeEventListener("forms-nav-reset", resetHandler);
+  }, []);
 
   function selectCategory(category: string) {
     setSelectedCategory(category);
@@ -469,6 +483,10 @@ export default function Forms() {
       setView("build-new");
       return;
     }
+    if (view === "form-fill") {
+      setView("form-detail");
+      return;
+    }
     if (view === "form-detail") {
       setView("form-library");
       setSelectedFormId(null);
@@ -481,9 +499,11 @@ export default function Forms() {
     ? (wizardStep > 0 ? `Back to Step ${wizardStep}` : "Back to Form Type")
     : view === "build-purpose"
       ? "Back to Categories"
-      : view === "form-detail"
-        ? "Back to Form Library"
-        : "Back to Forms";
+      : view === "form-fill"
+        ? "Back to Form Details"
+        : view === "form-detail"
+          ? "Back to Form Library"
+          : "Back to Forms";
 
   return (
     <div className="p-6 max-w-5xl mx-auto" data-testid="forms-page">
@@ -539,7 +559,8 @@ export default function Forms() {
         />
       )}
       {view === "form-library" && <FormLibrary onOpenForm={(id: string) => { setSelectedFormId(id); setView("form-detail"); }} />}
-      {view === "form-detail" && selectedFormId && <FormDetail formId={selectedFormId} />}
+      {view === "form-detail" && selectedFormId && <FormDetail formId={selectedFormId} onFillForm={() => setView("form-fill")} />}
+      {view === "form-fill" && selectedFormId && <FormFill formId={selectedFormId} />}
       {view === "update-existing" && <UpdateExisting />}
       {view === "form-drafts" && <FormDrafts />}
       {view === "share-forms" && <ShareForms />}
@@ -1696,7 +1717,7 @@ function FormLibrary({ onOpenForm }: { onOpenForm: (id: string) => void }) {
   );
 }
 
-function FormDetail({ formId }: { formId: string }) {
+function FormDetail({ formId, onFillForm }: { formId: string; onFillForm: () => void }) {
   const { data: form, isLoading } = useQuery<any>({
     queryKey: ["/api/builder-forms", formId],
     queryFn: async () => {
@@ -1740,6 +1761,9 @@ function FormDetail({ formId }: { formId: string }) {
         {form.createdAt && (
           <p className="text-sm text-muted-foreground mt-2">Created {new Date(form.createdAt).toLocaleDateString()}</p>
         )}
+        <Button onClick={onFillForm} className="mt-4 gap-2" data-testid="button-fill-form">
+          <FileEdit className="h-4 w-4" /> Test / Fill Out This Form
+        </Button>
       </div>
 
       {form.outcome && (
@@ -1830,6 +1854,267 @@ function FormDetail({ formId }: { formId: string }) {
             </div>
           </CardContent>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+function FormFill({ formId }: { formId: string }) {
+  const { toast } = useToast();
+  const { data: form, isLoading } = useQuery<any>({
+    queryKey: ["/api/builder-forms", formId],
+    queryFn: async () => {
+      const res = await fetch(`/api/builder-forms/${formId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load form");
+      return res.json();
+    },
+  });
+
+  const [formValues, setFormValues] = useState<Record<string, any>>({});
+
+  const fieldKey = (sIdx: number, fIdx: number) => `s${sIdx}_f${fIdx}`;
+
+  const updateField = (sIdx: number, fIdx: number, value: any) => {
+    setFormValues((prev) => ({ ...prev, [fieldKey(sIdx, fIdx)]: value }));
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16" data-testid="view-form-fill">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!form) {
+    return (
+      <div data-testid="view-form-fill">
+        <EmptyState icon={FileText} message="Form not found" />
+      </div>
+    );
+  }
+
+  const sections: any[] = Array.isArray(form.sections) ? form.sections : [];
+
+  const renderField = (field: any, sIdx: number, fIdx: number) => {
+    const key = fieldKey(sIdx, fIdx);
+    const val = formValues[key] ?? "";
+
+    switch (field.type) {
+      case "textarea":
+        return (
+          <Textarea
+            value={val}
+            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
+            placeholder={field.placeholder || ""}
+            rows={3}
+            data-testid={`fill-field-${sIdx}-${fIdx}`}
+          />
+        );
+      case "number":
+        return (
+          <Input
+            type="number"
+            value={val}
+            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
+            placeholder={field.placeholder || ""}
+            data-testid={`fill-field-${sIdx}-${fIdx}`}
+          />
+        );
+      case "email":
+        return (
+          <Input
+            type="email"
+            value={val}
+            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
+            placeholder={field.placeholder || ""}
+            data-testid={`fill-field-${sIdx}-${fIdx}`}
+          />
+        );
+      case "phone":
+        return (
+          <Input
+            type="tel"
+            value={val}
+            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
+            placeholder={field.placeholder || ""}
+            data-testid={`fill-field-${sIdx}-${fIdx}`}
+          />
+        );
+      case "date":
+        return (
+          <Input
+            type="date"
+            value={val}
+            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
+            data-testid={`fill-field-${sIdx}-${fIdx}`}
+          />
+        );
+      case "time":
+        return (
+          <Input
+            type="time"
+            value={val}
+            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
+            data-testid={`fill-field-${sIdx}-${fIdx}`}
+          />
+        );
+      case "select":
+        return (
+          <Select value={val} onValueChange={(v) => updateField(sIdx, fIdx, v)}>
+            <SelectTrigger data-testid={`fill-field-${sIdx}-${fIdx}`}>
+              <SelectValue placeholder={field.placeholder || "Select an option..."} />
+            </SelectTrigger>
+            <SelectContent>
+              {(field.options || []).map((opt: string) => (
+                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      case "checkbox":
+        if (Array.isArray(field.options) && field.options.length > 0) {
+          const checked: string[] = val || [];
+          return (
+            <div className="space-y-2">
+              {field.options.map((opt: string) => (
+                <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={checked.includes(opt)}
+                    onCheckedChange={(c) => {
+                      const next = c ? [...checked, opt] : checked.filter((v: string) => v !== opt);
+                      updateField(sIdx, fIdx, next);
+                    }}
+                    data-testid={`fill-checkbox-${sIdx}-${fIdx}-${opt}`}
+                  />
+                  <span className="text-sm">{opt}</span>
+                </label>
+              ))}
+            </div>
+          );
+        }
+        return (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Checkbox
+              checked={!!val}
+              onCheckedChange={(c) => updateField(sIdx, fIdx, !!c)}
+              data-testid={`fill-field-${sIdx}-${fIdx}`}
+            />
+            <span className="text-sm">{field.placeholder || "Check if applicable"}</span>
+          </label>
+        );
+      case "radio":
+        return (
+          <div className="space-y-2">
+            {(field.options || []).map((opt: string) => (
+              <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name={key}
+                  value={opt}
+                  checked={val === opt}
+                  onChange={() => updateField(sIdx, fIdx, opt)}
+                  className="h-4 w-4 text-primary"
+                  data-testid={`fill-radio-${sIdx}-${fIdx}-${opt}`}
+                />
+                <span className="text-sm">{opt}</span>
+              </label>
+            ))}
+          </div>
+        );
+      case "signature":
+        return (
+          <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 p-6 text-center text-sm text-muted-foreground" data-testid={`fill-field-${sIdx}-${fIdx}`}>
+            <PenTool className="h-5 w-5 mx-auto mb-2 text-muted-foreground/50" />
+            Signature capture area (tap/click to sign)
+          </div>
+        );
+      case "file":
+        return (
+          <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 p-4 text-center text-sm text-muted-foreground" data-testid={`fill-field-${sIdx}-${fIdx}`}>
+            <Upload className="h-5 w-5 mx-auto mb-2 text-muted-foreground/50" />
+            File upload area
+          </div>
+        );
+      case "address":
+        return (
+          <div className="space-y-2">
+            <Input value={val?.street || ""} onChange={(e) => updateField(sIdx, fIdx, { ...val, street: e.target.value })} placeholder="Street Address" data-testid={`fill-field-${sIdx}-${fIdx}-street`} />
+            <div className="grid grid-cols-3 gap-2">
+              <Input value={val?.city || ""} onChange={(e) => updateField(sIdx, fIdx, { ...val, city: e.target.value })} placeholder="City" data-testid={`fill-field-${sIdx}-${fIdx}-city`} />
+              <Input value={val?.state || ""} onChange={(e) => updateField(sIdx, fIdx, { ...val, state: e.target.value })} placeholder="State" data-testid={`fill-field-${sIdx}-${fIdx}-state`} />
+              <Input value={val?.zip || ""} onChange={(e) => updateField(sIdx, fIdx, { ...val, zip: e.target.value })} placeholder="ZIP" data-testid={`fill-field-${sIdx}-${fIdx}-zip`} />
+            </div>
+          </div>
+        );
+      default:
+        return (
+          <Input
+            value={val}
+            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
+            placeholder={field.placeholder || ""}
+            data-testid={`fill-field-${sIdx}-${fIdx}`}
+          />
+        );
+    }
+  };
+
+  const handleSubmit = () => {
+    toast({ title: "Form submitted!", description: "This is a test submission. In production, responses would be saved to the database." });
+  };
+
+  return (
+    <div data-testid="view-form-fill">
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Test Mode</Badge>
+        </div>
+        <h1 className="text-2xl font-bold" data-testid="text-form-fill-name">{form.name}</h1>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {form.category && <Badge variant="secondary">{form.category}</Badge>}
+          {form.purpose && <Badge variant="outline">{form.purpose}</Badge>}
+        </div>
+        {form.outcome && (
+          <p className="text-sm text-muted-foreground mt-2">{form.outcome}</p>
+        )}
+      </div>
+
+      <div className="space-y-6">
+        {sections.map((section: any, sIdx: number) => (
+          <Card key={sIdx} className="border-l-4 border-l-primary" data-testid={`fill-section-${sIdx}`}>
+            <CardContent className="p-5">
+              <h2 className="text-lg font-semibold mb-1">{section.title || `Section ${sIdx + 1}`}</h2>
+              {section.description && (
+                <p className="text-sm text-muted-foreground mb-4">{section.description}</p>
+              )}
+              <div className="space-y-4">
+                {Array.isArray(section.fields) && section.fields.map((field: any, fIdx: number) => (
+                  <div key={fIdx}>
+                    <Label className="text-sm font-medium">
+                      {field.label || `Field ${fIdx + 1}`}
+                      {field.required && <span className="text-red-500 ml-1">*</span>}
+                    </Label>
+                    {field.helpText && (
+                      <p className="text-xs text-muted-foreground mt-0.5 mb-1">{field.helpText}</p>
+                    )}
+                    <div className="mt-1">
+                      {renderField(field, sIdx, fIdx)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-center gap-4 mt-6 pb-8">
+        <Button variant="outline" onClick={() => setFormValues({})} className="gap-2" data-testid="button-clear-form">
+          <RefreshCw className="h-4 w-4" /> Clear Form
+        </Button>
+        <Button onClick={handleSubmit} className="gap-2" data-testid="button-submit-form">
+          <Send className="h-4 w-4" /> Submit (Test)
+        </Button>
       </div>
     </div>
   );
