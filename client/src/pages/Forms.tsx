@@ -560,7 +560,7 @@ export default function Forms() {
       )}
       {view === "form-library" && <FormLibrary onOpenForm={(id: string) => { setSelectedFormId(id); setView("form-detail"); }} />}
       {view === "form-detail" && selectedFormId && <FormDetail formId={selectedFormId} onFillForm={() => setView("form-fill")} />}
-      {view === "form-fill" && selectedFormId && <FormFill formId={selectedFormId} />}
+      {view === "form-fill" && selectedFormId && <FormFill formId={selectedFormId} onSubmitted={() => { setView("home"); setSelectedFormId(null); }} />}
       {view === "update-existing" && <UpdateExisting />}
       {view === "form-drafts" && <FormDrafts />}
       {view === "share-forms" && <ShareForms />}
@@ -1952,7 +1952,7 @@ function SignaturePad({ value, onChange, testId }: { value: string; onChange: (d
     ctx.stroke();
   };
 
-  const stopDrawing = () => {
+  const stopDrawing = useCallback(() => {
     if (isDrawing) {
       const canvas = canvasRef.current;
       if (canvas) {
@@ -1960,7 +1960,16 @@ function SignaturePad({ value, onChange, testId }: { value: string; onChange: (d
       }
     }
     setIsDrawing(false);
-  };
+  }, [isDrawing, onChange]);
+
+  useEffect(() => {
+    window.addEventListener("mouseup", stopDrawing);
+    window.addEventListener("touchend", stopDrawing);
+    return () => {
+      window.removeEventListener("mouseup", stopDrawing);
+      window.removeEventListener("touchend", stopDrawing);
+    };
+  }, [stopDrawing]);
 
   const clearSignature = () => {
     const canvas = canvasRef.current;
@@ -2020,7 +2029,7 @@ function calcBusinessDays(startDate: string, endDate: string): number {
   if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return 0;
   let count = 0;
   const current = new Date(start);
-  while (current <= end) {
+  while (current < end) {
     const day = current.getDay();
     if (day !== 0 && day !== 6) count++;
     current.setDate(current.getDate() + 1);
@@ -2028,7 +2037,7 @@ function calcBusinessDays(startDate: string, endDate: string): number {
   return count;
 }
 
-function FormFill({ formId }: { formId: string }) {
+function FormFill({ formId, onSubmitted }: { formId: string; onSubmitted: () => void }) {
   const { toast } = useToast();
   const { data: form, isLoading } = useQuery<any>({
     queryKey: ["/api/builder-forms", formId],
@@ -2268,6 +2277,7 @@ function FormFill({ formId }: { formId: string }) {
 
   const handleSubmit = () => {
     toast({ title: "Form submitted!", description: "This is a test submission. In production, responses would be saved to the database." });
+    setTimeout(() => onSubmitted(), 1500);
   };
 
   return (
