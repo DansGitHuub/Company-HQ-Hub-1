@@ -1859,6 +1859,175 @@ function FormDetail({ formId, onFillForm }: { formId: string; onFillForm: () => 
   );
 }
 
+function SignaturePad({ value, onChange, testId }: { value: string; onChange: (dataUrl: string) => void; testId: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [hasDrawn, setHasDrawn] = useState(!!value);
+
+  useEffect(() => {
+    const syncSize = () => {
+      const canvas = canvasRef.current;
+      const container = containerRef.current;
+      if (!canvas || !container) return;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = container.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = 120 * dpr;
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = "120px";
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.scale(dpr, dpr);
+        ctx.strokeStyle = "#1a1a2e";
+        ctx.lineWidth = 2;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+      }
+    };
+    syncSize();
+    window.addEventListener("resize", syncSize);
+    return () => window.removeEventListener("resize", syncSize);
+  }, []);
+
+  useEffect(() => {
+    if (value && canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d");
+      if (ctx) {
+        const img = new window.Image();
+        img.onload = () => {
+          const dpr = window.devicePixelRatio || 1;
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
+          ctx.drawImage(img, 0, 0, canvasRef.current!.width, canvasRef.current!.height);
+          ctx.restore();
+          setHasDrawn(true);
+        };
+        img.src = value;
+      }
+    }
+  }, [value]);
+
+  const getPos = (e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    if ("touches" in e) {
+      return {
+        x: e.touches[0].clientX - rect.left,
+        y: e.touches[0].clientY - rect.top,
+      };
+    }
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  };
+
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    setIsDrawing(true);
+    setHasDrawn(true);
+  };
+
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const pos = getPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    if (isDrawing) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        onChange(canvas.toDataURL("image/png"));
+      }
+    }
+    setIsDrawing(false);
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+    setHasDrawn(false);
+    onChange("");
+  };
+
+  return (
+    <div data-testid={testId}>
+      <div ref={containerRef} className="rounded-lg border-2 border-muted-foreground/20 bg-white relative overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          className="w-full cursor-crosshair touch-none"
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseLeave={stopDrawing}
+          onTouchStart={startDrawing}
+          onTouchMove={draw}
+          onTouchEnd={stopDrawing}
+          data-testid={`${testId}-canvas`}
+        />
+        <div className="absolute bottom-2 left-3 right-3 border-t border-muted-foreground/20" />
+        <div className="absolute bottom-1 left-3 text-[10px] text-muted-foreground/40">Sign above the line</div>
+      </div>
+      <div className="flex items-center justify-between mt-1.5">
+        <span className="text-xs text-muted-foreground">
+          {hasDrawn ? "Signature captured" : "Draw your signature above"}
+        </span>
+        {hasDrawn && (
+          <button
+            type="button"
+            onClick={clearSignature}
+            className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
+            data-testid={`${testId}-clear`}
+          >
+            <XCircle className="h-3 w-3" /> Clear
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function calcBusinessDays(startDate: string, endDate: string): number {
+  if (!startDate || !endDate) return 0;
+  const start = new Date(startDate + "T00:00:00");
+  const end = new Date(endDate + "T00:00:00");
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return 0;
+  let count = 0;
+  const current = new Date(start);
+  while (current <= end) {
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) count++;
+    current.setDate(current.getDate() + 1);
+  }
+  return count;
+}
+
 function FormFill({ formId }: { formId: string }) {
   const { toast } = useToast();
   const { data: form, isLoading } = useQuery<any>({
@@ -1941,15 +2110,52 @@ function FormFill({ formId }: { formId: string }) {
             data-testid={`fill-field-${sIdx}-${fIdx}`}
           />
         );
-      case "date":
+      case "date": {
+        const sectionFields = sections[sIdx]?.fields || [];
+        const label = (field.label || "").toLowerCase();
+        const startKw = ["start date", "begin date", "from date", "first day", "start of leave", "leave start", "absence start", "departure date", "pto start", "time off start", "days off start", "vacation start"];
+        const endKw = ["end date", "return date", "to date", "last day", "end of leave", "leave end", "absence end", "pto end", "time off end", "days off end", "vacation end"];
+        const isStart = startKw.some((k) => label.includes(k));
+        const isEnd = endKw.some((k) => label.includes(k));
+
+        let businessDaysBadge = null;
+        if (isStart || isEnd) {
+          const pairKw = isStart ? endKw : startKw;
+          const pairIdx = sectionFields.findIndex((f: any) => {
+            const l = (f.label || "").toLowerCase();
+            return f.type === "date" && pairKw.some((k) => l.includes(k));
+          });
+          if (pairIdx >= 0) {
+            const pairVal = formValues[fieldKey(sIdx, pairIdx)] || "";
+            if (pairVal && val) {
+              const startVal = isStart ? val : pairVal;
+              const endVal = isStart ? pairVal : val;
+              const days = calcBusinessDays(startVal, endVal);
+              if (days > 0) {
+                businessDaysBadge = (
+                  <div className="mt-1.5 flex items-center gap-2" data-testid={`fill-business-days-${sIdx}-${fIdx}`}>
+                    <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-xs gap-1">
+                      <Clock className="h-3 w-3" /> {days} business day{days !== 1 ? "s" : ""} (Mon-Fri)
+                    </Badge>
+                  </div>
+                );
+              }
+            }
+          }
+        }
+
         return (
-          <Input
-            type="date"
-            value={val}
-            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
-            data-testid={`fill-field-${sIdx}-${fIdx}`}
-          />
+          <div>
+            <Input
+              type="date"
+              value={val}
+              onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
+              data-testid={`fill-field-${sIdx}-${fIdx}`}
+            />
+            {businessDaysBadge}
+          </div>
         );
+      }
       case "time":
         return (
           <Input
@@ -2024,10 +2230,11 @@ function FormFill({ formId }: { formId: string }) {
         );
       case "signature":
         return (
-          <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 p-6 text-center text-sm text-muted-foreground" data-testid={`fill-field-${sIdx}-${fIdx}`}>
-            <PenTool className="h-5 w-5 mx-auto mb-2 text-muted-foreground/50" />
-            Signature capture area (tap/click to sign)
-          </div>
+          <SignaturePad
+            value={val || ""}
+            onChange={(dataUrl) => updateField(sIdx, fIdx, dataUrl)}
+            testId={`fill-field-${sIdx}-${fIdx}`}
+          />
         );
       case "file":
         return (
