@@ -892,7 +892,7 @@ function FormWizard({
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-center gap-4 pb-8">
         <Button
           variant="outline"
           onClick={() => step > 0 && setStep(step - 1)}
