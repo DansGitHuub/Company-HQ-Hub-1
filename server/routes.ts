@@ -3813,65 +3813,127 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
+  // Form Builder Wizard - PDF parse
+  const multerUpload = (await import("multer")).default;
+  const pdfUpload = multerUpload({ storage: multerUpload.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+  app.post("/api/form-builder/parse-pdf", requireAuth, pdfUpload.single("pdf"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No PDF file uploaded" });
+      }
+      const allowedMimes = ["application/pdf"];
+      if (!allowedMimes.includes(req.file.mimetype)) {
+        return res.status(400).json({ message: "Only PDF files are accepted" });
+      }
+      const pdfParse = (await import("pdf-parse")).default;
+      let pdfData;
+      try {
+        pdfData = await pdfParse(req.file.buffer);
+      } catch (parseErr: any) {
+        return res.status(400).json({ message: "The uploaded file could not be parsed as a valid PDF" });
+      }
+      const text = pdfData.text.slice(0, 15000);
+      const lines = text.split("\n").filter((l: string) => l.trim().length > 0);
+      const suggestedTitle = lines[0]?.trim().slice(0, 100) || "";
+      res.json({ text, suggestedTitle });
+    } catch (err: any) {
+      console.error("[form-builder/parse-pdf] Error:", err.message);
+      res.status(500).json({ message: "Failed to parse PDF" });
+    }
+  });
+
   // Form Builder Wizard - AI auto-fill
   app.post("/api/form-builder/ai-fill", requireAuth, async (req, res) => {
     try {
-      const { title, category } = req.body;
+      const { title, category, purpose, smartAnswers, pdfText } = req.body;
       if (!title) {
         return res.status(400).json({ message: "Title is required" });
       }
+
+      let purposeContext = "";
+      if (purpose) {
+        purposeContext = `\nForm Purpose: "${purpose}"`;
+      }
+
+      let smartContext = "";
+      if (smartAnswers && Object.keys(smartAnswers).length > 0) {
+        const answers = Object.entries(smartAnswers)
+          .map(([key, val]) => `  - ${key}: ${val}`)
+          .join("\n");
+        smartContext = `\nUser's answers to smart follow-up questions:\n${answers}\nIMPORTANT: Use these answers to heavily customize the form. These are specific choices the user made about their business — tailor every section, field, and option to match their answers exactly.`;
+      }
+
+      let pdfContext = "";
+      if (pdfText) {
+        pdfContext = `\nPDF DOCUMENT CONTENT (recreate this as a fillable form):\n---\n${pdfText.slice(0, 12000)}\n---\nIMPORTANT: Your job is to recreate this PDF document as a fillable digital form. Analyze every field, checkbox, line, and section in the PDF. Map each one to the appropriate field type (text, date, select, checkbox, signature, etc.). Preserve the exact structure, labels, and organization from the original document. Add helpful placeholder text to guide the person filling it out.`;
+      }
+
+      const hiringRules = purpose && (purpose.toLowerCase().includes("crew member hiring") || purpose.toLowerCase().includes("hiring application"))
+        ? `\nHIRING APPLICATION RULES (based on Fortune 500 / SHRM best practices):
+- WORK HISTORY: Include at least 3 previous employment entries, each with: Employer Name, Job Title, Start Date, End Date, Supervisor Name, Supervisor Phone, Reason for Leaving, and a brief description of duties
+- PERSONAL REFERENCES: Include at least 3 personal (non-family) references with guidance text like "Coach, Teacher, Minister, Mentor, or similar — no family members." Each reference should have: Full Name, Relationship, Phone, Email, and How Long Known
+- Include an "Equal Opportunity" acknowledgment checkbox
+- Include a "Background Check Consent" section if applicable
+- Include "Are you legally authorized to work in the United States?" question
+- Include a signature and date field for attestation that all information is true`
+        : "";
+
+      const managerRules = purpose && (purpose.toLowerCase().includes("manager") || purpose.toLowerCase().includes("supervisor application"))
+        ? `\nMANAGER/LEADERSHIP APPLICATION RULES (based on Amazon, Google, and SHRM behavioral interview standards):
+- BEHAVIORAL EXAMPLES: Include 2-3 behavioral/situational questions using the STAR format (Situation, Task, Action, Result). For example: "Describe a time you had to resolve a conflict between team members. What was the situation, what did you do, and what was the outcome?"
+- LEADERSHIP EXPERIENCE: Ask for specific metrics — team sizes managed, budgets overseen, revenue impact
+- PROFESSIONAL REFERENCES: At least 3, preferably supervisors or peers from management roles. Each with: Name, Title, Company, Phone, Email, Working Relationship, How Long
+- Include questions about management philosophy and leadership style
+- Include a section about relevant certifications, licenses, or continuing education`
+        : "";
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: `You are a senior business operations expert specializing in landscape installation and maintenance companies. You help create professional, well-structured business forms. Return ONLY valid JSON with NO additional text.
+            content: `You are a senior business operations expert specializing in landscape installation and maintenance companies. You create forms that match the quality and professionalism of those used by top US companies (Amazon, Deloitte, ADP, SHRM-recommended templates). Return ONLY valid JSON with NO additional text.
 
-Given a form title and category, generate comprehensive form builder data. Your output should be practical, industry-specific, and immediately usable.
+Given a form title, category, purpose, and any additional context, generate comprehensive, highly specific form builder data. Your output must be:
+- PROFESSIONAL: Match the quality standard of Fortune 500 companies and SHRM-recommended templates
+- SPECIFIC: Tailored exactly to the stated purpose — not generic
+- COMPLETE: Include all fields a real business would need for this specific form type
+- PRACTICAL: Based on how real landscape companies operate
+- LEGALLY SOUND: Include appropriate disclaimers, consents, and attestations where applicable
+${hiringRules}${managerRules}
 
 The JSON must include these fields:
-- title: string (the refined form title — clean it up if needed but keep the user's intent)
+- title: string (the refined form title)
 - category: string (the category provided)
-- outcome: string (2-3 sentences describing what this form achieves when filled out properly and why it matters to the business)
+- outcome: string (2-3 sentences describing what this form achieves)
 - outcomeType: string (one of: "data_collection", "approval", "compliance", "communication", "tracking")
-- audience: string (who fills out this form — be specific, e.g. "Crew Leaders", "Office Staff", "New Hires", "Customers", "Account Managers")
-- audienceRoles: string[] (array of roles from: "Admin", "Manager", "Crew", "Customer" — who should have access)
+- audience: string (who fills this out — be specific)
+- audienceRoles: string[] (from: "Admin", "Manager", "Crew", "Customer")
 - sections: array of objects, each with:
   - title: string (section heading)
-  - description: string (brief explanation of what this section captures)
+  - description: string (what this section captures)
   - fields: array of objects, each with:
-    - label: string (the field label)
+    - label: string (field label)
     - type: string (one of: "text", "textarea", "number", "email", "phone", "date", "time", "select", "checkbox", "radio", "file", "signature", "address")
     - required: boolean
-    - placeholder: string (example or hint text)
-    - options: string[] (only for select, checkbox, radio types — provide relevant options)
-    - helpText: string (optional guidance for the person filling it out)
-- toolsAndMedia: object with:
-  - enablePhotos: boolean (should the form support photo attachments?)
-  - enableFileUpload: boolean (should the form support file uploads?)
-  - enableSignature: boolean (does the form need a signature capture?)
-  - enableGeolocation: boolean (should location be captured?)
-  - suggestedIllustrations: string[] (list of visual aids or diagrams that would help, e.g. "Site layout diagram", "Equipment checklist icon")
-- externalConnections: object with:
-  - sendsEmail: boolean (does completing this form trigger an email notification?)
-  - emailRecipients: string (who gets notified — e.g. "Office Manager", "HR Department", "Customer")
-  - sendsToCalendar: boolean (does this create a calendar event?)
-  - requiresApproval: boolean (does someone need to sign off on this form?)
-  - approver: string (who approves — e.g. "Manager", "Admin", "Supervisor")
-  - integratesWithCRM: boolean (does this connect to customer records?)
+    - placeholder: string (example/hint text — be specific and helpful)
+    - options: string[] (for select/checkbox/radio — provide real options)
+    - helpText: string (guidance for the person filling it out)
+- toolsAndMedia: object with enablePhotos, enableFileUpload, enableSignature, enableGeolocation (booleans), suggestedIllustrations (string[])
+- externalConnections: object with sendsEmail (boolean), emailRecipients (string), sendsToCalendar (boolean), requiresApproval (boolean), approver (string), integratesWithCRM (boolean)
 
 SECTION GENERATION RULES:
-- Generate 3-8 sections depending on form complexity
-- Each section should have 2-6 fields
-- Use appropriate field types — don't make everything a text field
-- Include practical placeholder text that helps the user understand what to enter
-- For select/radio/checkbox fields, provide realistic options specific to the landscaping industry
-- Think about what information a landscape company actually needs to collect`
+- Generate 4-10 sections depending on form complexity
+- Each section should have 2-8 fields
+- Use the most appropriate field type for each piece of data
+- For repeating entries (like multiple references or work history), create separate sections or clearly numbered fields (e.g., "Reference 1 Name", "Reference 2 Name", etc.)
+- Include practical placeholder text specific to landscaping
+- For select/radio/checkbox fields, provide realistic, industry-specific options`
           },
           {
             role: "user",
-            content: `Generate form builder data for:\nTitle: "${title}"\nCategory: "${category}"`
+            content: `Generate form builder data for:\nTitle: "${title}"\nCategory: "${category}"${purposeContext}${smartContext}${pdfContext}`
           }
         ],
         response_format: { type: "json_object" },
@@ -3879,7 +3941,13 @@ SECTION GENERATION RULES:
       });
 
       const raw = completion.choices[0]?.message?.content || "{}";
-      const parsed = JSON.parse(raw);
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (jsonErr) {
+        console.error("[form-builder/ai-fill] Non-JSON response from AI:", raw.slice(0, 200));
+        return res.status(500).json({ message: "AI returned an invalid response. Please try again." });
+      }
       res.json(parsed);
     } catch (err: any) {
       console.error("[form-builder/ai-fill] Error:", err.message);

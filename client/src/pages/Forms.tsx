@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,10 @@ import {
   PenTool,
   MapPin,
   Check,
+  HelpCircle,
+  FileUp,
+  Briefcase,
+  ChevronRight,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -58,6 +62,7 @@ import { useToast } from "@/hooks/use-toast";
 type View =
   | "home"
   | "build-new"
+  | "build-purpose"
   | "build-wizard"
   | "form-library"
   | "update-existing"
@@ -101,6 +106,9 @@ type ExternalConnections = {
 type WizardData = {
   title: string;
   category: string;
+  purpose: string;
+  smartAnswers: Record<string, string>;
+  pdfText: string;
   outcome: string;
   outcomeType: string;
   audience: string;
@@ -110,9 +118,27 @@ type WizardData = {
   externalConnections: ExternalConnections;
 };
 
+type SmartQuestion = {
+  id: string;
+  question: string;
+  type: "select" | "text";
+  options?: string[];
+  placeholder?: string;
+};
+
+type PurposeOption = {
+  label: string;
+  description: string;
+  placeholder: string;
+  questions: SmartQuestion[];
+};
+
 const EMPTY_WIZARD: WizardData = {
   title: "",
   category: "",
+  purpose: "",
+  smartAnswers: {},
+  pdfText: "",
   outcome: "",
   outcomeType: "data_collection",
   audience: "",
@@ -158,34 +184,267 @@ const FIELD_TYPES = [
   "select", "checkbox", "radio", "file", "signature", "address",
 ];
 
-const CATEGORIES = [
-  { label: "Sales & Marketing", num: 1, description: "Proposals, lead tracking, and customer outreach forms", placeholder: "e.g. New Lead Intake Form", gradient: "from-emerald-500 to-emerald-700", hoverGradient: "from-emerald-600 to-emerald-800" },
-  { label: "Estimating & Pre-Construction", num: 2, description: "Site assessments, project bids, and measurement sheets", placeholder: "e.g. Job Site Assessment Worksheet", gradient: "from-blue-500 to-blue-700", hoverGradient: "from-blue-600 to-blue-800" },
-  { label: "Production & Field Operations", num: 3, description: "Daily crew logs, installation checklists, and job reports", placeholder: "e.g. Daily Crew Production Log", gradient: "from-orange-500 to-orange-700", hoverGradient: "from-orange-600 to-orange-800" },
-  { label: "Maintenance Operations", num: 4, description: "Service schedules, property visit logs, and maintenance records", placeholder: "e.g. Weekly Property Maintenance Report", gradient: "from-teal-500 to-teal-700", hoverGradient: "from-teal-600 to-teal-800" },
-  { label: "HR & Employees", num: 5, description: "Onboarding, time-off requests, and employee evaluations", placeholder: "e.g. New Employee Onboarding Checklist", gradient: "from-violet-500 to-violet-700", hoverGradient: "from-violet-600 to-violet-800" },
-  { label: "Finance & Accounting", num: 6, description: "Expense reports, purchase orders, and invoice tracking", placeholder: "e.g. Expense Reimbursement Request", gradient: "from-amber-500 to-amber-700", hoverGradient: "from-amber-600 to-amber-800" },
-  { label: "Equipment & Assets", num: 7, description: "Equipment logs, maintenance tracking, and asset inventories", placeholder: "e.g. Equipment Inspection Checklist", gradient: "from-cyan-500 to-cyan-700", hoverGradient: "from-cyan-600 to-cyan-800" },
-  { label: "Compliance & Legal", num: 8, description: "Safety audits, incident reports, and regulatory filings", placeholder: "e.g. Workplace Safety Incident Report", gradient: "from-red-500 to-red-700", hoverGradient: "from-red-600 to-red-800" },
-  { label: "Customer Experience & Retention", num: 9, description: "Satisfaction surveys, feedback forms, and follow-up trackers", placeholder: "e.g. Customer Satisfaction Survey", gradient: "from-pink-500 to-pink-700", hoverGradient: "from-pink-600 to-pink-800" },
-  { label: "Management & Strategy", num: 10, description: "Meeting agendas, goal tracking, and performance reviews", placeholder: "e.g. Quarterly Business Review Template", gradient: "from-indigo-500 to-indigo-700", hoverGradient: "from-indigo-600 to-indigo-800" },
-  { label: "Checklists", num: 11, description: "Quick-reference checklists for daily tasks and inspections", placeholder: "e.g. Morning Truck & Trailer Checklist", gradient: "from-lime-500 to-lime-700", hoverGradient: "from-lime-600 to-lime-800" },
-  { label: "Misc & Other", num: 12, description: "General forms that don't fit neatly into other categories", placeholder: "e.g. Vendor Contact Information Sheet", gradient: "from-slate-500 to-slate-700", hoverGradient: "from-slate-600 to-slate-800" },
+const CATEGORIES: {
+  label: string;
+  num: number;
+  description: string;
+  placeholder: string;
+  gradient: string;
+  hoverGradient: string;
+  purposes: PurposeOption[];
+}[] = [
+  {
+    label: "Sales & Marketing", num: 1,
+    description: "Proposals, lead tracking, and customer outreach forms",
+    placeholder: "e.g. New Lead Intake Form",
+    gradient: "from-emerald-500 to-emerald-700", hoverGradient: "from-emerald-600 to-emerald-800",
+    purposes: [
+      { label: "Lead Capture / Inquiry Form", description: "Collect prospect info from website, events, or referrals", placeholder: "e.g. New Customer Inquiry Form",
+        questions: [
+          { id: "source", question: "Where do most of your leads come from?", type: "select", options: ["Website", "Referrals", "Door-to-door", "Social media", "Trade shows", "Multiple sources"] },
+          { id: "services", question: "What services do you want to list?", type: "text", placeholder: "e.g. Lawn care, hardscaping, irrigation" },
+        ]},
+      { label: "Customer Proposal / Quote", description: "Present project scope, pricing, and terms to a customer", placeholder: "e.g. Landscape Design Proposal",
+        questions: [
+          { id: "pricing", question: "How do you structure pricing?", type: "select", options: ["Fixed bid", "Time & materials", "Per square foot", "Tiered packages", "Custom"] },
+          { id: "terms", question: "Do you include payment terms or a contract?", type: "select", options: ["Yes, with deposit required", "Yes, net 30 terms", "No, just a quote", "Varies by job"] },
+        ]},
+      { label: "Referral Tracking", description: "Track referral sources and reward programs", placeholder: "e.g. Customer Referral Form",
+        questions: [
+          { id: "reward", question: "Do you offer a referral reward?", type: "select", options: ["Yes, discount on next service", "Yes, cash or gift card", "No, just tracking", "Planning to start one"] },
+        ]},
+      { label: "Custom Sales Form", description: "Build any sales or marketing form from scratch", placeholder: "e.g. Event Follow-Up Sheet",
+        questions: [] },
+    ],
+  },
+  {
+    label: "Estimating & Pre-Construction", num: 2,
+    description: "Site assessments, project bids, and measurement sheets",
+    placeholder: "e.g. Job Site Assessment Worksheet",
+    gradient: "from-blue-500 to-blue-700", hoverGradient: "from-blue-600 to-blue-800",
+    purposes: [
+      { label: "Site Assessment / Walk-Through", description: "Document property conditions, measurements, and scope", placeholder: "e.g. Property Walk-Through Checklist",
+        questions: [
+          { id: "jobType", question: "What type of work is this assessment for?", type: "select", options: ["Full landscape install", "Hardscape only", "Planting / softscape", "Irrigation", "Maintenance takeover", "General assessment"] },
+          { id: "measurements", question: "Do you need detailed measurements?", type: "select", options: ["Yes, full property dimensions", "Yes, specific areas only", "No, photos are enough", "We use a separate measuring tool"] },
+        ]},
+      { label: "Material Takeoff / Cost Estimate", description: "Calculate materials, labor, and costs for a project", placeholder: "e.g. Hardscape Material Takeoff",
+        questions: [
+          { id: "detail", question: "How detailed should the estimate be?", type: "select", options: ["Line-item by material", "Lump sum by phase", "Both — detailed with summary", "Quick ballpark"] },
+        ]},
+      { label: "Custom Estimating Form", description: "Build any estimating or pre-construction form", placeholder: "e.g. Irrigation Zone Layout Sheet",
+        questions: [] },
+    ],
+  },
+  {
+    label: "Production & Field Operations", num: 3,
+    description: "Daily crew logs, installation checklists, and job reports",
+    placeholder: "e.g. Daily Crew Production Log",
+    gradient: "from-orange-500 to-orange-700", hoverGradient: "from-orange-600 to-orange-800",
+    purposes: [
+      { label: "Daily Crew Log / Production Report", description: "Track daily work, hours, and materials used on site", placeholder: "e.g. Daily Production Report",
+        questions: [
+          { id: "crewSize", question: "What's a typical crew size?", type: "select", options: ["1-2 people", "3-5 people", "6-10 people", "10+ people", "Varies by job"] },
+          { id: "tracking", question: "What do you need to track?", type: "select", options: ["Hours and tasks only", "Hours, tasks, and materials", "Everything including equipment", "Full documentation with photos"] },
+        ]},
+      { label: "Quality Control / Punch List", description: "Inspect completed work and document remaining items", placeholder: "e.g. Installation Punch List",
+        questions: [
+          { id: "stage", question: "When is this checklist used?", type: "select", options: ["Mid-project walkthrough", "Final inspection before handoff", "Post-completion follow-up", "All stages"] },
+        ]},
+      { label: "Custom Production Form", description: "Build any field operations form", placeholder: "e.g. Concrete Pour Log",
+        questions: [] },
+    ],
+  },
+  {
+    label: "Maintenance Operations", num: 4,
+    description: "Service schedules, property visit logs, and maintenance records",
+    placeholder: "e.g. Weekly Property Maintenance Report",
+    gradient: "from-teal-500 to-teal-700", hoverGradient: "from-teal-600 to-teal-800",
+    purposes: [
+      { label: "Property Visit / Service Log", description: "Record work done at each property visit", placeholder: "e.g. Weekly Mowing & Maintenance Log",
+        questions: [
+          { id: "frequency", question: "How often do you visit properties?", type: "select", options: ["Weekly", "Bi-weekly", "Monthly", "Seasonal", "On-demand"] },
+          { id: "services", question: "What services do you typically perform?", type: "text", placeholder: "e.g. Mowing, edging, blowing, trimming, weeding" },
+        ]},
+      { label: "Seasonal Transition Checklist", description: "Document spring startup, winterization, or seasonal changeovers", placeholder: "e.g. Spring Startup Checklist",
+        questions: [
+          { id: "season", question: "Which seasonal transition?", type: "select", options: ["Spring startup", "Summer prep", "Fall cleanup", "Winterization", "Year-round"] },
+        ]},
+      { label: "Custom Maintenance Form", description: "Build any maintenance operations form", placeholder: "e.g. Irrigation System Check",
+        questions: [] },
+    ],
+  },
+  {
+    label: "HR & Employees", num: 5,
+    description: "Onboarding, time-off requests, and employee evaluations",
+    placeholder: "e.g. New Employee Onboarding Checklist",
+    gradient: "from-violet-500 to-violet-700", hoverGradient: "from-violet-600 to-violet-800",
+    purposes: [
+      { label: "Crew Member Hiring Application", description: "Job application for field crew positions with work history and references", placeholder: "e.g. Landscape Crew Application",
+        questions: [
+          { id: "experience", question: "Do you require prior landscaping experience?", type: "select", options: ["Yes, minimum 1 year", "Yes, minimum 2+ years", "Preferred but not required", "No, we train from scratch"] },
+          { id: "license", question: "Does this position require a driver's license?", type: "select", options: ["Yes, valid driver's license required", "Yes, CDL preferred", "No", "Depends on the role"] },
+          { id: "bgCheck", question: "Do you run background checks?", type: "select", options: ["Yes, for all hires", "Yes, for crew leads and above", "No", "Only for certain positions"] },
+        ]},
+      { label: "Manager / Supervisor Application", description: "Detailed application for leadership roles with behavioral questions", placeholder: "e.g. Operations Manager Application",
+        questions: [
+          { id: "level", question: "What management level?", type: "select", options: ["Crew Leader / Foreman", "Branch Manager", "Operations Manager", "General Manager / Director"] },
+          { id: "directReports", question: "How many people would this person manage?", type: "select", options: ["1-5 direct reports", "6-15 direct reports", "15+ direct reports", "Varies seasonally"] },
+        ]},
+      { label: "New Employee Onboarding", description: "First-day paperwork, training acknowledgments, and setup tasks", placeholder: "e.g. New Hire Onboarding Packet",
+        questions: [
+          { id: "role", question: "What type of employee?", type: "select", options: ["Field crew", "Office / admin", "Management", "Seasonal / temporary", "All types"] },
+        ]},
+      { label: "Employee Performance Review", description: "Evaluate job performance, goals, and development", placeholder: "e.g. Annual Performance Review",
+        questions: [
+          { id: "frequency", question: "How often do you review employees?", type: "select", options: ["90-day probation review", "Quarterly", "Semi-annually", "Annually"] },
+          { id: "style", question: "What review style do you prefer?", type: "select", options: ["Rating scale (1-5)", "Written narrative", "Both ratings and narrative", "Self-assessment + manager review"] },
+        ]},
+      { label: "Time Off / Leave Request", description: "Standardized request form for PTO, sick days, and leave", placeholder: "e.g. PTO Request Form",
+        questions: [] },
+      { label: "Custom HR Form", description: "Build any HR or employee-related form", placeholder: "e.g. Employee Exit Interview",
+        questions: [] },
+    ],
+  },
+  {
+    label: "Finance & Accounting", num: 6,
+    description: "Expense reports, purchase orders, and invoice tracking",
+    placeholder: "e.g. Expense Reimbursement Request",
+    gradient: "from-amber-500 to-amber-700", hoverGradient: "from-amber-600 to-amber-800",
+    purposes: [
+      { label: "Expense Report / Reimbursement", description: "Submit and track business expenses with receipts", placeholder: "e.g. Field Expense Report",
+        questions: [
+          { id: "approval", question: "Who approves expenses?", type: "select", options: ["Direct supervisor", "Office manager", "Owner / GM", "Depends on amount"] },
+        ]},
+      { label: "Purchase Order", description: "Request approval for materials and supplies", placeholder: "e.g. Material Purchase Order",
+        questions: [
+          { id: "threshold", question: "Is there an approval threshold?", type: "select", options: ["All purchases need approval", "Over $100", "Over $500", "Over $1,000", "No approval needed"] },
+        ]},
+      { label: "Custom Finance Form", description: "Build any finance or accounting form", placeholder: "e.g. Petty Cash Log",
+        questions: [] },
+    ],
+  },
+  {
+    label: "Equipment & Assets", num: 7,
+    description: "Equipment logs, maintenance tracking, and asset inventories",
+    placeholder: "e.g. Equipment Inspection Checklist",
+    gradient: "from-cyan-500 to-cyan-700", hoverGradient: "from-cyan-600 to-cyan-800",
+    purposes: [
+      { label: "Daily Equipment Inspection", description: "Pre-operation safety and condition checklist", placeholder: "e.g. Morning Equipment Inspection",
+        questions: [
+          { id: "equipType", question: "What type of equipment?", type: "select", options: ["Trucks & trailers", "Mowers & trimmers", "Heavy equipment (skid steer, mini-ex)", "All types", "Specific — I'll name it"] },
+        ]},
+      { label: "Equipment Maintenance Log", description: "Track service history, repairs, and scheduled maintenance", placeholder: "e.g. Fleet Maintenance Log",
+        questions: [] },
+      { label: "Asset Inventory / Check-Out", description: "Track who has what equipment and when it was issued", placeholder: "e.g. Tool Checkout Sheet",
+        questions: [] },
+      { label: "Custom Equipment Form", description: "Build any equipment or asset form", placeholder: "e.g. Damage Report",
+        questions: [] },
+    ],
+  },
+  {
+    label: "Compliance & Legal", num: 8,
+    description: "Safety audits, incident reports, and regulatory filings",
+    placeholder: "e.g. Workplace Safety Incident Report",
+    gradient: "from-red-500 to-red-700", hoverGradient: "from-red-600 to-red-800",
+    purposes: [
+      { label: "Safety Incident Report", description: "Document workplace injuries, near-misses, and corrective actions", placeholder: "e.g. Workplace Injury Report",
+        questions: [
+          { id: "osha", question: "Do you need OSHA-compliant reporting?", type: "select", options: ["Yes, full OSHA 301 format", "Yes, simplified version", "No, internal use only"] },
+        ]},
+      { label: "Safety Audit / Inspection", description: "Periodic workplace safety walk-through checklist", placeholder: "e.g. Monthly Safety Audit",
+        questions: [
+          { id: "frequency", question: "How often do you perform safety audits?", type: "select", options: ["Weekly", "Monthly", "Quarterly", "Annually", "As needed"] },
+        ]},
+      { label: "Government / Regulatory Form (PDF Upload)", description: "Upload a government form (W-9, I-9, W-4, etc.) and recreate it as a fillable form", placeholder: "e.g. IRS W-9 Request",
+        questions: [] },
+      { label: "Custom Compliance Form", description: "Build any compliance or legal form", placeholder: "e.g. Chemical Application Record",
+        questions: [] },
+    ],
+  },
+  {
+    label: "Customer Experience & Retention", num: 9,
+    description: "Satisfaction surveys, feedback forms, and follow-up trackers",
+    placeholder: "e.g. Customer Satisfaction Survey",
+    gradient: "from-pink-500 to-pink-700", hoverGradient: "from-pink-600 to-pink-800",
+    purposes: [
+      { label: "Customer Satisfaction Survey", description: "Post-job feedback to measure quality and satisfaction", placeholder: "e.g. Post-Service Customer Survey",
+        questions: [
+          { id: "timing", question: "When do you send this survey?", type: "select", options: ["Immediately after job completion", "1-3 days after", "1 week after", "End of season"] },
+          { id: "scale", question: "What rating scale do you prefer?", type: "select", options: ["1-5 stars", "1-10 numeric", "Satisfied / Neutral / Dissatisfied", "NPS (0-10 recommend)"] },
+        ]},
+      { label: "Customer Complaint / Issue", description: "Document and track customer complaints and resolutions", placeholder: "e.g. Customer Issue Report",
+        questions: [] },
+      { label: "Custom Customer Form", description: "Build any customer experience form", placeholder: "e.g. Seasonal Service Renewal",
+        questions: [] },
+    ],
+  },
+  {
+    label: "Management & Strategy", num: 10,
+    description: "Meeting agendas, goal tracking, and performance reviews",
+    placeholder: "e.g. Quarterly Business Review Template",
+    gradient: "from-indigo-500 to-indigo-700", hoverGradient: "from-indigo-600 to-indigo-800",
+    purposes: [
+      { label: "Meeting Agenda / Minutes", description: "Structured agenda and action item tracking", placeholder: "e.g. Weekly Team Meeting Agenda",
+        questions: [
+          { id: "meetingType", question: "What type of meeting?", type: "select", options: ["Daily huddle / standup", "Weekly team meeting", "Monthly management review", "Quarterly planning", "Ad-hoc / project-specific"] },
+        ]},
+      { label: "Goal Setting / OKR Tracker", description: "Set and track objectives and key results", placeholder: "e.g. Quarterly Goal Tracker",
+        questions: [] },
+      { label: "Custom Management Form", description: "Build any management or strategy form", placeholder: "e.g. Department Budget Request",
+        questions: [] },
+    ],
+  },
+  {
+    label: "Checklists", num: 11,
+    description: "Quick-reference checklists for daily tasks and inspections",
+    placeholder: "e.g. Morning Truck & Trailer Checklist",
+    gradient: "from-lime-500 to-lime-700", hoverGradient: "from-lime-600 to-lime-800",
+    purposes: [
+      { label: "Daily Startup / End-of-Day Checklist", description: "Morning prep and end-of-day closeout procedures", placeholder: "e.g. Morning Crew Checklist",
+        questions: [
+          { id: "when", question: "Is this for morning, end-of-day, or both?", type: "select", options: ["Morning startup only", "End-of-day closeout only", "Both combined"] },
+        ]},
+      { label: "Vehicle / Trailer Pre-Trip", description: "DOT-style pre-trip inspection checklist", placeholder: "e.g. Truck & Trailer Pre-Trip Inspection",
+        questions: [] },
+      { label: "Job Site Setup / Teardown", description: "Checklist for arriving at and leaving a job site", placeholder: "e.g. Job Site Arrival Checklist",
+        questions: [] },
+      { label: "Custom Checklist", description: "Build any checklist from scratch", placeholder: "e.g. Weekly Office Closing Checklist",
+        questions: [] },
+    ],
+  },
+  {
+    label: "Misc & Other", num: 12,
+    description: "General forms that don't fit neatly into other categories",
+    placeholder: "e.g. Vendor Contact Information Sheet",
+    gradient: "from-slate-500 to-slate-700", hoverGradient: "from-slate-600 to-slate-800",
+    purposes: [
+      { label: "Upload a PDF to Recreate", description: "Upload any PDF document and convert it to a fillable form", placeholder: "e.g. Government Tax Form",
+        questions: [] },
+      { label: "Custom Form (No Template)", description: "Start completely from scratch with no predefined structure", placeholder: "e.g. Special Project Form",
+        questions: [] },
+    ],
+  },
 ];
 
 export default function Forms() {
   const [view, setView] = useState<View>("home");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedPurpose, setSelectedPurpose] = useState<PurposeOption | null>(null);
   const [titlePlaceholder, setTitlePlaceholder] = useState("");
   const [wizardData, setWizardData] = useState<WizardData>({ ...EMPTY_WIZARD });
   const [wizardStep, setWizardStep] = useState(0);
 
-  function startWizard(category: string) {
+  function selectCategory(category: string) {
     setSelectedCategory(category);
-    const cat = CATEGORIES.find((c) => c.label === category);
-    setTitlePlaceholder(cat?.placeholder || "e.g. My Custom Form");
-    setWizardData({ ...EMPTY_WIZARD, category });
+    setView("build-purpose");
+  }
+
+  function selectPurpose(purpose: PurposeOption) {
+    setSelectedPurpose(purpose);
+    setTitlePlaceholder(purpose.placeholder);
+    setWizardData({ ...EMPTY_WIZARD, category: selectedCategory, purpose: purpose.label });
     setWizardStep(0);
     setView("build-wizard");
   }
@@ -200,6 +459,10 @@ export default function Forms() {
         setWizardStep(wizardStep - 1);
         return;
       }
+      setView("build-purpose");
+      return;
+    }
+    if (view === "build-purpose") {
       setView("build-new");
       return;
     }
@@ -207,8 +470,10 @@ export default function Forms() {
   };
 
   const backLabel = view === "build-wizard"
-    ? (wizardStep > 0 ? `Back to Step ${wizardStep}` : "Back to Categories")
-    : "Back to Forms";
+    ? (wizardStep > 0 ? `Back to Step ${wizardStep}` : "Back to Form Type")
+    : view === "build-purpose"
+      ? "Back to Categories"
+      : "Back to Forms";
 
   return (
     <div className="p-6 max-w-5xl mx-auto" data-testid="forms-page">
@@ -221,7 +486,15 @@ export default function Forms() {
         {backLabel}
       </button>
 
-      {view === "build-new" && <BuildNewForm hoveredId={hoveredId} setHoveredId={setHoveredId} onSelectCategory={startWizard} />}
+      {view === "build-new" && <BuildNewForm hoveredId={hoveredId} setHoveredId={setHoveredId} onSelectCategory={selectCategory} />}
+      {view === "build-purpose" && (
+        <PurposeSelector
+          category={selectedCategory}
+          hoveredId={hoveredId}
+          setHoveredId={setHoveredId}
+          onSelectPurpose={selectPurpose}
+        />
+      )}
       {view === "build-wizard" && (
         <FormWizard
           data={wizardData}
@@ -229,10 +502,12 @@ export default function Forms() {
           step={wizardStep}
           setStep={setWizardStep}
           titlePlaceholder={titlePlaceholder}
+          purpose={selectedPurpose}
           onFinish={() => {
             setView("home");
             setWizardData({ ...EMPTY_WIZARD });
             setWizardStep(0);
+            setSelectedPurpose(null);
           }}
         />
       )}
@@ -397,12 +672,83 @@ function BuildNewForm({
   );
 }
 
+function PurposeSelector({
+  category,
+  hoveredId,
+  setHoveredId,
+  onSelectPurpose,
+}: {
+  category: string;
+  hoveredId: string | null;
+  setHoveredId: (id: string | null) => void;
+  onSelectPurpose: (purpose: PurposeOption) => void;
+}) {
+  const cat = CATEGORIES.find((c) => c.label === category);
+  const purposes = cat?.purposes || [];
+
+  return (
+    <div data-testid="view-purpose-selector">
+      <SectionHeader
+        icon={Briefcase}
+        title="What Type of Form?"
+        description={`Select the specific purpose for your ${category} form. This helps generate a more targeted, professional result.`}
+      />
+      <Badge variant="secondary" className="mb-4 text-sm">{category}</Badge>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {purposes.map((purpose, idx) => {
+          const key = `purpose-${idx}`;
+          const isHovered = hoveredId === key;
+          const isPdfUpload = purpose.label.toLowerCase().includes("pdf") || purpose.label.toLowerCase().includes("government");
+          return (
+            <button
+              key={key}
+              onClick={() => onSelectPurpose(purpose)}
+              className={`rounded-xl border-2 p-5 text-left transition-all duration-200 ${
+                isHovered
+                  ? "border-primary bg-primary/5 shadow-md scale-[1.01]"
+                  : "border-border bg-card hover:border-primary/40"
+              }`}
+              onMouseEnter={() => setHoveredId(key)}
+              onMouseLeave={() => setHoveredId(null)}
+              data-testid={`card-purpose-${idx}`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`rounded-lg p-2 mt-0.5 ${isHovered ? "bg-primary/10" : "bg-muted"}`}>
+                  {isPdfUpload ? (
+                    <FileUp className={`h-5 w-5 ${isHovered ? "text-primary" : "text-muted-foreground"}`} />
+                  ) : (
+                    <Briefcase className={`h-5 w-5 ${isHovered ? "text-primary" : "text-muted-foreground"}`} />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="font-semibold">{purpose.label}</div>
+                    {purpose.questions.length > 0 && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                        {purpose.questions.length} smart Q{purpose.questions.length > 1 ? "s" : ""}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-1">{purpose.description}</div>
+                </div>
+                <ChevronRight className={`h-5 w-5 shrink-0 mt-1 transition-transform ${isHovered ? "text-primary translate-x-0.5" : "text-muted-foreground/40"}`} />
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function FormWizard({
   data,
   setData,
   step,
   setStep,
   titlePlaceholder,
+  purpose,
   onFinish,
 }: {
   data: WizardData;
@@ -410,6 +756,7 @@ function FormWizard({
   step: number;
   setStep: React.Dispatch<React.SetStateAction<number>>;
   titlePlaceholder: string;
+  purpose: PurposeOption | null;
   onFinish: () => void;
 }) {
   const { toast } = useToast();
@@ -430,6 +777,9 @@ function FormWizard({
       const res = await apiRequest("POST", "/api/form-builder/ai-fill", {
         title: data.title,
         category: data.category,
+        purpose: data.purpose,
+        smartAnswers: data.smartAnswers,
+        pdfText: data.pdfText || undefined,
       });
       const ai: WizardData = await res.json();
       setData((prev) => ({
@@ -469,6 +819,7 @@ function FormWizard({
     <div data-testid="view-build-wizard">
       <div className="mb-2 flex items-center gap-2">
         <Badge variant="secondary">{data.category}</Badge>
+        {data.purpose && <Badge variant="outline">{data.purpose}</Badge>}
       </div>
 
       <div className="mb-6 flex items-center gap-1 overflow-x-auto pb-2">
@@ -522,7 +873,16 @@ function FormWizard({
             </div>
           </div>
 
-          {step === 0 && <StepIdentify data={data} update={update} onAiFill={runAiFill} isAiFilling={isAiFilling} titlePlaceholder={titlePlaceholder} />}
+          {step === 0 && (
+            <StepIdentify
+              data={data}
+              update={update}
+              onAiFill={runAiFill}
+              isAiFilling={isAiFilling}
+              titlePlaceholder={titlePlaceholder}
+              purpose={purpose}
+            />
+          )}
           {step === 1 && <StepOutcome data={data} update={update} />}
           {step === 2 && <StepAudience data={data} update={update} />}
           {step === 3 && <StepSections data={data} update={update} />}
@@ -568,15 +928,100 @@ function StepIdentify({
   onAiFill,
   isAiFilling,
   titlePlaceholder,
+  purpose,
 }: {
   data: WizardData;
   update: (p: Partial<WizardData>) => void;
   onAiFill: () => void;
   isAiFilling: boolean;
   titlePlaceholder: string;
+  purpose: PurposeOption | null;
 }) {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+  const questions = purpose?.questions || [];
+  const isPdfPurpose = purpose?.label.toLowerCase().includes("pdf") || purpose?.label.toLowerCase().includes("government");
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast({ title: "Please upload a PDF file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Max file size is 10MB", variant: "destructive" });
+      return;
+    }
+
+    setIsUploadingPdf(true);
+    try {
+      const formData = new FormData();
+      formData.append("pdf", file);
+      const res = await fetch("/api/form-builder/parse-pdf", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { text, suggestedTitle } = await res.json();
+      update({
+        pdfText: text,
+        title: data.title || suggestedTitle || file.name.replace(".pdf", ""),
+      });
+      toast({ title: "PDF uploaded successfully!", description: "Click 'Auto-Fill with AI' to generate a fillable version." });
+    } catch (err) {
+      toast({ title: "Failed to process PDF", description: "Try a different file or enter fields manually.", variant: "destructive" });
+    } finally {
+      setIsUploadingPdf(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="space-y-5">
+      {isPdfPurpose && (
+        <div className="rounded-xl border-2 border-dashed border-blue-300 bg-blue-50 p-5" data-testid="pdf-upload-area">
+          <div className="flex items-start gap-3">
+            <FileUp className="h-6 w-6 text-blue-600 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-semibold text-blue-900">Upload a PDF to Recreate</div>
+              <p className="text-sm text-blue-700 mt-1">
+                Upload a government form, tax document, or any PDF. We'll extract the content and let AI recreate it as a fillable form you can use digitally.
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf"
+                onChange={handlePdfUpload}
+                className="hidden"
+                data-testid="input-pdf-upload"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingPdf}
+                variant="outline"
+                className="mt-3 gap-2 border-blue-300 text-blue-700 hover:bg-blue-100"
+                data-testid="button-upload-pdf"
+              >
+                {isUploadingPdf ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Processing PDF...</>
+                ) : (
+                  <><Upload className="h-4 w-4" /> Choose PDF File</>
+                )}
+              </Button>
+              {data.pdfText && (
+                <div className="mt-3 flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <span className="text-sm text-emerald-700 font-medium">PDF content extracted ({data.pdfText.length.toLocaleString()} characters)</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <Label>Form Title *</Label>
         <Input
@@ -593,9 +1038,49 @@ function StepIdentify({
         <Label>Category</Label>
         <div className="mt-1 flex items-center gap-2">
           <Badge variant="secondary" className="text-sm">{data.category}</Badge>
-          <span className="text-xs text-muted-foreground">Selected from the previous page</span>
+          {data.purpose && <Badge variant="outline" className="text-sm">{data.purpose}</Badge>}
         </div>
       </div>
+
+      {questions.length > 0 && (
+        <div className="rounded-xl border bg-muted/30 p-5 space-y-4" data-testid="smart-questions">
+          <div className="flex items-center gap-2 mb-1">
+            <HelpCircle className="h-5 w-5 text-primary" />
+            <div className="font-semibold">Quick Questions</div>
+          </div>
+          <p className="text-sm text-muted-foreground -mt-2">
+            Answer these to get a more tailored, professional form. These are optional but highly recommended.
+          </p>
+          {questions.map((q) => (
+            <div key={q.id}>
+              <Label className="text-sm">{q.question}</Label>
+              {q.type === "select" && q.options ? (
+                <Select
+                  value={data.smartAnswers[q.id] || ""}
+                  onValueChange={(v) => update({ smartAnswers: { ...data.smartAnswers, [q.id]: v } })}
+                >
+                  <SelectTrigger className="mt-1" data-testid={`select-smart-${q.id}`}>
+                    <SelectValue placeholder="Select an option..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {q.options.map((opt) => (
+                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={data.smartAnswers[q.id] || ""}
+                  onChange={(e) => update({ smartAnswers: { ...data.smartAnswers, [q.id]: e.target.value } })}
+                  placeholder={q.placeholder || ""}
+                  className="mt-1"
+                  data-testid={`input-smart-${q.id}`}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-5">
         <div className="flex items-start gap-3">
@@ -603,7 +1088,12 @@ function StepIdentify({
           <div className="flex-1">
             <div className="font-semibold">AI Auto-Fill</div>
             <p className="text-sm text-muted-foreground mt-1">
-              Enter a form title above, then click the button to have AI automatically fill in all remaining steps — outcome, audience, sections, fields, and more. You can review and edit everything afterward.
+              {data.pdfText
+                ? "Your PDF content is ready. Click below to convert it into a fillable form with properly typed fields."
+                : questions.length > 0
+                  ? "Enter a title and answer the questions above, then click to generate a highly specific, professional-grade form based on best practices from top US companies."
+                  : "Enter a form title above, then click the button to have AI automatically fill in all remaining steps."
+              }
             </p>
             <Button
               onClick={onAiFill}
@@ -612,13 +1102,9 @@ function StepIdentify({
               data-testid="button-ai-fill"
             >
               {isAiFilling ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Generating…
-                </>
+                <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
               ) : (
-                <>
-                  <Sparkles className="h-4 w-4" /> Auto-Fill with AI
-                </>
+                <><Sparkles className="h-4 w-4" /> Auto-Fill with AI</>
               )}
             </Button>
           </div>
@@ -636,7 +1122,7 @@ function StepOutcome({ data, update }: { data: WizardData; update: (p: Partial<W
         <Textarea
           value={data.outcome}
           onChange={(e) => update({ outcome: e.target.value })}
-          placeholder="Describe the purpose and desired result of this form…"
+          placeholder="Describe the purpose and desired result of this form..."
           rows={4}
           className="mt-1"
           data-testid="input-outcome"
@@ -758,7 +1244,7 @@ function StepSections({ data, update }: { data: WizardData; update: (p: Partial<
                 <Input
                   value={section.description}
                   onChange={(e) => updateSection(sIdx, { description: e.target.value })}
-                  placeholder="Brief description of this section…"
+                  placeholder="Brief description of this section..."
                   className="text-sm"
                   data-testid={`input-section-desc-${sIdx}`}
                 />
@@ -975,13 +1461,16 @@ function StepReview({ data, onFinish }: { data: WizardData; onFinish: () => void
         <Card>
           <CardContent className="p-4">
             <div className="text-xs text-muted-foreground mb-1">Form Title</div>
-            <div className="font-semibold" data-testid="review-title">{data.title || "—"}</div>
+            <div className="font-semibold" data-testid="review-title">{data.title || "\u2014"}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground mb-1">Category</div>
-            <Badge variant="secondary">{data.category}</Badge>
+            <div className="text-xs text-muted-foreground mb-1">Category & Purpose</div>
+            <div className="flex flex-wrap gap-1">
+              <Badge variant="secondary">{data.category}</Badge>
+              {data.purpose && <Badge variant="outline">{data.purpose}</Badge>}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -989,7 +1478,7 @@ function StepReview({ data, onFinish }: { data: WizardData; onFinish: () => void
       <Card>
         <CardContent className="p-4">
           <div className="text-xs text-muted-foreground mb-1">Outcome</div>
-          <div className="text-sm" data-testid="review-outcome">{data.outcome || "—"}</div>
+          <div className="text-sm" data-testid="review-outcome">{data.outcome || "\u2014"}</div>
           <Badge variant="outline" className="mt-2">
             {OUTCOME_TYPES.find((t) => t.value === data.outcomeType)?.label || data.outcomeType}
           </Badge>
@@ -999,7 +1488,7 @@ function StepReview({ data, onFinish }: { data: WizardData; onFinish: () => void
       <Card>
         <CardContent className="p-4">
           <div className="text-xs text-muted-foreground mb-1">Audience</div>
-          <div className="text-sm font-medium">{data.audience || "—"}</div>
+          <div className="text-sm font-medium">{data.audience || "\u2014"}</div>
           <div className="flex gap-1 mt-2">
             {data.audienceRoles.map((r) => (
               <Badge key={r} variant="secondary">{r}</Badge>
@@ -1016,7 +1505,7 @@ function StepReview({ data, onFinish }: { data: WizardData; onFinish: () => void
             {data.sections.map((s, idx) => (
               <div key={idx} className="flex items-center gap-2 text-sm">
                 <span className="font-medium">{s.title || `Section ${idx + 1}`}</span>
-                <span className="text-muted-foreground">— {s.fields.length} fields</span>
+                <span className="text-muted-foreground">\u2014 {s.fields.length} fields</span>
               </div>
             ))}
           </div>
@@ -1064,7 +1553,7 @@ function FormLibrary() {
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search forms by name or category…" className="pl-9" data-testid="input-search-library" />
+          <Input placeholder="Search forms by name or category..." className="pl-9" data-testid="input-search-library" />
         </div>
         <Button variant="outline" className="gap-2" data-testid="button-filter-library">
           <Filter className="h-4 w-4" /> Filter
@@ -1082,7 +1571,7 @@ function UpdateExisting() {
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search for a form to update…" className="pl-9" data-testid="input-search-update" />
+          <Input placeholder="Search for a form to update..." className="pl-9" data-testid="input-search-update" />
         </div>
       </div>
       <EmptyState icon={RefreshCw} message="No forms available to update" submessage="Published forms will appear here so you can make changes." />
@@ -1097,7 +1586,7 @@ function FormDrafts() {
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search drafts…" className="pl-9" data-testid="input-search-drafts" />
+          <Input placeholder="Search drafts..." className="pl-9" data-testid="input-search-drafts" />
         </div>
       </div>
       <EmptyState icon={Clock} message="No drafts yet" submessage="When you start building a form and save it as a draft, it will show up here." />
@@ -1112,7 +1601,7 @@ function ShareForms() {
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search forms to share…" className="pl-9" data-testid="input-search-share" />
+          <Input placeholder="Search forms to share..." className="pl-9" data-testid="input-search-share" />
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -1174,7 +1663,7 @@ function DiscontinuedForms() {
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search discontinued forms…" className="pl-9" data-testid="input-search-discontinued" />
+          <Input placeholder="Search discontinued forms..." className="pl-9" data-testid="input-search-discontinued" />
         </div>
       </div>
       <EmptyState icon={Archive} message="No discontinued forms" submessage="When you retire a form, it will be moved here for safekeeping." />
