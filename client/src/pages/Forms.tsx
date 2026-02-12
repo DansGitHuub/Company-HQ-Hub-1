@@ -66,6 +66,7 @@ type View =
   | "build-purpose"
   | "build-wizard"
   | "form-library"
+  | "form-detail"
   | "update-existing"
   | "form-drafts"
   | "share-forms"
@@ -436,6 +437,7 @@ export default function Forms() {
   const [titlePlaceholder, setTitlePlaceholder] = useState("");
   const [wizardData, setWizardData] = useState<WizardData>({ ...EMPTY_WIZARD });
   const [wizardStep, setWizardStep] = useState(0);
+  const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
 
   function selectCategory(category: string) {
     setSelectedCategory(category);
@@ -467,6 +469,11 @@ export default function Forms() {
       setView("build-new");
       return;
     }
+    if (view === "form-detail") {
+      setView("form-library");
+      setSelectedFormId(null);
+      return;
+    }
     setView("home");
   };
 
@@ -474,7 +481,9 @@ export default function Forms() {
     ? (wizardStep > 0 ? `Back to Step ${wizardStep}` : "Back to Form Type")
     : view === "build-purpose"
       ? "Back to Categories"
-      : "Back to Forms";
+      : view === "form-detail"
+        ? "Back to Form Library"
+        : "Back to Forms";
 
   return (
     <div className="p-6 max-w-5xl mx-auto" data-testid="forms-page">
@@ -529,7 +538,8 @@ export default function Forms() {
           }}
         />
       )}
-      {view === "form-library" && <FormLibrary />}
+      {view === "form-library" && <FormLibrary onOpenForm={(id: string) => { setSelectedFormId(id); setView("form-detail"); }} />}
+      {view === "form-detail" && selectedFormId && <FormDetail formId={selectedFormId} />}
       {view === "update-existing" && <UpdateExisting />}
       {view === "form-drafts" && <FormDrafts />}
       {view === "share-forms" && <ShareForms />}
@@ -1584,7 +1594,7 @@ function StepReview({ data, onFinish }: { data: WizardData; onFinish: () => void
   );
 }
 
-function FormLibrary() {
+function FormLibrary({ onOpenForm }: { onOpenForm: (id: string) => void }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const { data: forms = [], isLoading } = useQuery<any[]>({
@@ -1647,8 +1657,13 @@ function FormLibrary() {
               ? form.sections.reduce((sum: number, s: any) => sum + (Array.isArray(s.fields) ? s.fields.length : 0), 0)
               : 0;
             return (
-              <Card key={form.id} className="transition-all hover:shadow-md hover:border-primary/40" data-testid={`card-form-${form.id}`}>
-                <CardContent className="p-5">
+              <button
+                key={form.id}
+                onClick={() => onOpenForm(form.id)}
+                className="text-left w-full rounded-xl border bg-card transition-all hover:shadow-md hover:border-primary/40 cursor-pointer"
+                data-testid={`card-form-${form.id}`}
+              >
+                <div className="p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-base truncate" data-testid={`text-form-name-${form.id}`}>{form.name}</div>
@@ -1668,15 +1683,154 @@ function FormLibrary() {
                       </div>
                     </div>
                     <div className="rounded-lg bg-primary/10 p-2 shrink-0">
-                      <FileText className="h-5 w-5 text-primary" />
+                      <ChevronRight className="h-5 w-5 text-primary" />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </button>
             );
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function FormDetail({ formId }: { formId: string }) {
+  const { data: form, isLoading } = useQuery<any>({
+    queryKey: ["/api/builder-forms", formId],
+    queryFn: async () => {
+      const res = await fetch(`/api/builder-forms/${formId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load form");
+      return res.json();
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16" data-testid="view-form-detail">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!form) {
+    return (
+      <div data-testid="view-form-detail">
+        <EmptyState icon={FileText} message="Form not found" submessage="This form may have been deleted." />
+      </div>
+    );
+  }
+
+  const sections: any[] = Array.isArray(form.sections) ? form.sections : [];
+  const totalFields = sections.reduce((sum: number, s: any) => sum + (Array.isArray(s.fields) ? s.fields.length : 0), 0);
+  const tm = form.toolsAndMedia || {};
+  const ec = form.externalConnections || {};
+  const roles: string[] = Array.isArray(form.audienceRoles) ? form.audienceRoles : [];
+
+  return (
+    <div data-testid="view-form-detail">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold" data-testid="text-form-detail-name">{form.name}</h1>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {form.category && <Badge variant="secondary">{form.category}</Badge>}
+          {form.purpose && <Badge variant="outline">{form.purpose}</Badge>}
+          {form.status && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{form.status}</Badge>}
+        </div>
+        {form.createdAt && (
+          <p className="text-sm text-muted-foreground mt-2">Created {new Date(form.createdAt).toLocaleDateString()}</p>
+        )}
+      </div>
+
+      {form.outcome && (
+        <Card className="mb-4">
+          <CardContent className="p-4">
+            <div className="text-xs font-medium text-muted-foreground mb-1">Outcome</div>
+            <p className="text-sm">{form.outcome}</p>
+            {form.outcomeType && (
+              <Badge variant="outline" className="mt-2">
+                {OUTCOME_TYPES.find((t) => t.value === form.outcomeType)?.label || form.outcomeType}
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {(form.audience || roles.length > 0) && (
+        <Card className="mb-4">
+          <CardContent className="p-4">
+            <div className="text-xs font-medium text-muted-foreground mb-1">Audience</div>
+            {form.audience && <p className="text-sm font-medium">{form.audience}</p>}
+            {roles.length > 0 && (
+              <div className="flex gap-1.5 mt-2">
+                {roles.map((r: string) => <Badge key={r} variant="secondary">{r}</Badge>)}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {sections.length > 0 && (
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <LayoutList className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Sections & Fields</h2>
+            <span className="text-sm text-muted-foreground">({sections.length} sections, {totalFields} fields)</span>
+          </div>
+          <div className="space-y-3">
+            {sections.map((section: any, sIdx: number) => (
+              <Card key={sIdx} className="border-l-4 border-l-primary">
+                <CardContent className="p-4">
+                  <div className="font-semibold">{section.title || `Section ${sIdx + 1}`}</div>
+                  {section.description && <p className="text-sm text-muted-foreground mt-0.5">{section.description}</p>}
+                  {Array.isArray(section.fields) && section.fields.length > 0 && (
+                    <div className="mt-3 space-y-1.5">
+                      {section.fields.map((field: any, fIdx: number) => (
+                        <div key={fIdx} className="flex items-center gap-2 text-sm rounded-lg bg-muted/40 px-3 py-2">
+                          <span className="font-medium flex-1">{field.label || `Field ${fIdx + 1}`}</span>
+                          <Badge variant="outline" className="text-[10px]">{field.type}</Badge>
+                          {field.required && <Badge className="text-[10px] bg-red-100 text-red-700 hover:bg-red-100">Required</Badge>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs font-medium text-muted-foreground mb-2">Tools & Media</div>
+            <div className="flex flex-wrap gap-2">
+              {tm.enablePhotos && <Badge>Photos</Badge>}
+              {tm.enableFileUpload && <Badge>File Upload</Badge>}
+              {tm.enableSignature && <Badge>Signature</Badge>}
+              {tm.enableGeolocation && <Badge>Geolocation</Badge>}
+              {!tm.enablePhotos && !tm.enableFileUpload && !tm.enableSignature && !tm.enableGeolocation && (
+                <span className="text-sm text-muted-foreground">None enabled</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs font-medium text-muted-foreground mb-2">External Connections</div>
+            <div className="flex flex-wrap gap-2">
+              {ec.sendsEmail && <Badge>Email</Badge>}
+              {ec.sendsToCalendar && <Badge>Calendar</Badge>}
+              {ec.requiresApproval && <Badge>Approval</Badge>}
+              {ec.integratesWithCRM && <Badge>CRM</Badge>}
+              {!ec.sendsEmail && !ec.sendsToCalendar && !ec.requiresApproval && !ec.integratesWithCRM && (
+                <span className="text-sm text-muted-foreground">None configured</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
