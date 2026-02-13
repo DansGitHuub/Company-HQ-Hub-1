@@ -22,6 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient, ApiError } from "@/lib/queryClient";
 import { showErrorToast } from "@/lib/errorToast";
@@ -826,11 +827,11 @@ function StepBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: P
     if (expandedStep === id) setExpandedStep(null);
   };
 
-  const moveStep = (index: number, direction: "up" | "down") => {
-    const newIndex = direction === "up" ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= data.steps.length) return;
+  const handleStepDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
     const newSteps = [...data.steps];
-    [newSteps[index], newSteps[newIndex]] = [newSteps[newIndex], newSteps[index]];
+    const [moved] = newSteps.splice(result.source.index, 1);
+    newSteps.splice(result.destination.index, 0, moved);
     onChange({ steps: newSteps });
   };
 
@@ -860,126 +861,136 @@ function StepBuilder({ data, onChange }: { data: SOPBuilderData; onChange: (d: P
         </Card>
       ) : (
         <div className="border rounded-lg bg-muted/20">
-          <div className="overflow-y-auto max-h-[calc(100vh-350px)] min-h-[200px] p-2 space-y-2">
-            {data.steps.map((step, index) => (
-              <Card key={step.id} className="border">
-                <div
-                  className="flex items-center gap-2 p-3 cursor-pointer hover:bg-muted/50"
-                  onClick={() => setExpandedStep(expandedStep === step.id ? null : step.id)}
-                >
-                  <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <Badge variant="outline" className="shrink-0">{index + 1}</Badge>
-                  <span className="font-medium text-sm truncate flex-1">
-                    {step.title || `Step ${index + 1} (untitled)`}
-                  </span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {step.proofRequired && <Badge variant="secondary" className="text-xs">Proof</Badge>}
-                    {step.isQCCheckpoint && <Badge variant="secondary" className="text-xs">QC</Badge>}
-                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted transition-colors" onClick={(e) => { e.stopPropagation(); moveStep(index, "up"); }} disabled={index === 0}>
-                      <ChevronUp className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted transition-colors" onClick={(e) => { e.stopPropagation(); moveStep(index, "down"); }} disabled={index === data.steps.length - 1}>
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10 transition-colors" onClick={(e) => { e.stopPropagation(); removeStep(step.id); }}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-                {expandedStep === step.id && (
-                  <CardContent className="pt-0 pb-4 space-y-3 border-t">
-                    <div className="grid grid-cols-1 gap-3 pt-3">
-                      <div>
-                        <Label className="text-xs">Step Title *</Label>
-                        <Input
-                          value={step.title}
-                          onChange={(e) => updateStep(step.id, { title: e.target.value })}
-                          placeholder="e.g., Dig the planting hole"
-                          data-testid={`input-step-title-${index}`}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Instructions *</Label>
-                        <Textarea
-                          value={step.instruction}
-                          onChange={(e) => updateStep(step.id, { instruction: e.target.value })}
-                          placeholder="Describe exactly what to do in this step..."
-                          rows={4}
-                          data-testid={`input-step-instruction-${index}`}
-                        />
-                      </div>
-
-                      {showAdvanced && (
-                        <>
-                          <div>
-                            <Label className="text-xs flex items-center gap-1"><Lightbulb className="h-3 w-3" /> Why This Matters</Label>
-                            <Textarea
-                              value={step.why || ""}
-                              onChange={(e) => updateStep(step.id, { why: e.target.value })}
-                              placeholder="Explain why this step is important..."
-                              rows={2}
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs flex items-center gap-1"><Check className="h-3 w-3" /> Success Criteria</Label>
-                            <Input
-                              value={step.successCriteria || ""}
-                              onChange={(e) => updateStep(step.id, { successCriteria: e.target.value })}
-                              placeholder="How do you know this step was done right?"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Common Mistakes</Label>
-                            <Input
-                              value={step.commonMistakes || ""}
-                              onChange={(e) => updateStep(step.id, { commonMistakes: e.target.value })}
-                              placeholder="What mistakes should be avoided?"
-                            />
-                          </div>
-                          <div className="flex gap-6">
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={step.proofRequired}
-                                onCheckedChange={(v) => updateStep(step.id, { proofRequired: v })}
-                              />
-                              <Label className="text-xs">Proof Required</Label>
+          <DragDropContext onDragEnd={handleStepDragEnd}>
+            <Droppable droppableId="sop-steps">
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps} className="overflow-y-auto max-h-[calc(100vh-350px)] min-h-[200px] p-2 space-y-2">
+                  {data.steps.map((step, index) => (
+                    <Draggable key={step.id} draggableId={step.id} index={index}>
+                      {(dragProvided, snapshot) => (
+                        <Card
+                          ref={dragProvided.innerRef}
+                          {...dragProvided.draggableProps}
+                          className={`border ${snapshot.isDragging ? "shadow-lg ring-2 ring-primary/30 bg-background" : ""}`}
+                        >
+                          <div
+                            className="flex items-center gap-2 p-3 cursor-pointer hover:bg-muted/50"
+                            onClick={() => setExpandedStep(expandedStep === step.id ? null : step.id)}
+                          >
+                            <div {...dragProvided.dragHandleProps} className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-muted transition-colors" onClick={(e) => e.stopPropagation()}>
+                              <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={step.isQCCheckpoint}
-                                onCheckedChange={(v) => updateStep(step.id, { isQCCheckpoint: v })}
-                              />
-                              <Label className="text-xs">QC Checkpoint</Label>
+                            <Badge variant="outline" className="shrink-0">{index + 1}</Badge>
+                            <span className="font-medium text-sm truncate flex-1">
+                              {step.title || `Step ${index + 1} (untitled)`}
+                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {step.proofRequired && <Badge variant="secondary" className="text-xs">Proof</Badge>}
+                              {step.isQCCheckpoint && <Badge variant="secondary" className="text-xs">QC</Badge>}
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10 transition-colors" onClick={(e) => { e.stopPropagation(); removeStep(step.id); }}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
                             </div>
                           </div>
-                          {step.proofRequired && (
-                            <div>
-                              <Label className="text-xs">Proof Type</Label>
-                              <Select value={step.proofType || ""} onValueChange={(v) => updateStep(step.id, { proofType: v })}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select proof type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="photo">Photo</SelectItem>
-                                  <SelectItem value="video">Video</SelectItem>
-                                  <SelectItem value="signature">Signature</SelectItem>
-                                  <SelectItem value="checklist">Checklist Completion</SelectItem>
-                                  <SelectItem value="measurement">Measurement Reading</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
+                          {expandedStep === step.id && (
+                            <CardContent className="pt-0 pb-4 space-y-3 border-t">
+                              <div className="grid grid-cols-1 gap-3 pt-3">
+                                <div>
+                                  <Label className="text-xs">Step Title *</Label>
+                                  <Input
+                                    value={step.title}
+                                    onChange={(e) => updateStep(step.id, { title: e.target.value })}
+                                    placeholder="e.g., Dig the planting hole"
+                                    data-testid={`input-step-title-${index}`}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Instructions *</Label>
+                                  <Textarea
+                                    value={step.instruction}
+                                    onChange={(e) => updateStep(step.id, { instruction: e.target.value })}
+                                    placeholder="Describe exactly what to do in this step..."
+                                    rows={4}
+                                    data-testid={`input-step-instruction-${index}`}
+                                  />
+                                </div>
+                                {showAdvanced && (
+                                  <>
+                                    <div>
+                                      <Label className="text-xs flex items-center gap-1"><Lightbulb className="h-3 w-3" /> Why This Matters</Label>
+                                      <Textarea
+                                        value={step.why || ""}
+                                        onChange={(e) => updateStep(step.id, { why: e.target.value })}
+                                        placeholder="Explain why this step is important..."
+                                        rows={2}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs flex items-center gap-1"><Check className="h-3 w-3" /> Success Criteria</Label>
+                                      <Input
+                                        value={step.successCriteria || ""}
+                                        onChange={(e) => updateStep(step.id, { successCriteria: e.target.value })}
+                                        placeholder="How do you know this step was done right?"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Common Mistakes</Label>
+                                      <Input
+                                        value={step.commonMistakes || ""}
+                                        onChange={(e) => updateStep(step.id, { commonMistakes: e.target.value })}
+                                        placeholder="What mistakes should be avoided?"
+                                      />
+                                    </div>
+                                    <div className="flex gap-6">
+                                      <div className="flex items-center gap-2">
+                                        <Switch
+                                          checked={step.proofRequired}
+                                          onCheckedChange={(v) => updateStep(step.id, { proofRequired: v })}
+                                        />
+                                        <Label className="text-xs">Proof Required</Label>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Switch
+                                          checked={step.isQCCheckpoint}
+                                          onCheckedChange={(v) => updateStep(step.id, { isQCCheckpoint: v })}
+                                        />
+                                        <Label className="text-xs">QC Checkpoint</Label>
+                                      </div>
+                                    </div>
+                                    {step.proofRequired && (
+                                      <div>
+                                        <Label className="text-xs">Proof Type</Label>
+                                        <Select value={step.proofType || ""} onValueChange={(v) => updateStep(step.id, { proofType: v })}>
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select proof type" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="photo">Photo</SelectItem>
+                                            <SelectItem value="video">Video</SelectItem>
+                                            <SelectItem value="signature">Signature</SelectItem>
+                                            <SelectItem value="checklist">Checklist Completion</SelectItem>
+                                            <SelectItem value="measurement">Measurement Reading</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </CardContent>
                           )}
-                        </>
+                        </Card>
                       )}
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-            ))}
-            <Button variant="outline" onClick={addStep} className="w-full hover:shadow-md hover:border-primary/50 transition-all" data-testid="button-add-step">
-              <Plus className="h-4 w-4 mr-2" /> Add Step
-            </Button>
-          </div>
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                  <Button variant="outline" onClick={addStep} className="w-full hover:shadow-md hover:border-primary/50 transition-all" data-testid="button-add-step">
+                    <Plus className="h-4 w-4 mr-2" /> Add Step
+                  </Button>
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
         </div>
       )}
     </div>
@@ -1536,11 +1547,11 @@ function TrainingGuideBuilder({ data, onChange }: { data: SOPBuilderData; onChan
     if (expandedSection === id) setExpandedSection(null);
   };
 
-  const moveSection = (index: number, direction: "up" | "down") => {
-    const newIndex = direction === "up" ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= sections.length) return;
+  const handleChapterDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
     const newSections = [...sections];
-    [newSections[index], newSections[newIndex]] = [newSections[newIndex], newSections[index]];
+    const [moved] = newSections.splice(result.source.index, 1);
+    newSections.splice(result.destination.index, 0, moved);
     onChange({ trainingSections: newSections });
   };
 
@@ -1592,91 +1603,103 @@ function TrainingGuideBuilder({ data, onChange }: { data: SOPBuilderData; onChan
         </Card>
       ) : (
         <div className="border rounded-lg bg-muted/20">
-          <div className="overflow-y-auto max-h-[calc(100vh-400px)] min-h-[200px] p-2 space-y-2">
-            {sections.map((section, index) => (
-              <Card key={section.id} className="border" data-testid={`training-chapter-${index}`}>
-                <div
-                  className="flex items-center gap-2 p-3 cursor-pointer hover:bg-muted/50"
-                  onClick={() => setExpandedSection(expandedSection === section.id ? null : section.id)}
-                >
-                  <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <Badge className="shrink-0 bg-primary/10 text-primary border-primary/20">Ch. {index + 1}</Badge>
-                  <span className="font-medium text-sm truncate flex-1">
-                    {section.chapterTitle || `Chapter ${index + 1} (untitled)`}
-                  </span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); moveSection(index, "up"); }} disabled={index === 0}>
-                      <ChevronUp className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); moveSection(index, "down"); }} disabled={index === sections.length - 1}>
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); removeSection(section.id); }}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+          <DragDropContext onDragEnd={handleChapterDragEnd}>
+            <Droppable droppableId="training-chapters">
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps} className="overflow-y-auto max-h-[calc(100vh-400px)] min-h-[200px] p-2 space-y-2">
+                  {sections.map((section, index) => (
+                    <Draggable key={section.id} draggableId={section.id} index={index}>
+                      {(dragProvided, snapshot) => (
+                        <Card
+                          ref={dragProvided.innerRef}
+                          {...dragProvided.draggableProps}
+                          className={`border ${snapshot.isDragging ? "shadow-lg ring-2 ring-primary/30 bg-background" : ""}`}
+                          data-testid={`training-chapter-${index}`}
+                        >
+                          <div
+                            className="flex items-center gap-2 p-3 cursor-pointer hover:bg-muted/50"
+                            onClick={() => setExpandedSection(expandedSection === section.id ? null : section.id)}
+                          >
+                            <div {...dragProvided.dragHandleProps} className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-muted transition-colors" onClick={(e) => e.stopPropagation()}>
+                              <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+                            </div>
+                            <Badge className="shrink-0 bg-primary/10 text-primary border-primary/20">Ch. {index + 1}</Badge>
+                            <span className="font-medium text-sm truncate flex-1">
+                              {section.chapterTitle || `Chapter ${index + 1} (untitled)`}
+                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); removeSection(section.id); }}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                          {expandedSection === section.id && (
+                            <CardContent className="pt-0 pb-4 space-y-3 border-t">
+                              <div className="grid grid-cols-1 gap-3 pt-3">
+                                <div>
+                                  <Label className="text-xs flex items-center gap-1"><BookOpen className="h-3 w-3" /> Chapter Title *</Label>
+                                  <Input
+                                    value={section.chapterTitle}
+                                    onChange={(e) => updateSection(section.id, { chapterTitle: e.target.value })}
+                                    placeholder="e.g., Introduction to Lawn Care Equipment"
+                                    data-testid={`input-chapter-title-${index}`}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs flex items-center gap-1"><Target className="h-3 w-3" /> Learning Objectives</Label>
+                                  <Textarea
+                                    value={section.learningObjectives}
+                                    onChange={(e) => updateSection(section.id, { learningObjectives: e.target.value })}
+                                    placeholder="What will the trainee learn? (one per line)&#10;- Identify all mower components&#10;- Perform basic safety checks"
+                                    rows={3}
+                                    data-testid={`input-chapter-objectives-${index}`}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs flex items-center gap-1"><FileText className="h-3 w-3" /> Chapter Content</Label>
+                                  <Textarea
+                                    value={section.content}
+                                    onChange={(e) => updateSection(section.id, { content: e.target.value })}
+                                    placeholder="The main instructional content for this chapter..."
+                                    rows={6}
+                                    data-testid={`input-chapter-content-${index}`}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs flex items-center gap-1"><Lightbulb className="h-3 w-3" /> Key Takeaways</Label>
+                                  <Textarea
+                                    value={section.keyTakeaways}
+                                    onChange={(e) => updateSection(section.id, { keyTakeaways: e.target.value })}
+                                    placeholder="Main points to remember (one per line)&#10;- Always wear PPE&#10;- Check fuel before starting"
+                                    rows={3}
+                                    data-testid={`input-chapter-takeaways-${index}`}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs flex items-center gap-1"><BookOpenCheck className="h-3 w-3" /> Practice Exercise</Label>
+                                  <Textarea
+                                    value={section.practiceExercise}
+                                    onChange={(e) => updateSection(section.id, { practiceExercise: e.target.value })}
+                                    placeholder="A hands-on exercise for the trainee to apply what they learned..."
+                                    rows={3}
+                                    data-testid={`input-chapter-exercise-${index}`}
+                                  />
+                                </div>
+                              </div>
+                            </CardContent>
+                          )}
+                        </Card>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                  <Button variant="outline" onClick={addSection} className="w-full" data-testid="button-add-chapter">
+                    <Plus className="h-4 w-4 mr-2" /> Add Chapter
+                  </Button>
                 </div>
-                {expandedSection === section.id && (
-                  <CardContent className="pt-0 pb-4 space-y-3 border-t">
-                    <div className="grid grid-cols-1 gap-3 pt-3">
-                      <div>
-                        <Label className="text-xs flex items-center gap-1"><BookOpen className="h-3 w-3" /> Chapter Title *</Label>
-                        <Input
-                          value={section.chapterTitle}
-                          onChange={(e) => updateSection(section.id, { chapterTitle: e.target.value })}
-                          placeholder="e.g., Introduction to Lawn Care Equipment"
-                          data-testid={`input-chapter-title-${index}`}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs flex items-center gap-1"><Target className="h-3 w-3" /> Learning Objectives</Label>
-                        <Textarea
-                          value={section.learningObjectives}
-                          onChange={(e) => updateSection(section.id, { learningObjectives: e.target.value })}
-                          placeholder="What will the trainee learn? (one per line)&#10;- Identify all mower components&#10;- Perform basic safety checks"
-                          rows={3}
-                          data-testid={`input-chapter-objectives-${index}`}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs flex items-center gap-1"><FileText className="h-3 w-3" /> Chapter Content</Label>
-                        <Textarea
-                          value={section.content}
-                          onChange={(e) => updateSection(section.id, { content: e.target.value })}
-                          placeholder="The main instructional content for this chapter..."
-                          rows={6}
-                          data-testid={`input-chapter-content-${index}`}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs flex items-center gap-1"><Lightbulb className="h-3 w-3" /> Key Takeaways</Label>
-                        <Textarea
-                          value={section.keyTakeaways}
-                          onChange={(e) => updateSection(section.id, { keyTakeaways: e.target.value })}
-                          placeholder="Main points to remember (one per line)&#10;- Always wear PPE&#10;- Check fuel before starting"
-                          rows={3}
-                          data-testid={`input-chapter-takeaways-${index}`}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs flex items-center gap-1"><BookOpenCheck className="h-3 w-3" /> Practice Exercise</Label>
-                        <Textarea
-                          value={section.practiceExercise}
-                          onChange={(e) => updateSection(section.id, { practiceExercise: e.target.value })}
-                          placeholder="A hands-on exercise for the trainee to apply what they learned..."
-                          rows={3}
-                          data-testid={`input-chapter-exercise-${index}`}
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-            ))}
-            <Button variant="outline" onClick={addSection} className="w-full" data-testid="button-add-chapter">
-              <Plus className="h-4 w-4 mr-2" /> Add Chapter
-            </Button>
-          </div>
+              )}
+            </Droppable>
+          </DragDropContext>
         </div>
       )}
     </div>
