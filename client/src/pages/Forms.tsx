@@ -1410,6 +1410,14 @@ function StepSections({ data, update }: { data: WizardData; update: (p: Partial<
     update({ sections: data.sections.filter((_, i) => i !== idx) });
   };
 
+  const duplicateSection = (idx: number) => {
+    const section = data.sections[idx];
+    const clone = { ...section, title: section.title ? `${section.title} (copy)` : "", fields: section.fields.map(f => ({ ...f })) };
+    const next = [...data.sections];
+    next.splice(idx + 1, 0, clone);
+    update({ sections: next });
+  };
+
   const addField = (sIdx: number) => {
     const section = data.sections[sIdx];
     updateSection(sIdx, {
@@ -1426,6 +1434,14 @@ function StepSections({ data, update }: { data: WizardData; update: (p: Partial<
   const removeField = (sIdx: number, fIdx: number) => {
     const section = data.sections[sIdx];
     updateSection(sIdx, { fields: section.fields.filter((_, i) => i !== fIdx) });
+  };
+
+  const duplicateField = (sIdx: number, fIdx: number) => {
+    const section = data.sections[sIdx];
+    const clone = { ...section.fields[fIdx] };
+    const fields = [...section.fields];
+    fields.splice(fIdx + 1, 0, clone);
+    updateSection(sIdx, { fields });
   };
 
   const reorderField = (sIdx: number, fromIdx: number, toIdx: number) => {
@@ -1467,9 +1483,14 @@ function StepSections({ data, update }: { data: WizardData; update: (p: Partial<
                   data-testid={`input-section-desc-${sIdx}`}
                 />
               </div>
-              <Button variant="ghost" size="sm" onClick={() => removeSection(sIdx)} data-testid={`button-remove-section-${sIdx}`}>
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" onClick={() => duplicateSection(sIdx)} className="h-8 w-8 p-0" data-testid={`button-duplicate-section-${sIdx}`} title="Duplicate section">
+                  <Copy className="h-4 w-4 text-muted-foreground" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => removeSection(sIdx)} className="h-8 w-8 p-0" data-testid={`button-remove-section-${sIdx}`} title="Remove section">
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
             </div>
 
             <DragDropContext onDragEnd={handleFieldDragEnd(sIdx)}>
@@ -1523,7 +1544,10 @@ function StepSections({ data, update }: { data: WizardData; update: (p: Partial<
                                   />
                                   <span className="text-xs">Req</span>
                                 </label>
-                                <Button variant="ghost" size="sm" onClick={() => removeField(sIdx, fIdx)} className="h-8 w-8 p-0" data-testid={`button-remove-field-${sIdx}-${fIdx}`}>
+                                <Button variant="ghost" size="sm" onClick={() => duplicateField(sIdx, fIdx)} className="h-8 w-8 p-0" data-testid={`button-duplicate-field-${sIdx}-${fIdx}`} title="Duplicate field">
+                                  <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => removeField(sIdx, fIdx)} className="h-8 w-8 p-0" data-testid={`button-remove-field-${sIdx}-${fIdx}`} title="Remove field">
                                   <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                                 </Button>
                               </div>
