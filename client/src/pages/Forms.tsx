@@ -56,6 +56,8 @@ import {
   FileUp,
   Briefcase,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1292,6 +1294,15 @@ function StepSections({ data, update }: { data: WizardData; update: (p: Partial<
     updateSection(sIdx, { fields: section.fields.filter((_, i) => i !== fIdx) });
   };
 
+  const moveField = (sIdx: number, fIdx: number, direction: "up" | "down") => {
+    const section = data.sections[sIdx];
+    const fields = [...section.fields];
+    const targetIdx = direction === "up" ? fIdx - 1 : fIdx + 1;
+    if (targetIdx < 0 || targetIdx >= fields.length) return;
+    [fields[fIdx], fields[targetIdx]] = [fields[targetIdx], fields[fIdx]];
+    updateSection(sIdx, { fields });
+  };
+
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted-foreground">
@@ -1326,7 +1337,27 @@ function StepSections({ data, update }: { data: WizardData; update: (p: Partial<
             <div className="space-y-2 pl-3 border-l-2 border-muted">
               {section.fields.map((field, fIdx) => (
                 <div key={fIdx} className="flex items-start gap-2 rounded-lg bg-muted/30 p-2">
-                  <GripVertical className="h-4 w-4 mt-2.5 text-muted-foreground/40 shrink-0" />
+                  <div className="flex flex-col items-center shrink-0 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => moveField(sIdx, fIdx, "up")}
+                      disabled={fIdx === 0}
+                      className="h-5 w-5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20 text-muted-foreground transition-colors"
+                      data-testid={`button-move-field-up-${sIdx}-${fIdx}`}
+                    >
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    </button>
+                    <GripVertical className="h-3.5 w-3.5 text-muted-foreground/30" />
+                    <button
+                      type="button"
+                      onClick={() => moveField(sIdx, fIdx, "down")}
+                      disabled={fIdx === section.fields.length - 1}
+                      className="h-5 w-5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20 text-muted-foreground transition-colors"
+                      data-testid={`button-move-field-down-${sIdx}-${fIdx}`}
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                   <div className="flex-1 grid grid-cols-1 sm:grid-cols-[1fr_120px_auto] gap-2">
                     <Input
                       value={field.label}
