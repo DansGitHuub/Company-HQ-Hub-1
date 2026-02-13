@@ -453,6 +453,9 @@ export default function Forms() {
   const [hasUnsavedWork, setHasUnsavedWork] = useState(false);
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
   const [pendingExitAction, setPendingExitAction] = useState<(() => void) | null>(null);
+  const [showNavDialog, setShowNavDialog] = useState(false);
+  const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
+  const [, navigate] = useLocation();
 
   const isInWizard = view === "build-wizard";
 
@@ -552,6 +555,32 @@ export default function Forms() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isInWizard, hasUnsavedWork]);
+
+  useEffect(() => {
+    if (!isInWizard || !hasUnsavedWork) return;
+    const handleClick = (e: MouseEvent) => {
+      const link = (e.target as HTMLElement).closest("a[href]");
+      if (!link) return;
+      const href = link.getAttribute("href");
+      if (!href || href.startsWith("http") || href.startsWith("#")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setPendingNavPath(href);
+      setShowNavDialog(true);
+    };
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, [isInWizard, hasUnsavedWork]);
+
+  const confirmNavigation = () => {
+    setShowNavDialog(false);
+    setHasUnsavedWork(false);
+    doExit();
+    if (pendingNavPath) {
+      navigate(pendingNavPath);
+    }
+    setPendingNavPath(null);
+  };
 
   function selectCategory(category: string) {
     setSelectedCategory(category);
@@ -727,6 +756,63 @@ export default function Forms() {
               onClick={handleDiscard}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-discard"
+            >
+              Discard & Leave
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showNavDialog} onOpenChange={(open) => { setShowNavDialog(open); if (!open) setPendingNavPath(null); }}>
+        <AlertDialogContent data-testid="dialog-nav-unsaved">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved work in the Form Builder. If you navigate away now, all your progress will be lost. You can also save to drafts to continue later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="ghost" onClick={() => { setShowNavDialog(false); setPendingNavPath(null); }} data-testid="button-nav-stay">
+              Keep Working
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  await apiRequest("POST", "/api/builder-forms", {
+                    name: wizardData.title || "Untitled Draft",
+                    category: wizardData.category,
+                    purpose: wizardData.purpose,
+                    outcome: wizardData.outcome,
+                    outcomeType: wizardData.outcomeType,
+                    audience: wizardData.audience,
+                    audienceRoles: wizardData.audienceRoles,
+                    sections: wizardData.sections,
+                    toolsAndMedia: wizardData.toolsAndMedia,
+                    externalConnections: wizardData.externalConnections,
+                    status: "draft",
+                  });
+                  queryClient.invalidateQueries({ queryKey: ["/api/builder-forms"] });
+                  toast({ title: "Draft saved!" });
+                  setShowNavDialog(false);
+                  setHasUnsavedWork(false);
+                  doExit();
+                  if (pendingNavPath) navigate(pendingNavPath);
+                  setPendingNavPath(null);
+                } catch {
+                  toast({ title: "Failed to save draft. Your work is still here.", variant: "destructive" });
+                  setShowNavDialog(false);
+                  setPendingNavPath(null);
+                }
+              }}
+              data-testid="button-nav-save-draft"
+            >
+              <Clock className="h-4 w-4 mr-2" /> Save to Drafts
+            </Button>
+            <Button
+              onClick={confirmNavigation}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-nav-leave"
             >
               Discard & Leave
             </Button>
