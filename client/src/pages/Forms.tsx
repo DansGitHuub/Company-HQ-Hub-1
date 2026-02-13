@@ -3248,6 +3248,7 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
   const [pageScales, setPageScales] = useState<{ scaleX: number; scaleY: number; pageHeight: number }[]>([]);
   const [rendering, setRendering] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [detectedFields, setDetectedFields] = useState<any[]>([]);
 
   const { data: pdfForm, isLoading } = useQuery<any>({
     queryKey: ["/api/pdf-forms", pdfFormId],
@@ -3271,12 +3272,12 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
         const res = await fetch(`/api/pdf-forms/${pdfFormId}/download`, { credentials: "include" });
         if (!res.ok) throw new Error("Failed to fetch PDF");
         const arrayBuffer = await res.arrayBuffer();
-
         const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
         const pdf = await loadingTask.promise;
 
         const canvases: HTMLCanvasElement[] = [];
         const scales: { scaleX: number; scaleY: number; pageHeight: number }[] = [];
+        const extractedFields: any[] = [];
         const containerWidth = canvasContainerRef.current?.clientWidth || 800;
 
         for (let i = 0; i < pdf.numPages; i++) {
@@ -3299,15 +3300,47 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
             scaleY: displayScale,
             pageHeight: viewport.height,
           });
+
+          try {
+            const annotations = await page.getAnnotations();
+            for (const annot of annotations) {
+              if (annot.subtype === "Widget" && annot.fieldName) {
+                const rect = annot.rect;
+                let fieldType = "text";
+                if (annot.checkBox) fieldType = "checkbox";
+                else if (annot.fieldType === "Btn" && !annot.radioButton) fieldType = "checkbox";
+                else if (annot.radioButton || annot.fieldType === "Btn") fieldType = "radio";
+                else if (annot.fieldType === "Ch") fieldType = annot.combo ? "dropdown" : "optionlist";
+
+                let options: string[] = [];
+                if (annot.options && Array.isArray(annot.options)) {
+                  options = annot.options.map((o: any) => typeof o === "string" ? o : o.displayValue || o.exportValue || "");
+                }
+
+                extractedFields.push({
+                  name: annot.fieldName,
+                  type: fieldType,
+                  page: i,
+                  rect: { x: rect[0], y: rect[1], width: rect[2] - rect[0], height: rect[3] - rect[1] },
+                  options,
+                });
+              }
+            }
+          } catch (annotErr) {
+            console.log("Could not extract annotations from page", i, annotErr);
+          }
         }
 
         if (!cancelled) {
           setPdfPages(canvases);
           setPageScales(scales);
+          if (extractedFields.length > 0) {
+            setDetectedFields(extractedFields);
+          }
         }
       } catch (err: any) {
         console.error("PDF render error:", err);
-        if (!cancelled) toast({ title: "Failed to render PDF", variant: "destructive" });
+        if (!cancelled) toast({ title: "Failed to render PDF", description: String(err?.message || ""), variant: "destructive" });
       } finally {
         if (!cancelled) setRendering(false);
       }
@@ -3328,7 +3361,7 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fieldValues }),
+        body: JSON.stringify({ fieldValues, detectedFieldsMeta: detectedFields.length > 0 && serverFields.length === 0 ? detectedFields : undefined }),
       });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
@@ -3374,14 +3407,18 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
     return <EmptyState icon={FileText} message="PDF form not found" />;
   }
 
-  const formFields = (pdfForm.formFields as any[]) || [];
+  const serverFields = (pdfForm.formFields as any[]) || [];
+  const formFields = serverFields.length > 0 ? serverFields : detectedFields;
   const hasFields = formFields.length > 0;
 
   return (
     <div data-testid="view-pdf-fill">
-      <SectionHeader icon={PenTool} title={pdfForm.title} description={`${pdfForm.pageCount} page${pdfForm.pageCount !== 1 ? "s" : ""} · ${formFields.length} fillable field${formFields.length !== 1 ? "s" : ""}`} />
+      <SectionHeader icon={PenTool} title={pdfForm.title} description={`${pdfForm.pageCount} page${pdfForm.pageCount !== 1 ? "s" : ""}${hasFields ? ` · ${formFields.length} fillable field${formFields.length !== 1 ? "s" : ""}` : ""}`} />
 
       <div className="flex items-center gap-3 mb-6">
+        <Button variant="outline" className="gap-2" onClick={onBack} data-testid="button-back-to-list">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </Button>
         <Button variant="outline" className="gap-2" onClick={handleDownloadOriginal} data-testid="button-download-original">
           <Download className="h-4 w-4" /> Download Original
         </Button>
@@ -3535,7 +3572,7 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
               <CardContent className="p-4">
                 <h3 className="font-semibold text-sm mb-2">No Fillable Fields Detected</h3>
                 <p className="text-xs text-muted-foreground">
-                  This PDF doesn't contain standard form fields (AcroForm). You can still view and download the original document. To make it fillable, consider recreating it using the Form Builder.
+                  This PDF doesn't contain standard form fields. You can still view and download the original document. To make it fillable, consider recreating it using the Form Builder.
                 </p>
               </CardContent>
             </Card>

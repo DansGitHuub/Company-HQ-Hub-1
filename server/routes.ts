@@ -4191,8 +4191,16 @@ SECTION GENERATION RULES:
       const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
       const objService = new ObjectStorageService();
       const objectFile = await objService.getObjectEntityFile(form.fileKey);
-      res.setHeader("Content-Disposition", `attachment; filename="${form.title}.pdf"`);
-      await objService.downloadObject(objectFile, res);
+
+      const chunks: Buffer[] = [];
+      const stream = objectFile.createReadStream();
+      for await (const chunk of stream) { chunks.push(Buffer.from(chunk)); }
+      const pdfBuffer = Buffer.concat(chunks);
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${form.title}.pdf"`);
+      res.setHeader("Content-Length", pdfBuffer.length);
+      res.send(pdfBuffer);
     } catch (err: any) {
       console.error("[pdf-forms/download] Error:", err.message);
       res.status(500).json({ message: "Failed to download PDF" });
@@ -4204,7 +4212,7 @@ SECTION GENERATION RULES:
       const form = await storage.getPdfForm(req.params.id);
       if (!form) return res.status(404).json({ message: "PDF form not found" });
 
-      const { fieldValues } = req.body;
+      const { fieldValues, detectedFieldsMeta } = req.body;
       if (!fieldValues || typeof fieldValues !== "object") {
         return res.status(400).json({ message: "Field values are required" });
       }
@@ -4220,27 +4228,66 @@ SECTION GENERATION RULES:
 
       const { PDFDocument } = await import("pdf-lib");
       const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
-      const pdfForm = pdfDoc.getForm();
 
-      for (const [fieldName, value] of Object.entries(fieldValues)) {
-        try {
-          const field = pdfForm.getField(fieldName);
-          const type = field.constructor.name;
-          if (type === "PDFTextField") {
-            (field as any).setText(String(value));
-          } else if (type === "PDFCheckBox") {
-            if (value) (field as any).check(); else (field as any).uncheck();
-          } else if (type === "PDFDropdown") {
-            (field as any).select(String(value));
-          } else if (type === "PDFRadioGroup") {
-            (field as any).select(String(value));
+      let filledAnyField = false;
+      try {
+        const pdfForm = pdfDoc.getForm();
+        const allFields = pdfForm.getFields();
+
+        if (allFields.length > 0) {
+          for (const [fieldName, value] of Object.entries(fieldValues)) {
+            try {
+              const field = pdfForm.getField(fieldName);
+              const type = field.constructor.name;
+              if (type === "PDFTextField") {
+                (field as any).setText(String(value));
+                filledAnyField = true;
+              } else if (type === "PDFCheckBox") {
+                if (value) (field as any).check(); else (field as any).uncheck();
+                filledAnyField = true;
+              } else if (type === "PDFDropdown") {
+                (field as any).select(String(value));
+                filledAnyField = true;
+              } else if (type === "PDFRadioGroup") {
+                (field as any).select(String(value));
+                filledAnyField = true;
+              }
+            } catch (fieldErr) {
+              console.log(`[pdf-forms/fill] Skipping field "${fieldName}":`, (fieldErr as Error).message);
+            }
           }
-        } catch (fieldErr) {
-          console.log(`[pdf-forms/fill] Skipping field "${fieldName}":`, (fieldErr as Error).message);
+
+          if (filledAnyField) {
+            try { pdfForm.flatten(); } catch {}
+          }
+        } else {
+          throw new Error("No AcroForm fields found");
+        }
+      } catch (formErr) {
+        console.log("[pdf-forms/fill] No AcroForm fields, drawing text directly onto PDF...");
+        const { rgb, StandardFonts } = await import("pdf-lib");
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+        const fieldsMeta: any[] = detectedFieldsMeta || (form.formFields as any[]) || [];
+        for (const [fieldName, value] of Object.entries(fieldValues)) {
+          if (!value || String(value).trim() === "") continue;
+          const fieldMeta = fieldsMeta.find((f: any) => f.name === fieldName);
+          if (!fieldMeta) continue;
+
+          const pages = pdfDoc.getPages();
+          const page = pages[fieldMeta.page] || pages[0];
+          if (fieldMeta.type !== "checkbox") {
+            page.drawText(String(value), {
+              x: fieldMeta.rect.x + 2,
+              y: fieldMeta.rect.y + 3,
+              size: Math.min(Math.max(fieldMeta.rect.height - 4, 8), 12),
+              font,
+              color: rgb(0, 0, 0),
+            });
+            filledAnyField = true;
+          }
         }
       }
-
-      try { pdfForm.flatten(); } catch {}
 
       const filledBytes = await pdfDoc.save();
       res.setHeader("Content-Type", "application/pdf");
