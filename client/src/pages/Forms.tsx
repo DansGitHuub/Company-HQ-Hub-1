@@ -662,6 +662,37 @@ export default function Forms() {
               // toast handled below
             }
           }}
+          onCancel={() => {
+            if (hasUnsavedWork) {
+              setPendingExitAction(() => doExit);
+              setExitDialogOpen(true);
+            } else {
+              doExit();
+            }
+          }}
+          onSaveDraft={async () => {
+            try {
+              await apiRequest("POST", "/api/builder-forms", {
+                name: wizardData.title || "Untitled Draft",
+                category: wizardData.category,
+                purpose: wizardData.purpose,
+                outcome: wizardData.outcome,
+                outcomeType: wizardData.outcomeType,
+                audience: wizardData.audience,
+                audienceRoles: wizardData.audienceRoles,
+                sections: wizardData.sections,
+                toolsAndMedia: wizardData.toolsAndMedia,
+                externalConnections: wizardData.externalConnections,
+                status: "draft",
+              });
+              queryClient.invalidateQueries({ queryKey: ["/api/builder-forms"] });
+              toast({ title: "Draft saved!" });
+              setHasUnsavedWork(false);
+              doExit();
+            } catch {
+              toast({ title: "Failed to save draft. Your work is still here.", variant: "destructive" });
+            }
+          }}
         />
       )}
       {view === "form-library" && <FormLibrary onOpenForm={(id: string) => { setSelectedFormId(id); setView("form-detail"); }} />}
@@ -935,6 +966,8 @@ function FormWizard({
   titlePlaceholder,
   purpose,
   onFinish,
+  onCancel,
+  onSaveDraft,
 }: {
   data: WizardData;
   setData: React.Dispatch<React.SetStateAction<WizardData>>;
@@ -943,6 +976,8 @@ function FormWizard({
   titlePlaceholder: string;
   purpose: PurposeOption | null;
   onFinish: () => void | Promise<void>;
+  onCancel: () => void;
+  onSaveDraft: () => void | Promise<void>;
 }) {
   const { toast } = useToast();
   const [isAiFilling, setIsAiFilling] = useState(false);
@@ -1078,7 +1113,7 @@ function FormWizard({
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-center gap-4 pb-8">
+      <div className="flex items-center justify-center gap-3 pb-8 flex-wrap">
         <Button
           variant="outline"
           onClick={() => step > 0 && setStep(step - 1)}
@@ -1087,6 +1122,32 @@ function FormWizard({
           data-testid="button-wizard-prev"
         >
           <ArrowLeft className="h-4 w-4" /> Previous
+        </Button>
+
+        <Button
+          variant="ghost"
+          onClick={onCancel}
+          className="gap-2 text-muted-foreground"
+          data-testid="button-wizard-cancel"
+        >
+          <XCircle className="h-4 w-4" /> Cancel
+        </Button>
+
+        <Button
+          variant="outline"
+          onClick={async () => {
+            setIsSaving(true);
+            try {
+              await onSaveDraft();
+            } finally {
+              setIsSaving(false);
+            }
+          }}
+          disabled={isSaving}
+          className="gap-2"
+          data-testid="button-wizard-save-draft"
+        >
+          <Clock className="h-4 w-4" /> Save to Drafts
         </Button>
 
         {step < WIZARD_STEPS.length - 1 ? (
