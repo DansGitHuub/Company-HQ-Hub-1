@@ -676,20 +676,28 @@ export default function Forms() {
       <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
         <AlertDialogContent data-testid="dialog-unsaved-changes">
           <AlertDialogHeader>
-            <AlertDialogTitle>You have unsaved changes</AlertDialogTitle>
+            <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
             <AlertDialogDescription>
-              You've been working on a form. What would you like to do?
+              You have unsaved work in the Form Builder. If you navigate away now, all your progress will be lost. You can also save to drafts to continue later.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="destructive" onClick={handleDiscard} data-testid="button-discard">
-              Discard
+          <AlertDialogFooter>
+            <Button variant="ghost" onClick={handleContinueWorking} data-testid="button-continue-working">
+              Keep Working
             </Button>
-            <Button variant="outline" onClick={handleSaveDraft} data-testid="button-save-draft">
-              Save as Draft
+            <Button
+              variant="outline"
+              onClick={handleSaveDraft}
+              data-testid="button-save-draft"
+            >
+              <Clock className="h-4 w-4 mr-2" /> Save to Drafts
             </Button>
-            <Button onClick={handleContinueWorking} data-testid="button-continue-working">
-              Continue Working
+            <Button
+              onClick={handleDiscard}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-discard"
+            >
+              Discard & Leave
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1295,11 +1303,11 @@ function StepIdentify({
             <Button
               onClick={onAiFill}
               disabled={isAiFilling || !data.title.trim()}
-              className="mt-3 gap-2"
+              className={`mt-3 gap-2 px-5 py-2.5 text-sm font-semibold shadow-sm transition-all bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md border-purple-600 dark:bg-purple-700 dark:hover:bg-purple-600`}
               data-testid="button-ai-fill"
             >
               {isAiFilling ? (
-                <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
+                <><Loader2 className="h-4 w-4 animate-spin" /> AI is filling in fields...</>
               ) : (
                 <><Sparkles className="h-4 w-4" /> Auto-Fill with AI</>
               )}
