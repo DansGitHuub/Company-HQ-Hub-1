@@ -4065,6 +4065,223 @@ SECTION GENERATION RULES:
     }
   });
 
+  // PDF Forms - Import, Fill, Export
+  const pdfFormUpload = multerUpload({ storage: multerUpload.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+
+  app.get("/api/pdf-forms", requireAuth, async (req, res) => {
+    try {
+      const forms = await storage.getPdfForms();
+      res.json(forms);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching PDF forms" });
+    }
+  });
+
+  app.get("/api/pdf-forms/:id", requireAuth, async (req, res) => {
+    try {
+      const form = await storage.getPdfForm(req.params.id);
+      if (!form) return res.status(404).json({ message: "PDF form not found" });
+      res.json(form);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching PDF form" });
+    }
+  });
+
+  app.post("/api/pdf-forms/upload", requireAuth, pdfFormUpload.single("pdf"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No PDF file uploaded" });
+      if (req.file.mimetype !== "application/pdf") return res.status(400).json({ message: "Only PDF files are accepted" });
+
+      const { PDFDocument } = await import("pdf-lib");
+      let pdfDoc;
+      try {
+        pdfDoc = await PDFDocument.load(req.file.buffer, { ignoreEncryption: true });
+      } catch (e) {
+        return res.status(400).json({ message: "Could not parse the PDF file" });
+      }
+
+      const pageCount = pdfDoc.getPageCount();
+      const form = pdfDoc.getForm();
+      const formFields: any[] = [];
+
+      try {
+        const fields = form.getFields();
+        for (const field of fields) {
+          const widgets = field.acroField.getWidgets();
+          const fieldName = field.getName();
+          const fieldType = field.constructor.name.replace("PDF", "").replace("Field", "").toLowerCase();
+
+          for (const widget of widgets) {
+            const rect = widget.getRectangle();
+            const pageRef = widget.P();
+            let pageIndex = 0;
+            if (pageRef) {
+              const pages = pdfDoc.getPages();
+              for (let i = 0; i < pages.length; i++) {
+                if (pages[i].ref === pageRef) { pageIndex = i; break; }
+              }
+            }
+            let options: string[] = [];
+            if (fieldType === "dropdown" || fieldType === "optionlist") {
+              try { options = (field as any).getOptions?.() || []; } catch {}
+            }
+            formFields.push({
+              name: fieldName,
+              type: fieldType,
+              page: pageIndex,
+              rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+              options,
+            });
+          }
+        }
+      } catch (fieldErr) {
+        console.log("[pdf-forms] No AcroForm fields found or error extracting:", (fieldErr as Error).message);
+      }
+
+      const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+      if (!privateDir) return res.status(500).json({ message: "Object storage not configured" });
+
+      const fileId = crypto.randomUUID();
+      const objectPath = `${privateDir}/pdf-forms/${fileId}.pdf`;
+      const pathParts = objectPath.startsWith("/") ? objectPath.slice(1).split("/") : objectPath.split("/");
+      const bucketName = pathParts[0];
+      const objectName = pathParts.slice(1).join("/");
+
+      const SIDECAR = "http://127.0.0.1:1106";
+      const signRes = await fetch(`${SIDECAR}/object-storage/signed-object-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bucket_name: bucketName, object_name: objectName, method: "PUT", expires_at: new Date(Date.now() + 900 * 1000).toISOString() }),
+      });
+      if (!signRes.ok) return res.status(500).json({ message: "Failed to get upload URL" });
+      const { signed_url } = await signRes.json() as { signed_url: string };
+
+      const uploadRes = await fetch(signed_url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/pdf" },
+        body: req.file.buffer,
+      });
+      if (!uploadRes.ok) return res.status(500).json({ message: "Failed to upload PDF to storage" });
+
+      const fileKey = `/objects/pdf-forms/${fileId}.pdf`;
+      const user = req.user as User;
+      const title = req.body.title || req.file.originalname?.replace(/\.pdf$/i, "") || "Untitled PDF";
+
+      const saved = await storage.createPdfForm({
+        title,
+        fileKey,
+        fileSize: req.file.size,
+        pageCount,
+        formFields,
+        createdBy: user.id,
+      });
+
+      res.status(201).json(saved);
+    } catch (err: any) {
+      console.error("[pdf-forms/upload] Error:", err.message);
+      res.status(500).json({ message: "Failed to import PDF" });
+    }
+  });
+
+  app.get("/api/pdf-forms/:id/download", requireAuth, async (req, res) => {
+    try {
+      const form = await storage.getPdfForm(req.params.id);
+      if (!form) return res.status(404).json({ message: "PDF form not found" });
+
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+      const objService = new ObjectStorageService();
+      const objectFile = await objService.getObjectEntityFile(form.fileKey);
+      res.setHeader("Content-Disposition", `attachment; filename="${form.title}.pdf"`);
+      await objService.downloadObject(objectFile, res);
+    } catch (err: any) {
+      console.error("[pdf-forms/download] Error:", err.message);
+      res.status(500).json({ message: "Failed to download PDF" });
+    }
+  });
+
+  app.post("/api/pdf-forms/:id/fill-export", requireAuth, async (req, res) => {
+    try {
+      const form = await storage.getPdfForm(req.params.id);
+      if (!form) return res.status(404).json({ message: "PDF form not found" });
+
+      const { fieldValues } = req.body;
+      if (!fieldValues || typeof fieldValues !== "object") {
+        return res.status(400).json({ message: "Field values are required" });
+      }
+
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+      const objService = new ObjectStorageService();
+      const objectFile = await objService.getObjectEntityFile(form.fileKey);
+
+      const chunks: Buffer[] = [];
+      const stream = objectFile.createReadStream();
+      for await (const chunk of stream) { chunks.push(Buffer.from(chunk)); }
+      const pdfBuffer = Buffer.concat(chunks);
+
+      const { PDFDocument } = await import("pdf-lib");
+      const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
+      const pdfForm = pdfDoc.getForm();
+
+      for (const [fieldName, value] of Object.entries(fieldValues)) {
+        try {
+          const field = pdfForm.getField(fieldName);
+          const type = field.constructor.name;
+          if (type === "PDFTextField") {
+            (field as any).setText(String(value));
+          } else if (type === "PDFCheckBox") {
+            if (value) (field as any).check(); else (field as any).uncheck();
+          } else if (type === "PDFDropdown") {
+            (field as any).select(String(value));
+          } else if (type === "PDFRadioGroup") {
+            (field as any).select(String(value));
+          }
+        } catch (fieldErr) {
+          console.log(`[pdf-forms/fill] Skipping field "${fieldName}":`, (fieldErr as Error).message);
+        }
+      }
+
+      try { pdfForm.flatten(); } catch {}
+
+      const filledBytes = await pdfDoc.save();
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${form.title} (filled).pdf"`);
+      res.send(Buffer.from(filledBytes));
+    } catch (err: any) {
+      console.error("[pdf-forms/fill-export] Error:", err.message);
+      res.status(500).json({ message: "Failed to export filled PDF" });
+    }
+  });
+
+  app.delete("/api/pdf-forms/:id", requireAuth, async (req, res) => {
+    try {
+      const form = await storage.getPdfForm(req.params.id);
+      if (!form) return res.status(404).json({ message: "PDF form not found" });
+
+      try {
+        const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+        if (privateDir && form.fileKey) {
+          const objectPath = `${privateDir}${form.fileKey}`;
+          const pathParts = objectPath.startsWith("/") ? objectPath.slice(1).split("/") : objectPath.split("/");
+          const bucketName = pathParts[0];
+          const objectName = pathParts.slice(1).join("/");
+          const SIDECAR = "http://127.0.0.1:1106";
+          await fetch(`${SIDECAR}/object-storage/delete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bucket_name: bucketName, object_name: objectName }),
+          });
+        }
+      } catch (storageErr) {
+        console.error("[pdf-forms/delete] Failed to remove object storage file:", (storageErr as Error).message);
+      }
+
+      await storage.deletePdfForm(req.params.id);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting PDF form" });
+    }
+  });
+
   // AI Form Builder
   app.post("/api/ai/generate-form", requireAdmin, async (req, res) => {
     try {

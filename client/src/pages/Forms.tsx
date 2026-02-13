@@ -56,6 +56,9 @@ import {
   FileUp,
   Briefcase,
   ChevronRight,
+  FileDown,
+  Eye,
+  Download,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -82,7 +85,9 @@ type View =
   | "form-drafts"
   | "share-forms"
   | "build-packet"
-  | "discontinued";
+  | "discontinued"
+  | "pdf-forms"
+  | "pdf-fill";
 
 type FormFieldDef = {
   label: string;
@@ -450,6 +455,7 @@ export default function Forms() {
   const [wizardData, setWizardData] = useState<WizardData>({ ...EMPTY_WIZARD });
   const [wizardStep, setWizardStep] = useState(0);
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
+  const [selectedPdfFormId, setSelectedPdfFormId] = useState<string | null>(null);
   const [hasUnsavedWork, setHasUnsavedWork] = useState(false);
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
   const [pendingExitAction, setPendingExitAction] = useState<(() => void) | null>(null);
@@ -626,6 +632,11 @@ export default function Forms() {
       setSelectedFormId(null);
       return;
     }
+    if (view === "pdf-fill") {
+      setView("pdf-forms");
+      setSelectedPdfFormId(null);
+      return;
+    }
     setView("home");
   };
 
@@ -637,7 +648,9 @@ export default function Forms() {
         ? "Back to Form Details"
         : view === "form-detail"
           ? "Back to Form Library"
-          : "Back to Forms";
+          : view === "pdf-fill"
+            ? "Back to PDF Forms"
+            : "Back to Forms";
 
   return (
     <div className="p-6 max-w-5xl mx-auto" data-testid="forms-page">
@@ -732,6 +745,8 @@ export default function Forms() {
       {view === "share-forms" && <ShareForms />}
       {view === "build-packet" && <BuildPacket />}
       {view === "discontinued" && <DiscontinuedForms />}
+      {view === "pdf-forms" && <PdfFormsLibrary onFillForm={(id: string) => { setSelectedPdfFormId(id); setView("pdf-fill"); }} />}
+      {view === "pdf-fill" && selectedPdfFormId && <PdfFormFill pdfFormId={selectedPdfFormId} onBack={() => { setView("pdf-forms"); setSelectedPdfFormId(null); }} />}
 
       <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
         <AlertDialogContent data-testid="dialog-unsaved-changes">
@@ -854,6 +869,7 @@ function FormsHome({
     { id: "form-drafts", label: "Form Drafts", description: "Continue working on forms you haven't finished yet", icon: FileEdit, color: "from-amber-500 to-amber-700", hoverColor: "from-amber-600 to-amber-800" },
     { id: "share-forms", label: "Share Forms", description: "Send forms to employees, customers, or external contacts", icon: Share2, color: "from-cyan-500 to-cyan-700", hoverColor: "from-cyan-600 to-cyan-800" },
     { id: "build-packet", label: "Build a Packet", description: "Bundle multiple forms together into a single packet", icon: Package, color: "from-rose-500 to-rose-700", hoverColor: "from-rose-600 to-rose-800" },
+    { id: "pdf-forms", label: "PDF Forms", description: "Import, fill, and export PDF forms digitally", icon: FileDown, color: "from-indigo-500 to-indigo-700", hoverColor: "from-indigo-600 to-indigo-800" },
     { id: "discontinued", label: "Discontinued Forms", description: "View and restore forms that have been retired", icon: XCircle, color: "from-slate-500 to-slate-700", hoverColor: "from-slate-600 to-slate-800" },
   ];
 
@@ -2787,6 +2803,454 @@ function DiscontinuedForms() {
         </div>
       </div>
       <EmptyState icon={Archive} message="No discontinued forms" submessage="When you retire a form, it will be moved here for safekeeping." />
+    </div>
+  );
+}
+
+function PdfFormsLibrary({ onFillForm }: { onFillForm: (id: string) => void }) {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const { data: pdfForms = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/pdf-forms"],
+    queryFn: async () => {
+      const res = await fetch("/api/pdf-forms", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load PDF forms");
+      return res.json();
+    },
+  });
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast({ title: "Only PDF files are accepted", variant: "destructive" });
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      toast({ title: "File is too large (max 25MB)", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("pdf", file);
+      formData.append("title", file.name.replace(/\.pdf$/i, ""));
+      const res = await fetch("/api/pdf-forms/upload", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Upload failed");
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/pdf-forms"] });
+      toast({ title: "PDF imported successfully!" });
+    } catch (err: any) {
+      toast({ title: err.message || "Failed to import PDF", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await fetch(`/api/pdf-forms/${id}`, { method: "DELETE", credentials: "include" });
+      queryClient.invalidateQueries({ queryKey: ["/api/pdf-forms"] });
+      toast({ title: "PDF form deleted" });
+    } catch {
+      toast({ title: "Failed to delete", variant: "destructive" });
+    }
+  };
+
+  const handleDownloadOriginal = async (form: any) => {
+    try {
+      const res = await fetch(`/api/pdf-forms/${form.id}/download`, { credentials: "include" });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${form.title}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Failed to download", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div data-testid="view-pdf-forms">
+      <SectionHeader icon={FileDown} title="PDF Forms" description="Import existing PDF forms, fill them out digitally, and export completed copies." />
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,application/pdf"
+          className="hidden"
+          onChange={handleUpload}
+          data-testid="input-pdf-upload"
+        />
+        <Button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="gap-2"
+          data-testid="button-import-pdf"
+        >
+          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          {uploading ? "Importing..." : "Import PDF Form"}
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : pdfForms.length === 0 ? (
+        <EmptyState icon={FileDown} message="No PDF forms imported yet" submessage="Import a PDF to get started. You can fill it out digitally and export completed copies." />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {pdfForms.map((form: any) => (
+            <Card key={form.id} className="transition-all hover:shadow-md hover:border-primary/30" data-testid={`card-pdf-form-${form.id}`}>
+              <CardContent className="p-5">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-lg bg-indigo-100 p-2.5 mt-0.5 shrink-0">
+                    <FileText className="h-5 w-5 text-indigo-700" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold truncate" data-testid={`text-pdf-title-${form.id}`}>{form.title}</h3>
+                    <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+                      <span>{form.pageCount} page{form.pageCount !== 1 ? "s" : ""}</span>
+                      <span>{((form.formFields as any[]) || []).length} field{((form.formFields as any[]) || []).length !== 1 ? "s" : ""}</span>
+                      <span>{(form.fileSize / 1024).toFixed(0)} KB</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-3">
+                      <Button size="sm" variant="default" className="gap-1.5" onClick={() => onFillForm(form.id)} data-testid={`button-fill-pdf-${form.id}`}>
+                        <PenTool className="h-3.5 w-3.5" /> Fill Form
+                      </Button>
+                      <Button size="sm" variant="outline" className="gap-1.5" onClick={() => handleDownloadOriginal(form)} data-testid={`button-download-pdf-${form.id}`}>
+                        <Download className="h-3.5 w-3.5" /> Original
+                      </Button>
+                      <Button size="sm" variant="ghost" className="gap-1.5 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(form.id)} data-testid={`button-delete-pdf-${form.id}`}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => void }) {
+  const { toast } = useToast();
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const [fieldValues, setFieldValues] = useState<Record<string, any>>({});
+  const [pdfPages, setPdfPages] = useState<HTMLCanvasElement[]>([]);
+  const [pageScales, setPageScales] = useState<{ scaleX: number; scaleY: number; pageHeight: number }[]>([]);
+  const [rendering, setRendering] = useState(true);
+  const [exporting, setExporting] = useState(false);
+
+  const { data: pdfForm, isLoading } = useQuery<any>({
+    queryKey: ["/api/pdf-forms", pdfFormId],
+    queryFn: async () => {
+      const res = await fetch(`/api/pdf-forms/${pdfFormId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load PDF form");
+      return res.json();
+    },
+  });
+
+  useEffect(() => {
+    if (!pdfForm) return;
+    let cancelled = false;
+
+    const renderPdf = async () => {
+      setRendering(true);
+      try {
+        const pdfjsLib = await import("pdfjs-dist");
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+        const res = await fetch(`/api/pdf-forms/${pdfFormId}/download`, { credentials: "include" });
+        if (!res.ok) throw new Error("Failed to fetch PDF");
+        const arrayBuffer = await res.arrayBuffer();
+
+        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+        const pdf = await loadingTask.promise;
+
+        const canvases: HTMLCanvasElement[] = [];
+        const scales: { scaleX: number; scaleY: number; pageHeight: number }[] = [];
+        const containerWidth = canvasContainerRef.current?.clientWidth || 800;
+
+        for (let i = 0; i < pdf.numPages; i++) {
+          const page = await pdf.getPage(i + 1);
+          const viewport = page.getViewport({ scale: 1 });
+          const displayScale = (containerWidth - 40) / viewport.width;
+          const scaledViewport = page.getViewport({ scale: displayScale });
+
+          const canvas = document.createElement("canvas");
+          canvas.width = scaledViewport.width;
+          canvas.height = scaledViewport.height;
+          canvas.style.width = `${scaledViewport.width}px`;
+          canvas.style.maxWidth = "100%";
+
+          const ctx = canvas.getContext("2d")!;
+          await page.render({ canvasContext: ctx, viewport: scaledViewport, canvas } as any).promise;
+          canvases.push(canvas);
+          scales.push({
+            scaleX: displayScale,
+            scaleY: displayScale,
+            pageHeight: viewport.height,
+          });
+        }
+
+        if (!cancelled) {
+          setPdfPages(canvases);
+          setPageScales(scales);
+        }
+      } catch (err: any) {
+        console.error("PDF render error:", err);
+        if (!cancelled) toast({ title: "Failed to render PDF", variant: "destructive" });
+      } finally {
+        if (!cancelled) setRendering(false);
+      }
+    };
+
+    renderPdf();
+    return () => { cancelled = true; };
+  }, [pdfForm, pdfFormId]);
+
+  const updateFieldValue = (fieldName: string, value: any) => {
+    setFieldValues((prev) => ({ ...prev, [fieldName]: value }));
+  };
+
+  const handleExportFilled = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/pdf-forms/${pdfFormId}/fill-export`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fieldValues }),
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${pdfForm?.title || "form"} (filled).pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Filled PDF exported!" });
+    } catch {
+      toast({ title: "Failed to export filled PDF", variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDownloadOriginal = async () => {
+    try {
+      const res = await fetch(`/api/pdf-forms/${pdfFormId}/download`, { credentials: "include" });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${pdfForm?.title || "form"}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Failed to download", variant: "destructive" });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!pdfForm) {
+    return <EmptyState icon={FileText} message="PDF form not found" />;
+  }
+
+  const formFields = (pdfForm.formFields as any[]) || [];
+  const hasFields = formFields.length > 0;
+
+  return (
+    <div data-testid="view-pdf-fill">
+      <SectionHeader icon={PenTool} title={pdfForm.title} description={`${pdfForm.pageCount} page${pdfForm.pageCount !== 1 ? "s" : ""} · ${formFields.length} fillable field${formFields.length !== 1 ? "s" : ""}`} />
+
+      <div className="flex items-center gap-3 mb-6">
+        <Button variant="outline" className="gap-2" onClick={handleDownloadOriginal} data-testid="button-download-original">
+          <Download className="h-4 w-4" /> Download Original
+        </Button>
+        {hasFields && (
+          <Button
+            className="gap-2"
+            onClick={handleExportFilled}
+            disabled={exporting || Object.keys(fieldValues).length === 0}
+            data-testid="button-export-filled"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            {exporting ? "Exporting..." : "Export Filled PDF"}
+          </Button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2" ref={canvasContainerRef}>
+          {rendering ? (
+            <div className="flex flex-col items-center justify-center py-20 border rounded-lg bg-muted/20">
+              <Loader2 className="h-10 w-10 animate-spin text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">Rendering PDF...</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {pdfPages.map((canvas, pageIdx) => (
+                <div key={pageIdx} className="relative border rounded-lg overflow-hidden shadow-sm bg-white" data-testid={`pdf-page-${pageIdx}`}>
+                  <div className="absolute top-2 right-2 z-10">
+                    <Badge variant="secondary" className="text-xs">Page {pageIdx + 1}</Badge>
+                  </div>
+                  <div
+                    ref={(el) => {
+                      if (el && !el.hasChildNodes()) {
+                        el.appendChild(canvas);
+                      }
+                    }}
+                  />
+                  {pageScales[pageIdx] && formFields
+                    .filter((f: any) => f.page === pageIdx)
+                    .map((field: any, fIdx: number) => {
+                      const scale = pageScales[pageIdx];
+                      const left = field.rect.x * scale.scaleX;
+                      const bottom = field.rect.y * scale.scaleY;
+                      const width = field.rect.width * scale.scaleX;
+                      const height = field.rect.height * scale.scaleY;
+                      const top = (scale.pageHeight * scale.scaleY) - bottom - height;
+
+                      return (
+                        <div
+                          key={`${field.name}-${fIdx}`}
+                          className="absolute"
+                          style={{ left: `${left}px`, top: `${top}px`, width: `${Math.max(width, 30)}px`, height: `${Math.max(height, 20)}px` }}
+                        >
+                          {field.type === "checkbox" ? (
+                            <input
+                              type="checkbox"
+                              checked={!!fieldValues[field.name]}
+                              onChange={(e) => updateFieldValue(field.name, e.target.checked)}
+                              className="w-full h-full cursor-pointer accent-indigo-600"
+                              title={field.name}
+                              data-testid={`pdf-field-${field.name}`}
+                            />
+                          ) : field.type === "dropdown" || field.type === "optionlist" ? (
+                            <select
+                              value={fieldValues[field.name] || ""}
+                              onChange={(e) => updateFieldValue(field.name, e.target.value)}
+                              className="w-full h-full bg-indigo-50/80 border border-indigo-300/60 rounded-sm text-xs px-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              title={field.name}
+                              data-testid={`pdf-field-${field.name}`}
+                            >
+                              <option value="">—</option>
+                              {(field.options || []).map((opt: string) => (
+                                <option key={opt} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={fieldValues[field.name] || ""}
+                              onChange={(e) => updateFieldValue(field.name, e.target.value)}
+                              className="w-full h-full bg-indigo-50/80 border border-indigo-300/60 rounded-sm text-xs px-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              placeholder={field.name}
+                              title={field.name}
+                              data-testid={`pdf-field-${field.name}`}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {hasFields && (
+          <div className="lg:col-span-1">
+            <Card>
+              <CardContent className="p-4">
+                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                  <LayoutList className="h-4 w-4" /> Form Fields ({formFields.length})
+                </h3>
+                <p className="text-xs text-muted-foreground mb-4">Fill in the fields below or type directly on the PDF. Both are synced.</p>
+                <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
+                  {formFields.map((field: any, idx: number) => (
+                    <div key={`${field.name}-${idx}`}>
+                      <Label className="text-xs truncate block mb-1" title={field.name}>{field.name}</Label>
+                      {field.type === "checkbox" ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={!!fieldValues[field.name]}
+                            onChange={(e) => updateFieldValue(field.name, e.target.checked)}
+                            className="accent-indigo-600"
+                            data-testid={`sidebar-field-${field.name}`}
+                          />
+                          <span className="text-xs text-muted-foreground">{fieldValues[field.name] ? "Checked" : "Unchecked"}</span>
+                        </div>
+                      ) : field.type === "dropdown" || field.type === "optionlist" ? (
+                        <select
+                          value={fieldValues[field.name] || ""}
+                          onChange={(e) => updateFieldValue(field.name, e.target.value)}
+                          className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          data-testid={`sidebar-field-${field.name}`}
+                        >
+                          <option value="">Select...</option>
+                          {(field.options || []).map((opt: string) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Input
+                          value={fieldValues[field.name] || ""}
+                          onChange={(e) => updateFieldValue(field.name, e.target.value)}
+                          placeholder={`Enter ${field.name}`}
+                          className="text-sm"
+                          data-testid={`sidebar-field-${field.name}`}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {!hasFields && !rendering && (
+          <div className="lg:col-span-1">
+            <Card>
+              <CardContent className="p-4">
+                <h3 className="font-semibold text-sm mb-2">No Fillable Fields Detected</h3>
+                <p className="text-xs text-muted-foreground">
+                  This PDF doesn't contain standard form fields (AcroForm). You can still view and download the original document. To make it fillable, consider recreating it using the Form Builder.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

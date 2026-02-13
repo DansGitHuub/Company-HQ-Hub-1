@@ -1823,3 +1823,22 @@ export const insertBuilderFormSchema = createInsertSchema(builderForms).omit({
 
 export type InsertBuilderForm = z.infer<typeof insertBuilderFormSchema>;
 export type BuilderForm = typeof builderForms.$inferSelect;
+
+export const pdfForms = pgTable("pdf_forms", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull().default("Untitled PDF"),
+  fileKey: text("file_key").notNull(),
+  fileSize: integer("file_size").notNull().default(0),
+  pageCount: integer("page_count").notNull().default(0),
+  formFields: jsonb("form_fields").notNull().default(sql`'[]'::jsonb`),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPdfFormSchema = createInsertSchema(pdfForms).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPdfForm = z.infer<typeof insertPdfFormSchema>;
+export type PdfForm = typeof pdfForms.$inferSelect;

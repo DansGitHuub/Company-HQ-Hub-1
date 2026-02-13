@@ -70,6 +70,7 @@ import {
   sopQuizQuestions, type SopQuizQuestion, type InsertSopQuizQuestion,
   userQuizAttempts, type UserQuizAttempt, type InsertUserQuizAttempt,
   builderForms, type BuilderForm, type InsertBuilderForm,
+  pdfForms, type PdfForm, type InsertPdfForm,
   conversations, chatMessages
 } from "@shared/schema";
 import { db, pool } from "./db";
@@ -227,6 +228,12 @@ export interface IStorage {
   createBuilderForm(form: InsertBuilderForm): Promise<BuilderForm>;
   updateBuilderForm(id: string, updates: Partial<BuilderForm>): Promise<BuilderForm | undefined>;
   deleteBuilderForm(id: string): Promise<boolean>;
+
+  // PDF Forms
+  getPdfForms(createdBy?: string): Promise<PdfForm[]>;
+  getPdfForm(id: string): Promise<PdfForm | undefined>;
+  createPdfForm(form: InsertPdfForm): Promise<PdfForm>;
+  deletePdfForm(id: string): Promise<boolean>;
   
   // Equipment
   getEquipment(): Promise<Equipment[]>;
@@ -1149,6 +1156,29 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBuilderForm(id: string): Promise<boolean> {
     await db.delete(builderForms).where(eq(builderForms.id, id));
+    return true;
+  }
+
+  // PDF Forms methods
+  async getPdfForms(createdBy?: string): Promise<PdfForm[]> {
+    if (createdBy) {
+      return db.select().from(pdfForms).where(eq(pdfForms.createdBy, createdBy)).orderBy(desc(pdfForms.createdAt));
+    }
+    return db.select().from(pdfForms).orderBy(desc(pdfForms.createdAt));
+  }
+
+  async getPdfForm(id: string): Promise<PdfForm | undefined> {
+    const [form] = await db.select().from(pdfForms).where(eq(pdfForms.id, id));
+    return form || undefined;
+  }
+
+  async createPdfForm(form: InsertPdfForm): Promise<PdfForm> {
+    const [newForm] = await db.insert(pdfForms).values(form).returning();
+    return newForm;
+  }
+
+  async deletePdfForm(id: string): Promise<boolean> {
+    await db.delete(pdfForms).where(eq(pdfForms.id, id));
     return true;
   }
 
