@@ -445,6 +445,214 @@ const CATEGORIES: {
   },
 ];
 
+type InfoCollector = {
+  id: string;
+  label: string;
+  description: string;
+  fields: FormFieldDef[];
+};
+
+type CollectorGroup = {
+  groupLabel: string;
+  collectors: InfoCollector[];
+};
+
+const UNIVERSAL_COLLECTORS: InfoCollector[] = [
+  { id: "scheduling", label: "Scheduling & Availability", description: "Collect preferred dates, times, and availability windows",
+    fields: [
+      { label: "Preferred Start Date", type: "date", required: false, placeholder: "", helpText: "When would you like work to begin?" },
+      { label: "Available Hours for Work", type: "select", required: false, placeholder: "", options: ["Morning (7am-12pm)", "Afternoon (12pm-5pm)", "Evening (5pm-8pm)", "Anytime during business hours", "Weekends only", "Flexible / No preference"], helpText: "When can crews access the property?" },
+      { label: "Access Instructions", type: "textarea", required: false, placeholder: "e.g. Gate code is 1234, enter through side gate", helpText: "Any special instructions for accessing the property" },
+    ],
+  },
+  { id: "customer_requests", label: "Customer Requests & Concerns", description: "Gather specific requests, special instructions, and concerns",
+    fields: [
+      { label: "Specific Requests or Preferences", type: "textarea", required: false, placeholder: "e.g. Keep existing rose bushes, prefer native plants", helpText: "Any special requests for the project" },
+      { label: "Known Concerns or Issues", type: "textarea", required: false, placeholder: "e.g. Drainage problem near back fence, dog in yard", helpText: "Any existing problems or concerns to be aware of" },
+      { label: "Budget Range", type: "select", required: false, placeholder: "", options: ["Under $1,000", "$1,000 - $5,000", "$5,000 - $10,000", "$10,000 - $25,000", "$25,000 - $50,000", "$50,000+", "Not sure / Need estimate"], helpText: "Approximate budget for the project" },
+      { label: "Priority Level", type: "select", required: false, placeholder: "", options: ["Urgent - ASAP", "High - Within 1-2 weeks", "Normal - Within a month", "Low - Flexible timeline"], helpText: "How urgently is this needed?" },
+    ],
+  },
+  { id: "property_info", label: "Property Information", description: "Collect property details, size, and characteristics",
+    fields: [
+      { label: "Property Address", type: "address", required: true, placeholder: "Full street address", helpText: "" },
+      { label: "Property Type", type: "select", required: false, placeholder: "", options: ["Residential - Single Family", "Residential - Multi-Family", "Commercial", "HOA / Community", "Municipal / Government", "Industrial"], helpText: "" },
+      { label: "Approximate Lot Size", type: "select", required: false, placeholder: "", options: ["Under 5,000 sq ft", "5,000 - 10,000 sq ft", "10,000 - 20,000 sq ft", "20,000 - 43,560 sq ft (1 acre)", "1 - 5 acres", "5+ acres"], helpText: "Total property area" },
+      { label: "Is there an HOA?", type: "select", required: false, placeholder: "", options: ["Yes", "No", "Not sure"], helpText: "HOA may have landscape requirements" },
+    ],
+  },
+  { id: "contact_info", label: "Contact Information", description: "Collect customer name, phone, email, and preferred contact method",
+    fields: [
+      { label: "Full Name", type: "text", required: true, placeholder: "First and Last Name", helpText: "" },
+      { label: "Phone Number", type: "phone", required: true, placeholder: "(555) 123-4567", helpText: "" },
+      { label: "Email Address", type: "email", required: false, placeholder: "email@example.com", helpText: "" },
+      { label: "Preferred Contact Method", type: "select", required: false, placeholder: "", options: ["Phone Call", "Text Message", "Email", "No Preference"], helpText: "" },
+    ],
+  },
+  { id: "photos_docs", label: "Photos & Documentation", description: "Request photos of the area, existing conditions, or reference images",
+    fields: [
+      { label: "Photos of Current Area", type: "file", required: false, placeholder: "", helpText: "Upload photos showing current conditions" },
+      { label: "Reference / Inspiration Photos", type: "file", required: false, placeholder: "", helpText: "Upload photos of the look you're going for" },
+      { label: "Additional Notes or Documents", type: "file", required: false, placeholder: "", helpText: "Any blueprints, surveys, or documents" },
+    ],
+  },
+];
+
+const CATEGORY_COLLECTORS: Record<string, CollectorGroup[]> = {
+  "Sales & Marketing": [
+    { groupLabel: "Sales Intake", collectors: [
+      { id: "sales_services", label: "Services of Interest", description: "Which services the prospect is interested in",
+        fields: [
+          { label: "Services Interested In", type: "select", required: true, placeholder: "", options: ["Lawn Maintenance", "Landscape Design & Install", "Hardscaping", "Irrigation", "Tree & Shrub Care", "Snow Removal", "Seasonal Cleanup", "Other"], helpText: "" },
+          { label: "How Did You Hear About Us?", type: "select", required: false, placeholder: "", options: ["Google Search", "Facebook / Social Media", "Referral from Friend/Neighbor", "Yard Sign", "Door Hanger / Flyer", "Home Advisor / Angi", "Other"], helpText: "" },
+          { label: "Salesperson Notes / Observations", type: "textarea", required: false, placeholder: "Notes from site visit or phone call...", helpText: "Internal notes for the sales team" },
+        ],
+      },
+    ]},
+  ],
+  "Estimating & Pre-Construction": [
+    { groupLabel: "Site Measurements", collectors: [
+      { id: "lawn_areas", label: "Lawn & Bed Area Measurements", description: "Collect square footage for lawn, beds, and hardscape areas",
+        fields: [
+          { label: "Lawn Area (sq ft)", type: "number", required: false, placeholder: "e.g. 5000", helpText: "Total square footage of lawn areas" },
+          { label: "Planting Bed Area (sq ft)", type: "number", required: false, placeholder: "e.g. 1200", helpText: "Total square footage of garden/planting beds" },
+          { label: "Hardscape Area (sq ft)", type: "number", required: false, placeholder: "e.g. 800", helpText: "Patios, walkways, driveways, etc." },
+          { label: "Mulch Area (sq ft)", type: "number", required: false, placeholder: "e.g. 600", helpText: "Areas that need mulch coverage" },
+          { label: "Slope / Grade Conditions", type: "select", required: false, placeholder: "", options: ["Mostly flat", "Gentle slope", "Moderate slope", "Steep grade", "Mixed terrain"], helpText: "" },
+        ],
+      },
+      { id: "irrigation_details", label: "Irrigation System Details", description: "Collect sprinkler head counts, zone info, and system specs",
+        fields: [
+          { label: "Number of Sprinkler Heads", type: "number", required: false, placeholder: "e.g. 24", helpText: "Total count of all sprinkler heads" },
+          { label: "Number of Zones", type: "number", required: false, placeholder: "e.g. 6", helpText: "How many irrigation zones" },
+          { label: "Sprinkler Head Types", type: "select", required: false, placeholder: "", options: ["Rotary / Rotor heads", "Pop-up spray heads", "Drip irrigation", "Micro-spray", "Mixed types", "Not sure"], helpText: "" },
+          { label: "Controller Type", type: "select", required: false, placeholder: "", options: ["Smart controller (Wi-Fi)", "Standard digital timer", "Manual valve", "No existing controller", "Not sure"], helpText: "" },
+          { label: "Water Source", type: "select", required: false, placeholder: "", options: ["City water", "Well water", "Reclaimed water", "Lake / pond", "Not sure"], helpText: "" },
+          { label: "Existing System Condition", type: "select", required: false, placeholder: "", options: ["Working well", "Needs minor repairs", "Needs major repairs", "Non-functional", "No existing system"], helpText: "" },
+          { label: "Irrigation Notes", type: "textarea", required: false, placeholder: "e.g. Zone 3 has low pressure, heads near driveway damaged", helpText: "Any known issues or details" },
+        ],
+      },
+    ]},
+    { groupLabel: "Material Estimates", collectors: [
+      { id: "material_quantities", label: "Material Quantities", description: "Collect quantities for common landscape materials",
+        fields: [
+          { label: "Sod Needed (sq ft)", type: "number", required: false, placeholder: "e.g. 3000", helpText: "" },
+          { label: "Mulch Needed (cubic yards)", type: "number", required: false, placeholder: "e.g. 8", helpText: "" },
+          { label: "Topsoil Needed (cubic yards)", type: "number", required: false, placeholder: "e.g. 5", helpText: "" },
+          { label: "Stone / Gravel (tons)", type: "number", required: false, placeholder: "e.g. 3", helpText: "" },
+          { label: "Number of Plants / Trees", type: "number", required: false, placeholder: "e.g. 25", helpText: "" },
+          { label: "Linear Feet of Edging", type: "number", required: false, placeholder: "e.g. 200", helpText: "" },
+        ],
+      },
+    ]},
+  ],
+  "Production & Field Operations": [
+    { groupLabel: "Crew & Labor", collectors: [
+      { id: "crew_tracking", label: "Crew & Labor Tracking", description: "Track crew members, hours worked, and labor details",
+        fields: [
+          { label: "Crew Leader Name", type: "text", required: true, placeholder: "", helpText: "" },
+          { label: "Number of Crew Members", type: "number", required: true, placeholder: "e.g. 4", helpText: "" },
+          { label: "Hours On Site", type: "number", required: true, placeholder: "e.g. 6.5", helpText: "" },
+          { label: "Arrival Time", type: "time", required: false, placeholder: "", helpText: "" },
+          { label: "Departure Time", type: "time", required: false, placeholder: "", helpText: "" },
+          { label: "Work Completed Today", type: "textarea", required: true, placeholder: "Describe what was accomplished...", helpText: "" },
+          { label: "Issues or Delays", type: "textarea", required: false, placeholder: "Any problems encountered on site...", helpText: "" },
+        ],
+      },
+    ]},
+    { groupLabel: "Materials Used", collectors: [
+      { id: "field_materials", label: "Materials Used on Site", description: "Track materials consumed during the job",
+        fields: [
+          { label: "Material Name", type: "text", required: true, placeholder: "e.g. River rock, 3/4 inch", helpText: "" },
+          { label: "Quantity Used", type: "number", required: true, placeholder: "e.g. 5", helpText: "" },
+          { label: "Unit of Measure", type: "select", required: false, placeholder: "", options: ["Cubic yards", "Tons", "Bags", "Pallets", "Pieces", "Linear feet", "Square feet", "Each"], helpText: "" },
+          { label: "Material Notes", type: "textarea", required: false, placeholder: "e.g. Need to order more for tomorrow", helpText: "" },
+        ],
+      },
+    ]},
+  ],
+  "Maintenance Operations": [
+    { groupLabel: "Service Details", collectors: [
+      { id: "mowing_details", label: "Mowing & Lawn Care", description: "Collect mowing height, frequency, and condition details",
+        fields: [
+          { label: "Lawn Area (sq ft)", type: "number", required: false, placeholder: "e.g. 8000", helpText: "" },
+          { label: "Mowing Height", type: "select", required: false, placeholder: "", options: ["2 inches", "2.5 inches", "3 inches", "3.5 inches", "4 inches", "Customer preference", "Varies by season"], helpText: "" },
+          { label: "Lawn Condition", type: "select", required: false, placeholder: "", options: ["Excellent", "Good", "Fair - needs attention", "Poor - major issues", "New sod / seed"], helpText: "" },
+          { label: "Edging Required", type: "select", required: false, placeholder: "", options: ["Yes - all edges", "Yes - beds and walks only", "No", "As needed"], helpText: "" },
+          { label: "Clippings Disposal", type: "select", required: false, placeholder: "", options: ["Mulch in place", "Bag and remove", "Side discharge", "Customer preference"], helpText: "" },
+        ],
+      },
+      { id: "bed_maintenance", label: "Bed & Planting Maintenance", description: "Track bed area care, weeding, and mulch conditions",
+        fields: [
+          { label: "Bed Area (sq ft)", type: "number", required: false, placeholder: "e.g. 1500", helpText: "" },
+          { label: "Weeding Status", type: "select", required: false, placeholder: "", options: ["Clean - no weeds", "Light weeding needed", "Moderate weeds", "Heavy weeding needed"], helpText: "" },
+          { label: "Mulch Condition", type: "select", required: false, placeholder: "", options: ["Fresh / adequate", "Thinning - refresh soon", "Needs full refresh", "No mulch currently"], helpText: "" },
+          { label: "Plant Health Notes", type: "textarea", required: false, placeholder: "e.g. Boxwoods on south side show browning", helpText: "" },
+        ],
+      },
+      { id: "irrigation_check", label: "Irrigation System Check", description: "Document sprinkler system status during service visits",
+        fields: [
+          { label: "Number of Sprinkler Heads Checked", type: "number", required: false, placeholder: "e.g. 24", helpText: "" },
+          { label: "Heads Needing Repair", type: "number", required: false, placeholder: "e.g. 2", helpText: "" },
+          { label: "System Pressure", type: "select", required: false, placeholder: "", options: ["Normal", "Low pressure", "High pressure", "Varies by zone", "Not checked"], helpText: "" },
+          { label: "Controller Settings Adjusted", type: "select", required: false, placeholder: "", options: ["Yes", "No", "N/A"], helpText: "" },
+          { label: "Irrigation Notes", type: "textarea", required: false, placeholder: "e.g. Zone 4 rotor not rotating, replaced nozzle on head #12", helpText: "" },
+        ],
+      },
+    ]},
+  ],
+  "Equipment & Assets": [
+    { groupLabel: "Equipment Details", collectors: [
+      { id: "equipment_condition", label: "Equipment Condition Assessment", description: "Document current condition and maintenance needs",
+        fields: [
+          { label: "Equipment Name / ID", type: "text", required: true, placeholder: "e.g. John Deere Z930M #JD-003", helpText: "" },
+          { label: "Hours / Mileage", type: "number", required: false, placeholder: "e.g. 1250", helpText: "Current hour meter or odometer reading" },
+          { label: "Overall Condition", type: "select", required: true, placeholder: "", options: ["Excellent", "Good", "Fair", "Poor", "Out of service"], helpText: "" },
+          { label: "Fuel Level", type: "select", required: false, placeholder: "", options: ["Full", "3/4", "1/2", "1/4", "Empty", "N/A - Electric"], helpText: "" },
+          { label: "Maintenance Due", type: "select", required: false, placeholder: "", options: ["Up to date", "Due within 1 week", "Overdue", "Unknown"], helpText: "" },
+          { label: "Damage or Issues", type: "textarea", required: false, placeholder: "Describe any damage or issues observed...", helpText: "" },
+        ],
+      },
+    ]},
+  ],
+  "Compliance & Legal": [
+    { groupLabel: "Safety & Compliance", collectors: [
+      { id: "safety_details", label: "Safety Observation Details", description: "Document safety conditions and observations",
+        fields: [
+          { label: "PPE Compliance", type: "select", required: false, placeholder: "", options: ["All crew wearing PPE", "Partial compliance", "PPE not worn", "N/A"], helpText: "" },
+          { label: "Safety Hazards Observed", type: "textarea", required: false, placeholder: "e.g. Uneven ground near retaining wall, overhead power lines", helpText: "" },
+          { label: "Chemical Applications Today", type: "select", required: false, placeholder: "", options: ["Yes - herbicide", "Yes - fertilizer", "Yes - pesticide", "Yes - multiple", "No chemicals applied"], helpText: "" },
+          { label: "Chemical Product Name", type: "text", required: false, placeholder: "e.g. Roundup Pro Max", helpText: "If chemicals were applied" },
+          { label: "Application Rate", type: "text", required: false, placeholder: "e.g. 2 oz per gallon", helpText: "" },
+          { label: "Weather Conditions", type: "select", required: false, placeholder: "", options: ["Clear / Sunny", "Partly cloudy", "Overcast", "Light rain", "Windy (>15 mph)", "Extreme heat"], helpText: "" },
+        ],
+      },
+    ]},
+  ],
+  "Customer Experience & Retention": [
+    { groupLabel: "Customer Feedback", collectors: [
+      { id: "satisfaction_metrics", label: "Satisfaction Rating Questions", description: "Standard satisfaction metrics for post-service surveys",
+        fields: [
+          { label: "Overall Satisfaction", type: "select", required: true, placeholder: "", options: ["Very Satisfied", "Satisfied", "Neutral", "Dissatisfied", "Very Dissatisfied"], helpText: "" },
+          { label: "Quality of Work", type: "select", required: false, placeholder: "", options: ["Excellent", "Good", "Average", "Below Average", "Poor"], helpText: "" },
+          { label: "Crew Professionalism", type: "select", required: false, placeholder: "", options: ["Excellent", "Good", "Average", "Below Average", "Poor"], helpText: "" },
+          { label: "Communication / Responsiveness", type: "select", required: false, placeholder: "", options: ["Excellent", "Good", "Average", "Below Average", "Poor"], helpText: "" },
+          { label: "Would You Recommend Us?", type: "select", required: false, placeholder: "", options: ["Definitely Yes", "Probably Yes", "Not Sure", "Probably No", "Definitely No"], helpText: "" },
+          { label: "Additional Feedback", type: "textarea", required: false, placeholder: "Tell us more about your experience...", helpText: "" },
+        ],
+      },
+    ]},
+  ],
+};
+
+function getCollectorsForCategory(category: string): CollectorGroup[] {
+  const specific = CATEGORY_COLLECTORS[category] || [];
+  return [
+    ...specific,
+    { groupLabel: "General (All Forms)", collectors: UNIVERSAL_COLLECTORS },
+  ];
+}
+
 export default function Forms() {
   const { toast } = useToast();
   const [view, setView] = useState<View>("home");
@@ -1208,7 +1416,7 @@ function FormWizard({
           )}
           {step === 1 && <StepOutcome data={data} update={update} />}
           {step === 2 && <StepAudience data={data} update={update} />}
-          {step === 3 && <StepSections data={data} update={update} />}
+          {step === 3 && <StepSections data={data} update={update} category={data.category} />}
           {step === 4 && <StepToolsMedia data={data} update={update} />}
           {step === 5 && <StepConnections data={data} update={update} />}
           {step === 6 && <StepReview data={data} onFinish={onFinish} />}
@@ -1555,7 +1763,14 @@ function StepAudience({ data, update }: { data: WizardData; update: (p: Partial<
   );
 }
 
-function StepSections({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+function StepSections({ data, update, category }: { data: WizardData; update: (p: Partial<WizardData>) => void; category: string }) {
+  const [showCollectors, setShowCollectors] = useState(false);
+
+  const collectorGroups = getCollectorsForCategory(category);
+
+  const existingSectionTitles = new Set(data.sections.map(s => s.title));
+  const isCollectorAdded = (collector: InfoCollector) => existingSectionTitles.has(collector.label);
+
   const addSection = () => {
     update({
       sections: [
@@ -1621,11 +1836,87 @@ function StepSections({ data, update }: { data: WizardData; update: (p: Partial<
     reorderField(sIdx, result.source.index, result.destination.index);
   };
 
+  const addCollectorAsSection = (collector: InfoCollector) => {
+    const newSection: FormSection = {
+      title: collector.label,
+      description: collector.description,
+      fields: collector.fields.map(f => ({ ...f, options: f.options ? [...f.options] : [] })),
+    };
+    update({ sections: [...data.sections, newSection] });
+  };
+
   return (
     <div className="space-y-5">
-      <p className="text-sm text-muted-foreground">
-        Break your form into logical sections. Each section can have multiple fields.
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Break your form into logical sections. Each section can have multiple fields.
+        </p>
+        <Button
+          variant={showCollectors ? "default" : "outline"}
+          size="sm"
+          className="gap-2 shrink-0"
+          onClick={() => setShowCollectors(!showCollectors)}
+          data-testid="button-toggle-collectors"
+        >
+          <Sparkles className="h-4 w-4" />
+          {showCollectors ? "Hide Suggestions" : "Add Info Collectors"}
+        </Button>
+      </div>
+
+      {showCollectors && (
+        <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <div>
+                <h3 className="font-semibold text-sm">Information Collectors</h3>
+                <p className="text-xs text-muted-foreground">Pre-built question sets tailored to your form type. Click to add as a new section.</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
+              {collectorGroups.map((group, gIdx) => (
+                <div key={gIdx}>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{group.groupLabel}</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {group.collectors.map((collector) => {
+                      const isAdded = isCollectorAdded(collector);
+                      return (
+                        <button
+                          key={collector.id}
+                          onClick={() => !isAdded && addCollectorAsSection(collector)}
+                          disabled={isAdded}
+                          className={`text-left p-3 rounded-lg border transition-all ${
+                            isAdded
+                              ? "bg-green-50 border-green-200 cursor-default"
+                              : "bg-background hover:border-primary/50 hover:shadow-sm cursor-pointer"
+                          }`}
+                          data-testid={`collector-${collector.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm truncate">{collector.label}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{collector.description}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{collector.fields.length} field{collector.fields.length !== 1 ? "s" : ""}</p>
+                            </div>
+                            {isAdded ? (
+                              <Badge variant="secondary" className="bg-green-100 text-green-700 shrink-0 text-xs">
+                                <Check className="h-3 w-3 mr-1" /> Added
+                              </Badge>
+                            ) : (
+                              <Plus className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {data.sections.map((section, sIdx) => (
         <Card key={sIdx} className="border-l-4 border-l-primary">
