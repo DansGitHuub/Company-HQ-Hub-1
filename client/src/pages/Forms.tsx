@@ -3266,7 +3266,7 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
       setRendering(true);
       try {
         const pdfjsLib = await import("pdfjs-dist");
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
         const res = await fetch(`/api/pdf-forms/${pdfFormId}/download`, { credentials: "include" });
         if (!res.ok) throw new Error("Failed to fetch PDF");
