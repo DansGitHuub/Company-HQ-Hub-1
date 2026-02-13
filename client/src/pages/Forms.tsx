@@ -1113,24 +1113,24 @@ function FormWizard({
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-center gap-3 pb-8 flex-wrap">
+      <div className="flex items-center justify-center gap-3 pb-8">
         <Button
           variant="outline"
           onClick={() => step > 0 && setStep(step - 1)}
           disabled={step === 0}
-          className="gap-2"
+          className="hover:bg-muted/80 transition-colors"
           data-testid="button-wizard-prev"
         >
-          <ArrowLeft className="h-4 w-4" /> Previous
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
 
         <Button
-          variant="ghost"
+          variant="outline"
           onClick={onCancel}
-          className="gap-2 text-muted-foreground"
+          className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
           data-testid="button-wizard-cancel"
         >
-          <XCircle className="h-4 w-4" /> Cancel
+          Cancel
         </Button>
 
         <Button
@@ -1144,20 +1144,21 @@ function FormWizard({
             }
           }}
           disabled={isSaving}
-          className="gap-2"
+          className="hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300 dark:hover:bg-amber-900/20 transition-colors"
           data-testid="button-wizard-save-draft"
         >
-          <Clock className="h-4 w-4" /> Save to Drafts
+          {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Clock className="h-4 w-4 mr-2" />}
+          Save to Drafts
         </Button>
 
         {step < WIZARD_STEPS.length - 1 ? (
           <Button
             onClick={goNext}
             disabled={!canProceed()}
-            className="gap-2"
+            className="hover:brightness-110 hover:shadow-md transition-all"
             data-testid="button-wizard-next"
           >
-            Next <ArrowRight className="h-4 w-4" />
+            Next <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         ) : (
           <Button
@@ -1173,13 +1174,13 @@ function FormWizard({
               }
             }}
             disabled={isSaving}
-            className="gap-2"
+            className="hover:brightness-110 hover:shadow-md transition-all"
             data-testid="button-wizard-finish"
           >
             {isSaving ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</>
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
             ) : (
-              <><CheckCircle2 className="h-4 w-4" /> Save Form</>
+              <><CheckCircle2 className="h-4 w-4 mr-2" /> Save Form</>
             )}
           </Button>
         )}
