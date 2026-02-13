@@ -4230,11 +4230,14 @@ SECTION GENERATION RULES:
       const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
 
       let filledAnyField = false;
+      let hasExistingAcroForm = false;
+
       try {
         const pdfForm = pdfDoc.getForm();
         const allFields = pdfForm.getFields();
+        hasExistingAcroForm = allFields.length > 0;
 
-        if (allFields.length > 0) {
+        if (hasExistingAcroForm) {
           for (const [fieldName, value] of Object.entries(fieldValues)) {
             try {
               const field = pdfForm.getField(fieldName);
@@ -4256,35 +4259,50 @@ SECTION GENERATION RULES:
               console.log(`[pdf-forms/fill] Skipping field "${fieldName}":`, (fieldErr as Error).message);
             }
           }
-
-          if (filledAnyField) {
-            try { pdfForm.flatten(); } catch {}
-          }
-        } else {
-          throw new Error("No AcroForm fields found");
         }
       } catch (formErr) {
-        console.log("[pdf-forms/fill] No AcroForm fields, drawing text directly onto PDF...");
+        console.log("[pdf-forms/fill] Could not read existing form fields:", (formErr as Error).message);
+      }
+
+      if (!hasExistingAcroForm) {
+        console.log("[pdf-forms/fill] No AcroForm fields found, creating fillable text fields...");
         const { rgb, StandardFonts } = await import("pdf-lib");
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const pdfForm = pdfDoc.getForm();
 
         const fieldsMeta: any[] = detectedFieldsMeta || (form.formFields as any[]) || [];
-        for (const [fieldName, value] of Object.entries(fieldValues)) {
-          if (!value || String(value).trim() === "") continue;
-          const fieldMeta = fieldsMeta.find((f: any) => f.name === fieldName);
-          if (!fieldMeta) continue;
-
+        for (const meta of fieldsMeta) {
+          if (meta.type === "checkbox") continue;
           const pages = pdfDoc.getPages();
-          const page = pages[fieldMeta.page] || pages[0];
-          if (fieldMeta.type !== "checkbox") {
-            page.drawText(String(value), {
-              x: fieldMeta.rect.x + 2,
-              y: fieldMeta.rect.y + 3,
-              size: Math.min(Math.max(fieldMeta.rect.height - 4, 8), 12),
+          const page = pages[meta.page] || pages[0];
+          const value = fieldValues[meta.name] || "";
+          const fontSize = Math.min(Math.max(meta.rect.height - 4, 8), 12);
+
+          try {
+            const textField = pdfForm.createTextField(meta.name);
+            textField.setText(String(value));
+            textField.addToPage(page, {
+              x: meta.rect.x,
+              y: meta.rect.y,
+              width: meta.rect.width,
+              height: meta.rect.height,
               font,
-              color: rgb(0, 0, 0),
+              borderWidth: 0,
             });
+            textField.setFontSize(fontSize);
             filledAnyField = true;
+          } catch (createErr) {
+            console.log(`[pdf-forms/fill] Failed to create field "${meta.name}":`, (createErr as Error).message);
+            if (value && String(value).trim() !== "") {
+              page.drawText(String(value), {
+                x: meta.rect.x + 2,
+                y: meta.rect.y + 3,
+                size: fontSize,
+                font,
+                color: rgb(0, 0, 0),
+              });
+              filledAnyField = true;
+            }
           }
         }
       }
