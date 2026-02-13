@@ -59,6 +59,14 @@ import {
   ChevronUp,
   ChevronDown,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -434,6 +442,7 @@ const CATEGORIES: {
 ];
 
 export default function Forms() {
+  const { toast } = useToast();
   const [view, setView] = useState<View>("home");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -442,18 +451,108 @@ export default function Forms() {
   const [wizardData, setWizardData] = useState<WizardData>({ ...EMPTY_WIZARD });
   const [wizardStep, setWizardStep] = useState(0);
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
+  const [hasUnsavedWork, setHasUnsavedWork] = useState(false);
+  const [exitDialogOpen, setExitDialogOpen] = useState(false);
+  const [pendingExitAction, setPendingExitAction] = useState<(() => void) | null>(null);
+
+  const isInWizard = view === "build-wizard";
+
+  const isWizardDirty = useCallback((d: WizardData) => {
+    return d.title.trim() !== "" ||
+      d.outcome.trim() !== "" ||
+      d.audience.trim() !== "" ||
+      d.sections.length > 0 ||
+      d.pdfText.trim() !== "" ||
+      Object.keys(d.smartAnswers).length > 0 ||
+      d.audienceRoles.length > 0 ||
+      d.toolsAndMedia.enablePhotos || d.toolsAndMedia.enableFileUpload || d.toolsAndMedia.enableSignature || d.toolsAndMedia.enableGeolocation ||
+      d.externalConnections.sendsEmail || d.externalConnections.sendsToCalendar || d.externalConnections.requiresApproval || d.externalConnections.integratesWithCRM;
+  }, []);
+
+  const setWizardDataTracked = useCallback((updater: WizardData | ((prev: WizardData) => WizardData)) => {
+    setWizardData((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      setHasUnsavedWork(isWizardDirty(next));
+      return next;
+    });
+  }, [isWizardDirty]);
+
+  const doExit = useCallback(() => {
+    setView("home");
+    setSelectedFormId(null);
+    setSelectedCategory("");
+    setSelectedPurpose(null);
+    setWizardStep(0);
+    setWizardData({ ...EMPTY_WIZARD });
+    setHasUnsavedWork(false);
+  }, []);
+
+  const tryExit = useCallback((exitFn: () => void) => {
+    if (isInWizard && hasUnsavedWork) {
+      setPendingExitAction(() => exitFn);
+      setExitDialogOpen(true);
+    } else {
+      exitFn();
+    }
+  }, [isInWizard, hasUnsavedWork]);
+
+  const handleDiscard = () => {
+    setExitDialogOpen(false);
+    setHasUnsavedWork(false);
+    if (pendingExitAction) pendingExitAction();
+    setPendingExitAction(null);
+  };
+
+  const handleSaveDraft = async () => {
+    try {
+      await apiRequest("POST", "/api/builder-forms", {
+        name: wizardData.title || "Untitled Draft",
+        category: wizardData.category,
+        purpose: wizardData.purpose,
+        outcome: wizardData.outcome,
+        outcomeType: wizardData.outcomeType,
+        audience: wizardData.audience,
+        audienceRoles: wizardData.audienceRoles,
+        sections: wizardData.sections,
+        toolsAndMedia: wizardData.toolsAndMedia,
+        externalConnections: wizardData.externalConnections,
+        status: "draft",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/builder-forms"] });
+      toast({ title: "Draft saved!" });
+      setExitDialogOpen(false);
+      setHasUnsavedWork(false);
+      if (pendingExitAction) pendingExitAction();
+      setPendingExitAction(null);
+    } catch {
+      toast({ title: "Failed to save draft. Your work is still here.", variant: "destructive" });
+      setExitDialogOpen(false);
+      setPendingExitAction(null);
+    }
+  };
+
+  const handleContinueWorking = () => {
+    setExitDialogOpen(false);
+    setPendingExitAction(null);
+  };
+
   useEffect(() => {
     const resetHandler = () => {
-      setView("home");
-      setSelectedFormId(null);
-      setSelectedCategory("");
-      setSelectedPurpose(null);
-      setWizardStep(0);
-      setWizardData({ ...EMPTY_WIZARD });
+      tryExit(doExit);
     };
     window.addEventListener("forms-nav-reset", resetHandler);
     return () => window.removeEventListener("forms-nav-reset", resetHandler);
-  }, []);
+  }, [tryExit, doExit]);
+
+  useEffect(() => {
+    if (!isInWizard || !hasUnsavedWork) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isInWizard, hasUnsavedWork]);
 
   function selectCategory(category: string) {
     setSelectedCategory(category);
@@ -478,7 +577,12 @@ export default function Forms() {
         setWizardStep(wizardStep - 1);
         return;
       }
-      setView("build-purpose");
+      tryExit(() => {
+        setView("build-purpose");
+        setHasUnsavedWork(false);
+        setWizardData({ ...EMPTY_WIZARD, category: selectedCategory, purpose: selectedPurpose?.label || "" });
+        setWizardStep(0);
+      });
       return;
     }
     if (view === "build-purpose") {
@@ -530,7 +634,7 @@ export default function Forms() {
       {view === "build-wizard" && (
         <FormWizard
           data={wizardData}
-          setData={setWizardData}
+          setData={setWizardDataTracked}
           step={wizardStep}
           setStep={setWizardStep}
           titlePlaceholder={titlePlaceholder}
@@ -550,6 +654,7 @@ export default function Forms() {
                 externalConnections: wizardData.externalConnections,
               });
               queryClient.invalidateQueries({ queryKey: ["/api/builder-forms"] });
+              setHasUnsavedWork(false);
               setView("form-library");
               setWizardData({ ...EMPTY_WIZARD });
               setWizardStep(0);
@@ -568,6 +673,28 @@ export default function Forms() {
       {view === "share-forms" && <ShareForms />}
       {view === "build-packet" && <BuildPacket />}
       {view === "discontinued" && <DiscontinuedForms />}
+
+      <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
+        <AlertDialogContent data-testid="dialog-unsaved-changes">
+          <AlertDialogHeader>
+            <AlertDialogTitle>You have unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You've been working on a form. What would you like to do?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="destructive" onClick={handleDiscard} data-testid="button-discard">
+              Discard
+            </Button>
+            <Button variant="outline" onClick={handleSaveDraft} data-testid="button-save-draft">
+              Save as Draft
+            </Button>
+            <Button onClick={handleContinueWorking} data-testid="button-continue-working">
+              Continue Working
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
