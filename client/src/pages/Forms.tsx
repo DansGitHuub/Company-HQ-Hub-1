@@ -56,8 +56,6 @@ import {
   FileUp,
   Briefcase,
   ChevronRight,
-  ChevronUp,
-  ChevronDown,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -67,6 +65,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -1421,13 +1420,17 @@ function StepSections({ data, update }: { data: WizardData; update: (p: Partial<
     updateSection(sIdx, { fields: section.fields.filter((_, i) => i !== fIdx) });
   };
 
-  const moveField = (sIdx: number, fIdx: number, direction: "up" | "down") => {
+  const reorderField = (sIdx: number, fromIdx: number, toIdx: number) => {
     const section = data.sections[sIdx];
     const fields = [...section.fields];
-    const targetIdx = direction === "up" ? fIdx - 1 : fIdx + 1;
-    if (targetIdx < 0 || targetIdx >= fields.length) return;
-    [fields[fIdx], fields[targetIdx]] = [fields[targetIdx], fields[fIdx]];
+    const [moved] = fields.splice(fromIdx, 1);
+    fields.splice(toIdx, 0, moved);
     updateSection(sIdx, { fields });
+  };
+
+  const handleFieldDragEnd = (sIdx: number) => (result: DropResult) => {
+    if (!result.destination) return;
+    reorderField(sIdx, result.source.index, result.destination.index);
   };
 
   return (
@@ -1461,68 +1464,74 @@ function StepSections({ data, update }: { data: WizardData; update: (p: Partial<
               </Button>
             </div>
 
-            <div className="space-y-2 pl-3 border-l-2 border-muted">
-              {section.fields.map((field, fIdx) => (
-                <div key={fIdx} className="flex items-start gap-2 rounded-lg bg-muted/30 p-2">
-                  <div className="flex flex-col items-center shrink-0 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => moveField(sIdx, fIdx, "up")}
-                      disabled={fIdx === 0}
-                      className="h-5 w-5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20 text-muted-foreground transition-colors"
-                      data-testid={`button-move-field-up-${sIdx}-${fIdx}`}
-                    >
-                      <ChevronUp className="h-3.5 w-3.5" />
-                    </button>
-                    <GripVertical className="h-3.5 w-3.5 text-muted-foreground/30" />
-                    <button
-                      type="button"
-                      onClick={() => moveField(sIdx, fIdx, "down")}
-                      disabled={fIdx === section.fields.length - 1}
-                      className="h-5 w-5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20 text-muted-foreground transition-colors"
-                      data-testid={`button-move-field-down-${sIdx}-${fIdx}`}
-                    >
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    </button>
+            <DragDropContext onDragEnd={handleFieldDragEnd(sIdx)}>
+              <Droppable droppableId={`section-${sIdx}-fields`}>
+                {(provided) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="space-y-2 pl-3 border-l-2 border-muted"
+                  >
+                    {section.fields.map((field, fIdx) => (
+                      <Draggable key={`field-${sIdx}-${fIdx}`} draggableId={`field-${sIdx}-${fIdx}`} index={fIdx}>
+                        {(dragProvided, snapshot) => (
+                          <div
+                            ref={dragProvided.innerRef}
+                            {...dragProvided.draggableProps}
+                            className={`flex items-start gap-2 rounded-lg bg-muted/30 p-2 ${snapshot.isDragging ? "shadow-lg ring-2 ring-primary/30 bg-background" : ""}`}
+                            data-testid={`draggable-field-${sIdx}-${fIdx}`}
+                          >
+                            <div
+                              {...dragProvided.dragHandleProps}
+                              className="flex items-center shrink-0 mt-2 cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted text-muted-foreground transition-colors"
+                              data-testid={`drag-handle-field-${sIdx}-${fIdx}`}
+                            >
+                              <GripVertical className="h-4 w-4" />
+                            </div>
+                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-[1fr_120px_auto] gap-2">
+                              <Input
+                                value={field.label}
+                                onChange={(e) => updateField(sIdx, fIdx, { label: e.target.value })}
+                                placeholder="Field label"
+                                className="text-sm"
+                                data-testid={`input-field-label-${sIdx}-${fIdx}`}
+                              />
+                              <Select value={field.type} onValueChange={(v) => updateField(sIdx, fIdx, { type: v })}>
+                                <SelectTrigger className="text-sm" data-testid={`select-field-type-${sIdx}-${fIdx}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {FIELD_TYPES.map((t) => (
+                                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <div className="flex items-center gap-2">
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                  <Checkbox
+                                    checked={field.required}
+                                    onCheckedChange={(c) => updateField(sIdx, fIdx, { required: !!c })}
+                                    data-testid={`checkbox-required-${sIdx}-${fIdx}`}
+                                  />
+                                  <span className="text-xs">Req</span>
+                                </label>
+                                <Button variant="ghost" size="sm" onClick={() => removeField(sIdx, fIdx)} className="h-8 w-8 p-0" data-testid={`button-remove-field-${sIdx}-${fIdx}`}>
+                                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                    <Button variant="ghost" size="sm" onClick={() => addField(sIdx)} className="gap-1 text-xs" data-testid={`button-add-field-${sIdx}`}>
+                      <Plus className="h-3.5 w-3.5" /> Add Field
+                    </Button>
                   </div>
-                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-[1fr_120px_auto] gap-2">
-                    <Input
-                      value={field.label}
-                      onChange={(e) => updateField(sIdx, fIdx, { label: e.target.value })}
-                      placeholder="Field label"
-                      className="text-sm"
-                      data-testid={`input-field-label-${sIdx}-${fIdx}`}
-                    />
-                    <Select value={field.type} onValueChange={(v) => updateField(sIdx, fIdx, { type: v })}>
-                      <SelectTrigger className="text-sm" data-testid={`select-field-type-${sIdx}-${fIdx}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {FIELD_TYPES.map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-1 cursor-pointer">
-                        <Checkbox
-                          checked={field.required}
-                          onCheckedChange={(c) => updateField(sIdx, fIdx, { required: !!c })}
-                          data-testid={`checkbox-required-${sIdx}-${fIdx}`}
-                        />
-                        <span className="text-xs">Req</span>
-                      </label>
-                      <Button variant="ghost" size="sm" onClick={() => removeField(sIdx, fIdx)} className="h-8 w-8 p-0" data-testid={`button-remove-field-${sIdx}-${fIdx}`}>
-                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <Button variant="ghost" size="sm" onClick={() => addField(sIdx)} className="gap-1 text-xs" data-testid={`button-add-field-${sIdx}`}>
-                <Plus className="h-3.5 w-3.5" /> Add Field
-              </Button>
-            </div>
+                )}
+              </Droppable>
+            </DragDropContext>
           </CardContent>
         </Card>
       ))}
