@@ -4125,12 +4125,31 @@ SECTION GENERATION RULES:
             if (fieldType === "dropdown" || fieldType === "optionlist") {
               try { options = (field as any).getOptions?.() || []; } catch {}
             }
+            let label = fieldName;
+            try {
+              const dict = widget.dict;
+              const tuKey = dict.get((pdfDoc as any).context.obj("TU"));
+              if (tuKey && typeof tuKey.decodeText === "function") {
+                label = tuKey.decodeText();
+              } else if (tuKey && typeof tuKey === "string") {
+                label = tuKey;
+              }
+            } catch {}
+            let detectedType = fieldType;
+            if (fieldType === "signature") detectedType = "signature";
+            else if (fieldType === "text") {
+              const lowerName = fieldName.toLowerCase();
+              if (lowerName.includes("signature") || lowerName.includes("sign")) {
+                detectedType = "signature";
+              }
+            }
             formFields.push({
               name: fieldName,
-              type: fieldType,
+              type: detectedType,
               page: pageIndex,
               rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
               options,
+              label,
             });
           }
         }

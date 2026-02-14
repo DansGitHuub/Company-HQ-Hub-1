@@ -3390,9 +3390,7 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
         if (!cancelled) {
           setPdfPages(canvases);
           setPageScales(scales);
-          if (processedFields.length > 0) {
-            setDetectedFields(processedFields);
-          }
+          setDetectedFields(processedFields);
         }
       } catch (err: any) {
         console.error("PDF render error:", err);
@@ -3466,8 +3464,27 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
   };
 
   const serverFields = (pdfForm?.formFields as any[]) || [];
-  const rawFields = serverFields.length > 0 ? serverFields : detectedFields;
-  const formFields = useMemo(() => postProcessFields(rawFields), [rawFields]);
+  const mergedFields = useMemo(() => {
+    if (serverFields.length === 0) return detectedFields;
+    if (detectedFields.length === 0) return serverFields;
+    const annotMap = new Map<string, any>();
+    for (const df of detectedFields) {
+      annotMap.set(df.name, df);
+    }
+    return serverFields.map((sf: any) => {
+      const annot = annotMap.get(sf.name);
+      if (annot) {
+        return {
+          ...sf,
+          label: annot.label && annot.label !== annot.name ? annot.label : sf.label,
+          type: annot.type === "signature" ? "signature" : sf.type,
+          exportValue: annot.exportValue || sf.exportValue,
+        };
+      }
+      return sf;
+    });
+  }, [serverFields, detectedFields]);
+  const formFields = useMemo(() => postProcessFields(mergedFields), [mergedFields]);
   const hasFields = formFields.length > 0;
   formFieldsRef.current = formFields;
 
@@ -3565,11 +3582,12 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
                       const height = field.rect.height * scale.scaleY;
                       const top = (scale.pageHeight * scale.scaleY) - bottom - height;
                       const displayLabel = field.label || field.name;
+                      const hasValue = !!fieldValues[field.name];
 
                       return (
                         <div
                           key={`${field.name}-${fIdx}`}
-                          className="absolute"
+                          className="absolute group"
                           style={{ left: `${left}px`, top: `${top}px`, width: `${Math.max(width, 30)}px`, height: `${Math.max(height, 20)}px` }}
                         >
                           {field.type === "radio" && field.radioGroup ? (
@@ -3596,9 +3614,9 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
                               type="text"
                               value={fieldValues[field.name] || ""}
                               onChange={(e) => updateFieldValue(field.name, e.target.value)}
-                              className="w-full h-full bg-amber-50/80 border border-amber-400/60 rounded-sm px-1 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                              className={`w-full h-full rounded-sm px-1 focus:outline-none focus:ring-1 focus:ring-amber-500 border ${hasValue ? "bg-amber-50/70 border-amber-400/60" : "bg-transparent border-transparent hover:border-amber-300/50 hover:bg-amber-50/30"}`}
                               style={{ fontFamily: "'Brush Script MT', 'Segoe Script', 'Dancing Script', cursive", fontSize: `${Math.min(Math.max(height * 0.6, 12), 24)}px` }}
-                              placeholder="Type signature"
+                              placeholder=""
                               title={displayLabel}
                               data-testid={`pdf-field-${field.name}`}
                             />
@@ -3606,7 +3624,7 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
                             <select
                               value={fieldValues[field.name] || ""}
                               onChange={(e) => updateFieldValue(field.name, e.target.value)}
-                              className="w-full h-full bg-indigo-50/80 border border-indigo-300/60 rounded-sm text-xs px-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              className={`w-full h-full rounded-sm text-xs px-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 border ${hasValue ? "bg-indigo-50/70 border-indigo-300/60" : "bg-transparent border-transparent hover:border-indigo-300/40 hover:bg-indigo-50/30"}`}
                               title={displayLabel}
                               data-testid={`pdf-field-${field.name}`}
                             >
@@ -3620,8 +3638,8 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
                               type="text"
                               value={fieldValues[field.name] || ""}
                               onChange={(e) => updateFieldValue(field.name, e.target.value)}
-                              className="w-full h-full bg-indigo-50/80 border border-indigo-300/60 rounded-sm text-xs px-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                              placeholder={displayLabel}
+                              className={`w-full h-full rounded-sm text-xs px-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 border ${hasValue ? "bg-blue-50/70 border-indigo-300/60" : "bg-transparent border-transparent hover:border-indigo-300/40 hover:bg-indigo-50/30"}`}
+                              placeholder=""
                               title={displayLabel}
                               data-testid={`pdf-field-${field.name}`}
                             />
