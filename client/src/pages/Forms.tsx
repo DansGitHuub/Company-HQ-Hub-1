@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -3259,6 +3259,54 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
     },
   });
 
+  const postProcessFields = (fields: any[]) => {
+    if (fields.some((f: any) => f.radioGroup)) return fields;
+
+    const checkboxGroups: Record<string, any[]> = {};
+    const nonGrouped: any[] = [];
+
+    for (const field of fields) {
+      if (field.type === "checkbox") {
+        const baseMatch = field.name.match(/^(.+)\[(\d+)\]$/);
+        if (baseMatch) {
+          const baseName = baseMatch[1];
+          if (!checkboxGroups[baseName]) checkboxGroups[baseName] = [];
+          checkboxGroups[baseName].push({ ...field, index: parseInt(baseMatch[2]) });
+        } else {
+          nonGrouped.push(field);
+        }
+      } else {
+        nonGrouped.push(field);
+      }
+    }
+
+    const result = [...nonGrouped];
+    for (const [baseName, members] of Object.entries(checkboxGroups)) {
+      if (members.length > 1) {
+        for (const member of members) {
+          result.push({
+            ...member,
+            type: "radio",
+            radioGroup: baseName,
+            radioValue: member.exportValue || String(member.index),
+          });
+        }
+      } else {
+        result.push(members[0]);
+      }
+    }
+
+    result.sort((a, b) => {
+      if (a.page !== b.page) return a.page - b.page;
+      const aTop = a.rect.y + a.rect.height;
+      const bTop = b.rect.y + b.rect.height;
+      if (Math.abs(aTop - bTop) > 5) return bTop - aTop;
+      return a.rect.x - b.rect.x;
+    });
+
+    return result;
+  };
+
   useEffect(() => {
     if (!pdfForm) return;
     let cancelled = false;
@@ -3307,9 +3355,10 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
               if (annot.subtype === "Widget" && annot.fieldName) {
                 const rect = annot.rect;
                 let fieldType = "text";
-                if (annot.checkBox) fieldType = "checkbox";
-                else if (annot.fieldType === "Btn" && !annot.radioButton) fieldType = "checkbox";
-                else if (annot.radioButton || annot.fieldType === "Btn") fieldType = "radio";
+                if (annot.fieldType === "Sig") fieldType = "signature";
+                else if (annot.checkBox) fieldType = "checkbox";
+                else if (annot.radioButton) fieldType = "radio";
+                else if (annot.fieldType === "Btn") fieldType = "checkbox";
                 else if (annot.fieldType === "Ch") fieldType = annot.combo ? "dropdown" : "optionlist";
 
                 let options: string[] = [];
@@ -3317,12 +3366,17 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
                   options = annot.options.map((o: any) => typeof o === "string" ? o : o.displayValue || o.exportValue || "");
                 }
 
+                const label = annot.alternativeText || annot.fieldName;
+                const exportValue = annot.exportValue || annot.buttonValue || "";
+
                 extractedFields.push({
                   name: annot.fieldName,
                   type: fieldType,
                   page: i,
                   rect: { x: rect[0], y: rect[1], width: rect[2] - rect[0], height: rect[3] - rect[1] },
                   options,
+                  label,
+                  exportValue,
                 });
               }
             }
@@ -3331,11 +3385,13 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
           }
         }
 
+        const processedFields = postProcessFields(extractedFields);
+
         if (!cancelled) {
           setPdfPages(canvases);
           setPageScales(scales);
-          if (extractedFields.length > 0) {
-            setDetectedFields(extractedFields);
+          if (processedFields.length > 0) {
+            setDetectedFields(processedFields);
           }
         }
       } catch (err: any) {
@@ -3350,9 +3406,23 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
     return () => { cancelled = true; };
   }, [pdfForm, pdfFormId]);
 
-  const updateFieldValue = (fieldName: string, value: any) => {
-    setFieldValues((prev) => ({ ...prev, [fieldName]: value }));
+  const updateFieldValue = (fieldName: string, value: any, radioGroup?: string) => {
+    setFieldValues((prev) => {
+      const next = { ...prev };
+      if (radioGroup) {
+        const groupMembers = (formFieldsRef.current || []).filter((f: any) => f.radioGroup === radioGroup);
+        for (const member of groupMembers) {
+          next[member.name] = false;
+        }
+        next[fieldName] = value;
+      } else {
+        next[fieldName] = value;
+      }
+      return next;
+    });
   };
+
+  const formFieldsRef = useRef<any[]>([]);
 
   const handleExportFilled = async () => {
     setExporting(true);
@@ -3395,6 +3465,39 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
     }
   };
 
+  const serverFields = (pdfForm?.formFields as any[]) || [];
+  const rawFields = serverFields.length > 0 ? serverFields : detectedFields;
+  const formFields = useMemo(() => postProcessFields(rawFields), [rawFields]);
+  const hasFields = formFields.length > 0;
+  formFieldsRef.current = formFields;
+
+  const radioGroups = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    for (const f of formFields) {
+      if (f.radioGroup) {
+        if (!groups[f.radioGroup]) groups[f.radioGroup] = [];
+        groups[f.radioGroup].push(f);
+      }
+    }
+    return groups;
+  }, [formFields]);
+
+  const sidebarFields = useMemo(() => {
+    const seen = new Set<string>();
+    const result: any[] = [];
+    for (const f of formFields) {
+      if (f.radioGroup) {
+        if (!seen.has(f.radioGroup)) {
+          seen.add(f.radioGroup);
+          result.push({ type: "radioGroup", groupName: f.radioGroup, members: radioGroups[f.radioGroup] || [] });
+        }
+      } else {
+        result.push(f);
+      }
+    }
+    return result;
+  }, [formFields, radioGroups]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -3406,10 +3509,6 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
   if (!pdfForm) {
     return <EmptyState icon={FileText} message="PDF form not found" />;
   }
-
-  const serverFields = (pdfForm.formFields as any[]) || [];
-  const formFields = serverFields.length > 0 ? serverFields : detectedFields;
-  const hasFields = formFields.length > 0;
 
   return (
     <div data-testid="view-pdf-fill">
@@ -3465,6 +3564,7 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
                       const width = field.rect.width * scale.scaleX;
                       const height = field.rect.height * scale.scaleY;
                       const top = (scale.pageHeight * scale.scaleY) - bottom - height;
+                      const displayLabel = field.label || field.name;
 
                       return (
                         <div
@@ -3472,13 +3572,34 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
                           className="absolute"
                           style={{ left: `${left}px`, top: `${top}px`, width: `${Math.max(width, 30)}px`, height: `${Math.max(height, 20)}px` }}
                         >
-                          {field.type === "checkbox" ? (
+                          {field.type === "radio" && field.radioGroup ? (
+                            <input
+                              type="radio"
+                              name={field.radioGroup}
+                              checked={!!fieldValues[field.name]}
+                              onChange={() => updateFieldValue(field.name, true, field.radioGroup)}
+                              className="w-full h-full cursor-pointer accent-indigo-600"
+                              title={displayLabel}
+                              data-testid={`pdf-field-${field.name}`}
+                            />
+                          ) : field.type === "checkbox" ? (
                             <input
                               type="checkbox"
                               checked={!!fieldValues[field.name]}
                               onChange={(e) => updateFieldValue(field.name, e.target.checked)}
                               className="w-full h-full cursor-pointer accent-indigo-600"
-                              title={field.name}
+                              title={displayLabel}
+                              data-testid={`pdf-field-${field.name}`}
+                            />
+                          ) : field.type === "signature" ? (
+                            <input
+                              type="text"
+                              value={fieldValues[field.name] || ""}
+                              onChange={(e) => updateFieldValue(field.name, e.target.value)}
+                              className="w-full h-full bg-amber-50/80 border border-amber-400/60 rounded-sm px-1 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                              style={{ fontFamily: "'Brush Script MT', 'Segoe Script', 'Dancing Script', cursive", fontSize: `${Math.min(Math.max(height * 0.6, 12), 24)}px` }}
+                              placeholder="Type signature"
+                              title={displayLabel}
                               data-testid={`pdf-field-${field.name}`}
                             />
                           ) : field.type === "dropdown" || field.type === "optionlist" ? (
@@ -3486,7 +3607,7 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
                               value={fieldValues[field.name] || ""}
                               onChange={(e) => updateFieldValue(field.name, e.target.value)}
                               className="w-full h-full bg-indigo-50/80 border border-indigo-300/60 rounded-sm text-xs px-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                              title={field.name}
+                              title={displayLabel}
                               data-testid={`pdf-field-${field.name}`}
                             >
                               <option value="">—</option>
@@ -3500,8 +3621,8 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
                               value={fieldValues[field.name] || ""}
                               onChange={(e) => updateFieldValue(field.name, e.target.value)}
                               className="w-full h-full bg-indigo-50/80 border border-indigo-300/60 rounded-sm text-xs px-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                              placeholder={field.name}
-                              title={field.name}
+                              placeholder={displayLabel}
+                              title={displayLabel}
                               data-testid={`pdf-field-${field.name}`}
                             />
                           )}
@@ -3523,40 +3644,82 @@ function PdfFormFill({ pdfFormId, onBack }: { pdfFormId: string; onBack: () => v
                 </h3>
                 <p className="text-xs text-muted-foreground mb-4">Fill in the fields below or type directly on the PDF. Both are synced.</p>
                 <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
-                  {formFields.map((field: any, idx: number) => (
-                    <div key={`${field.name}-${idx}`}>
-                      <Label className="text-xs truncate block mb-1" title={field.name}>{field.name}</Label>
-                      {field.type === "checkbox" ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={!!fieldValues[field.name]}
-                            onChange={(e) => updateFieldValue(field.name, e.target.checked)}
-                            className="accent-indigo-600"
+                  {sidebarFields.map((field: any, idx: number) => (
+                    <div key={`sidebar-${field.groupName || field.name}-${idx}`}>
+                      {field.type === "radioGroup" ? (
+                        <div>
+                          <Label className="text-xs truncate block mb-1" title={field.groupName}>
+                            {field.members[0]?.label || field.groupName}
+                          </Label>
+                          <div className="space-y-1.5">
+                            {field.members.map((m: any, mi: number) => (
+                              <label key={m.name} className="flex items-center gap-2 cursor-pointer text-xs">
+                                <input
+                                  type="radio"
+                                  name={`sidebar-${field.groupName}`}
+                                  checked={!!fieldValues[m.name]}
+                                  onChange={() => updateFieldValue(m.name, true, m.radioGroup)}
+                                  className="accent-indigo-600"
+                                  data-testid={`sidebar-field-${m.name}`}
+                                />
+                                <span className="text-muted-foreground">{m.label || `Option ${mi + 1}`}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ) : field.type === "checkbox" ? (
+                        <div>
+                          <Label className="text-xs truncate block mb-1" title={field.label || field.name}>{field.label || field.name}</Label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={!!fieldValues[field.name]}
+                              onChange={(e) => updateFieldValue(field.name, e.target.checked)}
+                              className="accent-indigo-600"
+                              data-testid={`sidebar-field-${field.name}`}
+                            />
+                            <span className="text-xs text-muted-foreground">{fieldValues[field.name] ? "Checked" : "Unchecked"}</span>
+                          </div>
+                        </div>
+                      ) : field.type === "signature" ? (
+                        <div>
+                          <Label className="text-xs truncate block mb-1" title={field.label || field.name}>{field.label || "Signature"}</Label>
+                          <Input
+                            value={fieldValues[field.name] || ""}
+                            onChange={(e) => updateFieldValue(field.name, e.target.value)}
+                            placeholder="Type your full name as signature"
+                            className="text-sm"
+                            style={{ fontFamily: "'Brush Script MT', 'Segoe Script', 'Dancing Script', cursive" }}
                             data-testid={`sidebar-field-${field.name}`}
                           />
-                          <span className="text-xs text-muted-foreground">{fieldValues[field.name] ? "Checked" : "Unchecked"}</span>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Type your name — it will appear in a signature style</p>
                         </div>
                       ) : field.type === "dropdown" || field.type === "optionlist" ? (
-                        <select
-                          value={fieldValues[field.name] || ""}
-                          onChange={(e) => updateFieldValue(field.name, e.target.value)}
-                          className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          data-testid={`sidebar-field-${field.name}`}
-                        >
-                          <option value="">Select...</option>
-                          {(field.options || []).map((opt: string) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
+                        <div>
+                          <Label className="text-xs truncate block mb-1" title={field.label || field.name}>{field.label || field.name}</Label>
+                          <select
+                            value={fieldValues[field.name] || ""}
+                            onChange={(e) => updateFieldValue(field.name, e.target.value)}
+                            className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            data-testid={`sidebar-field-${field.name}`}
+                          >
+                            <option value="">Select...</option>
+                            {(field.options || []).map((opt: string) => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        </div>
                       ) : (
-                        <Input
-                          value={fieldValues[field.name] || ""}
-                          onChange={(e) => updateFieldValue(field.name, e.target.value)}
-                          placeholder={`Enter ${field.name}`}
-                          className="text-sm"
-                          data-testid={`sidebar-field-${field.name}`}
-                        />
+                        <div>
+                          <Label className="text-xs truncate block mb-1" title={field.label || field.name}>{field.label || field.name}</Label>
+                          <Input
+                            value={fieldValues[field.name] || ""}
+                            onChange={(e) => updateFieldValue(field.name, e.target.value)}
+                            placeholder={`Enter ${field.label || field.name}`}
+                            className="text-sm"
+                            data-testid={`sidebar-field-${field.name}`}
+                          />
+                        </div>
                       )}
                     </div>
                   ))}

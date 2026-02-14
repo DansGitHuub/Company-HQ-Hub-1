@@ -4265,35 +4265,76 @@ SECTION GENERATION RULES:
       }
 
       if (!hasExistingAcroForm) {
-        console.log("[pdf-forms/fill] No AcroForm fields found, creating fillable text fields...");
+        console.log("[pdf-forms/fill] No AcroForm fields found, creating fillable fields...");
         const { rgb, StandardFonts } = await import("pdf-lib");
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const pdfForm = pdfDoc.getForm();
 
         const fieldsMeta: any[] = detectedFieldsMeta || (form.formFields as any[]) || [];
+        const radioGroupsCreated = new Set<string>();
+
         for (const meta of fieldsMeta) {
-          if (meta.type === "checkbox") continue;
           const pages = pdfDoc.getPages();
           const page = pages[meta.page] || pages[0];
           const value = fieldValues[meta.name] || "";
           const fontSize = Math.min(Math.max(meta.rect.height - 4, 8), 12);
 
           try {
-            const textField = pdfForm.createTextField(meta.name);
-            textField.setText(String(value));
-            textField.addToPage(page, {
-              x: meta.rect.x,
-              y: meta.rect.y,
-              width: meta.rect.width,
-              height: meta.rect.height,
-              font,
-              borderWidth: 0,
-            });
-            textField.setFontSize(fontSize);
-            filledAnyField = true;
+            if (meta.type === "radio" && meta.radioGroup) {
+              if (!radioGroupsCreated.has(meta.radioGroup)) {
+                radioGroupsCreated.add(meta.radioGroup);
+              }
+              const checkbox = pdfForm.createCheckBox(meta.name);
+              if (value) checkbox.check();
+              checkbox.addToPage(page, {
+                x: meta.rect.x,
+                y: meta.rect.y,
+                width: meta.rect.width,
+                height: meta.rect.height,
+                borderWidth: 0,
+              });
+              filledAnyField = true;
+            } else if (meta.type === "checkbox") {
+              const checkbox = pdfForm.createCheckBox(meta.name);
+              if (value) checkbox.check();
+              checkbox.addToPage(page, {
+                x: meta.rect.x,
+                y: meta.rect.y,
+                width: meta.rect.width,
+                height: meta.rect.height,
+                borderWidth: 0,
+              });
+              filledAnyField = true;
+            } else if (meta.type === "signature") {
+              const textField = pdfForm.createTextField(meta.name);
+              textField.setText(String(value));
+              textField.addToPage(page, {
+                x: meta.rect.x,
+                y: meta.rect.y,
+                width: meta.rect.width,
+                height: meta.rect.height,
+                font,
+                borderWidth: 0,
+              });
+              textField.setFontSize(fontSize);
+              filledAnyField = true;
+            } else {
+              const textField = pdfForm.createTextField(meta.name);
+              textField.setText(String(value));
+              textField.addToPage(page, {
+                x: meta.rect.x,
+                y: meta.rect.y,
+                width: meta.rect.width,
+                height: meta.rect.height,
+                font,
+                borderWidth: 0,
+              });
+              textField.setFontSize(fontSize);
+              filledAnyField = true;
+            }
           } catch (createErr) {
             console.log(`[pdf-forms/fill] Failed to create field "${meta.name}":`, (createErr as Error).message);
-            if (value && String(value).trim() !== "") {
+            if (value && String(value).trim() !== "" && meta.type !== "checkbox" && meta.type !== "radio") {
               page.drawText(String(value), {
                 x: meta.rect.x + 2,
                 y: meta.rect.y + 3,
