@@ -107,7 +107,7 @@ export default function HelpCenter() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       <div className="text-center mb-8">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}

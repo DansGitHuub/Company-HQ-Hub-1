@@ -397,7 +397,7 @@ export default function TodoList() {
   }
 
   return (
-    <div className="p-6 space-y-6" data-testid="todo-list-page">
+    <div className="space-y-6" data-testid="todo-list-page">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-heading font-bold text-foreground">To-Do List</h1>

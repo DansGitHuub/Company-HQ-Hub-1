@@ -247,7 +247,7 @@ export default function EquipmentTracker() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="page-title">Equipment Tracker</h1>

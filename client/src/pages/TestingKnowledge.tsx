@@ -124,7 +124,7 @@ export default function TestingKnowledge() {
 
   if (selectedQuiz) {
     return (
-      <div className="p-6 max-w-4xl mx-auto space-y-6" data-testid="quiz-active-view">
+      <div className="max-w-4xl mx-auto space-y-6" data-testid="quiz-active-view">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={handleBackToSop} data-testid="button-back-to-sop">
             <ArrowLeft className="h-4 w-4 mr-1" /> Back
@@ -282,7 +282,7 @@ export default function TestingKnowledge() {
   if (selectedSopEntry) {
     const quizzes = selectedSopEntry.quizzes;
     return (
-      <div className="p-6 max-w-4xl mx-auto space-y-6" data-testid="sop-quiz-selection">
+      <div className="max-w-4xl mx-auto space-y-6" data-testid="sop-quiz-selection">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={handleBackToList} data-testid="button-back-to-list">
             <ArrowLeft className="h-4 w-4 mr-1" /> Back to Catalog
@@ -377,7 +377,7 @@ export default function TestingKnowledge() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6" data-testid="testing-knowledge-page">
+    <div className="max-w-6xl mx-auto space-y-6" data-testid="testing-knowledge-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-2">

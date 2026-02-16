@@ -861,7 +861,7 @@ export default function Forms() {
             : "Back to Forms";
 
   return (
-    <div className="p-6 max-w-5xl mx-auto" data-testid="forms-page">
+    <div className="max-w-5xl mx-auto" data-testid="forms-page">
       <button
         onClick={handleBack}
         className="mb-6 inline-flex items-center gap-2.5 rounded-xl border bg-white px-4 py-2.5 text-sm font-medium text-foreground shadow-sm hover:bg-muted/60 hover:shadow-md transition-all"
@@ -1082,7 +1082,7 @@ function FormsHome({
   ];
 
   return (
-    <div className="p-6 max-w-4xl mx-auto" data-testid="forms-page">
+    <div className="max-w-4xl mx-auto" data-testid="forms-page">
       <h1 className="text-2xl font-heading font-bold text-foreground mb-6" data-testid="text-forms-title">Forms</h1>
       <button
         onClick={() => onNavigate(topButton.id)}

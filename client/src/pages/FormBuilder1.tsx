@@ -960,7 +960,7 @@ function FormBuilder1Inner() {
   }
 
   return (
-    <div className="p-4" data-testid="form-builder-1-page">
+    <div data-testid="form-builder-1-page">
       {ToastNode}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
