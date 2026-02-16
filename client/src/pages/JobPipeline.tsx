@@ -239,7 +239,7 @@ export default function JobPipeline() {
     <div className="h-[calc(100vh-140px)] flex flex-col space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Job Pipeline</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground">Job Pipeline</h1>
           <p className="text-muted-foreground">Track project velocity from lead to completion</p>
         </div>
         <Button className="gap-2" onClick={openNewJobModal} data-testid="button-add-job">

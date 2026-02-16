@@ -32,13 +32,13 @@ const container = {
   show: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.08
+      staggerChildren: 0.04
     }
   }
 };
 
 const item = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 12 },
   show: { opacity: 1, y: 0 }
 };
 
@@ -63,7 +63,7 @@ const allTiles: TileDef[] = [
     href: "/sops", 
     image: imgPlanning,
     color: "bg-emerald-900/10 text-emerald-900",
-    colSpan: "md:col-span-2 lg:col-span-1",
+    colSpan: "col-span-1 md:col-span-2",
     roles: ["Admin", "Manager", "Crew"]
   },
   { 
@@ -74,7 +74,7 @@ const allTiles: TileDef[] = [
     href: "/testing", 
     image: null,
     color: "bg-violet-100 text-violet-900",
-    colSpan: "md:col-span-1",
+    colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
   },
   { 
@@ -85,7 +85,7 @@ const allTiles: TileDef[] = [
     href: "/materials", 
     image: imgMaterials,
     color: "bg-stone-100 text-stone-900",
-    colSpan: "md:col-span-1 lg:col-span-2",
+    colSpan: "col-span-1 md:col-span-2",
     roles: ["Admin", "Manager", "Crew"]
   },
   { 
@@ -96,7 +96,7 @@ const allTiles: TileDef[] = [
     href: "/equipment", 
     image: null,
     color: "bg-orange-100 text-orange-900",
-    colSpan: "md:col-span-1",
+    colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
   },
   { 
@@ -107,51 +107,62 @@ const allTiles: TileDef[] = [
     href: "/todos", 
     image: null,
     color: "bg-green-100 text-green-900",
-    colSpan: "md:col-span-1",
+    colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
   },
   { 
     id: "hiring",
     title: "Hiring", 
-    desc: "Pipeline, Candidates & Onboarding", 
+    desc: "Pipeline & Onboarding", 
     icon: Users, 
     href: "/hiring", 
     image: imgCrew,
     color: "bg-blue-100 text-blue-900",
-    colSpan: "md:col-span-2",
+    colSpan: "col-span-1 md:col-span-2",
     roles: ["Admin", "Manager", "Crew"]
   },
   { 
     id: "jobs",
     title: "Jobs", 
-    desc: "Active Jobs & Project Tracking", 
+    desc: "Active Projects & Tracking", 
     icon: LayoutDashboard, 
     href: "/jobs", 
     image: null,
     color: "bg-teal-100 text-teal-900",
-    colSpan: "md:col-span-1",
+    colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
   },
   { 
     id: "education",
     title: "Customer Hub", 
-    desc: "Resources & Educational Content", 
+    desc: "Resources & Content", 
     icon: GraduationCap, 
     href: "/education", 
     image: null,
     color: "bg-cyan-100 text-cyan-900",
-    colSpan: "md:col-span-1",
+    colSpan: "col-span-1",
+    roles: ["Admin", "Manager", "Crew"]
+  },
+  { 
+    id: "messages",
+    title: "Messages", 
+    desc: "Internal Communications", 
+    icon: Mail, 
+    href: "/inbox", 
+    image: null,
+    color: "bg-indigo-100 text-indigo-900",
+    colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
   },
   { 
     id: "tools",
     title: "Tools", 
-    desc: "Plow Mapper, Calculator & More", 
+    desc: "Plow Mapper & More", 
     icon: Snowflake, 
     href: "/tools", 
     image: null,
     color: "bg-sky-100 text-sky-900",
-    colSpan: "md:col-span-1",
+    colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
   },
   { 
@@ -162,73 +173,62 @@ const allTiles: TileDef[] = [
     href: "/hq", 
     image: null,
     color: "bg-primary/10 text-primary",
-    colSpan: "md:col-span-1",
+    colSpan: "col-span-1",
     roles: ["Admin"]
   },
   { 
     id: "marketing",
-    title: "Marketing & Ads", 
-    desc: "Campaigns, ROI & Lead Gen", 
+    title: "Marketing", 
+    desc: "Campaigns & Lead Gen", 
     icon: Megaphone, 
     href: "/marketing", 
     image: imgMarketing,
     color: "bg-purple-100 text-purple-900",
-    colSpan: "md:col-span-1",
+    colSpan: "col-span-1",
     roles: ["Admin"]
   },
   { 
     id: "forms",
-    title: "Forms Library", 
-    desc: "Checklists, Safety & Intake", 
+    title: "Forms", 
+    desc: "Checklists & Intake", 
     icon: FileText, 
     href: "/forms", 
     image: null,
     color: "bg-rose-100 text-rose-900",
-    colSpan: "md:col-span-1",
+    colSpan: "col-span-1",
     roles: ["Admin"]
-  },
-  { 
-    id: "messages",
-    title: "Messages", 
-    desc: "Internal Communications", 
-    icon: Mail, 
-    href: "/inbox", 
-    image: null,
-    color: "bg-indigo-100 text-indigo-900",
-    colSpan: "md:col-span-1",
-    roles: ["Admin", "Manager", "Crew"]
   },
   { 
     id: "integrations",
     title: "Integrations", 
-    desc: "Connected Services & API Keys", 
+    desc: "Services & API Keys", 
     icon: Settings, 
     href: "/integrations", 
     image: null,
     color: "bg-slate-100 text-slate-900",
-    colSpan: "md:col-span-1",
+    colSpan: "col-span-1",
     roles: ["Admin"]
   },
   { 
     id: "admin",
     title: "Admin Panel", 
-    desc: "Users, Settings & Configuration", 
+    desc: "Users & Settings", 
     icon: Shield, 
     href: "/admin", 
     image: null,
     color: "bg-red-100 text-red-900",
-    colSpan: "md:col-span-1",
+    colSpan: "col-span-1",
     roles: ["Admin"]
   },
   { 
     id: "help",
     title: "Help Center", 
-    desc: "FAQs, Guides & Support", 
+    desc: "FAQs & Support", 
     icon: HelpCircle, 
     href: "/help", 
     image: null,
     color: "bg-amber-100 text-amber-900",
-    colSpan: "md:col-span-1",
+    colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
   },
 ];
@@ -240,12 +240,12 @@ export default function Home() {
   const tiles = allTiles.filter(t => t.roles.includes(userRole));
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-4xl font-heading font-bold text-foreground">
+    <div className="space-y-4">
+      <div className="flex items-baseline gap-3">
+        <h1 className="text-2xl font-heading font-bold text-foreground">
           Welcome back, {user?.name?.split(" ")[0]}
         </h1>
-        <p className="text-lg text-muted-foreground mt-2">
+        <p className="text-sm text-muted-foreground">
           Here's what's happening at Company HQ today.
         </p>
       </div>
@@ -254,9 +254,9 @@ export default function Home() {
         variants={container}
         initial="hidden"
         animate="show"
-        className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6"
+        className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3"
       >
-        {tiles.map((tile, i) => (
+        {tiles.map((tile) => (
           <motion.div 
             key={tile.id} 
             variants={item}
@@ -264,7 +264,7 @@ export default function Home() {
           >
             <Link href={tile.href}>
               <div 
-                className="tile-dash group relative h-64 w-full cursor-pointer"
+                className="tile-dash group relative h-32 w-full cursor-pointer"
                 data-testid={`tile-${tile.id}`}
               >
                 {tile.image && (
@@ -278,19 +278,19 @@ export default function Home() {
                   </div>
                 )}
 
-                <div className={`relative z-10 h-full flex flex-col justify-between ${tile.image ? 'text-white' : ''}`}>
+                <div className={`relative z-10 h-full flex flex-col justify-between p-3 ${tile.image ? 'text-white' : ''}`}>
                   <div className="flex justify-between items-start">
-                    <div className={`p-3 rounded-lg transition-all duration-300 group-hover:scale-110 ${tile.image ? 'bg-white/20 backdrop-blur-md text-white group-hover:bg-white/30' : tile.color}`}>
-                      <tile.icon className="w-6 h-6" />
+                    <div className={`p-2 rounded-lg transition-all duration-300 group-hover:scale-110 ${tile.image ? 'bg-white/20 backdrop-blur-md text-white group-hover:bg-white/30' : tile.color}`}>
+                      <tile.icon className="w-4 h-4" />
                     </div>
-                    <div className="p-2 rounded-full bg-primary/10 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                      <ArrowRight className={`w-5 h-5 ${tile.image ? 'text-white' : 'text-primary'}`} />
+                    <div className="p-1.5 rounded-full bg-primary/10 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+                      <ArrowRight className={`w-3.5 h-3.5 ${tile.image ? 'text-white' : 'text-primary'}`} />
                     </div>
                   </div>
                   
                   <div className="transform transition-transform duration-300 group-hover:translate-x-1">
-                    <h3 className="text-2xl font-heading font-bold mb-1 drop-shadow-md">{tile.title}</h3>
-                    <p className={`text-sm ${tile.image ? 'text-white/90' : 'text-muted-foreground'}`}>
+                    <h3 className="text-base font-heading font-bold mb-0.5 drop-shadow-md leading-tight">{tile.title}</h3>
+                    <p className={`text-xs leading-tight ${tile.image ? 'text-white/90' : 'text-muted-foreground'}`}>
                       {tile.desc}
                     </p>
                   </div>

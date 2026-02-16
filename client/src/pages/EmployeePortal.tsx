@@ -430,13 +430,13 @@ export default function EmployeePortal() {
   };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
+    <div className="space-y-4 max-w-5xl mx-auto">
       <div className="flex items-center gap-4">
         <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
           <User className="h-8 w-8 text-primary" />
         </div>
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Employee Portal</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground">Employee Portal</h1>
           <p className="text-muted-foreground">Manage your personal information and benefits.</p>
         </div>
       </div>

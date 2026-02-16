@@ -90,9 +90,9 @@ export default function CustomerPortal() {
   const pendingAccessRequest = accessRequests.find(r => r.status === "pending");
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
+    <div className="space-y-4 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-foreground">Welcome, {user?.name?.split(" ")[0]}</h1>
+        <h1 className="text-2xl font-heading font-bold text-foreground">Welcome, {user?.name?.split(" ")[0]}</h1>
         <p className="text-muted-foreground">Manage your requests and communicate with our team</p>
       </div>
 

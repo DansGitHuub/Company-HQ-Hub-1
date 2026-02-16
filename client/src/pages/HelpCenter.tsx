@@ -116,7 +116,7 @@ export default function HelpCenter() {
         >
           <HelpCircle className="h-8 w-8 text-primary" />
         </motion.div>
-        <h1 className="text-3xl font-bold mb-2">Help Center</h1>
+        <h1 className="text-2xl font-heading font-bold text-foreground mb-2">Help Center</h1>
         <p className="text-muted-foreground">
           Find answers to your questions and learn how to use Company HQ
         </p>

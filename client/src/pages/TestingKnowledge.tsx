@@ -380,7 +380,7 @@ export default function TestingKnowledge() {
     <div className="p-6 max-w-6xl mx-auto space-y-6" data-testid="testing-knowledge-page">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-2">
             <GraduationCap className="h-8 w-8" />
             Testing & Knowledge
           </h1>

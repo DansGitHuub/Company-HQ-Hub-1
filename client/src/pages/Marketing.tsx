@@ -47,9 +47,9 @@ export default function Marketing() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-foreground">Marketing Command Center</h1>
+        <h1 className="text-2xl font-heading font-bold text-foreground">Marketing Command Center</h1>
         <p className="text-muted-foreground">Track campaign performance and ROI</p>
       </div>
 

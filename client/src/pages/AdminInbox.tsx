@@ -131,9 +131,9 @@ export default function AdminInbox() {
   const pendingRequests = workRequests.filter(r => r.status === "pending").length;
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-4 max-w-6xl mx-auto">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-foreground flex items-center gap-3">
+        <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-3">
           <MessageSquare className="h-8 w-8 text-primary" /> Inbox
         </h1>
         <p className="text-muted-foreground">Manage customer messages and work requests</p>

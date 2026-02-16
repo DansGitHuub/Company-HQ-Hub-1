@@ -53,11 +53,11 @@ export default function HQOverview() {
   };
 
   return (
-    <div className="space-y-10 max-w-5xl mx-auto pb-20">
+    <div className="space-y-4 max-w-5xl mx-auto pb-20">
       {/* Hero Section */}
       <section className="text-center space-y-4">
-        <h1 className="text-5xl font-heading font-bold text-primary">Company HQ</h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+        <h1 className="text-2xl font-heading font-bold text-foreground">Company HQ</h1>
+        <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
           One team, one vision. Building the most respected landscape company in the region.
         </p>
       </section>

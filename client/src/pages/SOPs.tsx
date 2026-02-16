@@ -690,7 +690,7 @@ export default function SOPs() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">SOP Library</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground">SOP Library</h1>
           <p className="text-muted-foreground">Standard Operating Procedures & Knowledge Base</p>
         </div>
         <div className="flex gap-2 flex-wrap">

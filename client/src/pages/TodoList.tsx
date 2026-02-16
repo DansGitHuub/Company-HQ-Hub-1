@@ -400,7 +400,7 @@ export default function TodoList() {
     <div className="p-6 space-y-6" data-testid="todo-list-page">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">To-Do List</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground">To-Do List</h1>
           <p className="text-muted-foreground mt-1">
             {isAdmin ? "Manage all tasks and assignments" : "View and complete your assigned tasks"}
           </p>

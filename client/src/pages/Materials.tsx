@@ -309,7 +309,7 @@ export default function Materials() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Materials Catalog</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground">Materials Catalog</h1>
           <p className="text-muted-foreground">
             {isAdmin ? "Manage materials and categories" : "Browse materials"}
           </p>

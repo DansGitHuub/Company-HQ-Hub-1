@@ -236,7 +236,7 @@ export default function Hiring() {
     <div className="h-[calc(100vh-140px)] flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Hiring Pipeline</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground">Hiring Pipeline</h1>
           <p className="text-muted-foreground">Track candidates from application to offer</p>
         </div>
         <Button className="gap-2" onClick={openNewCandidateModal} data-testid="button-add-candidate">

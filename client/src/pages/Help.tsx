@@ -383,11 +383,11 @@ export default function Help() {
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground flex items-center gap-3">
+          <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-3">
             <HelpCircle className="h-8 w-8 text-primary" />
             {isCustomer ? "Customer Help" : "Help Center"}
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-sm text-muted-foreground mt-1">
             {isCustomer ? "Everything you need to know as a valued customer" : "Learn how to use Company HQ effectively"}
           </p>
         </div>

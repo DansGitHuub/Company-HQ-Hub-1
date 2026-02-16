@@ -226,7 +226,7 @@ export default function MessagingInbox() {
     <div className="container mx-auto py-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-2">
             <Mail className="h-8 w-8" />
             {isAdmin ? "Communications Center" : "Messages"}
           </h1>

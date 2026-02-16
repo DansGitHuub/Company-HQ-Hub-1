@@ -101,7 +101,7 @@ export default function SearchPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-foreground flex items-center gap-3">
+        <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-3">
           <SearchIcon className="h-8 w-8" />
           Search Results
         </h1>

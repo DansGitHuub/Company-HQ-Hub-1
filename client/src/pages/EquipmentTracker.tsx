@@ -250,7 +250,7 @@ export default function EquipmentTracker() {
     <div className="container mx-auto p-6 max-w-6xl">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold" data-testid="page-title">Equipment Tracker</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="page-title">Equipment Tracker</h1>
           <p className="text-muted-foreground">Manage vehicles, equipment, and maintenance schedules</p>
         </div>
         <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>

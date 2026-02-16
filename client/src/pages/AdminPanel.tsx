@@ -441,10 +441,10 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-4 max-w-6xl mx-auto">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground flex items-center gap-3">
+          <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-3">
             <Shield className="w-8 h-8 text-primary" /> Admin Panel
             {isMasterAdmin && <Badge className="bg-amber-100 text-amber-800"><Crown className="w-3 h-3 mr-1" /> Master</Badge>}
           </h1>

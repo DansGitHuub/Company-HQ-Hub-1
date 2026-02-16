@@ -353,11 +353,11 @@ export default function Education() {
   );
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-4 max-w-6xl mx-auto">
       <div className="flex flex-col md:flex-row gap-6 items-start justify-between">
         <div className="space-y-2">
-          <h1 className="text-4xl font-heading font-bold text-foreground" data-testid="page-title">Customer Hub</h1>
-          <p className="text-xl text-muted-foreground">Everything you need to know about your landscape journey.</p>
+          <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="page-title">Customer Hub</h1>
+          <p className="text-sm text-muted-foreground">Everything you need to know about your landscape journey.</p>
         </div>
         <div className="flex gap-2">
           {isAdmin && (
