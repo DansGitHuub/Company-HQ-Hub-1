@@ -286,10 +286,10 @@ export default function FileLibrary() {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`rounded-xl transition-all duration-200 min-h-[200px] ${
+        className={`border-2 border-dashed rounded-xl transition-all duration-200 min-h-[200px] p-4 ${
           isDragging
-            ? "border-2 border-dashed border-primary bg-primary/5 scale-[1.005]"
-            : ""
+            ? "border-primary bg-primary/5 scale-[1.005]"
+            : "border-muted-foreground/20 hover:border-muted-foreground/30"
         }`}
         data-testid="dropzone-files"
       >
@@ -303,7 +303,7 @@ export default function FileLibrary() {
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
         ) : filteredFiles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16 border-2 border-dashed border-muted-foreground/20 rounded-xl">
+          <div className="flex flex-col items-center justify-center gap-3 py-12">
             <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
               <FolderOpen className="w-8 h-8 text-muted-foreground/50" />
             </div>
