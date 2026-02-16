@@ -334,7 +334,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   // Default order for internal roles (help always at very bottom for all roles)
-  const teamDefaultIds = ["dashboard", "sops", "testing", "materials", "equipment", "hiring", "jobs", "education", "tools"];
+  const teamDefaultIds = ["dashboard", "sops", "testing", "materials", "equipment", "todos", "hiring", "jobs", "education", "inbox", "tools"];
   const adminExtraIds = ["hq", "marketing", "forms", "integrations", "admin"];
   const bottomIds = ["help"]; // Always shown at bottom for all roles
 

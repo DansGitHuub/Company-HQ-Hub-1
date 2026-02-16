@@ -10,12 +10,18 @@ import {
   Settings, 
   GraduationCap,
   Building2,
-  CalendarDays,
-  ArrowRight
+  ArrowRight,
+  Truck,
+  LayoutDashboard,
+  CheckSquare,
+  Brain,
+  Mail,
+  Snowflake,
+  Shield,
+  HelpCircle
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
-// Import generated assets
 import imgPlanning from "@assets/generated_images/landscape_architecture_plans_and_tools.png";
 import imgMaterials from "@assets/generated_images/landscaping_materials_stone_and_plants.png";
 import imgCrew from "@assets/generated_images/modern_landscape_crew_working.png";
@@ -26,7 +32,7 @@ const container = {
   show: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1
+      staggerChildren: 0.08
     }
   }
 };
@@ -36,92 +42,202 @@ const item = {
   show: { opacity: 1, y: 0 }
 };
 
+type TileDef = {
+  id: string;
+  title: string;
+  desc: string;
+  icon: any;
+  href: string;
+  image: string | null;
+  color: string;
+  colSpan: string;
+  roles: string[];
+};
+
+const allTiles: TileDef[] = [
+  { 
+    id: "sops",
+    title: "SOP Library", 
+    desc: "Standard Operating Procedures", 
+    icon: BookOpen, 
+    href: "/sops", 
+    image: imgPlanning,
+    color: "bg-emerald-900/10 text-emerald-900",
+    colSpan: "md:col-span-2 lg:col-span-1",
+    roles: ["Admin", "Manager", "Crew"]
+  },
+  { 
+    id: "quizzes",
+    title: "Quizzes", 
+    desc: "Training & Knowledge Tests", 
+    icon: Brain, 
+    href: "/testing", 
+    image: null,
+    color: "bg-violet-100 text-violet-900",
+    colSpan: "md:col-span-1",
+    roles: ["Admin", "Manager", "Crew"]
+  },
+  { 
+    id: "materials",
+    title: "Materials Catalog", 
+    desc: "Inventory, Pricing & Suppliers", 
+    icon: Hammer, 
+    href: "/materials", 
+    image: imgMaterials,
+    color: "bg-stone-100 text-stone-900",
+    colSpan: "md:col-span-1 lg:col-span-2",
+    roles: ["Admin", "Manager", "Crew"]
+  },
+  { 
+    id: "equipment",
+    title: "Equipment", 
+    desc: "Fleet Tracking & Maintenance", 
+    icon: Truck, 
+    href: "/equipment", 
+    image: null,
+    color: "bg-orange-100 text-orange-900",
+    colSpan: "md:col-span-1",
+    roles: ["Admin", "Manager", "Crew"]
+  },
+  { 
+    id: "todos",
+    title: "To-Do List", 
+    desc: "Tasks, Priorities & Deadlines", 
+    icon: CheckSquare, 
+    href: "/todos", 
+    image: null,
+    color: "bg-green-100 text-green-900",
+    colSpan: "md:col-span-1",
+    roles: ["Admin", "Manager", "Crew"]
+  },
+  { 
+    id: "hiring",
+    title: "Hiring", 
+    desc: "Pipeline, Candidates & Onboarding", 
+    icon: Users, 
+    href: "/hiring", 
+    image: imgCrew,
+    color: "bg-blue-100 text-blue-900",
+    colSpan: "md:col-span-2",
+    roles: ["Admin", "Manager", "Crew"]
+  },
+  { 
+    id: "jobs",
+    title: "Jobs", 
+    desc: "Active Jobs & Project Tracking", 
+    icon: LayoutDashboard, 
+    href: "/jobs", 
+    image: null,
+    color: "bg-teal-100 text-teal-900",
+    colSpan: "md:col-span-1",
+    roles: ["Admin", "Manager", "Crew"]
+  },
+  { 
+    id: "education",
+    title: "Customer Hub", 
+    desc: "Resources & Educational Content", 
+    icon: GraduationCap, 
+    href: "/education", 
+    image: null,
+    color: "bg-cyan-100 text-cyan-900",
+    colSpan: "md:col-span-1",
+    roles: ["Admin", "Manager", "Crew"]
+  },
+  { 
+    id: "tools",
+    title: "Tools", 
+    desc: "Plow Mapper, Calculator & More", 
+    icon: Snowflake, 
+    href: "/tools", 
+    image: null,
+    color: "bg-sky-100 text-sky-900",
+    colSpan: "md:col-span-1",
+    roles: ["Admin", "Manager", "Crew"]
+  },
+  { 
+    id: "hq",
+    title: "Company HQ", 
+    desc: "Mission, Vision & Team", 
+    icon: Building2, 
+    href: "/hq", 
+    image: null,
+    color: "bg-primary/10 text-primary",
+    colSpan: "md:col-span-1",
+    roles: ["Admin"]
+  },
+  { 
+    id: "marketing",
+    title: "Marketing & Ads", 
+    desc: "Campaigns, ROI & Lead Gen", 
+    icon: Megaphone, 
+    href: "/marketing", 
+    image: imgMarketing,
+    color: "bg-purple-100 text-purple-900",
+    colSpan: "md:col-span-1",
+    roles: ["Admin"]
+  },
+  { 
+    id: "forms",
+    title: "Forms Library", 
+    desc: "Checklists, Safety & Intake", 
+    icon: FileText, 
+    href: "/forms", 
+    image: null,
+    color: "bg-rose-100 text-rose-900",
+    colSpan: "md:col-span-1",
+    roles: ["Admin"]
+  },
+  { 
+    id: "messages",
+    title: "Messages", 
+    desc: "Internal Communications", 
+    icon: Mail, 
+    href: "/inbox", 
+    image: null,
+    color: "bg-indigo-100 text-indigo-900",
+    colSpan: "md:col-span-1",
+    roles: ["Admin", "Manager", "Crew"]
+  },
+  { 
+    id: "integrations",
+    title: "Integrations", 
+    desc: "Connected Services & API Keys", 
+    icon: Settings, 
+    href: "/integrations", 
+    image: null,
+    color: "bg-slate-100 text-slate-900",
+    colSpan: "md:col-span-1",
+    roles: ["Admin"]
+  },
+  { 
+    id: "admin",
+    title: "Admin Panel", 
+    desc: "Users, Settings & Configuration", 
+    icon: Shield, 
+    href: "/admin", 
+    image: null,
+    color: "bg-red-100 text-red-900",
+    colSpan: "md:col-span-1",
+    roles: ["Admin"]
+  },
+  { 
+    id: "help",
+    title: "Help Center", 
+    desc: "FAQs, Guides & Support", 
+    icon: HelpCircle, 
+    href: "/help", 
+    image: null,
+    color: "bg-amber-100 text-amber-900",
+    colSpan: "md:col-span-1",
+    roles: ["Admin", "Manager", "Crew"]
+  },
+];
+
 export default function Home() {
   const { user } = useAuth();
 
-  const tiles = [
-    { 
-      title: "SOP Library", 
-      desc: "Standard Operating Procedures", 
-      icon: BookOpen, 
-      href: "/sops", 
-      image: imgPlanning,
-      color: "bg-emerald-900/10 text-emerald-900",
-      colSpan: "md:col-span-2 lg:col-span-1"
-    },
-    { 
-      title: "Sales Playbook", 
-      desc: "Scripts, Estimates & Proposals", 
-      icon: CalendarDays, 
-      href: "/sales", 
-      image: null,
-      color: "bg-amber-100 text-amber-900",
-      colSpan: "md:col-span-1"
-    },
-    { 
-      title: "Materials Catalog", 
-      desc: "Inventory, Pricing & Suppliers", 
-      icon: Hammer, 
-      href: "/materials", 
-      image: imgMaterials,
-      color: "bg-stone-100 text-stone-900",
-      colSpan: "md:col-span-1 lg:col-span-2"
-    },
-    { 
-      title: "Hiring Automation", 
-      desc: "Pipeline, Candidates & Onboarding", 
-      icon: Users, 
-      href: "/hiring", 
-      image: imgCrew,
-      color: "bg-blue-100 text-blue-900",
-      colSpan: "md:col-span-2"
-    },
-    { 
-      title: "Marketing & Ads", 
-      desc: "Campaigns, ROI & Lead Gen", 
-      icon: Megaphone, 
-      href: "/marketing", 
-      image: imgMarketing,
-      color: "bg-purple-100 text-purple-900",
-      colSpan: "md:col-span-1"
-    },
-    { 
-      title: "Forms Library", 
-      desc: "Checklists, Safety & Intake", 
-      icon: FileText, 
-      href: "/forms", 
-      image: null,
-      color: "bg-rose-100 text-rose-900",
-      colSpan: "md:col-span-1"
-    },
-    { 
-      title: "Integrations Hub", 
-      desc: "API Keys & Webhooks", 
-      icon: Settings, 
-      href: "/integrations", 
-      image: null,
-      color: "bg-slate-100 text-slate-900",
-      colSpan: "md:col-span-1"
-    },
-    { 
-      title: "Education Center", 
-      desc: "Training & Resources", 
-      icon: GraduationCap, 
-      href: "/education", 
-      image: null,
-      color: "bg-cyan-100 text-cyan-900",
-      colSpan: "md:col-span-1"
-    },
-    { 
-      title: "Company HQ", 
-      desc: "Mission, Vision & Team", 
-      icon: Building2, 
-      href: "/hq", 
-      image: null,
-      color: "bg-primary/10 text-primary",
-      colSpan: "md:col-span-1"
-    },
-  ];
+  const userRole = user?.role || "Crew";
+  const tiles = allTiles.filter(t => t.roles.includes(userRole));
 
   return (
     <div className="space-y-8">
@@ -142,14 +258,14 @@ export default function Home() {
       >
         {tiles.map((tile, i) => (
           <motion.div 
-            key={i} 
+            key={tile.id} 
             variants={item}
             className={tile.colSpan}
           >
             <Link href={tile.href}>
               <div 
                 className="tile-dash group relative h-64 w-full cursor-pointer"
-                data-testid={`tile-${tile.title.toLowerCase().replace(/\s+/g, '-')}`}
+                data-testid={`tile-${tile.id}`}
               >
                 {tile.image && (
                   <div className="absolute inset-0 z-0 rounded-xl overflow-hidden">
