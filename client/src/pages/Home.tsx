@@ -26,6 +26,18 @@ import imgPlanning from "@assets/generated_images/landscape_architecture_plans_a
 import imgMaterials from "@assets/generated_images/landscaping_materials_stone_and_plants.png";
 import imgCrew from "@assets/generated_images/modern_landscape_crew_working.png";
 import imgMarketing from "@assets/generated_images/office_desk_with_marketing_charts.png";
+import imgQuizzes from "@assets/generated_images/training_quizzes_knowledge.png";
+import imgEquipment from "@assets/generated_images/equipment_fleet_tracking.png";
+import imgTodos from "@assets/generated_images/todo_list_tasks.png";
+import imgJobs from "@assets/generated_images/active_job_site.png";
+import imgEducation from "@assets/generated_images/customer_education_hub.png";
+import imgMessages from "@assets/generated_images/team_messaging.png";
+import imgTools from "@assets/generated_images/landscape_tools.png";
+import imgHQ from "@assets/generated_images/company_hq_office.png";
+import imgForms from "@assets/generated_images/forms_checklists.png";
+import imgIntegrations from "@assets/generated_images/integrations_tech.png";
+import imgAdmin from "@assets/generated_images/admin_panel_settings.png";
+import imgHelp from "@assets/generated_images/help_center_support.png";
 
 const container = {
   hidden: { opacity: 0 },
@@ -72,7 +84,7 @@ const allTiles: TileDef[] = [
     desc: "Training & Knowledge Tests", 
     icon: Brain, 
     href: "/testing", 
-    image: null,
+    image: imgQuizzes,
     color: "bg-violet-100 text-violet-900",
     colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
@@ -94,7 +106,7 @@ const allTiles: TileDef[] = [
     desc: "Fleet Tracking & Maintenance", 
     icon: Truck, 
     href: "/equipment", 
-    image: null,
+    image: imgEquipment,
     color: "bg-orange-100 text-orange-900",
     colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
@@ -105,7 +117,7 @@ const allTiles: TileDef[] = [
     desc: "Tasks, Priorities & Deadlines", 
     icon: CheckSquare, 
     href: "/todos", 
-    image: null,
+    image: imgTodos,
     color: "bg-green-100 text-green-900",
     colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
@@ -127,7 +139,7 @@ const allTiles: TileDef[] = [
     desc: "Active Projects & Tracking", 
     icon: LayoutDashboard, 
     href: "/jobs", 
-    image: null,
+    image: imgJobs,
     color: "bg-teal-100 text-teal-900",
     colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
@@ -138,7 +150,7 @@ const allTiles: TileDef[] = [
     desc: "Resources & Content", 
     icon: GraduationCap, 
     href: "/education", 
-    image: null,
+    image: imgEducation,
     color: "bg-cyan-100 text-cyan-900",
     colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
@@ -149,7 +161,7 @@ const allTiles: TileDef[] = [
     desc: "Internal Communications", 
     icon: Mail, 
     href: "/inbox", 
-    image: null,
+    image: imgMessages,
     color: "bg-indigo-100 text-indigo-900",
     colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
@@ -160,7 +172,7 @@ const allTiles: TileDef[] = [
     desc: "Plow Mapper & More", 
     icon: Snowflake, 
     href: "/tools", 
-    image: null,
+    image: imgTools,
     color: "bg-sky-100 text-sky-900",
     colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
@@ -171,7 +183,7 @@ const allTiles: TileDef[] = [
     desc: "Mission, Vision & Team", 
     icon: Building2, 
     href: "/hq", 
-    image: null,
+    image: imgHQ,
     color: "bg-primary/10 text-primary",
     colSpan: "col-span-1",
     roles: ["Admin"]
@@ -193,7 +205,7 @@ const allTiles: TileDef[] = [
     desc: "Checklists & Intake", 
     icon: FileText, 
     href: "/forms", 
-    image: null,
+    image: imgForms,
     color: "bg-rose-100 text-rose-900",
     colSpan: "col-span-1",
     roles: ["Admin"]
@@ -204,7 +216,7 @@ const allTiles: TileDef[] = [
     desc: "Services & API Keys", 
     icon: Settings, 
     href: "/integrations", 
-    image: null,
+    image: imgIntegrations,
     color: "bg-slate-100 text-slate-900",
     colSpan: "col-span-1",
     roles: ["Admin"]
@@ -215,7 +227,7 @@ const allTiles: TileDef[] = [
     desc: "Users & Settings", 
     icon: Shield, 
     href: "/admin", 
-    image: null,
+    image: imgAdmin,
     color: "bg-red-100 text-red-900",
     colSpan: "col-span-1",
     roles: ["Admin"]
@@ -226,7 +238,7 @@ const allTiles: TileDef[] = [
     desc: "FAQs & Support", 
     icon: HelpCircle, 
     href: "/help", 
-    image: null,
+    image: imgHelp,
     color: "bg-amber-100 text-amber-900",
     colSpan: "col-span-1",
     roles: ["Admin", "Manager", "Crew"]
