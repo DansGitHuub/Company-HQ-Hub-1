@@ -1842,3 +1842,21 @@ export const insertPdfFormSchema = createInsertSchema(pdfForms).omit({
 
 export type InsertPdfForm = z.infer<typeof insertPdfFormSchema>;
 export type PdfForm = typeof pdfForms.$inferSelect;
+
+export const hqFiles = pgTable("hq_files", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  objectPath: text("object_path").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull().default(0),
+  uploadedBy: varchar("uploaded_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertHqFileSchema = createInsertSchema(hqFiles).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertHqFile = z.infer<typeof insertHqFileSchema>;
+export type HqFile = typeof hqFiles.$inferSelect;

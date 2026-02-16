@@ -7084,6 +7084,79 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  // HQ Files
+  app.get("/api/hq-files", requireAuth, async (req, res) => {
+    try {
+      const files = await storage.getHqFiles();
+      res.json(files);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  const ALLOWED_HQ_MIME_TYPES = [
+    "image/png", "image/jpeg", "image/svg+xml",
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/csv",
+    "application/zip", "application/x-zip-compressed",
+    "application/octet-stream",
+  ];
+  const MAX_HQ_FILE_SIZE = 50 * 1024 * 1024;
+
+  app.post("/api/hq-files", requireAuth, async (req, res) => {
+    try {
+      const { name, objectPath, mimeType, size } = req.body;
+      if (!name || !objectPath || !mimeType) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      if (!objectPath.startsWith("/objects/")) {
+        return res.status(400).json({ message: "Invalid object path" });
+      }
+      if (!ALLOWED_HQ_MIME_TYPES.includes(mimeType)) {
+        return res.status(400).json({ message: "File type not allowed" });
+      }
+      if (size && size > MAX_HQ_FILE_SIZE) {
+        return res.status(400).json({ message: "File too large (50MB max)" });
+      }
+      const file = await storage.createHqFile({
+        name,
+        objectPath,
+        mimeType,
+        size: size || 0,
+        uploadedBy: (req.user as any).id,
+      });
+      res.json(file);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/hq-files/:id/download", requireAuth, async (req, res) => {
+    try {
+      const file = await storage.getHqFile(req.params.id);
+      if (!file) return res.status(404).json({ message: "File not found" });
+      const objectStorageService = new (await import("./replit_integrations/object_storage/objectStorage")).ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(file.objectPath);
+      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(file.name)}"`);
+      await objectStorageService.downloadObject(objectFile, res);
+    } catch (err: any) {
+      console.error("[hq-files/download]", err.message);
+      res.status(500).json({ message: "Failed to download file" });
+    }
+  });
+
+  app.delete("/api/hq-files/:id", requireAuth, async (req, res) => {
+    try {
+      const deleted = await storage.deleteHqFile(req.params.id);
+      if (!deleted) return res.status(404).json({ message: "File not found" });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 

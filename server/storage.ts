@@ -71,10 +71,11 @@ import {
   userQuizAttempts, type UserQuizAttempt, type InsertUserQuizAttempt,
   builderForms, type BuilderForm, type InsertBuilderForm,
   pdfForms, type PdfForm, type InsertPdfForm,
-  conversations, chatMessages
+  conversations, chatMessages,
+  hqFiles, type HqFile, type InsertHqFile
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, ilike, or, and, desc, isNull } from "drizzle-orm";
+import { eq, ilike, or, and, desc, isNull, sql } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -509,6 +510,12 @@ export interface IStorage {
   getUserQuizAttempts(userId: string, quizId?: string): Promise<UserQuizAttempt[]>;
   createQuizAttempt(attempt: InsertUserQuizAttempt): Promise<UserQuizAttempt>;
   getAllQuizAttempts(quizId: string): Promise<UserQuizAttempt[]>;
+
+  // HQ Files
+  getHqFiles(): Promise<HqFile[]>;
+  getHqFile(id: string): Promise<HqFile | undefined>;
+  createHqFile(file: InsertHqFile): Promise<HqFile>;
+  deleteHqFile(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2431,6 +2438,25 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(userQuizAttempts)
       .where(eq(userQuizAttempts.quizId, quizId))
       .orderBy(desc(userQuizAttempts.completedAt));
+  }
+
+  async getHqFiles(): Promise<HqFile[]> {
+    return db.select().from(hqFiles).orderBy(sql`${hqFiles.createdAt} DESC`);
+  }
+
+  async getHqFile(id: string): Promise<HqFile | undefined> {
+    const [file] = await db.select().from(hqFiles).where(eq(hqFiles.id, id));
+    return file;
+  }
+
+  async createHqFile(file: InsertHqFile): Promise<HqFile> {
+    const [created] = await db.insert(hqFiles).values(file).returning();
+    return created;
+  }
+
+  async deleteHqFile(id: string): Promise<boolean> {
+    const result = await db.delete(hqFiles).where(eq(hqFiles.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 }
 
