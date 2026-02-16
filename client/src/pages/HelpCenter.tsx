@@ -96,7 +96,7 @@ export default function HelpCenter() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-card rounded-xl border p-6"
         >
-          <h1 className="text-2xl font-bold mb-2">{selectedArticle.title}</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground mb-2">{selectedArticle.title}</h1>
           <p className="text-muted-foreground mb-6">{selectedArticle.summary}</p>
           <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-wrap">
             {selectedArticle.content}

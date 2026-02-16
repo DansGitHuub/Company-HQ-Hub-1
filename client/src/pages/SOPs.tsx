@@ -410,7 +410,7 @@ export default function SOPs() {
             <div>
               <Badge variant="outline" className="mb-2">{selectedSOP.category}</Badge>
               {selectedSOP.isArchived && <Badge variant="secondary" className="ml-2">Archived</Badge>}
-              <h1 className="text-4xl font-heading font-bold text-primary">{selectedSOP.title}</h1>
+              <h1 className="text-2xl font-heading font-bold text-foreground">{selectedSOP.title}</h1>
               <p className="text-sm text-muted-foreground mt-2">
                 Last updated: {selectedSOP.lastUpdated ? new Date(selectedSOP.lastUpdated).toLocaleDateString() : "N/A"}
               </p>

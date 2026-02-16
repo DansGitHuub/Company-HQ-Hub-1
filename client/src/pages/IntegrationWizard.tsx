@@ -213,7 +213,7 @@ export default function IntegrationWizard() {
         <div className="flex items-center gap-3">
           <Puzzle className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">Integration Wizard</h1>
+            <h1 className="text-2xl font-heading font-bold text-foreground">Integration Wizard</h1>
             <p className="text-muted-foreground">
               Connect your business software with AI-powered setup
             </p>

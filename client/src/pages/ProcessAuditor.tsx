@@ -135,7 +135,7 @@ export default function ProcessAuditor() {
         <div className="flex items-center gap-3">
           <ClipboardCheck className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">Process Auditor</h1>
+            <h1 className="text-2xl font-heading font-bold text-foreground">Process Auditor</h1>
             <p className="text-muted-foreground">
               Analyze and optimize your business workflows
             </p>

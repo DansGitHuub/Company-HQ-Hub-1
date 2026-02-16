@@ -1083,7 +1083,7 @@ function FormsHome({
 
   return (
     <div className="p-6 max-w-4xl mx-auto" data-testid="forms-page">
-      <h1 className="text-2xl font-bold mb-6" data-testid="text-forms-title">Forms</h1>
+      <h1 className="text-2xl font-heading font-bold text-foreground mb-6" data-testid="text-forms-title">Forms</h1>
       <button
         onClick={() => onNavigate(topButton.id)}
         className={`w-full mb-6 rounded-2xl bg-gradient-to-br ${hoveredId === topButton.id ? topButton.hoverColor : topButton.color} p-8 text-white text-left transition-all duration-200 ${hoveredId === topButton.id ? "scale-[1.01] shadow-xl" : "shadow-lg"}`}
@@ -1134,7 +1134,7 @@ function SectionHeader({ icon: Icon, title, description }: { icon: React.Element
         <div className="rounded-xl bg-primary/10 p-2.5">
           <Icon className="h-6 w-6 text-primary" />
         </div>
-        <h1 className="text-2xl font-bold" data-testid="text-section-title">{title}</h1>
+        <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="text-section-title">{title}</h1>
       </div>
       <p className="text-muted-foreground ml-[52px]">{description}</p>
     </div>
@@ -2406,7 +2406,7 @@ function FormDetail({ formId, onFillForm }: { formId: string; onFillForm: () => 
   return (
     <div data-testid="view-form-detail">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold" data-testid="text-form-detail-name">{form.name}</h1>
+        <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="text-form-detail-name">{form.name}</h1>
         <div className="flex flex-wrap gap-2 mt-2">
           {form.category && <Badge variant="secondary">{form.category}</Badge>}
           {form.purpose && <Badge variant="outline">{form.purpose}</Badge>}
@@ -2940,7 +2940,7 @@ function FormFill({ formId, onSubmitted }: { formId: string; onSubmitted: () => 
         <div className="flex items-center gap-2 mb-1">
           <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Test Mode</Badge>
         </div>
-        <h1 className="text-2xl font-bold" data-testid="text-form-fill-name">{form.name}</h1>
+        <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="text-form-fill-name">{form.name}</h1>
         <div className="flex flex-wrap gap-2 mt-2">
           {form.category && <Badge variant="secondary">{form.category}</Badge>}
           {form.purpose && <Badge variant="outline">{form.purpose}</Badge>}

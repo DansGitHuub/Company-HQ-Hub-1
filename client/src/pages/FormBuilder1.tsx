@@ -965,7 +965,7 @@ function FormBuilder1Inner() {
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold" data-testid="text-builder-title">Form Builder 1</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="text-builder-title">Form Builder 1</h1>
           <Badge variant="secondary" className="ml-2">
             v1 (local storage)
           </Badge>

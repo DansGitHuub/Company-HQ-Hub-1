@@ -130,7 +130,7 @@ export default function TestingKnowledge() {
             <ArrowLeft className="h-4 w-4 mr-1" /> Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{selectedQuiz.title}</h1>
+            <h1 className="text-2xl font-heading font-bold text-foreground">{selectedQuiz.title}</h1>
             <p className="text-muted-foreground text-sm">{selectedQuiz.description}</p>
           </div>
         </div>
@@ -288,7 +288,7 @@ export default function TestingKnowledge() {
             <ArrowLeft className="h-4 w-4 mr-1" /> Back to Catalog
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{selectedSopEntry.sop.title}</h1>
+            <h1 className="text-2xl font-heading font-bold text-foreground">{selectedSopEntry.sop.title}</h1>
             <p className="text-muted-foreground text-sm">Select a skill level to start the quiz</p>
           </div>
         </div>

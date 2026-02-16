@@ -309,7 +309,7 @@ export default function PlowSiteMapper() {
                 <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/20 mb-2">
                   <Compass className="h-10 w-10 text-primary" />
                 </div>
-                <h1 className="text-2xl font-heading font-bold text-foreground tracking-tight">Site Photo Markup & Map Tool</h1>
+                <h1 className="text-2xl font-heading font-bold text-foreground">Site Photo Markup & Map Tool</h1>
                 <p className="text-muted-foreground max-w-lg mx-auto">
                   Capture, annotate, and manage your job sites. Create detailed maps, mark up photos, and build instructions for your crew.
                 </p>

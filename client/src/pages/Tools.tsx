@@ -39,7 +39,7 @@ export default function Tools() {
   return (
     <div className="space-y-6" data-testid="tools-hub-page">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-tools-title">Tools</h1>
+        <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="text-tools-title">Tools</h1>
         <p className="text-muted-foreground mt-1">
           Specialized tools to help you get the job done faster.
         </p>

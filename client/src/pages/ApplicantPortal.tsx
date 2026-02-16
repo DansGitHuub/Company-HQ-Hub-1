@@ -105,7 +105,7 @@ export default function ApplicantPortal() {
     return (
       <div className="max-w-3xl mx-auto space-y-6">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Applicant Portal</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground">Applicant Portal</h1>
           <p className="text-muted-foreground">Track your job application status</p>
         </div>
         
@@ -138,7 +138,7 @@ export default function ApplicantPortal() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-foreground">Your Application</h1>
+        <h1 className="text-2xl font-heading font-bold text-foreground">Your Application</h1>
         <p className="text-muted-foreground">Track your progress and complete required steps</p>
       </div>
 

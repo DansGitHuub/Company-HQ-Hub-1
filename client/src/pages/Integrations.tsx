@@ -45,7 +45,7 @@ export default function Integrations() {
       {/* Original content (greyed out behind overlay) */}
       <div className="opacity-30 pointer-events-none">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Integrations Hub</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground">Integrations Hub</h1>
           <p className="text-muted-foreground">Manage API connections and webhooks</p>
         </div>
 

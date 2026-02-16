@@ -810,7 +810,7 @@ export default function CalculatorPage() {
         <div>
           <div className="flex items-center gap-2">
             <CalcIcon className="h-5 w-5 text-primary" />
-            <h1 className="text-2xl font-bold" data-testid="text-calculator-title">Universal Calculator</h1>
+            <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="text-calculator-title">Universal Calculator</h1>
           </div>
           <p className="text-muted-foreground mt-1">
             Pick one thing at a time, get the exact calculation + references.

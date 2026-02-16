@@ -169,10 +169,10 @@ export default function Assistant() {
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
       <div className="flex justify-between items-start">
         <div className="space-y-2">
-          <h1 className="text-4xl font-heading font-bold text-foreground flex items-center gap-3">
+          <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-3">
             <Sparkles className="w-8 h-8 text-primary" /> AI Assistant
           </h1>
-          <p className="text-muted-foreground text-lg">Your intelligent companion for landscape business questions.</p>
+          <p className="text-muted-foreground text-sm">Your intelligent companion for landscape business questions.</p>
         </div>
       </div>
 
