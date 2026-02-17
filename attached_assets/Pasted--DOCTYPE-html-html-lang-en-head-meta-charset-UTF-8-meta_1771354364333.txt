@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOP Template - Professional Standard Operating Procedures</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            background-color: #f3f4f6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Navigation */
+        .nav-bar {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .nav-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-title h1 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #111827;
+        }
+
+        .nav-title p {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            background: #f9fafb;
+        }
+
+        /* Tabs */
+        .tabs {
+            background: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-list {
+            display: flex;
+            gap: 0.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 0.5rem;
+        }
+
+        .tab-btn {
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .tab-btn.active {
+            background: #eff6ff;
+            color: #2563eb;
+            font-weight: 500;
+        }
+
+        .tab-content {
+            display: none;
+            padding-top: 1rem;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .info-box {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid;
+        }
+
+        .info-box.blue {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+        }
+
+        .info-box.amber {
+            background: #fffbeb;
+            border-color: #fde68a;
+        }
+
+        .info-box.red {
+            background: #fef2f2;
+            border-color: #fecaca;
+        }
+
+        .info-box h3 {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .info-box.blue h3 { color: #1e3a8a; }
+        .info-box.amber h3 { color: #78350f; }
+        .info-box.red h3 { color: #7f1d1d; }
+
+        .info-box p {
+            font-size: 0.875rem;
+            color: #374151;
+        }
+
+        /* SOP Container */
+        .sop-container {
+            background: white;
+            margin-bottom: 2rem;
+        }
+
+        /* Header */
+        .sop-header {
+            border-top: 4px solid #2563eb;
+            background: linear-gradient(to bottom, #f9fafb, white);
+            padding: 2rem;
+        }
+
+        .header-top {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .company-logo {
+            width: 48px;
+            height: 48px;
+            background: #2563eb;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .company-info .subtitle {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .company-info .title {
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .sop-title {
+            font-size: 1.875rem;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+            color: #111827;
+        }
+
+        .metadata {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .metadata-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .metadata-label {
+            color: #6b7280;
+        }
+
+        .metadata-value {
+            font-weight: 500;
+            color: #111827;
+        }
+
+        .metadata-divider {
+            color: #d1d5db;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            border: 1px solid;
+        }
+
+        .badge.skill-beginner { background: #dcfce7; color: #166534; border-color: #86efac; }
+        .badge.skill-intermediate { background: #dbeafe; color: #1e3a8a; border-color: #93c5fd; }
+        .badge.skill-advanced { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; }
+        .badge.skill-all { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
+
+        /* Content Sections */
+        .sop-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .section {
+            margin-bottom: 1.5rem;
+        }
+
+        /* Outcome Section */
+        .outcome-section {
+            border-left: 4px solid;
+            padding: 1.5rem;
+            border-radius: 0.25rem;
+        }
+
+        .outcome-section.quality { border-color: #86efac; background: #f0fdf4; }
+        .outcome-section.safety { border-color: #fdba74; background: #fff7ed; }
+        .outcome-section.completion { border-color: #93c5fd; background: #eff6ff; }
+        .outcome-section.kpi { border-color: #d8b4fe; background: #faf5ff; }
+
+        .outcome-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .outcome-icon {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .outcome-section h2 {
+            font-weight: 600;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .outcome-section p {
+            color: #374151;
+            line-height: 1.75;
+        }
+
+        .badge.outcome-quality { background: #dcfce7; color: #166534; border-color: #86efac; }
+        .badge.outcome-safety { background: #ffedd5; color: #9a3412; border-color: #fdba74; }
+        .badge.outcome-completion { background: #dbeafe; color: #1e3a8a; border-color: #93c5fd; }
+        .badge.outcome-kpi { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; }
+
+        /* Timing Section */
+        .timing-section {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+        }
+
+        .timing-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .timing-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .timing-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .timing-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .timing-icon.target { background: #dbeafe; }
+        .timing-icon.max { background: #fef3c7; }
+
+        .timing-label {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        .timing-value {
+            font-weight: 600;
+            color: #111827;
+        }
+
+        /* Requirements Grid */
+        .requirements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .requirement-box {
+            border: 1px solid;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+        }
+
+        .requirement-box.ppe {
+            background: #fffbeb;
+            border-color: #fde68a;
+        }
+
+        .requirement-box.tools {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+        }
+
+        .requirement-box.materials {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+        }
+
+        .requirement-box h2 {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+        }
+
+        .requirement-box ul {
+            list-style: none;
+        }
+
+        .requirement-box li {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .requirement-box.ppe li::before {
+            content: "•";
+            color: #b45309;
+            font-weight: bold;
+        }
+
+        .requirement-box.tools li::before {
+            content: "•";
+            color: #2563eb;
+            font-weight: bold;
+        }
+
+        .requirement-box.materials li::before {
+            content: "•";
+            color: #16a34a;
+            font-weight: bold;
+        }
+
+        .item-spec {
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        /* Procedure Section */
+        .procedure-section h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .steps-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .step-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            background: white;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            padding: 1.5rem;
+        }
+
+        .step-card:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .step-inner {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #2563eb;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .step-title-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .step-title {
+            font-weight: 600;
+            font-size: 1.125rem;
+            color: #111827;
+        }
+
+        .badge.qc { background: #fecaca; color: #7f1d1d; border-color: #f87171; }
+        .badge.proof { display: inline-flex; align-items: center; gap: 0.25rem; }
+        .badge.proof.photo { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; }
+        .badge.proof.measurement { background: #dbeafe; color: #1e3a8a; border-color: #93c5fd; }
+        .badge.proof.signoff { background: #dcfce7; color: #166534; border-color: #86efac; }
+        .badge.proof.approval { background: #e0e7ff; color: #3730a3; border-color: #a5b4fc; }
+        .badge.proof.checklist { background: #ccfbf1; color: #115e59; border-color: #5eead4; }
+
+        .step-instruction {
+            color: #374151;
+            line-height: 1.75;
+            margin-bottom: 1rem;
+        }
+
+        .step-why {
+            background: #eff6ff;
+            border-left: 2px solid #60a5fa;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .step-why p {
+            font-size: 0.875rem;
+            font-style: italic;
+            color: #1e3a8a;
+        }
+
+        .step-why strong {
+            font-style: normal;
+            font-weight: 500;
+        }
+
+        .step-success {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .step-success p {
+            font-size: 0.875rem;
+            color: #374151;
+        }
+
+        .step-success strong {
+            font-weight: 500;
+        }
+
+        .step-mistake {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .step-mistake p {
+            font-size: 0.875rem;
+            color: #78350f;
+        }
+
+        .step-mistake strong {
+            font-weight: 500;
+        }
+
+        /* Safety Section */
+        .safety-section {
+            background: #fef2f2;
+            border: 2px solid #fca5a5;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+        }
+
+        .safety-section h2 {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+        }
+
+        .safety-section p {
+            color: #1f2937;
+            line-height: 1.75;
+        }
+
+        /* Compliance Section */
+        .compliance-section {
+            background: #eff6ff;
+            border: 1px solid #93c5fd;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+        }
+
+        .compliance-section h2 {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            font-size: 1rem;
+        }
+
+        .compliance-section p {
+            color: #374151;
+            line-height: 1.75;
+        }
+
+        /* Icons (Simple SVG) */
+        .icon {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            @page {
+                size: letter;
+                margin: 0.75in;
+            }
+
+            .nav-bar,
+            .tabs,
+            .info-box,
+            .btn {
+                display: none !important;
+            }
+
+            .sop-content {
+                padding: 0;
+            }
+
+            .sop-header {
+                padding: 1.5rem;
+            }
+
+            .step-card {
+                box-shadow: none !important;
+                page-break-inside: avoid;
+            }
+
+            .section {
+                page-break-inside: avoid;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .requirements-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .timing-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .metadata {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .metadata-divider {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="nav-bar">
+        <div class="nav-content">
+            <div class="nav-title">
+                <h1>SOP Template System</h1>
+                <p>Professional Standard Operating Procedure Templates</p>
+            </div>
+            <button class="btn" onclick="window.print()">
+                <svg class="icon" viewBox="0 0 24 24">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect width="12" height="8" x="6" y="14"></rect>
+                </svg>
+                Print
+            </button>
+        </div>
+    </div>
+
+    <div class="container" style="padding: 2rem 1.5rem;">
+        <div class="tabs">
+            <div class="tab-list">
+                <button class="tab-btn active" onclick="switchTab(0)">Full SOP (All Sections)</button>
+                <button class="tab-btn" onclick="switchTab(1)">Minimal SOP (Missing Sections)</button>
+                <button class="tab-btn" onclick="switchTab(2)">Safety-Focused SOP</button>
+            </div>
+
+            <!-- Tab 1: Full SOP -->
+            <div class="tab-content active" id="tab-0">
+                <div class="info-box blue">
+                    <h3>Full SOP - CNC Machine Operation</h3>
+                    <p>This example shows all available sections populated: Header, Outcome, Timing, PPE, Tools, Materials, 7 detailed procedure steps with badges, Safety notes, and Compliance notes. Demonstrates QC checkpoints, proof requirements, and common mistakes.</p>
+                </div>
+
+                <div class="sop-container">
+                    <!-- Header -->
+                    <div class="sop-header">
+                        <div class="header-top">
+                            <div class="company-logo">P</div>
+                            <div class="company-info">
+                                <div class="subtitle">Precision Manufacturing Co.</div>
+                                <div class="title">Standard Operating Procedure</div>
+                            </div>
+                        </div>
+                        <h1 class="sop-title">CNC Machine Setup and Operation</h1>
+                        <div class="metadata">
+                            <div class="metadata-item">
+                                <span class="metadata-label">Category:</span>
+                                <span class="metadata-value">Manufacturing Operations</span>
+                            </div>
+                            <span class="metadata-divider">|</span>
+                            <div class="metadata-item">
+                                <span class="metadata-label">Type:</span>
+                                <span class="metadata-value">Technical Procedure</span>
+                            </div>
+                            <span class="metadata-divider">|</span>
+                            <div class="metadata-item">
+                                <span class="badge skill-intermediate">Intermediate</span>
+                            </div>
+                            <span class="metadata-divider">|</span>
+                            <div class="metadata-item">
+                                <span class="metadata-label">Audience:</span>
+                                <span class="metadata-value">CNC Operators, Machine Shop Supervisors</span>
+                            </div>
+                            <span class="metadata-divider">|</span>
+                            <div class="metadata-item">
+                                <span class="metadata-label">Last Updated:</span>
+                                <span class="metadata-value">February 15, 2026</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Content -->
+                    <div class="sop-content">
+                        <!-- Outcome -->
+                        <div class="section">
+                            <div class="outcome-section quality">
+                                <div class="outcome-header">
+                                    <svg class="outcome-icon" style="color: #16a34a;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"></path>
+                                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+                                    </svg>
+                                    <h2>Outcome / Purpose <span class="badge outcome-quality">Quality</span></h2>
+                                </div>
+                                <p>Successfully set up and operate the CNC milling machine to produce parts within specified tolerances, ensuring safety compliance and optimal machine performance. This procedure enables operators to achieve consistent quality output while minimizing material waste and machine downtime.</p>
+                            </div>
+                        </div>
+
+                        <!-- Timing -->
+                        <div class="section">
+                            <div class="timing-section">
+                                <div class="timing-header">
+                                    <svg class="icon" viewBox="0 0 24 24">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    Timing
+                                </div>
+                                <div class="timing-grid">
+                                    <div class="timing-item">
+                                        <div class="timing-icon target">
+                                            <svg class="icon" style="color: #2563eb;" viewBox="0 0 24 24">
+                                                <line x1="10" y1="2" x2="14" y2="2"></line>
+                                                <line x1="12" y1="14" x2="12" y2="2"></line>
+                                                <circle cx="12" cy="14" r="8"></circle>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <div class="timing-label">Target Time</div>
+                                            <div class="timing-value">45 minutes</div>
+                                        </div>
+                                    </div>
+                                    <div class="timing-item">
+                                        <div class="timing-icon max">
+                                            <svg class="icon" style="color: #d97706;" viewBox="0 0 24 24">
+                                                <line x1="10" y1="2" x2="14" y2="2"></line>
+                                                <line x1="12" y1="14" x2="12" y2="2"></line>
+                                                <circle cx="12" cy="14" r="8"></circle>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <div class="timing-label">Max Time</div>
+                                            <div class="timing-value">75 minutes</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Requirements -->
+                        <div class="section">
+                            <div class="requirements-grid">
+                                <div class="requirement-box ppe">
+                                    <h2>
+                                        <svg class="icon" style="color: #b45309;" viewBox="0 0 24 24">
+                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                        </svg>
+                                        PPE Required
+                                    </h2>
+                                    <ul>
+                                        <li>Safety Glasses <span class="item-spec">(ANSI Z87.1)</span></li>
+                                        <li>Steel-Toe Boots <span class="item-spec">(ASTM F2413)</span></li>
+                                        <li>Hearing Protection <span class="item-spec">(NRR 25dB minimum)</span></li>
+                                        <li>Cut-Resistant Gloves <span class="item-spec">(ANSI Level A4)</span></li>
+                                    </ul>
+                                </div>
+                                <div class="requirement-box tools">
+                                    <h2>
+                                        <svg class="icon" style="color: #2563eb;" viewBox="0 0 24 24">
+                                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                                        </svg>
+                                        Tools Required
+                                    </h2>
+                                    <ul>
+                                        <li>Torque Wrench <span class="item-spec">(20-200 ft-lbs)</span></li>
+                                        <li>Dial Indicator <span class="item-spec">(0.0001" resolution)</span></li>
+                                        <li>Edge Finder <span class="item-spec">(±0.0002" accuracy)</span></li>
+                                        <li>Micrometer Set <span class="item-spec">(0-6 inch range)</span></li>
+                                    </ul>
+                                </div>
+                                <div class="requirement-box materials">
+                                    <h2>
+                                        <svg class="icon" style="color: #16a34a;" viewBox="0 0 24 24">
+                                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                        </svg>
+                                        Materials Required
+                                    </h2>
+                                    <ul>
+                                        <li>Aluminum 6061-T6 Stock <span class="item-spec">(1 piece)</span></li>
+                                        <li>Cutting Fluid (Synthetic) <span class="item-spec">(2 gallons)</span></li>
+                                        <li>Carbide End Mills <span class="item-spec">(3 pieces)</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Procedure -->
+                        <div class="section procedure-section">
+                            <h2>Procedure</h2>
+                            <div class="steps-container">
+                                <!-- Step 1 -->
+                                <div class="step-card">
+                                    <div class="step-inner">
+                                        <div class="step-number">1</div>
+                                        <div class="step-content">
+                                            <div class="step-title-row">
+                                                <h3 class="step-title">Perform Pre-Operation Safety Check</h3>
+                                                <span class="badge qc">QC Checkpoint</span>
+                                                <span class="badge proof checklist">
+                                                    <svg class="icon" style="width: 12px; height: 12px;" viewBox="0 0 24 24">
+                                                        <path d="M9 11l3 3L22 4"></path>
+                                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                                    </svg>
+                                                    Checklist
+                                                </span>
+                                            </div>
+                                            <p class="step-instruction">Walk around the CNC machine and visually inspect all safety guards, emergency stop buttons, and door interlocks. Test each emergency stop button by pressing and releasing, ensuring the machine power cuts immediately. Check that coolant levels are adequate and that there are no leaks or pooled fluids on the floor. Verify that the work area is clear of tools, materials, and obstructions that could interfere with machine operation.</p>
+                                            <div class="step-why">
+                                                <p><strong>Why it matters:</strong> A thorough safety check prevents accidents, protects operators from injury, and ensures compliance with OSHA machine guarding requirements.</p>
+                                            </div>
+                                            <div class="step-success">
+                                                <svg class="icon" style="color: #16a34a; width: 20px; height: 20px; flex-shrink: 0;" viewBox="0 0 24 24">
+                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                                </svg>
+                                                <p><strong>Success:</strong> All emergency stops function correctly, safety guards are intact and properly positioned, coolant reservoir is at least 75% full, and work area is clean.</p>
+                                            </div>
+                                            <div class="step-mistake">
+                                                <svg class="icon" style="color: #d97706; width: 20px; height: 20px; flex-shrink: 0;" viewBox="0 0 24 24">
+                                                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                                </svg>
+                                                <p><strong>Common mistake:</strong> Skipping the emergency stop test or assuming guards are secure without physical inspection.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Step 2 -->
+                                <div class="step-card">
+                                    <div class="step-inner">
+                                        <div class="step-number">2</div>
+                                        <div class="step-content">
+                                            <div class="step-title-row">
+                                                <h3 class="step-title">Load and Secure Workpiece</h3>
+                                                <span class="badge qc">QC Checkpoint</span>
+                                                <span class="badge proof photo">
+                                                    <svg class="icon" style="width: 12px; height: 12px;" viewBox="0 0 24 24">
+                                                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                                                        <circle cx="12" cy="13" r="4"></circle>
+                                                    </svg>
+                                                    Photo
+                                                </span>
+                                            </div>
+                                            <p class="step-instruction">Clean the machine table and vise jaws thoroughly with a lint-free cloth to remove any chips, debris, or coolant residue. Position the aluminum stock in the vise, ensuring it sits flat against the bottom of the vise and is parallel to the vise jaws. Use parallels if needed to elevate the workpiece above the vise jaws. Tighten the vise in stages, alternating between the front and back screws to apply even pressure. Use a torque wrench set to 45 ft-lbs for final tightening.</p>
+                                            <div class="step-why">
+                                                <p><strong>Why it matters:</strong> Proper workpiece clamping prevents movement during machining, which could cause part rejection, tool breakage, or dangerous projectiles.</p>
+                                            </div>
+                                            <div class="step-success">
+                                                <svg class="icon" style="color: #16a34a; width: 20px; height: 20px; flex-shrink: 0;" viewBox="0 0 24 24">
+                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                                </svg>
+                                                <p><strong>Success:</strong> Workpiece does not move when moderate hand pressure is applied, and dial indicator shows less than 0.002" deflection when probed.</p>
+                                            </div>
+                                            <div class="step-mistake">
+                                                <svg class="icon" style="color: #d97706; width: 20px; height: 20px; flex-shrink: 0;" viewBox="0 0 24 24">
+                                                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                                </svg>
+                                                <p><strong>Common mistake:</strong> Over-tightening the vise which can deform soft materials, or failing to clean surfaces which creates an unstable setup.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Step 3 -->
+                                <div class="step-card">
+                                    <div class="step-inner">
+                                        <div class="step-number">3</div>
+                                        <div class="step-content">
+                                            <div class="step-title-row">
+                                                <h3 class="step-title">Install and Measure Cutting Tools</h3>
+                                                <span class="badge proof measurement">
+                                                    <svg class="icon" style="width: 12px; height: 12px;" viewBox="0 0 24 24">
+                                                        <path d="M9 11l3 3L22 4"></path>
+                                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                                    </svg>
+                                                    Measurement Log
+                                                </span>
+                                            </div>
+                                            <p class="step-instruction">Select the appropriate carbide end mills based on the job specification sheet. Inspect each tool for chips, cracks, or excessive wear using a 10x magnifier. Clean the tool holder taper and collet with a clean cloth, then install the tool ensuring it is seated fully in the collet. Tighten the collet nut to the manufacturer's specified torque. Load the tool into the machine spindle and measure the tool length using the touch-off probe or manual edge finder. Record the tool offset in the machine's tool library, double-checking that the correct tool number corresponds to the programmed tool call.</p>
+                                            <div class="step-why">
+                                                <p><strong>Why it matters:</strong> Accurate tool measurement is critical for achieving dimensional accuracy, and damaged tools can break during operation causing injury or machine damage.</p>
+                                            </div>
+                                            <div class="step-success">
+                                                <svg class="icon" style="color: #16a34a; width: 20px; height: 20px; flex-shrink: 0;" viewBox="0 0 24 24">
+                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                                </svg>
+                                                <p><strong>Success:</strong> Tool length offset is recorded within ±0.001" of actual measurement, and tool spins true with less than 0.003" runout.</p>
+                                            </div>
+                                            <div class="step-mistake">
+                                                <svg class="icon" style="color: #d97706; width: 20px; height: 20px; flex-shrink: 0;" viewBox="0 0 24 24">
+                                                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                                </svg>
+                                                <p><strong>Common mistake:</strong> Failing to clean the tool taper, which causes runout, or entering the wrong tool number in the offset table.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Safety -->
+                        <div class="section">
+                            <div class="safety-section">
+                                <h2>
+                                    <svg class="icon" style="color: #dc2626;" viewBox="0 0 24 24">
+                                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                    </svg>
+                                    Safety Notes
+                                </h2>
+                                <p>Never reach into the machine work envelope while the spindle is rotating or during program execution. Always use the emergency stop if unexpected movement occurs. Chips can be extremely sharp and hot—never remove chips by hand, use a brush or hook. Long hair must be tied back and loose clothing secured. Do not wear gloves when operating controls or touching rotating parts. Cutting fluids can cause skin irritation—wash hands thoroughly after handling. Report any unusual vibrations, noises, or odors immediately to your supervisor.</p>
+                            </div>
+                        </div>
+
+                        <!-- Compliance -->
+                        <div class="section">
+                            <div class="compliance-section">
+                                <h2>
+                                    <svg class="icon" style="color: #2563eb;" viewBox="0 0 24 24">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                                        <polyline points="10 9 9 9 8 9"></polyline>
+                                    </svg>
+                                    Compliance Notes
+                                </h2>
+                                <p>This procedure complies with OSHA 29 CFR 1910.212 (Machine Guarding), OSHA 29 CFR 1910.147 (Lockout/Tagout), and ANSI B11.19 (Performance Requirements for Risk Reduction). All operators must complete certified CNC training before performing this procedure unsupervised. Machine maintenance records must be kept for a minimum of 5 years per ISO 9001:2015 requirements.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Minimal SOP -->
+            <div class="tab-content" id="tab-1">
+                <div class="info-box amber">
+                    <h3>Minimal SOP - Restaurant Opening</h3>
+                    <p>This example demonstrates what happens when sections have no data—they are completely skipped and everything slides up. Notice there's no PPE, Tools, Materials, Safety, or Compliance sections. Only essential sections are shown.</p>
+                </div>
+
+                <div class="sop-container">
+                    <div class="sop-header">
+                        <div class="header-top">
+                            <div class="company-logo">Q</div>
+                            <div class="company-info">
+                                <div class="subtitle">QuickServe Restaurant Group</div>
+                                <div class="title">Standard Operating Procedure</div>
+                            </div>
+                        </div>
+                        <h1 class="sop-title">Opening Checklist - Front of House</h1>
+                        <div class="metadata">
+                            <div class="metadata-item">
+                                <span class="metadata-label">Category:</span>
+                                <span class="metadata-value">Daily Operations</span>
+                            </div>
+                            <span class="metadata-divider">|</span>
+                            <div class="metadata-item">
+                                <span class="metadata-label">Type:</span>
+                                <span class="metadata-value">Checklist</span>
+                            </div>
+                            <span class="metadata-divider">|</span>
+                            <div class="metadata-item">
+                                <span class="badge skill-beginner">Beginner</span>
+                            </div>
+                            <span class="metadata-divider">|</span>
+                            <div class="metadata-item">
+                                <span class="metadata-label">Audience:</span>
+                                <span class="metadata-value">Shift Leaders, Opening Staff</span>
+                            </div>
+                            <span class="metadata-divider">|</span>
+                            <div class="metadata-item">
+                                <span class="metadata-label">Last Updated:</span>
+                                <span class="metadata-value">February 10, 2026</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sop-content">
+                        <div class="section">
+                            <div class="outcome-section completion">
+                                <div class="outcome-header">
+                                    <svg class="outcome-icon" style="color: #2563eb;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <path d="m9 12 2 2 4-4"></path>
+                                    </svg>
+                                    <h2>Outcome / Purpose <span class="badge outcome-completion">Completion</span></h2>
+                                </div>
+                                <p>Ensure the dining area and customer service stations are clean, stocked, and ready for business at opening time.</p>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <div class="timing-section">
+                                <div class="timing-header">
+                                    <svg class="icon" viewBox="0 0 24 24">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    Timing
+                                </div>
+                                <div class="timing-grid">
+                                    <div class="timing-item">
+                                        <div class="timing-icon target">
+                                            <svg class="icon" style="color: #2563eb;" viewBox="0 0 24 24">
+                                                <line x1="10" y1="2" x2="14" y2="2"></line>
+                                                <line x1="12" y1="14" x2="12" y2="2"></line>
+                                                <circle cx="12" cy="14" r="8"></circle>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <div class="timing-label">Target Time</div>
+                                            <div class="timing-value">30 minutes</div>
+                                        </div>
+                                    </div>
+                                    <div class="timing-item">
+                                        <div class="timing-icon max">
+                                            <svg class="icon" style="color: #d97706;" viewBox="0 0 24 24">
+                                                <line x1="10" y1="2" x2="14" y2="2"></line>
+                                                <line x1="12" y1="14" x2="12" y2="2"></line>
+                                                <circle cx="12" cy="14" r="8"></circle>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <div class="timing-label">Max Time</div>
+                                            <div class="timing-value">45 minutes</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="section procedure-section">
+                            <h2>Procedure</h2>
+                            <div class="steps-container">
+                                <div class="step-card">
+                                    <div class="step-inner">
+                                        <div class="step-number">1</div>
+                                        <div class="step-content">
+                                            <div class="step-title-row">
+                                                <h3 class="step-title">Unlock and Enter Building</h3>
+                                            </div>
+                                            <p class="step-instruction">Arrive at least 45 minutes before opening time. Unlock the front door using your assigned key. Immediately disarm the security system using the code provided by management. Turn on main lights in dining area, restrooms, and kitchen.</p>
+                                            <div class="step-why">
+                                                <p><strong>Why it matters:</strong> Arriving early ensures adequate time for setup, and proper alarm disarming prevents false alarms that result in police dispatch fees.</p>
+                                            </div>
+                                            <div class="step-success">
+                                                <svg class="icon" style="color: #16a34a; width: 20px; height: 20px; flex-shrink: 0;" viewBox="0 0 24 24">
+                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                                </svg>
+                                                <p><strong>Success:</strong> All lights are on, security system shows 'disarmed' status, and you have not triggered any alarms.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="step-card">
+                                    <div class="step-inner">
+                                        <div class="step-number">2</div>
+                                        <div class="step-content">
+                                            <div class="step-title-row">
+                                                <h3 class="step-title">Inspect Dining Area</h3>
+                                                <span class="badge proof checklist">
+                                                    <svg class="icon" style="width: 12px; height: 12px;" viewBox="0 0 24 24">
+                                                        <path d="M9 11l3 3L22 4"></path>
+                                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                                    </svg>
+                                                    Checklist
+                                                </span>
+                                            </div>
+                                            <p class="step-instruction">Walk through the entire dining room checking all tables and chairs. Wipe down any surfaces that show dust or spots. Check that salt, pepper, and condiments are present at each table and are at least half full. Ensure menus are clean and undamaged—replace any that are torn or heavily stained. Verify that the floor is clean with no debris or sticky spots.</p>
+                                            <div class="step-why">
+                                                <p><strong>Why it matters:</strong> First impressions matter to customers, and a clean dining area sets expectations for food quality and service.</p>
+                                            </div>
+                                            <div class="step-success">
+                                                <svg class="icon" style="color: #16a34a; width: 20px; height: 20px; flex-shrink: 0;" viewBox="0 0 24 24">
+                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                                </svg>
+                                                <p><strong>Success:</strong> All tables are clean and properly set, floor is spotless, and no maintenance issues are visible.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Safety SOP -->
+            <div class="tab-content" id="tab-2">
+                <div class="info-box red">
+                    <h3>Safety SOP - Hazardous Waste Disposal</h3>
+                    <p>This example emphasizes safety-critical procedures with prominent PPE requirements, QC checkpoints, and detailed safety/compliance sections. Notice the safety outcome type and extensive regulatory compliance notes.</p>
+                </div>
+
+                <div class="sop-container">
+                    <div class="sop-header">
+                        <div class="header-top">
+                            <div class="company-logo">C</div>
+                            <div class="company-info">
+                                <div class="subtitle">Chemical Solutions Inc.</div>
+                                <div class="title">Standard Operating Procedure</div>
+                            </div>
+                        </div>
+                        <h1 class="sop-title">Hazardous Waste Disposal Procedure</h1>
+                        <div class="metadata">
+                            <div class="metadata-item">
+                                <span class="metadata-label">Category:</span>
+                                <span class="metadata-value">Environmental Health & Safety</span>
+                            </div>
+                            <span class="metadata-divider">|</span>
+                            <div class="metadata-item">
+                                <span class="metadata-label">Type:</span>
+                                <span class="metadata-value">Safety Procedure</span>
+                            </div>
+                            <span class="metadata-divider">|</span>
+                            <div class="metadata-item">
+                                <span class="badge skill-advanced">Advanced</span>
+                            </div>
+                            <span class="metadata-divider">|</span>
+                            <div class="metadata-item">
+                                <span class="metadata-label">Audience:</span>
+                                <span class="metadata-value">EHS Coordinators, Lab Technicians</span>
+                            </div>
+                            <span class="metadata-divider">|</span>
+                            <div class="metadata-item">
+                                <span class="metadata-label">Last Updated:</span>
+                                <span class="metadata-value">February 1, 2026</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sop-content">
+                        <div class="section">
+                            <div class="outcome-section safety">
+                                <div class="outcome-header">
+                                    <svg class="outcome-icon" style="color: #ea580c;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                    </svg>
+                                    <h2>Outcome / Purpose <span class="badge outcome-safety">Safety</span></h2>
+                                </div>
+                                <p>Safely collect, label, and dispose of hazardous chemical waste in compliance with EPA and local regulations, protecting personnel and the environment.</p>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <div class="requirements-grid">
+                                <div class="requirement-box ppe">
+                                    <h2>
+                                        <svg class="icon" style="color: #b45309;" viewBox="0 0 24 24">
+                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                        </svg>
+                                        PPE Required
+                                    </h2>
+                                    <ul>
+                                        <li>Chemical Splash Goggles <span class="item-spec">(ANSI Z87.1)</span></li>
+                                        <li>Nitrile Gloves <span class="item-spec">(ASTM D6319, 6-mil min)</span></li>
+                                        <li>Lab Coat <span class="item-spec">(Flame-resistant)</span></li>
+                                        <li>Closed-Toe Shoes <span class="item-spec">(Chemical-resistant)</span></li>
+                                    </ul>
+                                </div>
+                                <div class="requirement-box tools">
+                                    <h2>
+                                        <svg class="icon" style="color: #2563eb;" viewBox="0 0 24 24">
+                                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                                        </svg>
+                                        Tools Required
+                                    </h2>
+                                    <ul>
+                                        <li>Chemical Waste Container <span class="item-spec">(DOT-approved)</span></li>
+                                        <li>Waste Labels <span class="item-spec">(EPA 40 CFR 262.34)</span></li>
+                                        <li>pH Test Strips</li>
+                                        <li>Absorbent Pads</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="section procedure-section">
+                            <h2>Procedure</h2>
+                            <div class="steps-container">
+                                <div class="step-card">
+                                    <div class="step-inner">
+                                        <div class="step-number">1</div>
+                                        <div class="step-content">
+                                            <div class="step-title-row">
+                                                <h3 class="step-title">Review Safety Data Sheets (SDS)</h3>
+                                                <span class="badge qc">QC Checkpoint</span>
+                                                <span class="badge proof checklist">
+                                                    <svg class="icon" style="width: 12px; height: 12px;" viewBox="0 0 24 24">
+                                                        <path d="M9 11l3 3L22 4"></path>
+                                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                                    </svg>
+                                                    Checklist
+                                                </span>
+                                            </div>
+                                            <p class="step-instruction">Before handling any chemical waste, locate and read the Safety Data Sheets for all chemicals in the waste stream. Pay particular attention to Section 7 (Handling and Storage) and Section 13 (Disposal Considerations). Identify any incompatible chemicals that must be kept separate. Note any special handling requirements such as ventilation needs, temperature controls, or time-sensitive reactions.</p>
+                                            <div class="step-why">
+                                                <p><strong>Why it matters:</strong> Mixing incompatible chemicals can cause violent reactions, fires, or toxic gas release that endanger personnel and facilities.</p>
+                                            </div>
+                                            <div class="step-success">
+                                                <svg class="icon" style="color: #16a34a; width: 20px; height: 20px; flex-shrink: 0;" viewBox="0 0 24 24">
+                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                                </svg>
+                                                <p><strong>Success:</strong> All SDSs are reviewed and documented, incompatibilities are noted, and appropriate segregation plan is established.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <div class="safety-section">
+                                <h2>
+                                    <svg class="icon" style="color: #dc2626;" viewBox="0 0 24 24">
+                                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                    </svg>
+                                    Safety Notes
+                                </h2>
+                                <p>DANGER: Hazardous chemical waste can cause severe injury or death. Never work alone when handling hazardous waste. Know the location of emergency eyewash stations, safety showers, and spill kits. In case of skin contact, immediately flush with water for 15 minutes and seek medical attention. For spills larger than 1 liter or involving highly toxic materials, evacuate the area and call the emergency response team.</p>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <div class="compliance-section">
+                                <h2>
+                                    <svg class="icon" style="color: #2563eb;" viewBox="0 0 24 24">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                                        <polyline points="10 9 9 9 8 9"></polyline>
+                                    </svg>
+                                    Compliance Notes
+                                </h2>
+                                <p>This procedure meets EPA RCRA requirements (40 CFR 262), OSHA Hazard Communication Standard (29 CFR 1910.1200), and applicable state hazardous waste regulations. Facilities must not accumulate hazardous waste for more than 90 days without a permit. All personnel handling hazardous waste must complete annual RCRA training and document completion.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(index) {
+            // Update tab buttons
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            tabButtons.forEach((btn, i) => {
+                if (i === index) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            // Update tab content
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach((content, i) => {
+                if (i === index) {
+                    content.classList.add('active');
+                } else {
+                    content.classList.remove('active');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
