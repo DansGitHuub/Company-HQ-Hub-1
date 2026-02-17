@@ -20,7 +20,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import SOPBuilder, { type SOPBuilderData } from "@/components/SOPBuilder";
-import type { Sop, SopCategory, SopTemplate, SopExample, SopDraft, SopQuiz } from "@shared/schema";
+import SOPTemplateRenderer, { generateSOPPrintHTML, type SOPStructuredData } from "@/components/SOPTemplateRenderer";
+import type { Sop, SopCategory, SopTemplate, SopExample, SopDraft, SopQuiz, CompanySettings } from "@shared/schema";
 import { Clock, PlayCircle, Brain, Printer, Download, Mail, Eye, EyeOff, Bold, Italic, Underline, Heading2, Heading3, List, ToggleLeft, ToggleRight, SearchCheck } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -106,6 +107,10 @@ export default function SOPs() {
 
   const { data: examples = [] } = useQuery<SopExample[]>({
     queryKey: ["/api/sop-examples"],
+  });
+
+  const { data: companySettings } = useQuery<CompanySettings>({
+    queryKey: ["/api/company-settings"],
   });
 
   const createMutation = useMutation({
@@ -373,12 +378,13 @@ export default function SOPs() {
       });
       
       if (!res.ok) throw new Error("AI generation failed");
-      const { content, title, category } = await res.json();
+      const { content, title, category, structuredData } = await res.json();
       
       await createMutation.mutateAsync({
         title: title || "AI Generated SOP",
         category: category || "General",
         content: content,
+        structuredData: structuredData || undefined,
         ownerId: user?.id,
         categoryId: createCategoryId || undefined,
       });
@@ -399,117 +405,140 @@ export default function SOPs() {
   }
 
   if (selectedSOP) {
+    const structuredData = selectedSOP.structuredData as SOPStructuredData | null;
+    const hasStructuredView = !!structuredData && !!structuredData.steps && structuredData.steps.length > 0;
+
+    const handlePrint = () => {
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) return;
+      if (hasStructuredView) {
+        const html = generateSOPPrintHTML(selectedSOP.title, selectedSOP.category, selectedSOP.sopType || "", selectedSOP.lastUpdated, structuredData!, companySettings?.companyName || undefined);
+        printWindow.document.write(html);
+      } else {
+        printWindow.document.write(`<!DOCTYPE html><html><head><title>${selectedSOP.title}</title><style>
+          body { font-family: Arial, sans-serif; padding: 24px; max-width: 800px; margin: 0 auto; color: #1f2937; }
+          h1 { font-size: 24px; border-bottom: 2px solid #166534; padding-bottom: 8px; color: #166534; }
+          h2 { font-size: 18px; margin-top: 20px; color: #166534; }
+          h3 { font-size: 15px; margin-top: 16px; }
+          table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+          th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-size: 13px; }
+          th { background: #f0fdf4; color: #166534; }
+          img { max-width: 100%; height: auto; margin: 12px 0; border-radius: 8px; }
+          ul, ol { padding-left: 20px; }
+          li { margin-bottom: 4px; }
+          @media print { body { padding: 0; } }
+        </style></head><body><h1>${selectedSOP.title}</h1><p style="color:#6b7280;font-size:12px;margin-bottom:16px;">Category: ${selectedSOP.category || "Uncategorized"} | Last updated: ${selectedSOP.lastUpdated ? new Date(selectedSOP.lastUpdated).toLocaleDateString() : "N/A"}</p>${selectedSOP.content}</body></html>`);
+      }
+      printWindow.document.close();
+      printWindow.print();
+    };
+
+    const handleDownload = () => {
+      let fullHtml: string;
+      if (hasStructuredView) {
+        fullHtml = generateSOPPrintHTML(selectedSOP.title, selectedSOP.category, selectedSOP.sopType || "", selectedSOP.lastUpdated, structuredData!, companySettings?.companyName || undefined);
+      } else {
+        fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${selectedSOP.title}</title><style>
+          body { font-family: Arial, sans-serif; padding: 24px; max-width: 800px; margin: 0 auto; color: #1f2937; }
+          h1 { font-size: 24px; border-bottom: 2px solid #166534; padding-bottom: 8px; color: #166534; }
+          h2 { font-size: 18px; margin-top: 20px; color: #166534; }
+          h3 { font-size: 15px; margin-top: 16px; }
+          table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+          th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-size: 13px; }
+          th { background: #f0fdf4; color: #166534; }
+          img { max-width: 100%; height: auto; margin: 12px 0; border-radius: 8px; }
+        </style></head><body><h1>${selectedSOP.title}</h1><p style="color:#6b7280;font-size:12px;margin-bottom:16px;">Category: ${selectedSOP.category || "Uncategorized"} | Last updated: ${selectedSOP.lastUpdated ? new Date(selectedSOP.lastUpdated).toLocaleDateString() : "N/A"}</p>${selectedSOP.content}</body></html>`;
+      }
+      const blob = new Blob([fullHtml], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${selectedSOP.title.replace(/[^a-zA-Z0-9]/g, "_")}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "SOP downloaded" });
+    };
+
     return (
       <div className="space-y-6 max-w-4xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
-        <Button variant="ghost" onClick={() => setSelectedSOP(null)} className="pl-0 gap-2 text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="w-4 h-4" /> Back to Library
-        </Button>
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" onClick={() => setSelectedSOP(null)} className="pl-0 gap-2 text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="w-4 h-4" /> Back to Library
+          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setEditingSOP(selectedSOP)} data-testid="button-edit-sop">
+              <Edit className="w-4 h-4 mr-2" /> Edit
+            </Button>
+            <Button variant="outline" onClick={handlePrint} data-testid="button-print-sop">
+              <Printer className="w-4 h-4 mr-2" /> Print
+            </Button>
+            <Button variant="outline" onClick={handleDownload} data-testid="button-download-sop">
+              <Download className="w-4 h-4 mr-2" /> Download
+            </Button>
+            <Button variant="outline" onClick={() => {
+              const email = prompt("Enter email address to send this SOP to:");
+              if (!email || !email.includes("@")) {
+                if (email) toast({ title: "Please enter a valid email address", variant: "destructive" });
+                return;
+              }
+              apiRequest("POST", "/api/sop-email", { sopId: selectedSOP.id, toEmail: email })
+                .then(() => toast({ title: "SOP sent!", description: `Emailed to ${email}` }))
+                .catch(() => toast({ title: "Failed to send email", variant: "destructive" }));
+            }} data-testid="button-email-sop">
+              <Mail className="w-4 h-4 mr-2" /> Email
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => { setCopyingSopId(selectedSOP.id); setCopyDialogOpen(true); }}>
+                  <Copy className="w-4 h-4 mr-2" /> Copy to...
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setMovingSopId(selectedSOP.id); setMoveDialogOpen(true); }}>
+                  <Move className="w-4 h-4 mr-2" /> Move
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleArchive(selectedSOP)}>
+                  <Archive className="w-4 h-4 mr-2" /> {selectedSOP.isArchived ? "Restore" : "Archive"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => {
+                    if (confirm(`Are you sure you want to delete "${selectedSOP.title}"?`)) {
+                      deleteMutation.mutate(selectedSOP.id);
+                    }
+                  }}
+                  className="text-destructive"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
         
         <div className="space-y-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <Badge variant="outline" className="mb-2">{selectedSOP.category}</Badge>
-              {selectedSOP.isArchived && <Badge variant="secondary" className="ml-2">Archived</Badge>}
-              <h1 className="text-2xl font-heading font-bold text-foreground">{selectedSOP.title}</h1>
-              <p className="text-sm text-muted-foreground mt-2">
-                Last updated: {selectedSOP.lastUpdated ? new Date(selectedSOP.lastUpdated).toLocaleDateString() : "N/A"}
-              </p>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <Button variant="outline" onClick={() => setEditingSOP(selectedSOP)} data-testid="button-edit-sop">
-                <Edit className="w-4 h-4 mr-2" /> Edit
-              </Button>
-              <Button variant="outline" onClick={() => {
-                const printWindow = window.open("", "_blank");
-                if (printWindow) {
-                  printWindow.document.write(`<!DOCTYPE html><html><head><title>${selectedSOP.title}</title><style>
-                    body { font-family: Arial, sans-serif; padding: 24px; max-width: 800px; margin: 0 auto; color: #1f2937; }
-                    h1 { font-size: 24px; border-bottom: 2px solid #166534; padding-bottom: 8px; color: #166534; }
-                    h2 { font-size: 18px; margin-top: 20px; color: #166534; }
-                    h3 { font-size: 15px; margin-top: 16px; }
-                    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-                    th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-size: 13px; }
-                    th { background: #f0fdf4; color: #166534; }
-                    img { max-width: 100%; height: auto; margin: 12px 0; border-radius: 8px; }
-                    ul, ol { padding-left: 20px; }
-                    li { margin-bottom: 4px; }
-                    @media print { body { padding: 0; } }
-                  </style></head><body><h1>${selectedSOP.title}</h1><p style="color:#6b7280;font-size:12px;margin-bottom:16px;">Category: ${selectedSOP.category || "Uncategorized"} | Last updated: ${selectedSOP.lastUpdated ? new Date(selectedSOP.lastUpdated).toLocaleDateString() : "N/A"}</p>${selectedSOP.content}</body></html>`);
-                  printWindow.document.close();
-                  printWindow.print();
-                }
-              }} data-testid="button-print-sop">
-                <Printer className="w-4 h-4 mr-2" /> Print
-              </Button>
-              <Button variant="outline" onClick={() => {
-                const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${selectedSOP.title}</title><style>
-                  body { font-family: Arial, sans-serif; padding: 24px; max-width: 800px; margin: 0 auto; color: #1f2937; }
-                  h1 { font-size: 24px; border-bottom: 2px solid #166534; padding-bottom: 8px; color: #166534; }
-                  h2 { font-size: 18px; margin-top: 20px; color: #166534; }
-                  h3 { font-size: 15px; margin-top: 16px; }
-                  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-                  th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-size: 13px; }
-                  th { background: #f0fdf4; color: #166534; }
-                  img { max-width: 100%; height: auto; margin: 12px 0; border-radius: 8px; }
-                </style></head><body><h1>${selectedSOP.title}</h1><p style="color:#6b7280;font-size:12px;margin-bottom:16px;">Category: ${selectedSOP.category || "Uncategorized"} | Last updated: ${selectedSOP.lastUpdated ? new Date(selectedSOP.lastUpdated).toLocaleDateString() : "N/A"}</p>${selectedSOP.content}</body></html>`;
-                const blob = new Blob([fullHtml], { type: "text/html" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `${selectedSOP.title.replace(/[^a-zA-Z0-9]/g, "_")}.html`;
-                a.click();
-                URL.revokeObjectURL(url);
-                toast({ title: "SOP downloaded" });
-              }} data-testid="button-download-sop">
-                <Download className="w-4 h-4 mr-2" /> Download
-              </Button>
-              <Button variant="outline" onClick={() => {
-                const email = prompt("Enter email address to send this SOP to:");
-                if (!email || !email.includes("@")) {
-                  if (email) toast({ title: "Please enter a valid email address", variant: "destructive" });
-                  return;
-                }
-                apiRequest("POST", "/api/sop-email", { sopId: selectedSOP.id, toEmail: email })
-                  .then(() => toast({ title: "SOP sent!", description: `Emailed to ${email}` }))
-                  .catch(() => toast({ title: "Failed to send email", variant: "destructive" }));
-              }} data-testid="button-email-sop">
-                <Mail className="w-4 h-4 mr-2" /> Email
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => { setCopyingSopId(selectedSOP.id); setCopyDialogOpen(true); }}>
-                    <Copy className="w-4 h-4 mr-2" /> Copy to...
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => { setMovingSopId(selectedSOP.id); setMoveDialogOpen(true); }}>
-                    <Move className="w-4 h-4 mr-2" /> Move
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleArchive(selectedSOP)}>
-                    <Archive className="w-4 h-4 mr-2" /> {selectedSOP.isArchived ? "Restore" : "Archive"}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={() => {
-                      if (confirm(`Are you sure you want to delete "${selectedSOP.title}"?`)) {
-                        deleteMutation.mutate(selectedSOP.id);
-                      }
-                    }}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-          <Card className="min-h-[60vh]">
-            <CardContent className="p-8 prose prose-slate dark:prose-invert max-w-none">
-              <div dangerouslySetInnerHTML={{ __html: selectedSOP.content }} />
-            </CardContent>
+          {selectedSOP.isArchived && (
+            <Badge variant="secondary">Archived</Badge>
+          )}
+          <Card className="min-h-[60vh] overflow-hidden">
+            {hasStructuredView ? (
+              <SOPTemplateRenderer
+                title={selectedSOP.title}
+                category={selectedSOP.category}
+                sopType={selectedSOP.sopType || undefined}
+                lastUpdated={selectedSOP.lastUpdated}
+                companyName={companySettings?.companyName || undefined}
+                companyLogoUrl={companySettings?.logoUrl || undefined}
+                data={structuredData!}
+              />
+            ) : (
+              <CardContent className="p-8 prose prose-slate dark:prose-invert max-w-none">
+                <div dangerouslySetInnerHTML={{ __html: selectedSOP.content }} />
+              </CardContent>
+            )}
           </Card>
 
           {(user?.role === "Admin" || user?.role === "Manager") && (
@@ -650,6 +679,7 @@ export default function SOPs() {
             subCategory: sopData.subCategory || undefined,
             sopType: sopData.sopType || undefined,
             content: sopData.content,
+            structuredData: sopData.structuredData || undefined,
             ownerId: user?.id,
           }, {
             onSuccess: () => {

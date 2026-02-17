@@ -685,6 +685,10 @@ export class DatabaseStorage implements IStorage {
       category: targetCategoryName || originalSop.category,
       categoryId: targetCategoryId || originalSop.categoryId,
       content: originalSop.content,
+      structuredData: originalSop.structuredData,
+      sopType: originalSop.sopType,
+      superCategory: originalSop.superCategory,
+      subCategory: originalSop.subCategory,
       ownerId: originalSop.ownerId,
     }).returning();
     return newSop;

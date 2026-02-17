@@ -1210,6 +1210,19 @@ Rules:
             - title: A clear, concise title for the SOP
             - category: One of [Operations, Sales, Installation, Equipment, Safety, HR, Customer Service, General]
             - content: The full SOP content formatted in HTML with proper headings (h2, h3), numbered/bulleted lists, and clear sections
+            - structuredData: An object with these fields:
+              - outcome: string (1-3 sentences describing the desired outcome)
+              - outcomeType: string (one of: "completion", "quality", "safety", "kpi")
+              - audience: string (e.g. "Landscape Crew Members", "All Employees")
+              - skillLevel: string (one of: "beginner", "intermediate", "advanced", "all")
+              - timingTarget: string (e.g. "30 minutes")
+              - timingMax: string (e.g. "60 minutes")
+              - ppe: string (one item per line, include ANSI/OSHA ratings)
+              - tools: string (one tool per line, include sizes/specs)
+              - materials: string (one material per line, include quantities)
+              - steps: array of objects with { id: string, title: string, instruction: string (3-5 sentences), why: string, successCriteria: string, commonMistakes: string, proofRequired: boolean, proofType: string (photo/measurement_log/supervisor_signoff/checklist), isQCCheckpoint: boolean }
+              - safetyNotes: string
+              - complianceNotes: string
             
             Make the content practical, detailed, and professional. Include safety considerations where relevant.`
           },
@@ -1219,7 +1232,7 @@ Rules:
           }
         ],
         response_format: { type: "json_object" },
-        max_tokens: 2048,
+        max_tokens: 4096,
       });
 
       const result = JSON.parse(completion.choices[0]?.message?.content || "{}");

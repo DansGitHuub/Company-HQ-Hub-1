@@ -3112,7 +3112,7 @@ function generateTrainingContent(data: SOPBuilderData): string {
 
 interface SOPBuilderProps {
   categories: SopCategory[];
-  onComplete: (sopData: { title: string; category: string; categoryId: string; content: string; superCategory?: string; subCategory?: string; sopType?: string }) => void;
+  onComplete: (sopData: { title: string; category: string; categoryId: string; content: string; structuredData?: any; superCategory?: string; subCategory?: string; sopType?: string }) => void;
   onCancel: () => void;
   isSubmitting: boolean;
   initialData?: SOPBuilderData & { draftId?: string };
@@ -3359,11 +3359,38 @@ export default function SOPBuilder({ categories, onComplete, onCancel, isSubmitt
       return;
     }
     const content = generateSOPContent(data);
+    const structuredData = {
+      outcome: data.outcome || undefined,
+      outcomeType: data.outcomeType || undefined,
+      audience: data.audience || undefined,
+      skillLevel: data.skillLevel || undefined,
+      timingTarget: data.timingTarget || undefined,
+      timingMax: data.timingMax || undefined,
+      ppe: data.ppe || undefined,
+      tools: data.tools || undefined,
+      materials: data.materials || undefined,
+      steps: data.steps.map(s => ({
+        id: s.id,
+        title: s.title,
+        instruction: s.instruction,
+        why: s.why || undefined,
+        successCriteria: s.successCriteria || undefined,
+        commonMistakes: s.commonMistakes || undefined,
+        proofRequired: s.proofRequired || false,
+        proofType: s.proofType || undefined,
+        isQCCheckpoint: s.isQCCheckpoint || false,
+        imageUrl: data.stepImages[s.id]?.url || undefined,
+      })),
+      safetyNotes: data.safetyNotes || undefined,
+      complianceNotes: data.complianceNotes || undefined,
+      headerImageUrl: data.headerImage?.url || undefined,
+    };
     onComplete({
       title: data.title,
       category: data.category,
       categoryId: data.categoryId,
       content,
+      structuredData,
       superCategory: data.superCategory || undefined,
       subCategory: data.subCategory || undefined,
       sopType: data.sopType || undefined,

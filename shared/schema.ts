@@ -61,6 +61,7 @@ export const sops = pgTable("sops", {
   subCategory: text("sub_category"),
   sopType: text("sop_type"),
   content: text("content").notNull(),
+  structuredData: jsonb("structured_data"),
   ownerId: varchar("owner_id", { length: 36 }).references(() => users.id),
   isArchived: boolean("is_archived").notNull().default(false),
   lastUpdated: timestamp("last_updated").defaultNow(),
@@ -74,6 +75,7 @@ export const insertSopSchema = createInsertSchema(sops).pick({
   subCategory: true,
   sopType: true,
   content: true,
+  structuredData: true,
   ownerId: true,
 });
 
