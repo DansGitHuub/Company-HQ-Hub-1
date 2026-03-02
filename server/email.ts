@@ -2,6 +2,11 @@ import { Resend } from 'resend';
 
 let connectionSettings: any;
 
+function getAppUrl(): string {
+  const domain = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN;
+  return domain ? `https://${domain}` : 'http://localhost:5000';
+}
+
 async function getCredentials() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY 
@@ -43,7 +48,7 @@ export async function sendPasswordRecoveryEmail(toEmail: string, recoveryToken: 
   const { client, fromEmail } = await getResendClient();
   console.log("[email] Got Resend client, fromEmail:", fromEmail);
   
-  const recoveryUrl = `${process.env.REPLIT_DEV_DOMAIN ? 'https://' + process.env.REPLIT_DEV_DOMAIN : 'http://localhost:5000'}/auth?recovery=${recoveryToken}`;
+  const recoveryUrl = `${getAppUrl()}/auth?recovery=${recoveryToken}`;
   
   // Use verified domain for sending emails
   const senderEmail = 'Company HQ <noreply@chapinlandscapes.com>';
@@ -95,7 +100,7 @@ export async function sendSOPEmail(
   const { client, fromEmail } = await getResendClient();
 
   const senderEmail = 'Company HQ <noreply@chapinlandscapes.com>';
-  const appUrl = process.env.REPLIT_DEV_DOMAIN ? 'https://' + process.env.REPLIT_DEV_DOMAIN : 'http://localhost:5000';
+  const appUrl = getAppUrl();
 
   const { data, error } = await client.emails.send({
     from: senderEmail,
@@ -176,7 +181,7 @@ export async function sendMaintenanceReminderEmail(
           </div>
           <p style="color: #4b5563;">Please schedule this maintenance to keep your equipment in top condition.</p>
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.REPLIT_DEV_DOMAIN ? 'https://' + process.env.REPLIT_DEV_DOMAIN : 'http://localhost:5000'}/equipment" style="background-color: #166534; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Equipment Tracker</a>
+            <a href="${getAppUrl()}/equipment" style="background-color: #166534; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Equipment Tracker</a>
           </div>
         </div>
         <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
