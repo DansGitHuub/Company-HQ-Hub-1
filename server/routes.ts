@@ -5,6 +5,7 @@ import { setupAuth, requireAuth, requireAdmin, hashPassword, comparePasswords } 
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { sendMaintenanceReminderEmail, sendSOPEmail } from "./email";
+import { checkAndSendReminders } from "./maintenanceScheduler";
 import OpenAI from "openai";
 import { 
   insertSopTemplateSchema, 
@@ -4588,16 +4589,31 @@ SECTION GENERATION RULES:
 
   app.post("/api/maintenance-schedules", requireAuth, async (req, res) => {
     try {
-      const schedule = await storage.createMaintenanceSchedule(req.body);
+      const data = { ...req.body };
+      if (data.nextDueDate && typeof data.nextDueDate === "string") {
+        data.nextDueDate = new Date(data.nextDueDate);
+      }
+      if (data.lastCompletedDate && typeof data.lastCompletedDate === "string") {
+        data.lastCompletedDate = new Date(data.lastCompletedDate);
+      }
+      const schedule = await storage.createMaintenanceSchedule(data);
       res.status(201).json(schedule);
-    } catch (err) {
+    } catch (err: any) {
+      console.error("Error creating maintenance schedule:", err);
       res.status(500).json({ message: "Error creating maintenance schedule" });
     }
   });
 
   app.put("/api/maintenance-schedules/:id", requireAuth, async (req, res) => {
     try {
-      const schedule = await storage.updateMaintenanceSchedule(req.params.id as string, req.body);
+      const data = { ...req.body };
+      if (data.nextDueDate && typeof data.nextDueDate === "string") {
+        data.nextDueDate = new Date(data.nextDueDate);
+      }
+      if (data.lastCompletedDate && typeof data.lastCompletedDate === "string") {
+        data.lastCompletedDate = new Date(data.lastCompletedDate);
+      }
+      const schedule = await storage.updateMaintenanceSchedule(req.params.id as string, data);
       if (!schedule) return res.status(404).json({ message: "Schedule not found" });
       res.json(schedule);
     } catch (err) {
@@ -4642,7 +4658,9 @@ SECTION GENERATION RULES:
             lastCompletedHours: log.hoursAtService,
           };
           
-          // Calculate next due date/mileage/hours based on interval
+          updates.reminderCount = 0;
+          updates.lastReminderSent = null;
+
           if (schedule.intervalType === "days" && log.completedDate) {
             const nextDate = new Date(log.completedDate);
             nextDate.setDate(nextDate.getDate() + schedule.intervalValue);
@@ -4663,44 +4681,61 @@ SECTION GENERATION RULES:
     }
   });
 
-  // Maintenance reminder check - sends emails for due maintenance
   app.post("/api/maintenance/send-reminders", requireAdmin, async (req, res) => {
     try {
-      const dueSchedules = await storage.getDueMaintenanceSchedules();
-      const allEquipment = await storage.getEquipment();
-      
-      let sentCount = 0;
-      const errors: string[] = [];
-      
-      for (const schedule of dueSchedules) {
-        if (!schedule.reminderEmail) continue;
-        
-        const equip = allEquipment.find(e => e.id === schedule.equipmentId);
-        if (!equip) continue;
-        
-        try {
-          await sendMaintenanceReminderEmail(
-            schedule.reminderEmail,
-            equip.name,
-            schedule.name,
-            schedule.nextDueDate || undefined,
-            schedule.nextDueMileage || undefined,
-            schedule.nextDueHours || undefined
-          );
-          sentCount++;
-        } catch (err: any) {
-          errors.push(`Failed to send reminder for ${schedule.name}: ${err.message}`);
-        }
-      }
-      
-      res.json({ 
-        message: `Sent ${sentCount} reminder emails`,
-        dueSchedules: dueSchedules.length,
-        sentCount,
-        errors 
+      const results = await checkAndSendReminders();
+      const sent = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+      res.json({
+        message: `Sent ${sent} reminder emails`,
+        sentCount: sent,
+        failedCount: failed,
+        results
       });
     } catch (err) {
       res.status(500).json({ message: "Error sending maintenance reminders" });
+    }
+  });
+
+  app.get("/api/maintenance/reminder-status", requireAuth, async (req, res) => {
+    try {
+      const schedules = await storage.getMaintenanceSchedules();
+      const allEquipment = await storage.getEquipment();
+      const now = new Date();
+
+      const statuses = schedules
+        .filter(s => s.isActive && s.reminderEnabled && s.reminderEmail)
+        .map(s => {
+          const equip = allEquipment.find(e => e.id === s.equipmentId);
+          const isOverdue = s.nextDueDate ? now > new Date(s.nextDueDate) : false;
+          const isDueSoon = s.nextDueDate && !isOverdue
+            ? (() => {
+                const reminderStart = new Date(s.nextDueDate);
+                reminderStart.setDate(reminderStart.getDate() - (s.reminderDays || 7));
+                return now >= reminderStart;
+              })()
+            : false;
+
+          return {
+            scheduleId: s.id,
+            scheduleName: s.name,
+            equipmentId: s.equipmentId,
+            equipmentName: equip?.name || "Unknown",
+            reminderEmail: s.reminderEmail,
+            reminderEnabled: s.reminderEnabled,
+            nextDueDate: s.nextDueDate,
+            isOverdue,
+            isDueSoon,
+            lastReminderSent: s.lastReminderSent,
+            reminderCount: s.reminderCount || 0,
+            reminderDays: s.reminderDays,
+            recurringReminderDays: s.recurringReminderDays,
+          };
+        });
+
+      res.json(statuses);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching reminder status" });
     }
   });
 

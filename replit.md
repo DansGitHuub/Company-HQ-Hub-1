@@ -32,7 +32,7 @@ Preferred communication style: Simple, everyday language.
     - **Job Tracking**: Tabbed interface for job types, detailed job cards with location, deadlines, and document uploads.
     - **Customer Hub / Resource Library**: Centralized educational content with categorization and user bookmarking.
     - **Employee Management**: Employee Portal for payroll, time off, and personal details.
-    - **Equipment Tracker**: Management, maintenance scheduling, activity logging, and email reminders.
+    - **Equipment Tracker**: Management, maintenance scheduling, activity logging, and automated email reminders with recurring notifications via Resend.
 - **Admin Tools**:
     - **Form Builder**: Dynamic form creation with AI-powered generation.
     - **Company Branding**: Configurable logo and name with live preview.

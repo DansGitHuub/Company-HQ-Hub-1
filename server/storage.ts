@@ -1249,11 +1249,21 @@ export class DatabaseStorage implements IStorage {
   async getDueMaintenanceSchedules(): Promise<MaintenanceSchedule[]> {
     const now = new Date();
     const schedules = await db.select().from(maintenanceSchedules).where(eq(maintenanceSchedules.isActive, true));
+    const allEquipment = await db.select().from(equipment);
+
     return schedules.filter(s => {
       if (s.nextDueDate && s.reminderDays) {
         const reminderDate = new Date(s.nextDueDate);
         reminderDate.setDate(reminderDate.getDate() - s.reminderDays);
         return now >= reminderDate;
+      }
+      if (s.nextDueMileage) {
+        const equip = allEquipment.find(e => e.id === s.equipmentId);
+        return equip?.mileage ? equip.mileage >= s.nextDueMileage : false;
+      }
+      if (s.nextDueHours) {
+        const equip = allEquipment.find(e => e.id === s.equipmentId);
+        return equip?.hours ? equip.hours >= s.nextDueHours : false;
       }
       return false;
     });

@@ -745,6 +745,10 @@ export const maintenanceSchedules = pgTable("maintenance_schedules", {
   nextDueHours: integer("next_due_hours"),
   reminderDays: integer("reminder_days").default(7), // Days before due date to send reminder
   reminderEmail: text("reminder_email"), // Email to send reminders to
+  reminderEnabled: boolean("reminder_enabled").notNull().default(false),
+  lastReminderSent: timestamp("last_reminder_sent"),
+  reminderCount: integer("reminder_count").notNull().default(0),
+  recurringReminderDays: integer("recurring_reminder_days").default(3), // Re-send every N days if not completed
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -763,6 +767,8 @@ export const insertMaintenanceScheduleSchema = createInsertSchema(maintenanceSch
   nextDueHours: true,
   reminderDays: true,
   reminderEmail: true,
+  reminderEnabled: true,
+  recurringReminderDays: true,
   isActive: true,
 });
 

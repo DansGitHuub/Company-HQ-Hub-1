@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Wrench, Truck, Settings, Calendar, AlertTriangle, ChevronDown, ChevronUp, Trash2, Edit2, Upload, FileText, Image, Receipt, X, Loader2 } from "lucide-react";
+import { Plus, Wrench, Truck, Settings, Calendar, AlertTriangle, ChevronDown, ChevronUp, Trash2, Edit2, Upload, FileText, Image, Receipt, X, Loader2, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -218,8 +218,10 @@ export default function EquipmentTracker() {
       nextDueDate,
       nextDueMileage,
       nextDueHours,
-      reminderDays: formData.get("reminderDays") ? parseInt(formData.get("reminderDays") as string) : undefined,
+      reminderDays: formData.get("reminderDays") ? parseInt(formData.get("reminderDays") as string) : 7,
       reminderEmail: formData.get("notifyEmail") as string || undefined,
+      reminderEnabled: !!(formData.get("notifyEmail") as string),
+      recurringReminderDays: formData.get("recurringDays") ? parseInt(formData.get("recurringDays") as string) : 3,
       isActive: true,
     });
   };
@@ -472,16 +474,36 @@ export default function EquipmentTracker() {
                       <div className="space-y-3">
                         {getEquipmentSchedules(item.id).map((schedule) => {
                           const isOverdue = schedule.nextDueDate && new Date(schedule.nextDueDate) < new Date();
+                          const isDueSoon = schedule.nextDueDate && !isOverdue && (() => {
+                            const reminderStart = new Date(schedule.nextDueDate!);
+                            reminderStart.setDate(reminderStart.getDate() - (schedule.reminderDays || 7));
+                            return new Date() >= reminderStart;
+                          })();
                           return (
-                            <div key={schedule.id} className={`flex items-center justify-between p-3 rounded-lg border ${isOverdue ? 'border-red-200 bg-red-50' : 'bg-muted/30'}`}>
-                              <div>
-                                <p className="font-medium">{schedule.name}</p>
+                            <div key={schedule.id} className={`flex items-center justify-between p-3 rounded-lg border ${isOverdue ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20' : isDueSoon ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20' : 'bg-muted/30'}`}>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium">{schedule.name}</p>
+                                  {isOverdue && <Badge variant="destructive" className="text-xs" data-testid={`badge-overdue-${schedule.id}`}>Overdue</Badge>}
+                                  {isDueSoon && !isOverdue && <Badge className="text-xs bg-amber-500 hover:bg-amber-600" data-testid={`badge-due-soon-${schedule.id}`}>Due Soon</Badge>}
+                                  {schedule.reminderEnabled && schedule.reminderEmail && (
+                                    <Badge variant="outline" className="text-xs gap-1" data-testid={`badge-reminder-${schedule.id}`}>
+                                      <Bell className="h-3 w-3" />
+                                      {(schedule.reminderCount || 0) > 0 ? `${schedule.reminderCount} sent` : "Active"}
+                                    </Badge>
+                                  )}
+                                </div>
                                 <p className="text-sm text-muted-foreground">
                                   Every {schedule.intervalValue} {schedule.intervalType}
                                   {schedule.nextDueDate && ` • Due: ${new Date(schedule.nextDueDate).toLocaleDateString()}`}
                                   {schedule.nextDueMileage && ` • Due: ${schedule.nextDueMileage.toLocaleString()} mi`}
                                   {schedule.nextDueHours && ` • Due: ${schedule.nextDueHours.toLocaleString()} hrs`}
                                 </p>
+                                {schedule.lastReminderSent && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Last reminder: {new Date(schedule.lastReminderSent).toLocaleDateString()} • Recurring every {schedule.recurringReminderDays || 3} days until completed
+                                  </p>
+                                )}
                               </div>
                               <Button 
                                 size="sm" 
@@ -654,14 +676,22 @@ export default function EquipmentTracker() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="reminderDays">Reminder (days before)</Label>
-                <Input id="reminderDays" name="reminderDays" type="number" placeholder="e.g., 7" data-testid="input-reminder-days" />
-              </div>
-              <div>
-                <Label htmlFor="notifyEmail">Notify Email</Label>
-                <Input id="notifyEmail" name="notifyEmail" type="email" placeholder="email@example.com" data-testid="input-notify-email" />
+            <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+              <p className="text-sm font-medium">Email Reminders</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label htmlFor="notifyEmail">Notify Email</Label>
+                  <Input id="notifyEmail" name="notifyEmail" type="email" placeholder="email@example.com" data-testid="input-notify-email" />
+                  <p className="text-xs text-muted-foreground mt-1">Leave blank to disable email reminders</p>
+                </div>
+                <div>
+                  <Label htmlFor="reminderDays">First reminder (days before due)</Label>
+                  <Input id="reminderDays" name="reminderDays" type="number" defaultValue={7} placeholder="7" data-testid="input-reminder-days" />
+                </div>
+                <div>
+                  <Label htmlFor="recurringDays">Re-send every (days if not done)</Label>
+                  <Input id="recurringDays" name="recurringDays" type="number" defaultValue={3} placeholder="3" data-testid="input-recurring-days" />
+                </div>
               </div>
             </div>
             <DialogFooter>
