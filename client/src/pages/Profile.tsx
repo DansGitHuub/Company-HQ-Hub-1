@@ -8,10 +8,54 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Camera, Save, User, Mail, Phone, FileText, Palette, Check, Lock, Eye, EyeOff } from "lucide-react";
+import { Loader2, Camera, Save, User, Mail, Phone, FileText, Palette, Check, Lock, Eye, EyeOff, Bell, BellOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { themes, getTheme, applyTheme, type ThemeId } from "@/lib/themes";
+
+function EmailNotificationToggle({ profile }: { profile: any }) {
+  const { toast } = useToast();
+  const [enabled, setEnabled] = useState(profile?.emailNotifications !== false);
+
+  useEffect(() => {
+    setEnabled(profile?.emailNotifications !== false);
+  }, [profile?.emailNotifications]);
+
+  return (
+    <div className="border rounded-lg p-4 space-y-2 bg-muted/30">
+      <Label className="flex items-center gap-2">
+        <Bell className="h-4 w-4" /> Email Notifications
+      </Label>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Receive email alerts for new messages and important updates
+        </p>
+        <Button
+          type="button"
+          variant={enabled ? "default" : "outline"}
+          size="sm"
+          className="gap-2"
+          onClick={() => {
+            const newValue = !enabled;
+            setEnabled(newValue);
+            apiRequest("PATCH", "/api/profile", { emailNotifications: newValue }).then(() => {
+              queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+              toast({ title: newValue ? "Email notifications enabled" : "Email notifications disabled" });
+            });
+          }}
+          data-testid="button-toggle-email-notifications"
+        >
+          {enabled ? (
+            <><Bell className="h-4 w-4" /> On</>
+          ) : (
+            <><BellOff className="h-4 w-4" /> Off</>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default function Profile() {
   const { user } = useAuth();
@@ -320,6 +364,8 @@ export default function Profile() {
                 data-testid="input-profile-bio"
               />
             </div>
+
+            <EmailNotificationToggle profile={displayProfile} />
 
             <div className="flex justify-end pt-4">
               <Button 

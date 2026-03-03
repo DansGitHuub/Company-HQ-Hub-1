@@ -22,6 +22,7 @@ export const users = pgTable("users", {
   phone: text("phone"),
   profilePicture: text("profile_picture"),
   theme: text("theme").default("forest"),
+  emailNotifications: boolean("email_notifications").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

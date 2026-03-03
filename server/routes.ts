@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, hashPassword, comparePasswords } from "./auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
-import { sendMaintenanceReminderEmail, sendSOPEmail } from "./email";
+import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail } from "./email";
 import { checkAndSendReminders } from "./maintenanceScheduler";
 import OpenAI from "openai";
 import { 
@@ -3407,6 +3407,39 @@ Generate detailed information for this landscaping material.`;
         priority: priority || "normal",
         initialMessage,
       });
+
+      // Send email notification for new conversation (non-blocking)
+      if (initialMessage) {
+        (async () => {
+          try {
+            const recipientIds: string[] = [];
+            if (assignedEmployeeId) {
+              recipientIds.push(assignedEmployeeId);
+            } else {
+              const allUsers = await storage.getUsers();
+              const admins = allUsers.filter(u => (u.role === "Admin" || u.role === "Manager") && u.isActive);
+              recipientIds.push(...admins.map(a => a.id));
+            }
+
+            for (const recipientId of recipientIds) {
+              if (recipientId === user.id) continue;
+              const recipient = await storage.getUser(recipientId);
+              if (!recipient || !recipient.email || recipient.emailNotifications === false) continue;
+
+              await sendMessageNotificationEmail(
+                recipient.email,
+                recipient.name,
+                user.name,
+                subject,
+                initialMessage,
+                thread.id
+              );
+            }
+          } catch (emailErr: any) {
+            console.error("Failed to send new thread notification email:", emailErr.message);
+          }
+        })();
+      }
       
       res.status(201).json(thread);
     } catch (err) {
@@ -3514,6 +3547,44 @@ Generate detailed information for this landscaping material.`;
       // Update thread status to in_progress if it was open
       if (thread.status === "open" && user.role !== "Customer") {
         await storage.updateMessagingThread(req.params.id, { status: "in_progress" });
+      }
+
+      // Send email notification to recipient (non-blocking)
+      if (!isInternalNote) {
+        (async () => {
+          try {
+            const recipientIds: string[] = [];
+
+            if (user.role === "Customer") {
+              if (thread.assignedEmployeeId) {
+                recipientIds.push(thread.assignedEmployeeId);
+              } else {
+                const allUsers = await storage.getUsers();
+                const admins = allUsers.filter(u => (u.role === "Admin" || u.role === "Manager") && u.isActive);
+                recipientIds.push(...admins.map(a => a.id));
+              }
+            } else {
+              recipientIds.push(thread.customerId);
+            }
+
+            for (const recipientId of recipientIds) {
+              if (recipientId === user.id) continue;
+              const recipient = await storage.getUser(recipientId);
+              if (!recipient || !recipient.email || recipient.emailNotifications === false) continue;
+
+              await sendMessageNotificationEmail(
+                recipient.email,
+                recipient.name,
+                user.name,
+                thread.subject,
+                content,
+                req.params.id
+              );
+            }
+          } catch (emailErr: any) {
+            console.error("Failed to send message notification email:", emailErr.message);
+          }
+        })();
       }
       
       res.status(201).json(message);
@@ -4487,7 +4558,7 @@ SECTION GENERATION RULES:
 
   app.patch("/api/profile", requireAuth, async (req, res) => {
     try {
-      const { name, email, bio, phone, profilePicture, theme, currentPassword, newPassword } = req.body;
+      const { name, email, bio, phone, profilePicture, theme, emailNotifications, currentPassword, newPassword } = req.body;
       const updates: any = { updatedAt: new Date() };
       if (name !== undefined) updates.name = name;
       if (email !== undefined) updates.email = email;
@@ -4495,6 +4566,7 @@ SECTION GENERATION RULES:
       if (phone !== undefined) updates.phone = phone;
       if (profilePicture !== undefined) updates.profilePicture = profilePicture;
       if (theme !== undefined) updates.theme = theme;
+      if (emailNotifications !== undefined) updates.emailNotifications = emailNotifications;
       
       // Self-service password change
       if (newPassword) {

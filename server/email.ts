@@ -2,6 +2,15 @@ import { Resend } from 'resend';
 
 let connectionSettings: any;
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function getAppUrl(): string {
   const domain = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN;
   return domain ? `https://${domain}` : 'http://localhost:5000';
@@ -194,6 +203,60 @@ export async function sendMaintenanceReminderEmail(
   if (error) {
     console.error('Error sending maintenance reminder email:', error);
     throw new Error('Failed to send maintenance reminder email');
+  }
+
+  return data;
+}
+
+export async function sendMessageNotificationEmail(
+  toEmail: string,
+  recipientName: string,
+  senderName: string,
+  subject: string,
+  messagePreview: string,
+  threadId: string
+) {
+  const { client } = await getResendClient();
+  const senderEmail = 'Company HQ <noreply@chapinlandscapes.com>';
+  const appUrl = getAppUrl();
+  const messageUrl = `${appUrl}/communications`;
+
+  const truncatedPreview = messagePreview.length > 200
+    ? messagePreview.substring(0, 200) + '...'
+    : messagePreview;
+
+  const { data, error } = await client.emails.send({
+    from: senderEmail,
+    to: toEmail,
+    subject: `New Message: ${subject}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #166534; padding: 20px; text-align: center;">
+          <h1 style="color: white; margin: 0;">Company HQ</h1>
+        </div>
+        <div style="padding: 30px; background-color: #f9fafb;">
+          <h2 style="color: #1f2937;">New Message</h2>
+          <p style="color: #4b5563;">Hi ${escapeHtml(recipientName || 'there')}, you have a new message:</p>
+          <div style="background-color: #eff6ff; border: 1px solid #3b82f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="color: #1e40af; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; font-weight: 600;">Re: ${escapeHtml(subject)}</p>
+            <p style="color: #1e3a5f; margin: 0 0 12px 0; font-weight: 600;">From: ${escapeHtml(senderName)}</p>
+            <p style="color: #374151; margin: 0; line-height: 1.5;">${escapeHtml(truncatedPreview)}</p>
+          </div>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${messageUrl}" style="background-color: #166534; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Conversation</a>
+          </div>
+          <p style="color: #9ca3af; font-size: 12px; text-align: center;">You can manage email notifications in your profile settings.</p>
+        </div>
+        <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+          <p>Company HQ - Landscape Management</p>
+        </div>
+      </div>
+    `
+  });
+
+  if (error) {
+    console.error('Error sending message notification email:', error);
+    throw new Error('Failed to send message notification email');
   }
 
   return data;
