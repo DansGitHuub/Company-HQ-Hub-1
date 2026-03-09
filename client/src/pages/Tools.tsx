@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Snowflake, Calculator, ClipboardCheck, Wrench } from "lucide-react";
+import { Snowflake, Calculator, ClipboardCheck, Wrench, Target } from "lucide-react";
 
 const tools = [
   {
@@ -30,6 +30,13 @@ const tools = [
     description: "Connect third-party tools and services to streamline your workflow.",
     icon: Wrench,
     href: "/tools/integration-wizard",
+  },
+  {
+    id: "lead-qualifier",
+    title: "Lead Qualifier",
+    description: "Score and qualify incoming prospects to focus on the best opportunities.",
+    icon: Target,
+    href: "/tools/lead-qualifier",
   },
 ];
 

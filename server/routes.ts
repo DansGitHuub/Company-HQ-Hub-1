@@ -7277,6 +7277,95 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  // Qualified Leads
+  const requireStaffRole = (req: any, res: any, next: any) => {
+    const role = req.user?.role;
+    if (role === "Customer") return res.status(403).json({ message: "Not authorized" });
+    next();
+  };
+
+  app.get("/api/qualified-leads", requireAuth, requireStaffRole, async (req, res) => {
+    try {
+      const leads = await storage.getQualifiedLeads();
+      res.json(leads);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/qualified-leads/:id", requireAuth, requireStaffRole, async (req, res) => {
+    try {
+      const lead = await storage.getQualifiedLead(req.params.id);
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      res.json(lead);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/qualified-leads", requireAuth, requireStaffRole, async (req, res) => {
+    try {
+      const { contactName, contactEmail, contactPhone, companyName, propertyType,
+              serviceType, projectSize, budget, timeline, source, location, notes,
+              answers, score, maxScore, rating } = req.body;
+
+      if (!contactName || !propertyType || !serviceType || !projectSize) {
+        return res.status(400).json({ message: "Missing required fields: contactName, propertyType, serviceType, projectSize" });
+      }
+
+      const lead = await storage.createQualifiedLead({
+        contactName, contactEmail, contactPhone, companyName, propertyType,
+        serviceType, projectSize, budget, timeline, source, location, notes,
+        answers: answers || [],
+        score: typeof score === "number" ? score : 0,
+        maxScore: typeof maxScore === "number" ? maxScore : 0,
+        rating: ["hot", "warm", "cold", "unqualified"].includes(rating) ? rating : "cold",
+        qualifiedBy: req.user!.id,
+      });
+      res.status(201).json(lead);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/qualified-leads/:id", requireAuth, requireStaffRole, async (req, res) => {
+    try {
+      const lead = await storage.getQualifiedLead(req.params.id);
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+
+      const { contactName, contactEmail, contactPhone, companyName, propertyType,
+              serviceType, projectSize, budget, timeline, source, location, notes } = req.body;
+      const updates: any = {};
+      if (contactName !== undefined) updates.contactName = contactName;
+      if (contactEmail !== undefined) updates.contactEmail = contactEmail;
+      if (contactPhone !== undefined) updates.contactPhone = contactPhone;
+      if (companyName !== undefined) updates.companyName = companyName;
+      if (propertyType !== undefined) updates.propertyType = propertyType;
+      if (serviceType !== undefined) updates.serviceType = serviceType;
+      if (projectSize !== undefined) updates.projectSize = projectSize;
+      if (budget !== undefined) updates.budget = budget;
+      if (timeline !== undefined) updates.timeline = timeline;
+      if (source !== undefined) updates.source = source;
+      if (location !== undefined) updates.location = location;
+      if (notes !== undefined) updates.notes = notes;
+
+      const updated = await storage.updateQualifiedLead(req.params.id, updates);
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/qualified-leads/:id", requireAuth, requireStaffRole, async (req, res) => {
+    try {
+      const deleted = await storage.deleteQualifiedLead(req.params.id);
+      if (!deleted) return res.status(404).json({ message: "Lead not found" });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 

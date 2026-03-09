@@ -72,7 +72,8 @@ import {
   builderForms, type BuilderForm, type InsertBuilderForm,
   pdfForms, type PdfForm, type InsertPdfForm,
   conversations, chatMessages,
-  hqFiles, type HqFile, type InsertHqFile
+  hqFiles, type HqFile, type InsertHqFile,
+  qualifiedLeads, type QualifiedLead, type InsertQualifiedLead
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull, sql } from "drizzle-orm";
@@ -516,6 +517,13 @@ export interface IStorage {
   getHqFile(id: string): Promise<HqFile | undefined>;
   createHqFile(file: InsertHqFile): Promise<HqFile>;
   deleteHqFile(id: string): Promise<boolean>;
+
+  // Qualified Leads
+  getQualifiedLeads(): Promise<QualifiedLead[]>;
+  getQualifiedLead(id: string): Promise<QualifiedLead | undefined>;
+  createQualifiedLead(lead: InsertQualifiedLead): Promise<QualifiedLead>;
+  updateQualifiedLead(id: string, updates: Partial<QualifiedLead>): Promise<QualifiedLead | undefined>;
+  deleteQualifiedLead(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2470,6 +2478,30 @@ export class DatabaseStorage implements IStorage {
 
   async deleteHqFile(id: string): Promise<boolean> {
     const result = await db.delete(hqFiles).where(eq(hqFiles.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getQualifiedLeads(): Promise<QualifiedLead[]> {
+    return await db.select().from(qualifiedLeads).orderBy(desc(qualifiedLeads.createdAt));
+  }
+
+  async getQualifiedLead(id: string): Promise<QualifiedLead | undefined> {
+    const [lead] = await db.select().from(qualifiedLeads).where(eq(qualifiedLeads.id, id));
+    return lead;
+  }
+
+  async createQualifiedLead(lead: InsertQualifiedLead): Promise<QualifiedLead> {
+    const [created] = await db.insert(qualifiedLeads).values(lead).returning();
+    return created;
+  }
+
+  async updateQualifiedLead(id: string, updates: Partial<QualifiedLead>): Promise<QualifiedLead | undefined> {
+    const [updated] = await db.update(qualifiedLeads).set(updates).where(eq(qualifiedLeads.id, id)).returning();
+    return updated;
+  }
+
+  async deleteQualifiedLead(id: string): Promise<boolean> {
+    const result = await db.delete(qualifiedLeads).where(eq(qualifiedLeads.id, id));
     return (result.rowCount ?? 0) > 0;
   }
 }

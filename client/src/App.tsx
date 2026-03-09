@@ -38,6 +38,7 @@ import IntegrationWizard from "@/pages/IntegrationWizard";
 import TestingKnowledge from "@/pages/TestingKnowledge";
 import CalculatorPage from "@/pages/Calculator";
 import Tools from "@/pages/Tools";
+import LeadQualifier from "@/pages/LeadQualifier";
 import NotFound from "@/pages/not-found";
 
 function AppRoutes() {
@@ -92,6 +93,7 @@ function AppRoutes() {
         <Route path="/tools/process-auditor" component={ProcessAuditor} />
         <Route path="/tools/integration-wizard" component={IntegrationWizard} />
         <Route path="/tools/calculator" component={CalculatorPage} />
+        <Route path="/tools/lead-qualifier" component={LeadQualifier} />
         <Route path="/tools" component={Tools} />
         <Route path="/communications" component={MessagingInbox} />
         <Route path="/testing" component={TestingKnowledge} />

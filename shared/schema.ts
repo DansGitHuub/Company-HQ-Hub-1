@@ -1869,3 +1869,33 @@ export const insertHqFileSchema = createInsertSchema(hqFiles).omit({
 
 export type InsertHqFile = z.infer<typeof insertHqFileSchema>;
 export type HqFile = typeof hqFiles.$inferSelect;
+
+export const qualifiedLeads = pgTable("qualified_leads", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  contactName: text("contact_name").notNull(),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  companyName: text("company_name"),
+  propertyType: text("property_type").notNull(),
+  serviceType: text("service_type").notNull(),
+  projectSize: text("project_size").notNull(),
+  budget: text("budget"),
+  timeline: text("timeline"),
+  source: text("source"),
+  location: text("location"),
+  notes: text("notes"),
+  answers: jsonb("answers").notNull().default([]),
+  score: integer("score").notNull().default(0),
+  maxScore: integer("max_score").notNull().default(0),
+  rating: text("rating").notNull().default("cold"),
+  qualifiedBy: varchar("qualified_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertQualifiedLeadSchema = createInsertSchema(qualifiedLeads).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertQualifiedLead = z.infer<typeof insertQualifiedLeadSchema>;
+export type QualifiedLead = typeof qualifiedLeads.$inferSelect;

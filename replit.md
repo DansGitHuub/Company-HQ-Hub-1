@@ -39,6 +39,7 @@ Preferred communication style: Simple, everyday language.
     - **Help System**: Interactive walkthroughs, role-specific FAQs, and Admin "Test My Software" preview mode.
     - **Global Search**: Role-based search across key modules.
     - **Communications Center**: Internal messaging system with threaded conversations, role-based access, assignment workflow, and unread tracking.
+    - **Lead Qualifier**: Prospect scoring tool with 3-step wizard (contact info, weighted qualification questions, review/save). Persists results to `qualified_leads` table with hot/warm/cold/unqualified ratings. Staff-only access.
     - **Plow Site Mapper**: Snow removal route planning with Google Maps integration, AI-powered property analysis, and canvas-based markup tools.
     - **AI Agents System (Master Admin)**: Autonomous AI agents for system analysis and improvement with cost tracking and suggestion management.
     - **Update Notification System**: Role-based app updates with acknowledgment tracking.
