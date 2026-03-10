@@ -298,3 +298,90 @@ export async function sendHiringStageEmail(
 
   return data;
 }
+
+export async function sendCustomerWelcomeEmail(
+  toEmail: string,
+  customerName: string,
+  tempPassword: string
+) {
+  const { client } = await getResendClient();
+  const senderEmail = 'Chapin Landscapes <noreply@chapinlandscapes.com>';
+  const appUrl = getAppUrl();
+
+  const { data, error } = await client.emails.send({
+    from: senderEmail,
+    to: toEmail,
+    subject: 'Welcome to Your Chapin Landscapes Customer Portal',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #F7F3EC;">
+        <div style="background-color: #1E3A2F; padding: 30px; text-align: center;">
+          <h1 style="color: #C9A84C; margin: 0; font-size: 24px;">Chapin Landscapes</h1>
+          <p style="color: #F7F3EC; margin: 8px 0 0; font-size: 14px;">Customer Portal</p>
+        </div>
+        <div style="padding: 30px;">
+          <h2 style="color: #1E3A2F; margin-top: 0;">Welcome, ${escapeHtml(customerName)}!</h2>
+          <p style="color: #4b5563; line-height: 1.6;">Your customer portal account has been created. You can now view your projects, access documents, read care guides, and message our team.</p>
+          <div style="background-color: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <p style="margin: 0 0 8px; color: #6b7280; font-size: 14px;">Your temporary password:</p>
+            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #1E3A2F; letter-spacing: 1px;">${escapeHtml(tempPassword)}</p>
+          </div>
+          <a href="${appUrl}/auth" style="display: inline-block; background-color: #1E3A2F; color: #C9A84C; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Log In to Your Portal</a>
+          <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">Please change your password after your first login.</p>
+        </div>
+        <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
+          <p>Chapin Landscapes</p>
+        </div>
+      </div>
+    `
+  });
+
+  if (error) {
+    console.error('Error sending customer welcome email:', error);
+    throw new Error('Failed to send customer welcome email');
+  }
+  return data;
+}
+
+export async function sendCustomerNotificationEmail(
+  toEmail: string,
+  customerName: string,
+  subject: string,
+  message: string,
+  ctaText?: string,
+  ctaLink?: string
+) {
+  const { client } = await getResendClient();
+  const senderEmail = 'Chapin Landscapes <noreply@chapinlandscapes.com>';
+  const appUrl = getAppUrl();
+
+  const ctaHtml = ctaText && ctaLink
+    ? `<a href="${appUrl}${ctaLink}" style="display: inline-block; background-color: #1E3A2F; color: #C9A84C; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 16px;">${escapeHtml(ctaText)}</a>`
+    : '';
+
+  const { data, error } = await client.emails.send({
+    from: senderEmail,
+    to: toEmail,
+    subject,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #F7F3EC;">
+        <div style="background-color: #1E3A2F; padding: 20px; text-align: center;">
+          <h1 style="color: #C9A84C; margin: 0; font-size: 20px;">Chapin Landscapes</h1>
+        </div>
+        <div style="padding: 30px;">
+          <p style="color: #4b5563;">Hi ${escapeHtml(customerName)},</p>
+          <p style="color: #374151; line-height: 1.6;">${escapeHtml(message)}</p>
+          ${ctaHtml}
+        </div>
+        <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
+          <p>Chapin Landscapes</p>
+        </div>
+      </div>
+    `
+  });
+
+  if (error) {
+    console.error('Error sending customer notification email:', error);
+    throw new Error('Failed to send customer notification email');
+  }
+  return data;
+}

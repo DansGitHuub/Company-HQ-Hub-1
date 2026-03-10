@@ -50,6 +50,7 @@ Preferred communication style: Simple, everyday language.
     - **Interactive To-Do List**: Task management with priorities, statuses, due dates, assignments, and notifications.
     - **Interactive Calendar**: Mini calendar view with external calendar connection management (Google, Apple, Samsung, Outlook).
     - **Floating Assistant Button**: Combined access point for AI Assistant and Help Center.
+    - **Customer Hub**: Customer-facing portal at /customer-hub with branded UI (dark green #1E3A2F, gold #C9A84C, cream #F7F3EC). Features: Dashboard with active job card and quick stats, My Jobs with detail views (scope, materials, crew notes), Documents with folder organization and request workflow, Care Library with 8 categories and bookmarking, Messages with threaded conversations. Admin-side: Care Guide Manager at /care-guides for CRUD/publish, Customer Accounts tab with invite workflow, customer welcome emails via Resend. Routes in `server/customerHubRoutes.ts`. Tables: customer_jobs, customer_documents, care_guides, customer_saved_guides, customer_notifications, customer_messages, customer_message_threads.
 
 ## External Dependencies
 

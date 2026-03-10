@@ -304,7 +304,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Customer navigation is completely separate and not reorderable
   const customerNav = [
-    { id: "customer_portal", icon: LayoutDashboard, label: "My Portal", href: "/customer" },
+    { id: "customer_hub", icon: LayoutDashboard, label: "My Portal", href: "/customer-hub" },
     ...(user?.isApplicant ? [{ id: "applicant_portal", icon: ClipboardCheck, label: "My Application", href: "/applicant" }] : []),
     { id: "customer_resources", icon: GraduationCap, label: "Resources", href: "/education" },
     { id: "customer_account", icon: User, label: "My Account", href: "/profile" },
@@ -323,6 +323,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     hiring: { icon: Users, label: "Hiring", href: "/hiring" },
     jobs: { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
     education: { icon: GraduationCap, label: "Customer Hub", href: "/education" },
+    care_guides: { icon: BookOpen, label: "Care Guides", href: "/care-guides" },
     help: { icon: HelpCircle, label: "Help", href: "/help" },
     hq: { icon: Building2, label: "Company HQ", href: "/hq" },
     marketing: { icon: Megaphone, label: "Marketing", href: "/marketing" },
@@ -335,7 +336,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Default order for internal roles (help always at very bottom for all roles)
   const teamDefaultIds = ["dashboard", "sops", "testing", "materials", "equipment", "todos", "hiring", "jobs", "education", "inbox", "tools"];
-  const adminExtraIds = ["hq", "marketing", "forms", "integrations", "admin"];
+  const adminExtraIds = ["hq", "marketing", "forms", "care_guides", "integrations", "admin"];
   const bottomIds = ["help"]; // Always shown at bottom for all roles
 
   const getNavItems = () => {

@@ -520,6 +520,10 @@ export const jobs = pgTable("jobs", {
   contactEmail: text("contact_email"),
   zone: text("zone"),
   notes: text("notes"),
+  crewNotesCustomerVisible: text("crew_notes_customer_visible"),
+  crewLeadName: text("crew_lead_name"),
+  scopeOfWork: text("scope_of_work"),
+  materialsUsed: text("materials_used"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -545,6 +549,10 @@ export const insertJobSchema = createInsertSchema(jobs).pick({
   contactEmail: true,
   zone: true,
   notes: true,
+  crewNotesCustomerVisible: true,
+  crewLeadName: true,
+  scopeOfWork: true,
+  materialsUsed: true,
 });
 
 export type InsertJob = z.infer<typeof insertJobSchema>;
@@ -2075,3 +2083,76 @@ export const insertQualifiedLeadSchema = createInsertSchema(qualifiedLeads).omit
 
 export type InsertQualifiedLead = z.infer<typeof insertQualifiedLeadSchema>;
 export type QualifiedLead = typeof qualifiedLeads.$inferSelect;
+
+// Customer Hub Tables
+
+export const customerJobs = pgTable("customer_jobs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id", { length: 36 }).references(() => users.id).notNull(),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCustomerJobSchema = createInsertSchema(customerJobs).omit({ id: true, createdAt: true });
+export type InsertCustomerJob = z.infer<typeof insertCustomerJobSchema>;
+export type CustomerJob = typeof customerJobs.$inferSelect;
+
+export const customerDocuments = pgTable("customer_documents", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id", { length: 36 }).references(() => users.id).notNull(),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
+  name: text("name").notNull(),
+  folder: text("folder").notNull().default("Other"),
+  url: text("url"),
+  status: text("status").notNull().default("Available"),
+  uploadedBy: varchar("uploaded_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCustomerDocumentSchema = createInsertSchema(customerDocuments).omit({ id: true, createdAt: true });
+export type InsertCustomerDocument = z.infer<typeof insertCustomerDocumentSchema>;
+export type CustomerDocument = typeof customerDocuments.$inferSelect;
+
+export const careGuides = pgTable("care_guides", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  category: text("category").notNull(),
+  content: text("content").notNull(),
+  summary: text("summary"),
+  pdfUrl: text("pdf_url"),
+  tags: text("tags").array().default([]),
+  isPublished: boolean("is_published").notNull().default(false),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCareGuideSchema = createInsertSchema(careGuides).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCareGuide = z.infer<typeof insertCareGuideSchema>;
+export type CareGuide = typeof careGuides.$inferSelect;
+
+export const customerSavedGuides = pgTable("customer_saved_guides", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id", { length: 36 }).references(() => users.id).notNull(),
+  guideId: varchar("guide_id", { length: 36 }).references(() => careGuides.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCustomerSavedGuideSchema = createInsertSchema(customerSavedGuides).omit({ id: true, createdAt: true });
+export type InsertCustomerSavedGuide = z.infer<typeof insertCustomerSavedGuideSchema>;
+export type CustomerSavedGuide = typeof customerSavedGuides.$inferSelect;
+
+export const customerNotifications = pgTable("customer_notifications", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id", { length: 36 }).references(() => users.id).notNull(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  link: text("link"),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCustomerNotificationSchema = createInsertSchema(customerNotifications).omit({ id: true, createdAt: true });
+export type InsertCustomerNotification = z.infer<typeof insertCustomerNotificationSchema>;
+export type CustomerNotification = typeof customerNotifications.$inferSelect;

@@ -14,6 +14,8 @@ import AuthPage from "@/pages/auth-page";
 import AdminPanel from "@/pages/AdminPanel";
 import AdminInbox from "@/pages/AdminInbox";
 import CustomerPortal from "@/pages/CustomerPortal";
+import CustomerHub from "@/pages/CustomerHub";
+import CareGuideManager from "@/pages/CareGuideManager";
 import ApplicantPortal from "@/pages/ApplicantPortal";
 import SOPs from "@/pages/SOPs";
 import Materials from "@/pages/Materials";
@@ -57,17 +59,18 @@ function AppRoutes() {
   }
 
   const isCustomer = user?.role === "Customer";
-  const defaultPath = isCustomer ? "/customer" : "/";
+  const defaultPath = isCustomer ? "/customer-hub" : "/";
 
   return (
     <AppShell>
       <Switch>
         <Route path="/">
-          {isCustomer ? <Redirect to="/customer" /> : <Home />}
+          {isCustomer ? <Redirect to="/customer-hub" /> : <Home />}
         </Route>
         <Route path="/auth">
           <Redirect to={defaultPath} />
         </Route>
+        <Route path="/customer-hub/:section?" component={CustomerHub} />
         <Route path="/customer" component={CustomerPortal} />
         <Route path="/applicant" component={ApplicantPortal} />
         <Route path="/admin" component={AdminPanel} />
@@ -94,6 +97,7 @@ function AppRoutes() {
         <Route path="/tools/integration-wizard" component={IntegrationWizard} />
         <Route path="/tools/calculator" component={CalculatorPage} />
         <Route path="/tools/lead-qualifier" component={LeadQualifier} />
+        <Route path="/care-guides" component={CareGuideManager} />
         <Route path="/tools" component={Tools} />
         <Route path="/communications" component={MessagingInbox} />
         <Route path="/testing" component={TestingKnowledge} />

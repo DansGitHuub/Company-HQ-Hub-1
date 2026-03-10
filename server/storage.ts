@@ -83,7 +83,12 @@ import {
   employeeDocuments, type EmployeeDocument, type InsertEmployeeDocument,
   onboardingItems, type OnboardingItem, type InsertOnboardingItem,
   hrFormSubmissions, type HrFormSubmission, type InsertHrFormSubmission,
-  hiringEmailTemplates, type HiringEmailTemplate, type InsertHiringEmailTemplate
+  hiringEmailTemplates, type HiringEmailTemplate, type InsertHiringEmailTemplate,
+  customerJobs, type CustomerJob, type InsertCustomerJob,
+  customerDocuments, type CustomerDocument, type InsertCustomerDocument,
+  careGuides, type CareGuide, type InsertCareGuide,
+  customerSavedGuides, type CustomerSavedGuide, type InsertCustomerSavedGuide,
+  customerNotifications, type CustomerNotification, type InsertCustomerNotification
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull, sql } from "drizzle-orm";
@@ -582,6 +587,38 @@ export interface IStorage {
   getHiringEmailTemplates(): Promise<HiringEmailTemplate[]>;
   getHiringEmailTemplate(stage: string): Promise<HiringEmailTemplate | undefined>;
   updateHiringEmailTemplate(id: string, updates: Partial<HiringEmailTemplate>): Promise<HiringEmailTemplate | undefined>;
+
+  // Customer Hub - Customer Jobs
+  getCustomerJobs(customerId: string): Promise<CustomerJob[]>;
+  createCustomerJob(data: InsertCustomerJob): Promise<CustomerJob>;
+  deleteCustomerJob(id: string): Promise<boolean>;
+  getCustomerJobsByJobId(jobId: string): Promise<CustomerJob[]>;
+
+  // Customer Hub - Customer Documents
+  getCustomerDocuments(customerId: string): Promise<CustomerDocument[]>;
+  createCustomerDocument(data: InsertCustomerDocument): Promise<CustomerDocument>;
+  updateCustomerDocument(id: string, updates: Partial<CustomerDocument>): Promise<CustomerDocument | undefined>;
+  deleteCustomerDocument(id: string): Promise<boolean>;
+
+  // Customer Hub - Care Guides
+  getCareGuides(): Promise<CareGuide[]>;
+  getPublishedCareGuides(): Promise<CareGuide[]>;
+  getCareGuide(id: string): Promise<CareGuide | undefined>;
+  createCareGuide(data: InsertCareGuide): Promise<CareGuide>;
+  updateCareGuide(id: string, updates: Partial<CareGuide>): Promise<CareGuide | undefined>;
+  deleteCareGuide(id: string): Promise<boolean>;
+
+  // Customer Hub - Saved Guides
+  getCustomerSavedGuides(customerId: string): Promise<CustomerSavedGuide[]>;
+  createCustomerSavedGuide(data: InsertCustomerSavedGuide): Promise<CustomerSavedGuide>;
+  deleteCustomerSavedGuide(customerId: string, guideId: string): Promise<boolean>;
+
+  // Customer Hub - Notifications
+  getCustomerNotifications(customerId: string): Promise<CustomerNotification[]>;
+  getUnreadNotificationCount(customerId: string): Promise<number>;
+  createCustomerNotification(data: InsertCustomerNotification): Promise<CustomerNotification>;
+  markNotificationRead(id: string): Promise<boolean>;
+  markAllNotificationsRead(customerId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2707,6 +2744,114 @@ export class DatabaseStorage implements IStorage {
   async updateHiringEmailTemplate(id: string, updates: Partial<HiringEmailTemplate>): Promise<HiringEmailTemplate | undefined> {
     const [updated] = await db.update(hiringEmailTemplates).set({ ...updates, updatedAt: new Date() }).where(eq(hiringEmailTemplates.id, id)).returning();
     return updated;
+  }
+
+  // Customer Hub - Customer Jobs
+  async getCustomerJobs(customerId: string): Promise<CustomerJob[]> {
+    return await db.select().from(customerJobs).where(eq(customerJobs.customerId, customerId)).orderBy(desc(customerJobs.createdAt));
+  }
+
+  async createCustomerJob(data: InsertCustomerJob): Promise<CustomerJob> {
+    const [created] = await db.insert(customerJobs).values(data).returning();
+    return created;
+  }
+
+  async deleteCustomerJob(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(customerJobs).where(eq(customerJobs.id, id)).returning();
+    return !!deleted;
+  }
+
+  async getCustomerJobsByJobId(jobId: string): Promise<CustomerJob[]> {
+    return await db.select().from(customerJobs).where(eq(customerJobs.jobId, jobId));
+  }
+
+  // Customer Hub - Customer Documents
+  async getCustomerDocuments(customerId: string): Promise<CustomerDocument[]> {
+    return await db.select().from(customerDocuments).where(eq(customerDocuments.customerId, customerId)).orderBy(desc(customerDocuments.createdAt));
+  }
+
+  async createCustomerDocument(data: InsertCustomerDocument): Promise<CustomerDocument> {
+    const [created] = await db.insert(customerDocuments).values(data).returning();
+    return created;
+  }
+
+  async updateCustomerDocument(id: string, updates: Partial<CustomerDocument>): Promise<CustomerDocument | undefined> {
+    const [updated] = await db.update(customerDocuments).set(updates).where(eq(customerDocuments.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCustomerDocument(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(customerDocuments).where(eq(customerDocuments.id, id)).returning();
+    return !!deleted;
+  }
+
+  // Customer Hub - Care Guides
+  async getCareGuides(): Promise<CareGuide[]> {
+    return await db.select().from(careGuides).orderBy(desc(careGuides.createdAt));
+  }
+
+  async getPublishedCareGuides(): Promise<CareGuide[]> {
+    return await db.select().from(careGuides).where(eq(careGuides.isPublished, true)).orderBy(desc(careGuides.createdAt));
+  }
+
+  async getCareGuide(id: string): Promise<CareGuide | undefined> {
+    const [guide] = await db.select().from(careGuides).where(eq(careGuides.id, id));
+    return guide;
+  }
+
+  async createCareGuide(data: InsertCareGuide): Promise<CareGuide> {
+    const [created] = await db.insert(careGuides).values(data).returning();
+    return created;
+  }
+
+  async updateCareGuide(id: string, updates: Partial<CareGuide>): Promise<CareGuide | undefined> {
+    const [updated] = await db.update(careGuides).set({ ...updates, updatedAt: new Date() }).where(eq(careGuides.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCareGuide(id: string): Promise<boolean> {
+    await db.delete(customerSavedGuides).where(eq(customerSavedGuides.guideId, id));
+    const [deleted] = await db.delete(careGuides).where(eq(careGuides.id, id)).returning();
+    return !!deleted;
+  }
+
+  // Customer Hub - Saved Guides
+  async getCustomerSavedGuides(customerId: string): Promise<CustomerSavedGuide[]> {
+    return await db.select().from(customerSavedGuides).where(eq(customerSavedGuides.customerId, customerId));
+  }
+
+  async createCustomerSavedGuide(data: InsertCustomerSavedGuide): Promise<CustomerSavedGuide> {
+    const [created] = await db.insert(customerSavedGuides).values(data).returning();
+    return created;
+  }
+
+  async deleteCustomerSavedGuide(customerId: string, guideId: string): Promise<boolean> {
+    const [deleted] = await db.delete(customerSavedGuides).where(and(eq(customerSavedGuides.customerId, customerId), eq(customerSavedGuides.guideId, guideId))).returning();
+    return !!deleted;
+  }
+
+  // Customer Hub - Notifications
+  async getCustomerNotifications(customerId: string): Promise<CustomerNotification[]> {
+    return await db.select().from(customerNotifications).where(eq(customerNotifications.customerId, customerId)).orderBy(desc(customerNotifications.createdAt));
+  }
+
+  async getUnreadNotificationCount(customerId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(customerNotifications).where(and(eq(customerNotifications.customerId, customerId), eq(customerNotifications.isRead, false)));
+    return result[0]?.count || 0;
+  }
+
+  async createCustomerNotification(data: InsertCustomerNotification): Promise<CustomerNotification> {
+    const [created] = await db.insert(customerNotifications).values(data).returning();
+    return created;
+  }
+
+  async markNotificationRead(id: string): Promise<boolean> {
+    const [updated] = await db.update(customerNotifications).set({ isRead: true }).where(eq(customerNotifications.id, id)).returning();
+    return !!updated;
+  }
+
+  async markAllNotificationsRead(customerId: string): Promise<void> {
+    await db.update(customerNotifications).set({ isRead: true }).where(and(eq(customerNotifications.customerId, customerId), eq(customerNotifications.isRead, false)));
   }
 }
 
