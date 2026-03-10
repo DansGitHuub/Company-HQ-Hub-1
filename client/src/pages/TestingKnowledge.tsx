@@ -5,34 +5,82 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import {
   Search, BookOpen, GraduationCap, Trophy, CheckCircle2, XCircle,
-  ArrowLeft, Clock, Target, Loader2, AlertCircle, ChevronRight
+  ArrowLeft, Clock, Target, Loader2, AlertCircle, ChevronRight,
+  Shield, Users, BarChart3, Settings, Flag
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
-import type { SopQuiz, SopQuizQuestion, UserQuizAttempt, Sop } from "@shared/schema";
+import type { SopQuiz, UserQuizAttempt, Sop } from "@shared/schema";
 
 type CatalogEntry = {
   sop: Sop;
   quizzes: SopQuiz[];
 };
 
-type QuizWithQuestions = SopQuiz & { questions: SopQuizQuestion[] };
+interface AdaptiveQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  difficultyLevel: number;
+  sortOrder: number;
+}
+
+interface AnswerResult {
+  questionId: string;
+  selectedIndex: number;
+  correctIndex: number;
+  isCorrect: boolean;
+  explanation: string | null;
+  difficultyLevel: number;
+}
+
+const DIFFICULTY_LABELS: Record<number, string> = {
+  1: "Foundational",
+  2: "Competent",
+  3: "Proficient",
+  4: "Advanced",
+  5: "Expert",
+};
+
+const DIFFICULTY_COLORS: Record<number, string> = {
+  1: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+  2: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
+  3: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
+  4: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
+  5: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+};
 
 export default function TestingKnowledge() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
   const [search, setSearch] = useState("");
-  const [selectedQuiz, setSelectedQuiz] = useState<QuizWithQuestions | null>(null);
   const [selectedSopEntry, setSelectedSopEntry] = useState<CatalogEntry | null>(null);
-  const [activeSkillTab, setActiveSkillTab] = useState("beginner");
-  const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
-  const [quizResult, setQuizResult] = useState<UserQuizAttempt | null>(null);
-  const [showExplanations, setShowExplanations] = useState(false);
+  const [mainTab, setMainTab] = useState("catalog");
+
+  const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
+  const [activeQuizTitle, setActiveQuizTitle] = useState("");
+  const [currentQuestion, setCurrentQuestion] = useState<AdaptiveQuestion | null>(null);
+  const [currentDifficulty, setCurrentDifficulty] = useState(1);
+  const [questionNumber, setQuestionNumber] = useState(1);
+  const [answeredIds, setAnsweredIds] = useState<string[]>([]);
+  const [allAnswers, setAllAnswers] = useState<AnswerResult[]>([]);
+  const [highestLevelPassed, setHighestLevelPassed] = useState(0);
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [lastAnswerResult, setLastAnswerResult] = useState<AnswerResult | null>(null);
+  const [showingFeedback, setShowingFeedback] = useState(false);
+  const [quizFinished, setQuizFinished] = useState(false);
+  const [finalResult, setFinalResult] = useState<any>(null);
+  const [isAnswering, setIsAnswering] = useState(false);
+
+  const isManager = user?.role && ["Admin", "Master Admin", "Manager", "HR"].includes(user.role);
 
   const { data: catalog = [], isLoading: loadingCatalog } = useQuery<CatalogEntry[]>({
     queryKey: ["/api/quiz-catalog"],
@@ -42,238 +90,305 @@ export default function TestingKnowledge() {
     queryKey: ["/api/quiz-attempts/me"],
   });
 
-  const fetchQuizMutation = useMutation({
-    mutationFn: async (quizId: string) => {
-      const res = await apiRequest("GET", `/api/quizzes/${quizId}`);
-      return await res.json();
-    },
-    onSuccess: (data: QuizWithQuestions) => {
-      setSelectedQuiz(data);
-      setQuizAnswers({});
-      setQuizResult(null);
-      setShowExplanations(false);
-    },
+  const { data: employeeStats = [] } = useQuery<any[]>({
+    queryKey: ["/api/quiz-stats/employees"],
+    enabled: !!isManager && mainTab === "manager",
   });
 
-  const submitQuizMutation = useMutation({
-    mutationFn: async ({ quizId, answers }: { quizId: string; answers: number[] }) => {
-      const res = await apiRequest("POST", `/api/quizzes/${quizId}/attempts`, { answers });
-      return await res.json();
-    },
-    onSuccess: (data: UserQuizAttempt) => {
-      setQuizResult(data);
-      setShowExplanations(true);
-      queryClient.invalidateQueries({ queryKey: ["/api/quiz-attempts/me"] });
-      toast({
-        title: data.passed ? "Quiz Passed!" : "Quiz Not Passed",
-        description: `You scored ${data.score}/${data.totalQuestions} (${Math.round((data.score / data.totalQuestions) * 100)}%)`,
-      });
-    },
+  const { data: safetyFlags = [] } = useQuery<any[]>({
+    queryKey: ["/api/quiz-stats/safety-flags"],
+    enabled: !!isManager && mainTab === "manager",
   });
 
   const filteredCatalog = catalog.filter((entry) =>
     entry.sop.title.toLowerCase().includes(search.toLowerCase())
   );
 
-  const getAttemptForQuiz = (quizId: string) => {
-    return myAttempts.find((a) => a.quizId === quizId);
-  };
-
   const getBestAttemptForQuiz = (quizId: string) => {
     const attempts = myAttempts.filter((a) => a.quizId === quizId);
     if (attempts.length === 0) return null;
-    return attempts.reduce((best, curr) => (curr.score > best.score ? curr : best));
+    return attempts.reduce((best, curr) =>
+      ((curr as any).highestLevelPassed || 0) > ((best as any).highestLevelPassed || 0) ? curr : best
+    );
   };
 
-  const handleStartQuiz = (quizId: string) => {
-    fetchQuizMutation.mutate(quizId);
-  };
-
-  const handleSubmitQuiz = () => {
-    if (!selectedQuiz) return;
-    const totalQuestions = selectedQuiz.questions.length;
-    const answers = Array.from({ length: totalQuestions }, (_, i) => quizAnswers[i] ?? -1);
-    
-    const unanswered = answers.filter((a) => a === -1).length;
-    if (unanswered > 0) {
-      toast({
-        title: "Incomplete Quiz",
-        description: `You have ${unanswered} unanswered question${unanswered > 1 ? "s" : ""}. Please answer all questions.`,
-        variant: "destructive",
-      });
-      return;
+  const startAdaptiveQuiz = async (quizId: string) => {
+    try {
+      const res = await apiRequest("POST", `/api/quizzes/${quizId}/start`);
+      const data = await res.json();
+      if (data.error) {
+        toast({ title: "Cannot Start Quiz", description: data.message || data.error, variant: "destructive" });
+        return;
+      }
+      setActiveQuizId(quizId);
+      setActiveQuizTitle(data.quizTitle || "Adaptive Quiz");
+      setCurrentQuestion(data.question);
+      setCurrentDifficulty(data.currentDifficulty);
+      setQuestionNumber(data.questionNumber);
+      setAnsweredIds([]);
+      setAllAnswers([]);
+      setHighestLevelPassed(0);
+      setSelectedOption(null);
+      setLastAnswerResult(null);
+      setShowingFeedback(false);
+      setQuizFinished(false);
+      setFinalResult(null);
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to start quiz", variant: "destructive" });
     }
-
-    submitQuizMutation.mutate({ quizId: selectedQuiz.id, answers });
   };
 
-  const handleBackToList = () => {
-    setSelectedQuiz(null);
+  const submitAnswer = async () => {
+    if (!activeQuizId || !currentQuestion || selectedOption === null) return;
+    setIsAnswering(true);
+    try {
+      const res = await apiRequest("POST", `/api/quizzes/${activeQuizId}/answer`, {
+        questionId: currentQuestion.id,
+        selectedIndex: selectedOption,
+        answeredQuestionIds: answeredIds,
+        currentDifficulty,
+        questionNumber,
+      });
+      const data = await res.json();
+      const result = data.answerResult as AnswerResult;
+      setLastAnswerResult(result);
+      setShowingFeedback(true);
+
+      const newAnswers = [...allAnswers, result];
+      setAllAnswers(newAnswers);
+      setAnsweredIds(data.answeredQuestionIds || [...answeredIds, currentQuestion.id]);
+
+      if (result.isCorrect && result.difficultyLevel > highestLevelPassed) {
+        setHighestLevelPassed(result.difficultyLevel);
+      }
+
+      if (data.finished) {
+        setQuizFinished(true);
+      } else {
+        setCurrentDifficulty(data.currentDifficulty);
+        setQuestionNumber(data.questionNumber);
+        if (data.nextQuestion) {
+          setTimeout(() => {}, 0);
+          (window as any).__nextQuestion = data.nextQuestion;
+        }
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to submit answer", variant: "destructive" });
+    } finally {
+      setIsAnswering(false);
+    }
+  };
+
+  const proceedToNext = async () => {
+    if (quizFinished) {
+      try {
+        const res = await apiRequest("POST", `/api/quizzes/${activeQuizId}/complete`, {
+          answers: allAnswers,
+          questionsServed: answeredIds,
+          highestLevelPassed,
+        });
+        const data = await res.json();
+        setFinalResult(data);
+        queryClient.invalidateQueries({ queryKey: ["/api/quiz-attempts/me"] });
+      } catch (err) {
+        toast({ title: "Error", description: "Failed to save results", variant: "destructive" });
+      }
+    } else {
+      const nq = (window as any).__nextQuestion;
+      if (nq) {
+        setCurrentQuestion(nq);
+        (window as any).__nextQuestion = null;
+      }
+    }
+    setShowingFeedback(false);
+    setSelectedOption(null);
+    setLastAnswerResult(null);
+  };
+
+  const resetQuiz = () => {
+    setActiveQuizId(null);
+    setCurrentQuestion(null);
+    setQuizFinished(false);
+    setFinalResult(null);
     setSelectedSopEntry(null);
-    setQuizAnswers({});
-    setQuizResult(null);
-    setShowExplanations(false);
+    setAllAnswers([]);
+    setAnsweredIds([]);
+    setHighestLevelPassed(0);
   };
 
-  const handleBackToSop = () => {
-    setSelectedQuiz(null);
-    setQuizAnswers({});
-    setQuizResult(null);
-    setShowExplanations(false);
-  };
-
-  if (selectedQuiz) {
+  if (finalResult) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6" data-testid="quiz-active-view">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={handleBackToSop} data-testid="button-back-to-sop">
-            <ArrowLeft className="h-4 w-4 mr-1" /> Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-heading font-bold text-foreground">{selectedQuiz.title}</h1>
-            <p className="text-muted-foreground text-sm">{selectedQuiz.description}</p>
-          </div>
-        </div>
+      <div className="max-w-2xl mx-auto space-y-6" data-testid="quiz-results-view">
+        <Button variant="ghost" size="sm" onClick={resetQuiz} data-testid="button-back-catalog">
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back to Catalog
+        </Button>
 
-        {quizResult && (
-          <Card className={`border-2 ${quizResult.passed ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-orange-500 bg-orange-50 dark:bg-orange-950/20"}`} data-testid="quiz-result-card">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                {quizResult.passed ? (
-                  <Trophy className="h-10 w-10 text-green-500" />
-                ) : (
-                  <AlertCircle className="h-10 w-10 text-orange-500" />
-                )}
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold" data-testid="text-quiz-score">
-                    Score: {quizResult.score}/{quizResult.totalQuestions} ({Math.round((quizResult.score / quizResult.totalQuestions) * 100)}%)
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {quizResult.passed ? "Congratulations! You passed this quiz." : "You need 70% to pass. Review the explanations and try again."}
-                  </p>
-                </div>
-                <Badge variant={quizResult.passed ? "default" : "secondary"} className={quizResult.passed ? "bg-green-500" : ""} data-testid="badge-pass-status">
-                  {quizResult.passed ? "PASSED" : "NOT PASSED"}
-                </Badge>
+        <Card className={`border-2 ${finalResult.passed ? "border-green-500" : "border-orange-500"}`}>
+          <CardContent className="p-8 text-center space-y-4">
+            {finalResult.passed ? (
+              <Trophy className="h-16 w-16 mx-auto text-green-500" />
+            ) : (
+              <AlertCircle className="h-16 w-16 mx-auto text-orange-500" />
+            )}
+            <h2 className="text-2xl font-bold" data-testid="text-final-label">
+              {finalResult.finalScoreLabel || "Complete"}
+            </h2>
+            <p className="text-muted-foreground">
+              Highest Level Reached: <span className="font-bold">Level {finalResult.highestLevelPassed}</span> ({DIFFICULTY_LABELS[finalResult.highestLevelPassed] || "N/A"})
+            </p>
+            <div className="flex items-center justify-center gap-6">
+              <div className="text-center">
+                <p className="text-3xl font-bold" data-testid="text-final-score">{finalResult.score}/{finalResult.totalQuestions}</p>
+                <p className="text-xs text-muted-foreground">Correct</p>
               </div>
-              <Progress value={(quizResult.score / quizResult.totalQuestions) * 100} className="mt-4" />
+              <div className="text-center">
+                <p className="text-3xl font-bold">{Math.round((finalResult.score / finalResult.totalQuestions) * 100)}%</p>
+                <p className="text-xs text-muted-foreground">Accuracy</p>
+              </div>
+            </div>
+            <Badge variant={finalResult.passed ? "default" : "secondary"} className={`text-sm px-4 py-1 ${finalResult.passed ? "bg-green-500" : ""}`}>
+              {finalResult.passed ? "PASSED" : `Need Level ${finalResult.minPassLevel} to Pass`}
+            </Badge>
+
+            <div className="flex w-full gap-1 mt-4">
+              {[1, 2, 3, 4, 5].map((level) => (
+                <div
+                  key={level}
+                  className={`flex-1 h-3 rounded-full ${level <= finalResult.highestLevelPassed ? DIFFICULTY_COLORS[level].split(" ")[0] : "bg-muted"}`}
+                  title={`Level ${level}: ${DIFFICULTY_LABELS[level]}`}
+                />
+              ))}
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground px-1">
+              <span>Foundational</span>
+              <span>Expert</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {finalResult.reviewAreas && finalResult.reviewAreas.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <BookOpen className="h-4 w-4" /> Areas to Review
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {finalResult.reviewAreas.map((area: string, i: number) => (
+                <div key={i} className="text-sm p-2 bg-muted rounded-lg" data-testid={`review-area-${i}`}>{area}</div>
+              ))}
             </CardContent>
           </Card>
         )}
 
-        <div className="space-y-4">
-          {selectedQuiz.questions.map((question, qIndex) => {
-            const resultAnswer = quizResult ? (quizResult.answers as any[])?.[qIndex] : null;
-            const isCorrect = resultAnswer?.isCorrect;
-            const selectedAnswer = quizResult ? resultAnswer?.selectedIndex : quizAnswers[qIndex];
+        <div className="flex gap-3">
+          <Button onClick={() => { resetQuiz(); if (activeQuizId) startAdaptiveQuiz(activeQuizId); }} data-testid="button-retake">
+            Retake Quiz
+          </Button>
+          <Button variant="outline" onClick={resetQuiz} data-testid="button-back-to-catalog">
+            Back to Catalog
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
-            return (
-              <Card
-                key={question.id}
-                className={`${quizResult ? (isCorrect ? "border-green-300" : "border-red-300") : ""}`}
-                data-testid={`card-question-${qIndex}`}
-              >
-                <CardContent className="p-5">
-                  <div className="flex items-start gap-3 mb-4">
-                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
-                      {qIndex + 1}
-                    </span>
-                    <div className="flex-1">
-                      <p className="font-medium" data-testid={`text-question-${qIndex}`}>{question.question}</p>
-                      {question.isStandard && (
-                        <Badge variant="outline" className="mt-1 text-xs">Standard Question</Badge>
-                      )}
-                    </div>
-                    {quizResult && (
-                      isCorrect ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" /> : <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-                    )}
-                  </div>
-
-                  <div className="grid gap-2 ml-11">
-                    {(question.options as string[]).map((option, oIndex) => {
-                      const isSelected = selectedAnswer === oIndex;
-                      const isCorrectOption = quizResult && oIndex === question.correctIndex;
-                      let optionClass = "border p-3 rounded-lg cursor-pointer transition-all text-sm";
-
-                      if (quizResult) {
-                        if (isCorrectOption) {
-                          optionClass += " border-green-500 bg-green-50 dark:bg-green-950/30";
-                        } else if (isSelected && !isCorrect) {
-                          optionClass += " border-red-500 bg-red-50 dark:bg-red-950/30";
-                        } else {
-                          optionClass += " opacity-60";
-                        }
-                      } else {
-                        optionClass += isSelected
-                          ? " border-primary bg-primary/5 ring-2 ring-primary/20"
-                          : " hover:border-primary/50 hover:bg-muted/50";
-                      }
-
-                      return (
-                        <div
-                          key={oIndex}
-                          className={optionClass}
-                          onClick={() => {
-                            if (!quizResult) {
-                              setQuizAnswers((prev) => ({ ...prev, [qIndex]: oIndex }));
-                            }
-                          }}
-                          data-testid={`option-${qIndex}-${oIndex}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold">
-                              {String.fromCharCode(65 + oIndex)}
-                            </span>
-                            <span>{option}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {showExplanations && question.explanation && (
-                    <div className="mt-3 ml-11 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg text-sm">
-                      <span className="font-medium text-blue-700 dark:text-blue-400">Explanation: </span>
-                      <span className="text-blue-600 dark:text-blue-300">{question.explanation}</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+  if (activeQuizId && currentQuestion) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-6" data-testid="quiz-active-view">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold">{activeQuizTitle}</h1>
+            <div className="flex items-center gap-3 mt-1">
+              <Badge className={DIFFICULTY_COLORS[currentDifficulty]} data-testid="badge-difficulty">
+                Level {currentDifficulty} — {DIFFICULTY_LABELS[currentDifficulty]}
+              </Badge>
+              <span className="text-sm text-muted-foreground">Question {questionNumber}</span>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" onClick={resetQuiz}>
+            <XCircle className="h-4 w-4 mr-1" /> Quit
+          </Button>
         </div>
 
-        <div className="flex justify-between items-center pt-4 border-t">
-          <p className="text-sm text-muted-foreground">
-            {Object.keys(quizAnswers).length}/{selectedQuiz.questions.length} answered
-          </p>
-          {!quizResult ? (
-            <Button
-              size="lg"
-              onClick={handleSubmitQuiz}
-              disabled={submitQuizMutation.isPending}
-              data-testid="button-submit-quiz"
-            >
-              {submitQuizMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Grading...</>
-              ) : (
-                <>Submit Quiz</>
-              )}
-            </Button>
-          ) : (
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowExplanations(!showExplanations)} data-testid="button-toggle-explanations">
-                {showExplanations ? "Hide Explanations" : "Show Explanations"}
-              </Button>
-              <Button onClick={() => {
-                setQuizAnswers({});
-                setQuizResult(null);
-                setShowExplanations(false);
-              }} data-testid="button-retake-quiz">
-                Retake Quiz
-              </Button>
-            </div>
-          )}
+        <div className="flex gap-1 mb-2">
+          {[1, 2, 3, 4, 5].map((level) => (
+            <div
+              key={level}
+              className={`flex-1 h-2 rounded-full transition-colors ${level <= currentDifficulty ? DIFFICULTY_COLORS[level].split(" ")[0] : "bg-muted"}`}
+              title={DIFFICULTY_LABELS[level]}
+            />
+          ))}
+        </div>
+
+        <Card data-testid="card-current-question">
+          <CardContent className="p-6">
+            {showingFeedback && lastAnswerResult ? (
+              <div className="space-y-4">
+                <div className={`p-4 rounded-lg ${lastAnswerResult.isCorrect ? "bg-green-50 dark:bg-green-950/30 border border-green-200" : "bg-red-50 dark:bg-red-950/30 border border-red-200"}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    {lastAnswerResult.isCorrect ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    )}
+                    <span className="font-medium" data-testid="text-answer-feedback">
+                      {lastAnswerResult.isCorrect ? "Correct!" : "Incorrect"}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium mb-2">{currentQuestion.question}</p>
+                  {!lastAnswerResult.isCorrect && (
+                    <p className="text-sm">
+                      Correct answer: <span className="font-medium">{(currentQuestion.options as string[])[lastAnswerResult.correctIndex]}</span>
+                    </p>
+                  )}
+                  {lastAnswerResult.explanation && (
+                    <p className="text-sm mt-2 opacity-80">{lastAnswerResult.explanation}</p>
+                  )}
+                </div>
+                <Button onClick={proceedToNext} className="w-full" data-testid="button-next-question">
+                  {quizFinished ? "See Results" : "Next Question"}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-lg font-medium" data-testid="text-question">{currentQuestion.question}</p>
+                <div className="grid gap-2">
+                  {(currentQuestion.options as string[]).map((option, oIndex) => (
+                    <div
+                      key={oIndex}
+                      className={`border p-3 rounded-lg cursor-pointer transition-all text-sm ${
+                        selectedOption === oIndex
+                          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                          : "hover:border-primary/50 hover:bg-muted/50"
+                      }`}
+                      onClick={() => setSelectedOption(oIndex)}
+                      data-testid={`option-${oIndex}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold">
+                          {String.fromCharCode(65 + oIndex)}
+                        </span>
+                        <span>{option}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  className="w-full"
+                  disabled={selectedOption === null || isAnswering}
+                  onClick={submitAnswer}
+                  data-testid="button-submit-answer"
+                >
+                  {isAnswering ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Checking...</> : "Submit Answer"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="text-center text-xs text-muted-foreground">
+          Highest level reached so far: <span className="font-medium">Level {highestLevelPassed} ({DIFFICULTY_LABELS[highestLevelPassed] || "—"})</span>
         </div>
       </div>
     );
@@ -281,97 +396,124 @@ export default function TestingKnowledge() {
 
   if (selectedSopEntry) {
     const quizzes = selectedSopEntry.quizzes;
+    const adaptiveQuiz = quizzes.find((q) => q.skillLevel === "adaptive") || quizzes[0];
+    const bestAttempt = adaptiveQuiz ? getBestAttemptForQuiz(adaptiveQuiz.id) : null;
+    const attemptCount = adaptiveQuiz ? myAttempts.filter((a) => a.quizId === adaptiveQuiz.id).length : 0;
+
     return (
       <div className="max-w-4xl mx-auto space-y-6" data-testid="sop-quiz-selection">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={handleBackToList} data-testid="button-back-to-list">
+          <Button variant="ghost" size="sm" onClick={() => setSelectedSopEntry(null)} data-testid="button-back-to-list">
             <ArrowLeft className="h-4 w-4 mr-1" /> Back to Catalog
           </Button>
           <div>
             <h1 className="text-2xl font-heading font-bold text-foreground">{selectedSopEntry.sop.title}</h1>
-            <p className="text-muted-foreground text-sm">Select a skill level to start the quiz</p>
+            <p className="text-muted-foreground text-sm">Adaptive difficulty quiz — adjusts to your skill level</p>
           </div>
         </div>
 
-        <Tabs value={activeSkillTab} onValueChange={setActiveSkillTab}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="beginner" data-testid="tab-beginner">Beginner</TabsTrigger>
-            <TabsTrigger value="intermediate" data-testid="tab-intermediate">Intermediate</TabsTrigger>
-            <TabsTrigger value="advanced" data-testid="tab-advanced">Advanced</TabsTrigger>
-          </TabsList>
+        {adaptiveQuiz ? (
+          <Card data-testid="card-adaptive-quiz">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <GraduationCap className="h-5 w-5" />
+                {adaptiveQuiz.title}
+              </CardTitle>
+              <CardDescription>{adaptiveQuiz.description || "Questions adapt to your skill level. Answer correctly to unlock harder questions."}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <p className="text-2xl font-bold" data-testid="text-question-count">{adaptiveQuiz.questionCount}</p>
+                  <p className="text-xs text-muted-foreground">Questions</p>
+                </div>
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <p className="text-2xl font-bold" data-testid="text-attempt-count">{attemptCount}</p>
+                  <p className="text-xs text-muted-foreground">Attempts</p>
+                </div>
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <p className="text-2xl font-bold" data-testid="text-best-level">
+                    {bestAttempt ? `L${(bestAttempt as any).highestLevelPassed || 0}` : "--"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Best Level</p>
+                </div>
+              </div>
 
-          {["beginner", "intermediate", "advanced"].map((level) => {
-            const quiz = quizzes.find((q) => q.skillLevel === level);
-            const bestAttempt = quiz ? getBestAttemptForQuiz(quiz.id) : null;
-            const attemptCount = quiz ? myAttempts.filter((a) => a.quizId === quiz.id).length : 0;
+              {bestAttempt && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant={bestAttempt.passed ? "default" : "secondary"} className={bestAttempt.passed ? "bg-green-500" : ""}>
+                    {bestAttempt.passed ? "PASSED" : "NOT PASSED"}
+                  </Badge>
+                  <Badge className={DIFFICULTY_COLORS[(bestAttempt as any).highestLevelPassed || 1]}>
+                    {(bestAttempt as any).finalScoreLabel || DIFFICULTY_LABELS[(bestAttempt as any).highestLevelPassed || 0]}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    Best: {bestAttempt.score}/{bestAttempt.totalQuestions}
+                  </span>
+                </div>
+              )}
 
-            return (
-              <TabsContent key={level} value={level}>
-                {quiz ? (
-                  <Card data-testid={`card-quiz-${level}`}>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <GraduationCap className="h-5 w-5" />
-                        {quiz.title}
-                      </CardTitle>
-                      <CardDescription>{quiz.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="text-center p-3 bg-muted rounded-lg">
-                          <p className="text-2xl font-bold" data-testid={`text-question-count-${level}`}>{quiz.questionCount}</p>
-                          <p className="text-xs text-muted-foreground">Questions</p>
-                        </div>
-                        <div className="text-center p-3 bg-muted rounded-lg">
-                          <p className="text-2xl font-bold" data-testid={`text-attempt-count-${level}`}>{attemptCount}</p>
-                          <p className="text-xs text-muted-foreground">Attempts</p>
-                        </div>
-                        <div className="text-center p-3 bg-muted rounded-lg">
-                          <p className="text-2xl font-bold" data-testid={`text-best-score-${level}`}>
-                            {bestAttempt ? `${Math.round((bestAttempt.score / bestAttempt.totalQuestions) * 100)}%` : "--"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Best Score</p>
-                        </div>
-                      </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Difficulty Levels</p>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((level) => (
+                    <div key={level} className="flex-1">
+                      <div className={`h-2 rounded-full ${level <= ((bestAttempt as any)?.highestLevelPassed || 0) ? DIFFICULTY_COLORS[level].split(" ")[0] : "bg-muted"}`} />
+                      <p className="text-[10px] text-center text-muted-foreground mt-0.5">{DIFFICULTY_LABELS[level]}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-                      {bestAttempt && (
-                        <div className="flex items-center gap-2">
-                          <Badge variant={bestAttempt.passed ? "default" : "secondary"} className={bestAttempt.passed ? "bg-green-500" : ""}>
-                            {bestAttempt.passed ? "PASSED" : "NOT PASSED"}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">
-                            Best: {bestAttempt.score}/{bestAttempt.totalQuestions}
-                          </span>
-                        </div>
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => startAdaptiveQuiz(adaptiveQuiz.id)}
+                data-testid="button-start-adaptive"
+              >
+                {bestAttempt ? "Retake Quiz" : "Start Adaptive Quiz"}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <AlertCircle className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+              <p className="text-muted-foreground">No quiz available for this SOP yet.</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {quizzes.filter((q) => q.skillLevel !== "adaptive").length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Legacy Quizzes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {quizzes.filter((q) => q.skillLevel !== "adaptive").map((quiz) => {
+                const best = getBestAttemptForQuiz(quiz.id);
+                return (
+                  <div key={quiz.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div>
+                      <p className="font-medium text-sm">{quiz.title}</p>
+                      <p className="text-xs text-muted-foreground">{quiz.questionCount} questions</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {best && (
+                        <Badge variant={best.passed ? "default" : "secondary"} className={best.passed ? "bg-green-500" : ""}>
+                          {best.passed ? "Passed" : `${best.score}/${best.totalQuestions}`}
+                        </Badge>
                       )}
-
-                      <Button
-                        className="w-full"
-                        size="lg"
-                        onClick={() => handleStartQuiz(quiz.id)}
-                        disabled={fetchQuizMutation.isPending}
-                        data-testid={`button-start-quiz-${level}`}
-                      >
-                        {fetchQuizMutation.isPending ? (
-                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading...</>
-                        ) : (
-                          <>{bestAttempt ? "Retake Quiz" : "Start Quiz"}</>
-                        )}
+                      <Button size="sm" variant="outline" onClick={() => startAdaptiveQuiz(quiz.id)}>
+                        Take
                       </Button>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card>
-                    <CardContent className="p-8 text-center">
-                      <AlertCircle className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-                      <p className="text-muted-foreground">No quiz available for this skill level yet.</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-            );
-          })}
-        </Tabs>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }
@@ -384,10 +526,71 @@ export default function TestingKnowledge() {
             <GraduationCap className="h-8 w-8" />
             Testing & Knowledge
           </h1>
-          <p className="text-muted-foreground mt-1">Take quizzes to test your knowledge of company procedures</p>
+          <p className="text-muted-foreground mt-1">Take adaptive quizzes to test your knowledge of company procedures</p>
         </div>
       </div>
 
+      {isManager && (
+        <Tabs value={mainTab} onValueChange={setMainTab}>
+          <TabsList>
+            <TabsTrigger value="catalog" data-testid="tab-catalog">
+              <BookOpen className="h-4 w-4 mr-1" /> Quiz Catalog
+            </TabsTrigger>
+            <TabsTrigger value="manager" data-testid="tab-manager">
+              <BarChart3 className="h-4 w-4 mr-1" /> Team Results
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="manager" className="mt-4 space-y-6">
+            <ManagerQuizView
+              employeeStats={employeeStats}
+              safetyFlags={safetyFlags}
+              catalog={catalog}
+            />
+          </TabsContent>
+
+          <TabsContent value="catalog" className="mt-4">
+            <QuizCatalog
+              catalog={filteredCatalog}
+              loadingCatalog={loadingCatalog}
+              search={search}
+              setSearch={setSearch}
+              getBestAttemptForQuiz={getBestAttemptForQuiz}
+              setSelectedSopEntry={setSelectedSopEntry}
+              catalogCount={catalog.length}
+            />
+          </TabsContent>
+        </Tabs>
+      )}
+
+      {!isManager && (
+        <QuizCatalog
+          catalog={filteredCatalog}
+          loadingCatalog={loadingCatalog}
+          search={search}
+          setSearch={setSearch}
+          getBestAttemptForQuiz={getBestAttemptForQuiz}
+          setSelectedSopEntry={setSelectedSopEntry}
+          catalogCount={catalog.length}
+        />
+      )}
+    </div>
+  );
+}
+
+function QuizCatalog({
+  catalog, loadingCatalog, search, setSearch, getBestAttemptForQuiz, setSelectedSopEntry, catalogCount,
+}: {
+  catalog: CatalogEntry[];
+  loadingCatalog: boolean;
+  search: string;
+  setSearch: (s: string) => void;
+  getBestAttemptForQuiz: (id: string) => any;
+  setSelectedSopEntry: (e: CatalogEntry) => void;
+  catalogCount: number;
+}) {
+  return (
+    <div className="space-y-4">
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -401,7 +604,7 @@ export default function TestingKnowledge() {
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <BookOpen className="h-4 w-4" />
-          <span data-testid="text-catalog-count">{catalog.length} SOP{catalog.length !== 1 ? "s" : ""} with quizzes</span>
+          <span data-testid="text-catalog-count">{catalogCount} SOP{catalogCount !== 1 ? "s" : ""} with quizzes</span>
         </div>
       </div>
 
@@ -409,7 +612,7 @@ export default function TestingKnowledge() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : filteredCatalog.length === 0 ? (
+      ) : catalog.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
             <GraduationCap className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -421,12 +624,10 @@ export default function TestingKnowledge() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredCatalog.map((entry) => {
-            const totalQuizzes = entry.quizzes.length;
-            const passedQuizzes = entry.quizzes.filter((q) => {
-              const best = getBestAttemptForQuiz(q.id);
-              return best?.passed;
-            }).length;
+          {catalog.map((entry) => {
+            const adaptiveQuiz = entry.quizzes.find((q) => q.skillLevel === "adaptive");
+            const quizToCheck = adaptiveQuiz || entry.quizzes[0];
+            const best = quizToCheck ? getBestAttemptForQuiz(quizToCheck.id) : null;
 
             return (
               <Card
@@ -441,29 +642,32 @@ export default function TestingKnowledge() {
                     <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1" />
                   </div>
                   {entry.sop.sopType && (
-                    <Badge variant="outline" className="text-xs w-fit">
-                      {entry.sop.sopType}
-                    </Badge>
+                    <Badge variant="outline" className="text-xs w-fit">{entry.sop.sopType}</Badge>
                   )}
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-1 text-muted-foreground">
                       <Target className="h-3.5 w-3.5" />
-                      <span>{totalQuizzes} skill levels</span>
+                      <span>Adaptive</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      {passedQuizzes > 0 ? (
-                        <Badge variant="default" className="bg-green-500 text-xs">
-                          {passedQuizzes}/{totalQuizzes} passed
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">Not started</Badge>
-                      )}
-                    </div>
+                    {best ? (
+                      <Badge className={DIFFICULTY_COLORS[best.highestLevelPassed || 1] || ""}>
+                        Level {best.highestLevelPassed || 0}
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">Not started</Badge>
+                    )}
                   </div>
-                  {passedQuizzes > 0 && (
-                    <Progress value={(passedQuizzes / totalQuizzes) * 100} className="mt-3 h-1.5" />
+                  {best && (
+                    <div className="flex gap-0.5 mt-3">
+                      {[1, 2, 3, 4, 5].map((level) => (
+                        <div
+                          key={level}
+                          className={`flex-1 h-1.5 rounded-full ${level <= (best.highestLevelPassed || 0) ? DIFFICULTY_COLORS[level].split(" ")[0] : "bg-muted"}`}
+                        />
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -471,6 +675,149 @@ export default function TestingKnowledge() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function ManagerQuizView({ employeeStats, safetyFlags, catalog }: { employeeStats: any[]; safetyFlags: any[]; catalog: CatalogEntry[] }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async ({ quizId, ...data }: { quizId: string; minPassLevel?: number; isSafetyCritical?: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/quizzes/${quizId}/settings`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quiz-catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quiz-stats/safety-flags"] });
+      toast({ title: "Quiz settings updated" });
+    },
+  });
+
+  const groupedByEmployee = employeeStats.reduce((acc: any, stat: any) => {
+    if (!acc[stat.user_id]) {
+      acc[stat.user_id] = { name: stat.name || stat.username, role: stat.role, quizzes: [] };
+    }
+    acc[stat.user_id].quizzes.push(stat);
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-6">
+      {safetyFlags.length > 0 && (
+        <Card className="border-red-200 dark:border-red-800">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2 text-red-600">
+              <Flag className="h-4 w-4" /> Safety-Critical Alerts
+            </CardTitle>
+            <CardDescription>Employees who haven't reached Level 2 on safety-critical SOPs</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {safetyFlags.map((flag: any, i: number) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-950/20 rounded-lg" data-testid={`safety-flag-${i}`}>
+                  <div>
+                    <p className="font-medium text-sm">{flag.name || flag.username}</p>
+                    <p className="text-xs text-muted-foreground">{flag.role} — {flag.sop_title || flag.quiz_title}</p>
+                  </div>
+                  <Badge variant="destructive">Level {flag.best_level} / Need {flag.min_pass_level}</Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Users className="h-4 w-4" /> Employee Mastery Levels
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {Object.keys(groupedByEmployee).length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No quiz attempts recorded yet</p>
+          ) : (
+            <div className="space-y-4">
+              {Object.entries(groupedByEmployee).map(([userId, data]: [string, any]) => (
+                <div key={userId} className="border rounded-lg p-4" data-testid={`employee-stats-${userId}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="font-medium">{data.name}</p>
+                      <Badge variant="outline" className="text-xs">{data.role}</Badge>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    {data.quizzes.map((stat: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between text-sm py-1">
+                        <span className="text-muted-foreground truncate flex-1">{stat.quiz_title}</span>
+                        <div className="flex items-center gap-2">
+                          <Badge className={DIFFICULTY_COLORS[stat.best_level || 1]}>
+                            L{stat.best_level}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">{stat.attempt_count} tries</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Settings className="h-4 w-4" /> Quiz Settings
+          </CardTitle>
+          <CardDescription>Set minimum pass levels and mark safety-critical quizzes</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {catalog.map((entry) => {
+              const quiz = entry.quizzes.find((q) => q.skillLevel === "adaptive") || entry.quizzes[0];
+              if (!quiz) return null;
+              return (
+                <div key={quiz.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`quiz-settings-${quiz.id}`}>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{entry.sop.title}</p>
+                    <p className="text-xs text-muted-foreground">{quiz.questionCount} questions</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs">Min Level</Label>
+                      <Select
+                        defaultValue={String((quiz as any).minPassLevel || 2)}
+                        onValueChange={(val) => updateSettingsMutation.mutate({ quizId: quiz.id, minPassLevel: parseInt(val) })}
+                      >
+                        <SelectTrigger className="w-20 h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5].map((l) => (
+                            <SelectItem key={l} value={String(l)}>Level {l}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-muted-foreground" />
+                      <Switch
+                        defaultChecked={(quiz as any).isSafetyCritical || false}
+                        onCheckedChange={(checked) => updateSettingsMutation.mutate({ quizId: quiz.id, isSafetyCritical: checked })}
+                      />
+                      <Label className="text-xs">Safety Critical</Label>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

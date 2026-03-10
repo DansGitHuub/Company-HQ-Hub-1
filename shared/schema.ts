@@ -2062,6 +2062,8 @@ export const sopQuizzes = pgTable("sop_quizzes", {
   title: text("title").notNull(),
   description: text("description"),
   questionCount: integer("question_count").notNull().default(0),
+  minPassLevel: integer("min_pass_level").notNull().default(2),
+  isSafetyCritical: boolean("is_safety_critical").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -2082,6 +2084,8 @@ export const sopQuizQuestions = pgTable("sop_quiz_questions", {
   isStandard: boolean("is_standard").notNull().default(false),
   explanation: text("explanation"),
   sortOrder: integer("sort_order").notNull().default(0),
+  difficultyLevel: integer("difficulty_level").notNull().default(1),
+  audienceRoles: jsonb("audience_roles").notNull().default([]),
 });
 
 export const insertSopQuizQuestionSchema = createInsertSchema(sopQuizQuestions).omit({
@@ -2099,6 +2103,10 @@ export const userQuizAttempts = pgTable("user_quiz_attempts", {
   totalQuestions: integer("total_questions").notNull(),
   passed: boolean("passed").notNull().default(false),
   answers: jsonb("answers").notNull(),
+  questionsServed: jsonb("questions_served").notNull().default([]),
+  currentDifficulty: integer("current_difficulty").notNull().default(1),
+  highestLevelPassed: integer("highest_level_passed").notNull().default(0),
+  finalScoreLabel: text("final_score_label"),
   completedAt: timestamp("completed_at").defaultNow(),
 });
 

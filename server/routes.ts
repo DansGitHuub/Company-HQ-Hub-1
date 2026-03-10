@@ -857,23 +857,16 @@ Respond with a JSON object:
 
       await storage.deleteSopQuizzesBySop(sop.id);
 
-      const skillLevels = ["beginner", "intermediate", "advanced"];
-      const skillDescriptions: Record<string, string> = {
-        beginner: "New to landscaping, needs detailed guidance. Questions should cover basic terminology, fundamental safety, and step-by-step comprehension.",
-        intermediate: "Has some experience, knows basics. Questions should test practical application, troubleshooting, and efficiency improvements.",
-        advanced: "Experienced professional. Questions should cover edge cases, optimization, quality standards, and mentoring scenarios."
-      };
-
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: `You are a training quiz generator for landscape installation and maintenance companies. Generate quiz questions based on Standard Operating Procedures (SOPs). Return valid JSON only.`
+            content: `You are a training quiz generator for landscape installation and maintenance companies. Generate adaptive difficulty quiz questions based on Standard Operating Procedures (SOPs). Return valid JSON only.`
           },
           {
             role: "user",
-            content: `Based on this SOP, generate quiz questions for employee training.
+            content: `Based on this SOP, generate an adaptive difficulty quiz for employee training.
 
 SOP Title: ${sop.title}
 SOP Type: ${sop.sopType || "standard"}
@@ -882,32 +875,38 @@ ${sop.content}
 
 Generate a JSON object with this exact structure:
 {
-  "standardQuestions": [
+  "questions": [
     {
       "question": "text of question",
       "options": ["option A", "option B", "option C", "option D"],
       "correctIndex": 0,
-      "explanation": "why this is the correct answer"
+      "explanation": "why this is the correct answer",
+      "difficultyLevel": 1,
+      "audienceRoles": ["Crew", "Crew Lead", "New Hire"]
     }
-  ],
-  "skillLevels": {
-    "beginner": [/* 8-10 questions */],
-    "intermediate": [/* 8-10 questions */],
-    "advanced": [/* 8-10 questions */]
-  }
+  ]
 }
 
-Rules:
-- "standardQuestions" should contain 2-3 universal safety/compliance questions that apply to ALL skill levels
-- Each skill level should have 8-10 ADDITIONAL questions specific to that level
-- ${skillDescriptions.beginner}
-- ${skillDescriptions.intermediate}
-- ${skillDescriptions.advanced}
+DIFFICULTY LEVELS (generate at least 2-3 questions per level):
+- Level 1 (Foundational): Basic terminology, fundamental safety, step-by-step comprehension. For all roles.
+- Level 2 (Competent): Practical application, correct procedure ordering, identifying hazards. For Crew and above.
+- Level 3 (Proficient): Troubleshooting, efficiency improvements, handling variations. For Crew Lead and above.
+- Level 4 (Advanced): Edge cases, optimization, quality standards, mentoring scenarios. For Manager and above.
+- Level 5 (Expert): Complex analysis, cross-system integration, policy creation, training design. For Admin/Manager.
+
+AUDIENCE ROLES - tag each question with applicable roles from: ["New Hire", "Crew", "Crew Lead", "Manager", "Admin", "HR", "Sales"]
+- Level 1-2 questions: include all field roles ["New Hire", "Crew", "Crew Lead", "Manager"]
+- Level 3 questions: ["Crew", "Crew Lead", "Manager"]
+- Level 4-5 questions: ["Crew Lead", "Manager", "Admin"]
+
+RULES:
+- Generate 12-15 total questions spread across all 5 difficulty levels
+- At least 2 questions per difficulty level
 - Each question must have exactly 4 options
 - correctIndex is 0-based (0=first option, 3=last option)
 - Questions must directly relate to the SOP content
 - Include practical, real-world scenarios relevant to landscaping
-- Provide brief explanations for correct answers`
+- Provide brief, helpful explanations for correct answers`
           }
         ],
         response_format: { type: "json_object" },
@@ -922,39 +921,33 @@ Rules:
         return res.status(500).json({ message: "Failed to parse AI quiz response" });
       }
 
-      const standardQuestions = quizData.standardQuestions || [];
-      const createdQuizzes: any[] = [];
+      const questions = quizData.questions || [];
 
-      for (const level of skillLevels) {
-        const levelQuestions = quizData.skillLevels?.[level] || [];
-        const allQuestions = [...standardQuestions, ...levelQuestions];
+      const quiz = await storage.createSopQuiz({
+        sopId: sop.id,
+        skillLevel: "adaptive",
+        title: `${sop.title} - Adaptive Quiz`,
+        description: "Adaptive difficulty quiz that adjusts to your skill level. Questions get harder as you answer correctly.",
+        questionCount: questions.length,
+      });
 
-        const quiz = await storage.createSopQuiz({
-          sopId: sop.id,
-          skillLevel: level,
-          title: `${sop.title} - ${level.charAt(0).toUpperCase() + level.slice(1)} Quiz`,
-          description: skillDescriptions[level],
-          questionCount: allQuestions.length,
-        });
+      const questionsToInsert = questions.map((q: any, index: number) => ({
+        quizId: quiz.id,
+        question: q.question,
+        options: q.options,
+        correctIndex: q.correctIndex,
+        isStandard: false,
+        explanation: q.explanation || null,
+        sortOrder: index,
+        difficultyLevel: Math.min(Math.max(q.difficultyLevel || 1, 1), 5),
+        audienceRoles: q.audienceRoles || [],
+      }));
 
-        const questionsToInsert = allQuestions.map((q: any, index: number) => ({
-          quizId: quiz.id,
-          question: q.question,
-          options: q.options,
-          correctIndex: q.correctIndex,
-          isStandard: index < standardQuestions.length,
-          explanation: q.explanation || null,
-          sortOrder: index,
-        }));
-
-        if (questionsToInsert.length > 0) {
-          await storage.createQuizQuestionsBatch(questionsToInsert);
-        }
-
-        createdQuizzes.push({ ...quiz, questions: questionsToInsert });
+      if (questionsToInsert.length > 0) {
+        await storage.createQuizQuestionsBatch(questionsToInsert);
       }
 
-      res.status(201).json(createdQuizzes);
+      res.status(201).json([{ ...quiz, questions: questionsToInsert }]);
     } catch (err: any) {
       console.error("[QUIZ] Generation error:", err);
       res.status(500).json({ message: "Error generating quiz", errorCode: "SOP-003" });
@@ -1055,6 +1048,261 @@ Rules:
       res.json(catalog);
     } catch (err) {
       res.status(500).json({ message: "Error fetching quiz catalog" });
+    }
+  });
+
+  // Adaptive Quiz - Start
+  app.post("/api/quizzes/:id/start", requireAuth, async (req, res) => {
+    try {
+      const quiz = await storage.getSopQuiz(req.params.id as string);
+      if (!quiz) return res.status(404).json({ message: "Quiz not found" });
+
+      const user = req.user as any;
+      const { selectNextQuestion } = await import("./adaptiveEngine");
+      const result = await selectNextQuestion(quiz.id, 1, [], user.role, null);
+
+      if (!result) {
+        return res.status(400).json({ message: "No questions available for your role in this quiz" });
+      }
+
+      const question = result.question;
+      res.json({
+        question: {
+          id: question.id,
+          question: question.question,
+          options: question.options,
+          difficultyLevel: question.difficulty_level,
+          sortOrder: question.sort_order,
+        },
+        currentDifficulty: result.newDifficulty,
+        questionNumber: 1,
+        quizTitle: quiz.title,
+      });
+    } catch (err: any) {
+      console.error("[QUIZ] Start error:", err);
+      res.status(500).json({ message: "Error starting quiz" });
+    }
+  });
+
+  // Adaptive Quiz - Answer question & get next
+  app.post("/api/quizzes/:id/answer", requireAuth, async (req, res) => {
+    try {
+      const quiz = await storage.getSopQuiz(req.params.id as string);
+      if (!quiz) return res.status(404).json({ message: "Quiz not found" });
+
+      const user = req.user as any;
+      const { questionId, selectedIndex, answeredQuestionIds, questionNumber } = req.body;
+      const currentDifficulty = Math.min(Math.max(Math.floor(Number(req.body.currentDifficulty) || 1), 1), 5);
+
+      if (typeof selectedIndex !== "number" || selectedIndex < 0 || selectedIndex > 3) {
+        return res.status(400).json({ message: "Invalid selectedIndex" });
+      }
+
+      const questions = await storage.getQuizQuestions(quiz.id);
+      const answeredQuestion = questions.find((q: any) => q.id === questionId);
+      if (!answeredQuestion) return res.status(400).json({ message: "Question not found" });
+
+      const isCorrect = selectedIndex === answeredQuestion.correctIndex;
+      const maxQuestions = Math.min(questions.length, 15);
+      const allAnswered = [...(answeredQuestionIds || []), questionId];
+
+      const answerResult = {
+        questionId,
+        selectedIndex,
+        correctIndex: answeredQuestion.correctIndex,
+        isCorrect,
+        explanation: answeredQuestion.explanation,
+        difficultyLevel: answeredQuestion.difficultyLevel || answeredQuestion.difficulty_level,
+      };
+
+      if (allAnswered.length >= maxQuestions) {
+        return res.json({
+          answerResult,
+          finished: true,
+          answeredQuestionIds: allAnswered,
+        });
+      }
+
+      const { selectNextQuestion } = await import("./adaptiveEngine");
+      const next = await selectNextQuestion(
+        quiz.id,
+        currentDifficulty || 1,
+        allAnswered,
+        user.role,
+        isCorrect
+      );
+
+      if (!next) {
+        return res.json({
+          answerResult,
+          finished: true,
+          answeredQuestionIds: allAnswered,
+        });
+      }
+
+      res.json({
+        answerResult,
+        finished: false,
+        nextQuestion: {
+          id: next.question.id,
+          question: next.question.question,
+          options: next.question.options,
+          difficultyLevel: next.question.difficulty_level,
+          sortOrder: next.question.sort_order,
+        },
+        currentDifficulty: next.newDifficulty,
+        questionNumber: (questionNumber || 1) + 1,
+        answeredQuestionIds: allAnswered,
+      });
+    } catch (err: any) {
+      console.error("[QUIZ] Answer error:", err);
+      res.status(500).json({ message: "Error processing answer" });
+    }
+  });
+
+  // Adaptive Quiz - Complete and save results (server-validated)
+  app.post("/api/quizzes/:id/complete", requireAuth, async (req, res) => {
+    try {
+      const quiz = await storage.getSopQuiz(req.params.id as string);
+      if (!quiz) return res.status(404).json({ message: "Quiz not found" });
+
+      const user = req.user as any;
+      const { answers, questionsServed } = req.body;
+
+      if (!answers || !Array.isArray(answers)) {
+        return res.status(400).json({ message: "Answers array is required" });
+      }
+
+      const questions = await storage.getQuizQuestions(quiz.id);
+      const questionMap = new Map(questions.map((q: any) => [q.id, q]));
+
+      let serverScore = 0;
+      let serverHighestLevel = 0;
+      const verifiedAnswers: any[] = [];
+      const wrongIds: string[] = [];
+
+      for (const ans of answers) {
+        const q = questionMap.get(ans.questionId);
+        if (!q) continue;
+        const isCorrect = ans.selectedIndex === q.correctIndex;
+        const dl = q.difficultyLevel || 1;
+        if (isCorrect) {
+          serverScore++;
+          if (dl > serverHighestLevel) serverHighestLevel = dl;
+        } else {
+          wrongIds.push(ans.questionId);
+        }
+        verifiedAnswers.push({
+          questionId: ans.questionId,
+          selectedIndex: ans.selectedIndex,
+          correctIndex: q.correctIndex,
+          isCorrect,
+          difficultyLevel: dl,
+        });
+      }
+
+      const totalQuestions = verifiedAnswers.length;
+      const { calculateScoreLabel, getReviewAreas } = await import("./adaptiveEngine");
+      const finalLabel = calculateScoreLabel(serverHighestLevel);
+      const minLevel = quiz.minPassLevel || 2;
+      const passed = serverHighestLevel >= minLevel;
+
+      const reviewAreas = await getReviewAreas(quiz.id, wrongIds);
+
+      const attempt = await storage.createQuizAttempt({
+        quizId: quiz.id,
+        userId: user.id,
+        score: serverScore,
+        totalQuestions,
+        passed,
+        answers: verifiedAnswers,
+        questionsServed: questionsServed || [],
+        currentDifficulty: serverHighestLevel,
+        highestLevelPassed: serverHighestLevel,
+        finalScoreLabel: finalLabel,
+      });
+
+      res.status(201).json({
+        ...attempt,
+        finalScoreLabel: finalLabel,
+        highestLevelPassed: serverHighestLevel,
+        reviewAreas,
+        passed,
+        minPassLevel: minLevel,
+      });
+    } catch (err: any) {
+      console.error("[QUIZ] Complete error:", err);
+      res.status(500).json({ message: "Error completing quiz" });
+    }
+  });
+
+  // Manager View - All employee quiz stats
+  app.get("/api/quiz-stats/employees", requireAuth, async (req, res) => {
+    try {
+      const userRole = (req.user as any)?.role;
+      if (!["Admin", "Master Admin", "Manager", "HR"].includes(userRole)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const { getAllEmployeeQuizStats } = await import("./adaptiveEngine");
+      const stats = await getAllEmployeeQuizStats();
+      res.json(stats);
+    } catch (err) {
+      console.error("[QUIZ] Employee stats error:", err);
+      res.status(500).json({ message: "Error fetching employee quiz stats" });
+    }
+  });
+
+  // Manager View - Safety critical flags
+  app.get("/api/quiz-stats/safety-flags", requireAuth, async (req, res) => {
+    try {
+      const userRole = (req.user as any)?.role;
+      if (!["Admin", "Master Admin", "Manager", "HR"].includes(userRole)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const { getSafetyCriticalFlags } = await import("./adaptiveEngine");
+      const flags = await getSafetyCriticalFlags();
+      res.json(flags);
+    } catch (err) {
+      console.error("[QUIZ] Safety flags error:", err);
+      res.status(500).json({ message: "Error fetching safety flags" });
+    }
+  });
+
+  // Manager View - Update quiz settings (min pass level, safety critical)
+  app.patch("/api/quizzes/:id/settings", requireAuth, async (req, res) => {
+    try {
+      const userRole = (req.user as any)?.role;
+      if (!["Admin", "Master Admin", "Manager"].includes(userRole)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const { minPassLevel, isSafetyCritical } = req.body;
+      const updates: string[] = [];
+      const values: any[] = [];
+      let paramIdx = 2;
+
+      if (minPassLevel !== undefined) {
+        updates.push(`min_pass_level = $${paramIdx++}`);
+        values.push(Math.min(Math.max(minPassLevel, 1), 5));
+      }
+      if (isSafetyCritical !== undefined) {
+        updates.push(`is_safety_critical = $${paramIdx++}`);
+        values.push(!!isSafetyCritical);
+      }
+      if (updates.length === 0) {
+        return res.status(400).json({ message: "No fields to update" });
+      }
+
+      const { pool: dbPool } = await import("./db");
+      await dbPool.query(
+        `UPDATE sop_quizzes SET ${updates.join(", ")} WHERE id = $1`,
+        [req.params.id, ...values]
+      );
+
+      const quiz = await storage.getSopQuiz(req.params.id as string);
+      res.json(quiz);
+    } catch (err) {
+      console.error("[QUIZ] Settings update error:", err);
+      res.status(500).json({ message: "Error updating quiz settings" });
     }
   });
 

@@ -7,6 +7,7 @@ import { startMaintenanceScheduler } from "./maintenanceScheduler";
 import { runEquipmentMigration } from "./equipmentMigration";
 import { runTaskMigration } from "./taskMigration";
 import { runAssistantMigration } from "./assistantMigration";
+import { runQuizAdaptiveMigration } from "./quizMigration";
 import { startTaskScheduler } from "./taskScheduler";
 import { seedOemTemplates } from "./equipmentSeed";
 
@@ -71,6 +72,7 @@ app.use((req, res, next) => {
   await runEquipmentMigration();
   await runTaskMigration();
   await runAssistantMigration();
+  await runQuizAdaptiveMigration();
   await registerRoutes(httpServer, app);
   
   await seedUsers();
