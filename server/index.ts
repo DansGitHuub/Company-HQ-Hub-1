@@ -6,6 +6,7 @@ import { seedUsers, seedSampleData } from "./seed";
 import { startMaintenanceScheduler } from "./maintenanceScheduler";
 import { runEquipmentMigration } from "./equipmentMigration";
 import { runTaskMigration } from "./taskMigration";
+import { runAssistantMigration } from "./assistantMigration";
 import { startTaskScheduler } from "./taskScheduler";
 import { seedOemTemplates } from "./equipmentSeed";
 
@@ -69,6 +70,7 @@ app.use((req, res, next) => {
 (async () => {
   await runEquipmentMigration();
   await runTaskMigration();
+  await runAssistantMigration();
   await registerRoutes(httpServer, app);
   
   await seedUsers();

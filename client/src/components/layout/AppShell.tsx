@@ -3,9 +3,8 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import type { CompanySettings } from "@shared/schema";
-import FloatingChatPopup from "@/components/FloatingChatPopup";
+import AIAssistantPanel from "@/components/AIAssistantPanel";
 import UpdatesPopup from "@/components/UpdatesPopup";
-import FloatingAssistantButton from "@/components/FloatingAssistantButton";
 import QuickAddTask from "@/components/QuickAddTask";
 import InteractiveCalendar from "@/components/InteractiveCalendar";
 import { 
@@ -189,7 +188,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [isTileView, setIsTileView] = React.useState(false);
   const [tileLayout, setTileLayout] = React.useState<TileLayout>("grid");
   const [isUpdatesOpen, setIsUpdatesOpen] = React.useState(false);
-  const [isChatOpen, setIsChatOpen] = React.useState(false);
 
   // Reset main content scroll to top when navigating between pages
   // But preserve sidebar scroll position
@@ -915,16 +913,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       
       {user && effectiveRole && (
         <>
-          <FloatingChatPopup 
-            userRole={effectiveRole} 
-            userName={user.name || user.username || undefined}
-            isOpen={isChatOpen}
-            onClose={() => setIsChatOpen(false)}
-          />
-          <FloatingAssistantButton
-            onChatClick={() => setIsChatOpen(true)}
-            isChatOpen={isChatOpen}
-          />
+          <AIAssistantPanel />
           <QuickAddTask />
         </>
       )}

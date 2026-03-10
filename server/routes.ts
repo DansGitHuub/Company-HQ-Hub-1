@@ -8,6 +8,7 @@ import { registerHiringRoutes } from "./hiringRoutes";
 import { registerCustomerHubRoutes } from "./customerHubRoutes";
 import { registerEquipmentRoutes } from "./equipmentRoutes";
 import { registerTaskRoutes } from "./taskRoutes";
+import { registerAssistantRoutes } from "./assistantRoutes";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail } from "./email";
 import { checkAndSendReminders } from "./maintenanceScheduler";
 import OpenAI from "openai";
@@ -7376,6 +7377,7 @@ Provide accurate information based on publicly available documentation.`;
   registerTaskRoutes(app);
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
+  registerAssistantRoutes(app);
 
   return httpServer;
 }
