@@ -29,6 +29,8 @@ import {
   maintenanceSchedules, type MaintenanceSchedule, type InsertMaintenanceSchedule,
   maintenanceLogs, type MaintenanceLog, type InsertMaintenanceLog,
   equipmentUploads, type EquipmentUpload, type InsertEquipmentUpload,
+  oemMaintenanceTemplates, type OemMaintenanceTemplate, type InsertOemTemplate,
+  repairRequests, type RepairRequest, type InsertRepairRequest,
   customerResources, type CustomerResource, type InsertCustomerResource,
   savedResources, type SavedResource, type InsertSavedResource,
   companySettings, type CompanySettings, type InsertCompanySettings,
@@ -275,6 +277,20 @@ export interface IStorage {
   getEquipmentUploads(equipmentId: string): Promise<EquipmentUpload[]>;
   createEquipmentUpload(upload: InsertEquipmentUpload): Promise<EquipmentUpload>;
   deleteEquipmentUpload(id: string): Promise<boolean>;
+
+  // OEM Templates
+  getOemTemplates(brand?: string, category?: string): Promise<OemMaintenanceTemplate[]>;
+  getOemTemplate(id: string): Promise<OemMaintenanceTemplate | undefined>;
+
+  // Repair Requests
+  getRepairRequests(assetId?: string): Promise<RepairRequest[]>;
+  getRepairRequest(id: string): Promise<RepairRequest | undefined>;
+  createRepairRequest(req: InsertRepairRequest): Promise<RepairRequest>;
+  updateRepairRequest(id: string, updates: Partial<RepairRequest>): Promise<RepairRequest | undefined>;
+
+  // Fleet Dashboard
+  getNextAssetId(): Promise<string>;
+  getFleetDashboardStats(): Promise<{ total: number; active: number; inRepair: number; p1: number; p2: number; p3: number; complianceAlerts: number }>;
   
   // Customer Resources
   getCustomerResources(type?: string): Promise<CustomerResource[]>;
@@ -1398,6 +1414,73 @@ export class DatabaseStorage implements IStorage {
   async deleteEquipmentUpload(id: string): Promise<boolean> {
     const result = await db.delete(equipmentUploads).where(eq(equipmentUploads.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  async getOemTemplates(brand?: string, category?: string): Promise<OemMaintenanceTemplate[]> {
+    let conditions = [];
+    if (brand) conditions.push(eq(oemMaintenanceTemplates.brand, brand));
+    if (category) conditions.push(eq(oemMaintenanceTemplates.category, category));
+    if (conditions.length > 0) {
+      return await db.select().from(oemMaintenanceTemplates).where(and(...conditions));
+    }
+    return await db.select().from(oemMaintenanceTemplates);
+  }
+
+  async getOemTemplate(id: string): Promise<OemMaintenanceTemplate | undefined> {
+    const [t] = await db.select().from(oemMaintenanceTemplates).where(eq(oemMaintenanceTemplates.id, id));
+    return t || undefined;
+  }
+
+  async getRepairRequests(assetId?: string): Promise<RepairRequest[]> {
+    if (assetId) {
+      return await db.select().from(repairRequests).where(eq(repairRequests.assetId, assetId));
+    }
+    return await db.select().from(repairRequests);
+  }
+
+  async getRepairRequest(id: string): Promise<RepairRequest | undefined> {
+    const [r] = await db.select().from(repairRequests).where(eq(repairRequests.id, id));
+    return r || undefined;
+  }
+
+  async createRepairRequest(req: InsertRepairRequest): Promise<RepairRequest> {
+    const [newReq] = await db.insert(repairRequests).values(req).returning();
+    return newReq;
+  }
+
+  async updateRepairRequest(id: string, updates: Partial<RepairRequest>): Promise<RepairRequest | undefined> {
+    const [updated] = await db.update(repairRequests).set({ ...updates, updatedAt: new Date() }).where(eq(repairRequests.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async getNextAssetId(): Promise<string> {
+    const allEquip = await db.select().from(equipment);
+    let maxNum = 0;
+    for (const e of allEquip) {
+      const match = e.assetId?.match(/EQ-(\d+)/);
+      if (match) {
+        const num = parseInt(match[1]);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+    return `EQ-${String(maxNum + 1).padStart(4, "0")}`;
+  }
+
+  async getFleetDashboardStats(): Promise<{ total: number; active: number; inRepair: number; p1: number; p2: number; p3: number; complianceAlerts: number }> {
+    const allEquip = await db.select().from(equipment);
+    const allSchedules = await db.select().from(maintenanceSchedules).where(eq(maintenanceSchedules.isActive, true));
+    const active = allEquip.filter(e => e.status === "Active").length;
+    const inRepair = allEquip.filter(e => e.status === "In Service" || e.status === "in_repair").length;
+    const p1 = allSchedules.filter(s => s.priority === "p1").length;
+    const p2 = allSchedules.filter(s => s.priority === "p2").length;
+    const p3 = allSchedules.filter(s => s.priority === "p3").length;
+    const now = new Date();
+    let complianceAlerts = 0;
+    for (const e of allEquip) {
+      if (e.registrationExpiry && new Date(e.registrationExpiry) <= new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000)) complianceAlerts++;
+      if (e.insuranceExpiry && new Date(e.insuranceExpiry) <= new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000)) complianceAlerts++;
+    }
+    return { total: allEquip.length, active, inRepair, p1, p2, p3, complianceAlerts };
   }
 
   // Customer Resources methods

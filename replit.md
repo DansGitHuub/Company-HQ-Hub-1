@@ -32,7 +32,7 @@ Preferred communication style: Simple, everyday language.
     - **Job Tracking**: Tabbed interface for job types, detailed job cards with location, deadlines, and document uploads.
     - **Customer Hub / Resource Library**: Centralized educational content with categorization and user bookmarking.
     - **Employee Management**: Employee Portal for payroll, time off, and personal details.
-    - **Equipment Tracker**: Management, maintenance scheduling, activity logging, and automated email reminders with recurring notifications via Resend.
+    - **Equipment / Fleet Management**: Full fleet management system rebuilt from Equipment Tracker. Features: Fleet health dashboard with 6 summary tiles (Total, P1 Critical, P2 Due Soon, P3 Approaching, In Repair, Compliance), sortable/filterable asset table, asset detail profiles with 5 tabs (Overview, Maintenance Schedule, Service History, Repairs, Documents). OEM maintenance library with 53 pre-seeded templates (Exmark, Kubota, Stihl, Ford, GM, Ram, Generic Trailer). Priority engine (P1-P4) auto-calculates from hours/date thresholds. 4-step Add Equipment Wizard with VIN decode via NHTSA API and OEM template auto-assign. Quick actions: Update Hours, Log Service, Report Issue. Document management with folder organization. Calendar integration shows maintenance events with priority-colored dots. Auto-generated asset IDs (EQ-XXXX). Role-based access: Admin/Manager full, Crew view+log. Routes in `server/equipmentRoutes.ts` under `/api/fleet/*` prefix. Tables: equipment (extended), maintenance_schedules (extended), maintenance_logs (extended), equipment_uploads (extended), oem_maintenance_templates, repair_requests. Priority engine in `server/priorityEngine.ts`, OEM seed in `server/equipmentSeed.ts`, migration in `server/equipmentMigration.ts`.
 - **Admin Tools**:
     - **Form Builder**: Dynamic form creation with AI-powered generation.
     - **Company Branding**: Configurable logo and name with live preview.
@@ -83,3 +83,4 @@ Preferred communication style: Simple, everyday language.
 - Replit Object Storage (profile pictures, company logos)
 - Resend (email reminders)
 - Google Maps API (Plow Site Mapper)
+- NHTSA API (VIN decoding for fleet management)

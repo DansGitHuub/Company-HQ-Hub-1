@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 import { sendMaintenanceReminderEmail } from "./email";
 import { log } from "./index";
+import { recalculateAllPriorities } from "./priorityEngine";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // Check every hour
 const OVERDUE_ESCALATION_SUBJECT_PREFIX = "OVERDUE: ";
@@ -150,7 +151,13 @@ export function startMaintenanceScheduler() {
 
   log("Maintenance reminder scheduler started (checking every hour)", "scheduler");
 
-  setTimeout(() => {
+  setTimeout(async () => {
+    try {
+      await recalculateAllPriorities();
+      log("Priority recalculation complete", "scheduler");
+    } catch (err: any) {
+      log(`Priority recalculation error: ${err.message}`, "scheduler");
+    }
     checkAndSendReminders().then((results) => {
       if (results.length > 0) {
         log(
@@ -161,7 +168,12 @@ export function startMaintenanceScheduler() {
     });
   }, 10000);
 
-  schedulerInterval = setInterval(() => {
+  schedulerInterval = setInterval(async () => {
+    try {
+      await recalculateAllPriorities();
+    } catch (err: any) {
+      log(`Priority recalculation error: ${err.message}`, "scheduler");
+    }
     checkAndSendReminders().then((results) => {
       if (results.length > 0) {
         log(

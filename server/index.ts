@@ -4,6 +4,8 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedUsers, seedSampleData } from "./seed";
 import { startMaintenanceScheduler } from "./maintenanceScheduler";
+import { runEquipmentMigration } from "./equipmentMigration";
+import { seedOemTemplates } from "./equipmentSeed";
 
 const app = express();
 const httpServer = createServer(app);
@@ -63,10 +65,12 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await runEquipmentMigration();
   await registerRoutes(httpServer, app);
   
   await seedUsers();
   await seedSampleData();
+  await seedOemTemplates();
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

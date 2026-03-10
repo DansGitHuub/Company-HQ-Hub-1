@@ -40,6 +40,8 @@ interface CalendarEvent {
   end: string;
   location: string;
   allDay: boolean;
+  source?: "google" | "fleet";
+  priority?: string;
 }
 
 interface CalendarStatus {
@@ -84,9 +86,18 @@ function MiniCalendar({ onSelectDate, selectedDate, events }: {
            year === selectedDate.getFullYear();
   };
 
-  const hasEventsOnDay = (day: number) => {
+  const getEventsOnDay = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return events.some(event => event.start.startsWith(dateStr));
+    return events.filter(event => event.start.startsWith(dateStr));
+  };
+
+  const getDotColor = (dayEvents: CalendarEvent[]) => {
+    const fleetEvents = dayEvents.filter(e => e.source === "fleet");
+    if (fleetEvents.some(e => e.priority === "p1")) return "bg-red-500";
+    if (fleetEvents.some(e => e.priority === "p2")) return "bg-orange-500";
+    if (fleetEvents.some(e => e.priority === "p3")) return "bg-yellow-500";
+    if (fleetEvents.length > 0) return "bg-green-500";
+    return "bg-blue-500";
   };
   
   const handleDayClick = (day: number) => {
@@ -123,9 +134,11 @@ function MiniCalendar({ onSelectDate, selectedDate, events }: {
             }`}
           >
             {day}
-            {day !== null && hasEventsOnDay(day) && (
-              <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-500" />
-            )}
+            {day !== null && (() => {
+              const dayEvts = getEventsOnDay(day);
+              if (dayEvts.length === 0) return null;
+              return <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${getDotColor(dayEvts)}`} />;
+            })()}
           </div>
         ))}
       </div>
@@ -167,15 +180,48 @@ function EventsList({ events, date, isLoading }: { events: CalendarEvent[]; date
     );
   }
 
+  const priorityBorder: Record<string, string> = {
+    p1: "border-l-red-500",
+    p2: "border-l-orange-500",
+    p3: "border-l-yellow-500",
+    p4: "border-l-green-500",
+  };
+
+  const priorityLabel: Record<string, string> = {
+    p1: "Critical",
+    p2: "Due Soon",
+    p3: "Approaching",
+    p4: "Good",
+  };
+
   return (
     <ScrollArea className="h-[120px]">
       <div className="space-y-2 pr-3">
         {dayEvents.map(event => (
-          <div key={event.id} className="p-2 rounded-lg bg-muted/50 border text-sm">
-            <p className="font-medium truncate">{event.title}</p>
+          <div
+            key={event.id}
+            className={`p-2 rounded-lg bg-muted/50 border text-sm ${
+              event.source === "fleet" ? `border-l-4 ${priorityBorder[event.priority || "p4"] || ""}` : ""
+            }`}
+          >
+            <div className="flex items-center gap-1.5">
+              {event.source === "fleet" && (
+                <span className="text-[10px] font-bold uppercase px-1 py-0.5 rounded bg-muted text-muted-foreground">Maint</span>
+              )}
+              <p className="font-medium truncate flex-1">{event.title}</p>
+            </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-              <Clock className="h-3 w-3" />
-              {event.allDay ? "All day" : formatTime(event.start)}
+              {event.source === "fleet" ? (
+                <>
+                  <AlertTriangle className="h-3 w-3" />
+                  <span>{priorityLabel[event.priority || "p4"]}</span>
+                </>
+              ) : (
+                <>
+                  <Clock className="h-3 w-3" />
+                  {event.allDay ? "All day" : formatTime(event.start)}
+                </>
+              )}
             </div>
             {event.location && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
@@ -437,6 +483,7 @@ export default function InteractiveCalendar() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
+  const [showFleetOnly, setShowFleetOnly] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
@@ -454,7 +501,7 @@ export default function InteractiveCalendar() {
     return new Date(now.getFullYear(), now.getMonth() + 2, 0);
   }, []);
   
-  const { data: events = [], isLoading: eventsLoading } = useQuery<CalendarEvent[]>({
+  const { data: gcEvents = [], isLoading: eventsLoading } = useQuery<CalendarEvent[]>({
     queryKey: ["/api/google-calendar/events", startOfMonth.toISOString(), endOfMonth.toISOString()],
     queryFn: async () => {
       const res = await fetch(`/api/google-calendar/events?start=${startOfMonth.toISOString()}&end=${endOfMonth.toISOString()}`, {
@@ -464,10 +511,39 @@ export default function InteractiveCalendar() {
         if (res.status === 401) return [];
         throw new Error("Failed to fetch events");
       }
-      return res.json();
+      const data = await res.json();
+      return data.map((e: any) => ({ ...e, source: "google" as const }));
     },
     enabled: gcStatus?.connected === true
   });
+
+  const { data: fleetEvents = [] } = useQuery<CalendarEvent[]>({
+    queryKey: ["/api/fleet/calendar-events"],
+    queryFn: async () => {
+      const res = await fetch("/api/fleet/calendar-events", { credentials: "include" });
+      if (!res.ok) {
+        if (res.status === 401) return [];
+        return [];
+      }
+      const data = await res.json();
+      return data.map((e: any) => ({
+        id: `fleet-${e.id}`,
+        title: e.title,
+        description: `${e.assetName} - ${e.category || ""}`,
+        start: typeof e.date === "string" ? e.date : new Date(e.date).toISOString().split("T")[0],
+        end: typeof e.date === "string" ? e.date : new Date(e.date).toISOString().split("T")[0],
+        location: "",
+        allDay: true,
+        source: "fleet" as const,
+        priority: e.priority || "p4",
+      }));
+    },
+  });
+
+  const events = useMemo(() => {
+    if (showFleetOnly) return fleetEvents;
+    return [...gcEvents, ...fleetEvents];
+  }, [gcEvents, fleetEvents, showFleetOnly]);
   
   const connectMutation = useMutation({
     mutationFn: async () => {
@@ -517,6 +593,7 @@ export default function InteractiveCalendar() {
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/google-calendar/events"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/fleet/calendar-events"] });
     toast({ title: "Calendar refreshed" });
   };
   
@@ -545,11 +622,24 @@ export default function InteractiveCalendar() {
                 <h3 className="font-semibold">Calendar</h3>
                 <p className="text-xs text-muted-foreground">{dateString}</p>
               </div>
-              {isConnected && (
-                <Button variant="ghost" size="icon" onClick={handleRefresh}>
-                  <RefreshCw className="h-4 w-4" />
+              <div className="flex items-center gap-1">
+                <Button
+                  variant={showFleetOnly ? "default" : "ghost"}
+                  size="sm"
+                  className="h-7 text-xs px-2"
+                  onClick={() => setShowFleetOnly(!showFleetOnly)}
+                  title="Show equipment maintenance only"
+                  data-testid="button-fleet-filter"
+                >
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  Fleet
                 </Button>
-              )}
+                {isConnected && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleRefresh}>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
             
             <MiniCalendar 
@@ -560,10 +650,10 @@ export default function InteractiveCalendar() {
             
             <Separator />
             
+            <EventsList events={events} date={selectedDate} isLoading={eventsLoading} />
+
             {isConnected ? (
               <>
-                <EventsList events={events} date={selectedDate} isLoading={eventsLoading} />
-                
                 <div className="flex gap-2">
                   <Button 
                     className="flex-1" 

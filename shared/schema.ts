@@ -880,35 +880,44 @@ export type EquipmentType = "Vehicle" | "Equipment";
 
 export const equipment = pgTable("equipment", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  type: text("type").notNull(), // Vehicle or Equipment
+  type: text("type").notNull(),
   name: text("name").notNull(),
+  nickname: text("nickname"),
+  assetId: text("asset_id"),
+  category: text("category"),
   year: integer("year"),
   make: text("make"),
   model: text("model"),
   vin: text("vin"),
+  serialNumber: text("serial_number"),
   licensePlate: text("license_plate"),
   mileage: integer("mileage"),
-  hours: integer("hours"), // For equipment that tracks hours instead of mileage
-  status: text("status").notNull().default("Active"), // Active, In Service, Retired
+  hours: integer("hours"),
+  status: text("status").notNull().default("Active"),
   notes: text("notes"),
   image: text("image"),
+  purchaseDate: timestamp("purchase_date"),
+  purchasePrice: integer("purchase_price"),
+  purchasedFrom: text("purchased_from"),
+  conditionAtPurchase: text("condition_at_purchase"),
+  assignedToUserId: varchar("assigned_to_user_id", { length: 36 }),
+  primaryLocation: text("primary_location"),
+  trackingType: text("tracking_type").default("hours"),
+  currentHours: integer("current_hours").default(0),
+  hoursAtPurchase: integer("hours_at_purchase").default(0),
+  lastHoursUpdate: timestamp("last_hours_update"),
+  registrationExpiry: timestamp("registration_expiry"),
+  insuranceExpiry: timestamp("insurance_expiry"),
+  warrantyExpiry: timestamp("warranty_expiry"),
+  primaryPhotoUrl: text("primary_photo_url"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertEquipmentSchema = createInsertSchema(equipment).pick({
-  type: true,
-  name: true,
-  year: true,
-  make: true,
-  model: true,
-  vin: true,
-  licensePlate: true,
-  mileage: true,
-  hours: true,
-  status: true,
-  notes: true,
-  image: true,
+export const insertEquipmentSchema = createInsertSchema(equipment).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export type InsertEquipment = z.infer<typeof insertEquipmentSchema>;
@@ -918,43 +927,38 @@ export type Equipment = typeof equipment.$inferSelect;
 export const maintenanceSchedules = pgTable("maintenance_schedules", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   equipmentId: varchar("equipment_id", { length: 36 }).references(() => equipment.id).notNull(),
-  name: text("name").notNull(), // e.g., "Oil Change", "Tire Rotation"
+  templateId: varchar("template_id", { length: 36 }),
+  name: text("name").notNull(),
   description: text("description"),
-  intervalType: text("interval_type").notNull(), // "days", "miles", "hours"
-  intervalValue: integer("interval_value").notNull(), // e.g., 90 (days) or 5000 (miles)
+  taskDescription: text("task_description"),
+  intervalType: text("interval_type").notNull(),
+  intervalValue: integer("interval_value").notNull(),
+  hoursInterval: integer("hours_interval"),
+  calendarIntervalDays: integer("calendar_interval_days"),
   lastCompletedDate: timestamp("last_completed_date"),
   lastCompletedMileage: integer("last_completed_mileage"),
   lastCompletedHours: integer("last_completed_hours"),
+  lastServiceHours: integer("last_service_hours"),
+  lastServiceDate: timestamp("last_service_date"),
   nextDueDate: timestamp("next_due_date"),
   nextDueMileage: integer("next_due_mileage"),
   nextDueHours: integer("next_due_hours"),
-  reminderDays: integer("reminder_days").default(7), // Days before due date to send reminder
-  reminderEmail: text("reminder_email"), // Email to send reminders to
+  priority: text("priority").default("p4"),
+  isOverridden: boolean("is_overridden").default(false),
+  overrideNotes: text("override_notes"),
+  reminderDays: integer("reminder_days").default(7),
+  reminderEmail: text("reminder_email"),
   reminderEnabled: boolean("reminder_enabled").notNull().default(false),
   lastReminderSent: timestamp("last_reminder_sent"),
   reminderCount: integer("reminder_count").notNull().default(0),
-  recurringReminderDays: integer("recurring_reminder_days").default(3), // Re-send every N days if not completed
+  recurringReminderDays: integer("recurring_reminder_days").default(3),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertMaintenanceScheduleSchema = createInsertSchema(maintenanceSchedules).pick({
-  equipmentId: true,
-  name: true,
-  description: true,
-  intervalType: true,
-  intervalValue: true,
-  lastCompletedDate: true,
-  lastCompletedMileage: true,
-  lastCompletedHours: true,
-  nextDueDate: true,
-  nextDueMileage: true,
-  nextDueHours: true,
-  reminderDays: true,
-  reminderEmail: true,
-  reminderEnabled: true,
-  recurringReminderDays: true,
-  isActive: true,
+export const insertMaintenanceScheduleSchema = createInsertSchema(maintenanceSchedules).omit({
+  id: true,
+  createdAt: true,
 });
 
 export type InsertMaintenanceSchedule = z.infer<typeof insertMaintenanceScheduleSchema>;
@@ -965,30 +969,27 @@ export const maintenanceLogs = pgTable("maintenance_logs", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   equipmentId: varchar("equipment_id", { length: 36 }).references(() => equipment.id).notNull(),
   scheduleId: varchar("schedule_id", { length: 36 }).references(() => maintenanceSchedules.id),
+  logType: text("log_type").default("scheduled"),
   name: text("name").notNull(),
   description: text("description"),
   completedDate: timestamp("completed_date").notNull().defaultNow(),
   mileageAtService: integer("mileage_at_service"),
   hoursAtService: integer("hours_at_service"),
-  cost: integer("cost"), // Cost in cents
+  cost: integer("cost"),
   vendor: text("vendor"),
+  serviceLocation: text("service_location"),
+  partsUsed: jsonb("parts_used").default([]),
+  laborCost: integer("labor_cost").default(0),
+  totalCost: integer("total_cost").default(0),
+  receiptUrl: text("receipt_url"),
   notes: text("notes"),
   performedBy: varchar("performed_by", { length: 36 }).references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertMaintenanceLogSchema = createInsertSchema(maintenanceLogs).pick({
-  equipmentId: true,
-  scheduleId: true,
-  name: true,
-  description: true,
-  completedDate: true,
-  mileageAtService: true,
-  hoursAtService: true,
-  cost: true,
-  vendor: true,
-  notes: true,
-  performedBy: true,
+export const insertMaintenanceLogSchema = createInsertSchema(maintenanceLogs).omit({
+  id: true,
+  createdAt: true,
 });
 
 export type InsertMaintenanceLog = z.infer<typeof insertMaintenanceLogSchema>;
@@ -998,27 +999,66 @@ export type MaintenanceLog = typeof maintenanceLogs.$inferSelect;
 export const equipmentUploads = pgTable("equipment_uploads", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   equipmentId: varchar("equipment_id", { length: 36 }).references(() => equipment.id).notNull(),
+  folder: text("folder").default("other"),
   fileName: text("file_name").notNull(),
   fileUrl: text("file_url").notNull(),
-  fileType: text("file_type").notNull(), // image, document, receipt
-  workType: text("work_type"), // e.g., "Oil Change", "Tire Replacement", "Repair"
+  fileType: text("file_type").notNull(),
+  workType: text("work_type"),
   description: text("description"),
   uploadedBy: varchar("uploaded_by", { length: 36 }).references(() => users.id),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 
-export const insertEquipmentUploadSchema = createInsertSchema(equipmentUploads).pick({
-  equipmentId: true,
-  fileName: true,
-  fileUrl: true,
-  fileType: true,
-  workType: true,
-  description: true,
-  uploadedBy: true,
+export const insertEquipmentUploadSchema = createInsertSchema(equipmentUploads).omit({
+  id: true,
+  uploadedAt: true,
 });
 
 export type InsertEquipmentUpload = z.infer<typeof insertEquipmentUploadSchema>;
 export type EquipmentUpload = typeof equipmentUploads.$inferSelect;
+
+export const oemMaintenanceTemplates = pgTable("oem_maintenance_templates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  brand: text("brand").notNull(),
+  category: text("category").notNull(),
+  taskName: text("task_name").notNull(),
+  taskDescription: text("task_description"),
+  hoursInterval: integer("hours_interval"),
+  calendarIntervalDays: integer("calendar_interval_days"),
+  priorityLevel: text("priority_level").default("p3"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertOemTemplateSchema = createInsertSchema(oemMaintenanceTemplates).omit({ id: true, createdAt: true });
+export type InsertOemTemplate = z.infer<typeof insertOemTemplateSchema>;
+export type OemMaintenanceTemplate = typeof oemMaintenanceTemplates.$inferSelect;
+
+export const repairRequests = pgTable("repair_requests", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  assetId: varchar("asset_id", { length: 36 }).references(() => equipment.id, { onDelete: "cascade" }).notNull(),
+  reportedByUserId: varchar("reported_by_user_id", { length: 36 }).references(() => users.id),
+  reportDate: timestamp("report_date").defaultNow(),
+  problemDescription: text("problem_description").notNull(),
+  severity: text("severity").notNull().default("minor"),
+  isUsable: text("is_usable").notNull().default("yes"),
+  photos: jsonb("photos").default([]),
+  status: text("status").notNull().default("open"),
+  assignedToUserId: varchar("assigned_to_user_id", { length: 36 }).references(() => users.id),
+  shopName: text("shop_name"),
+  dropOffDate: timestamp("drop_off_date"),
+  expectedReturn: timestamp("expected_return"),
+  resolutionDescription: text("resolution_description"),
+  resolutionDate: timestamp("resolution_date"),
+  totalRepairCost: integer("total_repair_cost").default(0),
+  receiptUrl: text("receipt_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertRepairRequestSchema = createInsertSchema(repairRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertRepairRequest = z.infer<typeof insertRepairRequestSchema>;
+export type RepairRequest = typeof repairRequests.$inferSelect;
 
 // Customer Resources (Care Guides, Instructions, Documents)
 export type ResourceType = "guide" | "instruction" | "document" | "faq";
