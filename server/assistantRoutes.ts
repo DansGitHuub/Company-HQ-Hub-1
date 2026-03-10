@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import OpenAI from "openai";
 import { pool } from "./db";
 import { allToolDefinitions, executeTool, shouldRequireConfirmation, getToolNames } from "./assistantTools";
+import { speechToText } from "./replit_integrations/audio/client";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -410,6 +411,24 @@ export function registerAssistantRoutes(app: Express) {
     } catch (err) {
       console.error("[assistant] Suggestions error:", err);
       return res.json({ suggestions: [] });
+    }
+  });
+
+  app.post("/api/assistant/transcribe", requireAuth, requireInternalRole, async (req: Request, res: Response) => {
+    try {
+      const { audio, format = "webm" } = req.body;
+      if (!audio || typeof audio !== "string") {
+        return res.status(400).json({ error: "Base64 audio data is required" });
+      }
+      const audioBuffer = Buffer.from(audio, "base64");
+      if (audioBuffer.length > 25 * 1024 * 1024) {
+        return res.status(400).json({ error: "Audio file too large (max 25MB)" });
+      }
+      const transcript = await speechToText(audioBuffer, format as "wav" | "mp3" | "webm");
+      return res.json({ transcript });
+    } catch (err: any) {
+      console.error("[assistant] Transcription error:", err);
+      return res.status(500).json({ error: "Failed to transcribe audio" });
     }
   });
 

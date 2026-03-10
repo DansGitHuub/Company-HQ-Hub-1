@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Sparkles, X, Minus, MoreVertical, Send, Mic, Bot, User, Check, AlertTriangle } from "lucide-react";
+import { Sparkles, X, Minus, MoreVertical, Send, Mic, MicOff, Bot, User, Check, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
@@ -40,6 +40,10 @@ export default function AIAssistantPanel() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showMenu, setShowMenu] = useState(false);
   const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [, navigate] = useLocation();
@@ -167,6 +171,114 @@ export default function AIAssistantPanel() {
     );
     sendMessage("[Cancelled]", { confirmationGranted: false, confirmationToken });
   };
+
+  const startRecording = useCallback(async () => {
+    let stream: MediaStream | null = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      console.error("Microphone access denied:", err);
+      setMessages((prev) => [...prev, { role: "assistant", content: "Microphone access was denied. Please allow microphone permissions and try again.", type: "error" }]);
+      return;
+    }
+
+    try {
+      audioChunksRef.current = [];
+
+      let mimeType = "audio/webm";
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        mimeType = "audio/webm;codecs=opus";
+      } else if (!MediaRecorder.isTypeSupported("audio/webm")) {
+        mimeType = "";
+      }
+
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
+      const activeMime = recorder.mimeType;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream!.getTracks().forEach((t) => t.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { type: activeMime });
+        if (audioBlob.size === 0) return;
+
+        setIsTranscribing(true);
+        try {
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => {
+              const result = reader.result as string;
+              resolve(result.split(",")[1]);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(audioBlob);
+          });
+
+          let format: string = "webm";
+          if (activeMime.includes("mp4") || activeMime.includes("m4a")) format = "mp3";
+          else if (activeMime.includes("wav")) format = "wav";
+
+          const res = await apiRequest("POST", "/api/assistant/transcribe", { audio: base64, format });
+          const data = await res.json();
+
+          if (data.transcript && data.transcript.trim()) {
+            setInput((prev) => (prev ? prev + " " + data.transcript.trim() : data.transcript.trim()));
+            setTimeout(() => inputRef.current?.focus(), 100);
+          } else if (data.error) {
+            setMessages((prev) => [...prev, { role: "assistant", content: `Transcription failed: ${data.error}`, type: "error" }]);
+          }
+        } catch (err) {
+          console.error("Transcription failed:", err);
+          setMessages((prev) => [...prev, { role: "assistant", content: "Failed to transcribe audio. Please try again or type your message.", type: "error" }]);
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start(250);
+      setIsRecording(true);
+    } catch (err) {
+      console.error("MediaRecorder setup failed:", err);
+      stream.getTracks().forEach((t) => t.stop());
+      setMessages((prev) => [...prev, { role: "assistant", content: "Voice recording is not supported in this browser.", type: "error" }]);
+    }
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+    }
+    setIsRecording(false);
+  }, []);
+
+  const toggleRecording = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  }, [isRecording, startRecording, stopRecording]);
+
+  useEffect(() => {
+    if (!isOpen && isRecording) {
+      stopRecording();
+    }
+  }, [isOpen, isRecording, stopRecording]);
+
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
 
   const handleClearConversation = () => {
     setMessages([]);
@@ -347,6 +459,21 @@ export default function AIAssistantPanel() {
         </div>
 
         <div className="px-3 py-3 border-t">
+          {isRecording && (
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+              </span>
+              <span className="text-xs text-red-600 dark:text-red-400 font-medium">Recording... tap mic to stop</span>
+            </div>
+          )}
+          {isTranscribing && (
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+              <span className="text-xs text-muted-foreground">Transcribing audio...</span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <input
@@ -355,19 +482,30 @@ export default function AIAssistantPanel() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask me anything..."
+                placeholder={isRecording ? "Listening..." : isTranscribing ? "Transcribing..." : "Ask me anything..."}
                 className="w-full bg-muted rounded-lg pl-3 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                disabled={isLoading}
+                disabled={isLoading || isTranscribing}
                 data-testid="assistant-input"
               />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2" title="Voice coming soon">
-                <Mic className="h-4 w-4 text-muted-foreground/30 cursor-not-allowed" />
-              </div>
+              <button
+                type="button"
+                onClick={toggleRecording}
+                disabled={isLoading || isTranscribing}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full transition-colors ${
+                  isRecording
+                    ? "text-red-500 hover:text-red-600"
+                    : "text-muted-foreground hover:text-primary"
+                } ${isLoading || isTranscribing ? "opacity-30 cursor-not-allowed" : "cursor-pointer"}`}
+                title={isRecording ? "Stop recording" : "Start voice input"}
+                data-testid="assistant-mic-btn"
+              >
+                {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              </button>
             </div>
             <Button
               size="icon"
               className="h-9 w-9 rounded-lg flex-shrink-0"
-              disabled={!input.trim() || isLoading}
+              disabled={!input.trim() || isLoading || isRecording}
               onClick={() => sendMessage(input)}
               data-testid="assistant-send-btn"
             >
