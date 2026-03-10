@@ -7366,25 +7366,6 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
-  // Temporary: source code download for master admin only
-  app.get("/api/download-source", requireAuth, async (req, res) => {
-    try {
-      if (!req.user?.isMasterAdmin) {
-        return res.status(403).json({ message: "Master Admin access required" });
-      }
-      const { execSync } = await import("child_process");
-      const outputPath = "/tmp/companyhq-source.tar.gz";
-      execSync(`tar czf ${outputPath} --exclude='node_modules' --exclude='.git' --exclude='.cache' --exclude='.local' --exclude='.config' --exclude='*.log' --exclude='*.tar.gz' -C /home/runner/workspace .`);
-      res.setHeader("Content-Type", "application/gzip");
-      res.setHeader("Content-Disposition", "attachment; filename=companyhq-source.tar.gz");
-      const fs = await import("fs");
-      const fileStream = fs.createReadStream(outputPath);
-      fileStream.pipe(res);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 
