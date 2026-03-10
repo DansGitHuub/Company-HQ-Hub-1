@@ -90,7 +90,7 @@ export default function QuickAddTask() {
       <button
         data-testid="quick-add-task-button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 left-6 z-50 w-14 h-14 rounded-full bg-green-600 hover:bg-green-700 text-white shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+        className="fixed bottom-6 left-6 z-50 w-14 h-14 rounded-full bg-green-600 hover:bg-green-700 text-white shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 md:bottom-6 md:left-[17.5rem]"
         style={{ minWidth: 48, minHeight: 48 }}
       >
         <Plus className="w-7 h-7" />

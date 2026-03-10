@@ -10,9 +10,9 @@ Preferred communication style: Simple, everyday language.
 
 ### UI/UX Decisions
 - **Theming**: 8 landscape-inspired themes with distinct colors, border radius, shadows, and sidebar/button/input styles.
-- **Navigation**: Traditional sidebar and "Tile View" with Grid, Radial, and Dock layouts.
+- **Navigation**: Traditional sidebar with labeled sections and "Tile View" with Grid, Radial, and Dock layouts. Sidebar sections: FIELD OPS (Dashboard, Jobs, Equipment, Materials, Tools, To-Do List), PEOPLE (Hiring, Employees), KNOWLEDGE (SOP Library, Quizzes, Forms, Help), CUSTOMERS (Customer Hub), COMPANY (CompanyHQ, Marketing, Plow Mapper, Integrations), ADMIN (Admin Panel). Role-based section visibility: Crew/New Hire see FIELD OPS + KNOWLEDGE; Crew Lead adds PEOPLE; Manager/HR/Sales see all except ADMIN; Admin sees all. Care Guides removed from main sidebar (accessible inside Customer Hub only). Active module highlighted in sidebar.
 - **Hover Effects**: Consistent hover effects across all clickable elements, categorized by type.
-- **Layout Rules**: Strict guidelines for bottom padding, button placement, sidebar item length, and exclusion zones for floating elements.
+- **Layout Rules**: Strict guidelines for bottom padding, button placement, sidebar item length, and exclusion zones for floating elements. Quick Add task button positioned to avoid overlap with sidebar user profile area.
 
 ### Technical Implementation
 - **Frontend**: React with TypeScript, React Query for server state, React Context for local state, shadcn/ui, Radix UI, Tailwind CSS v4, Framer Motion for animations, @hello-pangea/dnd for drag & drop, Recharts for data visualization, React Hook Form with Zod.

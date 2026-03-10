@@ -319,7 +319,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { id: "customer_help", icon: HelpCircle, label: "Help", href: "/help" },
   ];
 
-  // Internal navigation items (for Crew, Manager, Admin) - these can be reordered
   const internalNavItems: Record<string, { icon: any; label: string; href: string }> = {
     dashboard: { icon: LayoutDashboard, label: "Dashboard", href: "/" },
     applicant_portal: { icon: ClipboardCheck, label: "My Application", href: "/applicant" },
@@ -329,75 +328,71 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     equipment: { icon: Truck, label: "Equipment", href: "/equipment" },
     todos: { icon: CheckSquare, label: "To-Do List", href: "/todos" },
     hiring: { icon: Users, label: "Hiring", href: "/hiring" },
+    employees: { icon: User, label: "Employees", href: "/employee" },
     jobs: { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
     education: { icon: GraduationCap, label: "Customer Hub", href: "/education" },
-    care_guides: { icon: BookOpen, label: "Care Guides", href: "/care-guides" },
     help: { icon: HelpCircle, label: "Help", href: "/help" },
-    hq: { icon: Building2, label: "Company HQ", href: "/hq" },
+    hq: { icon: Building2, label: "CompanyHQ", href: "/hq" },
     marketing: { icon: Megaphone, label: "Marketing", href: "/marketing" },
     forms: { icon: FileText, label: "Forms", href: "/forms" },
     inbox: { icon: Mail, label: "Messages", href: "/inbox" },
     integrations: { icon: Settings, label: "Integrations", href: "/integrations" },
     admin: { icon: Shield, label: "Admin Panel", href: "/admin" },
     tools: { icon: Snowflake, label: "Tools", href: "/tools" },
+    plow_mapper: { icon: Snowflake, label: "Plow Mapper", href: "/tools/plow-mapper" },
   };
 
-  // Default order for internal roles (help always at very bottom for all roles)
-  const teamDefaultIds = ["dashboard", "sops", "testing", "materials", "equipment", "todos", "hiring", "jobs", "education", "inbox", "tools"];
-  const adminExtraIds = ["hq", "marketing", "forms", "care_guides", "integrations", "admin"];
-  const bottomIds = ["help"]; // Always shown at bottom for all roles
+  type NavSection = { label: string; items: string[] };
 
-  const getNavItems = () => {
-    // Customer role uses fixed navigation - not affected by sidebar order settings
+  const sidebarSections: NavSection[] = [
+    { label: "FIELD OPS", items: ["dashboard", "jobs", "equipment", "materials", "tools", "todos"] },
+    { label: "PEOPLE", items: ["hiring", "employees"] },
+    { label: "KNOWLEDGE", items: ["sops", "testing", "forms", "help"] },
+    { label: "CUSTOMERS", items: ["education"] },
+    { label: "COMPANY", items: ["hq", "marketing", "plow_mapper", "integrations"] },
+    { label: "ADMIN", items: ["admin"] },
+  ];
+
+  const getSectionsForRole = (role: string): NavSection[] => {
+    const roleLower = role;
+    if (roleLower === "Crew" || roleLower === "New Hire") {
+      return sidebarSections.filter(s => s.label === "FIELD OPS" || s.label === "KNOWLEDGE");
+    }
+    if (roleLower === "Crew Lead") {
+      return sidebarSections.filter(s => s.label === "FIELD OPS" || s.label === "KNOWLEDGE" || s.label === "PEOPLE");
+    }
+    if (roleLower === "Manager" || roleLower === "HR" || roleLower === "Sales") {
+      return sidebarSections.filter(s => s.label !== "ADMIN");
+    }
+    return sidebarSections;
+  };
+
+  const getNavSections = (): { sections: NavSection[]; applicantItem?: { id: string; icon: any; label: string; href: string } } => {
     if (effectiveRole === "Customer") {
-      return customerNav;
+      return { sections: [] };
     }
-    
-    // Get the saved order from company settings (only applies to internal roles)
-    const savedOrder = companySettings?.sidebarOrder as string[] | undefined;
-    
-    // Determine which items this role can access (excluding bottom items which are added last)
-    let allowedIds: string[];
-    if (effectiveRole === "Admin") {
-      allowedIds = [...teamDefaultIds, ...adminExtraIds];
-    } else if (effectiveRole === "Manager") {
-      allowedIds = [...teamDefaultIds];
-    } else {
-      // Crew role
-      allowedIds = teamDefaultIds;
-    }
-    
-    // Add applicant portal if user is an applicant
-    if (user?.isApplicant) {
-      allowedIds = ["applicant_portal", ...allowedIds];
-    }
-    
-    // If there's a saved order, use it but filter to only allowed items for this role
-    if (savedOrder && savedOrder.length > 0) {
-      const orderedItems = savedOrder
-        .filter(id => allowedIds.includes(id) && internalNavItems[id] && !bottomIds.includes(id))
-        .map(id => ({ id, ...internalNavItems[id] }));
-      
-      // Add any missing allowed items (except bottom items)
-      const missingItems = allowedIds
-        .filter(id => !savedOrder.includes(id) && internalNavItems[id] && !bottomIds.includes(id))
-        .map(id => ({ id, ...internalNavItems[id] }));
-      
-      // Add bottom items (like Help) at the very end
-      const bottomItems = bottomIds
-        .filter(id => internalNavItems[id])
-        .map(id => ({ id, ...internalNavItems[id] }));
-      
-      return [...orderedItems, ...missingItems, ...bottomItems];
-    }
-    
-    // No saved order, use default order for this role + bottom items
-    const mainItems = allowedIds.map(id => ({ id, ...internalNavItems[id] }));
-    const bottomItems = bottomIds.map(id => ({ id, ...internalNavItems[id] }));
-    return [...mainItems, ...bottomItems];
+    const sections = getSectionsForRole(effectiveRole || "Crew");
+    const applicantItem = user?.isApplicant ? { id: "applicant_portal", ...internalNavItems["applicant_portal"] } : undefined;
+    return { sections, applicantItem };
   };
 
-  const displayNav = getNavItems();
+  const { sections: displaySections, applicantItem } = getNavSections();
+  const displayNav = effectiveRole === "Customer" 
+    ? customerNav 
+    : displaySections.flatMap(s => s.items.filter(id => internalNavItems[id]).map(id => ({ id, ...internalNavItems[id] })));
+
+  const getIsActive = (item: { id: string; href: string }) => {
+    if (item.href === "/tools" && item.id === "tools") {
+      return location === "/tools" || (location.startsWith("/tools") && !location.startsWith("/tools/plow"));
+    }
+    if (item.href === "/tools/plow-mapper") {
+      return location.startsWith("/tools/plow");
+    }
+    if (item.href === "/employee") {
+      return location.startsWith("/employee");
+    }
+    return location === item.href;
+  };
 
   const NavContent = () => {
     const { shapeClass, sizeClass } = getLogoClasses();
@@ -428,71 +423,125 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div 
         ref={sidebarNavRef}
         onScroll={handleSidebarScroll}
-        className="flex-1 py-6 px-3 space-y-1 overflow-y-auto"
+        className="flex-1 py-4 px-3 overflow-y-auto"
       >
-        {displayNav.map((item) => {
-          const isActive = item.href === "/tools" ? location.startsWith("/tools") : location === item.href;
-          const helpContent = menuHelpContent[item.id];
-          const showTodoBadge = item.id === "todos" && todoActiveStatus?.isActive && todoActiveStatus.unreadCount > 0;
+        {applicantItem && (
+          <div className="mb-2">
+            <Link href={applicantItem.href} className="block">
+              <div
+                className={cn(
+                  "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer",
+                  "border border-white/5 shadow-sm",
+                  "bg-gradient-to-b from-white/[0.08] to-transparent",
+                  location === applicantItem.href
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_2px_4px_rgba(0,0,0,0.3)] border-sidebar-primary/50"
+                    : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_2px_4px_rgba(0,0,0,0.2)] hover:border-white/10"
+                )}
+                onClick={() => setIsMobileOpen(false)}
+              >
+                <applicantItem.icon className="h-5 w-5" />
+                {applicantItem.label}
+              </div>
+            </Link>
+          </div>
+        )}
+        {effectiveRole !== "Customer" ? displaySections.map((section, sectionIdx) => (
+          <div key={section.label} className={cn(sectionIdx > 0 ? "mt-4" : "")}>
+            <div className="px-4 py-1.5 mb-1">
+              <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-sidebar-foreground/40" data-testid={`section-header-${section.label.toLowerCase().replace(' ', '-')}`}>
+                {section.label}
+              </span>
+            </div>
+            <div className="space-y-0.5">
+              {section.items.filter(id => internalNavItems[id]).map((itemId) => {
+                const item = { id: itemId, ...internalNavItems[itemId] };
+                const isActive = getIsActive(item);
+                const helpContent = menuHelpContent[item.id];
+                const showTodoBadge = item.id === "todos" && todoActiveStatus?.isActive && todoActiveStatus.unreadCount > 0;
+                return (
+                  <div key={item.id} className="flex items-center group w-full">
+                    <Link href={item.href} className="flex-1 min-w-0 block">
+                      <div
+                        className={cn(
+                          "flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer",
+                          "border border-white/5 shadow-sm",
+                          "bg-gradient-to-b from-white/[0.08] to-transparent",
+                          isActive
+                            ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_2px_4px_rgba(0,0,0,0.3)] border-sidebar-primary/50"
+                            : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_2px_4px_rgba(0,0,0,0.2)] hover:border-white/10"
+                        )}
+                        onClick={() => {
+                          if (location === item.href) {
+                            window.dispatchEvent(new CustomEvent("forms-nav-reset"));
+                          }
+                          setIsMobileOpen(false);
+                        }}
+                      >
+                        <div className="relative">
+                          <item.icon className="h-4 w-4" />
+                          {showTodoBadge && (
+                            <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                              {todoActiveStatus.unreadCount > 9 ? "9+" : todoActiveStatus.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                        {item.label}
+                      </div>
+                    </Link>
+                    {helpContent && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button 
+                            className="p-1 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Info className="h-3.5 w-3.5" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent side="right" className="w-72 p-4">
+                          <div className="space-y-3">
+                            <h4 className="font-semibold text-sm">{helpContent.title}</h4>
+                            <p className="text-sm text-muted-foreground">{helpContent.description}</p>
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-medium text-muted-foreground">Tips:</p>
+                              <ul className="space-y-1">
+                                {helpContent.tips.map((tip, i) => (
+                                  <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                                    <span className="text-primary mt-0.5">•</span>
+                                    {tip}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )) : customerNav.map((item) => {
+          const isActive = location === item.href;
           return (
-            <div key={item.href} className="flex items-center group w-full">
+            <div key={item.href} className="flex items-center group w-full mb-0.5">
               <Link href={item.href} className="flex-1 min-w-0 block">
                 <div
                   className={cn(
-                    "flex items-center gap-3 px-4 py-2.5 rounded-lg text-base font-semibold transition-all cursor-pointer",
+                    "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer",
                     "border border-white/5 shadow-sm",
                     "bg-gradient-to-b from-white/[0.08] to-transparent",
                     isActive
                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_2px_4px_rgba(0,0,0,0.3)] border-sidebar-primary/50"
                       : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_2px_4px_rgba(0,0,0,0.2)] hover:border-white/10"
                   )}
-                  onClick={() => {
-                    if (location === item.href) {
-                      window.dispatchEvent(new CustomEvent("forms-nav-reset"));
-                    }
-                    setIsMobileOpen(false);
-                  }}
+                  onClick={() => setIsMobileOpen(false)}
                 >
-                  <div className="relative">
-                    <item.icon className="h-5 w-5" />
-                    {showTodoBadge && (
-                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                        {todoActiveStatus.unreadCount > 9 ? "9+" : todoActiveStatus.unreadCount}
-                      </span>
-                    )}
-                  </div>
+                  <item.icon className="h-5 w-5" />
                   {item.label}
                 </div>
               </Link>
-              {helpContent && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button 
-                      className="p-1 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Info className="h-3.5 w-3.5" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent side="right" className="w-72 p-4">
-                    <div className="space-y-3">
-                      <h4 className="font-semibold text-sm">{helpContent.title}</h4>
-                      <p className="text-sm text-muted-foreground">{helpContent.description}</p>
-                      <div className="space-y-1.5">
-                        <p className="text-xs font-medium text-muted-foreground">Tips:</p>
-                        <ul className="space-y-1">
-                          {helpContent.tips.map((tip, i) => (
-                            <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
-                              <span className="text-primary mt-0.5">•</span>
-                              {tip}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              )}
             </div>
           );
         })}
@@ -564,7 +613,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-wrap justify-center gap-2">
             {tiles.map((item) => {
               const Icon = item.icon;
-              const isActive = item.href === "/tools" ? location.startsWith("/tools") : location === item.href;
+              const isActive = getIsActive(item);
               return (
                 <button
                   type="button"
@@ -602,7 +651,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex flex-wrap justify-center gap-2">
               {tiles.map((item) => {
                 const Icon = item.icon;
-                const isActive = item.href === "/tools" ? location.startsWith("/tools") : location === item.href;
+                const isActive = getIsActive(item);
                 return (
                   <button
                     type="button"
@@ -637,7 +686,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-1 px-3 py-2 bg-card/80 backdrop-blur-sm rounded-full shadow-lg border border-border">
             {tiles.map((item) => {
               const Icon = item.icon;
-              const isActive = item.href === "/tools" ? location.startsWith("/tools") : location === item.href;
+              const isActive = getIsActive(item);
               return (
                 <button
                   type="button"
