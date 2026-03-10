@@ -5,6 +5,8 @@ import { createServer } from "http";
 import { seedUsers, seedSampleData } from "./seed";
 import { startMaintenanceScheduler } from "./maintenanceScheduler";
 import { runEquipmentMigration } from "./equipmentMigration";
+import { runTaskMigration } from "./taskMigration";
+import { startTaskScheduler } from "./taskScheduler";
 import { seedOemTemplates } from "./equipmentSeed";
 
 const app = express();
@@ -66,6 +68,7 @@ app.use((req, res, next) => {
 
 (async () => {
   await runEquipmentMigration();
+  await runTaskMigration();
   await registerRoutes(httpServer, app);
   
   await seedUsers();
@@ -109,6 +112,7 @@ app.use((req, res, next) => {
     () => {
       log(`serving on port ${port}`);
       startMaintenanceScheduler();
+      startTaskScheduler();
     },
   );
 })();

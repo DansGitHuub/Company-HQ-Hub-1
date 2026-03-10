@@ -540,10 +540,30 @@ export default function InteractiveCalendar() {
     },
   });
 
+  const { data: taskEvents = [] } = useQuery<CalendarEvent[]>({
+    queryKey: ["/api/tasks/calendar-events"],
+    queryFn: async () => {
+      const res = await fetch("/api/tasks/calendar-events", { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.map((e: any) => ({
+        id: `task-${e.id}`,
+        title: `📋 ${e.title}`,
+        description: `Task ${e.taskId} - ${e.status}`,
+        start: typeof e.date === "string" ? e.date.split("T")[0] : new Date(e.date).toISOString().split("T")[0],
+        end: typeof e.date === "string" ? e.date.split("T")[0] : new Date(e.date).toISOString().split("T")[0],
+        location: "",
+        allDay: true,
+        source: "fleet" as const,
+        priority: e.priority?.replace("_urgent", "").replace("_high", "").replace("_normal", "").replace("_low", "") || "p3",
+      }));
+    },
+  });
+
   const events = useMemo(() => {
     if (showFleetOnly) return fleetEvents;
-    return [...gcEvents, ...fleetEvents];
-  }, [gcEvents, fleetEvents, showFleetOnly]);
+    return [...gcEvents, ...fleetEvents, ...taskEvents];
+  }, [gcEvents, fleetEvents, taskEvents, showFleetOnly]);
   
   const connectMutation = useMutation({
     mutationFn: async () => {

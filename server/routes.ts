@@ -7,6 +7,7 @@ import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerHiringRoutes } from "./hiringRoutes";
 import { registerCustomerHubRoutes } from "./customerHubRoutes";
 import { registerEquipmentRoutes } from "./equipmentRoutes";
+import { registerTaskRoutes } from "./taskRoutes";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail } from "./email";
 import { checkAndSendReminders } from "./maintenanceScheduler";
 import OpenAI from "openai";
@@ -7372,6 +7373,7 @@ Provide accurate information based on publicly available documentation.`;
   registerHiringRoutes(app, requireAuth);
   registerCustomerHubRoutes(app, requireAuth);
   registerEquipmentRoutes(app, requireAuth);
+  registerTaskRoutes(app);
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
 

@@ -1217,6 +1217,92 @@ export const insertTodoActiveUserSchema = createInsertSchema(todoActiveUsers).pi
 export type InsertTodoActiveUser = z.infer<typeof insertTodoActiveUserSchema>;
 export type TodoActiveUser = typeof todoActiveUsers.$inferSelect;
 
+// Task Management System (rebuilt from To-Do)
+export const tasks = pgTable("tasks", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  taskId: text("task_id").unique(),
+  title: text("title").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default("standard"),
+  priority: text("priority").notNull().default("p3_normal"),
+  status: text("status").notNull().default("assigned"),
+  createdByUserId: varchar("created_by_user_id", { length: 36 }).references(() => users.id).notNull(),
+  assignedToUserId: varchar("assigned_to_user_id", { length: 36 }).references(() => users.id).notNull(),
+  dueDate: timestamp("due_date"),
+  dueTime: text("due_time"),
+  category: text("category"),
+  estimatedMinutes: integer("estimated_minutes"),
+  location: text("location"),
+  requiresConfirmation: boolean("requires_confirmation").default(false),
+  completionNotes: text("completion_notes"),
+  completionPhotoUrl: text("completion_photo_url"),
+  isRecurring: boolean("is_recurring").default(false),
+  recurringConfig: jsonb("recurring_config"),
+  parentTaskId: varchar("parent_task_id", { length: 36 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  confirmedAt: timestamp("confirmed_at"),
+  cancelledAt: timestamp("cancelled_at"),
+});
+
+export const insertTaskSchema = createInsertSchema(tasks).omit({
+  id: true, taskId: true, createdAt: true, updatedAt: true,
+  acknowledgedAt: true, startedAt: true, completedAt: true, confirmedAt: true, cancelledAt: true,
+});
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type Task = typeof tasks.$inferSelect;
+
+export const taskChecklistItems = pgTable("task_checklist_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id", { length: 36 }).references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  itemText: text("item_text").notNull(),
+  isCompleted: boolean("is_completed").default(false),
+  completedBy: varchar("completed_by", { length: 36 }).references(() => users.id),
+  completedAt: timestamp("completed_at"),
+  sortOrder: integer("sort_order").default(0),
+});
+
+export type TaskChecklistItem = typeof taskChecklistItems.$inferSelect;
+
+export const taskHistory = pgTable("task_history", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id", { length: 36 }).references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  eventType: text("event_type").notNull(),
+  changedByUserId: varchar("changed_by_user_id", { length: 36 }).references(() => users.id),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type TaskHistoryEntry = typeof taskHistory.$inferSelect;
+
+export const taskAttachments = pgTable("task_attachments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id", { length: 36 }).references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: text("file_type"),
+  fileName: text("file_name"),
+  uploadedBy: varchar("uploaded_by", { length: 36 }).references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+export type TaskAttachment = typeof taskAttachments.$inferSelect;
+
+export const taskDelegationChain = pgTable("task_delegation_chain", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id", { length: 36 }).references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  fromUserId: varchar("from_user_id", { length: 36 }).references(() => users.id).notNull(),
+  toUserId: varchar("to_user_id", { length: 36 }).references(() => users.id).notNull(),
+  delegatedAt: timestamp("delegated_at").defaultNow(),
+  reason: text("reason"),
+});
+
+export type TaskDelegation = typeof taskDelegationChain.$inferSelect;
+
 // Plow Site Groups - for organizing sites (residential, commercial, routes, etc.)
 export const plowSiteGroups = pgTable("plow_site_groups", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),

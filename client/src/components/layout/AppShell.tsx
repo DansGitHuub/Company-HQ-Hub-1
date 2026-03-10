@@ -6,6 +6,7 @@ import type { CompanySettings } from "@shared/schema";
 import FloatingChatPopup from "@/components/FloatingChatPopup";
 import UpdatesPopup from "@/components/UpdatesPopup";
 import FloatingAssistantButton from "@/components/FloatingAssistantButton";
+import QuickAddTask from "@/components/QuickAddTask";
 import InteractiveCalendar from "@/components/InteractiveCalendar";
 import { 
   LayoutDashboard, 
@@ -924,6 +925,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             onChatClick={() => setIsChatOpen(true)}
             isChatOpen={isChatOpen}
           />
+          <QuickAddTask />
         </>
       )}
       

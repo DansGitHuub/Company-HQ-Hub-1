@@ -90,7 +90,12 @@ import {
   customerDocuments, type CustomerDocument, type InsertCustomerDocument,
   careGuides, type CareGuide, type InsertCareGuide,
   customerSavedGuides, type CustomerSavedGuide, type InsertCustomerSavedGuide,
-  customerNotifications, type CustomerNotification, type InsertCustomerNotification
+  customerNotifications, type CustomerNotification, type InsertCustomerNotification,
+  tasks, type Task, type InsertTask,
+  taskChecklistItems, type TaskChecklistItem,
+  taskHistory as taskHistoryTable, type TaskHistoryEntry,
+  taskAttachments, type TaskAttachment,
+  taskDelegationChain, type TaskDelegation
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull, sql } from "drizzle-orm";
@@ -635,6 +640,28 @@ export interface IStorage {
   createCustomerNotification(data: InsertCustomerNotification): Promise<CustomerNotification>;
   markNotificationRead(id: string): Promise<boolean>;
   markAllNotificationsRead(customerId: string): Promise<void>;
+
+  // Task Management System
+  getNextTaskId(): Promise<string>;
+  createTask(data: any): Promise<Task>;
+  getTask(id: string): Promise<Task | undefined>;
+  updateTask(id: string, updates: Partial<Task>): Promise<Task | undefined>;
+  deleteTask(id: string): Promise<boolean>;
+  getTasksByAssignee(userId: string): Promise<Task[]>;
+  getTasksByCreator(userId: string): Promise<Task[]>;
+  getAllTasks(): Promise<Task[]>;
+  getTaskDashboardCounts(userId: string): Promise<any>;
+  createTaskChecklistItem(data: any): Promise<TaskChecklistItem>;
+  getTaskChecklistItems(taskId: string): Promise<TaskChecklistItem[]>;
+  updateTaskChecklistItem(id: string, updates: Partial<TaskChecklistItem>): Promise<TaskChecklistItem | undefined>;
+  deleteTaskChecklistItem(id: string): Promise<boolean>;
+  createTaskHistory(data: any): Promise<TaskHistoryEntry>;
+  getTaskHistory(taskId: string): Promise<TaskHistoryEntry[]>;
+  createTaskAttachment(data: any): Promise<TaskAttachment>;
+  getTaskAttachments(taskId: string): Promise<TaskAttachment[]>;
+  deleteTaskAttachment(id: string): Promise<boolean>;
+  createTaskDelegation(data: any): Promise<TaskDelegation>;
+  getTaskDelegationChain(taskId: string): Promise<TaskDelegation[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2935,6 +2962,122 @@ export class DatabaseStorage implements IStorage {
 
   async markAllNotificationsRead(customerId: string): Promise<void> {
     await db.update(customerNotifications).set({ isRead: true }).where(and(eq(customerNotifications.customerId, customerId), eq(customerNotifications.isRead, false)));
+  }
+
+  // Task Management System
+  async getNextTaskId(): Promise<string> {
+    const result = await pool.query(`SELECT task_id FROM tasks WHERE task_id IS NOT NULL ORDER BY task_id DESC LIMIT 1`);
+    if (result.rows.length === 0) return "TK-0001";
+    const last = result.rows[0].task_id;
+    const num = parseInt(last.replace("TK-", "")) + 1;
+    return `TK-${String(num).padStart(4, "0")}`;
+  }
+
+  async createTask(data: any): Promise<Task> {
+    const taskId = await this.getNextTaskId();
+    const [created] = await db.insert(tasks).values({ ...data, taskId }).returning();
+    return created;
+  }
+
+  async getTask(id: string): Promise<Task | undefined> {
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
+    return task;
+  }
+
+  async updateTask(id: string, updates: Partial<Task>): Promise<Task | undefined> {
+    const [updated] = await db.update(tasks).set({ ...updates, updatedAt: new Date() }).where(eq(tasks.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTask(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(tasks).where(eq(tasks.id, id)).returning();
+    return !!deleted;
+  }
+
+  async getTasksByAssignee(userId: string): Promise<Task[]> {
+    return await db.select().from(tasks).where(eq(tasks.assignedToUserId, userId)).orderBy(desc(tasks.createdAt));
+  }
+
+  async getTasksByCreator(userId: string): Promise<Task[]> {
+    return await db.select().from(tasks).where(eq(tasks.createdByUserId, userId)).orderBy(desc(tasks.createdAt));
+  }
+
+  async getAllTasks(): Promise<Task[]> {
+    return await db.select().from(tasks).orderBy(desc(tasks.createdAt));
+  }
+
+  async getTaskDashboardCounts(userId: string): Promise<any> {
+    const myTasks = await db.select().from(tasks).where(eq(tasks.assignedToUserId, userId));
+    const now = new Date();
+    const overdue = myTasks.filter(t => t.dueDate && new Date(t.dueDate) < now && !["completed", "confirmed", "cancelled"].includes(t.status));
+    const urgent = myTasks.filter(t => t.priority === "p1_urgent" && !["completed", "confirmed", "cancelled"].includes(t.status));
+    const active = myTasks.filter(t => !["completed", "confirmed", "cancelled"].includes(t.status));
+    const awaitingAck = myTasks.filter(t => t.status === "assigned" && !t.acknowledgedAt);
+    const createdByMe = await db.select({ count: sql<number>`count(*)` }).from(tasks).where(eq(tasks.createdByUserId, userId));
+    const awaitingConfirm = await db.select({ count: sql<number>`count(*)` }).from(tasks).where(and(
+      eq(tasks.createdByUserId, userId),
+      eq(tasks.status, "completed"),
+      eq(tasks.requiresConfirmation, true)
+    ));
+    return {
+      total: active.length,
+      overdue: overdue.length,
+      urgent: urgent.length,
+      awaitingAck: awaitingAck.length,
+      assignedByMe: createdByMe[0]?.count || 0,
+      awaitingConfirmation: awaitingConfirm[0]?.count || 0,
+    };
+  }
+
+  async createTaskChecklistItem(data: any): Promise<TaskChecklistItem> {
+    const [created] = await db.insert(taskChecklistItems).values(data).returning();
+    return created;
+  }
+
+  async getTaskChecklistItems(taskId: string): Promise<TaskChecklistItem[]> {
+    return await db.select().from(taskChecklistItems).where(eq(taskChecklistItems.taskId, taskId)).orderBy(taskChecklistItems.sortOrder);
+  }
+
+  async updateTaskChecklistItem(id: string, updates: Partial<TaskChecklistItem>): Promise<TaskChecklistItem | undefined> {
+    const [updated] = await db.update(taskChecklistItems).set(updates).where(eq(taskChecklistItems.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTaskChecklistItem(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(taskChecklistItems).where(eq(taskChecklistItems.id, id)).returning();
+    return !!deleted;
+  }
+
+  async createTaskHistory(data: any): Promise<TaskHistoryEntry> {
+    const [created] = await db.insert(taskHistoryTable).values(data).returning();
+    return created;
+  }
+
+  async getTaskHistory(taskId: string): Promise<TaskHistoryEntry[]> {
+    return await db.select().from(taskHistoryTable).where(eq(taskHistoryTable.taskId, taskId)).orderBy(desc(taskHistoryTable.createdAt));
+  }
+
+  async createTaskAttachment(data: any): Promise<TaskAttachment> {
+    const [created] = await db.insert(taskAttachments).values(data).returning();
+    return created;
+  }
+
+  async getTaskAttachments(taskId: string): Promise<TaskAttachment[]> {
+    return await db.select().from(taskAttachments).where(eq(taskAttachments.taskId, taskId)).orderBy(desc(taskAttachments.uploadedAt));
+  }
+
+  async deleteTaskAttachment(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(taskAttachments).where(eq(taskAttachments.id, id)).returning();
+    return !!deleted;
+  }
+
+  async createTaskDelegation(data: any): Promise<TaskDelegation> {
+    const [created] = await db.insert(taskDelegationChain).values(data).returning();
+    return created;
+  }
+
+  async getTaskDelegationChain(taskId: string): Promise<TaskDelegation[]> {
+    return await db.select().from(taskDelegationChain).where(eq(taskDelegationChain.taskId, taskId)).orderBy(taskDelegationChain.delegatedAt);
   }
 }
 
