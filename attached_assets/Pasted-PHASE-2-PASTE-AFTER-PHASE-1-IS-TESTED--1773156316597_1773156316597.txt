@@ -1,0 +1,32 @@
+PHASE 2 — PASTE AFTER PHASE 1 IS TESTED
+──────────────────────────────────────────────────────────
+The Phase 1 assistant foundation is working. Now add the full tool library, confirmation flow, search capabilities, and the Agent Manager. Do not change the Phase 1 infrastructure — extend it.
+TOOL LIBRARY — ADD ALL OF THESE
+Add these tools to the /api/assistant/chat endpoint. Each tool definition needs: name, description (used by GPT to know when to call it), parameters schema (JSON Schema format). Each tool must validate user permissions before executing. All tools call existing API routes — never bypass the existing route handlers.
+navigateTo(module: string, subpage?: string) — already exists from Phase 1.
+openRecord(type: 'equipment'|'task'|'employee'|'job', id: string) — navigate to a specific record's detail page.
+searchGlobal(query: string) — full text search across tasks, equipment, employees, SOPs, messages. Returns top 5 results from each category.
+searchEquipment(filters: { status?, category?, assignedTo?, maintenanceDue? }) — returns matching equipment records with their current priority status.
+searchTasks(filters: { assignedTo?, priority?, status?, dueToday? }) — returns matching task records.
+searchEmployees(query: string) — search employees by name, role, or department.
+searchSOPs(query: string) — full text search across SOP library.
+getDailyBriefing() — returns a structured summary: overdue tasks (count + titles), urgent equipment (count + names), unread messages count, tasks due today count. GPT formats this into a natural language morning summary.
+createTask(title: string, assignedToUserId: number, priority: 'p1'|'p2'|'p3'|'p4', dueDate?: string, description?: string) — creates a task. REQUIRES ActionPreviewCard confirmation before executing.
+updateTaskStatus(taskId: string, status: string, note?: string) — updates a task status. Confirm before executing for complete/cancelled.
+createEquipment(data: { assetName, category, make, model, year?, serialNumber?, assignedTo?, currentHours? }) — creates a new equipment asset. REQUIRES ActionPreviewCard confirmation.
+logEquipmentService(assetId: string, serviceData: { taskName, serviceDate, hoursAtService, performedBy, notes?, cost? }) — logs a completed maintenance task. REQUIRES confirmation.
+updateEquipmentHours(assetId: string, currentHours: number) — updates current hours on an asset. Confirm before executing.
+lookupVIN(vin: string) — calls NHTSA API, returns decoded vehicle info.
+submitRepairRequest(assetId: string, description: string, severity: 'minor'|'moderate'|'major', isUsable: string) — submits repair request. REQUIRES confirmation.
+CONFIRMATION FLOW
+For any tool marked REQUIRES confirmation: before calling the tool, GPT must return a structured response with type: 'confirmation_required' and a summary of what will happen. The frontend displays this as an ActionPreviewCard with Confirm and Cancel buttons. Only when the user taps Confirm does the frontend send a follow-up message { confirmationGranted: true, pendingTool: {...} } and the backend executes the tool. If the user taps Cancel, send { confirmationGranted: false } and the assistant acknowledges the cancellation. This entire flow must be reliable — never execute a write operation without receiving explicit confirmation.
+PERMISSION ENFORCEMENT
+The Tool Executor validates permissions server-side before executing any tool, regardless of what the AI requested. Use the same permission rules as the rest of the app: role-based access, record-level access (crew lead can only update equipment assigned to their crew), etc. If permission fails, return a structured error — the AI will explain it to the user in plain English. Never expose raw permission errors or database errors to the user.
+AGENT MANAGER — ADMIN PANEL
+Add an AI Agents section to the Admin Panel. It reads from the assistant_agents table. Display: list of all agents with name, status (enabled/disabled), and allowed roles. Edit button opens a form: agent name, system prompt addition (text area — appended to the base system prompt when this agent is active), enabled tools (multi-select from all available tools), allowed roles (multi-select), is_enabled toggle. Add new agent form with the same fields. The main assistant checks this table on every request and includes agent context if the user's message matches any agent's domain. Seed the table with one default agent: { agent_name: 'Main Assistant', agent_key: 'main', is_enabled: true, allowed_roles: all roles }.
+CONVERSATION LOG VIEWER — ADMIN PANEL
+Add an AI Conversation Logs section to the Admin Panel. Shows all entries from assistant_conversations, grouped by session_id. Filterable by user, date range, tool called. Each session shows the full conversation thread. Show: user name, date/time, message, whether a tool was called and which one, the result. Also show a usage summary: total messages today/week/month, most used tools, average response time, estimated OpenAI cost (tokens_used * current GPT-4o pricing).
+PHASE 2 SUCCESS CRITERIA
+Test all of these before considering complete: (1) 'What tasks do I have today?' returns real tasks from the database. (2) 'Assign Jake a high priority task to clean Truck 3 by tomorrow' shows a confirmation card, then creates the real task. (3) 'Show me all overdue equipment' returns real equipment records. (4) 'Add a 2022 Exmark Lazer Z serial EX9824 to equipment' shows confirmation, then creates the record. (5) 'What do I need to know today?' returns a real daily briefing from live data. (6) 'Look up VIN 1FTFW1E87NKE12345' returns decoded vehicle info. (7) A non-manager trying to assign a task to a manager gets a clear permission error. (8) The Agent Manager in the Admin Panel shows the main agent and allows editing the system prompt addition.
+──────────────────────────────────────────────────────────
+END OF PHASE 2 PROMPT

@@ -53,6 +53,8 @@ import {
   ChevronUp
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import AssistantAgentManager from "@/components/AssistantAgentManager";
+import ConversationLogViewer from "@/components/ConversationLogViewer";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -487,7 +489,7 @@ export default function AdminPanel() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className={`grid w-full max-w-5xl ${user?.isMasterAdmin ? 'grid-cols-7' : 'grid-cols-5'}`}>
+        <TabsList className="flex flex-wrap w-full max-w-5xl gap-1 h-auto">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="requests" className="gap-2">
             Requests {pendingRequests.length > 0 && <Badge variant="destructive" className="ml-1">{pendingRequests.length}</Badge>}
@@ -500,6 +502,12 @@ export default function AdminPanel() {
           </TabsTrigger>
           <TabsTrigger value="company" className="gap-2">
             <Building2 className="h-4 w-4" /> Company
+          </TabsTrigger>
+          <TabsTrigger value="assistant-agents" className="gap-2" data-testid="tab-assistant-agents">
+            <Sparkles className="h-4 w-4" /> Assistant
+          </TabsTrigger>
+          <TabsTrigger value="ai-logs" className="gap-2" data-testid="tab-ai-logs">
+            <Bot className="h-4 w-4" /> AI Logs
           </TabsTrigger>
           {user?.isMasterAdmin && (
             <TabsTrigger value="ai-agents" className="gap-2">
@@ -1035,6 +1043,14 @@ export default function AdminPanel() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="assistant-agents" className="mt-6">
+          <AssistantAgentManager />
+        </TabsContent>
+
+        <TabsContent value="ai-logs" className="mt-6">
+          <ConversationLogViewer />
         </TabsContent>
 
         {user?.isMasterAdmin && (

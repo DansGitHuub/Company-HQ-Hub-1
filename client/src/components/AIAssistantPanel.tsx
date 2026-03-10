@@ -1,17 +1,20 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Sparkles, X, Minus, MoreVertical, Send, Mic, Bot, User } from "lucide-react";
+import { Sparkles, X, Minus, MoreVertical, Send, Mic, Bot, User, Check, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { SuggestionChips } from "./AssistantMessageCards";
+import { SuggestionChips, ActionResultCard, ErrorCard } from "./AssistantMessageCards";
 import { apiRequest } from "@/lib/queryClient";
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  type?: "text" | "confirmation_required" | "action_result" | "error" | "tool_result";
   toolCalled?: string;
   toolResult?: any;
   navigationTarget?: string;
+  confirmationToken?: string;
+  confirmed?: boolean;
 }
 
 function generateSessionId() {
@@ -85,11 +88,14 @@ export default function AIAssistantPanel() {
     return parts[0] || "dashboard";
   };
 
-  const sendMessage = useCallback(async (messageText: string) => {
-    if (!messageText.trim() || isLoading) return;
+  const sendMessage = useCallback(async (messageText: string, extra?: { confirmationGranted?: boolean; confirmationToken?: string }) => {
+    if (isLoading) return;
+    if (!extra && (!messageText.trim())) return;
 
-    const userMsg: ChatMessage = { role: "user", content: messageText };
-    setMessages((prev) => [...prev, userMsg]);
+    if (!extra) {
+      const userMsg: ChatMessage = { role: "user", content: messageText };
+      setMessages((prev) => [...prev, userMsg]);
+    }
     setInput("");
     setIsLoading(true);
     setSuggestions([]);
@@ -100,21 +106,29 @@ export default function AIAssistantPanel() {
         content: m.content,
       }));
 
-      const res = await apiRequest("POST", "/api/assistant/chat", {
-        message: messageText,
+      const body: any = {
+        message: extra ? (extra.confirmationGranted ? "[Confirmed]" : "[Cancelled]") : messageText,
         conversationHistory,
         currentModule: getCurrentModule(),
         sessionId: sessionId.current,
-      });
+      };
 
+      if (extra) {
+        body.confirmationGranted = extra.confirmationGranted;
+        body.confirmationToken = extra.confirmationToken;
+      }
+
+      const res = await apiRequest("POST", "/api/assistant/chat", body);
       const data = await res.json();
 
       const assistantMsg: ChatMessage = {
         role: "assistant",
         content: data.response,
+        type: data.type || "text",
         toolCalled: data.toolCalled,
         toolResult: data.toolResult,
         navigationTarget: data.navigationTarget,
+        confirmationToken: data.confirmationToken,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -125,12 +139,34 @@ export default function AIAssistantPanel() {
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, I encountered an error. Please try again." },
+        { role: "assistant", content: "Sorry, I encountered an error. Please try again.", type: "error" },
       ]);
     } finally {
       setIsLoading(false);
     }
   }, [isLoading, messages, navigate]);
+
+  const handleConfirm = (confirmationToken: string) => {
+    setMessages((prev) =>
+      prev.map((m, i) =>
+        i === prev.length - 1 && m.type === "confirmation_required"
+          ? { ...m, confirmed: true }
+          : m
+      )
+    );
+    sendMessage("[Confirmed]", { confirmationGranted: true, confirmationToken });
+  };
+
+  const handleCancel = (confirmationToken: string) => {
+    setMessages((prev) =>
+      prev.map((m, i) =>
+        i === prev.length - 1 && m.type === "confirmation_required"
+          ? { ...m, confirmed: false }
+          : m
+      )
+    );
+    sendMessage("[Cancelled]", { confirmationGranted: false, confirmationToken });
+  };
 
   const handleClearConversation = () => {
     setMessages([]);
@@ -184,46 +220,24 @@ export default function AIAssistantPanel() {
           </div>
           <div className="flex items-center gap-1">
             <div className="relative">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7"
-                onClick={() => setShowMenu(!showMenu)}
-                data-testid="assistant-menu-btn"
-              >
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShowMenu(!showMenu)} data-testid="assistant-menu-btn">
                 <MoreVertical className="h-4 w-4" />
               </Button>
               {showMenu && (
                 <>
                   <div className="fixed inset-0" onClick={() => setShowMenu(false)} />
                   <div className="absolute right-0 top-8 bg-background border rounded-lg shadow-lg z-10 min-w-[160px]">
-                    <button
-                      onClick={handleClearConversation}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors rounded-lg"
-                      data-testid="clear-conversation-btn"
-                    >
+                    <button onClick={handleClearConversation} className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors rounded-lg" data-testid="clear-conversation-btn">
                       Clear conversation
                     </button>
                   </div>
                 </>
               )}
             </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={() => setIsOpen(false)}
-              data-testid="assistant-minimize-btn"
-            >
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setIsOpen(false)} data-testid="assistant-minimize-btn">
               <Minus className="h-4 w-4" />
             </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7 sm:hidden"
-              onClick={() => setIsOpen(false)}
-              data-testid="assistant-close-btn"
-            >
+            <Button size="icon" variant="ghost" className="h-7 w-7 sm:hidden" onClick={() => setIsOpen(false)} data-testid="assistant-close-btn">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -242,39 +256,71 @@ export default function AIAssistantPanel() {
                 </p>
               </div>
               {suggestions.length > 0 && (
-                <SuggestionChips
-                  suggestions={suggestions}
-                  onChipClick={(s) => sendMessage(s)}
-                />
+                <SuggestionChips suggestions={suggestions} onChipClick={(s) => sendMessage(s)} />
               )}
             </div>
           )}
 
           {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-            >
+            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div className={`flex gap-2 max-w-[85%] ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
                 <div className={`flex-shrink-0 h-6 w-6 rounded-full flex items-center justify-center mt-1 ${
                   msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
                 }`}>
                   {msg.role === "user" ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
                 </div>
-                <div
-                  className={`rounded-lg px-3 py-2 text-sm ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
-                  }`}
-                  data-testid={`chat-message-${msg.role}-${i}`}
-                >
-                  {msg.navigationTarget && (
-                    <p className="text-xs opacity-75 mb-1 italic">
-                      Navigating to {msg.navigationTarget}...
-                    </p>
+                <div className="space-y-2" data-testid={`chat-message-${msg.role}-${i}`}>
+                  {msg.type === "confirmation_required" && msg.confirmationToken && msg.confirmed === undefined ? (
+                    <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 space-y-2" data-testid="confirmation-card">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                        <span className="font-medium text-sm text-amber-800 dark:text-amber-200">Confirm Action</span>
+                      </div>
+                      <p className="text-sm text-amber-700 dark:text-amber-300 whitespace-pre-wrap">{msg.content}</p>
+                      <div className="flex gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => handleConfirm(msg.confirmationToken!)}
+                          data-testid="confirm-action-btn"
+                        >
+                          <Check className="h-3 w-3 mr-1" /> Confirm
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-7 text-xs"
+                          onClick={() => handleCancel(msg.confirmationToken!)}
+                          data-testid="cancel-action-btn"
+                        >
+                          <X className="h-3 w-3 mr-1" /> Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : msg.type === "confirmation_required" && msg.confirmed !== undefined ? (
+                    <div className={`rounded-lg px-3 py-2 text-sm ${msg.confirmed ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800" : "bg-muted"}`}>
+                      <p className="text-xs opacity-75 mb-1 italic">{msg.confirmed ? "Confirmed" : "Cancelled"}</p>
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+                  ) : msg.type === "action_result" ? (
+                    <ActionResultCard
+                      title="Action Completed"
+                      description={msg.content}
+                      linkText={msg.navigationTarget ? "View record" : undefined}
+                      onLinkClick={msg.navigationTarget ? () => navigate(msg.navigationTarget!) : undefined}
+                    />
+                  ) : msg.type === "error" ? (
+                    <ErrorCard message={msg.content} />
+                  ) : (
+                    <div className={`rounded-lg px-3 py-2 text-sm ${
+                      msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+                    }`}>
+                      {msg.navigationTarget && (
+                        <p className="text-xs opacity-75 mb-1 italic">Navigating to {msg.navigationTarget}...</p>
+                      )}
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    </div>
                   )}
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
                 </div>
               </div>
             </div>
