@@ -328,7 +328,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     equipment: { icon: Truck, label: "Equipment", href: "/equipment" },
     todos: { icon: CheckSquare, label: "To-Do List", href: "/todos" },
     hiring: { icon: Users, label: "Hiring", href: "/hiring" },
-    employees: { icon: User, label: "Employees", href: "/employee" },
+    employees: { icon: User, label: "Employees", href: "/employees" },
     jobs: { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
     education: { icon: GraduationCap, label: "Customer Hub", href: "/education" },
     help: { icon: HelpCircle, label: "Help", href: "/help" },
@@ -388,8 +388,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (item.href === "/tools/plow-mapper") {
       return location.startsWith("/tools/plow");
     }
-    if (item.href === "/employee") {
-      return location.startsWith("/employee");
+    if (item.href === "/employees") {
+      return location === "/employees";
     }
     return location === item.href;
   };

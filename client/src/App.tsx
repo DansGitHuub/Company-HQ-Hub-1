@@ -25,6 +25,7 @@ import Forms from "@/pages/Forms";
 import Integrations from "@/pages/Integrations";
 import Education from "@/pages/Education";
 import EmployeePortal from "@/pages/EmployeePortal";
+import Employees from "@/pages/Employees";
 import HQOverview from "@/pages/HQOverview";
 import JobPipeline from "@/pages/JobPipeline";
 import Help from "@/pages/Help";
@@ -83,6 +84,7 @@ function AppRoutes() {
         <Route path="/integrations" component={Integrations} />
         <Route path="/education" component={Education} />
         <Route path="/profile" component={Profile} />
+        <Route path="/employees" component={Employees} />
         <Route path="/employee" component={EmployeePortal} />
         <Route path="/employee-portal" component={EmployeePortal} />
         <Route path="/hq" component={HQOverview} />

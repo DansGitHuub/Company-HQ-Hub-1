@@ -622,7 +622,11 @@ function DocumentsTab({ candidateId }: { candidateId: string }) {
       </div>
       <div className="space-y-2">
         {docs.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">No documents yet</p>
+          <div className="text-center py-8">
+            <FileText className="h-10 w-10 mx-auto mb-2 text-muted-foreground/30" />
+            <p className="text-sm text-muted-foreground font-medium">No documents yet</p>
+            <p className="text-xs text-muted-foreground mt-1">Upload documents using the button above. Documents will be auto-created when a candidate is hired.</p>
+          </div>
         ) : docs.map(doc => (
           <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`doc-${doc.id}`}>
             <div className="flex items-center gap-2">
@@ -635,15 +639,16 @@ function DocumentsTab({ candidateId }: { candidateId: string }) {
               </div>
             </div>
             <div className="flex gap-1">
-              {doc.status === "Not Sent" && (
-                <Button size="sm" variant="outline" onClick={() => updateDocMutation.mutate({ id: doc.id, status: "Sent" })}>
-                  <Send className="h-3 w-3 mr-1" /> Send
-                </Button>
-              )}
-              {doc.url && (
-                <Button size="sm" variant="ghost" onClick={() => window.open(doc.url!, "_blank")}>
+              {doc.url ? (
+                <Button size="sm" variant="ghost" onClick={() => window.open(doc.url!, "_blank")} data-testid={`view-doc-${doc.id}`}>
                   View
                 </Button>
+              ) : doc.status === "Not Sent" ? (
+                <Button size="sm" variant="outline" onClick={() => updateDocMutation.mutate({ id: doc.id, status: "Sent" })} data-testid={`send-doc-${doc.id}`}>
+                  <Send className="h-3 w-3 mr-1" /> Send
+                </Button>
+              ) : (
+                <span className="text-xs text-muted-foreground italic">Awaiting upload</span>
               )}
             </div>
           </div>
