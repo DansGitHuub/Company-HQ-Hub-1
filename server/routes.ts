@@ -7619,6 +7619,46 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  // Staff Notifications API
+  app.get("/api/staff-notifications", requireAuth, async (req, res) => {
+    try {
+      const notifications = await storage.getStaffNotifications(req.user!.id);
+      res.json(notifications);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching notifications" });
+    }
+  });
+
+  app.get("/api/staff-notifications/unread-count", requireAuth, async (req, res) => {
+    try {
+      const count = await storage.getUnreadStaffNotificationCount(req.user!.id);
+      res.json({ count });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching notification count" });
+    }
+  });
+
+  app.post("/api/staff-notifications/:id/read", requireAuth, async (req, res) => {
+    try {
+      const updated = await storage.markStaffNotificationRead(req.params.id, req.user!.id);
+      if (!updated) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error marking notification read" });
+    }
+  });
+
+  app.post("/api/staff-notifications/read-all", requireAuth, async (req, res) => {
+    try {
+      await storage.markAllStaffNotificationsRead(req.user!.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error marking all read" });
+    }
+  });
+
   registerHiringRoutes(app, requireAuth);
   registerCustomerHubRoutes(app, requireAuth);
   registerEquipmentRoutes(app, requireAuth);

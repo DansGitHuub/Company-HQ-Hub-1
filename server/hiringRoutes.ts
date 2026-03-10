@@ -1,6 +1,6 @@
 import type { Express, RequestHandler } from "express";
 import { storage } from "./storage";
-import { sendHiringStageEmail } from "./email";
+import { sendHiringStageEmail, sendHiringWelcomeEmail } from "./email";
 
 const ONBOARDING_EMPLOYEE_ITEMS = [
   "Fill out W-4",
@@ -70,6 +70,28 @@ async function createHiredDocuments(candidateId: string) {
   }
 }
 
+async function notifyHRAndManagers(type: string, title: string, message: string, link: string, metadata: any) {
+  try {
+    const { pool } = await import("./db");
+    const result = await pool.query(
+      `SELECT id FROM users WHERE role IN ('Admin', 'Manager', 'HR') AND id IS NOT NULL`
+    );
+    for (const row of result.rows) {
+      await storage.createStaffNotification({
+        userId: row.id,
+        type,
+        title,
+        message,
+        link,
+        metadata,
+        isRead: false,
+      });
+    }
+  } catch (err: any) {
+    console.error("[notifications] Failed to create staff notifications:", err.message);
+  }
+}
+
 async function handleStageChange(candidateId: string, newStage: string, candidate: any, userId?: string) {
   const template = await storage.getHiringEmailTemplate(newStage);
 
@@ -89,19 +111,31 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
     }
 
     try {
-      await sendHiringStageEmail(candidate.email, candidate.name, subject, body);
-      await storage.createApplicantCommunication({
-        candidateId,
-        type: "Email",
-        subject,
-        content: body,
-        sentBy: userId || null,
-        sentByName: "System",
-      });
+      const sent = await sendHiringStageEmail(candidate.email, candidate.name, subject, body);
+      if (sent) {
+        await storage.createApplicantCommunication({
+          candidateId,
+          type: "Email",
+          subject,
+          content: body,
+          sentBy: userId || null,
+          sentByName: "System",
+        });
+      } else {
+        console.error(`[hiring] Email delivery failed for ${newStage} to ${candidate.email}`);
+      }
     } catch (err: any) {
       console.error(`Failed to send stage email for ${newStage}:`, err.message);
     }
   }
+
+  await notifyHRAndManagers(
+    "hiring_stage_change",
+    `Applicant Moved: ${candidate.name}`,
+    `${candidate.name} has been moved to "${newStage}" for the ${candidate.role || "open"} position.`,
+    "/hiring",
+    { candidateId, newStage, candidateName: candidate.name, position: candidate.role }
+  );
 
   if (newStage === "Hired") {
     const existingEmployees = await storage.getEmployees();
@@ -113,6 +147,7 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
       const nameParts = candidate.name.split(" ");
       const firstName = nameParts[0] || "";
       const lastName = nameParts.slice(1).join(" ") || "";
+      const startDate = new Date().toISOString().split("T")[0];
 
       const employee = await storage.createEmployee({
         candidateId,
@@ -125,10 +160,23 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
         state: candidate.state || undefined,
         zip: candidate.zip || undefined,
         jobTitle: candidate.role || undefined,
-        startDate: new Date().toISOString().split("T")[0],
+        startDate,
       });
 
       await createOnboardingChecklist(employee.id);
+
+      if (candidate.email) {
+        try {
+          await sendHiringWelcomeEmail(
+            candidate.email,
+            candidate.name,
+            candidate.role || "Team Member",
+            new Date(startDate).toLocaleDateString()
+          );
+        } catch (err: any) {
+          console.error("Failed to send welcome/onboarding email:", err.message);
+        }
+      }
     }
   }
 }

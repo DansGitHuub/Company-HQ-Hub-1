@@ -2290,3 +2290,19 @@ export const customerNotifications = pgTable("customer_notifications", {
 export const insertCustomerNotificationSchema = createInsertSchema(customerNotifications).omit({ id: true, createdAt: true });
 export type InsertCustomerNotification = z.infer<typeof insertCustomerNotificationSchema>;
 export type CustomerNotification = typeof customerNotifications.$inferSelect;
+
+export const staffNotifications = pgTable("staff_notifications", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id).notNull(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  link: text("link"),
+  metadata: jsonb("metadata").default({}),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStaffNotificationSchema = createInsertSchema(staffNotifications).omit({ id: true, createdAt: true });
+export type InsertStaffNotification = z.infer<typeof insertStaffNotificationSchema>;
+export type StaffNotification = typeof staffNotifications.$inferSelect;

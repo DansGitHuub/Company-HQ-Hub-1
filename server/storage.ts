@@ -95,7 +95,8 @@ import {
   taskChecklistItems, type TaskChecklistItem,
   taskHistory as taskHistoryTable, type TaskHistoryEntry,
   taskAttachments, type TaskAttachment,
-  taskDelegationChain, type TaskDelegation
+  taskDelegationChain, type TaskDelegation,
+  staffNotifications, type StaffNotification, type InsertStaffNotification
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull, sql } from "drizzle-orm";
@@ -640,6 +641,13 @@ export interface IStorage {
   createCustomerNotification(data: InsertCustomerNotification): Promise<CustomerNotification>;
   markNotificationRead(id: string): Promise<boolean>;
   markAllNotificationsRead(customerId: string): Promise<void>;
+
+  // Staff Notifications
+  getStaffNotifications(userId: string): Promise<StaffNotification[]>;
+  getUnreadStaffNotificationCount(userId: string): Promise<number>;
+  createStaffNotification(data: InsertStaffNotification): Promise<StaffNotification>;
+  markStaffNotificationRead(id: string, userId: string): Promise<boolean>;
+  markAllStaffNotificationsRead(userId: string): Promise<void>;
 
   // Task Management System
   getNextTaskId(): Promise<string>;
@@ -2962,6 +2970,30 @@ export class DatabaseStorage implements IStorage {
 
   async markAllNotificationsRead(customerId: string): Promise<void> {
     await db.update(customerNotifications).set({ isRead: true }).where(and(eq(customerNotifications.customerId, customerId), eq(customerNotifications.isRead, false)));
+  }
+
+  // Staff Notifications
+  async getStaffNotifications(userId: string): Promise<StaffNotification[]> {
+    return await db.select().from(staffNotifications).where(eq(staffNotifications.userId, userId)).orderBy(desc(staffNotifications.createdAt));
+  }
+
+  async getUnreadStaffNotificationCount(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(staffNotifications).where(and(eq(staffNotifications.userId, userId), eq(staffNotifications.isRead, false)));
+    return result[0]?.count || 0;
+  }
+
+  async createStaffNotification(data: InsertStaffNotification): Promise<StaffNotification> {
+    const [created] = await db.insert(staffNotifications).values(data).returning();
+    return created;
+  }
+
+  async markStaffNotificationRead(id: string, userId: string): Promise<boolean> {
+    const [updated] = await db.update(staffNotifications).set({ isRead: true }).where(and(eq(staffNotifications.id, id), eq(staffNotifications.userId, userId))).returning();
+    return !!updated;
+  }
+
+  async markAllStaffNotificationsRead(userId: string): Promise<void> {
+    await db.update(staffNotifications).set({ isRead: true }).where(and(eq(staffNotifications.userId, userId), eq(staffNotifications.isRead, false)));
   }
 
   // Task Management System

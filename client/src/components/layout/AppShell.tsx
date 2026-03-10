@@ -282,6 +282,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     refetchInterval: 60000,
   });
 
+  const { data: staffNotifCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/staff-notifications/unread-count"],
+    staleTime: 30000,
+    refetchInterval: 30000,
+    enabled: !!user && user.role !== "Customer",
+  });
+
+  const totalBellCount = (unseenUpdates.length || 0) + (staffNotifCount?.count || 0);
+
   const getLogoClasses = () => {
     const shape = companySettings?.logoShape || "square";
     const cornerRadius = companySettings?.logoCornerRadius || 0;
@@ -787,9 +796,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       <Bell className="h-4 w-4 text-white drop-shadow-sm" />
                     </div>
                     <span className="hidden md:inline font-medium">Updates</span>
-                    {unseenUpdates.length > 0 && (
+                    {totalBellCount > 0 && (
                       <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
-                        {unseenUpdates.length > 9 ? "9+" : unseenUpdates.length}
+                        {totalBellCount > 9 ? "9+" : totalBellCount}
                       </span>
                     )}
                   </Button>
