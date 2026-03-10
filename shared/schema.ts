@@ -233,13 +233,15 @@ export type MaterialFieldValue = typeof materialFieldValues.$inferSelect;
 export type CandidateJobType = "Crew Member" | "Crew Lead" | "Manager" | "Office" | "Sales";
 export type CandidateWorkType = "Maintenance" | "Project";
 export type CandidateRating = "green" | "yellow" | "red" | null;
+export type ApplicantStage = "New Application" | "Review" | "Phone Screen" | "Interview" | "Offer Extended" | "Hired" | "Not a Fit";
+export type ApplicantSource = "Indeed" | "Referral" | "Walk-in" | "Website" | "Other";
 
 export const candidates = pgTable("candidates", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 36 }).references(() => users.id),
   name: text("name").notNull(),
   role: text("role").notNull(),
-  stage: text("stage").notNull().default("Applied"),
+  stage: text("stage").notNull().default("New Application"),
   appliedDate: timestamp("applied_date").defaultNow(),
   rating: text("rating").$type<CandidateRating>(),
   email: text("email"),
@@ -250,54 +252,228 @@ export const candidates = pgTable("candidates", {
   zip: text("zip"),
   jobType: text("job_type").$type<CandidateJobType>(),
   workType: text("work_type").$type<CandidateWorkType>(),
+  source: text("source").$type<ApplicantSource>(),
   notes: text("notes"),
+  interviewDate: timestamp("interview_date"),
+  interviewTime: text("interview_time"),
+  interviewLocation: text("interview_location"),
+  interviewType: text("interview_type"),
+  interviewerName: text("interviewer_name"),
+  interviewNotes: text("interview_notes"),
+  interviewRating: integer("interview_rating"),
+  interviewRecommendation: text("interview_recommendation"),
   lastNotifiedAt: timestamp("last_notified_at"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertCandidateSchema = createInsertSchema(candidates).pick({
-  userId: true,
-  name: true,
-  role: true,
-  stage: true,
-  email: true,
-  phone: true,
-  address: true,
-  city: true,
-  state: true,
-  zip: true,
-  jobType: true,
-  workType: true,
-  notes: true,
-  rating: true,
+export const insertCandidateSchema = createInsertSchema(candidates).omit({
+  id: true,
+  appliedDate: true,
+  lastNotifiedAt: true,
+  updatedAt: true,
 });
 
 export type InsertCandidate = z.infer<typeof insertCandidateSchema>;
 export type Candidate = typeof candidates.$inferSelect;
 
-// Candidate Documents (uploaded files like license, W-4, etc.)
 export const candidateDocuments = pgTable("candidate_documents", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   candidateId: varchar("candidate_id", { length: 36 }).references(() => candidates.id).notNull(),
   name: text("name").notNull(),
-  type: text("type").notNull(), // license, application, w4, handbook, etc.
-  url: text("url").notNull(),
+  type: text("type").notNull(),
+  url: text("url"),
+  status: text("status").notNull().default("Not Sent"),
   requiresAcknowledgment: boolean("requires_acknowledgment").default(false),
   acknowledged: boolean("acknowledged").default(false),
   acknowledgedAt: timestamp("acknowledged_at"),
+  completedAt: timestamp("completed_at"),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 
-export const insertCandidateDocumentSchema = createInsertSchema(candidateDocuments).pick({
-  candidateId: true,
-  name: true,
-  type: true,
-  url: true,
-  requiresAcknowledgment: true,
+export const insertCandidateDocumentSchema = createInsertSchema(candidateDocuments).omit({
+  id: true,
+  uploadedAt: true,
 });
 
 export type InsertCandidateDocument = z.infer<typeof insertCandidateDocumentSchema>;
 export type CandidateDocument = typeof candidateDocuments.$inferSelect;
+
+export const applicantNotes = pgTable("applicant_notes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  candidateId: varchar("candidate_id", { length: 36 }).references(() => candidates.id).notNull(),
+  content: text("content").notNull(),
+  authorId: varchar("author_id", { length: 36 }).references(() => users.id),
+  authorName: text("author_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertApplicantNoteSchema = createInsertSchema(applicantNotes).omit({ id: true, createdAt: true });
+export type InsertApplicantNote = z.infer<typeof insertApplicantNoteSchema>;
+export type ApplicantNote = typeof applicantNotes.$inferSelect;
+
+export const applicantCommunications = pgTable("applicant_communications", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  candidateId: varchar("candidate_id", { length: 36 }).references(() => candidates.id).notNull(),
+  type: text("type").notNull(),
+  subject: text("subject"),
+  content: text("content").notNull(),
+  sentBy: varchar("sent_by", { length: 36 }).references(() => users.id),
+  sentByName: text("sent_by_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertApplicantCommunicationSchema = createInsertSchema(applicantCommunications).omit({ id: true, createdAt: true });
+export type InsertApplicantCommunication = z.infer<typeof insertApplicantCommunicationSchema>;
+export type ApplicantCommunication = typeof applicantCommunications.$inferSelect;
+
+export type EmployeeStatus = "Active" | "On Leave" | "Terminated" | "Seasonal Off";
+export type EmploymentType = "Full-time" | "Part-time" | "Seasonal" | "Contractor";
+
+export const employees = pgTable("employees", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id),
+  candidateId: varchar("candidate_id", { length: 36 }).references(() => candidates.id),
+  employeeNumber: text("employee_number"),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  preferredName: text("preferred_name"),
+  pronouns: text("pronouns"),
+  dateOfBirth: text("date_of_birth"),
+  personalEmail: text("personal_email"),
+  personalPhone: text("personal_phone"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
+  emergencyContactName: text("emergency_contact_name"),
+  emergencyContactRelationship: text("emergency_contact_relationship"),
+  emergencyContactPhone: text("emergency_contact_phone"),
+  emergencyContact2Name: text("emergency_contact2_name"),
+  emergencyContact2Relationship: text("emergency_contact2_relationship"),
+  emergencyContact2Phone: text("emergency_contact2_phone"),
+  profilePhoto: text("profile_photo"),
+  jobTitle: text("job_title"),
+  department: text("department"),
+  employmentType: text("employment_type").$type<EmploymentType>().default("Full-time"),
+  startDate: text("start_date"),
+  endDate: text("end_date"),
+  supervisor: text("supervisor"),
+  workLocation: text("work_location"),
+  status: text("status").$type<EmployeeStatus>().default("Active"),
+  payRate: text("pay_rate"),
+  payType: text("pay_type"),
+  payPeriod: text("pay_period"),
+  paymentMethod: text("payment_method"),
+  bankNameLast4: text("bank_name_last4"),
+  accountLast4: text("account_last4"),
+  routingLast4: text("routing_last4"),
+  accountType: text("account_type"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
+export type Employee = typeof employees.$inferSelect;
+
+export const employeePayHistory = pgTable("employee_pay_history", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id", { length: 36 }).references(() => employees.id).notNull(),
+  oldRate: text("old_rate"),
+  newRate: text("new_rate"),
+  reason: text("reason"),
+  approvedBy: text("approved_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEmployeePayHistorySchema = createInsertSchema(employeePayHistory).omit({ id: true, createdAt: true });
+export type InsertEmployeePayHistory = z.infer<typeof insertEmployeePayHistorySchema>;
+export type EmployeePayHistory = typeof employeePayHistory.$inferSelect;
+
+export const employeeHistory = pgTable("employee_history", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id", { length: 36 }).references(() => employees.id).notNull(),
+  changeType: text("change_type").notNull(),
+  details: text("details").notNull(),
+  recordedBy: text("recorded_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEmployeeHistorySchema = createInsertSchema(employeeHistory).omit({ id: true, createdAt: true });
+export type InsertEmployeeHistory = z.infer<typeof insertEmployeeHistorySchema>;
+export type EmployeeHistory = typeof employeeHistory.$inferSelect;
+
+export const employeeNotes = pgTable("employee_notes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id", { length: 36 }).references(() => employees.id).notNull(),
+  content: text("content").notNull(),
+  authorId: varchar("author_id", { length: 36 }).references(() => users.id),
+  authorName: text("author_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEmployeeNoteSchema = createInsertSchema(employeeNotes).omit({ id: true, createdAt: true });
+export type InsertEmployeeNote = z.infer<typeof insertEmployeeNoteSchema>;
+export type EmployeeNote = typeof employeeNotes.$inferSelect;
+
+export const employeeDocuments = pgTable("employee_documents", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id", { length: 36 }).references(() => employees.id).notNull(),
+  name: text("name").notNull(),
+  type: text("type").notNull(),
+  url: text("url"),
+  status: text("status").notNull().default("Not Sent"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEmployeeDocumentSchema = createInsertSchema(employeeDocuments).omit({ id: true, createdAt: true });
+export type InsertEmployeeDocument = z.infer<typeof insertEmployeeDocumentSchema>;
+export type EmployeeDocument = typeof employeeDocuments.$inferSelect;
+
+export const onboardingItems = pgTable("onboarding_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id", { length: 36 }).references(() => employees.id).notNull(),
+  title: text("title").notNull(),
+  category: text("category").notNull(),
+  assignedTo: text("assigned_to").notNull(),
+  status: text("status").notNull().default("Pending"),
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertOnboardingItemSchema = createInsertSchema(onboardingItems).omit({ id: true, createdAt: true });
+export type InsertOnboardingItem = z.infer<typeof insertOnboardingItemSchema>;
+export type OnboardingItem = typeof onboardingItems.$inferSelect;
+
+export const hrFormSubmissions = pgTable("hr_form_submissions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id", { length: 36 }).references(() => employees.id),
+  candidateId: varchar("candidate_id", { length: 36 }).references(() => candidates.id),
+  formType: text("form_type").notNull(),
+  formData: jsonb("form_data").notNull().default({}),
+  status: text("status").notNull().default("Not Started"),
+  signedAt: timestamp("signed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertHrFormSubmissionSchema = createInsertSchema(hrFormSubmissions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertHrFormSubmission = z.infer<typeof insertHrFormSubmissionSchema>;
+export type HrFormSubmission = typeof hrFormSubmissions.$inferSelect;
+
+export const hiringEmailTemplates = pgTable("hiring_email_templates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  stage: text("stage").notNull().unique(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertHiringEmailTemplateSchema = createInsertSchema(hiringEmailTemplates).omit({ id: true, updatedAt: true });
+export type InsertHiringEmailTemplate = z.infer<typeof insertHiringEmailTemplateSchema>;
+export type HiringEmailTemplate = typeof hiringEmailTemplates.$inferSelect;
 
 export const campaigns = pgTable("campaigns", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),

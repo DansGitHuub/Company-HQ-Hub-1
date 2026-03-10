@@ -27,7 +27,7 @@ Preferred communication style: Simple, everyday language.
 - **Core Modules**:
     - **SOP Management**: Centralized management of SOPs with AI-powered quiz generation for training. Maintenance SOPs have two focus modes: "Specific Task Procedure" (generates procedure for the exact task in the SOP title) and "Full Equipment Schedule" (comprehensive OEM maintenance schedule). Equipment info includes Year, Engine/Power Type, and Fuel Type for accurate AI specs. Intervals support both preset options and custom freeform text (e.g., "Every 7,500 miles").
     - **Inventory Management**: Comprehensive materials catalog manager with AI-powered creation wizard and category-specific fields.
-    - **Hiring Pipeline**: Detailed candidate management with filtering, rating, and document uploads.
+    - **Hiring & HR Module**: Full hiring pipeline with 7-column Kanban board (New Application → Review → Phone Screen → Interview → Offer Extended → Hired → Not a Fit), drag-and-drop stage changes with automated email notifications, applicant detail panel (5 tabs: Profile, Documents, Communication, Interview, Onboarding), Employee Records section with table view and 7-tab employee profile (Personal, Employment, Pay, Documents, History, Notes, Onboarding), onboarding checklists auto-generated on hire, document upload/management, and HR email templates. Routes in `server/hiringRoutes.ts`.
     - **Marketing Campaigns**: Tools for managing marketing efforts.
     - **Job Tracking**: Tabbed interface for job types, detailed job cards with location, deadlines, and document uploads.
     - **Customer Hub / Resource Library**: Centralized educational content with categorization and user bookmarking.

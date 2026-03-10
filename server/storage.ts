@@ -73,7 +73,17 @@ import {
   pdfForms, type PdfForm, type InsertPdfForm,
   conversations, chatMessages,
   hqFiles, type HqFile, type InsertHqFile,
-  qualifiedLeads, type QualifiedLead, type InsertQualifiedLead
+  qualifiedLeads, type QualifiedLead, type InsertQualifiedLead,
+  applicantNotes, type ApplicantNote, type InsertApplicantNote,
+  applicantCommunications, type ApplicantCommunication, type InsertApplicantCommunication,
+  employees, type Employee, type InsertEmployee,
+  employeePayHistory, type EmployeePayHistory, type InsertEmployeePayHistory,
+  employeeHistory, type EmployeeHistory, type InsertEmployeeHistory,
+  employeeNotes, type EmployeeNote, type InsertEmployeeNote,
+  employeeDocuments, type EmployeeDocument, type InsertEmployeeDocument,
+  onboardingItems, type OnboardingItem, type InsertOnboardingItem,
+  hrFormSubmissions, type HrFormSubmission, type InsertHrFormSubmission,
+  hiringEmailTemplates, type HiringEmailTemplate, type InsertHiringEmailTemplate
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull, sql } from "drizzle-orm";
@@ -524,6 +534,54 @@ export interface IStorage {
   createQualifiedLead(lead: InsertQualifiedLead): Promise<QualifiedLead>;
   updateQualifiedLead(id: string, updates: Partial<QualifiedLead>): Promise<QualifiedLead | undefined>;
   deleteQualifiedLead(id: string): Promise<boolean>;
+
+  // Applicant Notes & Communications
+  getApplicantNotes(candidateId: string): Promise<ApplicantNote[]>;
+  createApplicantNote(note: InsertApplicantNote): Promise<ApplicantNote>;
+  getApplicantCommunications(candidateId: string): Promise<ApplicantCommunication[]>;
+  createApplicantCommunication(comm: InsertApplicantCommunication): Promise<ApplicantCommunication>;
+
+  // Employees
+  getEmployees(): Promise<Employee[]>;
+  getEmployee(id: string): Promise<Employee | undefined>;
+  getEmployeeByCandidateId(candidateId: string): Promise<Employee | undefined>;
+  createEmployee(emp: InsertEmployee): Promise<Employee>;
+  updateEmployee(id: string, updates: Partial<Employee>): Promise<Employee | undefined>;
+  deleteEmployee(id: string): Promise<boolean>;
+
+  // Employee Pay History
+  getEmployeePayHistory(employeeId: string): Promise<EmployeePayHistory[]>;
+  createEmployeePayHistory(entry: InsertEmployeePayHistory): Promise<EmployeePayHistory>;
+
+  // Employee History
+  getEmployeeHistory(employeeId: string): Promise<EmployeeHistory[]>;
+  createEmployeeHistory(entry: InsertEmployeeHistory): Promise<EmployeeHistory>;
+
+  // Employee Notes
+  getEmployeeNotes(employeeId: string): Promise<EmployeeNote[]>;
+  createEmployeeNote(note: InsertEmployeeNote): Promise<EmployeeNote>;
+
+  // Employee Documents
+  getEmployeeDocuments(employeeId: string): Promise<EmployeeDocument[]>;
+  createEmployeeDocument(doc: InsertEmployeeDocument): Promise<EmployeeDocument>;
+  updateEmployeeDocument(id: string, updates: Partial<EmployeeDocument>): Promise<EmployeeDocument | undefined>;
+  deleteEmployeeDocument(id: string): Promise<boolean>;
+
+  // Onboarding
+  getOnboardingItems(employeeId: string): Promise<OnboardingItem[]>;
+  createOnboardingItem(item: InsertOnboardingItem): Promise<OnboardingItem>;
+  updateOnboardingItem(id: string, updates: Partial<OnboardingItem>): Promise<OnboardingItem | undefined>;
+
+  // HR Forms
+  getHrFormSubmissions(employeeId?: string, candidateId?: string): Promise<HrFormSubmission[]>;
+  getHrFormSubmission(id: string): Promise<HrFormSubmission | undefined>;
+  createHrFormSubmission(form: InsertHrFormSubmission): Promise<HrFormSubmission>;
+  updateHrFormSubmission(id: string, updates: Partial<HrFormSubmission>): Promise<HrFormSubmission | undefined>;
+
+  // Hiring Email Templates
+  getHiringEmailTemplates(): Promise<HiringEmailTemplate[]>;
+  getHiringEmailTemplate(stage: string): Promise<HiringEmailTemplate | undefined>;
+  updateHiringEmailTemplate(id: string, updates: Partial<HiringEmailTemplate>): Promise<HiringEmailTemplate | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2503,6 +2561,152 @@ export class DatabaseStorage implements IStorage {
   async deleteQualifiedLead(id: string): Promise<boolean> {
     const result = await db.delete(qualifiedLeads).where(eq(qualifiedLeads.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  async getApplicantNotes(candidateId: string): Promise<ApplicantNote[]> {
+    return await db.select().from(applicantNotes).where(eq(applicantNotes.candidateId, candidateId)).orderBy(desc(applicantNotes.createdAt));
+  }
+
+  async createApplicantNote(note: InsertApplicantNote): Promise<ApplicantNote> {
+    const [created] = await db.insert(applicantNotes).values(note).returning();
+    return created;
+  }
+
+  async getApplicantCommunications(candidateId: string): Promise<ApplicantCommunication[]> {
+    return await db.select().from(applicantCommunications).where(eq(applicantCommunications.candidateId, candidateId)).orderBy(desc(applicantCommunications.createdAt));
+  }
+
+  async createApplicantCommunication(comm: InsertApplicantCommunication): Promise<ApplicantCommunication> {
+    const [created] = await db.insert(applicantCommunications).values(comm).returning();
+    return created;
+  }
+
+  async getEmployees(): Promise<Employee[]> {
+    return await db.select().from(employees).orderBy(desc(employees.createdAt));
+  }
+
+  async getEmployee(id: string): Promise<Employee | undefined> {
+    const [emp] = await db.select().from(employees).where(eq(employees.id, id));
+    return emp;
+  }
+
+  async getEmployeeByCandidateId(candidateId: string): Promise<Employee | undefined> {
+    const [emp] = await db.select().from(employees).where(eq(employees.candidateId, candidateId));
+    return emp;
+  }
+
+  async createEmployee(emp: InsertEmployee): Promise<Employee> {
+    const [created] = await db.insert(employees).values(emp).returning();
+    return created;
+  }
+
+  async updateEmployee(id: string, updates: Partial<Employee>): Promise<Employee | undefined> {
+    const [updated] = await db.update(employees).set({ ...updates, updatedAt: new Date() }).where(eq(employees.id, id)).returning();
+    return updated;
+  }
+
+  async deleteEmployee(id: string): Promise<boolean> {
+    const result = await db.delete(employees).where(eq(employees.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getEmployeePayHistory(employeeId: string): Promise<EmployeePayHistory[]> {
+    return await db.select().from(employeePayHistory).where(eq(employeePayHistory.employeeId, employeeId)).orderBy(desc(employeePayHistory.createdAt));
+  }
+
+  async createEmployeePayHistory(entry: InsertEmployeePayHistory): Promise<EmployeePayHistory> {
+    const [created] = await db.insert(employeePayHistory).values(entry).returning();
+    return created;
+  }
+
+  async getEmployeeHistory(employeeId: string): Promise<EmployeeHistory[]> {
+    return await db.select().from(employeeHistory).where(eq(employeeHistory.employeeId, employeeId)).orderBy(desc(employeeHistory.createdAt));
+  }
+
+  async createEmployeeHistory(entry: InsertEmployeeHistory): Promise<EmployeeHistory> {
+    const [created] = await db.insert(employeeHistory).values(entry).returning();
+    return created;
+  }
+
+  async getEmployeeNotes(employeeId: string): Promise<EmployeeNote[]> {
+    return await db.select().from(employeeNotes).where(eq(employeeNotes.employeeId, employeeId)).orderBy(desc(employeeNotes.createdAt));
+  }
+
+  async createEmployeeNote(note: InsertEmployeeNote): Promise<EmployeeNote> {
+    const [created] = await db.insert(employeeNotes).values(note).returning();
+    return created;
+  }
+
+  async getEmployeeDocuments(employeeId: string): Promise<EmployeeDocument[]> {
+    return await db.select().from(employeeDocuments).where(eq(employeeDocuments.employeeId, employeeId)).orderBy(desc(employeeDocuments.createdAt));
+  }
+
+  async createEmployeeDocument(doc: InsertEmployeeDocument): Promise<EmployeeDocument> {
+    const [created] = await db.insert(employeeDocuments).values(doc).returning();
+    return created;
+  }
+
+  async updateEmployeeDocument(id: string, updates: Partial<EmployeeDocument>): Promise<EmployeeDocument | undefined> {
+    const [updated] = await db.update(employeeDocuments).set(updates).where(eq(employeeDocuments.id, id)).returning();
+    return updated;
+  }
+
+  async deleteEmployeeDocument(id: string): Promise<boolean> {
+    const result = await db.delete(employeeDocuments).where(eq(employeeDocuments.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getOnboardingItems(employeeId: string): Promise<OnboardingItem[]> {
+    return await db.select().from(onboardingItems).where(eq(onboardingItems.employeeId, employeeId)).orderBy(onboardingItems.createdAt);
+  }
+
+  async createOnboardingItem(item: InsertOnboardingItem): Promise<OnboardingItem> {
+    const [created] = await db.insert(onboardingItems).values(item).returning();
+    return created;
+  }
+
+  async updateOnboardingItem(id: string, updates: Partial<OnboardingItem>): Promise<OnboardingItem | undefined> {
+    const [updated] = await db.update(onboardingItems).set(updates).where(eq(onboardingItems.id, id)).returning();
+    return updated;
+  }
+
+  async getHrFormSubmissions(employeeId?: string, candidateId?: string): Promise<HrFormSubmission[]> {
+    if (employeeId) {
+      return await db.select().from(hrFormSubmissions).where(eq(hrFormSubmissions.employeeId, employeeId)).orderBy(desc(hrFormSubmissions.createdAt));
+    }
+    if (candidateId) {
+      return await db.select().from(hrFormSubmissions).where(eq(hrFormSubmissions.candidateId, candidateId)).orderBy(desc(hrFormSubmissions.createdAt));
+    }
+    return await db.select().from(hrFormSubmissions).orderBy(desc(hrFormSubmissions.createdAt));
+  }
+
+  async getHrFormSubmission(id: string): Promise<HrFormSubmission | undefined> {
+    const [form] = await db.select().from(hrFormSubmissions).where(eq(hrFormSubmissions.id, id));
+    return form;
+  }
+
+  async createHrFormSubmission(form: InsertHrFormSubmission): Promise<HrFormSubmission> {
+    const [created] = await db.insert(hrFormSubmissions).values(form).returning();
+    return created;
+  }
+
+  async updateHrFormSubmission(id: string, updates: Partial<HrFormSubmission>): Promise<HrFormSubmission | undefined> {
+    const [updated] = await db.update(hrFormSubmissions).set({ ...updates, updatedAt: new Date() }).where(eq(hrFormSubmissions.id, id)).returning();
+    return updated;
+  }
+
+  async getHiringEmailTemplates(): Promise<HiringEmailTemplate[]> {
+    return await db.select().from(hiringEmailTemplates);
+  }
+
+  async getHiringEmailTemplate(stage: string): Promise<HiringEmailTemplate | undefined> {
+    const [template] = await db.select().from(hiringEmailTemplates).where(eq(hiringEmailTemplates.stage, stage));
+    return template;
+  }
+
+  async updateHiringEmailTemplate(id: string, updates: Partial<HiringEmailTemplate>): Promise<HiringEmailTemplate | undefined> {
+    const [updated] = await db.update(hiringEmailTemplates).set({ ...updates, updatedAt: new Date() }).where(eq(hiringEmailTemplates.id, id)).returning();
+    return updated;
   }
 }
 

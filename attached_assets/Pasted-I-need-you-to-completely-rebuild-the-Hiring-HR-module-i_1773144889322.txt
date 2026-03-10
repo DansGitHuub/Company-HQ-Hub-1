@@ -1,0 +1,324 @@
+I need you to completely rebuild the Hiring & HR module into a fully functional system. Here is everything it needs to do. Read all of this before writing any code.
+
+OVERVIEW
+The Hiring & HR module has two main sections:
+
+Hiring Pipeline — tracks applicants from first contact through hire
+Employee Records — stores everything about current and past employees
+
+
+SECTION 1: HIRING PIPELINE
+Kanban Board
+Build a drag-and-drop Kanban board with these exact columns in this order:
+
+New Application — just submitted
+Review — being looked at
+Phone Screen — scheduled or completed
+Interview — scheduled or completed
+Offer Extended — offer sent
+Hired — accepted and moving to onboarding
+Not a Fit — declined or rejected
+
+Each applicant is a card on the board. Cards must be draggable between columns. When a card is moved to a new column, it automatically triggers the notification for that stage (see Notifications section below).
+Applicant Card — What Shows on the Front
+
+Full name
+Position applied for
+Date applied
+Current stage label
+A colored dot: green = active, yellow = needs attention, red = overdue/no response
+Avatar/initials circle
+
+Applicant Card — Click to Open Detail Panel
+Clicking a card opens a full detail side panel (do not navigate away from the board). The panel contains:
+Tab 1: Profile
+
+Full name, email, phone, address
+Position applied for
+Source (how they heard about us — dropdown: Indeed, Referral, Walk-in, Website, Other)
+Date applied
+Notes field (freeform, timestamped entries — like a log)
+Edit button to update any field
+
+Tab 2: Documents
+
+List of all documents for this applicant
+Each document has: name, status (Not Sent / Sent / Completed / Signed), date completed
+Buttons to: Send Document, View Completed Document, Download PDF
+Required documents for applicants:
+
+Employment Application (fillable form — see Forms section below)
+Background Check Authorization
+Reference Check form
+
+
+When hired, additional documents are added automatically:
+
+W-4 (Federal Tax Withholding)
+I-9 (Employment Eligibility)
+Ohio IT-4 (State Tax)
+Direct Deposit Authorization
+Employee Handbook Acknowledgment
+Non-Disclosure Agreement (if applicable)
+Emergency Contact Form
+
+
+
+Tab 3: Communication Log
+
+Chronological list of every email, text, and note sent to this applicant
+Manual "Add Note" button
+Shows: timestamp, type (Email/SMS/Note), content summary, sent by
+
+Tab 4: Interview
+
+Schedule interview: date, time, location (in-person/phone/video), interviewer name
+Interview notes field
+Rating: 1–5 stars
+Recommendation dropdown: Strong Yes / Yes / Maybe / No
+
+Tab 5: Onboarding (only visible after card moves to Hired)
+
+Step-by-step onboarding checklist (see Onboarding section below)
+
+
+SECTION 2: AUTOMATED NOTIFICATIONS
+Every time a card moves to a new stage, the system automatically sends communications. Build this trigger system:
+New Application received:
+
+Email to applicant: "We received your application for [Position] at Chapin Landscapes. We'll be in touch within 2–3 business days."
+In-app notification to HR/Manager: "New application received — [Name] for [Position]"
+
+Moved to Review:
+
+In-app notification to HR: "[Name] moved to Review"
+
+Moved to Phone Screen:
+
+Email to applicant: "We'd like to schedule a quick phone call. Please reply with your availability or call us at [phone]."
+In-app notification to interviewer assigned
+
+Moved to Interview:
+
+Email to applicant: "You're invited to interview for [Position]. Your interview is scheduled for [date/time] at [location]."
+SMS to applicant: "Reminder: Your interview at Chapin Landscapes is [date] at [time]. Reply CONFIRM to confirm."
+
+Moved to Offer Extended:
+
+Email to applicant: "We'd like to extend an offer for the [Position] role. Please review the attached offer letter and respond within 48 hours."
+In-app notification to manager
+
+Moved to Hired:
+
+Email to applicant: "Welcome to Chapin Landscapes! We're excited to have you join the team. Please complete the onboarding documents attached."
+SMS to applicant: "Welcome to Chapin Landscapes! Check your email for next steps."
+Automatically create Employee Record (see Section 3)
+Automatically trigger onboarding checklist
+In-app notification to all managers: "New hire — [Name] starts [start date]"
+
+Moved to Not a Fit:
+
+Email to applicant: "Thank you for your interest in Chapin Landscapes. After careful consideration, we've decided to move forward with other candidates. We appreciate your time."
+
+All emails should be editable templates that admins can customize in Admin Panel settings. For now, use the above as the default text. Use the existing email/notification infrastructure in the project. If no email system exists yet, use nodemailer with environment variables for SMTP config.
+
+SECTION 3: EMPLOYEE RECORDS
+When an applicant is moved to Hired, automatically create a new Employee Record. Also allow creating Employee Records manually.
+Employee List View
+
+Table/list of all employees
+Columns: Name, Role, Department, Start Date, Status (Active/Inactive/Seasonal)
+Search bar (search by name, role, department)
+Filter by: Status, Department, Role
+"Add Employee" button
+Click any row to open the Employee Profile
+
+Employee Profile — Full Detail Page
+Tab 1: Personal Info
+
+Full name, preferred name, pronouns (optional)
+Date of birth
+Personal email, personal phone
+Home address
+Emergency contact (name, relationship, phone)
+Profile photo upload
+
+Tab 2: Employment
+
+Employee ID (auto-generated)
+Job title / role
+Department
+Employment type (Full-time / Part-time / Seasonal / Contractor)
+Start date
+End date (if applicable)
+Manager/supervisor
+Work location
+Employment status (Active / On Leave / Terminated / Seasonal Off)
+
+Tab 3: Pay & Payroll
+
+Current pay rate and type (hourly/salary)
+Pay history table: date, old rate, new rate, reason, approved by
+Pay period (weekly/bi-weekly)
+Payment method (direct deposit/check)
+Direct deposit info (stored securely, show last 4 digits only)
+This tab visible to HR and Admin roles only
+
+Tab 4: Documents
+Same document system as applicant cards. Shows all completed onboarding docs plus any additional uploaded documents. Each document has view, download, and re-send options.
+Tab 5: Employment History
+
+Timeline of all role changes, raises, status changes
+Each entry: date, change type, details, recorded by
+Add entry button (manager/HR only)
+
+Tab 6: Notes
+
+Private notes visible to HR and managers only
+Each note: timestamp, author, content
+Cannot be deleted, only added
+
+Tab 7: Onboarding
+
+Status of all onboarding checklist items
+Completion percentage
+Overdue items highlighted in red
+
+
+SECTION 4: ONBOARDING CHECKLIST
+When an employee is hired, generate this checklist automatically. Each item has: status (Pending/Complete), assigned to (employee or office), due date, and completion date.
+Employee completes:
+
+ Fill out W-4
+ Fill out I-9 (+ upload ID documents)
+ Fill out Ohio IT-4
+ Set up direct deposit
+ Sign Employee Handbook
+ Complete new hire orientation quiz (links to Quizzes module)
+ Submit emergency contact info
+ Submit photo for employee profile
+
+Office/HR completes:
+
+ Verify I-9 documents
+ Set up payroll in system
+ Create system login (CompanyHQ account)
+ Assign role and permissions
+ Assign crew/department
+ Add to group chat/communications
+ Order uniform/equipment if needed
+ Schedule first day orientation
+
+Send reminder emails/notifications for any checklist item not completed within 48 hours of hire.
+
+SECTION 5: FILLABLE FORMS / DOCUMENTS
+Build a document system that supports fillable forms. For Phase 1, create these as structured fillable forms inside the app (not external PDFs):
+Employment Application — fields:
+
+Personal info (name, address, phone, email, DOB)
+Position applying for, availability (days/hours)
+Work history (3 previous employers: company, title, dates, reason for leaving, may we contact)
+Education (highest level, school name)
+References (2 references: name, relationship, phone)
+Questions: Have you ever been convicted of a felony? Are you legally eligible to work in the US? Can you perform the physical requirements of this job?
+Signature + date
+
+W-4 (Federal) — standard fields per IRS Form W-4 2024:
+
+Name, SSN (encrypted at rest), address
+Filing status
+Multiple jobs / spouse works checkbox
+Dependents amount
+Other income, deductions
+Extra withholding
+Signature + date
+
+I-9 — standard USCIS I-9 fields:
+
+Section 1 (employee): name, address, DOB, SSN last 4, email, phone, attestation, signature
+Section 2 (employer): document type, issuing authority, document number, expiration, hire date, employer info
+Document upload for ID verification
+
+Ohio IT-4 — Ohio state tax withholding:
+
+Name, SSN, address
+Exemptions claimed
+Additional withholding
+Signature + date
+
+Emergency Contact Form:
+
+Employee name
+Contact 1: name, relationship, phone, email
+Contact 2: name, relationship, phone, email
+Medical conditions/allergies relevant to emergency response
+
+Direct Deposit Authorization:
+
+Employee name, signature
+Bank name, routing number (encrypted), account number (encrypted, show last 4 only)
+Account type (checking/savings)
+Void check upload option
+
+All forms must:
+
+Be completable on mobile
+Save progress automatically
+Show completion status (Not Started / In Progress / Completed / Signed)
+Generate a timestamped PDF upon completion that is stored in the employee's document tab
+Send a confirmation email to the employee when a form is completed
+Notify HR when a form is completed
+
+
+SECTION 6: DATABASE SCHEMA
+Add/update the following tables in the database schema (using Drizzle):
+
+applicants — all applicant data + current stage
+applicant_notes — timestamped log entries
+applicant_communications — log of all emails/SMS/notifications sent
+employees — all employee data
+employee_documents — document records linked to employee or applicant
+employee_pay_history — pay change log
+employee_history — employment history timeline
+onboarding_checklists — one per employee, linked checklist items
+onboarding_items — individual checklist line items
+form_submissions — completed form data, linked to employee or applicant
+hiring_email_templates — customizable email templates per stage
+
+
+SECTION 7: PERMISSIONS
+Apply role-based access:
+
+Admin, HR: Full access to everything in this module
+Manager: Can view all applicants and employees, move pipeline cards, add notes, view documents. Cannot view Pay tab.
+Crew Lead: Can view their own team members' basic profiles only
+Crew Member, New Hire: Can view and complete their own onboarding documents only. Cannot see other employees.
+Sales: No access to this module
+
+
+SECTION 8: UI REQUIREMENTS
+
+The Kanban board should feel smooth — use @hello-pangea/dnd or the existing drag library in the project for drag and drop
+Cards should animate when dragged
+The detail panel slides in from the right without leaving the board
+Mobile: stack columns vertically, swipeable
+Use the existing design system, colors, and component library already in the project
+All forms must work on iOS Safari and Android Chrome
+Loading states on all async operations
+Error handling with user-friendly messages (not raw errors)
+Success toasts when actions complete
+
+
+WHAT TO DO FIRST
+
+Update the database schema and run migrations
+Build the backend API routes for all CRUD operations
+Build the Kanban board with drag and drop
+Build the applicant detail panel with all tabs
+Build the employee records list and profile pages
+Build the fillable forms
+Wire up the notification/email triggers
+Apply role-based permissions
+Test that data persists correctly across page refreshes
+
+Do not use placeholder data or mock functions — everything must connect to the real database and persist. Do not skip the notifications — they are a core feature, not optional.

@@ -261,3 +261,40 @@ export async function sendMessageNotificationEmail(
 
   return data;
 }
+
+export async function sendHiringStageEmail(
+  toEmail: string,
+  recipientName: string,
+  subject: string,
+  body: string
+) {
+  const { client } = await getResendClient();
+  const senderEmail = 'Company HQ <noreply@chapinlandscapes.com>';
+
+  const { data, error } = await client.emails.send({
+    from: senderEmail,
+    to: toEmail,
+    subject,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #166534; padding: 20px; text-align: center;">
+          <h1 style="color: white; margin: 0;">Chapin Landscapes</h1>
+        </div>
+        <div style="padding: 30px; background-color: #f9fafb;">
+          <p style="color: #4b5563;">Hi ${escapeHtml(recipientName || 'there')},</p>
+          <p style="color: #374151; line-height: 1.6;">${escapeHtml(body)}</p>
+        </div>
+        <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+          <p>Chapin Landscapes — Hiring Team</p>
+        </div>
+      </div>
+    `
+  });
+
+  if (error) {
+    console.error('Error sending hiring stage email:', error);
+    throw new Error('Failed to send hiring stage email');
+  }
+
+  return data;
+}
