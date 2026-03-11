@@ -466,8 +466,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                           "bg-gradient-to-b from-white/[0.08] to-transparent",
                           "h-9 px-4 text-[13px] leading-[16px]",
                           isActive
-                            ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_2px_4px_rgba(0,0,0,0.3)] border-sidebar-primary/50"
-                            : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_2px_4px_rgba(0,0,0,0.2)] hover:border-white/10"
+                            ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] border-sidebar-primary/50"
+                            : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] hover:border-white/10"
                         )}
                         onClick={() => {
                           if (location === item.href) {
