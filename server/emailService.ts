@@ -28,6 +28,11 @@ export async function sendEmail(
   body: string
 ): Promise<boolean> {
   try {
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[emailService] DEV MODE — email suppressed. To: ${to}, Subject: "${subject}"`);
+      return true;
+    }
+
     ensureInitialized();
     if (!initialized) {
       console.error("[emailService] SendGrid not initialized — skipping email to:", to);

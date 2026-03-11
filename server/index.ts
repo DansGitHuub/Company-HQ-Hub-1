@@ -9,7 +9,6 @@ import { runTaskMigration } from "./taskMigration";
 import { runAssistantMigration } from "./assistantMigration";
 import { runQuizAdaptiveMigration } from "./quizMigration";
 import { runNotificationMigration } from "./notificationMigration";
-import { sendTestEmail } from "./emailService";
 import { startTaskScheduler } from "./taskScheduler";
 import { seedOemTemplates } from "./equipmentSeed";
 
@@ -120,11 +119,6 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
       startMaintenanceScheduler();
       startTaskScheduler();
-      sendTestEmail().then((ok) => {
-        console.log(`[emailService] Test email ${ok ? "sent successfully" : "failed or not configured"}`);
-      }).catch((err) => {
-        console.error("[emailService] Test email error:", err.message);
-      });
     },
   );
 })();

@@ -158,14 +158,6 @@ export function startMaintenanceScheduler() {
     } catch (err: any) {
       log(`Priority recalculation error: ${err.message}`, "scheduler");
     }
-    checkAndSendReminders().then((results) => {
-      if (results.length > 0) {
-        log(
-          `Initial check: sent ${results.filter((r) => r.success).length} reminders, ${results.filter((r) => !r.success).length} failures`,
-          "scheduler"
-        );
-      }
-    });
   }, 10000);
 
   schedulerInterval = setInterval(async () => {
