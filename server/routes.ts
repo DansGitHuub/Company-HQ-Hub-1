@@ -7660,6 +7660,246 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  app.post("/api/documents", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const role = user.role;
+      if (role !== "Admin" && role !== "Manager") {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+      const doc = await storage.createDocument({
+        ...req.body,
+        uploadedByUserId: user.id,
+      });
+      res.json(doc);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/documents", requireAuth, async (req, res) => {
+    try {
+      const { entityType, entityId, search, category } = req.query;
+      if (entityType && entityId) {
+        const docs = await storage.getDocumentsByEntityWithLinks(entityType as string, entityId as string);
+        return res.json(docs);
+      }
+      if (search || category || entityType) {
+        const docs = await storage.searchDocuments({
+          fileName: search as string,
+          category: category as string,
+          entityType: entityType as string,
+        });
+        return res.json(docs);
+      }
+      const docs = await storage.searchDocuments({});
+      res.json(docs);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/documents/:id", requireAuth, async (req, res) => {
+    try {
+      const doc = await storage.getDocument(req.params.id);
+      if (!doc) return res.status(404).json({ message: "Document not found" });
+      res.json(doc);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/documents/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "Admin" && user.role !== "Manager") {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+      const doc = await storage.updateDocument(req.params.id, req.body);
+      if (!doc) return res.status(404).json({ message: "Document not found" });
+      res.json(doc);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/documents/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "Admin" && user.role !== "Manager") {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+      await storage.deleteDocument(req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/documents/:id/link", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "Admin" && user.role !== "Manager") {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+      const link = await storage.createDocumentLink({
+        documentId: req.params.id,
+        linkedEntityType: req.body.linkedEntityType,
+        linkedEntityId: req.body.linkedEntityId,
+        linkedByUserId: user.id,
+      });
+      res.json(link);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/documents/:id/links", requireAuth, async (req, res) => {
+    try {
+      const links = await storage.getDocumentLinks(req.params.id);
+      res.json(links);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/document-links/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "Admin" && user.role !== "Manager") {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+      await storage.deleteDocumentLink(req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  async function generateAndStorePdf(sub: any, user: any, storage: any) {
+    try {
+      const { generateFormPdf, uploadPdfToStorage } = await import("./pdfGenerator");
+      const employeeName = user.name || "Employee";
+      const pdfBuffer = await generateFormPdf(sub.formType, sub.submissionData as Record<string, any>, employeeName);
+
+      const pdfPath = `forms/${sub.id}.pdf`;
+      await uploadPdfToStorage(pdfBuffer, pdfPath);
+
+      const doc = await storage.createDocument({
+        fileName: `${sub.formType}_${employeeName.replace(/\s/g, "_")}.pdf`,
+        fileUrl: `/objects/${pdfPath}`,
+        fileType: "application/pdf",
+        fileSizeKb: Math.round(pdfBuffer.length / 1024),
+        category: "form",
+        uploadedByUserId: user.id,
+        homeEntityType: "employee",
+        homeEntityId: sub.employeeId,
+      });
+
+      await storage.updateOnboardingFormSubmission(sub.id, { pdfDocumentId: doc.id });
+
+      const { pool: dbPool } = await import("./db");
+      await dbPool.query(
+        `UPDATE onboarding_items SET status = 'Complete' WHERE employee_id = $1 AND LOWER(title) LIKE $2 AND status = 'Pending'`,
+        [sub.employeeId, `%${sub.formType.replace(/_/g, "%")}%`]
+      );
+    } catch (pdfErr) {
+      console.error("[PDF] Generation error:", pdfErr);
+    }
+  }
+
+  app.post("/api/onboarding-forms", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const sub = await storage.createOnboardingFormSubmission({
+        ...req.body,
+        submittedByUserId: user.id,
+      });
+
+      if (sub.status === "submitted" && sub.submissionData && sub.employeeId) {
+        await generateAndStorePdf(sub, user, storage);
+      }
+
+      res.json(sub);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/onboarding-forms/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const sub = await storage.getOnboardingFormSubmission(req.params.id);
+      if (!sub) return res.status(404).json({ message: "Submission not found" });
+      if (user.role !== "Admin" && user.role !== "Manager" && sub.employeeId !== user.employeeId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      res.json(sub);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/onboarding-forms", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { employeeId } = req.query;
+      if (!employeeId) return res.status(400).json({ message: "employeeId required" });
+      if (user.role !== "Admin" && user.role !== "Manager" && employeeId !== user.employeeId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const subs = await storage.getOnboardingFormSubmissionsByEmployee(employeeId as string);
+      res.json(subs);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/onboarding-forms/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const existing = await storage.getOnboardingFormSubmission(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Submission not found" });
+
+      if (user.role !== "Admin" && user.role !== "Manager" && existing.employeeId !== user.employeeId) {
+        return res.status(403).json({ message: "Not authorized to update this submission" });
+      }
+
+      const sub = await storage.updateOnboardingFormSubmission(req.params.id, req.body);
+      if (!sub) return res.status(404).json({ message: "Update failed" });
+
+      if (sub.status === "submitted" && sub.submissionData && sub.employeeId && !sub.pdfDocumentId) {
+        await generateAndStorePdf(sub, user, storage);
+        const updated = await storage.getOnboardingFormSubmission(sub.id);
+        return res.json(updated || sub);
+      }
+
+      res.json(sub);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/onboarding-forms/:id/assign", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "Admin" && user.role !== "Manager") {
+        return res.status(403).json({ message: "Only Admin/Manager can assign forms" });
+      }
+      const { formType, employeeId } = req.body;
+      const sub = await storage.createOnboardingFormSubmission({
+        formType,
+        employeeId,
+        assignedByUserId: user.id,
+        assignedAt: new Date(),
+        status: "draft",
+      });
+      res.json(sub);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post("/api/shared-links", requireAuth, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;

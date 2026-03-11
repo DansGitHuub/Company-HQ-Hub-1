@@ -98,7 +98,10 @@ import {
   taskDelegationChain, type TaskDelegation,
   staffNotifications, type StaffNotification, type InsertStaffNotification,
   sharedLinks, type SharedLink, type InsertSharedLink,
-  sharedLinkAccessLogs, type SharedLinkAccessLog
+  sharedLinkAccessLogs, type SharedLinkAccessLog,
+  documents, type Document, type InsertDocument,
+  documentLinks, type DocumentLink, type InsertDocumentLink,
+  onboardingFormSubmissions, type OnboardingFormSubmission, type InsertOnboardingFormSubmission
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull, sql } from "drizzle-orm";
@@ -672,6 +675,21 @@ export interface IStorage {
   deleteTaskAttachment(id: string): Promise<boolean>;
   createTaskDelegation(data: any): Promise<TaskDelegation>;
   getTaskDelegationChain(taskId: string): Promise<TaskDelegation[]>;
+
+  createDocument(data: InsertDocument): Promise<Document>;
+  getDocument(id: string): Promise<Document | undefined>;
+  getDocumentsByEntity(entityType: string, entityId: string): Promise<Document[]>;
+  getDocumentsByEntityWithLinks(entityType: string, entityId: string): Promise<Document[]>;
+  updateDocument(id: string, data: Partial<InsertDocument>): Promise<Document | undefined>;
+  deleteDocument(id: string): Promise<void>;
+  searchDocuments(query: { fileName?: string; category?: string; entityType?: string; uploadedByUserId?: string }): Promise<Document[]>;
+  createDocumentLink(data: InsertDocumentLink): Promise<DocumentLink>;
+  getDocumentLinks(documentId: string): Promise<DocumentLink[]>;
+  deleteDocumentLink(id: string): Promise<void>;
+  createOnboardingFormSubmission(data: InsertOnboardingFormSubmission): Promise<OnboardingFormSubmission>;
+  getOnboardingFormSubmission(id: string): Promise<OnboardingFormSubmission | undefined>;
+  getOnboardingFormSubmissionsByEmployee(employeeId: string): Promise<OnboardingFormSubmission[]>;
+  updateOnboardingFormSubmission(id: string, data: Partial<InsertOnboardingFormSubmission>): Promise<OnboardingFormSubmission | undefined>;
 
   createSharedLink(data: InsertSharedLink): Promise<SharedLink>;
   getSharedLinks(): Promise<SharedLink[]>;
@@ -3158,6 +3176,100 @@ export class DatabaseStorage implements IStorage {
 
   async getSharedLinkAccessLogs(sharedLinkId: string): Promise<SharedLinkAccessLog[]> {
     return await db.select().from(sharedLinkAccessLogs).where(eq(sharedLinkAccessLogs.sharedLinkId, sharedLinkId)).orderBy(desc(sharedLinkAccessLogs.accessedAt));
+  }
+
+  async createDocument(data: InsertDocument): Promise<Document> {
+    const [doc] = await db.insert(documents).values(data).returning();
+    return doc;
+  }
+
+  async getDocument(id: string): Promise<Document | undefined> {
+    const [doc] = await db.select().from(documents).where(eq(documents.id, id));
+    return doc;
+  }
+
+  async getDocumentsByEntity(entityType: string, entityId: string): Promise<Document[]> {
+    return await db.select().from(documents)
+      .where(and(eq(documents.homeEntityType, entityType), eq(documents.homeEntityId, entityId)))
+      .orderBy(desc(documents.createdAt));
+  }
+
+  async getDocumentsByEntityWithLinks(entityType: string, entityId: string): Promise<Document[]> {
+    const homeDocs = await db.select().from(documents)
+      .where(and(eq(documents.homeEntityType, entityType), eq(documents.homeEntityId, entityId)))
+      .orderBy(desc(documents.createdAt));
+
+    const linkedRows = await db.select({ documentId: documentLinks.documentId })
+      .from(documentLinks)
+      .where(and(eq(documentLinks.linkedEntityType, entityType), eq(documentLinks.linkedEntityId, entityId)));
+
+    if (linkedRows.length > 0) {
+      const linkedDocIds = linkedRows.map(r => r.documentId);
+      const linkedDocs = await db.select().from(documents)
+        .where(or(...linkedDocIds.map(id => eq(documents.id, id))));
+      const homeIds = new Set(homeDocs.map(d => d.id));
+      const uniqueLinked = linkedDocs.filter(d => !homeIds.has(d.id));
+      return [...homeDocs, ...uniqueLinked];
+    }
+
+    return homeDocs;
+  }
+
+  async updateDocument(id: string, data: Partial<InsertDocument>): Promise<Document | undefined> {
+    const [doc] = await db.update(documents).set({ ...data, updatedAt: new Date() }).where(eq(documents.id, id)).returning();
+    return doc;
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    await db.delete(documentLinks).where(eq(documentLinks.documentId, id));
+    await db.delete(documents).where(eq(documents.id, id));
+  }
+
+  async searchDocuments(query: { fileName?: string; category?: string; entityType?: string; uploadedByUserId?: string }): Promise<Document[]> {
+    const conditions = [];
+    if (query.fileName) conditions.push(ilike(documents.fileName, `%${query.fileName}%`));
+    if (query.category) conditions.push(eq(documents.category, query.category));
+    if (query.entityType) conditions.push(eq(documents.homeEntityType, query.entityType));
+    if (query.uploadedByUserId) conditions.push(eq(documents.uploadedByUserId, query.uploadedByUserId));
+    
+    return await db.select().from(documents)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(documents.createdAt))
+      .limit(200);
+  }
+
+  async createDocumentLink(data: InsertDocumentLink): Promise<DocumentLink> {
+    const [link] = await db.insert(documentLinks).values(data).returning();
+    return link;
+  }
+
+  async getDocumentLinks(documentId: string): Promise<DocumentLink[]> {
+    return await db.select().from(documentLinks).where(eq(documentLinks.documentId, documentId));
+  }
+
+  async deleteDocumentLink(id: string): Promise<void> {
+    await db.delete(documentLinks).where(eq(documentLinks.id, id));
+  }
+
+  async createOnboardingFormSubmission(data: InsertOnboardingFormSubmission): Promise<OnboardingFormSubmission> {
+    const [sub] = await db.insert(onboardingFormSubmissions).values(data).returning();
+    return sub;
+  }
+
+  async getOnboardingFormSubmission(id: string): Promise<OnboardingFormSubmission | undefined> {
+    const [sub] = await db.select().from(onboardingFormSubmissions).where(eq(onboardingFormSubmissions.id, id));
+    return sub;
+  }
+
+  async getOnboardingFormSubmissionsByEmployee(employeeId: string): Promise<OnboardingFormSubmission[]> {
+    return await db.select().from(onboardingFormSubmissions)
+      .where(eq(onboardingFormSubmissions.employeeId, employeeId))
+      .orderBy(desc(onboardingFormSubmissions.createdAt));
+  }
+
+  async updateOnboardingFormSubmission(id: string, data: Partial<InsertOnboardingFormSubmission>): Promise<OnboardingFormSubmission | undefined> {
+    const [sub] = await db.update(onboardingFormSubmissions).set(data).where(eq(onboardingFormSubmissions.id, id)).returning();
+    return sub;
   }
 }
 

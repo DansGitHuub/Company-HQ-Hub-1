@@ -12,6 +12,7 @@ import { runNotificationMigration } from "./notificationMigration";
 import { startTaskScheduler } from "./taskScheduler";
 import { seedOemTemplates } from "./equipmentSeed";
 import { runSharedLinksMigration } from "./sharedLinksMigration";
+import { runDocumentMigration } from "./documentMigration";
 
 const app = express();
 const httpServer = createServer(app);
@@ -77,6 +78,7 @@ app.use((req, res, next) => {
   await runQuizAdaptiveMigration();
   await runNotificationMigration();
   await runSharedLinksMigration();
+  await runDocumentMigration();
   await registerRoutes(httpServer, app);
   
   await seedUsers();

@@ -18,6 +18,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { showErrorToast } from "@/lib/errorToast";
+import DocumentsPanel from "@/components/DocumentsPanel";
 import { useUpload } from "@/hooks/use-upload";
 import type { Job, JobDocument, JobPipelineTab, JobCategory } from "@shared/schema";
 
@@ -730,6 +731,20 @@ export default function JobPipeline() {
                     ))
                   )}
                 </div>
+                {selectedJob && !isNewJob && (
+                  <div className="mt-4">
+                    <DocumentsPanel
+                      entityType="job"
+                      entityId={selectedJob.id}
+                      canUpload
+                      canShare
+                      canLink
+                      canDelete
+                      title="Linked Documents"
+                      compact
+                    />
+                  </div>
+                )}
               </div>
             </TabsContent>
           </Tabs>

@@ -11,13 +11,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus, Phone, Mail, MapPin, FileText, User, Clock,
-  ChevronLeft, Upload, CheckCircle2, Circle, AlertCircle, Users, ExternalLink
+  ChevronLeft, Upload, CheckCircle2, Circle, AlertCircle, Users, ExternalLink, ClipboardList
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useUpload } from "@/hooks/use-upload";
 import ShareExternallyDialog from "@/components/ShareExternallyDialog";
+import DocumentsPanel from "@/components/DocumentsPanel";
 
 function getInitials(name: string) {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
@@ -287,6 +288,17 @@ function EmployeeProfile({ employee, onBack }: { employee: any; onBack: () => vo
         </TabsContent>
         <TabsContent value="documents">
           <DocumentsTab employeeId={employee.id} />
+          <div className="mt-4">
+            <DocumentsPanel
+              entityType="employee"
+              entityId={employee.id}
+              canUpload
+              canShare
+              canLink
+              canDelete
+              title="Additional Documents"
+            />
+          </div>
         </TabsContent>
         <TabsContent value="onboarding">
           <OnboardingTab employeeId={employee.id} />
@@ -456,6 +468,7 @@ function DocumentsTab({ employeeId }: { employeeId: string }) {
   const { user } = useAuth();
   const isAdmin = user?.role === "Admin" || user?.isMasterAdmin;
   const [shareDoc, setShareDoc] = useState<any>(null);
+  const [assignFormOpen, setAssignFormOpen] = useState(false);
 
   const { data: docs = [] } = useQuery({
     queryKey: [`/api/employees/${employeeId}/documents`],
@@ -466,6 +479,12 @@ function DocumentsTab({ employeeId }: { employeeId: string }) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Documents</CardTitle>
+        <div className="flex gap-2">
+        {isAdmin && (
+          <Button size="sm" variant="outline" onClick={() => setAssignFormOpen(true)} data-testid="button-assign-form">
+            <ClipboardList className="h-4 w-4 mr-1" /> Assign Form
+          </Button>
+        )}
         <Button size="sm" variant="outline" onClick={() => {
           const input = document.createElement("input");
           input.type = "file";
@@ -488,6 +507,7 @@ function DocumentsTab({ employeeId }: { employeeId: string }) {
         }} data-testid="button-upload-doc">
           <Upload className="h-4 w-4 mr-1" /> Upload
         </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {docs.length === 0 ? (
@@ -533,7 +553,87 @@ function DocumentsTab({ employeeId }: { employeeId: string }) {
           documentUrl={shareDoc.url}
         />
       )}
+
+      {assignFormOpen && (
+        <AssignFormDialog
+          open={assignFormOpen}
+          onOpenChange={setAssignFormOpen}
+          employeeId={employeeId}
+        />
+      )}
     </Card>
+  );
+}
+
+function AssignFormDialog({ open, onOpenChange, employeeId }: { open: boolean; onOpenChange: (v: boolean) => void; employeeId: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selectedForm, setSelectedForm] = useState("");
+
+  const FORM_TYPES: Record<string, string> = {
+    w4: "W-4 Tax Withholding",
+    i9: "I-9 Employment Eligibility",
+    ohio_it4: "Ohio IT-4 Withholding",
+    direct_deposit: "Direct Deposit Authorization",
+    handbook_acknowledgment: "Employee Handbook Acknowledgment",
+    emergency_contact: "Emergency Contact Info",
+    background_check_auth: "Background Check Authorization",
+    nda: "Non-Disclosure Agreement",
+    employment_application: "Employment Application",
+    workers_comp_first_report: "Workers' Comp First Report",
+    osha_incident: "OSHA 301 Incident Report",
+  };
+
+  const assignMutation = useMutation({
+    mutationFn: async (formType: string) => {
+      const res = await apiRequest("POST", "/api/onboarding-forms", {
+        formType,
+        employeeId,
+        status: "draft",
+        submissionData: {},
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Form assigned successfully" });
+      queryClient.invalidateQueries({ queryKey: [`/api/employees/${employeeId}/documents`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/employees/${employeeId}/onboarding`] });
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to assign form", variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Assign Form to Employee</DialogTitle>
+          <DialogDescription>Select a form to assign. The employee will be able to fill it out from their dashboard.</DialogDescription>
+        </DialogHeader>
+        <Select value={selectedForm} onValueChange={setSelectedForm}>
+          <SelectTrigger data-testid="select-form-type">
+            <SelectValue placeholder="Select a form..." />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(FORM_TYPES).map(([key, label]) => (
+              <SelectItem key={key} value={key} data-testid={`form-option-${key}`}>{label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            disabled={!selectedForm || assignMutation.isPending}
+            onClick={() => assignMutation.mutate(selectedForm)}
+            data-testid="button-confirm-assign"
+          >
+            {assignMutation.isPending ? "Assigning..." : "Assign Form"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

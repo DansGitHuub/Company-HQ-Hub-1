@@ -20,6 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Equipment, MaintenanceSchedule, MaintenanceLog, EquipmentUpload, RepairRequest } from "@shared/schema";
+import DocumentsPanel from "@/components/DocumentsPanel";
 
 const CATEGORIES = ["Mower", "Tractor", "Truck", "Trailer", "Handheld", "Attachment", "Other"];
 const STATUSES = ["Active", "In Service", "Stored", "Retired", "Sold"];
@@ -350,7 +351,20 @@ function AssetProfile({ assetId, onBack }: { assetId: string; onBack: () => void
         <TabsContent value="maintenance"><MaintenanceTab assetId={assetId} asset={asset} /></TabsContent>
         <TabsContent value="history"><ServiceHistoryTab assetId={assetId} /></TabsContent>
         <TabsContent value="repairs"><RepairsTab assetId={assetId} /></TabsContent>
-        <TabsContent value="documents"><DocumentsTab assetId={assetId} /></TabsContent>
+        <TabsContent value="documents">
+          <DocumentsTab assetId={assetId} />
+          <div className="mt-4">
+            <DocumentsPanel
+              entityType="equipment"
+              entityId={assetId}
+              canUpload
+              canShare
+              canLink
+              canDelete
+              title="Linked Documents"
+            />
+          </div>
+        </TabsContent>
       </Tabs>
     </div>
   );

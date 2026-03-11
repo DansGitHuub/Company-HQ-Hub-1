@@ -2307,6 +2307,73 @@ export const insertStaffNotificationSchema = createInsertSchema(staffNotificatio
 export type InsertStaffNotification = z.infer<typeof insertStaffNotificationSchema>;
 export type StaffNotification = typeof staffNotifications.$inferSelect;
 
+export const documentCategoryEnum = ["form", "policy", "manual", "registration", "insurance", "certification", "photo", "contract", "proposal", "invoice", "warranty", "report", "other"] as const;
+export type DocumentCategory = typeof documentCategoryEnum[number];
+
+export const documentEntityTypeEnum = ["employee", "equipment", "job", "customer", "company"] as const;
+export type DocumentEntityType = typeof documentEntityTypeEnum[number];
+
+export const documents = pgTable("documents", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: text("file_type"),
+  fileSizeKb: integer("file_size_kb"),
+  category: text("category").notNull().default("other"),
+  uploadedByUserId: varchar("uploaded_by_user_id", { length: 36 }).references(() => users.id),
+  homeEntityType: text("home_entity_type").notNull(),
+  homeEntityId: text("home_entity_id").notNull(),
+  description: text("description"),
+  isTemplate: boolean("is_template").notNull().default(false),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type Document = typeof documents.$inferSelect;
+
+export const documentLinks = pgTable("document_links", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id", { length: 36 }).references(() => documents.id).notNull(),
+  linkedEntityType: text("linked_entity_type").notNull(),
+  linkedEntityId: text("linked_entity_id").notNull(),
+  linkedByUserId: varchar("linked_by_user_id", { length: 36 }).references(() => users.id),
+  linkedAt: timestamp("linked_at").defaultNow(),
+});
+
+export const insertDocumentLinkSchema = createInsertSchema(documentLinks).omit({ id: true, linkedAt: true });
+export type InsertDocumentLink = z.infer<typeof insertDocumentLinkSchema>;
+export type DocumentLink = typeof documentLinks.$inferSelect;
+
+export const formTypeEnum = ["w4", "i9", "ohio_it4", "direct_deposit", "handbook_acknowledgment", "emergency_contact", "background_check_auth", "workers_comp_first_report", "osha_incident", "nda", "employment_application"] as const;
+export type FormType = typeof formTypeEnum[number];
+
+export const formStatusEnum = ["draft", "submitted", "pending_review", "approved", "rejected"] as const;
+export type FormStatus = typeof formStatusEnum[number];
+
+export const onboardingFormSubmissions = pgTable("onboarding_form_submissions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  formType: text("form_type").notNull(),
+  employeeId: varchar("employee_id", { length: 36 }).references(() => employees.id),
+  submittedByUserId: varchar("submitted_by_user_id", { length: 36 }).references(() => users.id),
+  submissionData: jsonb("submission_data").default({}),
+  status: text("status").notNull().default("draft"),
+  pdfDocumentId: varchar("pdf_document_id", { length: 36 }),
+  submittedAt: timestamp("submitted_at"),
+  reviewedByUserId: varchar("reviewed_by_user_id", { length: 36 }).references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  assignedByUserId: varchar("assigned_by_user_id", { length: 36 }).references(() => users.id),
+  assignedAt: timestamp("assigned_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertOnboardingFormSubmissionSchema = createInsertSchema(onboardingFormSubmissions).omit({ id: true, createdAt: true });
+export type InsertOnboardingFormSubmission = z.infer<typeof insertOnboardingFormSubmissionSchema>;
+export type OnboardingFormSubmission = typeof onboardingFormSubmissions.$inferSelect;
+
 export const sharedLinks = pgTable("shared_links", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   token: varchar("token", { length: 64 }).notNull().unique(),

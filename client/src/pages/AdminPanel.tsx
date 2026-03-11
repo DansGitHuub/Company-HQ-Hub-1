@@ -81,6 +81,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import ArticleReportsCenter from "@/components/ArticleReportsCenter";
 import DiagnosticReport from "@/components/DiagnosticReport";
+import AdminDocumentLibrary from "@/components/AdminDocumentLibrary";
 
 type SafeUser = Omit<User, "password">;
 type TodoActiveUser = { id: string; userId: string; activatedBy: string | null; activatedAt: Date | null };
@@ -512,6 +513,9 @@ export default function AdminPanel() {
           </TabsTrigger>
           <TabsTrigger value="ai-logs" className="gap-2" data-testid="tab-ai-logs">
             <Bot className="h-4 w-4" /> AI Logs
+          </TabsTrigger>
+          <TabsTrigger value="documents" className="gap-2" data-testid="tab-documents">
+            <FileText className="h-4 w-4" /> Documents
           </TabsTrigger>
           <TabsTrigger value="shared-links" className="gap-2" data-testid="tab-shared-links">
             <ExternalLink className="h-4 w-4" /> Shared Links
@@ -1058,6 +1062,10 @@ export default function AdminPanel() {
 
         <TabsContent value="ai-logs" className="mt-6">
           <ConversationLogViewer />
+        </TabsContent>
+
+        <TabsContent value="documents" className="mt-6">
+          <AdminDocumentLibrary />
         </TabsContent>
 
         <TabsContent value="shared-links" className="mt-6">
