@@ -10,6 +10,7 @@ import {
   Upload, Download, Trash2, File, Image, FileText, FileSpreadsheet,
   Loader2, Search, Link2, ExternalLink, MoreHorizontal, Eye
 } from "lucide-react";
+import DocumentDropZone from "@/components/DocumentDropZone";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
@@ -76,14 +77,12 @@ export default function DocumentsPanel({
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { uploadFile, isUploading } = useUpload();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [shareDoc, setShareDoc] = useState<DocType | null>(null);
   const [linkDialogDoc, setLinkDialogDoc] = useState<DocType | null>(null);
   const [uploadCategory, setUploadCategory] = useState("other");
-  const [dragOver, setDragOver] = useState(false);
 
   const { data: docs = [], isLoading } = useQuery<DocType[]>({
     queryKey: ["/api/documents", entityType, entityId],
@@ -127,18 +126,11 @@ export default function DocumentsPanel({
     },
   });
 
-  const handleFileSelect = useCallback(async (files: FileList | null) => {
-    if (!files) return;
-    for (const file of Array.from(files)) {
+  const handleDropZoneUpload = useCallback(async (files: File[]) => {
+    for (const file of files) {
       await uploadMutation.mutateAsync(file);
     }
   }, [uploadMutation]);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    handleFileSelect(e.dataTransfer.files);
-  }, [handleFileSelect]);
 
   const filteredDocs = docs.filter(doc => {
     if (searchQuery && !doc.fileName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -153,38 +145,18 @@ export default function DocumentsPanel({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">{title}</CardTitle>
-          <div className="flex items-center gap-2">
-            {canUpload && isAdmin && (
-              <>
-                <Select value={uploadCategory} onValueChange={setUploadCategory}>
-                  <SelectTrigger className="w-[120px] h-8 text-xs" data-testid="select-upload-category">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  data-testid="button-upload-document"
-                >
-                  {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
-                  Upload
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => handleFileSelect(e.target.files)}
-                />
-              </>
-            )}
-          </div>
+          {canUpload && isAdmin && (
+            <Select value={uploadCategory} onValueChange={setUploadCategory}>
+              <SelectTrigger className="w-[120px] h-8 text-xs" data-testid="select-upload-category">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
         {!compact && docs.length > 0 && (
           <div className="flex gap-2 mt-2">
@@ -213,12 +185,15 @@ export default function DocumentsPanel({
         )}
       </CardHeader>
       <CardContent>
-        <div
-          className={`min-h-[100px] ${dragOver ? "border-2 border-dashed border-primary bg-primary/5 rounded-lg" : ""}`}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-        >
+        {canUpload && isAdmin && (
+          <DocumentDropZone
+            onFilesSelected={handleDropZoneUpload}
+            disabled={isUploading}
+            compact={compact}
+            className="mb-3"
+          />
+        )}
+        <div>
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -227,11 +202,6 @@ export default function DocumentsPanel({
             <div className="flex flex-col items-center justify-center py-8 text-center" data-testid="documents-empty-state">
               <File className="h-10 w-10 text-muted-foreground/40 mb-2" />
               <p className="text-sm text-muted-foreground">No documents yet</p>
-              {canUpload && isAdmin && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Upload files or drag and drop here
-                </p>
-              )}
             </div>
           ) : (
             <div className="space-y-1">

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import {
   Upload, Download, Trash2, File, Image, FileText, FileSpreadsheet,
   Loader2, Search, FolderOpen, Eye, ExternalLink, Link2
 } from "lucide-react";
+import DocumentDropZone from "@/components/DocumentDropZone";
 import { useAuth } from "@/hooks/use-auth";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
@@ -82,7 +83,6 @@ export default function AdminDocumentLibrary() {
 function CompanyLibrary() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { uploadFile, isUploading } = useUpload();
   const [uploadCategory, setUploadCategory] = useState("policy");
   const [isTemplate, setIsTemplate] = useState(false);
@@ -122,6 +122,12 @@ function CompanyLibrary() {
     },
   });
 
+  const handleDropZoneUpload = useCallback(async (files: File[]) => {
+    for (const file of files) {
+      await uploadMutation.mutateAsync(file);
+    }
+  }, [uploadMutation]);
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/documents/${id}`);
@@ -138,6 +144,11 @@ function CompanyLibrary() {
 
   return (
     <div className="space-y-4">
+      <DocumentDropZone
+        onFilesSelected={handleDropZoneUpload}
+        disabled={isUploading}
+      />
+
       <div className="flex flex-wrap items-center gap-2">
         <Select value={uploadCategory} onValueChange={setUploadCategory}>
           <SelectTrigger className="w-[140px] h-9" data-testid="select-company-upload-category">
@@ -158,26 +169,6 @@ function CompanyLibrary() {
           />
           Template
         </label>
-        <Button
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          data-testid="button-upload-company-doc"
-        >
-          {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
-          Upload to Library
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            if (e.target.files) {
-              Array.from(e.target.files).forEach(f => uploadMutation.mutate(f));
-            }
-          }}
-        />
         <div className="ml-auto">
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
             <SelectTrigger className="w-[140px] h-9" data-testid="select-company-filter">
@@ -198,10 +189,9 @@ function CompanyLibrary() {
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : filteredDocs.length === 0 ? (
-        <div className="flex flex-col items-center py-12 text-center">
-          <FolderOpen className="h-12 w-12 text-muted-foreground/40 mb-3" />
-          <p className="text-muted-foreground">No company documents yet</p>
-          <p className="text-sm text-muted-foreground mt-1">Upload employee handbooks, policies, NDA templates, insurance certificates, and more</p>
+        <div className="flex flex-col items-center py-8 text-center">
+          <FolderOpen className="h-10 w-10 text-muted-foreground/40 mb-3" />
+          <p className="text-sm text-muted-foreground">No company documents yet</p>
         </div>
       ) : (
         <Table>

@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useUpload } from "@/hooks/use-upload";
 import ShareExternallyDialog from "@/components/ShareExternallyDialog";
+import DocumentDropZone from "@/components/DocumentDropZone";
 import DocumentsPanel from "@/components/DocumentsPanel";
 
 function getInitials(name: string) {
@@ -475,46 +476,37 @@ function DocumentsTab({ employeeId }: { employeeId: string }) {
     queryFn: async () => (await apiRequest("GET", `/api/employees/${employeeId}/documents`)).json(),
   });
 
+  const handleDropZoneUpload = React.useCallback(async (files: File[]) => {
+    for (const file of files) {
+      const result = await uploadFile(file);
+      if (!result) throw new Error("Upload failed");
+      await apiRequest("POST", `/api/employees/${employeeId}/documents`, {
+        name: file.name, type: "upload", url: result.objectPath, status: "Completed",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/employees/${employeeId}/documents`] });
+      toast({ title: "Document uploaded" });
+    }
+  }, [uploadFile, employeeId, queryClient, toast]);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Documents</CardTitle>
-        <div className="flex gap-2">
         {isAdmin && (
           <Button size="sm" variant="outline" onClick={() => setAssignFormOpen(true)} data-testid="button-assign-form">
             <ClipboardList className="h-4 w-4 mr-1" /> Assign Form
           </Button>
         )}
-        <Button size="sm" variant="outline" onClick={() => {
-          const input = document.createElement("input");
-          input.type = "file";
-          input.onchange = async (e) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (!file) return;
-            try {
-              const result = await uploadFile(file);
-              if (!result) throw new Error("Upload failed");
-              await apiRequest("POST", `/api/employees/${employeeId}/documents`, {
-                name: file.name, type: "upload", url: result.objectPath, status: "Completed",
-              });
-              queryClient.invalidateQueries({ queryKey: [`/api/employees/${employeeId}/documents`] });
-              toast({ title: "Document uploaded" });
-            } catch {
-              toast({ title: "Upload failed", variant: "destructive" });
-            }
-          };
-          input.click();
-        }} data-testid="button-upload-doc">
-          <Upload className="h-4 w-4 mr-1" /> Upload
-        </Button>
-        </div>
       </CardHeader>
       <CardContent>
+        <DocumentDropZone
+          onFilesSelected={handleDropZoneUpload}
+          className="mb-3"
+        />
         {docs.length === 0 ? (
-          <div className="text-center py-8">
+          <div className="text-center py-6">
             <FileText className="h-10 w-10 mx-auto mb-2 text-muted-foreground/30" />
             <p className="text-sm text-muted-foreground font-medium">No documents yet</p>
-            <p className="text-xs text-muted-foreground mt-1">Upload documents using the button above.</p>
           </div>
         ) : (
           <div className="space-y-2">
