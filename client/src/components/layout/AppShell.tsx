@@ -95,6 +95,11 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
     description: "Manage recruitment from application to hire with drag-and-drop stages.",
     tips: ["Drag candidates between stages", "Upload documents", "Rate candidates with colored dots"]
   },
+  employees: {
+    title: "Employee Directory",
+    description: "View and manage employee profiles, documents, and onboarding.",
+    tips: ["Track employee details", "Manage onboarding forms", "Upload and share documents"]
+  },
   jobs: {
     title: "Job Pipeline",
     description: "Track all projects from lead to completion with customizable tabs.",
