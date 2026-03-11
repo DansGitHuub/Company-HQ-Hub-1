@@ -1,8 +1,34 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Snowflake, Calculator, ClipboardCheck, Wrench, Target } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Snowflake, Calculator, ClipboardCheck, Wrench, Target, FileText, X } from "lucide-react";
 
-const tools = [
+type Tool = {
+  id: string;
+  title: string;
+  description: string;
+  icon: any;
+  href?: string;
+  modal?: {
+    src: string;
+    title: string;
+    allow?: string;
+  };
+};
+
+const tools: Tool[] = [
+  {
+    id: "pdf-field-placer",
+    title: "PDF Field Placer",
+    description: "Visually place fillable form fields on any PDF. Draw boxes, assign field types, and export coordinates.",
+    icon: FileText,
+    modal: {
+      src: "/pdf-field-placer.html",
+      title: "PDF Field Placer",
+      allow: "clipboard-write",
+    },
+  },
   {
     id: "calculator",
     title: "Universal Calculator",
@@ -42,6 +68,7 @@ const tools = [
 
 export default function Tools() {
   const [, setLocation] = useLocation();
+  const [activeModal, setActiveModal] = useState<Tool["modal"] | null>(null);
 
   return (
     <div className="space-y-6" data-testid="tools-hub-page">
@@ -58,8 +85,7 @@ export default function Tools() {
           return (
             <Card
               key={tool.id}
-              className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all"
-              onClick={() => setLocation(tool.href)}
+              className="hover:border-primary/50 hover:shadow-md transition-all"
               data-testid={`card-tool-${tool.id}`}
             >
               <CardHeader className="pb-3">
@@ -73,12 +99,49 @@ export default function Tools() {
                 </div>
               </CardHeader>
               <CardContent>
-                <CardDescription className="text-sm">{tool.description}</CardDescription>
+                <CardDescription className="text-sm mb-4">{tool.description}</CardDescription>
+                {tool.modal ? (
+                  <Button
+                    onClick={() => setActiveModal(tool.modal!)}
+                    data-testid={`button-open-${tool.id}`}
+                  >
+                    Open Tool
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => setLocation(tool.href!)}
+                    data-testid={`button-open-${tool.id}`}
+                  >
+                    Open Tool
+                  </Button>
+                )}
               </CardContent>
             </Card>
           );
         })}
       </div>
+
+      {activeModal && (
+        <div className="fixed inset-0 z-50 bg-background flex flex-col" data-testid="modal-tool-overlay">
+          <div className="flex items-center justify-between px-4 h-12 border-b bg-card shrink-0">
+            <h2 className="font-semibold text-sm" data-testid="text-modal-title">{activeModal.title}</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setActiveModal(null)}
+              data-testid="button-close-modal"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <iframe
+            src={activeModal.src}
+            className="flex-1 w-full border-0"
+            allow={activeModal.allow}
+            data-testid="iframe-tool"
+          />
+        </div>
+      )}
     </div>
   );
 }
