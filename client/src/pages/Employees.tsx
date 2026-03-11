@@ -11,12 +11,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus, Phone, Mail, MapPin, FileText, User, Clock,
-  ChevronLeft, Upload, CheckCircle2, Circle, AlertCircle, Users
+  ChevronLeft, Upload, CheckCircle2, Circle, AlertCircle, Users, ExternalLink
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useUpload } from "@/hooks/use-upload";
+import ShareExternallyDialog from "@/components/ShareExternallyDialog";
 
 function getInitials(name: string) {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
@@ -452,6 +453,9 @@ function DocumentsTab({ employeeId }: { employeeId: string }) {
   const queryClient = useQueryClient();
   const { uploadFile } = useUpload();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "Admin" || user?.isMasterAdmin;
+  const [shareDoc, setShareDoc] = useState<any>(null);
 
   const { data: docs = [] } = useQuery({
     queryKey: [`/api/employees/${employeeId}/documents`],
@@ -501,16 +505,34 @@ function DocumentsTab({ employeeId }: { employeeId: string }) {
                   <span className="text-sm font-medium">{doc.name}</span>
                   <Badge variant="outline" className="text-xs">{doc.status}</Badge>
                 </div>
-                {doc.url ? (
-                  <Button size="sm" variant="ghost" onClick={() => window.open(doc.url, "_blank")} data-testid={`view-doc-${doc.id}`}>View</Button>
-                ) : (
-                  <span className="text-xs text-muted-foreground">Awaiting upload</span>
-                )}
+                <div className="flex gap-1">
+                  {doc.url && isAdmin && (
+                    <Button size="sm" variant="ghost" onClick={() => setShareDoc(doc)} data-testid={`share-doc-${doc.id}`} title="Share Externally">
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  )}
+                  {doc.url ? (
+                    <Button size="sm" variant="ghost" onClick={() => window.open(doc.url, "_blank")} data-testid={`view-doc-${doc.id}`}>View</Button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Awaiting upload</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
       </CardContent>
+
+      {shareDoc && (
+        <ShareExternallyDialog
+          open={!!shareDoc}
+          onOpenChange={(open) => !open && setShareDoc(null)}
+          documentType="employee_document"
+          documentId={shareDoc.id}
+          documentName={shareDoc.name}
+          documentUrl={shareDoc.url}
+        />
+      )}
     </Card>
   );
 }

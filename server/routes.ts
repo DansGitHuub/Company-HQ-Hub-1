@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, hashPassword, comparePasswords } from "./auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -7656,6 +7657,191 @@ Provide accurate information based on publicly available documentation.`;
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Error marking all read" });
+    }
+  });
+
+  app.post("/api/shared-links", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { documentType, documentId, documentName, documentUrl, expiresIn, customDate, password, note } = req.body;
+      if (!documentType || !documentId || !documentName) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      let expiresAt: Date;
+      if (expiresIn === "24h") expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      else if (expiresIn === "7d") expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      else if (expiresIn === "30d") expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      else if (expiresIn === "custom" && customDate) expiresAt = new Date(customDate);
+      else return res.status(400).json({ message: "Invalid expiration" });
+
+      const token = crypto.randomBytes(32).toString("hex");
+      const passwordHash = password ? await hashPassword(password) : null;
+
+      const link = await storage.createSharedLink({
+        token,
+        documentType,
+        documentId,
+        documentName,
+        documentUrl: documentUrl || null,
+        createdBy: user.id,
+        createdByName: user.name,
+        expiresAt,
+        passwordHash,
+        note: note || null,
+      });
+
+      const domain = process.env.REPLIT_DOMAINS?.split(",")[0] || process.env.REPLIT_DEV_DOMAIN || "localhost:5000";
+      const protocol = domain.includes("localhost") ? "http" : "https";
+      const shareUrl = `${protocol}://${domain}/shared/${link.token}`;
+
+      res.json({ ...link, shareUrl });
+    } catch (err: any) {
+      console.error("Error creating shared link:", err);
+      res.status(500).json({ message: err.message || "Failed to create shared link" });
+    }
+  });
+
+  app.get("/api/shared-links", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const links = await storage.getSharedLinks();
+      res.json(links);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/shared-links/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const link = await storage.revokeSharedLink(req.params.id);
+      if (!link) return res.status(404).json({ message: "Link not found" });
+      res.json(link);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/shared-links/:id/access-logs", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const logs = await storage.getSharedLinkAccessLogs(req.params.id);
+      res.json(logs);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/shared/:token", async (req, res) => {
+    try {
+      const link = await storage.getSharedLinkByToken(req.params.token);
+      if (!link) return res.status(404).json({ message: "Link not found" });
+      if (link.isRevoked) return res.status(410).json({ message: "This link has been revoked." });
+      if (new Date(link.expiresAt) < new Date()) return res.status(410).json({ message: "This link has expired. Please contact Chapin Landscapes." });
+
+      const needsPassword = !!link.passwordHash;
+      if (needsPassword) {
+        return res.json({
+          needsPassword: true,
+          documentName: link.documentName,
+          note: link.note,
+          expiresAt: link.expiresAt,
+        });
+      }
+
+      await storage.incrementSharedLinkViewCount(link.id);
+      await storage.logSharedLinkAccess(link.id, req.ip || req.headers["x-forwarded-for"] as string || null, req.headers["user-agent"] || null);
+
+      let publicDocUrl = link.documentUrl;
+      if (publicDocUrl && publicDocUrl.startsWith("/api/hq-files/")) {
+        publicDocUrl = `/api/shared/${link.token}/download`;
+      }
+
+      res.json({
+        needsPassword: false,
+        documentName: link.documentName,
+        documentUrl: publicDocUrl,
+        documentType: link.documentType,
+        note: link.note,
+        expiresAt: link.expiresAt,
+        createdByName: link.createdByName,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/shared/:token/verify-password", async (req, res) => {
+    try {
+      const link = await storage.getSharedLinkByToken(req.params.token);
+      if (!link) return res.status(404).json({ message: "Link not found" });
+      if (link.isRevoked) return res.status(410).json({ message: "This link has been revoked." });
+      if (new Date(link.expiresAt) < new Date()) return res.status(410).json({ message: "This link has expired." });
+
+      const { password } = req.body;
+      if (!password || !link.passwordHash) return res.status(400).json({ message: "Password required" });
+
+      const valid = await comparePasswords(password, link.passwordHash);
+      if (!valid) return res.status(401).json({ message: "Incorrect password" });
+
+      await storage.incrementSharedLinkViewCount(link.id);
+      await storage.logSharedLinkAccess(link.id, req.ip || req.headers["x-forwarded-for"] as string || null, req.headers["user-agent"] || null);
+
+      let verifiedDocUrl = link.documentUrl;
+      if (verifiedDocUrl && verifiedDocUrl.startsWith("/api/hq-files/")) {
+        verifiedDocUrl = `/api/shared/${link.token}/download`;
+      }
+
+      res.json({
+        documentName: link.documentName,
+        documentUrl: verifiedDocUrl,
+        documentType: link.documentType,
+        note: link.note,
+        expiresAt: link.expiresAt,
+        createdByName: link.createdByName,
+        passwordVerified: true,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/shared/:token/download", async (req, res) => {
+    try {
+      const link = await storage.getSharedLinkByToken(req.params.token);
+      if (!link) return res.status(404).json({ message: "Link not found" });
+      if (link.isRevoked || new Date(link.expiresAt) < new Date()) {
+        return res.status(410).json({ message: "Link expired or revoked" });
+      }
+
+      if (link.passwordHash) {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+          return res.status(401).json({ message: "Password required" });
+        }
+        const providedPassword = Buffer.from(authHeader.slice(7), "base64").toString();
+        const valid = await comparePasswords(providedPassword, link.passwordHash);
+        if (!valid) return res.status(401).json({ message: "Incorrect password" });
+      }
+
+      if (link.documentUrl && link.documentUrl.startsWith("/api/hq-files/")) {
+        const fileIdMatch = link.documentUrl.match(/\/api\/hq-files\/([^/]+)\/download/);
+        if (fileIdMatch) {
+          const file = await storage.getHqFile(fileIdMatch[1]);
+          if (file && file.objectPath) {
+            const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+            const objectStorage = new ObjectStorageService();
+            res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(file.name)}"`);
+            if (file.mimeType) res.setHeader("Content-Type", file.mimeType);
+            return objectStorage.downloadObject(file.objectPath, res);
+          }
+        }
+      }
+
+      if (link.documentUrl) {
+        return res.redirect(link.documentUrl);
+      }
+      return res.status(404).json({ message: "No downloadable file" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
     }
   });
 

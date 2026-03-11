@@ -96,7 +96,9 @@ import {
   taskHistory as taskHistoryTable, type TaskHistoryEntry,
   taskAttachments, type TaskAttachment,
   taskDelegationChain, type TaskDelegation,
-  staffNotifications, type StaffNotification, type InsertStaffNotification
+  staffNotifications, type StaffNotification, type InsertStaffNotification,
+  sharedLinks, type SharedLink, type InsertSharedLink,
+  sharedLinkAccessLogs, type SharedLinkAccessLog
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull, sql } from "drizzle-orm";
@@ -670,6 +672,15 @@ export interface IStorage {
   deleteTaskAttachment(id: string): Promise<boolean>;
   createTaskDelegation(data: any): Promise<TaskDelegation>;
   getTaskDelegationChain(taskId: string): Promise<TaskDelegation[]>;
+
+  createSharedLink(data: InsertSharedLink): Promise<SharedLink>;
+  getSharedLinks(): Promise<SharedLink[]>;
+  getSharedLinkByToken(token: string): Promise<SharedLink | undefined>;
+  getSharedLink(id: string): Promise<SharedLink | undefined>;
+  revokeSharedLink(id: string): Promise<SharedLink | undefined>;
+  incrementSharedLinkViewCount(id: string): Promise<void>;
+  logSharedLinkAccess(sharedLinkId: string, ipAddress: string | null, userAgent: string | null): Promise<SharedLinkAccessLog>;
+  getSharedLinkAccessLogs(sharedLinkId: string): Promise<SharedLinkAccessLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3110,6 +3121,43 @@ export class DatabaseStorage implements IStorage {
 
   async getTaskDelegationChain(taskId: string): Promise<TaskDelegation[]> {
     return await db.select().from(taskDelegationChain).where(eq(taskDelegationChain.taskId, taskId)).orderBy(taskDelegationChain.delegatedAt);
+  }
+
+  async createSharedLink(data: InsertSharedLink): Promise<SharedLink> {
+    const [created] = await db.insert(sharedLinks).values(data).returning();
+    return created;
+  }
+
+  async getSharedLinks(): Promise<SharedLink[]> {
+    return await db.select().from(sharedLinks).orderBy(desc(sharedLinks.createdAt));
+  }
+
+  async getSharedLinkByToken(token: string): Promise<SharedLink | undefined> {
+    const [link] = await db.select().from(sharedLinks).where(eq(sharedLinks.token, token));
+    return link;
+  }
+
+  async getSharedLink(id: string): Promise<SharedLink | undefined> {
+    const [link] = await db.select().from(sharedLinks).where(eq(sharedLinks.id, id));
+    return link;
+  }
+
+  async revokeSharedLink(id: string): Promise<SharedLink | undefined> {
+    const [updated] = await db.update(sharedLinks).set({ isRevoked: true }).where(eq(sharedLinks.id, id)).returning();
+    return updated;
+  }
+
+  async incrementSharedLinkViewCount(id: string): Promise<void> {
+    await db.update(sharedLinks).set({ viewCount: sql`${sharedLinks.viewCount} + 1` }).where(eq(sharedLinks.id, id));
+  }
+
+  async logSharedLinkAccess(sharedLinkId: string, ipAddress: string | null, userAgent: string | null): Promise<SharedLinkAccessLog> {
+    const [log] = await db.insert(sharedLinkAccessLogs).values({ sharedLinkId, ipAddress, userAgent }).returning();
+    return log;
+  }
+
+  async getSharedLinkAccessLogs(sharedLinkId: string): Promise<SharedLinkAccessLog[]> {
+    return await db.select().from(sharedLinkAccessLogs).where(eq(sharedLinkAccessLogs.sharedLinkId, sharedLinkId)).orderBy(desc(sharedLinkAccessLogs.accessedAt));
   }
 }
 

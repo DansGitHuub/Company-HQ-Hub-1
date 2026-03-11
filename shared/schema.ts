@@ -2306,3 +2306,34 @@ export const staffNotifications = pgTable("staff_notifications", {
 export const insertStaffNotificationSchema = createInsertSchema(staffNotifications).omit({ id: true, createdAt: true });
 export type InsertStaffNotification = z.infer<typeof insertStaffNotificationSchema>;
 export type StaffNotification = typeof staffNotifications.$inferSelect;
+
+export const sharedLinks = pgTable("shared_links", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  documentType: text("document_type").notNull(),
+  documentId: text("document_id").notNull(),
+  documentName: text("document_name").notNull(),
+  documentUrl: text("document_url"),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id).notNull(),
+  createdByName: text("created_by_name").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  passwordHash: text("password_hash"),
+  note: text("note"),
+  viewCount: integer("view_count").notNull().default(0),
+  isRevoked: boolean("is_revoked").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSharedLinkSchema = createInsertSchema(sharedLinks).omit({ id: true, viewCount: true, isRevoked: true, createdAt: true });
+export type InsertSharedLink = z.infer<typeof insertSharedLinkSchema>;
+export type SharedLink = typeof sharedLinks.$inferSelect;
+
+export const sharedLinkAccessLogs = pgTable("shared_link_access_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  sharedLinkId: varchar("shared_link_id", { length: 36 }).references(() => sharedLinks.id).notNull(),
+  accessedAt: timestamp("accessed_at").defaultNow(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+});
+
+export type SharedLinkAccessLog = typeof sharedLinkAccessLogs.$inferSelect;

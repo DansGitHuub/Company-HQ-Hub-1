@@ -42,10 +42,15 @@ import TestingKnowledge from "@/pages/TestingKnowledge";
 import CalculatorPage from "@/pages/Calculator";
 import Tools from "@/pages/Tools";
 import LeadQualifier from "@/pages/LeadQualifier";
+import SharedDocument from "@/pages/SharedDocument";
 import NotFound from "@/pages/not-found";
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
+
+  if (window.location.pathname.startsWith("/shared/")) {
+    return <SharedDocument />;
+  }
 
   if (isLoading) {
     return (

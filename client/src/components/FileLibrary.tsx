@@ -26,7 +26,10 @@ import {
   Eye,
   FileCode,
   Table2,
+  ExternalLink,
 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import ShareExternallyDialog from "@/components/ShareExternallyDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -72,6 +75,7 @@ function isPreviewable(mimeType: string) {
 
 export default function FileLibrary() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -81,7 +85,9 @@ export default function FileLibrary() {
   const [viewerFile, setViewerFile] = useState<HqFile | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<HqFile | null>(null);
+  const [shareFile, setShareFile] = useState<HqFile | null>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
+  const isAdmin = user?.role === "Admin" || user?.isMasterAdmin;
 
   const { data: hqFiles = [], isLoading: filesLoading } = useQuery<HqFile[]>({
     queryKey: ["/api/hq-files"],
@@ -481,6 +487,18 @@ export default function FileLibrary() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={() => setShareFile(viewerFile)}
+                      data-testid="viewer-share-external"
+                      title="Share Externally"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -620,6 +638,17 @@ export default function FileLibrary() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {shareFile && (
+        <ShareExternallyDialog
+          open={!!shareFile}
+          onOpenChange={(open) => !open && setShareFile(null)}
+          documentType="hq_file"
+          documentId={shareFile.id}
+          documentName={shareFile.name}
+          documentUrl={`/api/hq-files/${shareFile.id}/download`}
+        />
+      )}
     </section>
   );
 }

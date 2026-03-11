@@ -11,6 +11,7 @@ import { runQuizAdaptiveMigration } from "./quizMigration";
 import { runNotificationMigration } from "./notificationMigration";
 import { startTaskScheduler } from "./taskScheduler";
 import { seedOemTemplates } from "./equipmentSeed";
+import { runSharedLinksMigration } from "./sharedLinksMigration";
 
 const app = express();
 const httpServer = createServer(app);
@@ -75,6 +76,7 @@ app.use((req, res, next) => {
   await runAssistantMigration();
   await runQuizAdaptiveMigration();
   await runNotificationMigration();
+  await runSharedLinksMigration();
   await registerRoutes(httpServer, app);
   
   await seedUsers();
