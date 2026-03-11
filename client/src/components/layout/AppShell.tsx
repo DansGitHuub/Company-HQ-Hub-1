@@ -349,7 +349,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "PEOPLE", items: ["hiring", "employees"] },
     { label: "KNOWLEDGE", items: ["sops", "testing", "forms", "help"] },
     { label: "CUSTOMERS", items: ["education"] },
-    { label: "COMPANY", items: ["hq", "marketing", "plow_mapper", "integrations"] },
+    { label: "COMPANY", items: ["hq", "marketing", "integrations"] },
     { label: "ADMIN", items: ["admin"] },
   ];
 
@@ -383,10 +383,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const getIsActive = (item: { id: string; href: string }) => {
     if (item.href === "/tools" && item.id === "tools") {
-      return location === "/tools" || (location.startsWith("/tools") && !location.startsWith("/tools/plow"));
-    }
-    if (item.href === "/tools/plow-mapper") {
-      return location.startsWith("/tools/plow");
+      return location.startsWith("/tools");
     }
     if (item.href === "/employees") {
       return location === "/employees";
@@ -430,16 +427,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Link href={applicantItem.href} className="block">
               <div
                 className={cn(
-                  "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer",
+                  "flex items-center gap-3 rounded-lg font-semibold transition-all cursor-pointer",
                   "border border-white/5 shadow-sm",
                   "bg-gradient-to-b from-white/[0.08] to-transparent",
+                  "h-9 px-4 text-[13px] leading-[16px]",
                   location === applicantItem.href
                     ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_2px_4px_rgba(0,0,0,0.3)] border-sidebar-primary/50"
                     : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_2px_4px_rgba(0,0,0,0.2)] hover:border-white/10"
                 )}
                 onClick={() => setIsMobileOpen(false)}
               >
-                <applicantItem.icon className="h-5 w-5" />
+                <applicantItem.icon className="h-4 w-4" />
                 {applicantItem.label}
               </div>
             </Link>
@@ -463,9 +461,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <Link href={item.href} className="flex-1 min-w-0 block">
                       <div
                         className={cn(
-                          "flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer",
+                          "flex items-center gap-3 rounded-lg font-semibold transition-all cursor-pointer",
                           "border border-white/5 shadow-sm",
                           "bg-gradient-to-b from-white/[0.08] to-transparent",
+                          "h-9 px-4 text-[13px] leading-[16px]",
                           isActive
                             ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_2px_4px_rgba(0,0,0,0.3)] border-sidebar-primary/50"
                             : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_2px_4px_rgba(0,0,0,0.2)] hover:border-white/10"
@@ -529,16 +528,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Link href={item.href} className="flex-1 min-w-0 block">
                 <div
                   className={cn(
-                    "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer",
+                    "flex items-center gap-3 rounded-lg font-semibold transition-all cursor-pointer",
                     "border border-white/5 shadow-sm",
                     "bg-gradient-to-b from-white/[0.08] to-transparent",
+                    "h-9 px-4 text-[13px] leading-[16px]",
                     isActive
                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_2px_4px_rgba(0,0,0,0.3)] border-sidebar-primary/50"
                       : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_2px_4px_rgba(0,0,0,0.2)] hover:border-white/10"
                   )}
                   onClick={() => setIsMobileOpen(false)}
                 >
-                  <item.icon className="h-5 w-5" />
+                  <item.icon className="h-4 w-4" />
                   {item.label}
                 </div>
               </Link>
