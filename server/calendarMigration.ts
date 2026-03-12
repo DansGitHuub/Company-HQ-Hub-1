@@ -31,6 +31,9 @@ export async function runCalendarMigration() {
       { name: "google_refresh_token", type: "TEXT" },
       { name: "google_calendar_id", type: "TEXT DEFAULT 'primary'" },
       { name: "google_token_expiry", type: "TIMESTAMPTZ" },
+      { name: "voice_enabled", type: "BOOLEAN NOT NULL DEFAULT false" },
+      { name: "voice_auto_speak", type: "BOOLEAN NOT NULL DEFAULT false" },
+      { name: "voice_selection", type: "TEXT DEFAULT 'alloy'" },
     ];
 
     for (const col of cols) {

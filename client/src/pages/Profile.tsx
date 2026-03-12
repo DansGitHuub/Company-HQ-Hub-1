@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Camera, Save, User, Mail, Phone, FileText, Palette, Check, Lock, Eye, EyeOff, Bell, BellOff } from "lucide-react";
+import { Loader2, Camera, Save, User, Mail, Phone, FileText, Palette, Check, Lock, Eye, EyeOff, Bell, BellOff, Volume2, VolumeX, Mic, Play } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { themes, getTheme, applyTheme, type ThemeId } from "@/lib/themes";
@@ -54,6 +56,173 @@ function EmailNotificationToggle({ profile }: { profile: any }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+const VOICE_OPTIONS = [
+  { value: "alloy", label: "Alloy", description: "Neutral, balanced" },
+  { value: "echo", label: "Echo", description: "Male, conversational" },
+  { value: "fable", label: "Fable", description: "Male, expressive" },
+  { value: "onyx", label: "Onyx", description: "Male, deep" },
+  { value: "nova", label: "Nova", description: "Female, warm" },
+  { value: "shimmer", label: "Shimmer", description: "Female, clear" },
+];
+
+function VoiceSettingsSection() {
+  const { toast } = useToast();
+  const [isPreviewing, setIsPreviewing] = useState(false);
+
+  const { data: voiceSettings, isLoading } = useQuery({
+    queryKey: ["/api/users/voice-settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/users/voice-settings", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch voice settings");
+      return res.json();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("PATCH", "/api/users/voice-settings", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/voice-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      toast({ title: "Voice settings updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update voice settings", variant: "destructive" });
+    },
+  });
+
+  const handleToggle = (field: string, value: boolean) => {
+    updateMutation.mutate({ [field]: value });
+  };
+
+  const handleVoiceChange = (value: string) => {
+    updateMutation.mutate({ voiceSelection: value });
+  };
+
+  const previewVoice = async (voiceName?: string) => {
+    setIsPreviewing(true);
+    try {
+      const res = await fetch("/api/ai/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: "Hi there! I'm your CompanyHQ assistant. How can I help you today?",
+          voice: voiceName || voiceSettings?.voiceSelection || "alloy",
+        }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate preview");
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = () => {
+        setIsPreviewing(false);
+        URL.revokeObjectURL(url);
+      };
+      audio.onerror = () => {
+        setIsPreviewing(false);
+        URL.revokeObjectURL(url);
+      };
+      await audio.play();
+    } catch (err) {
+      setIsPreviewing(false);
+      toast({ title: "Failed to preview voice", variant: "destructive" });
+    }
+  };
+
+  if (isLoading) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Volume2 className="h-5 w-5" />
+          Voice Settings
+        </CardTitle>
+        <CardDescription>Configure speech-to-text and text-to-speech for the AI Assistant</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label className="flex items-center gap-2">
+              <Mic className="h-4 w-4" /> Voice Features
+            </Label>
+            <p className="text-sm text-muted-foreground">Enable voice input and spoken responses</p>
+          </div>
+          <Switch
+            checked={voiceSettings?.voiceEnabled ?? false}
+            onCheckedChange={(checked) => handleToggle("voiceEnabled", checked)}
+            data-testid="toggle-voice-enabled"
+          />
+        </div>
+
+        {voiceSettings?.voiceEnabled && (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="flex items-center gap-2">
+                  <Volume2 className="h-4 w-4" /> Auto-speak responses
+                </Label>
+                <p className="text-sm text-muted-foreground">AI responses are read aloud automatically</p>
+              </div>
+              <Switch
+                checked={voiceSettings?.voiceAutoSpeak ?? false}
+                onCheckedChange={(checked) => handleToggle("voiceAutoSpeak", checked)}
+                data-testid="toggle-voice-auto-speak"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>AI Voice</Label>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={voiceSettings?.voiceSelection || "alloy"}
+                  onValueChange={handleVoiceChange}
+                >
+                  <SelectTrigger className="flex-1" data-testid="select-voice">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VOICE_OPTIONS.map((v) => (
+                      <SelectItem key={v.value} value={v.value}>
+                        <span className="flex items-center gap-2">
+                          <span className="font-medium">{v.label}</span>
+                          <span className="text-muted-foreground text-xs">({v.description})</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => previewVoice()}
+                  disabled={isPreviewing || updateMutation.isPending}
+                  data-testid="button-preview-voice"
+                >
+                  {isPreviewing ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <Play className="h-4 w-4 mr-1" />
+                  )}
+                  Preview
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Choose the voice your AI assistant uses when speaking responses
+              </p>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -491,6 +660,8 @@ export default function Profile() {
           </form>
         </CardContent>
       </Card>
+
+      <VoiceSettingsSection />
 
       <Card>
         <CardHeader>

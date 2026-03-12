@@ -16,7 +16,7 @@ The frontend is built with React and TypeScript, leveraging React Query for serv
 
 ### Feature Specifications
 - **Role-Based Access Control (RBAC)**: Supports Admin, Manager, Crew, Customer, and Master Admin roles with differentiated access and an access request system.
-- **AI Assistant**: Integrates OpenAI for AI chat with streaming responses, per-user conversation history, and a tool library for interacting with various system functionalities, including a confirmation flow for destructive actions.
+- **AI Assistant**: Integrates OpenAI for AI chat with streaming responses, per-user conversation history, and a tool library for interacting with various system functionalities, including a confirmation flow for destructive actions. Features full voice capabilities: speech-to-text (Web Speech API), text-to-speech (OpenAI TTS with 6 voice options), per-user voice settings (enable/disable, auto-speak, voice selection), global floating mic button, session-level mic/speaker toggles in the assistant header, and animated waveform visualizations. Voice settings configurable in Profile page. Routes: `/api/ai/speak`, `/api/users/voice-settings`.
 - **SOP Management**: Centralized SOPs with AI-powered quiz generation. Includes adaptive quiz system with 5 difficulty levels, real-time progression, and manager oversight for employee mastery and safety-critical alerts.
 - **Inventory Management**: Comprehensive materials catalog with an AI-powered creation wizard.
 - **Hiring & HR Module**: Full hiring pipeline with a 7-column Kanban board, drag-and-drop functionality, applicant detail panels, employee records, onboarding checklists, document management, and HR email templates.

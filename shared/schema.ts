@@ -27,6 +27,9 @@ export const users = pgTable("users", {
   googleRefreshToken: text("google_refresh_token"),
   googleCalendarId: text("google_calendar_id").default("primary"),
   googleTokenExpiry: timestamp("google_token_expiry", { withTimezone: true }),
+  voiceEnabled: boolean("voice_enabled").notNull().default(false),
+  voiceAutoSpeak: boolean("voice_auto_speak").notNull().default(false),
+  voiceSelection: text("voice_selection").default("alloy"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

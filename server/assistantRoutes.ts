@@ -617,6 +617,118 @@ export function registerAssistantRoutes(app: Express) {
     }
   });
 
+  // ── Text-to-Speech ──
+  app.post("/api/ai/speak", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+      const { text, voice: overrideVoice } = req.body;
+      if (!text || typeof text !== "string") {
+        return res.status(400).json({ error: "Text is required" });
+      }
+
+      const truncatedText = text.length > 500 ? text.slice(0, 500) + "..." : text;
+
+      let voiceToUse = overrideVoice || "alloy";
+      if (!overrideVoice) {
+        const userResult = await pool.query(
+          `SELECT voice_selection FROM users WHERE id = $1`,
+          [userId]
+        );
+        if (userResult.rows[0]?.voice_selection) {
+          voiceToUse = userResult.rows[0].voice_selection;
+        }
+      }
+
+      const validVoices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+      if (!validVoices.includes(voiceToUse)) voiceToUse = "alloy";
+
+      const response = await openai.audio.speech.create({
+        model: "tts-1",
+        voice: voiceToUse as any,
+        input: truncatedText,
+        response_format: "mp3",
+      });
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.set({
+        "Content-Type": "audio/mpeg",
+        "Content-Length": buffer.length.toString(),
+        "Cache-Control": "no-cache",
+      });
+      res.send(buffer);
+    } catch (err) {
+      console.error("[ai/speak] TTS error:", err);
+      res.status(500).json({ error: "Failed to generate speech" });
+    }
+  });
+
+  // ── Voice Settings ──
+  app.get("/api/users/voice-settings", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+      const result = await pool.query(
+        `SELECT voice_enabled, voice_auto_speak, voice_selection FROM users WHERE id = $1`,
+        [userId]
+      );
+
+      if (!result.rows[0]) return res.status(404).json({ error: "User not found" });
+
+      res.json({
+        voiceEnabled: result.rows[0].voice_enabled ?? false,
+        voiceAutoSpeak: result.rows[0].voice_auto_speak ?? false,
+        voiceSelection: result.rows[0].voice_selection ?? "alloy",
+      });
+    } catch (err) {
+      console.error("[voice] Settings fetch error:", err);
+      res.status(500).json({ error: "Failed to fetch voice settings" });
+    }
+  });
+
+  app.patch("/api/users/voice-settings", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+      const { voiceEnabled, voiceAutoSpeak, voiceSelection } = req.body;
+      const updates: string[] = [];
+      const values: any[] = [];
+      let idx = 1;
+
+      if (voiceEnabled !== undefined) {
+        updates.push(`voice_enabled = $${idx++}`);
+        values.push(!!voiceEnabled);
+      }
+      if (voiceAutoSpeak !== undefined) {
+        updates.push(`voice_auto_speak = $${idx++}`);
+        values.push(!!voiceAutoSpeak);
+      }
+      if (voiceSelection !== undefined) {
+        const validVoices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+        if (validVoices.includes(voiceSelection)) {
+          updates.push(`voice_selection = $${idx++}`);
+          values.push(voiceSelection);
+        }
+      }
+
+      if (updates.length === 0) return res.status(400).json({ error: "No valid fields to update" });
+
+      values.push(userId);
+      await pool.query(
+        `UPDATE users SET ${updates.join(", ")} WHERE id = $${idx}`,
+        values
+      );
+
+      res.json({ message: "Voice settings updated" });
+    } catch (err) {
+      console.error("[voice] Settings update error:", err);
+      res.status(500).json({ error: "Failed to update voice settings" });
+    }
+  });
+
   // ── Seed default agent ──
   (async () => {
     try {

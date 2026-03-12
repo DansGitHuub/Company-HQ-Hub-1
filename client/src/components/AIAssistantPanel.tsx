@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Sparkles, X, Minus, MoreVertical, Send, Mic, MicOff, Bot, User, Check, AlertTriangle, Loader2 } from "lucide-react";
+import { Sparkles, X, Minus, MoreVertical, Send, Mic, MicOff, Bot, User, Check, AlertTriangle, Loader2, Volume2, VolumeX, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { SuggestionChips, ActionResultCard, ErrorCard } from "./AssistantMessageCards";
 import { apiRequest } from "@/lib/queryClient";
+import { useVoice } from "@/hooks/use-voice";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -42,12 +44,29 @@ export default function AIAssistantPanel() {
   const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [speakingMessageIdx, setSpeakingMessageIdx] = useState<number | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [, navigate] = useLocation();
   const sessionId = useRef(getOrCreateSessionId());
+
+  const voice = useVoice();
+
+  useEffect(() => {
+    if (voice.openAssistantWithVoice && !isOpen) {
+      setIsOpen(true);
+      voice.setOpenAssistantWithVoice(false);
+      setTimeout(() => {
+        voice.startListening((text) => {
+          if (text.trim()) {
+            sendMessage(text);
+          }
+        });
+      }, 500);
+    }
+  }, [voice.openAssistantWithVoice]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -135,7 +154,16 @@ export default function AIAssistantPanel() {
         confirmationToken: data.confirmationToken,
       };
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      setMessages((prev) => {
+        const newMessages = [...prev, assistantMsg];
+        if (voice.settings?.voiceEnabled && voice.sessionSpeakerEnabled && data.response && data.type !== "error") {
+          setTimeout(() => {
+            setSpeakingMessageIdx(newMessages.length - 1);
+            voice.speakText(data.response);
+          }, 200);
+        }
+        return newMessages;
+      });
 
       if (data.navigationTarget) {
         setTimeout(() => navigate(data.navigationTarget), 800);
@@ -148,7 +176,7 @@ export default function AIAssistantPanel() {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, messages, navigate]);
+  }, [isLoading, messages, navigate, voice.settings?.voiceEnabled, voice.sessionSpeakerEnabled]);
 
   const handleConfirm = (confirmationToken: string) => {
     setMessages((prev) =>
@@ -173,6 +201,17 @@ export default function AIAssistantPanel() {
   };
 
   const startRecording = useCallback(async () => {
+    if (voice.settings?.voiceEnabled) {
+      voice.startListening((text) => {
+        if (text.trim()) {
+          setInput(text);
+          setTimeout(() => sendMessage(text), 100);
+        }
+      });
+      setIsRecording(true);
+      return;
+    }
+
     let stream: MediaStream | null = null;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -248,23 +287,28 @@ export default function AIAssistantPanel() {
       stream.getTracks().forEach((t) => t.stop());
       setMessages((prev) => [...prev, { role: "assistant", content: "Voice recording is not supported in this browser.", type: "error" }]);
     }
-  }, []);
+  }, [voice.settings?.voiceEnabled]);
 
   const stopRecording = useCallback(() => {
+    if (voice.settings?.voiceEnabled && voice.isListening) {
+      voice.stopListening();
+      setIsRecording(false);
+      return;
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current = null;
     }
     setIsRecording(false);
-  }, []);
+  }, [voice.settings?.voiceEnabled, voice.isListening]);
 
   const toggleRecording = useCallback(() => {
-    if (isRecording) {
+    if (isRecording || voice.isListening) {
       stopRecording();
     } else {
       startRecording();
     }
-  }, [isRecording, startRecording, stopRecording]);
+  }, [isRecording, voice.isListening, startRecording, stopRecording]);
 
   useEffect(() => {
     if (!isOpen && isRecording) {
@@ -296,6 +340,25 @@ export default function AIAssistantPanel() {
       sendMessage(input);
     }
   };
+
+  const handleSpeakMessage = (msgContent: string, msgIndex: number) => {
+    if (voice.isSpeaking && speakingMessageIdx === msgIndex) {
+      voice.stopSpeaking();
+      setSpeakingMessageIdx(null);
+      return;
+    }
+    voice.stopSpeaking();
+    setSpeakingMessageIdx(msgIndex);
+    voice.speakText(msgContent);
+  };
+
+  useEffect(() => {
+    if (!voice.isSpeaking) {
+      setSpeakingMessageIdx(null);
+    }
+  }, [voice.isSpeaking]);
+
+  const activeListening = isRecording || voice.isListening;
 
   if (!isOpen) {
     return (
@@ -331,6 +394,38 @@ export default function AIAssistantPanel() {
             <span className="font-semibold text-sm">CompanyHQ Assistant</span>
           </div>
           <div className="flex items-center gap-1">
+            {voice.settings?.voiceEnabled && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className={`h-7 w-7 ${voice.sessionMicEnabled || voice.isListening ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
+                      onClick={voice.toggleSessionMic}
+                      data-testid="assistant-voice-mic-toggle"
+                    >
+                      {voice.sessionMicEnabled ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Voice input {voice.sessionMicEnabled ? "on" : "off"}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className={`h-7 w-7 ${voice.sessionSpeakerEnabled ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
+                      onClick={voice.toggleSessionSpeaker}
+                      data-testid="assistant-voice-speaker-toggle"
+                    >
+                      {voice.sessionSpeakerEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Auto-speak {voice.sessionSpeakerEnabled ? "on" : "off"}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             <div className="relative">
               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShowMenu(!showMenu)} data-testid="assistant-menu-btn">
                 <MoreVertical className="h-4 w-4" />
@@ -433,6 +528,30 @@ export default function AIAssistantPanel() {
                       <p className="whitespace-pre-wrap">{msg.content}</p>
                     </div>
                   )}
+                  {msg.role === "assistant" && msg.type !== "error" && voice.settings?.voiceEnabled && (
+                    <button
+                      onClick={() => handleSpeakMessage(msg.content, i)}
+                      className={`flex items-center gap-1 text-xs transition-colors ${
+                        speakingMessageIdx === i && voice.isSpeaking
+                          ? "text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      title={speakingMessageIdx === i && voice.isSpeaking ? "Stop speaking" : "Read aloud"}
+                      data-testid={`speak-message-${i}`}
+                    >
+                      {speakingMessageIdx === i && voice.isSpeaking ? (
+                        <>
+                          <SoundWaveIcon />
+                          <span>Speaking...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="h-3 w-3" />
+                          <span>Listen</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -459,7 +578,29 @@ export default function AIAssistantPanel() {
         </div>
 
         <div className="px-3 py-3 border-t">
-          {isRecording && (
+          {(activeListening || voice.isListening) && voice.settings?.voiceEnabled && (
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <VoiceWaveform />
+              <span className="text-xs text-red-600 dark:text-red-400 font-medium">Listening...</span>
+              {voice.liveTranscript && (
+                <span className="text-xs text-muted-foreground italic truncate flex-1">{voice.liveTranscript}</span>
+              )}
+            </div>
+          )}
+          {voice.isSpeaking && voice.settings?.voiceEnabled && (
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <SoundWaveIcon />
+              <span className="text-xs text-primary font-medium">Speaking...</span>
+              <button
+                onClick={() => voice.stopSpeaking()}
+                className="text-xs text-muted-foreground hover:text-foreground ml-auto"
+                data-testid="stop-speaking-btn"
+              >
+                <Square className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+          {!voice.settings?.voiceEnabled && isRecording && (
             <div className="flex items-center gap-2 mb-2 px-1">
               <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
@@ -479,12 +620,14 @@ export default function AIAssistantPanel() {
               <input
                 ref={inputRef}
                 type="text"
-                value={input}
+                value={voice.isListening && voice.liveTranscript ? voice.liveTranscript : input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={isRecording ? "Listening..." : isTranscribing ? "Transcribing..." : "Ask me anything..."}
-                className="w-full bg-muted rounded-lg pl-3 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                disabled={isLoading || isTranscribing}
+                placeholder={activeListening ? "Listening..." : isTranscribing ? "Transcribing..." : "Ask me anything..."}
+                className={`w-full bg-muted rounded-lg pl-3 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30 ${
+                  voice.isListening && voice.liveTranscript ? "italic text-muted-foreground" : ""
+                }`}
+                disabled={isLoading || isTranscribing || voice.isListening}
                 data-testid="assistant-input"
               />
               <button
@@ -492,20 +635,20 @@ export default function AIAssistantPanel() {
                 onClick={toggleRecording}
                 disabled={isLoading || isTranscribing}
                 className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full transition-colors ${
-                  isRecording
+                  activeListening
                     ? "text-red-500 hover:text-red-600"
                     : "text-muted-foreground hover:text-primary"
                 } ${isLoading || isTranscribing ? "opacity-30 cursor-not-allowed" : "cursor-pointer"}`}
-                title={isRecording ? "Stop recording" : "Start voice input"}
+                title={activeListening ? "Stop recording" : "Start voice input"}
                 data-testid="assistant-mic-btn"
               >
-                {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                {activeListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               </button>
             </div>
             <Button
               size="icon"
               className="h-9 w-9 rounded-lg flex-shrink-0"
-              disabled={!input.trim() || isLoading || isRecording}
+              disabled={!input.trim() || isLoading || activeListening}
               onClick={() => sendMessage(input)}
               data-testid="assistant-send-btn"
             >
@@ -515,5 +658,49 @@ export default function AIAssistantPanel() {
         </div>
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+function VoiceWaveform() {
+  return (
+    <div className="flex items-center gap-0.5 h-4">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <motion.div
+          key={i}
+          className="w-0.5 bg-red-500 rounded-full"
+          animate={{
+            height: [4, 12, 6, 14, 4],
+          }}
+          transition={{
+            duration: 0.8,
+            repeat: Infinity,
+            delay: i * 0.1,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SoundWaveIcon() {
+  return (
+    <div className="flex items-center gap-0.5 h-3">
+      {[1, 2, 3].map((i) => (
+        <motion.div
+          key={i}
+          className="w-0.5 bg-primary rounded-full"
+          animate={{
+            height: [3, 8, 3],
+          }}
+          transition={{
+            duration: 0.6,
+            repeat: Infinity,
+            delay: i * 0.15,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
+    </div>
   );
 }

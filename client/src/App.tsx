@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppProvider } from "@/lib/store";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { VoiceProvider } from "@/hooks/use-voice";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppShell from "@/components/layout/AppShell";
 import { Loader2 } from "lucide-react";
@@ -125,8 +126,10 @@ function App() {
         <TooltipProvider>
           <AuthProvider>
             <AppProvider>
-              <Toaster />
-              <AppRoutes />
+              <VoiceProvider>
+                <Toaster />
+                <AppRoutes />
+              </VoiceProvider>
             </AppProvider>
           </AuthProvider>
         </TooltipProvider>

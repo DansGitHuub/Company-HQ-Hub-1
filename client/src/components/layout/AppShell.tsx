@@ -7,6 +7,7 @@ import AIAssistantPanel from "@/components/AIAssistantPanel";
 import UpdatesPopup from "@/components/UpdatesPopup";
 import QuickAddTask from "@/components/QuickAddTask";
 import InteractiveCalendar from "@/components/InteractiveCalendar";
+import GlobalMicButton from "@/components/GlobalMicButton";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -983,6 +984,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       
       {user && effectiveRole && (
         <>
+          <GlobalMicButton />
           <AIAssistantPanel />
           <QuickAddTask />
         </>
