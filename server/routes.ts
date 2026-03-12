@@ -28,6 +28,7 @@ import {
   insertBuilderFormSchema,
   calendarEvents,
   todoAssignments,
+  users,
   type User 
 } from "@shared/schema";
 import { db } from "./db";
@@ -6827,49 +6828,68 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
   
-  // OAuth callback - exchange code for tokens
-  app.get("/api/auth/google/callback", async (req, res) => {
+  // OAuth callback - exchange code for tokens (at /auth/google/callback, no /api prefix)
+  // This matches the GOOGLE_REDIRECT_URI for production (companyhq.app/auth/google/callback)
+  app.get("/auth/google/callback", async (req, res) => {
     try {
-      const { code, state: userId } = req.query;
-      
+      const code = req.query.code as string;
+      const userId = req.query.state as string;
+
       if (!code || !userId) {
-        return res.redirect("/?error=missing_params");
+        return res.redirect("/calendar?google_error=missing_params");
       }
-      
+
       const { exchangeCodeForTokens, getUserCalendarList } = await import("./googleOAuth");
       const tokens = await exchangeCodeForTokens(code as string);
-      
-      // Get or create connection
-      let connection = await storage.getCalendarConnectionByProvider(userId as string, "google");
-      
-      const calendarList = await getUserCalendarList(tokens.access_token!);
-      const primaryCalendar = calendarList.find((c: any) => c.primary) || calendarList[0];
-      
-      const connectionData = {
-        accessToken: tokens.access_token!,
-        refreshToken: tokens.refresh_token || connection?.refreshToken || null,
-        tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
-        calendarId: primaryCalendar?.id || "primary",
-        calendarName: primaryCalendar?.summary || "Primary Calendar",
-        isConnected: true,
-        lastSyncAt: new Date(),
-        lastError: null
-      };
-      
-      if (connection) {
-        await storage.updateCalendarConnection(connection.id, connectionData);
-      } else {
-        await storage.createCalendarConnection({
-          userId: userId as string,
-          provider: "google",
-          ...connectionData
-        });
+
+      let calendarId = "primary";
+      try {
+        if (tokens.access_token) {
+          const calendarList = await getUserCalendarList(tokens.access_token);
+          const primaryCalendar = calendarList.find((c: any) => c.primary) || calendarList[0];
+          if (primaryCalendar?.id) calendarId = primaryCalendar.id;
+        }
+      } catch (calErr) {
+        console.error("[google-oauth] Failed to fetch calendar list:", calErr);
       }
-      
-      res.redirect("/?calendar=connected");
+
+      await db.update(users).set({
+        googleAccessToken: tokens.access_token || undefined,
+        googleRefreshToken: tokens.refresh_token || undefined,
+        googleCalendarId: calendarId,
+        googleTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
+      }).where(eq(users.id, userId));
+
+      // Also update calendar_connections table if it exists
+      try {
+        let connection = await storage.getCalendarConnectionByProvider(userId, "google");
+        const connectionData = {
+          accessToken: tokens.access_token!,
+          refreshToken: tokens.refresh_token || connection?.refreshToken || null,
+          tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+          calendarId,
+          calendarName: "Primary Calendar",
+          isConnected: true,
+          lastSyncAt: new Date(),
+          lastError: null,
+        };
+        if (connection) {
+          await storage.updateCalendarConnection(connection.id, connectionData);
+        } else {
+          await storage.createCalendarConnection({
+            userId,
+            provider: "google",
+            ...connectionData,
+          });
+        }
+      } catch (connErr) {
+        console.error("[google-oauth] Calendar connection table update failed (non-fatal):", connErr);
+      }
+
+      res.redirect("/calendar?google_connected=true");
     } catch (err: any) {
-      console.error("OAuth callback error:", err);
-      res.redirect("/?error=oauth_failed");
+      console.error("[google-oauth] Callback error:", err);
+      res.redirect("/calendar?google_error=auth_failed");
     }
   });
   

@@ -321,20 +321,35 @@ export function registerCalendarRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // Note: The primary OAuth callback is registered at /auth/google/callback (no /api prefix)
+  // in routes.ts to match the GOOGLE_REDIRECT_URI. This /api/ prefixed version is kept
+  // as a fallback for dev environments where GOOGLE_REDIRECT_URI may not be set.
   app.get("/api/auth/google/callback", async (req, res) => {
     try {
       const code = req.query.code as string;
       const userId = req.query.state as string;
 
       if (!code || !userId) {
-        return res.redirect("/?google_error=missing_params");
+        return res.redirect("/calendar?google_error=missing_params");
       }
 
       const tokens = await exchangeCodeForTokens(code);
 
+      let calendarId = "primary";
+      try {
+        if (tokens.access_token) {
+          const calendarList = await googleOAuth.getUserCalendarList(tokens.access_token);
+          const primaryCalendar = calendarList.find((c: any) => c.primary) || calendarList[0];
+          if (primaryCalendar?.id) calendarId = primaryCalendar.id;
+        }
+      } catch (calErr) {
+        console.error("[calendar] Failed to fetch calendar list:", calErr);
+      }
+
       await db.update(users).set({
         googleAccessToken: tokens.access_token || undefined,
         googleRefreshToken: tokens.refresh_token || undefined,
+        googleCalendarId: calendarId,
         googleTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
       }).where(eq(users.id, userId));
 
