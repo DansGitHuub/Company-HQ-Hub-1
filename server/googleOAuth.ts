@@ -20,6 +20,9 @@ function getOAuth2Client() {
 }
 
 function getRedirectUri() {
+  if (process.env.GOOGLE_REDIRECT_URI) {
+    return process.env.GOOGLE_REDIRECT_URI;
+  }
   const domain = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN;
   if (!domain) {
     throw new Error('No domain configured for OAuth redirect');
