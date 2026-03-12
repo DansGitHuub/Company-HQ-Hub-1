@@ -2509,3 +2509,15 @@ export const googleCalendarEvents = pgTable("google_calendar_events", {
 });
 
 export type GoogleCalendarEvent = typeof googleCalendarEvents.$inferSelect;
+
+export const userCalendarSettings = pgTable("user_calendar_settings", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id).notNull(),
+  categoryKey: text("category_key").notNull(),
+  displayName: text("display_name").notNull(),
+  color: text("color").notNull(),
+  isCustom: boolean("is_custom").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type UserCalendarSetting = typeof userCalendarSettings.$inferSelect;

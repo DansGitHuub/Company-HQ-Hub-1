@@ -47,6 +47,9 @@ import {
   Phone,
   Mail,
   User,
+  Settings,
+  X,
+  Palette,
 } from "lucide-react";
 
 interface CalendarEvent {
@@ -99,19 +102,57 @@ interface GoogleStatus {
   calendarId: string;
 }
 
+interface CategorySetting {
+  categoryKey: string;
+  displayName: string;
+  color: string;
+  isCustom: boolean;
+}
+
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+const DEFAULT_CATEGORIES: CategorySetting[] = [
+  { categoryKey: "job", displayName: "Job", color: "#16a34a", isCustom: false },
+  { categoryKey: "shift", displayName: "Shift", color: "#7c3aed", isCustom: false },
+  { categoryKey: "equipment", displayName: "Equipment", color: "#ea580c", isCustom: false },
+  { categoryKey: "task", displayName: "Task", color: "#0284c7", isCustom: false },
+  { categoryKey: "company", displayName: "Company Event", color: "#0d9488", isCustom: false },
+  { categoryKey: "personal", displayName: "Personal", color: "#3b82f6", isCustom: false },
+  { categoryKey: "customer_appointment", displayName: "Customer Appointment", color: "#e11d48", isCustom: false },
+  { categoryKey: "google", displayName: "Google Calendar", color: "#d97706", isCustom: false },
+];
 
 const EVENT_TYPES = [
   { value: "personal", label: "Personal", color: "bg-blue-500" },
   { value: "job", label: "Job", color: "bg-green-600" },
+  { value: "shift", label: "Shift", color: "bg-violet-600" },
+  { value: "equipment", label: "Equipment", color: "bg-orange-600" },
+  { value: "task", label: "Task", color: "bg-sky-600" },
   { value: "meeting", label: "Meeting", color: "bg-purple-500" },
   { value: "deadline", label: "Deadline", color: "bg-red-500" },
   { value: "maintenance", label: "Maintenance", color: "bg-orange-500" },
   { value: "company", label: "Company", color: "bg-teal-500" },
+  { value: "customer_appointment", label: "Customer Appointment", color: "bg-rose-600" },
 ];
 
-function getEventColor(eventType: string, isCompanyEvent: boolean, isGoogleEvent?: boolean) {
+function hexToTwClass(hex: string): string {
+  return `bg-[${hex}]`;
+}
+
+function getEventColor(eventType: string, isCompanyEvent: boolean, isGoogleEvent?: boolean, categorySettings?: CategorySetting[]) {
+  if (categorySettings && categorySettings.length > 0) {
+    if (isGoogleEvent) {
+      const gs = categorySettings.find(c => c.categoryKey === "google");
+      if (gs) return hexToTwClass(gs.color);
+    }
+    if (isCompanyEvent) {
+      const cs = categorySettings.find(c => c.categoryKey === "company");
+      if (cs) return hexToTwClass(cs.color);
+    }
+    const found = categorySettings.find(c => c.categoryKey === eventType);
+    if (found) return hexToTwClass(found.color);
+  }
   if (isGoogleEvent) return "bg-amber-500";
   if (isCompanyEvent) return "bg-teal-500";
   const found = EVENT_TYPES.find(t => t.value === eventType);
@@ -149,6 +190,10 @@ export default function CalendarPage() {
   const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
   const [filterType, setFilterType] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [showDayPopup, setShowDayPopup] = useState(false);
+  const [dayPopupDate, setDayPopupDate] = useState<Date | null>(null);
+  const [dayPopupEvents, setDayPopupEvents] = useState<CalendarEvent[]>([]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -239,6 +284,45 @@ export default function CalendarPage() {
     },
     enabled: !!googleStatus?.connected,
   });
+
+  const { data: savedSettings = [] } = useQuery<CategorySetting[]>({
+    queryKey: ["/api/calendar/settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/calendar/settings", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const categorySettings = useMemo(() => {
+    if (savedSettings.length === 0) return DEFAULT_CATEGORIES;
+    const merged = DEFAULT_CATEGORIES.map(dc => {
+      const saved = savedSettings.find((s: any) => s.categoryKey === dc.categoryKey);
+      return saved ? { ...dc, displayName: saved.displayName, color: saved.color } : dc;
+    });
+    const customs = savedSettings.filter((s: any) => s.isCustom);
+    return [...merged, ...customs];
+  }, [savedSettings]);
+
+  const allEventTypes = useMemo(() => {
+    const base = EVENT_TYPES.map(et => {
+      const cs = categorySettings.find(c => c.categoryKey === et.value);
+      return cs ? { ...et, label: cs.displayName, color: hexToTwClass(cs.color) } : et;
+    });
+    const customCats = categorySettings.filter(c => c.isCustom);
+    const customTypes = customCats.map(c => ({
+      value: c.categoryKey,
+      label: c.displayName,
+      color: hexToTwClass(c.color),
+    }));
+    return [...base, ...customTypes];
+  }, [categorySettings]);
+
+  const openDayPopup = useCallback((date: Date, events: CalendarEvent[]) => {
+    setDayPopupDate(date);
+    setDayPopupEvents(events);
+    setShowDayPopup(true);
+  }, []);
 
   const mergedEvents = useMemo(() => {
     const companyHQGoogleIds = new Set(
@@ -433,6 +517,9 @@ export default function CalendarPage() {
             <Plus className="h-4 w-4 mr-2" />
             New Event
           </Button>
+          <Button variant="ghost" size="icon" onClick={() => setShowSettingsDialog(true)} data-testid="calendar-settings-button">
+            <Settings className="h-5 w-5" />
+          </Button>
         </div>
       </div>
 
@@ -468,9 +555,8 @@ export default function CalendarPage() {
             <SelectContent>
               <SelectItem value="all">All Events</SelectItem>
               <SelectItem value="mine">My Events</SelectItem>
-              <SelectItem value="company">Company</SelectItem>
               <SelectItem value="google">Google Calendar</SelectItem>
-              {EVENT_TYPES.map(t => (
+              {allEventTypes.map(t => (
                 <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
               ))}
             </SelectContent>
@@ -515,6 +601,8 @@ export default function CalendarPage() {
             onDayClick={d => { setSelectedDate(d); setCurrentDate(d); }}
             onEventClick={openDetailDialog}
             onCreateEvent={openCreateDialog}
+            onShowDayPopup={openDayPopup}
+            categorySettings={categorySettings}
           />
         ) : viewMode === "week" ? (
           <WeekView
@@ -548,6 +636,8 @@ export default function CalendarPage() {
         onCreate={data => createMutation.mutate(data)}
         onUpdate={data => updateMutation.mutate(data)}
         isSubmitting={createMutation.isPending || updateMutation.isPending}
+        eventTypes={allEventTypes}
+        categorySettings={categorySettings}
       />
 
       <EventDetailDialog
@@ -559,6 +649,22 @@ export default function CalendarPage() {
         onEdit={openEditDialog}
         onDelete={id => deleteMutation.mutate(id)}
         isDeleting={deleteMutation.isPending}
+        categorySettings={categorySettings}
+      />
+
+      <DayEventsPopup
+        open={showDayPopup}
+        onOpenChange={setShowDayPopup}
+        date={dayPopupDate}
+        events={dayPopupEvents}
+        onEventClick={(e) => { setShowDayPopup(false); openDetailDialog(e); }}
+        categorySettings={categorySettings}
+      />
+
+      <CalendarSettingsDialog
+        open={showSettingsDialog}
+        onOpenChange={setShowSettingsDialog}
+        categorySettings={categorySettings}
       />
     </div>
   );
@@ -619,12 +725,16 @@ function MonthView({
   onDayClick,
   onEventClick,
   onCreateEvent,
+  onShowDayPopup,
+  categorySettings,
 }: {
   currentDate: Date;
   events: CalendarEvent[];
   onDayClick: (d: Date) => void;
   onEventClick: (e: CalendarEvent) => void;
   onCreateEvent: (d: Date) => void;
+  onShowDayPopup: (date: Date, events: CalendarEvent[]) => void;
+  categorySettings: CategorySetting[];
 }) {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -679,17 +789,20 @@ function MonthView({
                 onDoubleClick={() => onCreateEvent(day)}
                 data-testid={`month-day-${day.getDate()}-${day.getMonth()}`}
               >
-                <div className={`text-sm mb-1 ${isToday
-                  ? "bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center mx-auto font-bold"
-                  : "text-right pr-1"
-                }`}>
+                <div
+                  className={`text-sm mb-1 ${isToday
+                    ? "bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center mx-auto font-bold"
+                    : "text-right pr-1"
+                  } ${dayEvents.length > 0 ? "cursor-pointer hover:text-primary" : ""}`}
+                  onClick={e => { if (dayEvents.length > 0) { e.stopPropagation(); onShowDayPopup(day, dayEvents); } }}
+                >
                   {day.getDate()}
                 </div>
                 <div className="space-y-0.5">
                   {dayEvents.slice(0, 3).map(evt => (
                     <div
                       key={evt.id}
-                      className={`text-xs px-1 py-0.5 rounded truncate text-white cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent)}`}
+                      className={`text-xs px-1 py-0.5 rounded truncate text-white cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent, categorySettings)}`}
                       onClick={e => { e.stopPropagation(); onEventClick(evt); }}
                       data-testid={`event-chip-${evt.id}`}
                     >
@@ -700,7 +813,11 @@ function MonthView({
                     </div>
                   ))}
                   {dayEvents.length > 3 && (
-                    <div className="text-xs text-muted-foreground pl-1 cursor-pointer hover:underline">
+                    <div
+                      className="text-xs text-primary font-medium pl-1 cursor-pointer hover:underline"
+                      onClick={e => { e.stopPropagation(); onShowDayPopup(day, dayEvents); }}
+                      data-testid={`day-more-${day.getDate()}-${day.getMonth()}`}
+                    >
                       +{dayEvents.length - 3} more
                     </div>
                   )}
@@ -976,6 +1093,8 @@ function EventFormDialog({
   onCreate,
   onUpdate,
   isSubmitting,
+  eventTypes,
+  categorySettings,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -986,6 +1105,8 @@ function EventFormDialog({
   onCreate: (data: any) => void;
   onUpdate: (data: any) => void;
   isSubmitting: boolean;
+  eventTypes: { value: string; label: string; color: string }[];
+  categorySettings: CategorySetting[];
 }) {
   const isEditing = !!event;
   const defaultStart = selectedDate || new Date();
@@ -1098,7 +1219,7 @@ function EventFormDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {EVENT_TYPES.map(t => (
+                  {eventTypes.map(t => (
                     <SelectItem key={t.value} value={t.value}>
                       <span className="flex items-center gap-2">
                         <span className={`w-2 h-2 rounded-full ${t.color}`} />
@@ -1209,6 +1330,7 @@ function EventDetailDialog({
   onEdit,
   onDelete,
   isDeleting,
+  categorySettings,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -1218,6 +1340,7 @@ function EventDetailDialog({
   onEdit: (e: CalendarEvent) => void;
   onDelete: (id: string) => void;
   isDeleting: boolean;
+  categorySettings: CategorySetting[];
 }) {
   if (!event) return null;
 
@@ -1230,7 +1353,7 @@ function EventDetailDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2" data-testid="event-detail-title">
-            <span className={`w-3 h-3 rounded-full ${getEventColor(event.eventType, event.isCompanyEvent, event.isGoogleEvent)}`} />
+            <span className={`w-3 h-3 rounded-full ${getEventColor(event.eventType, event.isCompanyEvent, event.isGoogleEvent, categorySettings)}`} />
             {event.title}
           </DialogTitle>
         </DialogHeader>
@@ -1316,6 +1439,225 @@ function EventDetailDialog({
             </Button>
           </DialogFooter>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DayEventsPopup({
+  open,
+  onOpenChange,
+  date,
+  events,
+  onEventClick,
+  categorySettings,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  date: Date | null;
+  events: CalendarEvent[];
+  onEventClick: (e: CalendarEvent) => void;
+  categorySettings: CategorySetting[];
+}) {
+  if (!date) return null;
+
+  const dateLabel = date.toLocaleDateString(undefined, {
+    weekday: "long", year: "numeric", month: "long", day: "numeric"
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle data-testid="day-popup-title">{dateLabel}</DialogTitle>
+          <DialogDescription>{events.length} event{events.length !== 1 ? "s" : ""}</DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="max-h-[50vh]">
+          <div className="space-y-2 pr-2">
+            {events.map(evt => (
+              <div
+                key={evt.id}
+                className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                onClick={() => onEventClick(evt)}
+                data-testid={`day-popup-event-${evt.id}`}
+              >
+                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent, categorySettings)}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{evt.title}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {evt.allDay ? "All Day" : formatTime(evt.startDatetime)}
+                    {evt.isGoogleEvent && <span className="ml-1 text-amber-600">(Google)</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CalendarSettingsDialog({
+  open,
+  onOpenChange,
+  categorySettings: initialSettings,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  categorySettings: CategorySetting[];
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [categories, setCategories] = useState<CategorySetting[]>([]);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatColor, setNewCatColor] = useState("#6366f1");
+
+  useEffect(() => {
+    if (open) {
+      setCategories([...initialSettings]);
+    }
+  }, [open, initialSettings]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (cats: CategorySetting[]) => {
+      const res = await apiRequest("POST", "/api/calendar/settings", { categories: cats });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/settings"] });
+      toast({ title: "Settings Saved" });
+      onOpenChange(false);
+    },
+    onError: (err: any) => showErrorToast(toast, err),
+  });
+
+  const updateCategory = (key: string, field: "displayName" | "color", value: string) => {
+    setCategories(prev => prev.map(c => c.categoryKey === key ? { ...c, [field]: value } : c));
+  };
+
+  const addCustomCategory = () => {
+    if (!newCatName.trim()) return;
+    const key = newCatName.trim().toLowerCase().replace(/\s+/g, "_");
+    if (categories.find(c => c.categoryKey === key)) {
+      toast({ title: "Category already exists", variant: "destructive" });
+      return;
+    }
+    setCategories(prev => [...prev, {
+      categoryKey: key,
+      displayName: newCatName.trim(),
+      color: newCatColor,
+      isCustom: true,
+    }]);
+    setNewCatName("");
+    setNewCatColor("#6366f1");
+  };
+
+  const removeCustomCategory = (key: string) => {
+    setCategories(prev => prev.filter(c => c.categoryKey !== key));
+  };
+
+  const defaultKeys = DEFAULT_CATEGORIES.map(c => c.categoryKey);
+  const defaultCats = categories.filter(c => defaultKeys.includes(c.categoryKey));
+  const customCats = categories.filter(c => !defaultKeys.includes(c.categoryKey));
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2" data-testid="settings-title">
+            <Settings className="h-5 w-5" /> Calendar Settings
+          </DialogTitle>
+          <DialogDescription>Customize event categories, colors, and names</DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="max-h-[60vh]">
+          <div className="space-y-4 pr-2">
+            <div>
+              <Label className="text-sm font-semibold">Category Colors & Names</Label>
+              <div className="space-y-2 mt-2">
+                {defaultCats.map(cat => (
+                  <div key={cat.categoryKey} className="flex items-center gap-2" data-testid={`setting-cat-${cat.categoryKey}`}>
+                    <input
+                      type="color"
+                      value={cat.color}
+                      onChange={e => updateCategory(cat.categoryKey, "color", e.target.value)}
+                      className="w-8 h-8 rounded border cursor-pointer p-0.5"
+                      data-testid={`color-picker-${cat.categoryKey}`}
+                    />
+                    <Input
+                      value={cat.displayName}
+                      onChange={e => updateCategory(cat.categoryKey, "displayName", e.target.value)}
+                      className="flex-1 h-8 text-sm"
+                      data-testid={`name-input-${cat.categoryKey}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <Label className="text-sm font-semibold">My Custom Categories</Label>
+              <div className="space-y-2 mt-2">
+                {customCats.map(cat => (
+                  <div key={cat.categoryKey} className="flex items-center gap-2" data-testid={`setting-custom-${cat.categoryKey}`}>
+                    <input
+                      type="color"
+                      value={cat.color}
+                      onChange={e => updateCategory(cat.categoryKey, "color", e.target.value)}
+                      className="w-8 h-8 rounded border cursor-pointer p-0.5"
+                    />
+                    <Input
+                      value={cat.displayName}
+                      onChange={e => updateCategory(cat.categoryKey, "displayName", e.target.value)}
+                      className="flex-1 h-8 text-sm"
+                    />
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeCustomCategory(cat.categoryKey)}>
+                      <X className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+                {customCats.length === 0 && (
+                  <div className="text-xs text-muted-foreground py-1">No custom categories yet</div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 mt-3">
+                <input
+                  type="color"
+                  value={newCatColor}
+                  onChange={e => setNewCatColor(e.target.value)}
+                  className="w-8 h-8 rounded border cursor-pointer p-0.5"
+                  data-testid="new-cat-color"
+                />
+                <Input
+                  value={newCatName}
+                  onChange={e => setNewCatName(e.target.value)}
+                  placeholder="New category name"
+                  className="flex-1 h-8 text-sm"
+                  data-testid="new-cat-name"
+                  onKeyDown={e => { if (e.key === "Enter") addCustomCategory(); }}
+                />
+                <Button size="sm" variant="outline" onClick={addCustomCategory} data-testid="add-category-button">
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                </Button>
+              </div>
+            </div>
+          </div>
+        </ScrollArea>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            onClick={() => saveMutation.mutate(categories)}
+            disabled={saveMutation.isPending}
+            data-testid="save-settings-button"
+          >
+            {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Save
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

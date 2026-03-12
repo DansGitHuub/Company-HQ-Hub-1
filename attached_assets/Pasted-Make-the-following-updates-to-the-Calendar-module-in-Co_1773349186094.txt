@@ -1,0 +1,53 @@
+Make the following updates to the Calendar module in CompanyHQ:
+
+---
+
+## FIX 1 — Remove duplicate category in filter
+
+In the event type filter dropdown on the Calendar page, "Company" appears twice. Remove the duplicate so it only appears once.
+
+---
+
+## FIX 2 — Expand day in month view
+
+In month view, when a day has more events than fit in the day cell:
+- Show as many events as fit, then show a small clickable link at the bottom of the cell that says "+ X more" where X is the number of hidden events
+- Clicking either the day number OR the "+ X more" link opens a popup/modal showing ALL events for that day as a scrollable list
+- Each event in the popup shows its color dot, title, and time
+- Clicking an event in the popup opens the normal event detail view
+- The month view grid size does NOT change — nothing collapses or shrinks
+
+---
+
+## FIX 3 — Calendar Settings panel
+
+Add a settings gear icon in the top right area of the Calendar page header. Clicking it opens a Calendar Settings panel (slide-out or modal) with:
+
+### Category Colors & Names
+- Show each event category (Job, Shift, Equipment, Task, Company Event, Personal, Customer Appointment, Google Calendar) as a row
+- Each row has: a color swatch the user can click to pick a new color, the category name the user can rename
+- Changes apply to that user's view only — other users keep their own settings
+- The default categories listed above are always present and cannot be deleted (they can be renamed and recolored)
+
+### Custom Categories
+- A section below the defaults titled "My Custom Categories"
+- A "+ Add Category" button that lets the user type a name and pick a color
+- Custom categories can be deleted
+- Custom categories appear in the event type dropdown when creating events
+
+### Save button at the bottom — changes apply immediately on save
+
+Store each user's category preferences in a `user_calendar_settings` table:
+- id
+- user_id
+- category_key (string — matches the event_type values)
+- display_name (string)
+- color (hex string)
+- is_custom (boolean)
+- created_at
+
+---
+
+## NOTES
+- Do not change any other calendar functionality
+- Use existing styling patterns

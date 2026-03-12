@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "./db";
-import { calendarEvents, googleCalendarEvents, users } from "@shared/schema";
+import { calendarEvents, googleCalendarEvents, users, userCalendarSettings } from "@shared/schema";
 import { eq, and, or, gte, lte, sql, desc } from "drizzle-orm";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, isTokenExpired } from "./googleOAuth";
 import * as googleOAuth from "./googleOAuth";
@@ -484,6 +484,48 @@ export function registerCalendarRoutes(app: Express, requireAuth: any) {
     } catch (err) {
       console.error("[calendar] Error fetching google events:", err);
       res.status(500).json({ message: "Error fetching Google Calendar events" });
+    }
+  });
+
+  // GET /api/calendar/settings — get user's category settings
+  app.get("/api/calendar/settings", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const settings = await db.select().from(userCalendarSettings)
+        .where(eq(userCalendarSettings.userId, req.user!.id));
+      res.json(settings);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching calendar settings" });
+    }
+  });
+
+  // POST /api/calendar/settings — save user's category settings (full replace)
+  app.post("/api/calendar/settings", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.id;
+      const { categories } = req.body;
+
+      if (!Array.isArray(categories)) {
+        return res.status(400).json({ message: "categories array required" });
+      }
+
+      await db.delete(userCalendarSettings).where(eq(userCalendarSettings.userId, userId));
+
+      for (const cat of categories) {
+        await db.insert(userCalendarSettings).values({
+          userId,
+          categoryKey: cat.categoryKey,
+          displayName: cat.displayName,
+          color: cat.color,
+          isCustom: cat.isCustom || false,
+        });
+      }
+
+      const settings = await db.select().from(userCalendarSettings)
+        .where(eq(userCalendarSettings.userId, userId));
+      res.json(settings);
+    } catch (err) {
+      console.error("[calendar] Error saving settings:", err);
+      res.status(500).json({ message: "Error saving calendar settings" });
     }
   });
 }

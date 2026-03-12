@@ -77,6 +77,18 @@ export async function runCalendarMigration() {
       );
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_calendar_settings (
+        id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR(36) NOT NULL REFERENCES users(id),
+        category_key TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        color TEXT NOT NULL,
+        is_custom BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
     console.log("[migration] Calendar tables ready");
   } catch (err) {
     console.error("[migration] Calendar migration error:", err);
