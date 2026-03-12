@@ -37,7 +37,8 @@ import {
   CheckSquare,
   Snowflake,
   Bell,
-  Brain
+  Brain,
+  CalendarDays
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -174,6 +175,11 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
     title: "My Application",
     description: "Track your job application status and required documents.",
     tips: ["View hiring progress", "Upload required documents", "See next steps"]
+  },
+  calendar: {
+    title: "Calendar",
+    description: "Schedule and manage events, jobs, and meetings with Google Calendar sync.",
+    tips: ["Create personal or company events", "Sync with Google Calendar", "Assign events to team members"]
   }
 };
 
@@ -345,12 +351,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     admin: { icon: Shield, label: "Admin Panel", href: "/admin" },
     tools: { icon: Snowflake, label: "Tools", href: "/tools" },
     plow_mapper: { icon: Snowflake, label: "Plow Mapper", href: "/tools/plow-mapper" },
+    calendar: { icon: CalendarDays, label: "Calendar", href: "/calendar" },
   };
 
   type NavSection = { label: string; items: string[] };
 
   const sidebarSections: NavSection[] = [
-    { label: "FIELD OPS", items: ["dashboard", "jobs", "equipment", "materials", "tools", "todos"] },
+    { label: "FIELD OPS", items: ["dashboard", "jobs", "equipment", "materials", "tools", "todos", "calendar"] },
     { label: "PEOPLE", items: ["hiring", "employees"] },
     { label: "KNOWLEDGE", items: ["sops", "testing", "forms", "help"] },
     { label: "CUSTOMERS", items: ["education"] },

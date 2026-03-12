@@ -43,6 +43,7 @@ import TestingKnowledge from "@/pages/TestingKnowledge";
 import CalculatorPage from "@/pages/Calculator";
 import Tools from "@/pages/Tools";
 import LeadQualifier from "@/pages/LeadQualifier";
+import CalendarPage from "@/pages/Calendar";
 import SharedDocument from "@/pages/SharedDocument";
 import NotFound from "@/pages/not-found";
 
@@ -108,6 +109,7 @@ function AppRoutes() {
         <Route path="/tools/lead-qualifier" component={LeadQualifier} />
         <Route path="/care-guides" component={CareGuideManager} />
         <Route path="/tools" component={Tools} />
+        <Route path="/calendar" component={CalendarPage} />
         <Route path="/communications" component={MessagingInbox} />
         <Route path="/testing" component={TestingKnowledge} />
         <Route component={NotFound} />

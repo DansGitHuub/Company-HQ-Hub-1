@@ -23,6 +23,10 @@ export const users = pgTable("users", {
   profilePicture: text("profile_picture"),
   theme: text("theme").default("forest"),
   emailNotifications: boolean("email_notifications").notNull().default(true),
+  googleAccessToken: text("google_access_token"),
+  googleRefreshToken: text("google_refresh_token"),
+  googleCalendarId: text("google_calendar_id").default("primary"),
+  googleTokenExpiry: timestamp("google_token_expiry", { withTimezone: true }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -2404,3 +2408,31 @@ export const sharedLinkAccessLogs = pgTable("shared_link_access_logs", {
 });
 
 export type SharedLinkAccessLog = typeof sharedLinkAccessLogs.$inferSelect;
+
+// Calendar Events
+export const calendarEvents = pgTable("calendar_events", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  eventType: text("event_type").notNull().default("personal"),
+  startDatetime: timestamp("start_datetime", { withTimezone: true }).notNull(),
+  endDatetime: timestamp("end_datetime", { withTimezone: true }).notNull(),
+  allDay: boolean("all_day").notNull().default(false),
+  location: text("location"),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id).notNull(),
+  assignedTo: varchar("assigned_to", { length: 36 }).references(() => users.id),
+  linkedRecordType: text("linked_record_type"),
+  linkedRecordId: varchar("linked_record_id", { length: 36 }),
+  googleEventId: text("google_event_id"),
+  isCompanyEvent: boolean("is_company_event").notNull().default(false),
+  isPrivate: boolean("is_private").notNull().default(false),
+  recurrenceRule: text("recurrence_rule"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
