@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "./db";
-import { calendarEvents, users } from "@shared/schema";
+import { calendarEvents, googleCalendarEvents, users } from "@shared/schema";
 import { eq, and, or, gte, lte, sql, desc } from "drizzle-orm";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, isTokenExpired } from "./googleOAuth";
 import * as googleOAuth from "./googleOAuth";
@@ -177,7 +177,8 @@ export function registerCalendarRoutes(app: Express, requireAuth: any) {
       const user = req.user!;
       const { title, description, eventType, startDatetime, endDatetime, allDay,
         location, assignedTo, linkedRecordType, linkedRecordId,
-        isCompanyEvent, isPrivate, recurrenceRule } = req.body;
+        isCompanyEvent, isPrivate, recurrenceRule,
+        contactName, contactEmail, contactPhone } = req.body;
 
       if (!title || !startDatetime || !endDatetime) {
         return res.status(400).json({ message: "Title, start and end datetime are required" });
@@ -202,6 +203,9 @@ export function registerCalendarRoutes(app: Express, requireAuth: any) {
         isCompanyEvent: isCompanyEvent || false,
         isPrivate: isPrivate || false,
         recurrenceRule: recurrenceRule || null,
+        contactName: contactName || null,
+        contactEmail: contactEmail || null,
+        contactPhone: contactPhone || null,
       }).returning();
 
       // Push to Google Calendar
@@ -250,7 +254,8 @@ export function registerCalendarRoutes(app: Express, requireAuth: any) {
       const updates: any = {};
       const allowedFields = ["title", "description", "eventType", "startDatetime", "endDatetime",
         "allDay", "location", "assignedTo", "linkedRecordType", "linkedRecordId",
-        "isCompanyEvent", "isPrivate", "recurrenceRule"];
+        "isCompanyEvent", "isPrivate", "recurrenceRule",
+        "contactName", "contactEmail", "contactPhone"];
 
       for (const field of allowedFields) {
         if (req.body[field] !== undefined) {
@@ -405,6 +410,80 @@ export function registerCalendarRoutes(app: Express, requireAuth: any) {
       res.json(allUsers);
     } catch (err) {
       res.status(500).json({ message: "Error fetching users" });
+    }
+  });
+
+  // POST /api/calendar/google/sync — pull Google Calendar events into CompanyHQ
+  app.post("/api/calendar/google/sync", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user!;
+      const token = await getValidAccessToken(user);
+      if (!token) {
+        return res.status(400).json({ message: "Google Calendar not connected or token expired" });
+      }
+
+      const calendarId = user.googleCalendarId || "primary";
+      const now = new Date();
+      const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const threeMonthsAhead = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+      const googleEvents = await googleOAuth.getUserCalendarEvents(
+        token, threeMonthsAgo, threeMonthsAhead, calendarId
+      );
+
+      await db.delete(googleCalendarEvents).where(eq(googleCalendarEvents.userId, user.id));
+
+      let synced = 0;
+      for (const ge of googleEvents) {
+        if (!ge.summary && !ge.start) continue;
+
+        const isAllDay = !!(ge.start?.date);
+        const startDt = isAllDay
+          ? new Date(ge.start!.date! + "T00:00:00")
+          : new Date(ge.start?.dateTime || ge.start?.date || now.toISOString());
+        const endDt = isAllDay
+          ? new Date(ge.end?.date ? ge.end.date + "T23:59:59" : startDt.toISOString())
+          : new Date(ge.end?.dateTime || ge.end?.date || startDt.toISOString());
+
+        await db.insert(googleCalendarEvents).values({
+          userId: user.id,
+          googleEventId: ge.id || `ge-${Date.now()}-${synced}`,
+          title: ge.summary || "(No title)",
+          description: ge.description || null,
+          startDatetime: startDt,
+          endDatetime: endDt,
+          allDay: isAllDay,
+          location: ge.location || null,
+          calendarId,
+        });
+        synced++;
+      }
+
+      res.json({ message: `Synced ${synced} events from Google Calendar`, count: synced });
+    } catch (err) {
+      console.error("[calendar] Google sync pull error:", err);
+      res.status(500).json({ message: "Error syncing Google Calendar events" });
+    }
+  });
+
+  // GET /api/calendar/google/events — fetch cached Google Calendar events
+  app.get("/api/calendar/google/events", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user!;
+      const start = req.query.start ? new Date(req.query.start as string) : new Date();
+      const end = req.query.end ? new Date(req.query.end as string) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+
+      const events = await db.select().from(googleCalendarEvents)
+        .where(and(
+          eq(googleCalendarEvents.userId, user.id),
+          gte(googleCalendarEvents.startDatetime, start),
+          lte(googleCalendarEvents.endDatetime, end)
+        ));
+
+      res.json(events);
+    } catch (err) {
+      console.error("[calendar] Error fetching google events:", err);
+      res.status(500).json({ message: "Error fetching Google Calendar events" });
     }
   });
 }

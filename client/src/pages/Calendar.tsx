@@ -44,6 +44,9 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle2,
+  Phone,
+  Mail,
+  User,
 } from "lucide-react";
 
 interface CalendarEvent {
@@ -63,8 +66,26 @@ interface CalendarEvent {
   isCompanyEvent: boolean;
   isPrivate: boolean;
   recurrenceRule: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
   createdAt: string;
   updatedAt: string;
+  isGoogleEvent?: boolean;
+}
+
+interface GoogleCalendarEventData {
+  id: string;
+  userId: string;
+  googleEventId: string;
+  title: string;
+  description: string | null;
+  startDatetime: string;
+  endDatetime: string;
+  allDay: boolean;
+  location: string | null;
+  calendarId: string | null;
+  syncedAt: string;
 }
 
 interface UserOption {
@@ -90,7 +111,8 @@ const EVENT_TYPES = [
   { value: "company", label: "Company", color: "bg-teal-500" },
 ];
 
-function getEventColor(eventType: string, isCompanyEvent: boolean) {
+function getEventColor(eventType: string, isCompanyEvent: boolean, isGoogleEvent?: boolean) {
+  if (isGoogleEvent) return "bg-amber-500";
   if (isCompanyEvent) return "bg-teal-500";
   const found = EVENT_TYPES.find(t => t.value === eventType);
   return found?.color || "bg-blue-500";
@@ -205,13 +227,75 @@ export default function CalendarPage() {
     },
   });
 
+  const { data: googleEvents = [] } = useQuery<GoogleCalendarEventData[]>({
+    queryKey: ["/api/calendar/google/events", startOfRange.toISOString(), endOfRange.toISOString()],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/calendar/google/events?start=${startOfRange.toISOString()}&end=${endOfRange.toISOString()}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!googleStatus?.connected,
+  });
+
+  const mergedEvents = useMemo(() => {
+    const companyHQGoogleIds = new Set(
+      events.filter(e => e.googleEventId).map(e => e.googleEventId)
+    );
+
+    const googleAsCalendarEvents: CalendarEvent[] = googleEvents
+      .filter(ge => !companyHQGoogleIds.has(ge.googleEventId))
+      .map(ge => ({
+        id: ge.id,
+        title: ge.title,
+        description: ge.description,
+        eventType: "personal",
+        startDatetime: ge.startDatetime,
+        endDatetime: ge.endDatetime,
+        allDay: ge.allDay,
+        location: ge.location,
+        createdBy: ge.userId,
+        assignedTo: null,
+        linkedRecordType: null,
+        linkedRecordId: null,
+        googleEventId: ge.googleEventId,
+        isCompanyEvent: false,
+        isPrivate: false,
+        recurrenceRule: null,
+        contactName: null,
+        contactEmail: null,
+        contactPhone: null,
+        createdAt: ge.syncedAt,
+        updatedAt: ge.syncedAt,
+        isGoogleEvent: true,
+      }));
+
+    return [...events, ...googleAsCalendarEvents];
+  }, [events, googleEvents]);
+
+  const syncGoogleMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/calendar/google/sync");
+      return res.json();
+    },
+    onSuccess: (data: { message: string; count: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar/google/events"] });
+      toast({ title: "Google Calendar Synced", description: data.message });
+    },
+    onError: (err: any) => showErrorToast(toast, err),
+  });
+
   const filteredEvents = useMemo(() => {
-    let result = events;
+    let result = mergedEvents;
     if (filterType !== "all") {
       if (filterType === "company") {
         result = result.filter(e => e.isCompanyEvent);
       } else if (filterType === "mine") {
         result = result.filter(e => e.createdBy === user?.id || e.assignedTo === user?.id);
+      } else if (filterType === "google") {
+        result = result.filter(e => e.isGoogleEvent);
       } else {
         result = result.filter(e => e.eventType === filterType);
       }
@@ -225,7 +309,7 @@ export default function CalendarPage() {
       );
     }
     return result;
-  }, [events, filterType, searchQuery, user?.id]);
+  }, [mergedEvents, filterType, searchQuery, user?.id]);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -341,7 +425,9 @@ export default function CalendarPage() {
             status={googleStatus}
             onConnect={() => connectGoogleMutation.mutate()}
             onDisconnect={() => disconnectGoogleMutation.mutate()}
+            onSync={() => syncGoogleMutation.mutate()}
             isConnecting={connectGoogleMutation.isPending}
+            isSyncing={syncGoogleMutation.isPending}
           />
           <Button onClick={() => openCreateDialog()} data-testid="create-event-button">
             <Plus className="h-4 w-4 mr-2" />
@@ -383,6 +469,7 @@ export default function CalendarPage() {
               <SelectItem value="all">All Events</SelectItem>
               <SelectItem value="mine">My Events</SelectItem>
               <SelectItem value="company">Company</SelectItem>
+              <SelectItem value="google">Google Calendar</SelectItem>
               {EVENT_TYPES.map(t => (
                 <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
               ))}
@@ -481,12 +568,16 @@ function GoogleCalendarStatus({
   status,
   onConnect,
   onDisconnect,
+  onSync,
   isConnecting,
+  isSyncing,
 }: {
   status: GoogleStatus | undefined;
   onConnect: () => void;
   onDisconnect: () => void;
+  onSync: () => void;
   isConnecting: boolean;
+  isSyncing: boolean;
 }) {
   if (!status) return null;
 
@@ -497,6 +588,10 @@ function GoogleCalendarStatus({
           <CheckCircle2 className="h-3 w-3" />
           Google Calendar
         </Badge>
+        <Button variant="outline" size="sm" onClick={onSync} disabled={isSyncing} data-testid="sync-google">
+          {isSyncing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+          Sync Now
+        </Button>
         <Button variant="ghost" size="sm" onClick={onDisconnect} data-testid="disconnect-google">
           Disconnect
         </Button>
@@ -594,7 +689,7 @@ function MonthView({
                   {dayEvents.slice(0, 3).map(evt => (
                     <div
                       key={evt.id}
-                      className={`text-xs px-1 py-0.5 rounded truncate text-white cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent)}`}
+                      className={`text-xs px-1 py-0.5 rounded truncate text-white cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent)}`}
                       onClick={e => { e.stopPropagation(); onEventClick(evt); }}
                       data-testid={`event-chip-${evt.id}`}
                     >
@@ -671,7 +766,7 @@ function WeekView({
               {allDayEvents(d).map(evt => (
                 <div
                   key={evt.id}
-                  className={`text-xs px-1 py-0.5 rounded truncate text-white ${getEventColor(evt.eventType, evt.isCompanyEvent)}`}
+                  className={`text-xs px-1 py-0.5 rounded truncate text-white ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent)}`}
                   onClick={e => { e.stopPropagation(); onEventClick(evt); }}
                 >
                   {evt.title}
@@ -702,7 +797,7 @@ function WeekView({
                   {hourEvents.map(evt => (
                     <div
                       key={evt.id}
-                      className={`text-xs px-1 py-0.5 rounded truncate text-white mb-0.5 cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent)}`}
+                      className={`text-xs px-1 py-0.5 rounded truncate text-white mb-0.5 cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent)}`}
                       onClick={() => onEventClick(evt)}
                     >
                       {formatTime(evt.startDatetime)} {evt.title}
@@ -748,7 +843,7 @@ function DayView({
             {allDayEvts.map(evt => (
               <div
                 key={evt.id}
-                className={`text-xs px-2 py-1 rounded text-white cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent)}`}
+                className={`text-xs px-2 py-1 rounded text-white cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent)}`}
                 onClick={() => onEventClick(evt)}
               >
                 {evt.title}
@@ -777,7 +872,7 @@ function DayView({
                 {hourEvents.map(evt => (
                   <div
                     key={evt.id}
-                    className={`text-sm px-2 py-1 rounded text-white cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent)}`}
+                    className={`text-sm px-2 py-1 rounded text-white cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent)}`}
                     onClick={() => onEventClick(evt)}
                     data-testid={`day-event-${evt.id}`}
                   >
@@ -839,7 +934,7 @@ function ListView({
                 data-testid={`list-event-${evt.id}`}
               >
                 <CardContent className="p-3 flex items-center gap-3">
-                  <div className={`w-1 h-10 rounded-full flex-shrink-0 ${getEventColor(evt.eventType, evt.isCompanyEvent)}`} />
+                  <div className={`w-1 h-10 rounded-full flex-shrink-0 ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent)}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate flex items-center gap-2">
                       {evt.title}
@@ -911,6 +1006,9 @@ function EventFormDialog({
   const [assignedTo, setAssignedTo] = useState<string | null>(null);
   const [isCompanyEvent, setIsCompanyEvent] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -925,6 +1023,9 @@ function EventFormDialog({
         setAssignedTo(event.assignedTo);
         setIsCompanyEvent(event.isCompanyEvent);
         setIsPrivate(event.isPrivate);
+        setContactName(event.contactName || "");
+        setContactEmail(event.contactEmail || "");
+        setContactPhone(event.contactPhone || "");
       } else {
         setTitle("");
         setDescription("");
@@ -936,6 +1037,9 @@ function EventFormDialog({
         setAssignedTo(null);
         setIsCompanyEvent(false);
         setIsPrivate(false);
+        setContactName("");
+        setContactEmail("");
+        setContactPhone("");
       }
     }
   }, [open, event]);
@@ -954,6 +1058,9 @@ function EventFormDialog({
       assignedTo: assignedTo || null,
       isCompanyEvent,
       isPrivate,
+      contactName: contactName.trim() || null,
+      contactEmail: contactEmail.trim() || null,
+      contactPhone: contactPhone.trim() || null,
     };
 
     if (isEditing && event) {
@@ -1049,6 +1156,17 @@ function EventFormDialog({
             <Label>Location</Label>
             <Input value={location} onChange={e => setLocation(e.target.value)} placeholder="Optional location" data-testid="event-location-input" />
           </div>
+          <Separator />
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5" /> Contact Info
+            </Label>
+            <Input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Contact name" data-testid="event-contact-name" />
+            <div className="grid grid-cols-2 gap-2">
+              <Input value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="Email" type="email" data-testid="event-contact-email" />
+              <Input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Phone" type="tel" data-testid="event-contact-phone" />
+            </div>
+          </div>
           {canManageCompany && (
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
@@ -1112,7 +1230,7 @@ function EventDetailDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2" data-testid="event-detail-title">
-            <span className={`w-3 h-3 rounded-full ${getEventColor(event.eventType, event.isCompanyEvent)}`} />
+            <span className={`w-3 h-3 rounded-full ${getEventColor(event.eventType, event.isCompanyEvent, event.isGoogleEvent)}`} />
             {event.title}
           </DialogTitle>
         </DialogHeader>
@@ -1153,10 +1271,33 @@ function EventDetailDialog({
             )}
             {event.googleEventId && (
               <Badge variant="outline" className="text-blue-600">
-                <Globe className="h-3 w-3 mr-1" /> Synced
+                <Globe className="h-3 w-3 mr-1" /> {event.isGoogleEvent ? "Google Calendar" : "Synced"}
               </Badge>
             )}
           </div>
+          {(event.contactName || event.contactEmail || event.contactPhone) && (
+            <div className="space-y-1.5">
+              <div className="text-xs font-medium text-muted-foreground">Contact</div>
+              {event.contactName && (
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>{event.contactName}</span>
+                </div>
+              )}
+              {event.contactEmail && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                  <a href={`mailto:${event.contactEmail}`} className="text-primary hover:underline">{event.contactEmail}</a>
+                </div>
+              )}
+              {event.contactPhone && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                  <a href={`tel:${event.contactPhone}`} className="text-primary hover:underline">{event.contactPhone}</a>
+                </div>
+              )}
+            </div>
+          )}
           {(assignedUser || creator) && (
             <div className="text-xs text-muted-foreground space-y-1">
               {creator && <div>Created by: {creator.name}</div>}
@@ -1164,7 +1305,7 @@ function EventDetailDialog({
             </div>
           )}
         </div>
-        {canEdit && (
+        {canEdit && !event.isGoogleEvent && (
           <DialogFooter className="gap-2">
             <Button variant="destructive" size="sm" onClick={() => onDelete(event.id)} disabled={isDeleting} data-testid="delete-event-button">
               {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}

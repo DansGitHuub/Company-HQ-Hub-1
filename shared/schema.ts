@@ -2481,6 +2481,9 @@ export const calendarEvents = pgTable("calendar_events", {
   isCompanyEvent: boolean("is_company_event").notNull().default(false),
   isPrivate: boolean("is_private").notNull().default(false),
   recurrenceRule: text("recurrence_rule"),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -2490,3 +2493,19 @@ export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit
 });
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
+
+export const googleCalendarEvents = pgTable("google_calendar_events", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id).notNull(),
+  googleEventId: text("google_event_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  startDatetime: timestamp("start_datetime", { withTimezone: true }).notNull(),
+  endDatetime: timestamp("end_datetime", { withTimezone: true }).notNull(),
+  allDay: boolean("all_day").notNull().default(false),
+  location: text("location"),
+  calendarId: text("calendar_id"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+});
+
+export type GoogleCalendarEvent = typeof googleCalendarEvents.$inferSelect;
