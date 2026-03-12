@@ -1,0 +1,302 @@
+I need you to add two backend API routes to support the PDF Field Placer tool. The tool is a static HTML file at `public/pdf-field-placer.html` that sends requests to these endpoints.
+
+## What to install
+
+Install the Python package `pypdf` if it is not already installed:
+```
+pip install pypdf
+```
+
+Also make sure `multer` is available for handling file uploads in the Express backend.
+
+---
+
+## Route 1 — Build the fillable PDF
+
+**POST `/api/tools/pdf-field-placer/build`**
+
+This route receives a PDF file and a JSON field map, adds fillable form fields to the PDF using a Python script, and returns the finished PDF as a download.
+
+### Request
+- Multipart form data
+- `pdf` — the uploaded source PDF file
+- `fields` — JSON string array of field objects, each with:
+  - `name` (string)
+  - `type` (string: "any", "name", "numerical", "currency", "date_mdy", "ssn", "xmark", "checkbox", "signature", "date")
+  - `page` (integer, 0-indexed)
+  - `rect` (array of 4 numbers: [x0, y0, x1, y1] in PDF points)
+
+### What to do
+1. Save the uploaded PDF to a temp file
+2. Run the Python build script (see below) passing the temp file path and fields JSON
+3. Return the output PDF as a file download with content-type `application/pdf`
+4. Clean up temp files after sending
+
+### Python build script
+
+Create the file `scripts/build_pdf_fields.py` with this exact content:
+
+```python
+import sys
+import json
+from pypdf import PdfReader, PdfWriter
+from pypdf.generic import (
+    DictionaryObject, ArrayObject, NameObject, NumberObject,
+    create_string_object, BooleanObject, DecodedStreamObject
+)
+
+def make_str(s): return create_string_object(s)
+
+def setup_acroform(writer):
+    acro = DictionaryObject()
+    acro[NameObject("/Fields")] = ArrayObject()
+    acro[NameObject("/NeedAppearances")] = BooleanObject(True)
+    helv = DictionaryObject()
+    helv[NameObject("/Type")]     = NameObject("/Font")
+    helv[NameObject("/Subtype")]  = NameObject("/Type1")
+    helv[NameObject("/BaseFont")] = NameObject("/Helvetica")
+    font_dict = DictionaryObject()
+    font_dict[NameObject("/Helv")] = helv
+    dr = DictionaryObject()
+    dr[NameObject("/Font")] = font_dict
+    acro[NameObject("/DR")] = dr
+    writer._root_object[NameObject("/AcroForm")] = acro
+
+def make_js_action(writer, js):
+    a = DictionaryObject()
+    a[NameObject("/Type")] = NameObject("/Action")
+    a[NameObject("/S")]    = NameObject("/JavaScript")
+    a[NameObject("/JS")]   = make_str(js)
+    return writer._add_object(a)
+
+def add_text(writer, page_num, name, tooltip, rect, fmt=None, nums_only=False, font_size=12, align=1):
+    page = writer.pages[page_num]
+    field = DictionaryObject()
+    field[NameObject("/Type")]    = NameObject("/Annot")
+    field[NameObject("/Subtype")] = NameObject("/Widget")
+    field[NameObject("/FT")]      = NameObject("/Tx")
+    field[NameObject("/T")]       = make_str(name)
+    field[NameObject("/TU")]      = make_str(tooltip)
+    field[NameObject("/Ff")]      = NumberObject(0)
+    field[NameObject("/Q")]       = NumberObject(align)
+    field[NameObject("/V")]       = make_str("")
+    field[NameObject("/DV")]      = make_str("")
+    field[NameObject("/Rect")]    = ArrayObject([NumberObject(x) for x in rect])
+    bs = DictionaryObject()
+    bs[NameObject("/W")] = NumberObject(1)
+    bs[NameObject("/S")] = NameObject("/S")
+    field[NameObject("/BS")] = bs
+    field[NameObject("/DA")] = make_str(f"/Helv {font_size} Tf 0 g")
+
+    aa = DictionaryObject()
+    has_aa = False
+
+    if fmt == "ssn":
+        ks_js = (
+            "if (!event.willCommit) {"
+            "  var k = event.change;"
+            "  if (!/^[0-9]$/.test(k)) { event.rc = false; return; }"
+            "  var raw = event.value.replace(/-/g,'');"
+            "  if (raw.length >= 9) { event.rc = false; return; }"
+            "  if (raw.length == 2) { event.change = k + '-'; }"
+            "  else if (raw.length == 4) { event.change = k + '-'; }"
+            "  else { event.change = k; }"
+            "}"
+        )
+        fmt_js = (
+            "var v = event.value.replace(/-/g,'');"
+            "if (v.length == 9) {"
+            "  event.value = v.substr(0,3)+'-'+v.substr(3,2)+'-'+v.substr(5,4);"
+            "}"
+        )
+        aa[NameObject("/K")] = make_js_action(writer, ks_js)
+        aa[NameObject("/F")] = make_js_action(writer, fmt_js)
+        has_aa = True
+
+    elif fmt == "date":
+        ks_js = (
+            "if (!event.willCommit) {"
+            "  var k = event.change;"
+            "  if (!/^[0-9]$/.test(k)) { event.rc = false; return; }"
+            "  var raw = event.value.replace(/\\//g,'');"
+            "  if (raw.length >= 8) { event.rc = false; return; }"
+            "  if (raw.length === 1) { event.change = k + '/'; }"
+            "  else if (raw.length === 3) { event.change = k + '/'; }"
+            "  else { event.change = k; }"
+            "}"
+        )
+        fmt_js = (
+            "var v = event.value.replace(/\\//g,'');"
+            "if (v.length == 8) {"
+            "  event.value = v.substr(0,2)+'/'+v.substr(2,2)+'/'+v.substr(4,4);"
+            "}"
+        )
+        aa[NameObject("/K")] = make_js_action(writer, ks_js)
+        aa[NameObject("/F")] = make_js_action(writer, fmt_js)
+        has_aa = True
+
+    elif fmt == "currency":
+        ks_js  = "AFNumber_Keystroke(2, 0, 0, 0, '$', true);"
+        fmt_js = "AFNumber_Format(2, 0, 0, 0, '$', true);"
+        aa[NameObject("/K")] = make_js_action(writer, ks_js)
+        aa[NameObject("/F")] = make_js_action(writer, fmt_js)
+        has_aa = True
+
+    elif nums_only:
+        ks_js = (
+            "if (!event.willCommit) {"
+            "  if (!/^[0-9]$/.test(event.change)) { event.rc = false; }"
+            "}"
+        )
+        aa[NameObject("/K")] = make_js_action(writer, ks_js)
+        has_aa = True
+
+    if has_aa:
+        field[NameObject("/AA")] = aa
+
+    ref = writer._add_object(field)
+    page[NameObject("/Annots")].append(ref)
+    writer._root_object[NameObject("/AcroForm")][NameObject("/Fields")].append(ref)
+
+def add_checkbox(writer, page_num, name, tooltip, rect):
+    page = writer.pages[page_num]
+    w = rect[2] - rect[0]
+    h = rect[3] - rect[1]
+    checked_stream = DecodedStreamObject()
+    checked_stream._data = (f"q 2 w 0 0 m {w:.1f} {h:.1f} l S {w:.1f} 0 m 0 {h:.1f} l S Q").encode()
+    checked_stream[NameObject("/Type")]      = NameObject("/XObject")
+    checked_stream[NameObject("/Subtype")]   = NameObject("/Form")
+    checked_stream[NameObject("/BBox")]      = ArrayObject([NumberObject(0), NumberObject(0), NumberObject(w), NumberObject(h)])
+    checked_stream[NameObject("/Resources")] = DictionaryObject()
+    off_stream = DecodedStreamObject()
+    off_stream._data = b""
+    off_stream[NameObject("/Type")]      = NameObject("/XObject")
+    off_stream[NameObject("/Subtype")]   = NameObject("/Form")
+    off_stream[NameObject("/BBox")]      = ArrayObject([NumberObject(0), NumberObject(0), NumberObject(w), NumberObject(h)])
+    off_stream[NameObject("/Resources")] = DictionaryObject()
+    n_dict = DictionaryObject()
+    n_dict[NameObject("/Yes")] = writer._add_object(checked_stream)
+    n_dict[NameObject("/Off")] = writer._add_object(off_stream)
+    ap = DictionaryObject()
+    ap[NameObject("/N")] = writer._add_object(n_dict)
+    field = DictionaryObject()
+    field[NameObject("/Type")]    = NameObject("/Annot")
+    field[NameObject("/Subtype")] = NameObject("/Widget")
+    field[NameObject("/FT")]      = NameObject("/Btn")
+    field[NameObject("/T")]       = make_str(name)
+    field[NameObject("/TU")]      = make_str(tooltip)
+    field[NameObject("/Ff")]      = NumberObject(0)
+    field[NameObject("/V")]       = NameObject("/Off")
+    field[NameObject("/AS")]      = NameObject("/Off")
+    field[NameObject("/DV")]      = NameObject("/Off")
+    field[NameObject("/Rect")]    = ArrayObject([NumberObject(x) for x in rect])
+    field[NameObject("/AP")]      = ap
+    bs = DictionaryObject()
+    bs[NameObject("/W")] = NumberObject(1)
+    bs[NameObject("/S")] = NameObject("/S")
+    field[NameObject("/BS")] = bs
+    ref = writer._add_object(field)
+    page[NameObject("/Annots")].append(ref)
+    writer._root_object[NameObject("/AcroForm")][NameObject("/Fields")].append(ref)
+
+# ── MAIN ───────────────────────────────────────────────────────
+input_path  = sys.argv[1]
+output_path = sys.argv[2]
+fields_json = sys.argv[3]
+
+fields = json.loads(fields_json)
+
+reader = PdfReader(input_path)
+writer = PdfWriter()
+writer.clone_reader_document_root(reader)
+setup_acroform(writer)
+
+for page_num in range(len(writer.pages)):
+    page = writer.pages[page_num]
+    from pypdf.generic import NameObject as NO, ArrayObject as AO
+    if NO("/Annots") not in page:
+        page[NO("/Annots")] = AO()
+
+for f in fields:
+    page   = f["page"]
+    name   = f["name"]
+    rect   = f["rect"]
+    ftype  = f["type"]
+
+    if ftype in ("xmark", "checkbox"):
+        add_checkbox(writer, page, name, name, rect)
+    elif ftype == "numerical":
+        add_text(writer, page, name, name, rect, nums_only=True)
+    elif ftype == "currency":
+        add_text(writer, page, name, name, rect, fmt="currency")
+    elif ftype == "date_mdy":
+        add_text(writer, page, name, "MM/DD/YYYY", rect, fmt="date")
+    elif ftype == "ssn":
+        add_text(writer, page, name, "XXX-XX-XXXX", rect, fmt="ssn")
+    else:
+        add_text(writer, page, name, name, rect)
+
+with open(output_path, "wb") as out:
+    writer.write(out)
+
+print("OK")
+```
+
+### Express route handler
+
+```javascript
+// POST /api/tools/pdf-field-placer/build
+router.post('/build', upload.single('pdf'), async (req, res) => {
+  const inputPath  = req.file.path;
+  const outputPath = inputPath + '_out.pdf';
+  const fields     = req.body.fields;
+
+  try {
+    await runPython('scripts/build_pdf_fields.py', [inputPath, outputPath, fields]);
+    res.download(outputPath, 'fillable.pdf', () => {
+      fs.unlinkSync(inputPath);
+      fs.unlinkSync(outputPath);
+    });
+  } catch (err) {
+    res.status(500).send(err.message);
+    fs.unlinkSync(inputPath);
+  }
+});
+```
+
+---
+
+## Route 2 — Save the finished PDF to CompanyHQ
+
+**POST `/api/tools/pdf-field-placer/save`**
+
+This route receives the finished PDF and saves it to the correct location in CompanyHQ based on the chosen destination.
+
+### Request
+- Multipart form data
+- `file` — the finished PDF
+- `name` — file name to save as
+- `destination` — one of: `"document_library"`, `"forms_folder"`, `"linked_record"`
+- `linkedType` — (optional) `"employee"` or `"customer"`
+- `linkedId` — (optional) the ID of the employee or customer record
+
+### What to do
+
+- If `destination` is `"document_library"` — save to the main document library (use the same storage pattern as other document uploads in the app)
+- If `destination` is `"forms_folder"` — save to a "Forms" category/folder in the document library, creating that category if it doesn't exist
+- If `destination` is `"linked_record"` — attach the file to the specified employee or customer record's documents tab (same as uploading a document to that record directly)
+
+Use the existing document storage patterns already in the app — don't create a new storage system.
+
+### Response
+Return `{ success: true, documentId: <id> }` on success, or a 500 with an error message on failure.
+
+---
+
+## Notes
+
+- Both routes should require the user to be authenticated and have Admin role
+- Use the existing auth middleware pattern from the rest of the app
+- The `runPython` helper should use Node's `child_process.spawn` to run `python3 scripts/build_pdf_fields.py`
+- Temp files should go in the OS temp directory (`os.tmpdir()`)
+- Do not change any existing routes or files

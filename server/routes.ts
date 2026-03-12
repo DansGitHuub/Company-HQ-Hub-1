@@ -8153,6 +8153,172 @@ Provide accurate information based on publicly available documentation.`;
   registerChatRoutes(app);
   registerAssistantRoutes(app);
 
+  // PDF Field Placer — build fillable PDF from field placer tool
+  const fieldPlacerUpload = (await import("multer")).default({
+    storage: (await import("multer")).default.memoryStorage(),
+    limits: { fileSize: 25 * 1024 * 1024 }
+  });
+
+  app.post("/api/tools/pdf-field-placer/build",
+    requireAuth,
+    requireAdmin,
+    fieldPlacerUpload.single("pdf"),
+    async (req: any, res) => {
+      const fs = await import("fs");
+      const path = await import("path");
+      const os = await import("os");
+      const { spawn } = await import("child_process");
+
+      let inputPath = "";
+      let outputPath = "";
+
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "No PDF file uploaded" });
+        }
+        if (!req.body.fields) {
+          return res.status(400).json({ message: "No fields data provided" });
+        }
+
+        let fieldsData: any[];
+        try {
+          fieldsData = JSON.parse(req.body.fields);
+        } catch {
+          return res.status(400).json({ message: "Invalid fields JSON" });
+        }
+
+        if (!Array.isArray(fieldsData) || fieldsData.length === 0) {
+          return res.status(400).json({ message: "Fields must be a non-empty array" });
+        }
+
+        const tmpDir = os.tmpdir();
+        const timestamp = Date.now();
+        inputPath = path.join(tmpDir, `placer_in_${timestamp}.pdf`);
+        outputPath = path.join(tmpDir, `placer_out_${timestamp}.pdf`);
+
+        fs.writeFileSync(inputPath, req.file.buffer);
+
+        const scriptPath = path.join(process.cwd(), "scripts", "build_pdf_fields.py");
+        const fieldsArg = JSON.stringify(fieldsData);
+
+        await new Promise<void>((resolve, reject) => {
+          const proc = spawn("python3", [scriptPath, inputPath, outputPath, fieldsArg], {
+            timeout: 30000,
+          });
+          let stderr = "";
+          proc.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+          proc.on("close", (code: number) => {
+            if (code !== 0) {
+              reject(new Error(stderr || "Python script failed"));
+            } else {
+              resolve();
+            }
+          });
+          proc.on("error", (err: Error) => reject(err));
+        });
+
+        if (!fs.existsSync(outputPath)) {
+          return res.status(500).json({ message: "PDF build completed but output file was not created" });
+        }
+
+        const outputBuffer = fs.readFileSync(outputPath);
+        const originalName = req.file.originalname?.replace(/\.pdf$/i, "") || "document";
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${originalName}_fillable.pdf"`);
+        res.setHeader("Content-Length", outputBuffer.length);
+        res.send(outputBuffer);
+      } catch (err: any) {
+        console.error("[pdf-field-placer/build] Error:", err);
+        res.status(500).json({ message: err.message || "Internal server error building PDF" });
+      } finally {
+        const fs2 = await import("fs");
+        try { if (inputPath) fs2.unlinkSync(inputPath); } catch {}
+        try { if (outputPath) fs2.unlinkSync(outputPath); } catch {}
+      }
+    }
+  );
+
+  // PDF Field Placer — save finished PDF to CompanyHQ document system
+  app.post("/api/tools/pdf-field-placer/save",
+    requireAuth,
+    requireAdmin,
+    fieldPlacerUpload.single("file"),
+    async (req: any, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+        const user = req.user as any;
+        const { name, destination, linkedType, linkedId } = req.body;
+        const fileName = name || req.file.originalname || "fillable.pdf";
+
+        if (!destination) {
+          return res.status(400).json({ message: "Destination is required" });
+        }
+
+        const { ObjectStorageService, objectStorageClient } = await import("./replit_integrations/object_storage/objectStorage");
+        const { randomUUID } = await import("crypto");
+
+        const objService = new ObjectStorageService();
+        const privateDir = objService.getPrivateObjectDir();
+        const objectId = randomUUID();
+        const fullPath = `${privateDir}/uploads/${objectId}`;
+
+        const pathParts = fullPath.startsWith("/") ? fullPath.split("/") : `/${fullPath}`.split("/");
+        const bucketName = pathParts[1];
+        const objectName = pathParts.slice(2).join("/");
+        const bucket = objectStorageClient.bucket(bucketName);
+        const file = bucket.file(objectName);
+
+        await file.save(req.file.buffer, {
+          contentType: "application/pdf",
+          metadata: { contentType: "application/pdf" },
+        });
+
+        const fileUrl = `/objects/${objectId}`;
+        const fileSizeKb = Math.ceil(req.file.buffer.length / 1024);
+
+        let category = "form";
+        let homeEntityType = "company";
+        let homeEntityId = "global";
+
+        if (destination === "forms_folder") {
+          category = "form";
+        } else if (destination === "document_library") {
+          category = "general";
+        } else if (destination === "linked_record") {
+          if (linkedType === "employee" && linkedId) {
+            homeEntityType = "employee";
+            homeEntityId = linkedId;
+          } else if (linkedType === "customer" && linkedId) {
+            homeEntityType = "customer";
+            homeEntityId = linkedId;
+          }
+          category = "form";
+        }
+
+        const doc = await storage.createDocument({
+          fileName,
+          fileUrl,
+          fileType: "application/pdf",
+          fileSizeKb,
+          category,
+          homeEntityType,
+          homeEntityId,
+          isTemplate: false,
+          version: 1,
+          uploadedByUserId: user.id,
+        });
+
+        res.json({ success: true, documentId: doc.id });
+      } catch (err: any) {
+        console.error("[pdf-field-placer/save] Error:", err);
+        res.status(500).json({ message: err.message || "Internal server error saving document" });
+      }
+    }
+  );
+
   // PDF Field Builder - build fillable PDFs from field coordinates
   const buildPdfUpload = (await import("multer")).default({
     storage: (await import("multer")).default.memoryStorage(),
