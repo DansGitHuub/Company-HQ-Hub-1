@@ -124,39 +124,35 @@ const DEFAULT_CATEGORIES: CategorySetting[] = [
 ];
 
 const EVENT_TYPES = [
-  { value: "personal", label: "Personal", color: "bg-blue-500" },
-  { value: "job", label: "Job", color: "bg-green-600" },
-  { value: "shift", label: "Shift", color: "bg-violet-600" },
-  { value: "equipment", label: "Equipment", color: "bg-orange-600" },
-  { value: "task", label: "Task", color: "bg-sky-600" },
-  { value: "meeting", label: "Meeting", color: "bg-purple-500" },
-  { value: "deadline", label: "Deadline", color: "bg-red-500" },
-  { value: "maintenance", label: "Maintenance", color: "bg-orange-500" },
-  { value: "company", label: "Company", color: "bg-teal-500" },
-  { value: "customer_appointment", label: "Customer Appointment", color: "bg-rose-600" },
+  { value: "personal", label: "Personal", color: "#3b82f6" },
+  { value: "job", label: "Job", color: "#16a34a" },
+  { value: "shift", label: "Shift", color: "#7c3aed" },
+  { value: "equipment", label: "Equipment", color: "#ea580c" },
+  { value: "task", label: "Task", color: "#0284c7" },
+  { value: "meeting", label: "Meeting", color: "#a855f7" },
+  { value: "deadline", label: "Deadline", color: "#ef4444" },
+  { value: "maintenance", label: "Maintenance", color: "#f97316" },
+  { value: "company", label: "Company", color: "#14b8a6" },
+  { value: "customer_appointment", label: "Customer Appointment", color: "#e11d48" },
 ];
 
-function hexToTwClass(hex: string): string {
-  return `bg-[${hex}]`;
-}
-
-function getEventColor(eventType: string, isCompanyEvent: boolean, isGoogleEvent?: boolean, categorySettings?: CategorySetting[]) {
+function getEventColorHex(eventType: string, isCompanyEvent: boolean, isGoogleEvent?: boolean, categorySettings?: CategorySetting[]): string {
   if (categorySettings && categorySettings.length > 0) {
     if (isGoogleEvent) {
       const gs = categorySettings.find(c => c.categoryKey === "google");
-      if (gs) return hexToTwClass(gs.color);
+      if (gs) return gs.color;
     }
     if (isCompanyEvent) {
       const cs = categorySettings.find(c => c.categoryKey === "company");
-      if (cs) return hexToTwClass(cs.color);
+      if (cs) return cs.color;
     }
     const found = categorySettings.find(c => c.categoryKey === eventType);
-    if (found) return hexToTwClass(found.color);
+    if (found) return found.color;
   }
-  if (isGoogleEvent) return "bg-amber-500";
-  if (isCompanyEvent) return "bg-teal-500";
+  if (isGoogleEvent) return "#f59e0b";
+  if (isCompanyEvent) return "#14b8a6";
   const found = EVENT_TYPES.find(t => t.value === eventType);
-  return found?.color || "bg-blue-500";
+  return found?.color || "#3b82f6";
 }
 
 function formatTime(dateStr: string) {
@@ -307,13 +303,13 @@ export default function CalendarPage() {
   const allEventTypes = useMemo(() => {
     const base = EVENT_TYPES.map(et => {
       const cs = categorySettings.find(c => c.categoryKey === et.value);
-      return cs ? { ...et, label: cs.displayName, color: hexToTwClass(cs.color) } : et;
+      return cs ? { ...et, label: cs.displayName, color: cs.color } : et;
     });
     const customCats = categorySettings.filter(c => c.isCustom);
     const customTypes = customCats.map(c => ({
       value: c.categoryKey,
       label: c.displayName,
-      color: hexToTwClass(c.color),
+      color: c.color,
     }));
     return [...base, ...customTypes];
   }, [categorySettings]);
@@ -802,7 +798,8 @@ function MonthView({
                   {dayEvents.slice(0, 3).map(evt => (
                     <div
                       key={evt.id}
-                      className={`text-xs px-1 py-0.5 rounded truncate text-white cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent, categorySettings)}`}
+                      className="text-xs px-1 py-0.5 rounded truncate text-white cursor-pointer"
+                      style={{ backgroundColor: getEventColorHex(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent, categorySettings) }}
                       onClick={e => { e.stopPropagation(); onEventClick(evt); }}
                       data-testid={`event-chip-${evt.id}`}
                     >
@@ -883,7 +880,8 @@ function WeekView({
               {allDayEvents(d).map(evt => (
                 <div
                   key={evt.id}
-                  className={`text-xs px-1 py-0.5 rounded truncate text-white ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent)}`}
+                  className="text-xs px-1 py-0.5 rounded truncate text-white"
+                  style={{ backgroundColor: getEventColorHex(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent) }}
                   onClick={e => { e.stopPropagation(); onEventClick(evt); }}
                 >
                   {evt.title}
@@ -914,7 +912,8 @@ function WeekView({
                   {hourEvents.map(evt => (
                     <div
                       key={evt.id}
-                      className={`text-xs px-1 py-0.5 rounded truncate text-white mb-0.5 cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent)}`}
+                      className="text-xs px-1 py-0.5 rounded truncate text-white mb-0.5 cursor-pointer"
+                      style={{ backgroundColor: getEventColorHex(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent) }}
                       onClick={() => onEventClick(evt)}
                     >
                       {formatTime(evt.startDatetime)} {evt.title}
@@ -960,7 +959,8 @@ function DayView({
             {allDayEvts.map(evt => (
               <div
                 key={evt.id}
-                className={`text-xs px-2 py-1 rounded text-white cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent)}`}
+                className="text-xs px-2 py-1 rounded text-white cursor-pointer"
+                style={{ backgroundColor: getEventColorHex(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent) }}
                 onClick={() => onEventClick(evt)}
               >
                 {evt.title}
@@ -989,7 +989,8 @@ function DayView({
                 {hourEvents.map(evt => (
                   <div
                     key={evt.id}
-                    className={`text-sm px-2 py-1 rounded text-white cursor-pointer ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent)}`}
+                    className="text-sm px-2 py-1 rounded text-white cursor-pointer"
+                    style={{ backgroundColor: getEventColorHex(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent) }}
                     onClick={() => onEventClick(evt)}
                     data-testid={`day-event-${evt.id}`}
                   >
@@ -1051,7 +1052,7 @@ function ListView({
                 data-testid={`list-event-${evt.id}`}
               >
                 <CardContent className="p-3 flex items-center gap-3">
-                  <div className={`w-1 h-10 rounded-full flex-shrink-0 ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent)}`} />
+                  <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: getEventColorHex(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent) }} />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate flex items-center gap-2">
                       {evt.title}
@@ -1222,7 +1223,7 @@ function EventFormDialog({
                   {eventTypes.map(t => (
                     <SelectItem key={t.value} value={t.value}>
                       <span className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${t.color}`} />
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }} />
                         {t.label}
                       </span>
                     </SelectItem>
@@ -1353,7 +1354,7 @@ function EventDetailDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2" data-testid="event-detail-title">
-            <span className={`w-3 h-3 rounded-full ${getEventColor(event.eventType, event.isCompanyEvent, event.isGoogleEvent, categorySettings)}`} />
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: getEventColorHex(event.eventType, event.isCompanyEvent, event.isGoogleEvent, categorySettings) }} />
             {event.title}
           </DialogTitle>
         </DialogHeader>
@@ -1481,7 +1482,7 @@ function DayEventsPopup({
                 onClick={() => onEventClick(evt)}
                 data-testid={`day-popup-event-${evt.id}`}
               >
-                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${getEventColor(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent, categorySettings)}`} />
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: getEventColorHex(evt.eventType, evt.isCompanyEvent, evt.isGoogleEvent, categorySettings) }} />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{evt.title}</div>
                   <div className="text-xs text-muted-foreground">
