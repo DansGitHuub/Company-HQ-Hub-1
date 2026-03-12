@@ -36,6 +36,7 @@ import {
   Grip,
   Minus,
   CheckSquare,
+  ListChecks,
   Snowflake,
   Bell,
   Brain,
@@ -81,6 +82,11 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
     title: "To-Do List",
     description: "Manage tasks with priorities, due dates, and assignments.",
     tips: ["Set priorities and due dates", "Assign tasks to team members", "Track completion status"]
+  },
+  tasks: {
+    title: "Tasks",
+    description: "Track and manage tasks across the company with kanban boards and list views.",
+    tips: ["Drag and drop to change status", "Pick up open pool tasks", "Add comments and custom fields"]
   },
   materials: {
     title: "Materials Catalog",
@@ -288,6 +294,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     refetchInterval: 30000,
   });
 
+  const { data: tasksDashboard } = useQuery<{ overdue: number }>({
+    queryKey: ["/api/tasks/dashboard"],
+    staleTime: 30000,
+    refetchInterval: 30000,
+    enabled: !!user,
+  });
+
   const { data: unseenUpdates = [] } = useQuery<{ id: string }[]>({
     queryKey: ["/api/updates/unseen"],
     staleTime: 30000,
@@ -339,6 +352,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     materials: { icon: Hammer, label: "Materials", href: "/materials" },
     equipment: { icon: Truck, label: "Equipment", href: "/equipment" },
     todos: { icon: CheckSquare, label: "To-Do List", href: "/todos" },
+    tasks: { icon: ListChecks, label: "Tasks", href: "/tasks" },
     hiring: { icon: Users, label: "Hiring", href: "/hiring" },
     employees: { icon: User, label: "Employees", href: "/employees" },
     jobs: { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
@@ -358,7 +372,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   type NavSection = { label: string; items: string[] };
 
   const sidebarSections: NavSection[] = [
-    { label: "FIELD OPS", items: ["dashboard", "jobs", "equipment", "materials", "tools", "todos", "calendar"] },
+    { label: "FIELD OPS", items: ["dashboard", "jobs", "equipment", "materials", "tools", "tasks", "todos", "calendar"] },
     { label: "PEOPLE", items: ["hiring", "employees"] },
     { label: "KNOWLEDGE", items: ["sops", "testing", "forms", "help"] },
     { label: "CUSTOMERS", items: ["education"] },
@@ -469,6 +483,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 const isActive = getIsActive(item);
                 const helpContent = menuHelpContent[item.id];
                 const showTodoBadge = item.id === "todos" && todoActiveStatus?.isActive && todoActiveStatus.unreadCount > 0;
+                const showTaskBadge = item.id === "tasks" && tasksDashboard && tasksDashboard.overdue > 0;
                 return (
                   <div key={item.id} className="flex items-center group w-full">
                     <Link href={item.href} className="flex-1 min-w-0 block">
@@ -494,6 +509,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                           {showTodoBadge && (
                             <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
                               {todoActiveStatus.unreadCount > 9 ? "9+" : todoActiveStatus.unreadCount}
+                            </span>
+                          )}
+                          {showTaskBadge && (
+                            <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                              {tasksDashboard!.overdue > 9 ? "9+" : tasksDashboard!.overdue}
                             </span>
                           )}
                         </div>

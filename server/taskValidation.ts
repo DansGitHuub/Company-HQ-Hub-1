@@ -31,26 +31,15 @@ export function getAssignableRoles(user: User): string[] {
   return [user.role, ...allowed];
 }
 
-export function canReassignTask(currentHolder: User, newAssignee: User): boolean {
-  if (currentHolder.isMasterAdmin) return true;
-  return canAssignTo(currentHolder, newAssignee);
-}
-
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  assigned: ["acknowledged", "cancelled"],
-  acknowledged: ["in_progress", "on_hold", "cancelled"],
-  in_progress: ["completed", "on_hold", "reassigned", "cancelled"],
-  on_hold: ["in_progress", "cancelled"],
-  reassigned: ["acknowledged", "cancelled"],
-  completed: ["confirmed", "assigned"],
-  confirmed: [],
-  cancelled: [],
-  overdue: ["acknowledged", "in_progress", "completed", "cancelled"],
-};
-
 export function canTransitionStatus(from: string, to: string): boolean {
-  const allowed = VALID_TRANSITIONS[from] || [];
-  return allowed.includes(to);
+  const validTransitions: Record<string, string[]> = {
+    todo: ["in_progress", "waiting", "complete", "cancelled"],
+    in_progress: ["todo", "waiting", "complete", "cancelled"],
+    waiting: ["todo", "in_progress", "complete", "cancelled"],
+    complete: ["todo", "in_progress"],
+    cancelled: ["todo"],
+  };
+  return validTransitions[from]?.includes(to) ?? false;
 }
 
 export function canUserTransition(user: User, task: any, newStatus: string): boolean {
@@ -59,24 +48,7 @@ export function canUserTransition(user: User, task: any, newStatus: string): boo
   const isAdmin = user.role === "Admin" || user.isMasterAdmin;
   const isManager = user.role === "Manager";
 
-  switch (newStatus) {
-    case "acknowledged":
-      return isAssignee;
-    case "in_progress":
-      return isAssignee;
-    case "completed":
-      return isAssignee;
-    case "confirmed":
-      return isCreator || isAdmin || isManager;
-    case "assigned":
-      return isCreator || isAdmin || isManager;
-    case "on_hold":
-      return isAssignee || isCreator || isAdmin;
-    case "cancelled":
-      return isCreator || isAdmin;
-    case "reassigned":
-      return isAssignee || isCreator || isAdmin || isManager;
-    default:
-      return false;
-  }
+  if (isAdmin || isManager) return true;
+  if (isAssignee || isCreator) return true;
+  return false;
 }

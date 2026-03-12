@@ -1224,22 +1224,27 @@ export const insertTodoActiveUserSchema = createInsertSchema(todoActiveUsers).pi
 export type InsertTodoActiveUser = z.infer<typeof insertTodoActiveUserSchema>;
 export type TodoActiveUser = typeof todoActiveUsers.$inferSelect;
 
-// Task Management System (rebuilt from To-Do)
+// Task Management System
 export const tasks = pgTable("tasks", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   taskId: text("task_id").unique(),
   title: text("title").notNull(),
   description: text("description"),
   type: text("type").notNull().default("standard"),
-  priority: text("priority").notNull().default("p3_normal"),
-  status: text("status").notNull().default("assigned"),
+  priority: text("priority").notNull().default("medium"),
+  status: text("status").notNull().default("todo"),
   createdByUserId: varchar("created_by_user_id", { length: 36 }).references(() => users.id).notNull(),
-  assignedToUserId: varchar("assigned_to_user_id", { length: 36 }).references(() => users.id).notNull(),
+  assignedToUserId: varchar("assigned_to_user_id", { length: 36 }).references(() => users.id),
   dueDate: timestamp("due_date"),
+  startDate: timestamp("start_date"),
   dueTime: text("due_time"),
   category: text("category"),
   estimatedMinutes: integer("estimated_minutes"),
   location: text("location"),
+  linkedRecordType: text("linked_record_type"),
+  linkedRecordId: varchar("linked_record_id", { length: 36 }),
+  reminderDate: timestamp("reminder_date"),
+  reminderSent: boolean("reminder_sent").default(false),
   requiresConfirmation: boolean("requires_confirmation").default(false),
   completionNotes: text("completion_notes"),
   completionPhotoUrl: text("completion_photo_url"),
@@ -1274,6 +1279,31 @@ export const taskChecklistItems = pgTable("task_checklist_items", {
 
 export type TaskChecklistItem = typeof taskChecklistItems.$inferSelect;
 
+export const taskComments = pgTable("task_comments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id", { length: 36 }).references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id).notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTaskCommentSchema = createInsertSchema(taskComments).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
+export type TaskComment = typeof taskComments.$inferSelect;
+
+export const taskCustomFields = pgTable("task_custom_fields", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id", { length: 36 }).references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  fieldName: text("field_name").notNull(),
+  fieldValue: text("field_value"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type TaskCustomField = typeof taskCustomFields.$inferSelect;
+
 export const taskHistory = pgTable("task_history", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   taskId: varchar("task_id", { length: 36 }).references(() => tasks.id, { onDelete: "cascade" }).notNull(),
@@ -1293,6 +1323,7 @@ export const taskAttachments = pgTable("task_attachments", {
   fileUrl: text("file_url").notNull(),
   fileType: text("file_type"),
   fileName: text("file_name"),
+  fileSize: integer("file_size"),
   uploadedBy: varchar("uploaded_by", { length: 36 }).references(() => users.id),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });

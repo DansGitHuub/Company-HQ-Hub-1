@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import { storage } from "./storage";
-import { canAssignTo, canCreateTasks, getAssignableRoles, canTransitionStatus, canUserTransition } from "./taskValidation";
 
 export function registerTaskRoutes(app: Express) {
   const requireAuth = (req: any, res: any, next: any) => {
@@ -8,18 +7,14 @@ export function registerTaskRoutes(app: Express) {
     next();
   };
 
-  const requireTaskCreator = (req: any, res: any, next: any) => {
-    if (!canCreateTasks(req.user)) return res.status(403).json({ message: "Not authorized to create tasks" });
-    next();
-  };
+  const isManagerOrAdmin = (user: any) => ["Admin", "Manager", "Master Admin"].includes(user.role);
 
   app.get("/api/tasks/assignable-users", requireAuth, async (req: any, res) => {
     try {
       const users = await storage.getAllUsers();
-      const assignableRoles = getAssignableRoles(req.user);
       const assignable = users
-        .filter(u => u.isActive && assignableRoles.includes(u.role))
-        .map(u => ({ id: u.id, name: u.name, role: u.role, username: u.username }));
+        .filter(u => u.isActive && u.role !== "Customer")
+        .map(u => ({ id: u.id, name: u.name, role: u.role, username: u.username, profilePictureUrl: u.profilePictureUrl }));
       res.json(assignable);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -35,122 +30,65 @@ export function registerTaskRoutes(app: Express) {
     }
   });
 
-  app.post("/api/tasks", requireAuth, requireTaskCreator, async (req: any, res) => {
+  app.get("/api/tasks", requireAuth, async (req: any, res) => {
     try {
-      const { title, description, type, priority, assignedToUserId, dueDate, dueTime,
-        category, estimatedMinutes, location, requiresConfirmation,
-        isRecurring, recurringConfig, checklistItems } = req.body;
+      const user = req.user;
+      let allTasks;
 
-      if (!title || !assignedToUserId) {
-        return res.status(400).json({ message: "Title and assignee required" });
+      if (isManagerOrAdmin(user)) {
+        allTasks = await storage.getAllTasks();
+      } else {
+        const myTasks = await storage.getTasksByAssignee(user.id);
+        const myCreated = await storage.getTasksByCreator(user.id);
+        const openPool = await storage.getOpenPoolTasks();
+        const taskMap = new Map();
+        [...myTasks, ...myCreated, ...openPool].forEach(t => taskMap.set(t.id, t));
+        allTasks = Array.from(taskMap.values());
       }
 
-      if (assignedToUserId !== req.user.id) {
-        const assignee = await storage.getUser(assignedToUserId);
-        if (!assignee || !canAssignTo(req.user, assignee)) {
-          return res.status(403).json({ message: "Not authorized to assign to this user" });
-        }
-      }
-
-      const task = await storage.createTask({
-        title: title.substring(0, 120),
-        description,
-        type: type || "standard",
-        priority: priority || "p3_normal",
-        status: "assigned",
-        createdByUserId: req.user.id,
-        assignedToUserId,
-        dueDate: dueDate ? new Date(dueDate) : null,
-        dueTime: dueTime || null,
-        category: category || null,
-        estimatedMinutes: estimatedMinutes || null,
-        location: location || null,
-        requiresConfirmation: requiresConfirmation ?? false,
-        isRecurring: isRecurring ?? false,
-        recurringConfig: recurringConfig || null,
-      });
-
-      await storage.createTaskHistory({
-        taskId: task.id,
-        eventType: "created",
-        changedByUserId: req.user.id,
-        newValue: JSON.stringify({ title: task.title, priority: task.priority, assignee: assignedToUserId }),
-      });
-
-      if (checklistItems && Array.isArray(checklistItems)) {
-        for (let i = 0; i < checklistItems.length; i++) {
-          if (checklistItems[i]?.text || checklistItems[i]?.itemText) {
-            await storage.createTaskChecklistItem({
-              taskId: task.id,
-              itemText: checklistItems[i].text || checklistItems[i].itemText,
-              sortOrder: i,
-            });
-          }
-        }
-      }
-
-      res.status(201).json(task);
+      res.json(allTasks);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  app.get("/api/tasks/my", requireAuth, async (req: any, res) => {
+  app.get("/api/tasks/open-pool", requireAuth, async (req: any, res) => {
     try {
-      const allTasks = await storage.getTasksByAssignee(req.user.id);
-      const users = await storage.getAllUsers();
-      const userMap = new Map(users.map(u => [u.id, u.name]));
+      const openTasks = await storage.getOpenPoolTasks();
+      res.json(openTasks);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/tasks/linked/:recordType/:recordId", requireAuth, async (req: any, res) => {
+    try {
+      const linkedTasks = await storage.getTasksByLinkedRecord(req.params.recordType, req.params.recordId);
+      res.json(linkedTasks);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/tasks/my-upcoming", requireAuth, async (req: any, res) => {
+    try {
+      const myTasks = await storage.getTasksByAssignee(req.user.id);
       const now = new Date();
+      const active = myTasks
+        .filter(t => !["complete", "cancelled"].includes(t.status))
+        .sort((a, b) => {
+          if (!a.dueDate && !b.dueDate) return 0;
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        })
+        .slice(0, 5);
 
-      const enriched = allTasks.map(t => ({
-        ...t,
-        assigneeName: userMap.get(t.assignedToUserId) || "Unknown",
-        creatorName: userMap.get(t.createdByUserId) || "Unknown",
-        isOverdue: t.dueDate && new Date(t.dueDate) < now && !["completed", "confirmed", "cancelled"].includes(t.status),
-      }));
+      const overdueCount = myTasks.filter(t =>
+        t.dueDate && new Date(t.dueDate) < now && !["complete", "cancelled"].includes(t.status)
+      ).length;
 
-      res.json(enriched);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.get("/api/tasks/assigned", requireAuth, async (req: any, res) => {
-    try {
-      const allTasks = await storage.getTasksByCreator(req.user.id);
-      const users = await storage.getAllUsers();
-      const userMap = new Map(users.map(u => [u.id, u.name]));
-
-      const enriched = allTasks.map(t => ({
-        ...t,
-        assigneeName: userMap.get(t.assignedToUserId) || "Unknown",
-        creatorName: userMap.get(t.createdByUserId) || "Unknown",
-        isOverdue: t.dueDate && new Date(t.dueDate) < new Date() && !["completed", "confirmed", "cancelled"].includes(t.status),
-      }));
-
-      res.json(enriched);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.get("/api/tasks/team", requireAuth, async (req: any, res) => {
-    try {
-      if (!["Admin", "Manager"].includes(req.user.role) && !req.user.isMasterAdmin) {
-        return res.status(403).json({ message: "Manager access required" });
-      }
-      const allTasks = await storage.getAllTasks();
-      const users = await storage.getAllUsers();
-      const userMap = new Map(users.map(u => [u.id, u.name]));
-
-      const enriched = allTasks.map(t => ({
-        ...t,
-        assigneeName: userMap.get(t.assignedToUserId) || "Unknown",
-        creatorName: userMap.get(t.createdByUserId) || "Unknown",
-        isOverdue: t.dueDate && new Date(t.dueDate) < new Date() && !["completed", "confirmed", "cancelled"].includes(t.status),
-      }));
-
-      res.json(enriched);
+      res.json({ tasks: active, overdueCount });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -158,107 +96,20 @@ export function registerTaskRoutes(app: Express) {
 
   app.get("/api/tasks/calendar-events", requireAuth, async (req: any, res) => {
     try {
-      const myTasks = await storage.getTasksByAssignee(req.user.id);
-      const events = myTasks
-        .filter(t => t.dueDate && !["completed", "confirmed", "cancelled"].includes(t.status))
+      const allTasks = await storage.getTasksByAssignee(req.user.id);
+      const tasksWithDates = allTasks
+        .filter(t => t.dueDate && !["complete", "cancelled"].includes(t.status))
         .map(t => ({
-          id: t.id,
-          title: t.title,
-          date: t.dueDate,
+          id: `task-${t.id}`,
+          title: `Task: ${t.title}`,
+          start: t.dueDate,
+          end: t.dueDate,
+          type: "task",
           priority: t.priority,
-          status: t.status,
-          taskId: t.taskId,
+          linkedRecordType: "task",
+          linkedRecordId: t.id,
         }));
-      res.json(events);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.get("/api/tasks/reports/individual", requireAuth, async (req: any, res) => {
-    try {
-      if (!["Admin", "Manager"].includes(req.user.role) && !req.user.isMasterAdmin) {
-        return res.status(403).json({ message: "Manager access required" });
-      }
-      const { userId, start, end } = req.query;
-      const allTasks = await storage.getAllTasks();
-      const targetTasks = allTasks.filter(t => {
-        if (userId && t.assignedToUserId !== userId) return false;
-        if (start && t.createdAt && new Date(t.createdAt) < new Date(start as string)) return false;
-        if (end && t.createdAt && new Date(t.createdAt) > new Date(end as string)) return false;
-        return true;
-      });
-
-      const completed = targetTasks.filter(t => ["completed", "confirmed"].includes(t.status));
-      const onTime = completed.filter(t => !t.dueDate || new Date(t.completedAt || t.updatedAt!) <= new Date(t.dueDate));
-      const late = completed.filter(t => t.dueDate && new Date(t.completedAt || t.updatedAt!) > new Date(t.dueDate));
-      const overdue = targetTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && !["completed", "confirmed", "cancelled"].includes(t.status));
-
-      const ackTimes = completed
-        .filter(t => t.acknowledgedAt && t.createdAt)
-        .map(t => (new Date(t.acknowledgedAt!).getTime() - new Date(t.createdAt!).getTime()) / 60000);
-      const completionTimes = completed
-        .filter(t => t.completedAt && t.createdAt)
-        .map(t => (new Date(t.completedAt!).getTime() - new Date(t.createdAt!).getTime()) / 60000);
-
-      res.json({
-        totalAssigned: targetTasks.length,
-        completedOnTime: onTime.length,
-        completedOnTimePercent: targetTasks.length ? Math.round((onTime.length / targetTasks.length) * 100) : 0,
-        completedLate: late.length,
-        completedLatePercent: targetTasks.length ? Math.round((late.length / targetTasks.length) * 100) : 0,
-        overdue: overdue.length,
-        avgAckTimeMinutes: ackTimes.length ? Math.round(ackTimes.reduce((a, b) => a + b, 0) / ackTimes.length) : 0,
-        avgCompletionTimeMinutes: completionTimes.length ? Math.round(completionTimes.reduce((a, b) => a + b, 0) / completionTimes.length) : 0,
-      });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.get("/api/tasks/reports/team", requireAuth, async (req: any, res) => {
-    try {
-      if (!["Admin", "Manager"].includes(req.user.role) && !req.user.isMasterAdmin) {
-        return res.status(403).json({ message: "Manager access required" });
-      }
-      const { start, end } = req.query;
-      const allTasks = await storage.getAllTasks();
-      const users = await storage.getAllUsers();
-      const userMap = new Map(users.map(u => [u.id, u.name]));
-
-      const filtered = allTasks.filter(t => {
-        if (start && t.createdAt && new Date(t.createdAt) < new Date(start as string)) return false;
-        if (end && t.createdAt && new Date(t.createdAt) > new Date(end as string)) return false;
-        return true;
-      });
-
-      const byPerson = new Map<string, { total: number; completed: number; onTime: number; overdue: number; name: string }>();
-      for (const t of filtered) {
-        const key = t.assignedToUserId;
-        if (!byPerson.has(key)) byPerson.set(key, { total: 0, completed: 0, onTime: 0, overdue: 0, name: userMap.get(key) || "Unknown" });
-        const entry = byPerson.get(key)!;
-        entry.total++;
-        if (["completed", "confirmed"].includes(t.status)) {
-          entry.completed++;
-          if (!t.dueDate || new Date(t.completedAt || t.updatedAt!) <= new Date(t.dueDate)) entry.onTime++;
-        }
-        if (t.dueDate && new Date(t.dueDate) < new Date() && !["completed", "confirmed", "cancelled"].includes(t.status)) entry.overdue++;
-      }
-
-      const overdueTasks = filtered
-        .filter(t => t.dueDate && new Date(t.dueDate) < new Date() && !["completed", "confirmed", "cancelled"].includes(t.status))
-        .map(t => ({
-          ...t,
-          assigneeName: userMap.get(t.assignedToUserId) || "Unknown",
-          daysOverdue: Math.floor((Date.now() - new Date(t.dueDate!).getTime()) / (1000 * 60 * 60 * 24)),
-        }));
-
-      res.json({
-        byPerson: Array.from(byPerson.values()).sort((a, b) => b.total - a.total),
-        overdueTasks: overdueTasks.sort((a, b) => b.daysOverdue - a.daysOverdue),
-        totalTasks: filtered.length,
-        totalCompleted: filtered.filter(t => ["completed", "confirmed"].includes(t.status)).length,
-      });
+      res.json(tasksWithDates);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -269,93 +120,76 @@ export function registerTaskRoutes(app: Express) {
       const task = await storage.getTask(req.params.id);
       if (!task) return res.status(404).json({ message: "Task not found" });
 
-      const isAssignee = task.assignedToUserId === req.user.id;
-      const isCreator = task.createdByUserId === req.user.id;
-      const isAdmin = req.user.role === "Admin" || req.user.isMasterAdmin;
-      const isManager = req.user.role === "Manager";
-      if (!isAssignee && !isCreator && !isAdmin && !isManager) {
-        return res.status(403).json({ message: "Not authorized to view this task" });
-      }
+      const [comments, customFields, attachments, checklist, history] = await Promise.all([
+        storage.getTaskComments(task.id),
+        storage.getTaskCustomFields(task.id),
+        storage.getTaskAttachments(task.id),
+        storage.getTaskChecklistItems(task.id),
+        storage.getTaskHistory(task.id),
+      ]);
 
-      if (isAssignee && task.status === "assigned" && !task.acknowledgedAt) {
-        await storage.updateTask(task.id, { acknowledgedAt: new Date(), status: "acknowledged" });
-        await storage.createTaskHistory({
-          taskId: task.id,
-          eventType: "acknowledged",
-          changedByUserId: req.user.id,
-        });
-      }
+      const commentUsers = await Promise.all(
+        comments.map(async c => {
+          const user = await storage.getUser(c.userId);
+          return { ...c, userName: user?.name || "Unknown", userProfilePicture: user?.profilePictureUrl };
+        })
+      );
 
-      const checklist = await storage.getTaskChecklistItems(task.id);
-      const history = await storage.getTaskHistory(task.id);
-      const attachments = await storage.getTaskAttachments(task.id);
-      const delegationChain = await storage.getTaskDelegationChain(task.id);
-
-      const users = await storage.getAllUsers();
-      const userMap = new Map(users.map(u => [u.id, u.name]));
-
-      res.json({
-        ...task,
-        assigneeName: userMap.get(task.assignedToUserId) || "Unknown",
-        creatorName: userMap.get(task.createdByUserId) || "Unknown",
-        checklist,
-        history: history.map(h => ({ ...h, changedByName: userMap.get(h.changedByUserId || "") || "System" })),
-        attachments,
-        delegationChain: delegationChain.map(d => ({
-          ...d,
-          fromName: userMap.get(d.fromUserId) || "Unknown",
-          toName: userMap.get(d.toUserId) || "Unknown",
-        })),
-      });
+      res.json({ ...task, comments: commentUsers, customFields, attachments, checklist, history });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  app.patch("/api/tasks/:id/status", requireAuth, async (req: any, res) => {
+  app.post("/api/tasks", requireAuth, async (req: any, res) => {
     try {
-      const task = await storage.getTask(req.params.id);
-      if (!task) return res.status(404).json({ message: "Task not found" });
+      const { title, description, status, priority, assignedToUserId, dueDate, startDate,
+        estimatedMinutes, linkedRecordType, linkedRecordId, reminderDate,
+        customFields, category, location } = req.body;
 
-      const { status, note, completionNotes, completionPhotoUrl } = req.body;
-      if (!status) return res.status(400).json({ message: "Status required" });
-
-      if (!canTransitionStatus(task.status, status)) {
-        return res.status(400).json({ message: `Cannot transition from ${task.status} to ${status}` });
+      if (!title) {
+        return res.status(400).json({ message: "Title is required" });
       }
 
-      if (!canUserTransition(req.user, task, status)) {
-        return res.status(403).json({ message: "Not authorized for this transition" });
+      if (assignedToUserId && assignedToUserId !== req.user.id && !isManagerOrAdmin(req.user)) {
+        return res.status(403).json({ message: "Only managers and admins can assign tasks to others" });
       }
 
-      const updates: any = { status };
-      if (status === "acknowledged") updates.acknowledgedAt = new Date();
-      if (status === "in_progress") updates.startedAt = new Date();
-      if (status === "completed") {
-        updates.completedAt = new Date();
-        if (completionNotes) updates.completionNotes = completionNotes;
-        if (completionPhotoUrl) updates.completionPhotoUrl = completionPhotoUrl;
-        if (!task.requiresConfirmation) updates.status = "confirmed";
-      }
-      if (status === "confirmed") updates.confirmedAt = new Date();
-      if (status === "cancelled") updates.cancelledAt = new Date();
-      if (status === "assigned") {
-        updates.completedAt = null;
-        updates.completionNotes = null;
-      }
+      const taskData: any = {
+        title,
+        description: description || null,
+        status: status || "todo",
+        priority: priority || "medium",
+        createdByUserId: req.user.id,
+        assignedToUserId: assignedToUserId || null,
+        dueDate: dueDate ? new Date(dueDate) : null,
+        startDate: startDate ? new Date(startDate) : null,
+        estimatedMinutes: estimatedMinutes || null,
+        linkedRecordType: linkedRecordType || null,
+        linkedRecordId: linkedRecordId || null,
+        reminderDate: reminderDate ? new Date(reminderDate) : null,
+        category: category || null,
+        location: location || null,
+      };
 
-      const updated = await storage.updateTask(task.id, updates);
+      const task = await storage.createTask(taskData);
+
+      if (customFields && Array.isArray(customFields)) {
+        for (const cf of customFields) {
+          if (cf.fieldName) {
+            await storage.createTaskCustomField({ taskId: task.id, fieldName: cf.fieldName, fieldValue: cf.fieldValue || null });
+          }
+        }
+      }
 
       await storage.createTaskHistory({
         taskId: task.id,
-        eventType: "status_changed",
+        eventType: "created",
         changedByUserId: req.user.id,
-        oldValue: task.status,
-        newValue: updates.status || status,
-        note: note || null,
+        newValue: title,
       });
 
-      res.json(updated);
+      res.status(201).json(task);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -366,182 +200,61 @@ export function registerTaskRoutes(app: Express) {
       const task = await storage.getTask(req.params.id);
       if (!task) return res.status(404).json({ message: "Task not found" });
 
-      const isCreator = task.createdByUserId === req.user.id;
-      const isAdmin = req.user.role === "Admin" || req.user.isMasterAdmin;
-      if (!isCreator && !isAdmin) return res.status(403).json({ message: "Only creator or admin can edit" });
+      const user = req.user;
+      const canEdit = isManagerOrAdmin(user) || task.createdByUserId === user.id || task.assignedToUserId === user.id;
+      if (!canEdit) return res.status(403).json({ message: "Not authorized to edit this task" });
 
-      const { title, description, priority, dueDate, dueTime, category, estimatedMinutes, location, requiresConfirmation } = req.body;
+      if (req.body.assignedToUserId !== undefined && req.body.assignedToUserId !== user.id && !isManagerOrAdmin(user)) {
+        return res.status(403).json({ message: "Only managers and admins can reassign tasks" });
+      }
+
       const updates: any = {};
-      if (title !== undefined) updates.title = title.substring(0, 120);
-      if (description !== undefined) updates.description = description;
-      if (priority !== undefined) updates.priority = priority;
-      if (dueDate !== undefined) updates.dueDate = dueDate ? new Date(dueDate) : null;
-      if (dueTime !== undefined) updates.dueTime = dueTime;
-      if (category !== undefined) updates.category = category;
-      if (estimatedMinutes !== undefined) updates.estimatedMinutes = estimatedMinutes;
-      if (location !== undefined) updates.location = location;
-      if (requiresConfirmation !== undefined) updates.requiresConfirmation = requiresConfirmation;
+      const allowedFields = ['title', 'description', 'status', 'priority', 'assignedToUserId',
+        'dueDate', 'startDate', 'estimatedMinutes', 'linkedRecordType', 'linkedRecordId',
+        'reminderDate', 'category', 'location', 'completionNotes'];
 
-      const updated = await storage.updateTask(task.id, updates);
-
-      for (const [key, val] of Object.entries(updates)) {
-        if ((task as any)[key] !== val) {
-          await storage.createTaskHistory({
-            taskId: task.id,
-            eventType: "edited",
-            changedByUserId: req.user.id,
-            oldValue: String((task as any)[key] ?? ""),
-            newValue: String(val ?? ""),
-            note: `Changed ${key}`,
-          });
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          if (['dueDate', 'startDate', 'reminderDate'].includes(field)) {
+            updates[field] = req.body[field] ? new Date(req.body[field]) : null;
+          } else {
+            updates[field] = req.body[field];
+          }
         }
       }
 
-      res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.post("/api/tasks/:id/reassign", requireAuth, async (req: any, res) => {
-    try {
-      const task = await storage.getTask(req.params.id);
-      if (!task) return res.status(404).json({ message: "Task not found" });
-
-      const isAssignee = task.assignedToUserId === req.user.id;
-      const isCreator = task.createdByUserId === req.user.id;
-      const isAdmin = req.user.role === "Admin" || req.user.isMasterAdmin;
-      const isManager = req.user.role === "Manager";
-      if (!isAssignee && !isCreator && !isAdmin && !isManager) {
-        return res.status(403).json({ message: "Not authorized to reassign this task" });
-      }
-
-      const { toUserId, reason } = req.body;
-      if (!toUserId) return res.status(400).json({ message: "New assignee required" });
-
-      const newAssignee = await storage.getUser(toUserId);
-      if (!newAssignee) return res.status(404).json({ message: "User not found" });
-
-      if (!canAssignTo(req.user, newAssignee)) {
-        return res.status(403).json({ message: "Not authorized to assign to this user" });
-      }
-
-      await storage.createTaskDelegation({
-        taskId: task.id,
-        fromUserId: task.assignedToUserId,
-        toUserId,
-        reason: reason || null,
-      });
-
-      const updated = await storage.updateTask(task.id, {
-        assignedToUserId: toUserId,
-        status: "assigned",
-        acknowledgedAt: null,
-        startedAt: null,
-      });
-
-      await storage.createTaskHistory({
-        taskId: task.id,
-        eventType: "reassigned",
-        changedByUserId: req.user.id,
-        oldValue: task.assignedToUserId,
-        newValue: toUserId,
-        note: reason || null,
-      });
-
-      res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.post("/api/tasks/:id/confirm", requireAuth, async (req: any, res) => {
-    try {
-      const task = await storage.getTask(req.params.id);
-      if (!task) return res.status(404).json({ message: "Task not found" });
-      if (task.status !== "completed") return res.status(400).json({ message: "Task must be completed first" });
-
-      const isCreator = task.createdByUserId === req.user.id;
-      const isAdmin = req.user.role === "Admin" || req.user.isMasterAdmin || req.user.role === "Manager";
-      if (!isCreator && !isAdmin) return res.status(403).json({ message: "Only assigner or admin can confirm" });
-
-      const updated = await storage.updateTask(task.id, { status: "confirmed", confirmedAt: new Date() });
-      await storage.createTaskHistory({
-        taskId: task.id,
-        eventType: "confirmed",
-        changedByUserId: req.user.id,
-      });
-
-      res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.post("/api/tasks/:id/send-back", requireAuth, async (req: any, res) => {
-    try {
-      const task = await storage.getTask(req.params.id);
-      if (!task) return res.status(404).json({ message: "Task not found" });
-      if (task.status !== "completed") return res.status(400).json({ message: "Task must be completed first" });
-
-      const { reason } = req.body;
-      if (!reason) return res.status(400).json({ message: "Reason required" });
-
-      const isCreator = task.createdByUserId === req.user.id;
-      const isAdmin = req.user.role === "Admin" || req.user.isMasterAdmin || req.user.role === "Manager";
-      if (!isCreator && !isAdmin) return res.status(403).json({ message: "Only assigner or admin can send back" });
-
-      const updated = await storage.updateTask(task.id, {
-        status: "assigned",
-        completedAt: null,
-        completionNotes: null,
-      });
-
-      await storage.createTaskHistory({
-        taskId: task.id,
-        eventType: "status_changed",
-        changedByUserId: req.user.id,
-        oldValue: "completed",
-        newValue: "assigned",
-        note: reason,
-      });
-
-      res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.post("/api/tasks/:id/checklist", requireAuth, async (req: any, res) => {
-    try {
-      const { itemText, sortOrder } = req.body;
-      if (!itemText) return res.status(400).json({ message: "Item text required" });
-      const item = await storage.createTaskChecklistItem({ taskId: req.params.id, itemText, sortOrder: sortOrder || 0 });
-      res.status(201).json(item);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  app.patch("/api/tasks/:id/checklist/:itemId", requireAuth, async (req: any, res) => {
-    try {
-      const task = await storage.getTask(req.params.id);
-      if (!task) return res.status(404).json({ message: "Task not found" });
-      const isAssignee = task.assignedToUserId === req.user.id;
-      const isAdmin = req.user.role === "Admin" || req.user.isMasterAdmin;
-      if (!isAssignee && !isAdmin) return res.status(403).json({ message: "Not authorized" });
-
-      const { isCompleted } = req.body;
-      const updates: any = { isCompleted };
-      if (isCompleted) {
-        updates.completedBy = req.user.id;
+      if (req.body.status === "complete" && task.status !== "complete") {
         updates.completedAt = new Date();
-      } else {
-        updates.completedBy = null;
-        updates.completedAt = null;
       }
-      const item = await storage.updateTaskChecklistItem(req.params.itemId, updates);
-      res.json(item);
+      if (req.body.status === "cancelled" && task.status !== "cancelled") {
+        updates.cancelledAt = new Date();
+      }
+      if (req.body.status === "in_progress" && task.status !== "in_progress") {
+        updates.startedAt = new Date();
+      }
+
+      if (req.body.status && req.body.status !== task.status) {
+        await storage.createTaskHistory({
+          taskId: task.id,
+          eventType: "status_change",
+          changedByUserId: user.id,
+          oldValue: task.status,
+          newValue: req.body.status,
+        });
+      }
+
+      if (req.body.assignedToUserId !== undefined && req.body.assignedToUserId !== task.assignedToUserId) {
+        await storage.createTaskHistory({
+          taskId: task.id,
+          eventType: "assignment_change",
+          changedByUserId: user.id,
+          oldValue: task.assignedToUserId || "unassigned",
+          newValue: req.body.assignedToUserId || "unassigned",
+        });
+      }
+
+      const updated = await storage.updateTask(req.params.id, updates);
+      res.json(updated);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -551,11 +264,177 @@ export function registerTaskRoutes(app: Express) {
     try {
       const task = await storage.getTask(req.params.id);
       if (!task) return res.status(404).json({ message: "Task not found" });
-      const isCreator = task.createdByUserId === req.user.id;
-      const isAdmin = req.user.role === "Admin" || req.user.isMasterAdmin;
-      if (!isCreator && !isAdmin) return res.status(403).json({ message: "Only creator or admin can delete" });
+
+      if (!isManagerOrAdmin(req.user) && task.createdByUserId !== req.user.id) {
+        return res.status(403).json({ message: "Only managers, admins, or task creator can delete tasks" });
+      }
+
       await storage.deleteTask(req.params.id);
-      res.json({ ok: true });
+      res.json({ message: "Task deleted" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/tasks/:id/comments", requireAuth, async (req: any, res) => {
+    try {
+      const task = await storage.getTask(req.params.id);
+      if (!task) return res.status(404).json({ message: "Task not found" });
+
+      const { body } = req.body;
+      if (!body || !body.trim()) return res.status(400).json({ message: "Comment body is required" });
+
+      const comment = await storage.createTaskComment({
+        taskId: task.id,
+        userId: req.user.id,
+        body: body.trim(),
+      });
+
+      const user = await storage.getUser(req.user.id);
+      res.status(201).json({ ...comment, userName: user?.name || "Unknown", userProfilePicture: user?.profilePictureUrl });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/tasks/:taskId/comments/:commentId", requireAuth, async (req: any, res) => {
+    try {
+      const comments = await storage.getTaskComments(req.params.taskId);
+      const comment = comments.find(c => c.id === req.params.commentId);
+      if (!comment) return res.status(404).json({ message: "Comment not found" });
+
+      if (comment.userId !== req.user.id && !isManagerOrAdmin(req.user)) {
+        return res.status(403).json({ message: "Not authorized to delete this comment" });
+      }
+
+      await storage.deleteTaskComment(req.params.commentId);
+      res.json({ message: "Comment deleted" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/tasks/:id/custom-fields", requireAuth, async (req: any, res) => {
+    try {
+      const { fieldName, fieldValue } = req.body;
+      if (!fieldName) return res.status(400).json({ message: "Field name is required" });
+
+      const field = await storage.createTaskCustomField({
+        taskId: req.params.id,
+        fieldName,
+        fieldValue: fieldValue || null,
+      });
+      res.status(201).json(field);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/tasks/:taskId/custom-fields/:fieldId", requireAuth, async (req: any, res) => {
+    try {
+      const updated = await storage.updateTaskCustomField(req.params.fieldId, req.body);
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/tasks/:taskId/custom-fields/:fieldId", requireAuth, async (req: any, res) => {
+    try {
+      await storage.deleteTaskCustomField(req.params.fieldId);
+      res.json({ message: "Custom field deleted" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/tasks/:id/attachments", requireAuth, async (req: any, res) => {
+    try {
+      const { fileUrl, fileName, fileType, fileSize } = req.body;
+      if (!fileUrl) return res.status(400).json({ message: "File URL is required" });
+
+      const attachment = await storage.createTaskAttachment({
+        taskId: req.params.id,
+        fileUrl,
+        fileName: fileName || "file",
+        fileType: fileType || null,
+        fileSize: fileSize || null,
+        uploadedBy: req.user.id,
+      });
+      res.status(201).json(attachment);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/tasks/:taskId/attachments/:attachmentId", requireAuth, async (req: any, res) => {
+    try {
+      await storage.deleteTaskAttachment(req.params.attachmentId);
+      res.json({ message: "Attachment deleted" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/tasks/:id/assign-to-me", requireAuth, async (req: any, res) => {
+    try {
+      const task = await storage.getTask(req.params.id);
+      if (!task) return res.status(404).json({ message: "Task not found" });
+
+      if (task.assignedToUserId && !isManagerOrAdmin(req.user)) {
+        return res.status(403).json({ message: "Task is already assigned" });
+      }
+
+      const updated = await storage.updateTask(req.params.id, { assignedToUserId: req.user.id });
+
+      await storage.createTaskHistory({
+        taskId: task.id,
+        eventType: "assignment_change",
+        changedByUserId: req.user.id,
+        oldValue: task.assignedToUserId || "unassigned",
+        newValue: req.user.id,
+        note: "Self-assigned from open pool",
+      });
+
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/tasks/:id/checklist", requireAuth, async (req: any, res) => {
+    try {
+      const items = await storage.getTaskChecklistItems(req.params.id);
+      res.json(items);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/tasks/:id/checklist", requireAuth, async (req: any, res) => {
+    try {
+      const { itemText } = req.body;
+      if (!itemText) return res.status(400).json({ message: "Item text is required" });
+      const item = await storage.createTaskChecklistItem({ taskId: req.params.id, itemText });
+      res.status(201).json(item);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/tasks/:taskId/checklist/:itemId", requireAuth, async (req: any, res) => {
+    try {
+      const updated = await storage.updateTaskChecklistItem(req.params.itemId, req.body);
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/tasks/:taskId/checklist/:itemId", requireAuth, async (req: any, res) => {
+    try {
+      await storage.deleteTaskChecklistItem(req.params.itemId);
+      res.json({ message: "Checklist item deleted" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

@@ -93,6 +93,8 @@ import {
   customerNotifications, type CustomerNotification, type InsertCustomerNotification,
   tasks, type Task, type InsertTask,
   taskChecklistItems, type TaskChecklistItem,
+  taskComments, type TaskComment, type InsertTaskComment,
+  taskCustomFields, type TaskCustomField,
   taskHistory as taskHistoryTable, type TaskHistoryEntry,
   taskAttachments, type TaskAttachment,
   taskDelegationChain, type TaskDelegation,
@@ -104,7 +106,7 @@ import {
   onboardingFormSubmissions, type OnboardingFormSubmission, type InsertOnboardingFormSubmission
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, ilike, or, and, desc, isNull, sql } from "drizzle-orm";
+import { eq, ilike, or, and, desc, isNull, notInArray, sql } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -663,11 +665,20 @@ export interface IStorage {
   getTasksByAssignee(userId: string): Promise<Task[]>;
   getTasksByCreator(userId: string): Promise<Task[]>;
   getAllTasks(): Promise<Task[]>;
+  getOpenPoolTasks(): Promise<Task[]>;
+  getTasksByLinkedRecord(recordType: string, recordId: string): Promise<Task[]>;
   getTaskDashboardCounts(userId: string): Promise<any>;
   createTaskChecklistItem(data: any): Promise<TaskChecklistItem>;
   getTaskChecklistItems(taskId: string): Promise<TaskChecklistItem[]>;
   updateTaskChecklistItem(id: string, updates: Partial<TaskChecklistItem>): Promise<TaskChecklistItem | undefined>;
   deleteTaskChecklistItem(id: string): Promise<boolean>;
+  createTaskComment(data: any): Promise<TaskComment>;
+  getTaskComments(taskId: string): Promise<TaskComment[]>;
+  deleteTaskComment(id: string): Promise<boolean>;
+  createTaskCustomField(data: any): Promise<TaskCustomField>;
+  getTaskCustomFields(taskId: string): Promise<TaskCustomField[]>;
+  updateTaskCustomField(id: string, updates: Partial<TaskCustomField>): Promise<TaskCustomField | undefined>;
+  deleteTaskCustomField(id: string): Promise<boolean>;
   createTaskHistory(data: any): Promise<TaskHistoryEntry>;
   getTaskHistory(taskId: string): Promise<TaskHistoryEntry[]>;
   createTaskAttachment(data: any): Promise<TaskAttachment>;
@@ -3067,26 +3078,33 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(tasks).orderBy(desc(tasks.createdAt));
   }
 
+  async getOpenPoolTasks(): Promise<Task[]> {
+    return await db.select().from(tasks).where(
+      and(isNull(tasks.assignedToUserId), notInArray(tasks.status, ["complete", "cancelled"]))
+    ).orderBy(desc(tasks.createdAt));
+  }
+
+  async getTasksByLinkedRecord(recordType: string, recordId: string): Promise<Task[]> {
+    return await db.select().from(tasks).where(
+      and(eq(tasks.linkedRecordType, recordType), eq(tasks.linkedRecordId, recordId))
+    ).orderBy(desc(tasks.createdAt));
+  }
+
   async getTaskDashboardCounts(userId: string): Promise<any> {
     const myTasks = await db.select().from(tasks).where(eq(tasks.assignedToUserId, userId));
     const now = new Date();
-    const overdue = myTasks.filter(t => t.dueDate && new Date(t.dueDate) < now && !["completed", "confirmed", "cancelled"].includes(t.status));
-    const urgent = myTasks.filter(t => t.priority === "p1_urgent" && !["completed", "confirmed", "cancelled"].includes(t.status));
-    const active = myTasks.filter(t => !["completed", "confirmed", "cancelled"].includes(t.status));
-    const awaitingAck = myTasks.filter(t => t.status === "assigned" && !t.acknowledgedAt);
-    const createdByMe = await db.select({ count: sql<number>`count(*)` }).from(tasks).where(eq(tasks.createdByUserId, userId));
-    const awaitingConfirm = await db.select({ count: sql<number>`count(*)` }).from(tasks).where(and(
-      eq(tasks.createdByUserId, userId),
-      eq(tasks.status, "completed"),
-      eq(tasks.requiresConfirmation, true)
-    ));
+    const overdue = myTasks.filter(t => t.dueDate && new Date(t.dueDate) < now && !["complete", "cancelled"].includes(t.status));
+    const urgent = myTasks.filter(t => t.priority === "urgent" && !["complete", "cancelled"].includes(t.status));
+    const active = myTasks.filter(t => !["complete", "cancelled"].includes(t.status));
+    const openPool = await db.select({ count: sql<number>`count(*)` }).from(tasks).where(
+      and(isNull(tasks.assignedToUserId), notInArray(tasks.status, ["complete", "cancelled"]))
+    );
     return {
       total: active.length,
       overdue: overdue.length,
       urgent: urgent.length,
-      awaitingAck: awaitingAck.length,
-      assignedByMe: createdByMe[0]?.count || 0,
-      awaitingConfirmation: awaitingConfirm[0]?.count || 0,
+      active: active.length,
+      openPool: openPool[0]?.count || 0,
     };
   }
 
@@ -3129,6 +3147,39 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTaskAttachment(id: string): Promise<boolean> {
     const [deleted] = await db.delete(taskAttachments).where(eq(taskAttachments.id, id)).returning();
+    return !!deleted;
+  }
+
+  async createTaskComment(data: any): Promise<TaskComment> {
+    const [created] = await db.insert(taskComments).values(data).returning();
+    return created;
+  }
+
+  async getTaskComments(taskId: string): Promise<TaskComment[]> {
+    return await db.select().from(taskComments).where(eq(taskComments.taskId, taskId)).orderBy(desc(taskComments.createdAt));
+  }
+
+  async deleteTaskComment(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(taskComments).where(eq(taskComments.id, id)).returning();
+    return !!deleted;
+  }
+
+  async createTaskCustomField(data: any): Promise<TaskCustomField> {
+    const [created] = await db.insert(taskCustomFields).values(data).returning();
+    return created;
+  }
+
+  async getTaskCustomFields(taskId: string): Promise<TaskCustomField[]> {
+    return await db.select().from(taskCustomFields).where(eq(taskCustomFields.taskId, taskId)).orderBy(taskCustomFields.createdAt);
+  }
+
+  async updateTaskCustomField(id: string, updates: Partial<TaskCustomField>): Promise<TaskCustomField | undefined> {
+    const [updated] = await db.update(taskCustomFields).set(updates).where(eq(taskCustomFields.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTaskCustomField(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(taskCustomFields).where(eq(taskCustomFields.id, id)).returning();
     return !!deleted;
   }
 

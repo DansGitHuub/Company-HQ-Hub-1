@@ -1,67 +1,43 @@
 import { storage } from "./storage";
 import { pool } from "./db";
 
-const ESCALATION_THRESHOLDS: Record<string, number> = {
-  p1_urgent: 30,
-  p2_high: 120,
-  p3_normal: 1440,
-  p4_low: 2880,
-};
-
-async function checkUnacknowledgedTasks() {
+async function checkReminderTasks() {
   try {
     const result = await pool.query(`
-      SELECT id, task_id, title, priority, assigned_to_user_id, created_by_user_id, created_at 
+      SELECT id, title, assigned_to_user_id 
       FROM tasks 
-      WHERE status = 'assigned' AND acknowledged_at IS NULL
+      WHERE reminder_date IS NOT NULL 
+        AND reminder_date <= NOW() 
+        AND reminder_sent = false 
+        AND status NOT IN ('complete', 'cancelled')
     `);
 
-    const now = Date.now();
     for (const task of result.rows) {
-      const elapsed = (now - new Date(task.created_at).getTime()) / 60000;
-      const threshold = ESCALATION_THRESHOLDS[task.priority] || 1440;
-
-      if (elapsed > threshold) {
-        const existing = await pool.query(
-          `SELECT id FROM task_history WHERE task_id = $1 AND event_type = 'escalated' AND created_at > NOW() - INTERVAL '1 hour' LIMIT 1`,
-          [task.id]
-        );
-        if (existing.rows.length === 0) {
-          await storage.createTaskHistory({
-            taskId: task.id,
-            eventType: "escalated",
-            note: `Auto-escalated: unacknowledged for ${Math.round(elapsed)} minutes (threshold: ${threshold}min)`,
-          });
+      await pool.query(`UPDATE tasks SET reminder_sent = true, updated_at = NOW() WHERE id = $1`, [task.id]);
+      if (task.assigned_to_user_id) {
+        const user = await storage.getUser(task.assigned_to_user_id);
+        if (user) {
+          console.log(`[TaskScheduler] Reminder sent for task "${task.title}" to ${user.name}`);
         }
       }
     }
   } catch (err) {
-    console.error("[TaskScheduler] Escalation check error:", err);
+    console.error("[TaskScheduler] Reminder check error:", err);
   }
 }
 
 async function checkOverdueTasks() {
   try {
     const result = await pool.query(`
-      UPDATE tasks 
-      SET status = 'overdue', updated_at = NOW() 
+      SELECT id, task_id, title, assigned_to_user_id
+      FROM tasks 
       WHERE due_date < NOW() 
-        AND status NOT IN ('completed', 'confirmed', 'cancelled', 'overdue')
-      RETURNING id, task_id, title
+        AND status NOT IN ('complete', 'cancelled')
+        AND assigned_to_user_id IS NOT NULL
     `);
 
-    for (const task of result.rows) {
-      await storage.createTaskHistory({
-        taskId: task.id,
-        eventType: "status_changed",
-        oldValue: "in_progress",
-        newValue: "overdue",
-        note: "Auto-marked overdue by system",
-      });
-    }
-
     if (result.rows.length > 0) {
-      console.log(`[TaskScheduler] Marked ${result.rows.length} tasks as overdue`);
+      console.log(`[TaskScheduler] ${result.rows.length} overdue task(s) detected`);
     }
   } catch (err) {
     console.error("[TaskScheduler] Overdue check error:", err);
@@ -73,7 +49,7 @@ async function generateRecurringTasks() {
     const result = await pool.query(`
       SELECT * FROM tasks 
       WHERE is_recurring = true 
-        AND status IN ('completed', 'confirmed')
+        AND status IN ('complete')
         AND recurring_config IS NOT NULL
     `);
 
@@ -82,7 +58,7 @@ async function generateRecurringTasks() {
       if (!config || !config.frequency) continue;
 
       const existing = await pool.query(`
-        SELECT id FROM tasks WHERE parent_task_id = $1 AND status NOT IN ('completed', 'confirmed', 'cancelled') LIMIT 1
+        SELECT id FROM tasks WHERE parent_task_id = $1 AND status NOT IN ('complete', 'cancelled') LIMIT 1
       `, [task.id]);
 
       if (existing.rows.length > 0) continue;
@@ -103,11 +79,9 @@ async function generateRecurringTasks() {
           createdByUserId: task.created_by_user_id,
           assignedToUserId: task.assigned_to_user_id,
           dueDate: nextDate,
-          dueTime: config.time || task.due_time,
           category: task.category,
           estimatedMinutes: task.estimated_minutes,
           location: task.location,
-          requiresConfirmation: task.requires_confirmation,
           isRecurring: true,
           recurringConfig: task.recurring_config,
           parentTaskId: task.id,
@@ -154,27 +128,26 @@ function calculateNextDate(config: any, lastCompleted: string | Date): Date | nu
   return next;
 }
 
-let escalationInterval: ReturnType<typeof setInterval> | null = null;
+let reminderInterval: ReturnType<typeof setInterval> | null = null;
 let overdueInterval: ReturnType<typeof setInterval> | null = null;
 let recurringInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startTaskScheduler() {
   console.log("[TaskScheduler] Starting task scheduler...");
 
-  escalationInterval = setInterval(checkUnacknowledgedTasks, 15 * 60 * 1000);
-
+  reminderInterval = setInterval(checkReminderTasks, 60 * 60 * 1000);
   overdueInterval = setInterval(checkOverdueTasks, 60 * 60 * 1000);
-
   recurringInterval = setInterval(generateRecurringTasks, 60 * 60 * 1000);
 
   setTimeout(() => {
+    checkReminderTasks();
     checkOverdueTasks();
     generateRecurringTasks();
   }, 10000);
 }
 
 export function stopTaskScheduler() {
-  if (escalationInterval) clearInterval(escalationInterval);
+  if (reminderInterval) clearInterval(reminderInterval);
   if (overdueInterval) clearInterval(overdueInterval);
   if (recurringInterval) clearInterval(recurringInterval);
 }
