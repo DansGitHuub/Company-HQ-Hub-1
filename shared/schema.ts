@@ -1159,9 +1159,13 @@ export const todos = pgTable("todos", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   description: text("description"),
-  priority: text("priority").default("medium"), // low, medium, high, urgent
-  status: text("status").default("pending"), // pending, in_progress, completed
+  priority: text("priority").default("medium"),
+  status: text("status").default("pending"),
   dueDate: timestamp("due_date"),
+  reminderDate: timestamp("reminder_date"),
+  reminderSent: boolean("reminder_sent").default(false),
+  linkedRecordType: text("linked_record_type"),
+  linkedRecordId: varchar("linked_record_id", { length: 36 }),
   createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -1173,6 +1177,9 @@ export const insertTodoSchema = createInsertSchema(todos).pick({
   priority: true,
   status: true,
   dueDate: true,
+  reminderDate: true,
+  linkedRecordType: true,
+  linkedRecordId: true,
 });
 
 export type InsertTodo = z.infer<typeof insertTodoSchema>;

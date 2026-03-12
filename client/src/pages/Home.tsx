@@ -254,11 +254,11 @@ export default function Home() {
   return (
     <div className="space-y-4">
       <div className="flex items-baseline gap-3">
-        <h1 className="text-2xl font-heading font-bold text-foreground">
-          Welcome back, {user?.name?.split(" ")[0]}
+        <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="heading-workspace">
+          My Workspace
         </h1>
         <p className="text-sm text-muted-foreground">
-          Here's what's happening at Company HQ today.
+          Welcome back, {user?.name?.split(" ")[0]}. Here's what's happening today.
         </p>
       </div>
 

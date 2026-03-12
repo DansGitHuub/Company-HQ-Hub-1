@@ -36,7 +36,7 @@ import AdminSetup from "@/pages/AdminSetup";
 import EquipmentTracker from "@/pages/EquipmentTracker";
 import SearchPage from "@/pages/Search";
 import TodoList from "@/pages/TodoList";
-import Tasks from "@/pages/Tasks";
+
 import PlowSiteMapper from "@/pages/PlowSiteMapper";
 import MessagingInbox from "@/pages/MessagingInbox";
 import ProcessAuditor from "@/pages/ProcessAuditor";
@@ -103,7 +103,6 @@ function AppRoutes() {
         <Route path="/admin-setup" component={AdminSetup} />
         <Route path="/equipment" component={EquipmentTracker} />
         <Route path="/search" component={SearchPage} />
-        <Route path="/tasks" component={Tasks} />
         <Route path="/todos" component={TodoList} />
         <Route path="/tools/plow-mapper" component={PlowSiteMapper} />
         <Route path="/tools/process-auditor" component={ProcessAuditor} />

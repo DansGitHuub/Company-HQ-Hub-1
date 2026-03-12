@@ -26,8 +26,12 @@ import {
   insertConfiguredIntegrationSchema,
   insertIntegrationResearchSessionSchema,
   insertBuilderFormSchema,
+  calendarEvents,
+  todoAssignments,
   type User 
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { autoClassifySOPTitle, getTaxonomy } from "@shared/sopClassification";
 
@@ -5235,6 +5239,50 @@ SECTION GENERATION RULES:
     }
   });
 
+  async function syncTodoCalendarEvent(todoId: string, todoTitle: string, dueDate: Date | null, createdBy: string, status?: string) {
+    try {
+      const existing = await db.select().from(calendarEvents)
+        .where(and(eq(calendarEvents.linkedRecordType, "todo"), eq(calendarEvents.linkedRecordId, todoId)));
+      
+      if (!dueDate || status === "completed") {
+        if (existing.length > 0) {
+          await db.delete(calendarEvents)
+            .where(and(eq(calendarEvents.linkedRecordType, "todo"), eq(calendarEvents.linkedRecordId, todoId)));
+        }
+        return;
+      }
+
+      const assignments = await db.select().from(todoAssignments).where(eq(todoAssignments.todoId, todoId));
+      const assignedTo = assignments.length > 0 ? assignments[0].userId : null;
+
+      const startDate = new Date(dueDate);
+      startDate.setHours(9, 0, 0, 0);
+      const endDate = new Date(dueDate);
+      endDate.setHours(17, 0, 0, 0);
+
+      if (existing.length > 0) {
+        await db.update(calendarEvents)
+          .set({ title: `Task: ${todoTitle}`, startDatetime: startDate, endDatetime: endDate, assignedTo, updatedAt: new Date() })
+          .where(eq(calendarEvents.id, existing[0].id));
+      } else {
+        await db.insert(calendarEvents).values({
+          title: `Task: ${todoTitle}`,
+          description: `Auto-created from task: ${todoTitle}`,
+          eventType: "task",
+          startDatetime: startDate,
+          endDatetime: endDate,
+          allDay: true,
+          createdBy,
+          assignedTo,
+          linkedRecordType: "todo",
+          linkedRecordId: todoId,
+        });
+      }
+    } catch (err) {
+      console.error("[TODO-CALENDAR] Error syncing calendar event:", err);
+    }
+  }
+
   // To-Do System routes
   app.get("/api/todos", requireAuth, async (req, res) => {
     try {
@@ -5310,6 +5358,11 @@ SECTION GENERATION RULES:
           await storage.createTodoAssignment({ todoId: todo.id, userId });
         }
       }
+
+      if (todo.dueDate) {
+        await syncTodoCalendarEvent(todo.id, todo.title, todo.dueDate, user.id);
+      }
+
       res.status(201).json(todo);
     } catch (err) {
       console.error("[TODO] Error creating todo:", err);
@@ -5357,6 +5410,9 @@ SECTION GENERATION RULES:
       }
 
       const todo = await storage.updateTodo(req.params.id as string, allowedUpdates);
+      
+      await syncTodoCalendarEvent(todo.id, todo.title, todo.dueDate, todo.createdBy || user.id, todo.status || undefined);
+
       res.json(todo);
     } catch (err) {
       res.status(500).json({ message: "Error updating todo" });
@@ -5371,6 +5427,8 @@ SECTION GENERATION RULES:
       if (todo.createdBy !== user.id && !user.isMasterAdmin) {
         return res.status(403).json({ message: "Only the creator can delete this task" });
       }
+      await db.delete(calendarEvents)
+        .where(and(eq(calendarEvents.linkedRecordType, "todo"), eq(calendarEvents.linkedRecordId, req.params.id as string)));
       await storage.deleteTodo(req.params.id as string);
       res.json({ success: true });
     } catch (err) {

@@ -176,6 +176,29 @@ export async function runTaskMigration() {
   } finally {
     client.release();
   }
+
+  const client2 = await pool.connect();
+  try {
+    const cols = await client2.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'todos'`);
+    const colNames = cols.rows.map((r: any) => r.column_name);
+    if (!colNames.includes("reminder_date")) {
+      await client2.query(`ALTER TABLE todos ADD COLUMN reminder_date timestamp`);
+    }
+    if (!colNames.includes("reminder_sent")) {
+      await client2.query(`ALTER TABLE todos ADD COLUMN reminder_sent boolean DEFAULT false`);
+    }
+    if (!colNames.includes("linked_record_type")) {
+      await client2.query(`ALTER TABLE todos ADD COLUMN linked_record_type text`);
+    }
+    if (!colNames.includes("linked_record_id")) {
+      await client2.query(`ALTER TABLE todos ADD COLUMN linked_record_id varchar(36)`);
+    }
+    console.log("[migration] Todos table columns updated");
+  } catch (err: any) {
+    console.error("[migration] Todos column migration error:", err.message);
+  } finally {
+    client2.release();
+  }
 }
 
 export async function getNextTaskId(): Promise<string> {

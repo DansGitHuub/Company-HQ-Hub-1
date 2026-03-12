@@ -5,9 +5,8 @@ import { useAuth } from "@/hooks/use-auth";
 import type { CompanySettings } from "@shared/schema";
 import AIAssistantPanel from "@/components/AIAssistantPanel";
 import UpdatesPopup from "@/components/UpdatesPopup";
-import QuickAddTask from "@/components/QuickAddTask";
-import InteractiveCalendar from "@/components/InteractiveCalendar";
 import GlobalMicButton from "@/components/GlobalMicButton";
+import CalendarPage from "@/pages/Calendar";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -30,17 +29,12 @@ import {
   Truck,
   Info,
   ClipboardCheck,
-  LayoutGrid,
-  PanelLeft,
-  Circle,
-  Grip,
-  Minus,
   CheckSquare,
-  ListChecks,
   Snowflake,
   Bell,
   Brain,
-  CalendarDays
+  CalendarDays,
+  X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -64,9 +58,9 @@ import { Badge } from "@/components/ui/badge";
 
 const menuHelpContent: Record<string, { title: string; description: string; tips: string[] }> = {
   dashboard: {
-    title: "Dashboard",
+    title: "My Workspace",
     description: "Your home base with quick access tiles to all major features.",
-    tips: ["Click any tile to navigate", "Dashboard adapts to your role", "Use sidebar for quick navigation"]
+    tips: ["Click any tile to navigate", "Workspace adapts to your role", "Use sidebar for quick navigation"]
   },
   sops: {
     title: "SOP Library",
@@ -79,14 +73,9 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
     tips: ["Quizzes are auto-generated from SOPs", "Track your scores over time", "Retake to improve"]
   },
   todos: {
-    title: "To-Do List",
+    title: "Tasks",
     description: "Manage tasks with priorities, due dates, and assignments.",
     tips: ["Set priorities and due dates", "Assign tasks to team members", "Track completion status"]
-  },
-  tasks: {
-    title: "Tasks",
-    description: "Track and manage tasks across the company with kanban boards and list views.",
-    tips: ["Drag and drop to change status", "Pick up open pool tasks", "Add comments and custom fields"]
   },
   materials: {
     title: "Materials Catalog",
@@ -190,8 +179,6 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
   }
 };
 
-type TileLayout = "grid" | "radial" | "dock";
-
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation, effectiveRole, previewRole } = useAuth();
   const [location] = useLocation();
@@ -203,9 +190,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const contentRef = React.useRef<HTMLDivElement>(null);
   const sidebarNavRef = React.useRef<HTMLDivElement>(null);
   const sidebarScrollPosition = React.useRef<number>(0);
-  const [isTileView, setIsTileView] = React.useState(false);
-  const [tileLayout, setTileLayout] = React.useState<TileLayout>("grid");
   const [isUpdatesOpen, setIsUpdatesOpen] = React.useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
 
   // Reset main content scroll to top when navigating between pages
   // But preserve sidebar scroll position
@@ -294,13 +280,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     refetchInterval: 30000,
   });
 
-  const { data: tasksDashboard } = useQuery<{ overdue: number }>({
-    queryKey: ["/api/tasks/dashboard"],
-    staleTime: 30000,
-    refetchInterval: 30000,
-    enabled: !!user,
-  });
-
   const { data: unseenUpdates = [] } = useQuery<{ id: string }[]>({
     queryKey: ["/api/updates/unseen"],
     staleTime: 30000,
@@ -345,14 +324,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   ];
 
   const internalNavItems: Record<string, { icon: any; label: string; href: string }> = {
-    dashboard: { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+    dashboard: { icon: LayoutDashboard, label: "My Workspace", href: "/" },
     applicant_portal: { icon: ClipboardCheck, label: "My Application", href: "/applicant" },
     sops: { icon: BookOpen, label: "SOP Library", href: "/sops" },
     testing: { icon: Brain, label: "Quizzes", href: "/testing" },
     materials: { icon: Hammer, label: "Materials", href: "/materials" },
     equipment: { icon: Truck, label: "Equipment", href: "/equipment" },
-    todos: { icon: CheckSquare, label: "To-Do List", href: "/todos" },
-    tasks: { icon: ListChecks, label: "Tasks", href: "/tasks" },
+    todos: { icon: CheckSquare, label: "Tasks", href: "/todos" },
     hiring: { icon: Users, label: "Hiring", href: "/hiring" },
     employees: { icon: User, label: "Employees", href: "/employees" },
     jobs: { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
@@ -366,29 +344,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     admin: { icon: Shield, label: "Admin Panel", href: "/admin" },
     tools: { icon: Snowflake, label: "Tools", href: "/tools" },
     plow_mapper: { icon: Snowflake, label: "Plow Mapper", href: "/tools/plow-mapper" },
-    calendar: { icon: CalendarDays, label: "Calendar", href: "/calendar" },
   };
 
   type NavSection = { label: string; items: string[] };
 
   const sidebarSections: NavSection[] = [
-    { label: "FIELD OPS", items: ["dashboard", "jobs", "equipment", "materials", "tools", "tasks", "todos", "calendar"] },
-    { label: "PEOPLE", items: ["hiring", "employees"] },
-    { label: "KNOWLEDGE", items: ["sops", "testing", "forms", "help"] },
-    { label: "CUSTOMERS", items: ["education"] },
-    { label: "COMPANY", items: ["hq", "marketing", "integrations"] },
-    { label: "ADMIN", items: ["admin"] },
+    { label: "", items: ["dashboard"] },
+    { label: "WORK", items: ["jobs", "todos", "equipment"] },
+    { label: "PEOPLE", items: ["employees", "education", "hiring"] },
+    { label: "COMPANY", items: ["inbox", "forms", "sops", "testing"] },
+    { label: "ADMIN", items: ["admin", "tools", "hq"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {
-    const roleLower = role;
-    if (roleLower === "Crew" || roleLower === "New Hire") {
-      return sidebarSections.filter(s => s.label === "FIELD OPS" || s.label === "KNOWLEDGE");
+    if (role === "Crew" || role === "New Hire") {
+      return sidebarSections.filter(s => s.label !== "ADMIN");
     }
-    if (roleLower === "Crew Lead") {
-      return sidebarSections.filter(s => s.label === "FIELD OPS" || s.label === "KNOWLEDGE" || s.label === "PEOPLE");
+    if (role === "Crew Lead") {
+      return sidebarSections.filter(s => s.label !== "ADMIN");
     }
-    if (roleLower === "Manager" || roleLower === "HR" || roleLower === "Sales") {
+    if (role === "Manager" || role === "HR" || role === "Sales") {
       return sidebarSections.filter(s => s.label !== "ADMIN");
     }
     return sidebarSections;
@@ -471,19 +446,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         )}
         {effectiveRole !== "Customer" ? displaySections.map((section, sectionIdx) => (
-          <div key={section.label} className={cn(sectionIdx > 0 ? "mt-4" : "")}>
-            <div className="px-4 py-1.5 mb-1">
-              <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-sidebar-foreground/40" data-testid={`section-header-${section.label.toLowerCase().replace(' ', '-')}`}>
-                {section.label}
-              </span>
-            </div>
+          <div key={section.label || "workspace"} className={cn(sectionIdx > 0 ? "mt-4" : "")}>
+            {section.label && (
+              <div className="px-4 py-1.5 mb-1">
+                <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-sidebar-foreground/40" data-testid={`section-header-${section.label.toLowerCase().replace(' ', '-')}`}>
+                  {section.label}
+                </span>
+              </div>
+            )}
             <div className="space-y-0.5">
               {section.items.filter(id => internalNavItems[id]).map((itemId) => {
                 const item = { id: itemId, ...internalNavItems[itemId] };
                 const isActive = getIsActive(item);
                 const helpContent = menuHelpContent[item.id];
                 const showTodoBadge = item.id === "todos" && todoActiveStatus?.isActive && todoActiveStatus.unreadCount > 0;
-                const showTaskBadge = item.id === "tasks" && tasksDashboard && tasksDashboard.overdue > 0;
                 return (
                   <div key={item.id} className="flex items-center group w-full">
                     <Link href={item.href} className="flex-1 min-w-0 block">
@@ -509,11 +485,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                           {showTodoBadge && (
                             <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
                               {todoActiveStatus.unreadCount > 9 ? "9+" : todoActiveStatus.unreadCount}
-                            </span>
-                          )}
-                          {showTaskBadge && (
-                            <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                              {tasksDashboard!.overdue > 9 ? "9+" : tasksDashboard!.overdue}
                             </span>
                           )}
                         </div>
@@ -630,151 +601,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
   };
 
-  const TileNavigation = () => {
-    const tiles = displayNav.filter(item => item.id !== "help");
-    
-    const handleTileClick = (href: string) => {
-      if (location === href) {
-        window.dispatchEvent(new CustomEvent("forms-nav-reset"));
-      }
-      navigate(href);
-    };
-
-    if (tileLayout === "grid") {
-      return (
-        <div className="flex items-center justify-center p-3">
-          <div className="flex flex-wrap justify-center gap-2">
-            {tiles.map((item) => {
-              const Icon = item.icon;
-              const isActive = getIsActive(item);
-              return (
-                <button
-                  type="button"
-                  key={item.id}
-                  onClick={() => handleTileClick(item.href)}
-                  className={cn(
-                    "group flex items-center gap-2 px-3 py-2 rounded-lg",
-                    "shadow hover:shadow-md transition-all duration-200",
-                    "hover:scale-105 cursor-pointer",
-                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
-                    isActive 
-                      ? "bg-primary text-primary-foreground ring-2 ring-primary/50" 
-                      : "bg-primary/80 hover:bg-primary text-primary-foreground"
-                  )}
-                  aria-label={`Navigate to ${item.label}`}
-                  data-testid={`tile-${item.id}`}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="font-medium text-sm hidden sm:inline">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    if (tileLayout === "radial") {
-      return (
-        <div className="flex items-center justify-center p-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg">
-              <span className="text-primary-foreground font-bold text-sm">HQ</span>
-            </div>
-            <div className="flex flex-wrap justify-center gap-2">
-              {tiles.map((item) => {
-                const Icon = item.icon;
-                const isActive = getIsActive(item);
-                return (
-                  <button
-                    type="button"
-                    key={item.id}
-                    onClick={() => handleTileClick(item.href)}
-                    className={cn(
-                      "flex items-center justify-center p-2 rounded-full",
-                      "shadow hover:shadow-md transition-all duration-200",
-                      "hover:scale-110 cursor-pointer",
-                      "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
-                      isActive 
-                        ? "bg-primary text-primary-foreground ring-2 ring-primary/50" 
-                        : "bg-primary/80 hover:bg-primary text-primary-foreground"
-                    )}
-                    aria-label={`Navigate to ${item.label}`}
-                    title={item.label}
-                    data-testid={`tile-${item.id}`}
-                  >
-                    <Icon className="h-5 w-5" />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (tileLayout === "dock") {
-      return (
-        <div className="flex items-center justify-center p-2">
-          <div className="flex items-center gap-1 px-3 py-2 bg-card/80 backdrop-blur-sm rounded-full shadow-lg border border-border">
-            {tiles.map((item) => {
-              const Icon = item.icon;
-              const isActive = getIsActive(item);
-              return (
-                <button
-                  type="button"
-                  key={item.id}
-                  onClick={() => handleTileClick(item.href)}
-                  className={cn(
-                    "group flex items-center gap-1.5 px-3 py-1.5 rounded-full relative",
-                    "transition-all duration-200",
-                    "hover:scale-105 cursor-pointer",
-                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
-                    isActive 
-                      ? "bg-primary text-primary-foreground" 
-                      : "hover:bg-primary/20 text-foreground"
-                  )}
-                  aria-label={`Navigate to ${item.label}`}
-                  data-testid={`tile-${item.id}`}
-                >
-                  <Icon className={cn("h-4 w-4", isActive ? "" : "text-primary")} />
-                  <span className={cn(
-                    "font-medium text-xs hidden sm:inline",
-                    isActive ? "" : "text-muted-foreground group-hover:text-foreground"
-                  )}>{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    return null;
-  };
-
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      {!isTileView && (
-        <div className="hidden md:block w-64 shrink-0 border-r border-border bg-sidebar overflow-y-auto">
-          <NavContent />
-        </div>
-      )}
+      <div className="hidden md:block w-64 shrink-0 border-r border-border bg-sidebar overflow-y-auto">
+        <NavContent />
+      </div>
 
-      {!isTileView && (
-        <div className="md:hidden">
-          <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50 md:hidden">
-                <Menu className="h-6 w-6" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-64 border-r border-sidebar-border sidebar-themed">
-              <NavContent />
-            </SheetContent>
-          </Sheet>
-        </div>
-      )}
+      <div className="md:hidden">
+        <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50 md:hidden">
+              <Menu className="h-6 w-6" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="p-0 w-64 border-r border-sidebar-border sidebar-themed">
+            <NavContent />
+          </SheetContent>
+        </Sheet>
+      </div>
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-16 border-b bg-card px-8 flex items-center justify-between sticky top-0 z-10">
@@ -810,61 +654,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
            </div>
            <div className="flex items-center gap-2">
               <TooltipProvider delayDuration={300}>
-              {/* To-Do List button - shown only for active users or admins */}
-              {(todoActiveStatus?.isActive || user?.role === "Admin") && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Link href="/todos">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="relative gap-2 h-10 hover:bg-accent hover:scale-105 transition-all"
-                        data-testid="button-todo-header"
-                      >
-                        <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-600 shadow-md shadow-emerald-500/30">
-                          <CheckSquare className="h-4 w-4 text-white drop-shadow-sm" />
-                        </div>
-                        <span className="hidden md:inline font-medium">To-Do</span>
-                        {todoActiveStatus?.unreadCount && todoActiveStatus.unreadCount > 0 && (
-                          <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm">
-                            {todoActiveStatus.unreadCount > 9 ? "9+" : todoActiveStatus.unreadCount}
-                          </span>
-                        )}
-                      </Button>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>View your tasks and to-do items</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-              {/* Communications/Inbox button */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Link href="/communications">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="relative gap-2 h-10 hover:bg-accent hover:scale-105 transition-all"
-                      data-testid="button-communications-header"
-                    >
-                      <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 shadow-md shadow-amber-500/30">
-                        <Mail className="h-4 w-4 text-white drop-shadow-sm" />
-                      </div>
-                      <span className="hidden md:inline font-medium">Messages</span>
-                      {unreadData && unreadData.count > 0 && (
-                        <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
-                          {unreadData.count > 9 ? "9+" : unreadData.count}
-                        </span>
-                      )}
-                    </Button>
-                  </Link>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="relative gap-2 h-10 hover:bg-accent hover:scale-105 transition-all"
+                    onClick={() => setIsCalendarOpen(true)}
+                    data-testid="button-calendar-header"
+                  >
+                    <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-indigo-400 via-indigo-500 to-indigo-600 shadow-md shadow-indigo-500/30">
+                      <CalendarDays className="h-4 w-4 text-white drop-shadow-sm" />
+                    </div>
+                    <span className="hidden md:inline font-medium">Calendar</span>
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>View messages and conversations</p>
+                  <p>Open calendar</p>
                 </TooltipContent>
               </Tooltip>
-              {/* Updates/What's New button */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -889,124 +697,57 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <p>See what's new and recent updates</p>
                 </TooltipContent>
               </Tooltip>
-              <div className="flex items-center gap-2 mr-2 border-r pr-3">
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-muted-foreground hidden md:inline">View:</span>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant={isTileView ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setIsTileView(!isTileView)}
-                        className={cn(
-                          "gap-2 transition-all h-10 hover:scale-105",
-                          isTileView ? "bg-primary text-primary-foreground" : "hover:bg-accent"
-                        )}
-                        data-testid="button-tile-view-toggle"
-                      >
-                        <div className={cn(
-                          "relative w-7 h-7 flex items-center justify-center rounded-lg shadow-md transition-all",
-                          isTileView 
-                            ? "bg-gradient-to-br from-slate-500 via-slate-600 to-slate-700 shadow-slate-500/30" 
-                            : "bg-gradient-to-br from-violet-400 via-violet-500 to-violet-600 shadow-violet-500/30"
-                        )}>
-                          {isTileView ? <PanelLeft className="h-4 w-4 text-white drop-shadow-sm" /> : <LayoutGrid className="h-4 w-4 text-white drop-shadow-sm" />}
-                        </div>
-                        <span className="font-medium">{isTileView ? "Back to Menu" : "Tile View"}</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{isTileView ? "Switch to sidebar navigation" : "Switch to tile-based navigation"}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                {isTileView && (
-                  <div className="flex items-center gap-1 pl-2 border-l" role="group" aria-label="Tile layout options">
-                    <span className="text-xs text-muted-foreground hidden md:inline mr-1">Layout:</span>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={tileLayout === "grid" ? "secondary" : "ghost"}
-                          size="sm"
-                          className="gap-1 h-8 px-2 hover:scale-105 transition-all"
-                          onClick={() => setTileLayout("grid")}
-                          aria-label="Switch to grid layout"
-                          aria-pressed={tileLayout === "grid"}
-                          data-testid="button-layout-grid"
-                        >
-                          <Grip className="h-4 w-4" />
-                          <span className="hidden lg:inline text-xs">Grid</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Grid layout</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={tileLayout === "radial" ? "secondary" : "ghost"}
-                          size="sm"
-                          className="gap-1 h-8 px-2 hover:scale-105 transition-all"
-                          onClick={() => setTileLayout("radial")}
-                          aria-label="Switch to radial layout"
-                          aria-pressed={tileLayout === "radial"}
-                          data-testid="button-layout-radial"
-                        >
-                          <Circle className="h-4 w-4" />
-                          <span className="hidden lg:inline text-xs">Radial</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Radial layout</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={tileLayout === "dock" ? "secondary" : "ghost"}
-                          size="sm"
-                          className="gap-1 h-8 px-2 hover:scale-105 transition-all"
-                          onClick={() => setTileLayout("dock")}
-                          aria-label="Switch to dock layout"
-                          aria-pressed={tileLayout === "dock"}
-                          data-testid="button-layout-dock"
-                        >
-                          <Minus className="h-4 w-4" />
-                          <span className="hidden lg:inline text-xs">Dock</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Dock layout</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                )}
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link href="/help">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="relative gap-2 h-10 hover:bg-accent hover:scale-105 transition-all"
+                      data-testid="button-help-header"
+                    >
+                      <HelpCircle className="h-5 w-5 text-muted-foreground" />
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Help Center</p>
+                </TooltipContent>
+              </Tooltip>
               </TooltipProvider>
-              <div className="hidden md:block ml-2">
-                <InteractiveCalendar />
-              </div>
            </div>
         </header>
 
         <div ref={contentRef} className="flex-1 overflow-y-auto">
-          {isTileView && (
-            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b">
-              <TileNavigation />
-            </div>
-          )}
-          <div className={cn("p-4 md:p-8 pb-24", isTileView && "pt-4")}>
+          <div className="p-4 md:p-8 pb-24">
             {children}
           </div>
         </div>
       </main>
+
+      {isCalendarOpen && (
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
+          <div className="flex items-center justify-between px-6 py-3 border-b bg-card">
+            <h2 className="text-lg font-semibold">Calendar</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsCalendarOpen(false)}
+              data-testid="button-close-calendar-overlay"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 md:p-8">
+            <CalendarPage />
+          </div>
+        </div>
+      )}
       
       {user && effectiveRole && (
         <>
           <GlobalMicButton />
           <AIAssistantPanel />
-          <QuickAddTask />
         </>
       )}
       
