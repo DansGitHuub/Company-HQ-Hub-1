@@ -25,7 +25,6 @@ import {
   Shield,
   Mail,
   Inbox,
-  HelpCircle,
   Truck,
   Info,
   ClipboardCheck,
@@ -34,7 +33,8 @@ import {
   Bell,
   Brain,
   CalendarDays,
-  X
+  X,
+  LifeBuoy
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -320,7 +320,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     ...(user?.isApplicant ? [{ id: "applicant_portal", icon: ClipboardCheck, label: "My Application", href: "/applicant" }] : []),
     { id: "customer_resources", icon: GraduationCap, label: "Resources", href: "/education" },
     { id: "customer_account", icon: User, label: "My Account", href: "/profile" },
-    { id: "customer_help", icon: HelpCircle, label: "Help", href: "/help" },
+    { id: "customer_help", icon: LifeBuoy, label: "Help", href: "/help" },
   ];
 
   const internalNavItems: Record<string, { icon: any; label: string; href: string }> = {
@@ -335,7 +335,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     employees: { icon: User, label: "Employees", href: "/employees" },
     jobs: { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
     education: { icon: GraduationCap, label: "Customer Hub", href: "/education" },
-    help: { icon: HelpCircle, label: "Help", href: "/help" },
+    help: { icon: LifeBuoy, label: "Help", href: "/help" },
     hq: { icon: Building2, label: "CompanyHQ", href: "/hq" },
     marketing: { icon: Megaphone, label: "Marketing", href: "/marketing" },
     forms: { icon: FileText, label: "Forms", href: "/forms" },
@@ -682,7 +682,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     onClick={() => setIsUpdatesOpen(true)}
                     data-testid="button-updates-header"
                   >
-                    <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 shadow-md shadow-blue-500/30">
+                    <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 shadow-md shadow-amber-500/30">
                       <Bell className="h-4 w-4 text-white drop-shadow-sm" />
                     </div>
                     <span className="hidden md:inline font-medium">Updates</span>
@@ -706,7 +706,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       className="relative gap-2 h-10 hover:bg-accent hover:scale-105 transition-all"
                       data-testid="button-help-header"
                     >
-                      <HelpCircle className="h-5 w-5 text-muted-foreground" />
+                      <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-600 shadow-md shadow-emerald-500/30">
+                        <LifeBuoy className="h-4 w-4 text-white drop-shadow-sm" />
+                      </div>
+                      <span className="hidden md:inline font-medium">Help</span>
                     </Button>
                   </Link>
                 </TooltipTrigger>

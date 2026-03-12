@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  HelpCircle, 
+  LifeBuoy,
   Home, 
   FileText, 
   Package, 
@@ -24,14 +24,10 @@ import {
   MessageSquare,
   Shield,
   ArrowRight,
-  Eye,
-  EyeOff,
   Leaf,
   Wrench,
   Phone,
   Calendar,
-  Star,
-  Settings,
   Search,
   ArrowLeft,
   Flag,
@@ -300,111 +296,21 @@ const staffFAQs = [
   }
 ];
 
-function RolePreviewPanel() {
-  const { user, previewRole, setPreviewRole, effectiveRole } = useAuth();
-  const [open, setOpen] = useState(false);
-  const isAdmin = user?.role === "Admin";
-  
-  if (!isAdmin) return null;
-  
-  const roles = ["Admin", "Manager", "Crew", "Customer"] as const;
-  
-  return (
-    <>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button 
-            variant={previewRole ? "default" : "outline"} 
-            className="gap-2"
-            data-testid="button-test-software"
-          >
-            {previewRole ? <Eye className="h-4 w-4" /> : <Settings className="h-4 w-4" />}
-            {previewRole ? `Viewing as ${previewRole}` : "Test My Software"}
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5 text-primary" />
-              Test My Software
-            </DialogTitle>
-            <DialogDescription>
-              Preview the app as different access levels to see what each role sees. This only changes your view, not your actual permissions.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-3">
-              {roles.map(role => (
-                <Button
-                  key={role}
-                  variant={effectiveRole === role ? "default" : "outline"}
-                  className="h-16 flex-col gap-1"
-                  onClick={() => {
-                    setPreviewRole(role === user?.role ? null : role);
-                    if (role !== user?.role) setOpen(false);
-                  }}
-                >
-                  {role === "Admin" && <Shield className="h-5 w-5" />}
-                  {role === "Manager" && <Users className="h-5 w-5" />}
-                  {role === "Crew" && <Wrench className="h-5 w-5" />}
-                  {role === "Customer" && <Star className="h-5 w-5" />}
-                  <span>{role}</span>
-                  {role === user?.role && <Badge variant="secondary" className="text-xs">Your Role</Badge>}
-                </Button>
-              ))}
-            </div>
-            {previewRole && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <p className="text-sm text-amber-800">
-                  <strong>Preview Mode Active:</strong> You're viewing the app as a {previewRole}. Click your actual role ({user?.role}) to return to normal view.
-                </p>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            {previewRole && (
-              <Button variant="outline" onClick={() => { setPreviewRole(null); setOpen(false); }}>
-                <EyeOff className="h-4 w-4 mr-2" /> Exit Preview Mode
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
 export default function Help() {
   const { user, effectiveRole, previewRole } = useAuth();
-  const isActualAdmin = user?.role === "Admin";
   const isCustomer = effectiveRole === "Customer";
   
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-3">
-            <HelpCircle className="h-8 w-8 text-primary" />
-            {isCustomer ? "Customer Help" : "Help Center"}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {isCustomer ? "Everything you need to know as a valued customer" : "Learn how to use Company HQ effectively"}
-          </p>
-        </div>
-        {isActualAdmin && <RolePreviewPanel />}
+      <div>
+        <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-3">
+          <LifeBuoy className="h-8 w-8 text-primary" />
+          {isCustomer ? "Customer Help" : "Help Center"}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {isCustomer ? "Everything you need to know as a valued customer" : "Learn how to use Company HQ effectively"}
+        </p>
       </div>
-
-      {previewRole && (
-        <div className="bg-amber-100 border border-amber-300 rounded-lg p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Eye className="h-5 w-5 text-amber-600" />
-            <span className="font-medium text-amber-800">
-              Preview Mode: Viewing as {previewRole}
-            </span>
-          </div>
-          <Badge variant="outline" className="text-amber-700 border-amber-400">Test Mode</Badge>
-        </div>
-      )}
 
       <Tabs defaultValue="articles" className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-6">
@@ -535,7 +441,7 @@ export default function Help() {
                 <CardContent className="pt-6">
                   <div className="flex items-start gap-4">
                     <div className="p-3 bg-primary/10 rounded-lg">
-                      <HelpCircle className="h-6 w-6 text-primary" />
+                      <LifeBuoy className="h-6 w-6 text-primary" />
                     </div>
                     <div>
                       <h3 className="font-semibold mb-1">Quick Tip: Info Icons</h3>

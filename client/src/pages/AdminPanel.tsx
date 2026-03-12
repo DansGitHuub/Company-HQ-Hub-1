@@ -54,7 +54,9 @@ import {
   ExternalLink,
   Link2,
   Copy,
-  Globe
+  Globe,
+  Wrench,
+  Star
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
@@ -519,6 +521,9 @@ export default function AdminPanel() {
           </TabsTrigger>
           <TabsTrigger value="shared-links" className="gap-2" data-testid="tab-shared-links">
             <ExternalLink className="h-4 w-4" /> Shared Links
+          </TabsTrigger>
+          <TabsTrigger value="app-testing" className="gap-2" data-testid="tab-app-testing">
+            <Eye className="h-4 w-4" /> App Testing
           </TabsTrigger>
           {user?.isMasterAdmin && (
             <TabsTrigger value="ai-agents" className="gap-2">
@@ -1070,6 +1075,10 @@ export default function AdminPanel() {
 
         <TabsContent value="shared-links" className="mt-6">
           <SharedLinksManager />
+        </TabsContent>
+
+        <TabsContent value="app-testing" className="mt-6">
+          <AppTestingPanel />
         </TabsContent>
 
         {user?.isMasterAdmin && (
@@ -1800,6 +1809,61 @@ function CreateAgentDialog({ onCreated }: { onCreated: () => void }) {
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AppTestingPanel() {
+  const { user, previewRole, setPreviewRole, effectiveRole } = useAuth();
+  const roles = ["Admin", "Manager", "Crew", "Customer"] as const;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Eye className="h-5 w-5 text-primary" />
+          App Testing
+        </CardTitle>
+        <CardDescription>
+          Preview the app as different roles to see what each access level experiences. This only changes your view — not your actual permissions.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {roles.map(role => (
+            <Button
+              key={role}
+              variant={effectiveRole === role ? "default" : "outline"}
+              className="h-20 flex-col gap-2"
+              data-testid={`button-preview-${role.toLowerCase()}`}
+              onClick={() => {
+                setPreviewRole(role === user?.role ? null : role);
+              }}
+            >
+              {role === "Admin" && <Shield className="h-5 w-5" />}
+              {role === "Manager" && <Users className="h-5 w-5" />}
+              {role === "Crew" && <Wrench className="h-5 w-5" />}
+              {role === "Customer" && <Star className="h-5 w-5" />}
+              <span className="font-medium">{role}</span>
+              {role === user?.role && <Badge variant="secondary" className="text-xs">Your Role</Badge>}
+            </Button>
+          ))}
+        </div>
+        {previewRole && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Eye className="h-5 w-5 text-amber-600" />
+              <span className="text-sm text-amber-800">
+                <strong>Preview Mode Active:</strong> You're viewing the app as <strong>{previewRole}</strong>. 
+                Navigate to any page to see what a {previewRole} user would see.
+              </span>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setPreviewRole(null)} data-testid="button-exit-preview">
+              <EyeOff className="h-4 w-4 mr-2" /> Exit Preview
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

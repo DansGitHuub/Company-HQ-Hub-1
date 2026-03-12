@@ -1,0 +1,128 @@
+Update the notification bell panel in CompanyHQ with real content in the Activity and Updates tabs, and add a new Roadmap tab.
+
+---
+
+## TAB 1 — Activity (already exists, needs real content)
+
+The Activity tab should show a live feed of things that have happened in the app for the logged-in user. Each item in the feed shows:
+- An icon representing the type of activity
+- A description of what happened (e.g. "Task 'Mow lawn at Smith property' was marked complete")
+- A link to the related record where applicable
+- How long ago it happened (e.g. "2 hours ago")
+
+### What triggers an activity item:
+- A task assigned to this user is completed
+- A task is assigned to this user
+- A job they are on is updated or completed
+- A document is shared to their record
+- A form is submitted by or for them
+- A calendar event is added that includes them
+- They receive an internal message (if messages module exists)
+- An employee they manage completes onboarding (managers only)
+
+Activity items are per-user — each person only sees activity relevant to them.
+
+Store in an `activity_feed` table:
+- id
+- user_id
+- type (string)
+- description (string)
+- link_url (string, optional)
+- linked_record_type (string, optional)
+- linked_record_id (integer, optional)
+- is_read (boolean, default false)
+- created_at
+
+Mark items as read when the user opens the bell panel. Show unread count as a red badge on the bell icon.
+
+---
+
+## TAB 2 — Updates (already exists, needs real content)
+
+The Updates tab is for CompanyHQ announcements posted by Admin. Each update shows:
+- Title
+- Description/body text
+- Date posted
+- Posted by (name)
+- A comment section where anyone (employee level and above) can leave a comment
+- Comment shows commenter name, comment text, and timestamp
+
+### Posting updates:
+- Only Admin can create new updates
+- Add a "+ Post Update" button at the top of the Updates tab visible only to Admin
+- Clicking it opens a simple form: Title (required), Body text (required), Post button
+
+Store in an `app_updates` table:
+- id
+- title
+- body
+- posted_by (user id)
+- created_at
+
+Store comments in an `app_update_comments` table:
+- id
+- update_id
+- user_id
+- comment_text
+- created_at
+
+---
+
+## TAB 3 — Roadmap (new tab)
+
+Add a third tab to the bell panel called "Roadmap".
+
+### What it shows:
+A list of items with a status badge. Each item shows:
+- Status badge: Idea | In Progress | Completed
+- Title
+- Description
+- Date added
+- Date completed (if status is Completed)
+- Comment section (same pattern as Updates tab)
+
+### Status badge colors:
+- Idea — gray
+- In Progress — blue  
+- Completed — green
+
+### Permissions:
+- Admin can create, edit, and delete roadmap items
+- Admin can change the status of any item
+- Managers and Employees can view all items and comment
+- Customers cannot see this tab at all — hide it entirely from customer role
+
+### Posting items:
+- "+ Add Item" button visible to Admin only
+- Form: Title (required), Description (required), Status dropdown (default: Idea)
+
+### Auto-archive:
+- Items with status "Completed" are automatically hidden from the main list after 30 days
+- Add an "View Archive" link at the bottom of the tab that shows all archived completed items in a separate scrollable list
+- Archived items are read-only — no new comments, no status changes
+
+Store in a `roadmap_items` table:
+- id
+- title
+- description
+- status (enum: idea, in_progress, completed)
+- completed_at (timestamp, optional)
+- archived_at (timestamp, optional)
+- created_by (user id)
+- created_at
+- updated_at
+
+Store comments in a `roadmap_comments` table:
+- id
+- item_id
+- user_id
+- comment_text
+- created_at
+
+---
+
+## NOTES
+- The bell panel already exists — update it in place, do not rebuild it
+- Keep the existing panel width and positioning
+- Use existing styling patterns
+- Do not break any existing functionality
