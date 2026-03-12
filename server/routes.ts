@@ -7855,6 +7855,95 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  app.get("/api/users", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "Admin" && user.role !== "Manager") {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+      const role = req.query.role as string | undefined;
+      const conditions = [];
+      if (role) conditions.push(eq(users.role, role));
+      const result = await db.select({ id: users.id, name: users.name, username: users.username, role: users.role })
+        .from(users)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(users.name);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/document-shares", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "Admin" && user.role !== "Manager") {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+      const { documentId, shares } = req.body;
+      if (!documentId || !Array.isArray(shares)) {
+        return res.status(400).json({ message: "documentId and shares array required" });
+      }
+      const results = [];
+      for (const s of shares) {
+        if (!s.module) continue;
+        const share = await storage.createDocumentShare({
+          documentId,
+          module: s.module,
+          recordId: s.recordId || null,
+          sharedByUserId: user.id,
+        });
+        results.push(share);
+      }
+      res.json(results);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/document-shares", requireAuth, async (req, res) => {
+    try {
+      const { documentId, module, recordId } = req.query;
+      if (documentId) {
+        const shares = await storage.getDocumentSharesByDocument(documentId as string);
+        return res.json(shares);
+      }
+      if (module) {
+        const shares = await storage.getDocumentSharesByModule(module as string, recordId as string | undefined);
+        return res.json(shares);
+      }
+      res.json([]);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/document-shares/documents", requireAuth, async (req, res) => {
+    try {
+      const { module, recordId } = req.query;
+      if (!module) {
+        return res.status(400).json({ message: "module parameter required" });
+      }
+      const docs = await storage.getSharedDocumentsForModule(module as string, recordId as string | undefined);
+      res.json(docs);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/document-shares/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "Admin" && user.role !== "Manager") {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+      await storage.deleteDocumentShare(req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   async function generateAndStorePdf(sub: any, user: any, storage: any) {
     try {
       const { generateFormPdf, uploadPdfToStorage } = await import("./pdfGenerator");

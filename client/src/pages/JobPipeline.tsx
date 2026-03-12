@@ -740,6 +740,8 @@ export default function JobPipeline() {
                       canShare
                       canLink
                       canDelete
+                      canAttachFromLibrary
+                      module="job"
                       title="Linked Documents"
                       compact
                     />

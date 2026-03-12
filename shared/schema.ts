@@ -2392,6 +2392,19 @@ export const insertDocumentLinkSchema = createInsertSchema(documentLinks).omit({
 export type InsertDocumentLink = z.infer<typeof insertDocumentLinkSchema>;
 export type DocumentLink = typeof documentLinks.$inferSelect;
 
+export const documentShares = pgTable("document_shares", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id", { length: 36 }).references(() => documents.id).notNull(),
+  module: text("module").notNull(),
+  recordId: varchar("record_id", { length: 36 }),
+  sharedByUserId: varchar("shared_by_user_id", { length: 36 }).references(() => users.id),
+  sharedAt: timestamp("shared_at").defaultNow(),
+});
+
+export const insertDocumentShareSchema = createInsertSchema(documentShares).omit({ id: true, sharedAt: true });
+export type InsertDocumentShare = z.infer<typeof insertDocumentShareSchema>;
+export type DocumentShare = typeof documentShares.$inferSelect;
+
 export const formTypeEnum = ["w4", "i9", "ohio_it4", "direct_deposit", "handbook_acknowledgment", "emergency_contact", "background_check_auth", "workers_comp_first_report", "osha_incident", "nda", "employment_application"] as const;
 export type FormType = typeof formTypeEnum[number];
 

@@ -1,0 +1,86 @@
+I need you to build a document sharing system that connects the Document Library to all other modules in CompanyHQ. Here is exactly what to build:
+
+---
+
+## HOW IT SHOULD WORK
+
+Admins upload documents to the Document Library (already exists). From there, any document can be shared to one or more modules by checking boxes. Inside each module, users can browse and attach documents from the library to any record.
+
+---
+
+## PART 1 — SHARE FROM DOCUMENT LIBRARY
+
+On each document in the Document Library, update the existing share button or add a "Share to Modules" option that opens a simple modal with checkboxes:
+
+**Share to:**
+- [ ] Employee Records — optionally pick a specific employee from a dropdown, or leave blank to make it available to all employees
+- [ ] Hiring / Onboarding — optionally pick a specific applicant or new hire
+- [ ] Jobs / Work Orders — optionally pick a specific job
+- [ ] Equipment Records — optionally pick a specific equipment item
+- [ ] Customer Records — optionally pick a specific customer
+
+The user checks one or more boxes, optionally selects a specific record from the dropdown for each checked module, then clicks Save. That document is now accessible inside those modules.
+
+If no specific record is selected for a module, the document goes into a general pool for that module that any record in that module can access.
+
+---
+
+## PART 2 — DOCUMENTS TAB IN EACH MODULE
+
+Add or update a Documents tab on the detail/profile page of records in these modules:
+- Employee records
+- Hiring / applicant records
+- Job / work order records
+- Equipment records
+- Customer records
+
+Each Documents tab should show:
+- A list of documents already attached to that specific record
+- An "Attach Document" button that opens a picker modal
+
+The picker modal shows:
+- A searchable list of documents from the Document Library that have been shared to this module
+- Each document shows its name, file type icon, upload date, and a checkbox
+- User checks the documents they want and clicks Attach
+- Those documents are now linked to that record and visible in its Documents tab
+
+Each attached document in the tab should have:
+- Document name (clickable to view/download)
+- File type icon
+- Upload date
+- Who uploaded it
+- A Remove button to unlink it from this record (does not delete it from the library)
+
+---
+
+## PART 3 — DATABASE
+
+Create a `document_shares` table:
+- id
+- document_id (foreign key to documents table)
+- module (string: "employee", "hiring", "job", "equipment", "customer")
+- record_id (integer, optional — null means shared to all records in that module)
+- shared_by (user id)
+- shared_at (timestamp)
+
+This table tracks which documents are shared where without moving or duplicating the actual files.
+
+---
+
+## PART 4 — PERMISSIONS
+
+- Only Admins can upload to the Document Library
+- Only Admins and Managers can share documents to modules
+- Only Admins and Managers can attach documents to records
+- All roles can view documents attached to records they have access to
+- Employees can only see documents attached to their own record
+- Customers can only see documents attached to their own record
+
+---
+
+## NOTES
+
+- Do not change the existing document upload or external share link functionality
+- Do not duplicate files — everything references the same file in storage
+- Use the existing styling patterns throughout
+- Do not break any existing modules

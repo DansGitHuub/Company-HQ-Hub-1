@@ -103,6 +103,7 @@ import {
   sharedLinkAccessLogs, type SharedLinkAccessLog,
   documents, type Document, type InsertDocument,
   documentLinks, type DocumentLink, type InsertDocumentLink,
+  documentShares, type DocumentShare, type InsertDocumentShare,
   onboardingFormSubmissions, type OnboardingFormSubmission, type InsertOnboardingFormSubmission
 } from "@shared/schema";
 import { db, pool } from "./db";
@@ -697,6 +698,12 @@ export interface IStorage {
   createDocumentLink(data: InsertDocumentLink): Promise<DocumentLink>;
   getDocumentLinks(documentId: string): Promise<DocumentLink[]>;
   deleteDocumentLink(id: string): Promise<void>;
+  createDocumentShare(data: InsertDocumentShare): Promise<DocumentShare>;
+  getDocumentSharesByDocument(documentId: string): Promise<DocumentShare[]>;
+  getDocumentSharesByModule(module: string, recordId?: string): Promise<DocumentShare[]>;
+  getSharedDocumentsForModule(module: string, recordId?: string): Promise<Document[]>;
+  deleteDocumentShare(id: string): Promise<void>;
+  deleteDocumentSharesByDocument(documentId: string): Promise<void>;
   createOnboardingFormSubmission(data: InsertOnboardingFormSubmission): Promise<OnboardingFormSubmission>;
   getOnboardingFormSubmission(id: string): Promise<OnboardingFormSubmission | undefined>;
   getOnboardingFormSubmissionsByEmployee(employeeId: string): Promise<OnboardingFormSubmission[]>;
@@ -3300,6 +3307,49 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDocumentLink(id: string): Promise<void> {
     await db.delete(documentLinks).where(eq(documentLinks.id, id));
+  }
+
+  async createDocumentShare(data: InsertDocumentShare): Promise<DocumentShare> {
+    const [share] = await db.insert(documentShares).values(data).returning();
+    return share;
+  }
+
+  async getDocumentSharesByDocument(documentId: string): Promise<DocumentShare[]> {
+    return await db.select().from(documentShares)
+      .where(eq(documentShares.documentId, documentId))
+      .orderBy(desc(documentShares.sharedAt));
+  }
+
+  async getDocumentSharesByModule(module: string, recordId?: string): Promise<DocumentShare[]> {
+    if (recordId) {
+      return await db.select().from(documentShares)
+        .where(and(
+          eq(documentShares.module, module),
+          or(eq(documentShares.recordId, recordId), isNull(documentShares.recordId))
+        ))
+        .orderBy(desc(documentShares.sharedAt));
+    }
+    return await db.select().from(documentShares)
+      .where(eq(documentShares.module, module))
+      .orderBy(desc(documentShares.sharedAt));
+  }
+
+  async getSharedDocumentsForModule(module: string, recordId?: string): Promise<Document[]> {
+    const shares = await this.getDocumentSharesByModule(module, recordId);
+    if (shares.length === 0) return [];
+    const docIds = [...new Set(shares.map(s => s.documentId))];
+    const docs = await db.select().from(documents)
+      .where(or(...docIds.map(id => eq(documents.id, id))))
+      .orderBy(desc(documents.createdAt));
+    return docs;
+  }
+
+  async deleteDocumentShare(id: string): Promise<void> {
+    await db.delete(documentShares).where(eq(documentShares.id, id));
+  }
+
+  async deleteDocumentSharesByDocument(documentId: string): Promise<void> {
+    await db.delete(documentShares).where(eq(documentShares.documentId, documentId));
   }
 
   async createOnboardingFormSubmission(data: InsertOnboardingFormSubmission): Promise<OnboardingFormSubmission> {

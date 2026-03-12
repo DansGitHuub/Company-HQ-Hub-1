@@ -297,6 +297,8 @@ function EmployeeProfile({ employee, onBack }: { employee: any; onBack: () => vo
               canShare
               canLink
               canDelete
+              canAttachFromLibrary
+              module="employee"
               title="Additional Documents"
             />
           </div>

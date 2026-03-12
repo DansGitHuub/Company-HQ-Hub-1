@@ -361,6 +361,8 @@ function AssetProfile({ assetId, onBack }: { assetId: string; onBack: () => void
               canShare
               canLink
               canDelete
+              canAttachFromLibrary
+              module="equipment"
               title="Linked Documents"
             />
           </div>

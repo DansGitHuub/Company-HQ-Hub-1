@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Upload, Download, Trash2, File, Image, FileText, FileSpreadsheet,
-  Loader2, Search, FolderOpen, Eye, ExternalLink, Link2
+  Loader2, Search, FolderOpen, Eye, ExternalLink, Link2, Share2
 } from "lucide-react";
 import DocumentDropZone from "@/components/DocumentDropZone";
 import { useAuth } from "@/hooks/use-auth";
@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import ShareExternallyDialog from "@/components/ShareExternallyDialog";
+import ShareToModulesDialog from "@/components/ShareToModulesDialog";
 import type { Document as DocType } from "@shared/schema";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -88,6 +89,7 @@ function CompanyLibrary() {
   const [isTemplate, setIsTemplate] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [shareDoc, setShareDoc] = useState<DocType | null>(null);
+  const [shareModulesDoc, setShareModulesDoc] = useState<DocType | null>(null);
 
   const { data: docs = [], isLoading } = useQuery<DocType[]>({
     queryKey: ["/api/documents", "company", "company-library"],
@@ -232,7 +234,10 @@ function CompanyLibrary() {
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => window.open(doc.fileUrl, "_blank")} data-testid={`view-company-doc-${doc.id}`}>
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShareDoc(doc)} data-testid={`share-company-doc-${doc.id}`}>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShareModulesDoc(doc)} title="Share to Modules" data-testid={`share-modules-company-doc-${doc.id}`}>
+                        <Share2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShareDoc(doc)} title="Share Externally" data-testid={`share-company-doc-${doc.id}`}>
                         <ExternalLink className="h-3.5 w-3.5" />
                       </Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteMutation.mutate(doc.id)} data-testid={`delete-company-doc-${doc.id}`}>
@@ -257,6 +262,15 @@ function CompanyLibrary() {
           documentUrl={shareDoc.fileUrl}
         />
       )}
+
+      {shareModulesDoc && (
+        <ShareToModulesDialog
+          open={!!shareModulesDoc}
+          onOpenChange={(open) => !open && setShareModulesDoc(null)}
+          documentId={shareModulesDoc.id}
+          documentName={shareModulesDoc.fileName}
+        />
+      )}
     </div>
   );
 }
@@ -266,6 +280,7 @@ function AllDocuments() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [entityTypeFilter, setEntityTypeFilter] = useState("all");
   const [shareDoc, setShareDoc] = useState<DocType | null>(null);
+  const [shareModulesDoc, setShareModulesDoc] = useState<DocType | null>(null);
 
   const { data: docs = [], isLoading } = useQuery<DocType[]>({
     queryKey: ["/api/documents", "search", searchQuery, categoryFilter, entityTypeFilter],
@@ -368,7 +383,10 @@ function AllDocuments() {
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => window.open(doc.fileUrl, "_blank")} data-testid={`view-all-doc-${doc.id}`}>
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShareDoc(doc)} data-testid={`share-all-doc-${doc.id}`}>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShareModulesDoc(doc)} title="Share to Modules" data-testid={`share-modules-all-doc-${doc.id}`}>
+                        <Share2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShareDoc(doc)} title="Share Externally" data-testid={`share-all-doc-${doc.id}`}>
                         <ExternalLink className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -388,6 +406,15 @@ function AllDocuments() {
           documentName={shareDoc.fileName}
           documentType="document"
           documentUrl={shareDoc.fileUrl}
+        />
+      )}
+
+      {shareModulesDoc && (
+        <ShareToModulesDialog
+          open={!!shareModulesDoc}
+          onOpenChange={(open) => !open && setShareModulesDoc(null)}
+          documentId={shareModulesDoc.id}
+          documentName={shareModulesDoc.fileName}
         />
       )}
     </div>

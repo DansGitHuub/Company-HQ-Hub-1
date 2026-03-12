@@ -1,0 +1,64 @@
+I need two updates to the Calendar module in CompanyHQ:
+
+---
+
+## UPDATE 1 — Pull existing Google Calendar events into CompanyHQ
+
+Currently the calendar only pushes CompanyHQ events to Google. I need it to also pull events from Google Calendar so existing Google events show up in CompanyHQ.
+
+### How it should work:
+
+When a user connects their Google Calendar, immediately fetch their existing events from Google and display them in the CompanyHQ calendar. Going forward, keep them in sync.
+
+Specifically:
+
+1. When a user completes the Google Calendar OAuth connection, fetch all events from their Google Calendar for the next 90 days and display them in CompanyHQ. Also fetch the past 30 days so recent history is visible.
+
+2. Add a background sync that refreshes Google Calendar events every 15 minutes for connected users so the calendar stays current.
+
+3. Add a manual "Sync Now" button on the Calendar page that the user can click to force a refresh from Google immediately.
+
+4. Events pulled from Google should:
+   - Show on the calendar with a small Google Calendar icon or "G" badge so users can tell them apart from CompanyHQ events
+   - Be displayed as read-only in CompanyHQ — clicking them shows the event details but no edit button
+   - Use a distinct color (light gray or muted blue) so they don't visually compete with CompanyHQ events
+
+5. Store pulled Google events in a separate table `google_calendar_events` with:
+   - id
+   - user_id
+   - google_event_id
+   - title
+   - description
+   - start_datetime
+   - end_datetime
+   - all_day
+   - location
+   - calendar_id
+   - synced_at
+
+6. When syncing, update existing records by google_event_id, insert new ones, and delete any that no longer exist in Google.
+
+7. Use the existing google_access_token and google_refresh_token stored on the user record. Refresh the token automatically if expired.
+
+---
+
+## UPDATE 2 — Add contact fields to calendar events
+
+Add the following optional contact fields to the event create/edit modal:
+
+- **Contact name** (text field)
+- **Contact email** (email field — clicking it opens a mailto link)
+- **Contact phone** (phone field — clicking it opens a tel link on mobile)
+
+These fields should:
+- Be grouped together under a "Contact" section in the modal, collapsed by default with a "+ Add Contact" toggle to expand
+- Be saved on the event record (add these three columns to the calendar_events table: contact_name, contact_email, contact_phone)
+- Show on the event detail view when populated — if contact email is filled in show a clickable email icon, if phone is filled in show a clickable phone icon
+- Be optional — no validation required, leave blank if not needed
+
+---
+
+## NOTES
+- Do not break existing calendar functionality
+- Do not break the push sync from CompanyHQ to Google
+- Use existing styling patterns

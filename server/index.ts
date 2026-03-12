@@ -14,6 +14,7 @@ import { seedOemTemplates } from "./equipmentSeed";
 import { runSharedLinksMigration } from "./sharedLinksMigration";
 import { runDocumentMigration } from "./documentMigration";
 import { runCalendarMigration } from "./calendarMigration";
+import { runDocumentSharesMigration } from "./documentSharesMigration";
 
 const app = express();
 const httpServer = createServer(app);
@@ -80,6 +81,7 @@ app.use((req, res, next) => {
   await runNotificationMigration();
   await runSharedLinksMigration();
   await runDocumentMigration();
+  await runDocumentSharesMigration();
   await runCalendarMigration();
   await registerRoutes(httpServer, app);
   

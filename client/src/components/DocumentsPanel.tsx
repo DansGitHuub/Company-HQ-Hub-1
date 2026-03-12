@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import {
   Upload, Download, Trash2, File, Image, FileText, FileSpreadsheet,
-  Loader2, Search, Link2, ExternalLink, MoreHorizontal, Eye
+  Loader2, Search, Link2, ExternalLink, MoreHorizontal, Eye, Paperclip
 } from "lucide-react";
 import DocumentDropZone from "@/components/DocumentDropZone";
 import {
@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import ShareExternallyDialog from "@/components/ShareExternallyDialog";
+import AttachFromLibraryDialog from "@/components/AttachFromLibraryDialog";
 import type { Document as DocType } from "@shared/schema";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -60,6 +61,8 @@ interface DocumentsPanelProps {
   canShare?: boolean;
   canLink?: boolean;
   canDelete?: boolean;
+  canAttachFromLibrary?: boolean;
+  module?: string;
   title?: string;
   compact?: boolean;
 }
@@ -71,6 +74,8 @@ export default function DocumentsPanel({
   canShare = false,
   canLink = false,
   canDelete = false,
+  canAttachFromLibrary = false,
+  module,
   title = "Documents",
   compact = false,
 }: DocumentsPanelProps) {
@@ -83,6 +88,7 @@ export default function DocumentsPanel({
   const [shareDoc, setShareDoc] = useState<DocType | null>(null);
   const [linkDialogDoc, setLinkDialogDoc] = useState<DocType | null>(null);
   const [uploadCategory, setUploadCategory] = useState("other");
+  const [showAttachDialog, setShowAttachDialog] = useState(false);
 
   const { data: docs = [], isLoading } = useQuery<DocType[]>({
     queryKey: ["/api/documents", entityType, entityId],
@@ -145,18 +151,26 @@ export default function DocumentsPanel({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">{title}</CardTitle>
-          {canUpload && isAdmin && (
-            <Select value={uploadCategory} onValueChange={setUploadCategory}>
-              <SelectTrigger className="w-[120px] h-8 text-xs" data-testid="select-upload-category">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <div className="flex items-center gap-2">
+            {canAttachFromLibrary && isAdmin && module && (
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setShowAttachDialog(true)} data-testid="btn-attach-from-library">
+                <Paperclip className="h-3.5 w-3.5 mr-1" />
+                Attach from Library
+              </Button>
+            )}
+            {canUpload && isAdmin && (
+              <Select value={uploadCategory} onValueChange={setUploadCategory}>
+                <SelectTrigger className="w-[120px] h-8 text-xs" data-testid="select-upload-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </div>
         {!compact && docs.length > 0 && (
           <div className="flex gap-2 mt-2">
@@ -312,6 +326,18 @@ export default function DocumentsPanel({
           onOpenChange={(open) => !open && setLinkDialogDoc(null)}
           documentId={linkDialogDoc.id}
           documentName={linkDialogDoc.fileName}
+        />
+      )}
+
+      {canAttachFromLibrary && module && (
+        <AttachFromLibraryDialog
+          open={showAttachDialog}
+          onOpenChange={setShowAttachDialog}
+          module={module}
+          recordId={entityId}
+          entityType={entityType}
+          entityId={entityId}
+          existingDocIds={docs.map(d => d.id)}
         />
       )}
     </Card>

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import DocumentsPanel from "@/components/DocumentsPanel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -414,6 +415,19 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
           </TabsContent>
           <TabsContent value="documents" className="mt-0">
             <DocumentsTab candidateId={candidate.id} />
+            <div className="mt-4">
+              <DocumentsPanel
+                entityType="hiring"
+                entityId={candidate.id}
+                canUpload
+                canShare
+                canLink
+                canDelete
+                canAttachFromLibrary
+                module="hiring"
+                title="Library Documents"
+              />
+            </div>
           </TabsContent>
           <TabsContent value="communication" className="mt-0">
             <CommunicationTab candidateId={candidate.id} />
