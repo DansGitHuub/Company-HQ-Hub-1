@@ -394,6 +394,13 @@
   <button class="btn" onclick="showCode()">{ } Show Code</button>
   <button class="btn danger" onclick="clearAll()">✕ Clear All</button>
 
+  <span style="color:#444; font-size:18px">|</span>
+
+  <input type="file" id="build-pdf-upload" accept=".pdf" style="display:none">
+  <button class="btn" onclick="document.getElementById('build-pdf-upload').click()">Upload Source PDF</button>
+  <span id="build-pdf-filename" style="font-size:11px; color:#888; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">No PDF selected</span>
+  <button class="btn primary" id="build-pdf-btn" onclick="buildFillablePdf()" disabled style="opacity:0.5">Build Fillable PDF</button>
+
   <div id="page-controls">
     <button class="btn" onclick="changePage(-1)">◀</button>
     <span id="page-info">— / —</span>
@@ -1039,6 +1046,84 @@ document.addEventListener('keydown', e => {
   if ((e.key === 'd' || e.key === 'D') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); duplicateField(selectedId); return; }
   if (e.key === 'Delete' || e.key === 'Backspace') { deleteField(selectedId); return; }
 });
+
+// ── BUILD FILLABLE PDF ─────────────────────────────────────────
+let buildSourceFile = null;
+
+document.getElementById('build-pdf-upload').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  buildSourceFile = file;
+  document.getElementById('build-pdf-filename').textContent = file.name;
+  document.getElementById('build-pdf-filename').style.color = '#c8a96e';
+  updateBuildButton();
+});
+
+function updateBuildButton() {
+  const btn = document.getElementById('build-pdf-btn');
+  const canBuild = buildSourceFile && fields.length > 0;
+  btn.disabled = !canBuild;
+  btn.style.opacity = canBuild ? '1' : '0.5';
+}
+
+const _origRenderSidebar = typeof renderSidebar === 'function' ? renderSidebar : null;
+const _origPushSplice = Array.prototype.push;
+
+setInterval(updateBuildButton, 1000);
+
+async function buildFillablePdf() {
+  if (!buildSourceFile || fields.length === 0) return;
+
+  const btn = document.getElementById('build-pdf-btn');
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Building...';
+  btn.style.opacity = '0.7';
+
+  try {
+    const exportData = fields.map(f => ({
+      name: f.name,
+      type: f.type,
+      page: f.page,
+      rect: [f.x, f.y, f.x + f.w, f.y + f.h]
+    }));
+
+    const formData = new FormData();
+    formData.append('source_pdf', buildSourceFile);
+    formData.append('field_coords', new Blob([JSON.stringify(exportData)], { type: 'application/json' }), 'fields.json');
+
+    const response = await fetch('/api/tools/build-pdf', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ message: 'Unknown error' }));
+      throw new Error(err.message || 'Build failed');
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const baseName = buildSourceFile.name.replace(/\.pdf$/i, '');
+    a.href = url;
+    a.download = baseName + '_fillable.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    status('Fillable PDF downloaded successfully!');
+  } catch (err) {
+    alert('Build failed: ' + err.message);
+    status('Build failed — ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
+    btn.style.opacity = (buildSourceFile && fields.length > 0) ? '1' : '0.5';
+  }
+}
 </script>
 </body>
 </html>

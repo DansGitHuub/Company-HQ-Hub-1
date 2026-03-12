@@ -25,7 +25,7 @@ The frontend is built with React and TypeScript, leveraging React Query for serv
 - **Customer Hub / Resource Library**: Centralized educational content for customers with bookmarking.
 - **Employee Management**: Employee Portal for payroll, time off, and personal details.
 - **Equipment / Fleet Management**: Full fleet management system with a health dashboard, sortable asset table, detailed profiles, OEM maintenance library, priority engine, VIN decode via NHTSA API, and document management.
-- **Admin Tools**: Includes a dynamic Form Builder, Company Branding options, an interactive Help System, Global Search, an internal Communications Center, a Lead Qualifier, a Plow Site Mapper (with Google Maps and AI), an AI Agents System for system analysis (Master Admin), an Update Notification System, Help Articles, and a Diagnostic Report System (Master Admin).
+- **Admin Tools**: Includes a dynamic Form Builder, Company Branding options, an interactive Help System, Global Search, an internal Communications Center, a Lead Qualifier, a Plow Site Mapper (with Google Maps and AI), an AI Agents System for system analysis (Master Admin), an Update Notification System, Help Articles, a Diagnostic Report System (Master Admin), and a PDF Field Placer tool (with backend PDF builder using Python/pypdf).
 - **User Tools**: Features customizable User Profiles, a comprehensive Task Management System with quick add functionality, multiple views, recurring tasks, and a scheduler. Also includes an Interactive Calendar with external integrations, a Document Sharing system with token-based access and configurable security, a unified Document Management System with cross-linking, and an Onboarding Forms System with 11 fillable digital forms, signature pads, and PDF generation.
 - **Customer Hub**: A customer-facing portal providing a branded UI with a dashboard, job details, document access, a care library, and messaging functionality.
 
@@ -48,6 +48,7 @@ The frontend is built with React and TypeScript, leveraging React Query for serv
 - Passport (with passport-local)
 - Drizzle ORM
 - Zod
+- pypdf (Python - for PDF field builder)
 
 ### Development Tools
 - Vite

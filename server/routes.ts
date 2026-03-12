@@ -8093,5 +8093,101 @@ Provide accurate information based on publicly available documentation.`;
   registerChatRoutes(app);
   registerAssistantRoutes(app);
 
+  // PDF Field Builder - build fillable PDFs from field coordinates
+  const buildPdfUpload = (await import("multer")).default({
+    storage: (await import("multer")).default.memoryStorage(),
+    limits: { fileSize: 25 * 1024 * 1024 }
+  });
+
+  app.post("/api/tools/build-pdf",
+    requireAuth,
+    requireRole(["Admin", "Manager"]),
+    buildPdfUpload.fields([
+      { name: "source_pdf", maxCount: 1 },
+      { name: "field_coords", maxCount: 1 }
+    ]),
+    async (req: any, res) => {
+      const fs = await import("fs");
+      const path = await import("path");
+      const os = await import("os");
+      const { spawnSync } = await import("child_process");
+
+      let sourceTmpPath = "";
+      let fieldsTmpPath = "";
+      let outputTmpPath = "";
+
+      try {
+        if (!req.files?.source_pdf?.[0]) {
+          return res.status(400).json({ message: "No source PDF uploaded" });
+        }
+        if (!req.files?.field_coords?.[0]) {
+          return res.status(400).json({ message: "No field coordinates file uploaded" });
+        }
+
+        const sourcePdfFile = req.files.source_pdf[0];
+        const fieldCoordsFile = req.files.field_coords[0];
+
+        if (sourcePdfFile.mimetype !== "application/pdf") {
+          return res.status(400).json({ message: "Source file must be a PDF" });
+        }
+
+        let fieldsData: any[];
+        try {
+          fieldsData = JSON.parse(fieldCoordsFile.buffer.toString("utf-8"));
+        } catch {
+          return res.status(400).json({ message: "Invalid field coordinates JSON" });
+        }
+
+        if (!Array.isArray(fieldsData) || fieldsData.length === 0) {
+          return res.status(400).json({ message: "Field coordinates must be a non-empty array" });
+        }
+
+        const tmpDir = os.tmpdir();
+        const timestamp = Date.now();
+        sourceTmpPath = path.join(tmpDir, `source_${timestamp}.pdf`);
+        fieldsTmpPath = path.join(tmpDir, `fields_${timestamp}.json`);
+        outputTmpPath = path.join(tmpDir, `output_${timestamp}.pdf`);
+
+        fs.writeFileSync(sourceTmpPath, sourcePdfFile.buffer);
+        fs.writeFileSync(fieldsTmpPath, JSON.stringify(fieldsData));
+
+        const scriptPath = path.join(process.cwd(), "server", "pdf_builder.py");
+        const result = spawnSync("python3", [scriptPath, sourceTmpPath, fieldsTmpPath, outputTmpPath], {
+          timeout: 30000,
+          encoding: "utf-8",
+        });
+
+        if (result.status !== 0) {
+          const errMsg = result.stderr || result.stdout || "Unknown error";
+          console.error("[build-pdf] Python script failed:", errMsg);
+          if (errMsg.includes("No module named")) {
+            return res.status(500).json({ message: "pypdf library is not available on the server" });
+          }
+          return res.status(500).json({ message: "Failed to build PDF: " + errMsg.slice(0, 200) });
+        }
+
+        if (!fs.existsSync(outputTmpPath)) {
+          return res.status(500).json({ message: "PDF build completed but output file was not created" });
+        }
+
+        const originalName = sourcePdfFile.originalname?.replace(/\.pdf$/i, "") || "document";
+        const outputBuffer = fs.readFileSync(outputTmpPath);
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${originalName}_fillable.pdf"`);
+        res.setHeader("Content-Length", outputBuffer.length);
+        res.send(outputBuffer);
+      } catch (err: any) {
+        console.error("[build-pdf] Error:", err);
+        res.status(500).json({ message: "Internal server error building PDF" });
+      } finally {
+        const fs2 = await import("fs");
+        try { if (sourceTmpPath) fs2.unlinkSync(sourceTmpPath); } catch {}
+        try { if (fieldsTmpPath) fs2.unlinkSync(fieldsTmpPath); } catch {}
+        try { if (outputTmpPath) fs2.unlinkSync(outputTmpPath); } catch {}
+      }
+    }
+  );
+
   return httpServer;
 }
