@@ -13,7 +13,8 @@ import {
   Home, Briefcase, FileText, BookOpen, MessageSquare, Bell,
   ChevronRight, Download, Bookmark, BookmarkCheck, Search,
   Send, Clock, MapPin, Calendar, CheckCircle2, AlertCircle,
-  Leaf, Sun, Snowflake, CloudRain, ArrowLeft, Eye, Star
+  Leaf, Sun, Snowflake, CloudRain, ArrowLeft, Eye, Star,
+  Lightbulb
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -82,6 +83,7 @@ export default function CustomerHub() {
           </h1>
         </div>
         <div className="flex items-center gap-3">
+          <SuggestButton />
           <NotificationBell />
           <span className="text-sm hidden md:block" style={{ color: brandColors.cream }}>
             {user?.name}
@@ -186,6 +188,194 @@ function NotificationBell() {
   );
 }
 
+function SuggestButton() {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/suggestions", { title, description });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Thanks! We'll review your idea and keep you posted." });
+      setOpen(false);
+      setTitle("");
+      setDescription("");
+      queryClient.invalidateQueries({ queryKey: ["/api/suggestions/mine"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to submit suggestion", variant: "destructive" });
+    },
+  });
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="relative flex items-center justify-center w-8 h-8 rounded-full transition-colors hover:opacity-80"
+        style={{ backgroundColor: brandColors.gold + "30" }}
+        data-testid="button-suggest"
+        title="Suggest an improvement"
+      >
+        <Lightbulb className="h-4 w-4" style={{ color: brandColors.gold }} />
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5" style={{ color: brandColors.gold }} />
+              Suggest an Improvement
+            </DialogTitle>
+            <DialogDescription>
+              Share your ideas to help us serve you better.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">What's your idea? *</label>
+              <Input
+                value={title}
+                onChange={e => setTitle(e.target.value.slice(0, 200))}
+                placeholder="Brief summary of your suggestion"
+                data-testid="input-suggestion-title"
+              />
+              <p className="text-xs text-muted-foreground mt-1">{title.length}/200</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Tell us more (optional)</label>
+              <Textarea
+                value={description}
+                onChange={e => setDescription(e.target.value.slice(0, 1000))}
+                placeholder="Any additional details..."
+                rows={4}
+                data-testid="input-suggestion-description"
+              />
+              <p className="text-xs text-muted-foreground mt-1">{description.length}/1000</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)} data-testid="button-suggestion-cancel">Cancel</Button>
+            <Button
+              onClick={() => submitMutation.mutate()}
+              disabled={!title.trim() || submitMutation.isPending}
+              style={{ backgroundColor: brandColors.darkGreen }}
+              data-testid="button-suggestion-submit"
+            >
+              {submitMutation.isPending ? "Submitting..." : "Submit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+const SUGGESTION_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  received: { label: "Received", color: "#6b7280", bg: "#f3f4f6" },
+  reviewing: { label: "Reviewing", color: "#2563eb", bg: "#dbeafe" },
+  planned: { label: "Planned", color: "#7c3aed", bg: "#ede9fe" },
+  completed: { label: "Completed", color: "#16a34a", bg: "#dcfce7" },
+  not_planned: { label: "Not Planned", color: "#dc2626", bg: "#fee2e2" },
+};
+
+function MySuggestionsSection() {
+  const { data: suggestions = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/suggestions/mine"],
+    queryFn: async () => (await apiRequest("GET", "/api/suggestions/mine")).json(),
+  });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = suggestions.find(s => s.id === selectedId);
+
+  if (isLoading) return null;
+  if (suggestions.length === 0) return null;
+
+  return (
+    <Card data-testid="my-suggestions-section">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: brandColors.gold + "20" }}>
+            <Lightbulb className="h-4 w-4" style={{ color: brandColors.gold }} />
+          </div>
+          <h3 className="font-semibold text-sm">My Suggestions</h3>
+        </div>
+        <div className="space-y-2">
+          {suggestions.slice(0, 5).map((s: any) => {
+            const cfg = SUGGESTION_STATUS_CONFIG[s.status] || SUGGESTION_STATUS_CONFIG.received;
+            return (
+              <button
+                key={s.id}
+                onClick={() => setSelectedId(s.id)}
+                className="flex items-center justify-between w-full p-2.5 rounded-lg hover:bg-gray-50 text-sm transition-colors text-left"
+                data-testid={`suggestion-item-${s.id}`}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate" style={{ color: brandColors.darkGreen }}>{s.title}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {new Date(s.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <Badge
+                  variant="secondary"
+                  className="ml-2 text-xs shrink-0"
+                  style={{ backgroundColor: cfg.bg, color: cfg.color }}
+                >
+                  {cfg.label}
+                </Badge>
+              </button>
+            );
+          })}
+        </div>
+      </CardContent>
+
+      <Dialog open={!!selectedId} onOpenChange={open => { if (!open) setSelectedId(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5" style={{ color: brandColors.gold }} />
+              Suggestion Details
+            </DialogTitle>
+          </DialogHeader>
+          {selected && (
+            <div className="space-y-4 py-2">
+              <div>
+                <p className="font-semibold" style={{ color: brandColors.darkGreen }}>{selected.title}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Submitted {new Date(selected.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+              {selected.description && (
+                <p className="text-sm text-gray-600">{selected.description}</p>
+              )}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Status:</span>
+                <Badge
+                  variant="secondary"
+                  style={{
+                    backgroundColor: (SUGGESTION_STATUS_CONFIG[selected.status] || SUGGESTION_STATUS_CONFIG.received).bg,
+                    color: (SUGGESTION_STATUS_CONFIG[selected.status] || SUGGESTION_STATUS_CONFIG.received).color
+                  }}
+                >
+                  {(SUGGESTION_STATUS_CONFIG[selected.status] || SUGGESTION_STATUS_CONFIG.received).label}
+                </Badge>
+              </div>
+              {selected.adminNote && (
+                <div className="bg-gray-50 border rounded-lg p-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Note from our team</p>
+                  <p className="text-sm text-gray-700">{selected.adminNote}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 function DashboardSection({ onNavigate, onSelectJob }: { onNavigate: (s: Section) => void; onSelectJob: (id: string) => void }) {
   const { data: dashboard, isLoading } = useQuery({
     queryKey: ["/api/customer-hub/dashboard"],
@@ -281,6 +471,8 @@ function DashboardSection({ onNavigate, onSelectJob }: { onNavigate: (s: Section
           </Card>
         )}
       </div>
+
+      <MySuggestionsSection />
     </div>
   );
 }

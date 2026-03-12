@@ -56,7 +56,8 @@ import {
   Copy,
   Globe,
   Wrench,
-  Star
+  Star,
+  Lightbulb
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
@@ -521,6 +522,9 @@ export default function AdminPanel() {
           </TabsTrigger>
           <TabsTrigger value="shared-links" className="gap-2" data-testid="tab-shared-links">
             <ExternalLink className="h-4 w-4" /> Shared Links
+          </TabsTrigger>
+          <TabsTrigger value="suggestions" className="gap-2" data-testid="tab-suggestions">
+            <Lightbulb className="h-4 w-4" /> Suggestions
           </TabsTrigger>
           <TabsTrigger value="app-testing" className="gap-2" data-testid="tab-app-testing">
             <Eye className="h-4 w-4" /> App Testing
@@ -1075,6 +1079,10 @@ export default function AdminPanel() {
 
         <TabsContent value="shared-links" className="mt-6">
           <SharedLinksManager />
+        </TabsContent>
+
+        <TabsContent value="suggestions" className="mt-6">
+          <CustomerSuggestionsPanel />
         </TabsContent>
 
         <TabsContent value="app-testing" className="mt-6">
@@ -1809,6 +1817,166 @@ function CreateAgentDialog({ onCreated }: { onCreated: () => void }) {
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const SUGGESTION_STATUS_OPTIONS = [
+  { value: "received", label: "Received", color: "#6b7280", bg: "#f3f4f6" },
+  { value: "reviewing", label: "Reviewing", color: "#2563eb", bg: "#dbeafe" },
+  { value: "planned", label: "Planned", color: "#7c3aed", bg: "#ede9fe" },
+  { value: "completed", label: "Completed", color: "#16a34a", bg: "#dcfce7" },
+  { value: "not_planned", label: "Not Planned", color: "#dc2626", bg: "#fee2e2" },
+];
+
+function CustomerSuggestionsPanel() {
+  const { toast } = useToast();
+  const { data: suggestions = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/suggestions"],
+    queryFn: async () => {
+      const res = await fetch("/api/suggestions", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, status, adminNote }: { id: string; status?: string; adminNote?: string }) => {
+      const res = await fetch(`/api/suggestions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status, adminNote }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/suggestions"] });
+      toast({ title: "Suggestion updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update suggestion", variant: "destructive" });
+    },
+  });
+
+  const [editingNote, setEditingNote] = useState<{ id: string; note: string } | null>(null);
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Lightbulb className="h-5 w-5 text-amber-500" />
+          Customer Suggestions
+        </CardTitle>
+        <CardDescription>
+          Review and respond to improvement suggestions from your customers.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {suggestions.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Lightbulb className="h-10 w-10 mx-auto mb-3 opacity-30" />
+            <p>No suggestions yet</p>
+            <p className="text-sm mt-1">Customer suggestions will appear here when submitted.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {suggestions.map((s: any) => {
+              const statusCfg = SUGGESTION_STATUS_OPTIONS.find(o => o.value === s.status) || SUGGESTION_STATUS_OPTIONS[0];
+              return (
+                <div key={s.id} className="border rounded-lg p-4 space-y-3" data-testid={`admin-suggestion-${s.id}`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold">{s.title}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        by {s.customerName} &middot; {new Date(s.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Select
+                      value={s.status}
+                      onValueChange={(value) => updateMutation.mutate({ id: s.id, status: value })}
+                    >
+                      <SelectTrigger className="w-[140px]" data-testid={`status-select-${s.id}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUGGESTION_STATUS_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            <span style={{ color: opt.color }}>{opt.label}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {s.description && (
+                    <p className="text-sm text-gray-600">{s.description}</p>
+                  )}
+                  <div className="pt-2 border-t">
+                    {editingNote?.id === s.id ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editingNote.note}
+                          onChange={e => setEditingNote({ ...editingNote, note: e.target.value })}
+                          placeholder="Add a note for the customer..."
+                          rows={2}
+                          data-testid={`note-input-${s.id}`}
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              updateMutation.mutate({ id: s.id, adminNote: editingNote.note });
+                              setEditingNote(null);
+                            }}
+                            data-testid={`save-note-${s.id}`}
+                          >
+                            Save Note
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setEditingNote(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between">
+                        <div>
+                          {s.adminNote ? (
+                            <p className="text-sm text-gray-600">
+                              <span className="font-medium text-xs text-gray-400 uppercase tracking-wide block mb-0.5">Status Note</span>
+                              {s.adminNote}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-muted-foreground italic">No note added</p>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditingNote({ id: s.id, note: s.adminNote || "" })}
+                          data-testid={`edit-note-${s.id}`}
+                        >
+                          {s.adminNote ? "Edit Note" : "Add Note"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

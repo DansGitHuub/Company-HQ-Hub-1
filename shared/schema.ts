@@ -2521,3 +2521,26 @@ export const userCalendarSettings = pgTable("user_calendar_settings", {
 });
 
 export type UserCalendarSetting = typeof userCalendarSettings.$inferSelect;
+
+export const customerSuggestions = pgTable("customer_suggestions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id", { length: 36 }).references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("received"),
+  adminNote: text("admin_note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCustomerSuggestionSchema = createInsertSchema(customerSuggestions).omit({
+  id: true,
+  customerId: true,
+  status: true,
+  adminNote: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type CustomerSuggestion = typeof customerSuggestions.$inferSelect;
+export type InsertCustomerSuggestion = z.infer<typeof insertCustomerSuggestionSchema>;

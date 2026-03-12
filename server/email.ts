@@ -258,3 +258,70 @@ export async function sendCustomerNotificationEmail(
     </div>
   `);
 }
+
+export async function sendSuggestionConfirmationEmail(toEmail: string, customerName: string, suggestionTitle: string) {
+  return sendEmail(toEmail, "We received your idea!", `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #F7F3EC;">
+      <div style="background-color: #1E3A2F; padding: 20px; text-align: center;">
+        <h1 style="color: #C9A84C; margin: 0; font-size: 20px;">Chapin Landscapes</h1>
+      </div>
+      <div style="padding: 30px;">
+        <p style="color: #4b5563;">Hi ${escapeHtml(customerName)},</p>
+        <p style="color: #374151; line-height: 1.6;">Thank you for sharing your idea with us! We appreciate you taking the time to help us improve.</p>
+        <div style="background-color: #e5e7eb; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="color: #1f2937; font-weight: bold; margin: 0;">Your suggestion:</p>
+          <p style="color: #374151; margin: 8px 0 0 0;">${escapeHtml(suggestionTitle)}</p>
+        </div>
+        <p style="color: #374151; line-height: 1.6;">We'll review your suggestion and keep you posted on any updates. You can check the status of your suggestions anytime from your Customer Portal.</p>
+      </div>
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
+        <p>Chapin Landscapes</p>
+      </div>
+    </div>
+  `);
+}
+
+export async function sendSuggestionStatusUpdateEmail(
+  toEmail: string,
+  customerName: string,
+  suggestionTitle: string,
+  newStatus: string,
+  adminNote?: string | null
+) {
+  const statusLabels: Record<string, string> = {
+    received: "Received",
+    reviewing: "Reviewing",
+    planned: "Planned",
+    completed: "Completed",
+    not_planned: "Not Planned",
+  };
+  const statusLabel = statusLabels[newStatus] || newStatus;
+
+  const noteHtml = adminNote
+    ? `<div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #1E3A2F;">
+        <p style="color: #6b7280; font-size: 12px; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px;">Note from our team</p>
+        <p style="color: #374151; margin: 0;">${escapeHtml(adminNote)}</p>
+      </div>`
+    : "";
+
+  return sendEmail(toEmail, `Update on your suggestion: ${suggestionTitle}`, `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #F7F3EC;">
+      <div style="background-color: #1E3A2F; padding: 20px; text-align: center;">
+        <h1 style="color: #C9A84C; margin: 0; font-size: 20px;">Chapin Landscapes</h1>
+      </div>
+      <div style="padding: 30px;">
+        <p style="color: #4b5563;">Hi ${escapeHtml(customerName)},</p>
+        <p style="color: #374151; line-height: 1.6;">We have an update on your suggestion:</p>
+        <div style="background-color: #e5e7eb; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="color: #1f2937; font-weight: bold; margin: 0;">${escapeHtml(suggestionTitle)}</p>
+          <p style="color: #374151; margin: 8px 0 0 0;">New status: <strong>${escapeHtml(statusLabel)}</strong></p>
+        </div>
+        ${noteHtml}
+        <p style="color: #374151; line-height: 1.6;">Thank you for your feedback — it helps us serve you better!</p>
+      </div>
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
+        <p>Chapin Landscapes</p>
+      </div>
+    </div>
+  `);
+}

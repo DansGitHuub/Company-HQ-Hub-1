@@ -1,0 +1,89 @@
+Add a customer improvement suggestion feature to CompanyHQ.
+
+---
+
+## WHAT TO BUILD
+
+Customers can submit improvement suggestions from their portal. Admin reviews them and updates their status. Customers get automatic email notifications when their suggestion status changes.
+
+---
+
+## PART 1 — Suggest button in customer portal
+
+Add a small feedback/suggestion icon button at the top center of the customer portal dashboard. Use a simple lightbulb or speech bubble icon that matches the overall app icon style.
+
+Clicking it opens a simple modal with:
+- Title: "Suggest an Improvement"
+- A text field: "What's your idea?" (required, max 200 characters)
+- A larger text area: "Tell us more" (optional, max 1000 characters)
+- Submit button
+- Cancel button
+
+On submit:
+- Save the suggestion
+- Show a thank you message: "Thanks! We'll review your idea and keep you posted."
+- Send an automatic email to the customer confirming receipt using SendGrid
+- Send an internal notification to Admin that a new suggestion was submitted
+
+---
+
+## PART 2 — Customer suggestion status page
+
+Add a "My Suggestions" section to the customer portal (can be a tab or small section on their dashboard) where they can see:
+- A list of their own suggestions only
+- Each shows: title, date submitted, current status badge
+- Status options: Received | Reviewing | Planned | Completed | Not Planned
+- Clicking a suggestion shows the full details including any status notes Admin added
+
+Customers cannot see other customers' suggestions.
+
+---
+
+## PART 3 — Admin review in Admin Panel
+
+Add a "Customer Suggestions" section to the Admin Panel showing all submitted suggestions. Each suggestion shows:
+- Customer name
+- Suggestion title and description
+- Date submitted
+- Current status
+- A dropdown to change the status
+- A "Status Note" field where Admin can add a short note explaining the decision (optional)
+- This note is visible to the customer
+
+When Admin changes the status, automatically send an email to the customer notifying them, including the new status and any note Admin added.
+
+---
+
+## PART 4 — Email templates
+
+Use SendGrid for all emails. FROM: dan@chapinlandscapes.com
+
+Email 1 — Confirmation (sent to customer on submission):
+Subject: "We received your idea!"
+Body: Thank them, tell them they'll hear back when there's an update, include their suggestion title.
+
+Email 2 — Status update (sent to customer when Admin changes status):
+Subject: "Update on your suggestion: [suggestion title]"
+Body: Tell them the new status, include any note from Admin, thank them for the feedback.
+
+---
+
+## DATABASE
+
+Create a `customer_suggestions` table:
+- id
+- customer_id (foreign key)
+- title
+- description
+- status (enum: received, reviewing, planned, completed, not_planned) default: received
+- admin_note (text, optional)
+- created_at
+- updated_at
+
+---
+
+## NOTES
+- Customers only ever see their own suggestions
+- Do not add this feature to any non-customer role view except the Admin Panel review section
+- Use existing styling patterns
+- Do not break any existing customer portal functionality

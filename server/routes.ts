@@ -9,6 +9,7 @@ import { registerHiringRoutes } from "./hiringRoutes";
 import { registerCustomerHubRoutes } from "./customerHubRoutes";
 import { registerEquipmentRoutes } from "./equipmentRoutes";
 import { registerCalendarRoutes } from "./calendarRoutes";
+import { registerSuggestionsRoutes } from "./suggestionsRoutes";
 import { registerTaskRoutes } from "./taskRoutes";
 import { registerAssistantRoutes } from "./assistantRoutes";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail } from "./email";
@@ -8255,6 +8256,7 @@ Provide accurate information based on publicly available documentation.`;
 
   registerHiringRoutes(app, requireAuth);
   registerCustomerHubRoutes(app, requireAuth);
+  registerSuggestionsRoutes(app, requireAuth);
   registerEquipmentRoutes(app, requireAuth);
   registerCalendarRoutes(app, requireAuth);
   registerTaskRoutes(app);
