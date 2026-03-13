@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
@@ -241,9 +242,7 @@ export default function Hiring() {
           candidate={selectedCandidate}
           onClose={() => setSelectedCandidate(null)}
           onUpdate={(data) => updateMutation.mutate({ id: selectedCandidate.id, ...data })}
-          onDelete={() => {
-            if (confirm("Remove this applicant?")) deleteMutation.mutate(selectedCandidate.id);
-          }}
+          onDelete={() => deleteMutation.mutate(selectedCandidate.id)}
           tab={detailTab}
           onTabChange={setDetailTab}
         />
@@ -376,6 +375,7 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
   tab: string;
   onTabChange: (tab: string) => void;
 }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const showOnboarding = candidate.stage === "Hired";
   const availableTabs = ["profile", "documents", "communication", "interview"];
   if (showOnboarding) availableTabs.push("onboarding");
@@ -396,7 +396,7 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
           </Badge>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" size="icon" onClick={onDelete} data-testid="button-delete-candidate">
+          <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(true)} data-testid="button-delete-candidate">
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
           <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-panel">
@@ -404,6 +404,30 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Applicant</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <strong>{candidate.name}</strong> from the hiring pipeline? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowDeleteConfirm(false);
+                onDelete();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Tabs value={tab} onValueChange={onTabChange} className="flex-1 flex flex-col overflow-hidden">
         <TabsList className="mx-4 mt-2 justify-start">
