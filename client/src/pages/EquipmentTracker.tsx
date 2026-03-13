@@ -111,6 +111,7 @@ function FleetDashboard({
   search: string;
   setSearch: (v: string) => void;
 }) {
+  const { t } = useTranslation();
   const { data: stats } = useQuery<any>({
     queryKey: ["/api/fleet/dashboard"],
     queryFn: async () => (await apiRequest("GET", "/api/fleet/dashboard")).json(),
