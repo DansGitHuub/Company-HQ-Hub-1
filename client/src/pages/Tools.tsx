@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Snowflake, Calculator, ClipboardCheck, Wrench, Target, FileText, X } from "lucide-react";
+import { Snowflake, Calculator, ClipboardCheck, Wrench, Target, FileText, X, ClipboardList } from "lucide-react";
+
+const PropertyReportCard = lazy(() => import("@/tools/property-report-card/PropertyReportCard"));
 
 type Tool = {
   id: string;
@@ -15,9 +17,23 @@ type Tool = {
     title: string;
     allow?: string;
   };
+  reactModal?: {
+    title: string;
+    component: string;
+  };
 };
 
 const tools: Tool[] = [
+  {
+    id: "property-report-card",
+    title: "Property Report Card",
+    description: "Assess property health across lawns, trees, plants, beds, irrigation, and infrastructure. Generate a scored report card with recommended services.",
+    icon: ClipboardList,
+    reactModal: {
+      title: "Property Report Card",
+      component: "PropertyReportCard",
+    },
+  },
   {
     id: "pdf-field-placer",
     title: "PDF Field Placer",
@@ -69,6 +85,7 @@ const tools: Tool[] = [
 export default function Tools() {
   const [, setLocation] = useLocation();
   const [activeModal, setActiveModal] = useState<Tool["modal"] | null>(null);
+  const [activeReactModal, setActiveReactModal] = useState<Tool["reactModal"] | null>(null);
 
   return (
     <div className="space-y-6" data-testid="tools-hub-page">
@@ -107,6 +124,13 @@ export default function Tools() {
                   >
                     Open Tool
                   </Button>
+                ) : tool.reactModal ? (
+                  <Button
+                    onClick={() => setActiveReactModal(tool.reactModal!)}
+                    data-testid={`button-open-${tool.id}`}
+                  >
+                    Open Tool
+                  </Button>
                 ) : (
                   <Button
                     onClick={() => setLocation(tool.href!)}
@@ -140,6 +164,27 @@ export default function Tools() {
             allow={activeModal.allow}
             data-testid="iframe-tool"
           />
+        </div>
+      )}
+
+      {activeReactModal && (
+        <div className="fixed inset-0 z-50 bg-background flex flex-col" data-testid="modal-tool-overlay">
+          <div className="flex items-center justify-between px-4 h-12 border-b bg-card shrink-0">
+            <h2 className="font-semibold text-sm" data-testid="text-modal-title">{activeReactModal.title}</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setActiveReactModal(null)}
+              data-testid="button-close-modal"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="flex-1 overflow-auto">
+            <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground">Loading...</div>}>
+              {activeReactModal.component === "PropertyReportCard" && <PropertyReportCard />}
+            </Suspense>
+          </div>
         </div>
       )}
     </div>
