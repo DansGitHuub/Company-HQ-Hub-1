@@ -1,6 +1,6 @@
 import { Request } from "express";
 import { storage } from "./storage";
-import type { InsertErrorLog, InsertActivityLog } from "@shared/schema";
+import type { InsertErrorLog, InsertActivityLogs } from "@shared/schema";
 
 type ErrorSeverity = "info" | "warning" | "error" | "critical";
 type FeatureType = "sops" | "materials" | "jobs" | "hiring" | "todos" | "equipment" | "forms" | "messages" | "users" | "settings" | "auth" | "calendar" | "plow_sites" | "ai_agents" | "help" | "updates" | "frontend" | "general";
@@ -90,7 +90,7 @@ export async function logActivity(options: ActivityLogOptions): Promise<void> {
   try {
     const userInfo = extractUserFromRequest(options.req);
     
-    const log: InsertActivityLog = {
+    const log: InsertActivityLogs = {
       action: options.action,
       feature: options.feature,
       description: options.description,

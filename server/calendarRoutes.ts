@@ -4,6 +4,7 @@ import { calendarEvents, googleCalendarEvents, users, userCalendarSettings } fro
 import { eq, and, or, gte, lte, sql, desc } from "drizzle-orm";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, isTokenExpired } from "./googleOAuth";
 import * as googleOAuth from "./googleOAuth";
+import { logActivity } from "./activityLogger";
 
 type AuthRequest = Request & { user?: any };
 
@@ -230,6 +231,7 @@ export function registerCalendarRoutes(app: Express, requireAuth: any) {
         }
       }
 
+      logActivity("calendar_event", `"${title}" added to calendar`, "/calendar", user.id);
       res.status(201).json(event);
     } catch (err) {
       console.error("[calendar] Error creating event:", err);

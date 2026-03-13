@@ -63,7 +63,7 @@ import {
   articleUpdateNotifications, type ArticleUpdateNotification, type InsertArticleUpdateNotification,
   calendarConnections, type CalendarConnection, type InsertCalendarConnection,
   errorLogs, type ErrorLog, type InsertErrorLog,
-  activityLogs, type ActivityLog, type InsertActivityLog,
+  activityLogs, type ActivityLogs, type InsertActivityLogs,
   developmentTracker, type DevelopmentTracker, type InsertDevelopmentTracker,
   sopMedia, type SopMedia, type InsertSopMedia,
   aiGenerationEvents, type AiGenerationEvent, type InsertAiGenerationEvent,
@@ -518,8 +518,8 @@ export interface IStorage {
   getErrorStats(): Promise<{ total: number; unresolved: number; bySeverity: Record<string, number>; byFeature: Record<string, number> }>;
   
   // Activity Logs
-  getActivityLogs(filters?: { feature?: string; action?: string; userId?: string; limit?: number }): Promise<ActivityLog[]>;
-  createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
+  getActivityLogs(filters?: { feature?: string; action?: string; userId?: string; limit?: number }): Promise<ActivityLogs[]>;
+  createActivityLog(log: InsertActivityLogs): Promise<ActivityLogs>;
   
   // Development Tracker
   getDevelopmentItems(filters?: { status?: string; category?: string; priority?: string }): Promise<DevelopmentTracker[]>;
@@ -2553,7 +2553,7 @@ export class DatabaseStorage implements IStorage {
     return await query.orderBy(desc(activityLogs.createdAt)).limit(filters?.limit || 100);
   }
 
-  async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
+  async createActivityLog(log: InsertActivityLogs): Promise<ActivityLogs> {
     const [created] = await db.insert(activityLogs).values(log).returning();
     return created;
   }

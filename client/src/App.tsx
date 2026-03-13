@@ -47,6 +47,7 @@ import Tools from "@/pages/Tools";
 import LeadQualifier from "@/pages/LeadQualifier";
 import CalendarPage from "@/pages/Calendar";
 import SharedDocument from "@/pages/SharedDocument";
+import SettingsPage from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
 function AppRoutes() {
@@ -114,6 +115,7 @@ function AppRoutes() {
         <Route path="/calendar" component={CalendarPage} />
         <Route path="/communications" component={MessagingInbox} />
         <Route path="/testing" component={TestingKnowledge} />
+        <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>

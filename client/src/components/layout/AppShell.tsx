@@ -297,7 +297,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     enabled: !!user && user.role !== "Customer",
   });
 
-  const totalBellCount = (unseenUpdates.length || 0) + (staffNotifCount?.count || 0);
+  const { data: activityUnseenCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/activity-log/unseen-count"],
+    staleTime: 30000,
+    refetchInterval: 30000,
+    enabled: !!user && user.role !== "Customer",
+  });
+
+  const totalBellCount = (unseenUpdates.length || 0) + (staffNotifCount?.count || 0) + (activityUnseenCount?.count || 0);
 
   const getLogoClasses = () => {
     const shape = companySettings?.logoShape || "square";
@@ -594,6 +601,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/profile">
                 <User className="mr-2 h-4 w-4" />
                 {t("nav.myProfile")}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild className="cursor-pointer">
+              <Link href="/settings">
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

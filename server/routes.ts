@@ -13,6 +13,7 @@ import { registerSuggestionsRoutes } from "./suggestionsRoutes";
 import { registerTaskRoutes } from "./taskRoutes";
 import { registerAssistantRoutes } from "./assistantRoutes";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail } from "./email";
+import { logActivity } from "./activityLogger";
 import { checkAndSendReminders } from "./maintenanceScheduler";
 import OpenAI from "openai";
 import { 
@@ -30,10 +31,11 @@ import {
   calendarEvents,
   todoAssignments,
   users,
-  type User 
+  type User,
+  activityLog
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { autoClassifySOPTitle, getTaxonomy } from "@shared/sopClassification";
 
@@ -3381,6 +3383,9 @@ Generate detailed information for this landscaping material.`;
     try {
       const job = await storage.updateJob(req.params.id as string, req.body);
       if (!job) return res.status(404).json({ message: "Job not found" });
+      if (req.body.stage) {
+        logActivity("job_stage_change", `Work card "${job.client}" moved to ${req.body.stage}`, "/jobs", req.user?.id);
+      }
       res.json(job);
     } catch (err) {
       res.status(500).json({ message: "Error updating job" });
@@ -3704,6 +3709,7 @@ Generate detailed information for this landscaping material.`;
         })();
       }
       
+      logActivity("message_sent", `New message from ${user.name}`, "/communications", user.id);
       res.status(201).json(thread);
     } catch (err) {
       res.status(500).json({ message: "Error creating conversation" });
@@ -3928,6 +3934,7 @@ Generate detailed information for this landscaping material.`;
         console.error("Error sending admin notifications:", notifErr);
       }
 
+      logActivity("work_request", `New work request from ${customerUser.fullName || customerUser.username}`, "/jobs", customerUser.id);
       res.status(201).json(request);
     } catch (err) {
       res.status(500).json({ message: "Error creating work request" });
@@ -3986,6 +3993,7 @@ Generate detailed information for this landscaping material.`;
         return res.status(403).json({ message: "Not authorized" });
       }
       const estimate = await storage.createEstimate(req.body);
+      logActivity("estimate_created", `New estimate created for ${estimate.clientName}`, "/jobs", req.user?.id);
       res.status(201).json(estimate);
     } catch (err) {
       res.status(500).json({ message: "Error creating estimate" });
@@ -4077,6 +4085,7 @@ Generate detailed information for this landscaping material.`;
 
       await storage.updateEstimate(req.params.id, { stage: "Won" });
 
+      logActivity("estimate_converted", `Estimate for ${estimate.clientName} converted to a Sold job`, "/jobs", req.user?.id);
       res.json({ job, estimate });
     } catch (err) {
       res.status(500).json({ message: "Error converting estimate to job" });
@@ -7895,6 +7904,47 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  // ==================== ACTIVITY LOG ====================
+
+  app.get("/api/activity-log", requireAuth, async (req, res) => {
+    try {
+      const items = await db.select().from(activityLog).orderBy(desc(activityLog.createdAt)).limit(50);
+      res.json(items);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching activity log" });
+    }
+  });
+
+  app.get("/api/activity-log/unseen-count", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const items = await db.select().from(activityLog).orderBy(desc(activityLog.createdAt)).limit(100);
+      const unseenCount = items.filter((item) => {
+        const seenBy = (item.seenBy as string[]) || [];
+        return !seenBy.includes(userId);
+      }).length;
+      res.json({ count: unseenCount });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching unseen count" });
+    }
+  });
+
+  app.post("/api/activity-log/mark-seen", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const items = await db.select().from(activityLog).orderBy(desc(activityLog.createdAt)).limit(100);
+      for (const item of items) {
+        const seenBy = (item.seenBy as string[]) || [];
+        if (!seenBy.includes(userId)) {
+          await db.update(activityLog).set({ seenBy: [...seenBy, userId] }).where(eq(activityLog.id, item.id));
+        }
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error marking activity seen" });
+    }
+  });
+
   app.post("/api/documents", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
@@ -7906,6 +7956,7 @@ Provide accurate information based on publicly available documentation.`;
         ...req.body,
         uploadedByUserId: user.id,
       });
+      logActivity("document_uploaded", `"${doc.fileName}" uploaded to Document Library`, null, user.id);
       res.json(doc);
     } catch (err: any) {
       res.status(500).json({ message: err.message });

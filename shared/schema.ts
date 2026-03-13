@@ -1995,13 +1995,13 @@ export const activityLogs = pgTable("activity_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
+export const insertActivityLogsSchema = createInsertSchema(activityLogs).omit({
   id: true,
   createdAt: true,
 });
 
-export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
-export type ActivityLog = typeof activityLogs.$inferSelect;
+export type InsertActivityLogs = z.infer<typeof insertActivityLogsSchema>;
+export type ActivityLogs = typeof activityLogs.$inferSelect;
 
 // Development Tracker - for tracking incomplete features and systems
 export const developmentTracker = pgTable("development_tracker", {
@@ -2581,3 +2581,22 @@ export const insertEstimateSchema = createInsertSchema(estimates).omit({
 
 export type InsertEstimate = z.infer<typeof insertEstimateSchema>;
 export type Estimate = typeof estimates.$inferSelect;
+
+export const activityLog = pgTable("activity_log", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  description: text("description").notNull(),
+  link: varchar("link", { length: 500 }),
+  seenBy: jsonb("seen_by").default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
+  id: true,
+  createdAt: true,
+  seenBy: true,
+});
+
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type ActivityLog = typeof activityLog.$inferSelect;

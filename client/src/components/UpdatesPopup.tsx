@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Bell, Sparkles, AlertCircle, Info, Check, Clock, Users, Briefcase, Wrench, FileText } from "lucide-react";
+import { X, Bell, Sparkles, AlertCircle, Info, Check, Clock, Users, Briefcase, Wrench, FileText, Plus, Calendar, MessageSquare, TrendingUp, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -21,15 +24,13 @@ interface AppUpdate {
   publishedAt: string;
 }
 
-interface StaffNotification {
+interface ActivityLogItem {
   id: string;
-  userId: string;
-  type: string;
-  title: string;
-  message: string;
+  userId: string | null;
+  eventType: string;
+  description: string;
   link: string | null;
-  metadata: any;
-  isRead: boolean;
+  seenBy: string[];
   createdAt: string;
 }
 
@@ -42,19 +43,24 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showPostForm, setShowPostForm] = useState(false);
   const isStaff = user?.role && user.role !== "Customer";
+  const isAdmin = user?.role === "Admin" || user?.role === "Master Admin";
 
   const { data: updates = [] } = useQuery<AppUpdate[]>({
     queryKey: ["/api/updates/unseen"],
     enabled: isOpen,
   });
 
-  const { data: staffNotifications = [] } = useQuery<StaffNotification[]>({
-    queryKey: ["/api/staff-notifications"],
+  const { data: activityItems = [] } = useQuery<ActivityLogItem[]>({
+    queryKey: ["/api/activity-log"],
     enabled: isOpen && !!isStaff,
   });
 
-  const unreadNotifications = staffNotifications.filter((n) => !n.isRead);
+  const unseenActivityCount = activityItems.filter((item) => {
+    const seenBy = item.seenBy || [];
+    return !seenBy.includes(user?.id || "");
+  }).length;
 
   const acknowledgeMutation = useMutation({
     mutationFn: async (updateId: string) => {
@@ -65,23 +71,13 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
     },
   });
 
-  const markNotifReadMutation = useMutation({
-    mutationFn: async (notifId: string) => {
-      await apiRequest("POST", `/api/staff-notifications/${notifId}/read`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/staff-notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/staff-notifications/unread-count"] });
-    },
-  });
-
-  const markAllNotifReadMutation = useMutation({
+  const markActivitySeenMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/staff-notifications/read-all");
+      await apiRequest("POST", "/api/activity-log/mark-seen");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/staff-notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/staff-notifications/unread-count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activity-log"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activity-log/unseen-count"] });
     },
   });
 
@@ -89,6 +85,32 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
     updates.forEach((update) => {
       acknowledgeMutation.mutate(update.id);
     });
+  };
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case "job_stage_change": return <TrendingUp className="h-4 w-4" />;
+      case "estimate_created":
+      case "estimate_converted": return <Briefcase className="h-4 w-4" />;
+      case "message_sent": return <MessageSquare className="h-4 w-4" />;
+      case "calendar_event": return <Calendar className="h-4 w-4" />;
+      case "document_uploaded": return <FileText className="h-4 w-4" />;
+      case "work_request": return <Package className="h-4 w-4" />;
+      default: return <Bell className="h-4 w-4" />;
+    }
+  };
+
+  const getActivityColor = (type: string) => {
+    switch (type) {
+      case "job_stage_change": return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
+      case "estimate_created":
+      case "estimate_converted": return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
+      case "message_sent": return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
+      case "calendar_event": return "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300";
+      case "document_uploaded": return "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300";
+      case "work_request": return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
+      default: return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
+    }
   };
 
   const getUpdateIcon = (type: string) => {
@@ -100,29 +122,12 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
     }
   };
 
-  const getNotifIcon = (type: string) => {
-    switch (type) {
-      case "hiring_stage_change": return <Briefcase className="h-4 w-4" />;
-      case "maintenance": return <Wrench className="h-4 w-4" />;
-      case "document": return <FileText className="h-4 w-4" />;
-      default: return <Bell className="h-4 w-4" />;
-    }
-  };
-
   const getUpdateTypeColor = (type: string) => {
     switch (type) {
       case "feature": return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       case "improvement": return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
       case "bugfix": return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
       default: return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
-    }
-  };
-
-  const getNotifTypeColor = (type: string) => {
-    switch (type) {
-      case "hiring_stage_change": return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
-      case "maintenance": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
-      default: return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
     }
   };
 
@@ -174,13 +179,13 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
             </div>
 
             {isStaff ? (
-              <Tabs defaultValue="notifications">
+              <Tabs defaultValue="activity">
                 <TabsList className="w-full grid grid-cols-2 mx-0 rounded-none border-b">
-                  <TabsTrigger value="notifications" className="relative" data-testid="tab-notifications">
+                  <TabsTrigger value="activity" className="relative" data-testid="tab-activity">
                     Activity
-                    {unreadNotifications.length > 0 && (
+                    {unseenActivityCount > 0 && (
                       <Badge variant="destructive" className="ml-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]">
-                        {unreadNotifications.length}
+                        {unseenActivityCount}
                       </Badge>
                     )}
                   </TabsTrigger>
@@ -194,57 +199,87 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="notifications" className="m-0">
+                <TabsContent value="activity" className="m-0">
                   <ScrollArea className="max-h-[55vh]">
-                    {unreadNotifications.length > 0 && (
+                    {unseenActivityCount > 0 && (
                       <div className="flex justify-end p-2 pb-0">
-                        <Button variant="ghost" size="sm" className="text-xs" onClick={() => markAllNotifReadMutation.mutate()} data-testid="mark-all-notifs-read">
-                          <Check className="h-3 w-3 mr-1" /> Mark all read
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => markActivitySeenMutation.mutate()}
+                          data-testid="mark-all-activity-seen"
+                        >
+                          <Check className="h-3 w-3 mr-1" /> Mark all seen
                         </Button>
                       </div>
                     )}
-                    {staffNotifications.length === 0 ? (
+                    {activityItems.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground">
                         <Bell className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                        <p className="font-medium">No notifications</p>
-                        <p className="text-sm mt-1">Activity notifications will appear here.</p>
+                        <p className="font-medium">No activity yet</p>
+                        <p className="text-sm mt-1">Recent activity will appear here.</p>
                       </div>
                     ) : (
                       <div className="p-2">
-                        {staffNotifications.slice(0, 20).map((notif) => (
-                          <div
-                            key={notif.id}
-                            className={`p-3 rounded-lg mb-1 transition-colors cursor-pointer ${notif.isRead ? "opacity-60" : "bg-muted/30 hover:bg-muted/50"}`}
-                            onClick={() => {
-                              if (!notif.isRead) markNotifReadMutation.mutate(notif.id);
-                              if (notif.link) window.location.href = notif.link;
-                            }}
-                            data-testid={`notif-item-${notif.id}`}
-                          >
-                            <div className="flex items-start gap-2">
-                              <span className={`p-1.5 rounded-md ${getNotifTypeColor(notif.type)}`}>
-                                {getNotifIcon(notif.type)}
-                              </span>
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-sm leading-tight">{notif.title}</h4>
-                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notif.message}</p>
-                                <span className="text-xs text-muted-foreground flex items-center mt-1">
-                                  <Clock className="h-3 w-3 mr-1" />
-                                  {formatTimeAgo(notif.createdAt)}
+                        {activityItems.slice(0, 30).map((item) => {
+                          const isSeen = (item.seenBy || []).includes(user?.id || "");
+                          return (
+                            <div
+                              key={item.id}
+                              className={`p-3 rounded-lg mb-1 transition-colors ${item.link ? "cursor-pointer" : ""} ${isSeen ? "opacity-60" : "bg-muted/30 hover:bg-muted/50"}`}
+                              onClick={() => {
+                                if (item.link) window.location.href = item.link;
+                              }}
+                              data-testid={`activity-item-${item.id}`}
+                            >
+                              <div className="flex items-start gap-2">
+                                <span className={`p-1.5 rounded-md ${getActivityColor(item.eventType)}`}>
+                                  {getActivityIcon(item.eventType)}
                                 </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm leading-tight">{item.description}</p>
+                                  <span className="text-xs text-muted-foreground flex items-center mt-1">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    {formatTimeAgo(item.createdAt)}
+                                  </span>
+                                </div>
+                                {!isSeen && (
+                                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 shrink-0" />
+                                )}
                               </div>
-                              {!notif.isRead && (
-                                <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 shrink-0" />
-                              )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </ScrollArea>
                 </TabsContent>
 
                 <TabsContent value="updates" className="m-0">
+                  {isAdmin && (
+                    <div className="p-2 pb-0">
+                      {!showPostForm ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-xs"
+                          onClick={() => setShowPostForm(true)}
+                          data-testid="button-post-update"
+                        >
+                          <Plus className="h-3 w-3 mr-1" /> Post Update
+                        </Button>
+                      ) : (
+                        <InlinePostUpdateForm
+                          onClose={() => setShowPostForm(false)}
+                          onSuccess={() => {
+                            setShowPostForm(false);
+                            queryClient.invalidateQueries({ queryKey: ["/api/updates/unseen"] });
+                          }}
+                        />
+                      )}
+                    </div>
+                  )}
                   {renderUpdates(updates, expandedId, setExpandedId, acknowledgeMutation, acknowledgeAll, getUpdateIcon, getUpdateTypeColor, formatDate)}
                 </TabsContent>
               </Tabs>
@@ -255,6 +290,71 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
         </>
       )}
     </AnimatePresence>
+  );
+}
+
+function InlinePostUpdateForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("feature");
+
+  const postMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/updates", {
+        title,
+        description,
+        category,
+        version: new Date().toISOString().slice(0, 10),
+        minRole: "Crew",
+        isActive: true,
+      });
+    },
+    onSuccess,
+  });
+
+  return (
+    <div className="border rounded-lg p-3 space-y-2 bg-muted/20" data-testid="post-update-form">
+      <Input
+        placeholder="Update title"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        className="text-sm h-8"
+        data-testid="input-update-title"
+      />
+      <Textarea
+        placeholder="Brief description..."
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={2}
+        className="text-sm resize-none"
+        data-testid="input-update-description"
+      />
+      <Select value={category} onValueChange={setCategory}>
+        <SelectTrigger className="h-8 text-xs" data-testid="select-update-category">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="feature">Feature</SelectItem>
+          <SelectItem value="improvement">Improvement</SelectItem>
+          <SelectItem value="bugfix">Bug Fix</SelectItem>
+          <SelectItem value="announcement">Announcement</SelectItem>
+        </SelectContent>
+      </Select>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          className="text-xs h-7"
+          onClick={() => postMutation.mutate()}
+          disabled={!title.trim() || !description.trim() || postMutation.isPending}
+          data-testid="button-submit-update"
+        >
+          <Check className="h-3 w-3 mr-1" /> Post
+        </Button>
+        <Button variant="ghost" size="sm" className="text-xs h-7" onClick={onClose}>
+          Cancel
+        </Button>
+      </div>
+    </div>
   );
 }
 
