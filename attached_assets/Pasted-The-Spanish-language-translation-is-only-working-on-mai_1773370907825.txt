@@ -1,0 +1,169 @@
+The Spanish language translation is only working on main navigation titles and icons. All inner content — form labels, button text, table column headers, dropdown options, status badges, error messages, placeholder text, confirmation dialogs, and empty state messages — is still displaying in English when the user switches to Español. Fix this so every visible string in the app translates correctly.
+
+
+
+HOW THE TRANSLATION SYSTEM SHOULD WORK
+
+The app should use a centralized translation file (i18n) with a key-value lookup. Every string rendered in the UI should come from this lookup rather than being hardcoded in English. When the user's language preference is set to Español, all keys resolve to Spanish. When set to English, all keys resolve to English.
+
+If the current implementation is using a translation library (react-i18next, i18next, or similar), extend the existing translation files. If translations are currently handled with a custom context or hook, extend that system. Do not switch to a different translation approach — extend whatever is already in place.
+
+
+
+STRINGS THAT MUST BE TRANSLATED
+
+Go through every module and translate ALL of the following categories of text:
+
+Buttons
+All button labels throughout the entire app including but not limited to:
+•	Save, Cancel, Delete, Edit, Add, Create, Submit, Close, Confirm, Back, Next
+•	Upload, Download, Export, Import, Print
+•	Connect, Disconnect, Sync, Refresh
+•	Send, Reply, Archive, Mark as read
+•	Approve, Reject, Convert, Move
+•	Open, View, Preview, Share
+•	Sign out, Log out
+•	Any other action button in any module
+
+Form labels and input placeholders
+Every label above or beside an input field, and every placeholder inside an input field, including:
+•	Name, First name, Last name, Email, Phone, Address, City, State, Zip
+•	Title, Description, Notes, Subject, Message
+•	Date, Start date, End date, Time, Duration
+•	Password, Confirm password, Current password
+•	Search..., Type to search..., Select..., Choose...
+•	Any other field label or placeholder in any form
+
+Table column headers
+Every column header in every table in every module including:
+•	Name, Date, Status, Type, Category, Amount, Actions
+•	Employee, Customer, Job, Title, Assigned to, Created by
+•	Any other column header
+
+Status badges and labels
+Every status label that appears as a badge, tag, or pill including:
+•	Active, Inactive, Pending, Approved, Rejected, Completed, In progress
+•	Draft, Published, Archived, Deleted
+•	New Request, Contacted, Estimate Scheduled, Estimate Sent, Won
+•	New, In Progress, Done, On Hold, Cancelled
+•	Internal, External
+•	Admin, Manager, Employee, Customer
+•	Any other status or role badge
+
+Dropdown and select options
+Every option inside every dropdown or select menu including:
+•	All status options
+•	All role options
+•	All category options
+•	All filter options (All, Active, Inactive, This week, This month, etc.)
+•	Sort options (Newest first, Oldest first, A-Z, Z-A)
+•	Language options (English, Español)
+•	Any other select option
+
+Section headings and page sub-headings
+Every heading that appears inside a page (not just the main page title) including:
+•	Section headers within forms
+•	Card titles within dashboards
+•	Group labels within lists
+•	Any subheading or label that introduces a section of content
+
+Empty state messages
+Every message that appears when a list or section has no content including:
+•	"No results found", "No records yet", "Nothing here yet"
+•	"No messages", "No events", "No documents"
+•	"Get started by adding your first..."
+•	Any instructional text in an empty state
+
+Confirmation dialogs and modals
+Every piece of text inside any confirmation dialog, alert, or modal including:
+•	Modal titles
+•	Modal body text
+•	Confirmation questions ("Are you sure you want to delete this?")
+•	Warning messages
+•	All buttons inside modals (Confirm, Cancel, Delete, Keep, etc.)
+
+Error messages and validation text
+Every error message shown when a form field fails validation or an action fails including:
+•	"This field is required"
+•	"Please enter a valid email address"
+•	"Password must be at least 8 characters"
+•	"Something went wrong. Please try again."
+•	Any other error or validation message
+
+Toast / notification messages
+Every toast, snackbar, or inline notification message including:
+•	"Saved successfully", "Changes saved", "Record deleted"
+•	"Error saving", "Failed to load"
+•	"Copied to clipboard", "Link copied"
+•	Any other success, error, or info notification text
+
+Help text and descriptive text
+Any helper text, description, or instruction text that appears near a form field or section including:
+•	Field descriptions below inputs
+•	Section descriptions
+•	Tooltip text
+•	Instructional paragraphs on any page
+
+Navigation and sidebar labels (verify these are complete)
+Confirm that ALL sidebar navigation labels are translating — not just the top-level items. Include:
+•	All sub-menu items
+•	All badge labels next to nav items (e.g. "New", count badges with labels)
+•	The user role label shown in the sidebar or header
+
+
+
+SPANISH TRANSLATIONS REQUIRED
+
+Provide complete Spanish translations for all strings. Use professional, natural business Spanish — not literal word-for-word translation. Key translations to verify:
+
+Buttons: Guardar, Cancelar, Eliminar, Editar, Agregar, Crear, Enviar, Cerrar, Confirmar, Volver, Siguiente, Subir, Descargar, Exportar, Importar, Imprimir, Conectar, Desconectar, Sincronizar, Actualizar, Responder, Archivar, Aprobar, Rechazar, Convertir, Abrir, Ver, Compartir, Cerrar sesión
+
+Status badges: Activo, Inactivo, Pendiente, Aprobado, Rechazado, Completado, En progreso, Borrador, Publicado, Archivado, Nueva solicitud, Contactado, Estimación programada, Estimación enviada, Ganado, Nuevo, En curso, Listo, En espera, Cancelado, Interno, Externo
+
+Roles: Administrador, Gerente, Empleado, Cliente
+
+Common labels: Nombre, Correo electrónico, Teléfono, Dirección, Fecha, Estado, Tipo, Categoría, Monto, Acciones, Título, Descripción, Notas, Asunto, Mensaje, Contraseña, Buscar, Seleccionar, Todos
+
+Empty states: "No se encontraron resultados", "No hay registros aún", "No hay mensajes", "No hay eventos", "Comienza agregando tu primer registro"
+
+Errors: "Este campo es obligatorio", "Ingresa un correo electrónico válido", "Algo salió mal. Intenta de nuevo."
+
+
+
+IMPLEMENTATION APPROACH
+
+1.	First, audit the codebase for all hardcoded English strings that are NOT going through the translation system. Search for patterns like: text content inside JSX that is a plain English string, aria-labels in English, placeholder attributes in English, title attributes in English.
+
+2.	For each hardcoded string found, replace it with a translation lookup using the existing translation hook or function (e.g. t('key') or similar).
+
+3.	Add the corresponding key to both the English translation file and the Spanish translation file.
+
+4.	Pay special attention to these commonly missed areas:
+•	Strings inside .map() loops (table rows, list items)
+•	Strings inside conditional renders
+•	Strings passed as props (placeholder="...", label="...", title="...")
+•	Strings in toast/notification calls
+•	Strings in window.confirm() or custom modal text
+•	Strings in aria-label attributes (these affect accessibility)
+
+5.	After making changes, do a final search of the codebase for any remaining English-only strings that are user-visible and translate those too.
+
+
+
+DO NOT CHANGE
+
+•	Do not change any functionality
+•	Do not change any routing or data logic
+•	Do not change the language switching mechanism — only the coverage of strings it translates
+•	Do not change the default language (English remains the default for all existing users)
+•	Keep all existing translation keys that are already working — only add new ones
+
+
+
+VERIFICATION
+
+After completing the changes, confirm:
+6.	Switching to Español translates ALL visible text in the sidebar, all module pages, all forms, all tables, all modals, all toasts, and all empty states
+7.	Switching back to English restores all original English text
+8.	No visible English text remains when the app is set to Español
+
