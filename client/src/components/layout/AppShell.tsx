@@ -23,7 +23,6 @@ import {
   GraduationCap,
   Building2,
   User,
-  Sparkles,
   Shield,
   Mail,
   Inbox,
@@ -758,12 +757,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Link href="/assistant">
-              <Button variant="outline" size="sm" className="hidden sm:flex h-9 rounded-full px-4 gap-2 bg-primary/5 hover:bg-primary/10 border-primary/20" data-testid="link-assistant">
-                <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-                <span className="text-xs font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">AI Assistant</span>
-              </Button>
-            </Link>
           </div>
         </header>
 
