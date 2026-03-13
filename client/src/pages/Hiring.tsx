@@ -258,13 +258,24 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
   onSave: (data: any) => void;
   isPending: boolean;
 }) {
-  const [form, setForm] = useState({
+  const defaultForm = {
     name: "", role: "", email: "", phone: "", address: "", city: "", state: "", zip: "",
-    source: "", jobType: "", rating: "green",
-  });
+    source: "", rating: "green",
+  };
+  const [form, setForm] = useState(defaultForm);
+
+  const handleSave = () => {
+    onSave({ ...form, stage: "New Application" });
+    setForm(defaultForm);
+  };
+
+  const handleClose = () => {
+    setForm(defaultForm);
+    onClose();
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Applicant</DialogTitle>
@@ -278,7 +289,12 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
             </div>
             <div className="space-y-1">
               <Label>Position *</Label>
-              <Input value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} placeholder="e.g. Crew Member" data-testid="input-applicant-role" />
+              <Select value={form.role || undefined} onValueChange={v => setForm({ ...form, role: v })}>
+                <SelectTrigger data-testid="select-applicant-role"><SelectValue placeholder="Select position..." /></SelectTrigger>
+                <SelectContent>
+                  {JOB_TYPES.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -291,25 +307,14 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
               <Input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} data-testid="input-applicant-phone" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Source</Label>
-              <Select value={form.source} onValueChange={v => setForm({ ...form, source: v })}>
-                <SelectTrigger data-testid="select-source"><SelectValue placeholder="Select..." /></SelectTrigger>
-                <SelectContent>
-                  {SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Job Type</Label>
-              <Select value={form.jobType} onValueChange={v => setForm({ ...form, jobType: v })}>
-                <SelectTrigger data-testid="select-job-type"><SelectValue placeholder="Select..." /></SelectTrigger>
-                <SelectContent>
-                  {JOB_TYPES.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-1">
+            <Label>Source</Label>
+            <Select value={form.source || undefined} onValueChange={v => setForm({ ...form, source: v })}>
+              <SelectTrigger data-testid="select-source"><SelectValue placeholder="Select..." /></SelectTrigger>
+              <SelectContent>
+                {SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <Label>Address</Label>
@@ -349,9 +354,9 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={handleClose}>Cancel</Button>
           <Button
-            onClick={() => onSave({ ...form, stage: "New Application" })}
+            onClick={handleSave}
             disabled={!form.name || !form.role || isPending}
             data-testid="button-save-applicant"
           >
