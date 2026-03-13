@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useApp } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import { TrendingUp, Users, DollarSign, MousePointerClick, Plus } from "lucide-r
 import { useToast } from "@/hooks/use-toast";
 
 export default function Marketing() {
+  const { t } = useTranslation();
   const { campaigns } = useApp();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -49,8 +51,8 @@ export default function Marketing() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-heading font-bold text-foreground">Marketing Command Center</h1>
-        <p className="text-muted-foreground">Track campaign performance and ROI</p>
+        <h1 className="text-2xl font-heading font-bold text-foreground">{t("marketing.commandCenter")}</h1>
+        <p className="text-muted-foreground">{t("marketing.trackPerformance")}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -58,7 +60,7 @@ export default function Marketing() {
            <CardContent className="pt-6">
              <div className="flex items-center justify-between">
                <div>
-                 <p className="text-sm font-medium text-muted-foreground">Total Spend</p>
+                 <p className="text-sm font-medium text-muted-foreground">{t("marketing.totalSpend")}</p>
                  <h2 className="text-3xl font-bold mt-1">$1,750</h2>
                </div>
                <div className="p-3 bg-red-100 rounded-full text-red-600">
@@ -71,7 +73,7 @@ export default function Marketing() {
            <CardContent className="pt-6">
              <div className="flex items-center justify-between">
                <div>
-                 <p className="text-sm font-medium text-muted-foreground">Total Leads</p>
+                 <p className="text-sm font-medium text-muted-foreground">{t("marketing.totalLeads")}</p>
                  <h2 className="text-3xl font-bold mt-1">62</h2>
                </div>
                <div className="p-3 bg-blue-100 rounded-full text-blue-600">
@@ -84,7 +86,7 @@ export default function Marketing() {
            <CardContent className="pt-6">
              <div className="flex items-center justify-between">
                <div>
-                 <p className="text-sm font-medium text-muted-foreground">Avg CPL</p>
+                 <p className="text-sm font-medium text-muted-foreground">{t("marketing.avgCpl")}</p>
                  <h2 className="text-3xl font-bold mt-1">$28.22</h2>
                </div>
                <div className="p-3 bg-green-100 rounded-full text-green-600">
@@ -97,7 +99,7 @@ export default function Marketing() {
            <CardContent className="pt-6">
              <div className="flex items-center justify-between">
                <div>
-                 <p className="text-sm font-medium text-muted-foreground">Conversion Rate</p>
+                 <p className="text-sm font-medium text-muted-foreground">{t("marketing.conversionRate")}</p>
                  <h2 className="text-3xl font-bold mt-1">12.5%</h2>
                </div>
                <div className="p-3 bg-yellow-100 rounded-full text-yellow-600">
@@ -111,8 +113,8 @@ export default function Marketing() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Campaign Performance</CardTitle>
-            <CardDescription>Spend vs Leads generated per campaign</CardDescription>
+            <CardTitle>{t("marketing.campaignPerformance")}</CardTitle>
+            <CardDescription>{t("marketing.spendVsLeads")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -122,8 +124,8 @@ export default function Marketing() {
                   <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
                   <Tooltip cursor={{ fill: 'transparent' }} />
-                  <Bar dataKey="spend" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Spend" />
-                  <Bar dataKey="leads" fill="hsl(var(--secondary))" radius={[4, 4, 0, 0]} name="Leads" />
+                  <Bar dataKey="spend" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name={t("marketing.spend")} />
+                  <Bar dataKey="leads" fill="hsl(var(--secondary))" radius={[4, 4, 0, 0]} name={t("marketing.leads")} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -132,7 +134,7 @@ export default function Marketing() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Active Campaigns</CardTitle>
+            <CardTitle>{t("marketing.activeCampaigns")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -146,8 +148,8 @@ export default function Marketing() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-sm">{c.leads} Leads</div>
-                    <div className="text-xs text-muted-foreground">${c.cpl.toFixed(2)} / lead</div>
+                    <div className="font-bold text-sm">{t("marketing.leadsCount", { count: c.leads })}</div>
+                    <div className="text-xs text-muted-foreground">${c.cpl.toFixed(2)} / {t("marketing.perLead")}</div>
                   </div>
                 </div>
               ))}
@@ -156,26 +158,26 @@ export default function Marketing() {
                 <DialogTrigger asChild>
                   <Button className="w-full gap-2" variant="outline">
                     <Plus className="w-4 h-4" />
-                    Create Campaign
+                    {t("marketing.createCampaign")}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Create New Campaign</DialogTitle>
-                    <DialogDescription>Set up a new marketing campaign to track performance and ROI.</DialogDescription>
+                    <DialogTitle>{t("marketing.createNewCampaign")}</DialogTitle>
+                    <DialogDescription>{t("marketing.createCampaignDesc")}</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="campaign-name">Campaign Name</Label>
+                      <Label htmlFor="campaign-name">{t("marketing.campaignName")}</Label>
                       <Input 
                         id="campaign-name"
-                        placeholder="e.g., Spring Lawn Care Promo"
+                        placeholder={t("marketing.campaignPlaceholder")}
                         value={campaignName}
                         onChange={(e) => setCampaignName(e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="platform">Platform</Label>
+                      <Label htmlFor="platform">{t("marketing.platform")}</Label>
                       <select 
                         id="platform"
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -191,7 +193,7 @@ export default function Marketing() {
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="budget">Monthly Budget</Label>
+                      <Label htmlFor="budget">{t("marketing.monthlyBudget")}</Label>
                       <Input 
                         id="budget"
                         type="number"
@@ -202,8 +204,8 @@ export default function Marketing() {
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                    <Button onClick={handleCreateCampaign}>Create Campaign</Button>
+                    <Button variant="outline" onClick={() => setDialogOpen(false)}>{t("common.cancel")}</Button>
+                    <Button onClick={handleCreateCampaign}>{t("marketing.createCampaign")}</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>

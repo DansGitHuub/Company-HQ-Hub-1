@@ -5,6 +5,7 @@ import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { showErrorToast } from "@/lib/errorToast";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -174,6 +175,7 @@ function isSameDay(d1: Date, d2: Date) {
 export default function CalendarPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
@@ -194,11 +196,11 @@ export default function CalendarPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("google_connected") === "true") {
-      toast({ title: "Google Calendar Connected", description: "Your Google Calendar is now synced." });
+      toast({ title: t("calendar.googleCalendar"), description: t("calendar.syncComplete") });
       window.history.replaceState({}, "", "/calendar");
     }
     if (params.get("google_error")) {
-      toast({ title: "Connection Failed", description: "Could not connect Google Calendar. Please try again.", variant: "destructive" });
+      toast({ title: t("errors.failedToLoad"), variant: "destructive" });
       window.history.replaceState({}, "", "/calendar");
     }
   }, []);
@@ -362,7 +364,7 @@ export default function CalendarPage() {
     },
     onSuccess: (data: { message: string; count: number }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/google/events"] });
-      toast({ title: "Google Calendar Synced", description: data.message });
+      toast({ title: t("calendar.syncComplete"), description: data.message });
     },
     onError: (err: any) => showErrorToast(toast, err),
   });
@@ -398,7 +400,7 @@ export default function CalendarPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/events"] });
-      toast({ title: "Event Created" });
+      toast({ title: t("calendar.eventCreated") });
       setShowEventDialog(false);
     },
     onError: (err: any) => showErrorToast(toast, err),
@@ -411,7 +413,7 @@ export default function CalendarPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/events"] });
-      toast({ title: "Event Updated" });
+      toast({ title: t("calendar.eventUpdated") });
       setShowEventDialog(false);
       setEditingEvent(null);
     },
@@ -424,7 +426,7 @@ export default function CalendarPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/events"] });
-      toast({ title: "Event Deleted" });
+      toast({ title: t("calendar.eventDeleted") });
       setShowDetailDialog(false);
       setDetailEvent(null);
     },
@@ -449,7 +451,7 @@ export default function CalendarPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/google/status"] });
-      toast({ title: "Disconnected from Google Calendar" });
+      toast({ title: t("calendar.disconnectGoogle") });
     },
   });
 
@@ -498,7 +500,7 @@ export default function CalendarPage() {
       <div className="flex items-center justify-between px-6 py-4 border-b">
         <div className="flex items-center gap-3">
           <CalendarIcon className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold" data-testid="calendar-title">Calendar</h1>
+          <h1 className="text-2xl font-bold" data-testid="calendar-title">{t("calendar.title")}</h1>
         </div>
         <div className="flex items-center gap-2">
           <GoogleCalendarStatus
@@ -511,7 +513,7 @@ export default function CalendarPage() {
           />
           <Button onClick={() => openCreateDialog()} data-testid="create-event-button">
             <Plus className="h-4 w-4 mr-2" />
-            New Event
+            {t("calendar.addEvent")}
           </Button>
           <Button variant="ghost" size="icon" onClick={() => setShowSettingsDialog(true)} data-testid="calendar-settings-button">
             <Settings className="h-5 w-5" />
@@ -525,7 +527,7 @@ export default function CalendarPage() {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm" onClick={goToToday} data-testid="calendar-today">
-            Today
+            {t("calendar.today")}
           </Button>
           <Button variant="outline" size="icon" onClick={() => navigate(1)} data-testid="calendar-nav-next">
             <ChevronRight className="h-4 w-4" />
@@ -537,7 +539,7 @@ export default function CalendarPage() {
             <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               className="pl-8 w-48"
-              placeholder="Search events..."
+              placeholder={t("common.search") + "..."}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               data-testid="calendar-search"
@@ -549,9 +551,9 @@ export default function CalendarPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Events</SelectItem>
-              <SelectItem value="mine">My Events</SelectItem>
-              <SelectItem value="google">Google Calendar</SelectItem>
+              <SelectItem value="all">{t("common.all")}</SelectItem>
+              <SelectItem value="mine">{t("tasks.myTasks")}</SelectItem>
+              <SelectItem value="google">{t("calendar.googleCalendar")}</SelectItem>
               {allEventTypes.map(t => (
                 <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
               ))}
@@ -559,10 +561,10 @@ export default function CalendarPage() {
           </Select>
           <div className="flex border rounded-md">
             {([
-              { key: "month", icon: LayoutGrid, label: "Month" },
-              { key: "week", icon: CalendarDays, label: "Week" },
-              { key: "day", icon: CalendarIcon, label: "Day" },
-              { key: "list", icon: List, label: "List" },
+              { key: "month", icon: LayoutGrid, label: t("calendar.month") },
+              { key: "week", icon: CalendarDays, label: t("calendar.week") },
+              { key: "day", icon: CalendarIcon, label: t("calendar.day") },
+              { key: "list", icon: List, label: t("calendar.list") },
             ] as const).map(v => (
               <TooltipProvider key={v.key}>
                 <Tooltip>
@@ -1113,6 +1115,7 @@ function EventFormDialog({
   const defaultStart = selectedDate || new Date();
   const defaultEnd = new Date(defaultStart.getTime() + 60 * 60 * 1000);
 
+  const { t } = useTranslation();
   const toLocalInput = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -1198,23 +1201,23 @@ function EventFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle data-testid="event-form-title">{isEditing ? "Edit Event" : "New Event"}</DialogTitle>
+          <DialogTitle data-testid="event-form-title">{isEditing ? t("calendar.editEvent") : t("calendar.addEvent")}</DialogTitle>
           <DialogDescription>
-            {isEditing ? "Update the event details below." : "Fill in the details for your new event."}
+            {isEditing ? t("calendar.editEvent") : t("calendar.addEvent")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
           <div>
-            <Label>Title *</Label>
-            <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Event title" data-testid="event-title-input" />
+            <Label>{t("calendar.eventTitle")} *</Label>
+            <Input value={title} onChange={e => setTitle(e.target.value)} placeholder={t("calendar.eventTitle")} data-testid="event-title-input" />
           </div>
           <div>
-            <Label>Description</Label>
-            <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" data-testid="event-description-input" rows={2} />
+            <Label>{t("common.description")}</Label>
+            <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder={t("common.description")} data-testid="event-description-input" rows={2} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Event Type</Label>
+              <Label>{t("common.type")}</Label>
               <Select value={eventType} onValueChange={setEventType}>
                 <SelectTrigger data-testid="event-type-select">
                   <SelectValue />
@@ -1232,13 +1235,13 @@ function EventFormDialog({
               </Select>
             </div>
             <div>
-              <Label>Assign To</Label>
+              <Label>{t("calendar.assignTo")}</Label>
               <Select value={assignedTo || "none"} onValueChange={v => setAssignedTo(v === "none" ? null : v)}>
                 <SelectTrigger data-testid="event-assign-select">
-                  <SelectValue placeholder="Unassigned" />
+                  <SelectValue placeholder={t("common.unassigned")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Unassigned</SelectItem>
+                  <SelectItem value="none">{t("common.unassigned")}</SelectItem>
                   {users.map(u => (
                     <SelectItem key={u.id} value={u.id}>
                       {u.name} ({u.role})
@@ -1251,12 +1254,12 @@ function EventFormDialog({
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <Switch checked={allDay} onCheckedChange={setAllDay} id="allDay" data-testid="event-allday-switch" />
-              <Label htmlFor="allDay">All Day</Label>
+              <Label htmlFor="allDay">{t("calendar.allDay")}</Label>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Start {allDay ? "Date" : "Date/Time"} *</Label>
+              <Label>{t("calendar.startDate")} *</Label>
               <Input
                 type={allDay ? "date" : "datetime-local"}
                 value={allDay ? startDatetime.split("T")[0] : startDatetime}
@@ -1265,7 +1268,7 @@ function EventFormDialog({
               />
             </div>
             <div>
-              <Label>End {allDay ? "Date" : "Date/Time"} *</Label>
+              <Label>{t("calendar.endDate")} *</Label>
               <Input
                 type={allDay ? "date" : "datetime-local"}
                 value={allDay ? endDatetime.split("T")[0] : endDatetime}
@@ -1275,18 +1278,18 @@ function EventFormDialog({
             </div>
           </div>
           <div>
-            <Label>Location</Label>
-            <Input value={location} onChange={e => setLocation(e.target.value)} placeholder="Optional location" data-testid="event-location-input" />
+            <Label>{t("calendar.location")}</Label>
+            <Input value={location} onChange={e => setLocation(e.target.value)} placeholder={t("calendar.location")} data-testid="event-location-input" />
           </div>
           <Separator />
           <div className="space-y-2">
             <Label className="text-sm font-medium flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5" /> Contact Info
+              <User className="h-3.5 w-3.5" /> {t("calendar.contactName")}
             </Label>
-            <Input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Contact name" data-testid="event-contact-name" />
+            <Input value={contactName} onChange={e => setContactName(e.target.value)} placeholder={t("calendar.contactName")} data-testid="event-contact-name" />
             <div className="grid grid-cols-2 gap-2">
-              <Input value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="Email" type="email" data-testid="event-contact-email" />
-              <Input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Phone" type="tel" data-testid="event-contact-phone" />
+              <Input value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder={t("calendar.contactEmail")} type="email" data-testid="event-contact-email" />
+              <Input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder={t("calendar.contactPhone")} type="tel" data-testid="event-contact-phone" />
             </div>
           </div>
           {canManageCompany && (
@@ -1294,27 +1297,27 @@ function EventFormDialog({
               <div className="flex items-center gap-2">
                 <Switch checked={isCompanyEvent} onCheckedChange={setIsCompanyEvent} id="companyEvent" data-testid="event-company-switch" />
                 <Label htmlFor="companyEvent" className="flex items-center gap-1">
-                  <Building2 className="h-3.5 w-3.5" /> Company Event
+                  <Building2 className="h-3.5 w-3.5" /> {t("calendar.companyEvent")}
                 </Label>
               </div>
               <div className="flex items-center gap-2">
                 <Switch checked={isPrivate} onCheckedChange={setIsPrivate} id="privateEvent" data-testid="event-private-switch" />
                 <Label htmlFor="privateEvent" className="flex items-center gap-1">
-                  <Lock className="h-3.5 w-3.5" /> Private
+                  <Lock className="h-3.5 w-3.5" /> {t("calendar.privateEvent")}
                 </Label>
               </div>
             </div>
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button
             onClick={handleSubmit}
             disabled={!title.trim() || !startDatetime || !endDatetime || isSubmitting}
             data-testid="event-save-button"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {isEditing ? "Update" : "Create"}
+            {isEditing ? t("common.update") : t("common.create")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1343,6 +1346,7 @@ function EventDetailDialog({
   isDeleting: boolean;
   categorySettings: CategorySetting[];
 }) {
+  const { t } = useTranslation();
   if (!event) return null;
 
   const canEdit = user?.role === "Admin" || user?.isMasterAdmin || user?.role === "Manager" || event.createdBy === user?.id;
@@ -1528,7 +1532,7 @@ function CalendarSettingsDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/calendar/settings"] });
-      toast({ title: "Settings Saved" });
+      toast({ title: t("common.saved") });
       onOpenChange(false);
     },
     onError: (err: any) => showErrorToast(toast, err),
@@ -1542,7 +1546,7 @@ function CalendarSettingsDialog({
     if (!newCatName.trim()) return;
     const key = newCatName.trim().toLowerCase().replace(/\s+/g, "_");
     if (categories.find(c => c.categoryKey === key)) {
-      toast({ title: "Category already exists", variant: "destructive" });
+      toast({ title: t("common.error"), variant: "destructive" });
       return;
     }
     setCategories(prev => [...prev, {

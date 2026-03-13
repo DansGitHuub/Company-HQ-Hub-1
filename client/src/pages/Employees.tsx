@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -26,6 +27,7 @@ function getInitials(name: string) {
 }
 
 export default function Employees() {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
@@ -52,10 +54,10 @@ export default function Employees() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       setShowAddDialog(false);
-      toast({ title: "Employee added" });
+      toast({ title: t("employees.employeeAdded") || "Employee added" });
     },
     onError: () => {
-      toast({ title: "Failed to add employee", variant: "destructive" });
+      toast({ title: t("common.error") || "Failed to add employee", variant: "destructive" });
     },
   });
 
@@ -82,48 +84,48 @@ export default function Employees() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-employees-title">
-            <Users className="h-6 w-6" /> Employees
+            <Users className="h-6 w-6" /> {t("employees.title")}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {employees.length} total &middot; {activeCount} active{onLeaveCount > 0 ? ` \u00b7 ${onLeaveCount} on leave` : ""}
+            {employees.length} {t("common.total")} &middot; {activeCount} {t("status.active")}{onLeaveCount > 0 ? ` \u00b7 ${onLeaveCount} ${t("status.onHold")}` : ""}
           </p>
         </div>
         {isAdmin && (
           <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-employee">
-            <Plus className="h-4 w-4 mr-2" /> Add Employee
+            <Plus className="h-4 w-4 mr-2" /> {t("employees.addEmployee")}
           </Button>
         )}
       </div>
 
       <div className="flex gap-3 items-center">
         <Input
-          placeholder="Search by name, role, or department..."
+          placeholder={t("common.searchPlaceholder")}
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="max-w-sm"
           data-testid="input-search-employees"
         />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40" data-testid="select-status-filter"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-40" data-testid="select-status-filter"><SelectValue placeholder={t("common.filter")} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="Active">Active</SelectItem>
-            <SelectItem value="On Leave">On Leave</SelectItem>
-            <SelectItem value="Terminated">Terminated</SelectItem>
-            <SelectItem value="Seasonal Off">Seasonal Off</SelectItem>
+            <SelectItem value="all">{t("common.all")} {t("common.status")}</SelectItem>
+            <SelectItem value="Active">{t("status.active")}</SelectItem>
+            <SelectItem value="On Leave">{t("status.onHold")}</SelectItem>
+            <SelectItem value="Terminated">{t("status.retired")}</SelectItem>
+            <SelectItem value="Seasonal Off">{t("status.inactive")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {isLoading ? (
-        <p className="text-center text-muted-foreground py-8">Loading...</p>
+        <p className="text-center text-muted-foreground py-8">{t("common.loading")}</p>
       ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
-            <p className="text-muted-foreground font-medium">No employees found</p>
+            <p className="text-muted-foreground font-medium">{t("common.noResults")}</p>
             <p className="text-sm text-muted-foreground mt-1">
-              {employees.length === 0 ? "Employees will appear here when applicants are moved to Hired, or you can add one manually." : "Try adjusting your search or filter."}
+              {employees.length === 0 ? t("employees.noEmployees") : t("common.noResults")}
             </p>
           </CardContent>
         </Card>
@@ -132,11 +134,11 @@ export default function Employees() {
           <table className="w-full" data-testid="table-employees">
             <thead className="bg-muted/50">
               <tr>
-                <th className="text-left p-3 text-sm font-medium">Name</th>
-                <th className="text-left p-3 text-sm font-medium">Role</th>
-                <th className="text-left p-3 text-sm font-medium">Department</th>
-                <th className="text-left p-3 text-sm font-medium">Start Date</th>
-                <th className="text-left p-3 text-sm font-medium">Status</th>
+                <th className="text-left p-3 text-sm font-medium">{t("common.name")}</th>
+                <th className="text-left p-3 text-sm font-medium">{t("employees.position")}</th>
+                <th className="text-left p-3 text-sm font-medium">{t("employees.department")}</th>
+                <th className="text-left p-3 text-sm font-medium">{t("employees.startDate")}</th>
+                <th className="text-left p-3 text-sm font-medium">{t("common.status")}</th>
               </tr>
             </thead>
             <tbody>
@@ -188,6 +190,7 @@ export default function Employees() {
 }
 
 function AddEmployeeForm({ onSave, isPending }: { onSave: (data: any) => void; isPending: boolean }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     firstName: "", lastName: "", personalEmail: "", personalPhone: "",
     jobTitle: "", department: "", employmentType: "Full-time", startDate: "",
@@ -196,22 +199,22 @@ function AddEmployeeForm({ onSave, isPending }: { onSave: (data: any) => void; i
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <div><Label>First Name *</Label><Input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} data-testid="input-emp-first-name" /></div>
-        <div><Label>Last Name *</Label><Input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} data-testid="input-emp-last-name" /></div>
+        <div><Label>{t("employees.firstName")} *</Label><Input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} data-testid="input-emp-first-name" /></div>
+        <div><Label>{t("employees.lastName")} *</Label><Input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} data-testid="input-emp-last-name" /></div>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <div><Label>Email</Label><Input value={form.personalEmail} onChange={e => setForm({ ...form, personalEmail: e.target.value })} /></div>
-        <div><Label>Phone</Label><Input value={form.personalPhone} onChange={e => setForm({ ...form, personalPhone: e.target.value })} /></div>
+        <div><Label>{t("common.email")}</Label><Input value={form.personalEmail} onChange={e => setForm({ ...form, personalEmail: e.target.value })} /></div>
+        <div><Label>{t("common.phone")}</Label><Input value={form.personalPhone} onChange={e => setForm({ ...form, personalPhone: e.target.value })} /></div>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <div><Label>Job Title</Label><Input value={form.jobTitle} onChange={e => setForm({ ...form, jobTitle: e.target.value })} /></div>
-        <div><Label>Department</Label><Input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} /></div>
+        <div><Label>{t("employees.position")}</Label><Input value={form.jobTitle} onChange={e => setForm({ ...form, jobTitle: e.target.value })} /></div>
+        <div><Label>{t("employees.department")}</Label><Input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} /></div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label>Employment Type</Label>
+          <Label>{t("employees.employment")}</Label>
           <Select value={form.employmentType} onValueChange={v => setForm({ ...form, employmentType: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
             <SelectContent>
               <SelectItem value="Full-time">Full-time</SelectItem>
               <SelectItem value="Part-time">Part-time</SelectItem>
@@ -220,11 +223,11 @@ function AddEmployeeForm({ onSave, isPending }: { onSave: (data: any) => void; i
             </SelectContent>
           </Select>
         </div>
-        <div><Label>Start Date</Label><Input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} /></div>
+        <div><Label>{t("employees.startDate")}</Label><Input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} /></div>
       </div>
       <DialogFooter>
         <Button onClick={() => form.firstName && form.lastName && onSave(form)} disabled={!form.firstName || !form.lastName || isPending} data-testid="button-save-employee">
-          {isPending ? "Saving..." : "Save Employee"}
+          {isPending ? t("common.saving") : t("employees.createEmployee")}
         </Button>
       </DialogFooter>
     </div>
@@ -232,6 +235,7 @@ function AddEmployeeForm({ onSave, isPending }: { onSave: (data: any) => void; i
 }
 
 function EmployeeProfile({ employee, onBack }: { employee: any; onBack: () => void }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState("personal");
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -256,7 +260,7 @@ function EmployeeProfile({ employee, onBack }: { employee: any; onBack: () => vo
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={onBack} data-testid="button-back-to-list">
-          <ChevronLeft className="h-4 w-4 mr-1" /> Back to Employees
+          <ChevronLeft className="h-4 w-4 mr-1" /> {t("common.backToList")}
         </Button>
       </div>
       <div className="flex items-center gap-3">
@@ -265,20 +269,20 @@ function EmployeeProfile({ employee, onBack }: { employee: any; onBack: () => vo
         </div>
         <div>
           <h2 className="font-semibold text-xl" data-testid="text-employee-name">{employee.firstName} {employee.lastName}</h2>
-          <p className="text-sm text-muted-foreground">{employee.jobTitle || "No title"} {employee.department ? `\u00b7 ${employee.department}` : ""}</p>
+          <p className="text-sm text-muted-foreground">{employee.jobTitle || t("common.none")} {employee.department ? `\u00b7 ${employee.department}` : ""}</p>
         </div>
         <Badge className="ml-auto" variant="outline">{employee.status}</Badge>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="personal" data-testid="tab-personal">Personal Info</TabsTrigger>
-          <TabsTrigger value="employment" data-testid="tab-employment">Employment</TabsTrigger>
-          <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
-          <TabsTrigger value="onboarding" data-testid="tab-onboarding">Onboarding</TabsTrigger>
-          {isAdmin && <TabsTrigger value="pay" data-testid="tab-pay">Pay</TabsTrigger>}
-          <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
-          {isAdmin && <TabsTrigger value="notes" data-testid="tab-notes">Notes</TabsTrigger>}
+          <TabsTrigger value="personal" data-testid="tab-personal">{t("employees.personalDetails")}</TabsTrigger>
+          <TabsTrigger value="employment" data-testid="tab-employment">{t("employees.employment")}</TabsTrigger>
+          <TabsTrigger value="documents" data-testid="tab-documents">{t("employees.documents")}</TabsTrigger>
+          <TabsTrigger value="onboarding" data-testid="tab-onboarding">{t("hiring.onboarding")}</TabsTrigger>
+          {isAdmin && <TabsTrigger value="pay" data-testid="tab-pay">{t("employees.payRate")}</TabsTrigger>}
+          <TabsTrigger value="history" data-testid="tab-history">{t("common.history")}</TabsTrigger>
+          {isAdmin && <TabsTrigger value="notes" data-testid="tab-notes">{t("common.notes")}</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="personal">

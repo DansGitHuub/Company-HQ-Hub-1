@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Download, Lock, FileText, Clock, AlertTriangle, TreePine } from "lucide-react";
 
 export default function SharedDocument() {
+  const { t } = useTranslation();
   const [, params] = useRoute("/shared/:token");
   const token = params?.token;
   const [password, setPassword] = useState("");
@@ -74,8 +76,8 @@ export default function SharedDocument() {
           <Card className="max-w-lg mx-auto mt-12 border-red-200">
             <CardContent className="p-8 text-center">
               <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-red-400" />
-              <h2 className="text-xl font-semibold mb-2" data-testid="text-share-not-found">Link Not Found</h2>
-              <p className="text-muted-foreground">This shared link does not exist or has been removed.</p>
+              <h2 className="text-xl font-semibold mb-2" data-testid="text-share-not-found">{t("shared.linkNotFound")}</h2>
+              <p className="text-muted-foreground">{t("shared.linkNotFoundDesc")}</p>
             </CardContent>
           </Card>
         </Shell>
@@ -86,8 +88,8 @@ export default function SharedDocument() {
         <Card className="max-w-lg mx-auto mt-12 border-amber-200">
           <CardContent className="p-8 text-center">
             <Clock className="h-12 w-12 mx-auto mb-4 text-amber-500" />
-            <h2 className="text-xl font-semibold mb-2" data-testid="text-share-expired">Link Expired</h2>
-            <p className="text-muted-foreground">{msg || "This link has expired. Please contact Chapin Landscapes."}</p>
+            <h2 className="text-xl font-semibold mb-2" data-testid="text-share-expired">{t("shared.linkExpired")}</h2>
+            <p className="text-muted-foreground">{msg || t("shared.linkExpiredDesc")}</p>
           </CardContent>
         </Card>
       </Shell>
@@ -100,15 +102,15 @@ export default function SharedDocument() {
         <Card className="max-w-md mx-auto mt-12">
           <CardHeader className="text-center">
             <Lock className="h-10 w-10 mx-auto mb-2 text-green-700" />
-            <CardTitle data-testid="text-password-required">Password Required</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">This document is password protected.</p>
+            <CardTitle data-testid="text-password-required">{t("shared.passwordRequired")}</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">{t("shared.passwordProtected")}</p>
           </CardHeader>
           <CardContent>
             <p className="text-sm font-medium mb-3">{data.documentName}</p>
             <form onSubmit={(e) => { e.preventDefault(); verifyMutation.mutate(password); }} className="space-y-3">
               <Input
                 type="password"
-                placeholder="Enter password..."
+                placeholder={t("shared.enterPassword")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 data-testid="input-share-password"
@@ -116,7 +118,7 @@ export default function SharedDocument() {
               {passwordError && <p className="text-sm text-red-500" data-testid="text-password-error">{passwordError}</p>}
               <Button type="submit" className="w-full bg-green-700 hover:bg-green-800" disabled={!password || verifyMutation.isPending} data-testid="button-unlock">
                 {verifyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Lock className="h-4 w-4 mr-2" />}
-                Unlock Document
+                {t("shared.unlockDocument")}
               </Button>
             </form>
           </CardContent>
@@ -138,7 +140,7 @@ export default function SharedDocument() {
                 <div>
                   <CardTitle className="text-lg" data-testid="text-document-name">{docData.documentName}</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Shared by {docData.createdByName}
+                    {t("shared.sharedBy", { name: docData.createdByName })}
                   </p>
                 </div>
               </div>
@@ -150,7 +152,7 @@ export default function SharedDocument() {
           <CardContent className="space-y-4">
             {docData.note && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4" data-testid="text-share-note">
-                <p className="text-sm font-medium text-amber-800 mb-1">Note from {docData.createdByName}:</p>
+                <p className="text-sm font-medium text-amber-800 mb-1">{t("shared.noteFrom", { name: docData.createdByName })}:</p>
                 <p className="text-sm text-amber-700">{docData.note}</p>
               </div>
             )}
@@ -164,7 +166,7 @@ export default function SharedDocument() {
                 ) : (
                   <div className="py-8">
                     <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                    <p className="text-muted-foreground">Document preview not available</p>
+                    <p className="text-muted-foreground">{t("shared.previewNotAvailable")}</p>
                   </div>
                 )}
               </div>
@@ -173,12 +175,12 @@ export default function SharedDocument() {
             <div className="flex items-center justify-between pt-2">
               <div className="text-xs text-muted-foreground flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                Expires: {new Date(docData.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                {t("common.expires")}: {new Date(docData.expiresAt).toLocaleDateString(t("common.locale"), { month: "long", day: "numeric", year: "numeric" })}
               </div>
               {docData.documentUrl && (
                 <Button asChild className="bg-green-700 hover:bg-green-800" data-testid="button-download">
                   <a href={`/api/shared/${token}/download`} target="_blank" rel="noopener noreferrer">
-                    <Download className="h-4 w-4 mr-2" /> Download
+                    <Download className="h-4 w-4 mr-2" /> {t("common.download")}
                   </a>
                 </Button>
               )}
@@ -202,7 +204,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           </div>
           <div>
             <h1 className="font-bold text-lg tracking-tight">Chapin Landscapes</h1>
-            <p className="text-xs text-white/60">Shared Document</p>
+            <p className="text-xs text-white/60">{t("shared.sharedDocument")}</p>
           </div>
         </div>
       </header>

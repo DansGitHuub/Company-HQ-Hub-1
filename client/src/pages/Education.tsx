@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { useApp } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +44,7 @@ const RESOURCE_TYPES = [
 ];
 
 export default function Education() {
+  const { t } = useTranslation();
   const { currentUser } = useApp();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -356,17 +358,17 @@ export default function Education() {
     <div className="space-y-4 max-w-6xl mx-auto">
       <div className="flex flex-col md:flex-row gap-6 items-start justify-between">
         <div className="space-y-2">
-          <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="page-title">Customer Hub</h1>
-          <p className="text-sm text-muted-foreground">Everything you need to know about your landscape journey.</p>
+          <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="page-title">{t("education.pageTitle")}</h1>
+          <p className="text-sm text-muted-foreground">{t("education.pageSubtitle")}</p>
         </div>
         <div className="flex gap-2">
           {isAdmin && (
             <>
               <Button onClick={() => openCreateDialog(false)} className="gap-2" data-testid="create-resource-btn">
-                <Plus className="w-4 h-4" /> New Resource
+                <Plus className="w-4 h-4" /> {t("education.newResource")}
               </Button>
               <Button variant="outline" onClick={() => openCreateDialog(true)} className="gap-2" data-testid="upload-document-btn">
-                <Upload className="w-4 h-4" /> Upload Document
+                <Upload className="w-4 h-4" /> {t("education.uploadDocument")}
               </Button>
             </>
           )}
@@ -375,22 +377,22 @@ export default function Education() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-5 lg:w-[600px]">
-          <TabsTrigger value="process">Our Process</TabsTrigger>
-          <TabsTrigger value="guides">Care Guides</TabsTrigger>
-          <TabsTrigger value="instructions">Instructions</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="process">{t("education.ourProcess")}</TabsTrigger>
+          <TabsTrigger value="guides">{t("education.careGuides")}</TabsTrigger>
+          <TabsTrigger value="instructions">{t("education.instructions")}</TabsTrigger>
+          <TabsTrigger value="documents">{t("education.documents")}</TabsTrigger>
           <TabsTrigger value="saved">
-            <Bookmark className="w-4 h-4 mr-1" /> Saved
+            <Bookmark className="w-4 h-4 mr-1" /> {t("education.saved")}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="process" className="mt-8 space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative">
             {[
-              { title: "Consultation", icon: HelpCircle, desc: "We discuss your vision and budget." },
-              { title: "Design", icon: Map, desc: "Visualizing your dream outdoor space." },
-              { title: "Install", icon: ShieldCheck, desc: "Expert crews bring the design to life." },
-              { title: "Maintain", icon: Clock, desc: "Keeping your investment beautiful." }
+              { title: t("education.consultation"), icon: HelpCircle, desc: t("education.consultationDesc") },
+              { title: t("education.design"), icon: Map, desc: t("education.designDesc") },
+              { title: t("education.install"), icon: ShieldCheck, desc: t("education.installDesc") },
+              { title: t("education.maintain"), icon: Clock, desc: t("education.maintainDesc") }
             ].map((step, i) => (
               <div key={i} className="relative p-6 bg-card border rounded-xl space-y-4">
                 <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xl">

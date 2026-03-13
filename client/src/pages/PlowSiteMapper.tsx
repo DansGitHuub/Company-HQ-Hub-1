@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -86,6 +87,7 @@ function useLoadImage(src: string | null) {
 }
 
 export default function PlowSiteMapper() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
 

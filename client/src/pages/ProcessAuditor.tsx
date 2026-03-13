@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +50,7 @@ import {
 import type { BusinessProcess, ProcessAuditResult } from "@shared/schema";
 
 export default function ProcessAuditor() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [selectedProcessId, setSelectedProcessId] = useState<string>("");
   const [showRunDialog, setShowRunDialog] = useState(false);

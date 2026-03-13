@@ -59,129 +59,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 
-const menuHelpContent: Record<string, { title: string; description: string; tips: string[] }> = {
-  dashboard: {
-    title: "My Workspace",
-    description: "Your home base with quick access tiles to all major features.",
-    tips: ["Click any tile to navigate", "Workspace adapts to your role", "Use sidebar for quick navigation"]
-  },
-  sops: {
-    title: "SOP Library",
-    description: "Store and organize Standard Operating Procedures for any process.",
-    tips: ["Organize by category", "Add detailed steps", "Team can reference anytime"]
-  },
-  testing: {
-    title: "Quizzes",
-    description: "Take quizzes generated from SOPs to test and build your knowledge.",
-    tips: ["Quizzes are auto-generated from SOPs", "Track your scores over time", "Retake to improve"]
-  },
-  todos: {
-    title: "Tasks",
-    description: "Manage tasks with priorities, due dates, and assignments.",
-    tips: ["Set priorities and due dates", "Assign tasks to team members", "Track completion status"]
-  },
-  materials: {
-    title: "Materials Catalog",
-    description: "Track inventory, stock levels, pricing, and supplier info.",
-    tips: ["Set minimum stock levels", "Track costs for estimates", "Categorize for easy search"]
-  },
-  equipment: {
-    title: "Equipment Tracker",
-    description: "Manage vehicles, mowers, trailers and schedule maintenance.",
-    tips: ["Track mileage and hours", "Set maintenance schedules", "Log completed maintenance"]
-  },
-  hiring: {
-    title: "Hiring Pipeline",
-    description: "Manage recruitment from application to hire with drag-and-drop stages.",
-    tips: ["Drag candidates between stages", "Upload documents", "Rate candidates with colored dots"]
-  },
-  employees: {
-    title: "Employee Directory",
-    description: "View and manage employee profiles, documents, and onboarding.",
-    tips: ["Track employee details", "Manage onboarding forms", "Upload and share documents"]
-  },
-  jobs: {
-    title: "Job Pipeline",
-    description: "Track all projects from lead to completion with customizable tabs.",
-    tips: ["Use tabs for job types", "Upload permits and contracts", "Track with Google Maps"]
-  },
-  education: {
-    title: "Customer Hub",
-    description: "Resource library with care guides, instructions, and documents for customers.",
-    tips: ["Create guides and instructions", "Upload manufacturer documents", "Customers can bookmark favorites"]
-  },
-  help: {
-    title: "Help Center",
-    description: "Access guides, walkthroughs, and FAQs for using Company HQ.",
-    tips: ["Start interactive walkthrough", "Browse FAQs", "Role-specific guidance"]
-  },
-  hq: {
-    title: "Company HQ",
-    description: "Overview of your company's central hub and settings.",
-    tips: ["View company stats", "Access key metrics", "Central information hub"]
-  },
-  marketing: {
-    title: "Marketing",
-    description: "Track marketing campaigns, spend, and lead generation.",
-    tips: ["Log campaign details", "Track ROI", "Monitor lead sources"]
-  },
-  forms: {
-    title: "Forms",
-    description: "Build custom forms for applications, surveys, and data collection.",
-    tips: ["Drag-and-drop builder", "Multiple field types", "Review submissions"]
-  },
-  inbox: {
-    title: "Messages",
-    description: "View and respond to customer messages and inquiries.",
-    tips: ["Track message status", "Reply to customers", "Mark as read/replied"]
-  },
-  integrations: {
-    title: "Integrations",
-    description: "Connect third-party tools like QuickBooks, CompanyCam, and more.",
-    tips: ["Coming soon", "Connect business tools", "Sync data automatically"]
-  },
-  admin: {
-    title: "Admin Panel",
-    description: "Manage users, approve access requests, and configure settings.",
-    tips: ["Create user accounts", "Approve role requests", "Company branding"]
-  },
-  tools: {
-    title: "Tools",
-    description: "Access specialized tools for landscape work.",
-    tips: ["Material calculators & converters", "Map plow routes", "AI-powered analysis"]
-  },
-  customer_portal: {
-    title: "Customer Portal",
-    description: "Your dedicated area to communicate and request services.",
-    tips: ["Send messages", "Request work", "Track request status"]
-  },
-  customer_messages: {
-    title: "Messages",
-    description: "Communicate directly with our team.",
-    tips: ["Start conversations", "Track message status", "Get notified of replies"]
-  },
-  customer_account: {
-    title: "My Account",
-    description: "View and update your account information.",
-    tips: ["Update contact info", "Request role upgrades", "Manage preferences"]
-  },
-  customer_help: {
-    title: "Help",
-    description: "Get assistance with using the customer portal.",
-    tips: ["View guides", "Contact support", "FAQ answers"]
-  },
-  applicant_portal: {
-    title: "My Application",
-    description: "Track your job application status and required documents.",
-    tips: ["View hiring progress", "Upload required documents", "See next steps"]
-  },
-  calendar: {
-    title: "Calendar",
-    description: "Schedule and manage events, jobs, and meetings with Google Calendar sync.",
-    tips: ["Create personal or company events", "Sync with Google Calendar", "Assign events to team members"]
-  }
-};
-
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation, effectiveRole, previewRole } = useAuth();
   const { t, i18n } = useTranslation();
@@ -196,6 +73,129 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const sidebarScrollPosition = React.useRef<number>(0);
   const [isUpdatesOpen, setIsUpdatesOpen] = React.useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+
+  const menuHelpContent: Record<string, { title: string; description: string; tips: string[] }> = {
+    dashboard: {
+      title: t("nav.myWorkspace"),
+      description: "Your home base with quick access tiles to all major features.",
+      tips: ["Click any tile to navigate", "Workspace adapts to your role", "Use sidebar for quick navigation"]
+    },
+    sops: {
+      title: t("nav.sopLibrary"),
+      description: "Store and organize Standard Operating Procedures for any process.",
+      tips: ["Organize by category", "Add detailed steps", "Team can reference anytime"]
+    },
+    testing: {
+      title: t("nav.quizzes"),
+      description: "Take quizzes generated from SOPs to test and build your knowledge.",
+      tips: ["Quizzes are auto-generated from SOPs", "Track your scores over time", "Retake to improve"]
+    },
+    todos: {
+      title: t("nav.tasks"),
+      description: "Manage tasks with priorities, due dates, and assignments.",
+      tips: ["Set priorities and due dates", "Assign tasks to team members", "Track completion status"]
+    },
+    materials: {
+      title: t("nav.materials"),
+      description: "Track inventory, stock levels, pricing, and supplier info.",
+      tips: ["Set minimum stock levels", "Track costs for estimates", "Categorize for easy search"]
+    },
+    equipment: {
+      title: t("nav.equipment"),
+      description: "Manage vehicles, mowers, trailers and schedule maintenance.",
+      tips: ["Track mileage and hours", "Set maintenance schedules", "Log completed maintenance"]
+    },
+    hiring: {
+      title: t("nav.hiring"),
+      description: "Manage recruitment from application to hire with drag-and-drop stages.",
+      tips: ["Drag candidates between stages", "Upload documents", "Rate candidates with colored dots"]
+    },
+    employees: {
+      title: t("nav.employees"),
+      description: "View and manage employee profiles, documents, and onboarding.",
+      tips: ["Track employee details", "Manage onboarding forms", "Upload and share documents"]
+    },
+    jobs: {
+      title: t("nav.work"),
+      description: "Track all projects from lead to completion with customizable tabs.",
+      tips: ["Use tabs for job types", "Upload permits and contracts", "Track with Google Maps"]
+    },
+    education: {
+      title: t("nav.customerHub"),
+      description: "Resource library with care guides, instructions, and documents for customers.",
+      tips: ["Create guides and instructions", "Upload manufacturer documents", "Customers can bookmark favorites"]
+    },
+    help: {
+      title: t("nav.help"),
+      description: "Access guides, walkthroughs, and FAQs for using Company HQ.",
+      tips: ["Start interactive walkthrough", "Browse FAQs", "Role-specific guidance"]
+    },
+    hq: {
+      title: t("nav.companyHQ"),
+      description: "Overview of your company's central hub and settings.",
+      tips: ["View company stats", "Access key metrics", "Central information hub"]
+    },
+    marketing: {
+      title: t("nav.marketing"),
+      description: "Track marketing campaigns, spend, and lead generation.",
+      tips: ["Log campaign details", "Track ROI", "Monitor lead sources"]
+    },
+    forms: {
+      title: t("nav.forms"),
+      description: "Build custom forms for applications, surveys, and data collection.",
+      tips: ["Drag-and-drop builder", "Multiple field types", "Review submissions"]
+    },
+    inbox: {
+      title: t("nav.messages"),
+      description: "View and respond to customer messages and inquiries.",
+      tips: ["Track message status", "Reply to customers", "Mark as read/replied"]
+    },
+    integrations: {
+      title: t("nav.integrations"),
+      description: "Connect third-party tools like QuickBooks, CompanyCam, and more.",
+      tips: ["Coming soon", "Connect business tools", "Sync data automatically"]
+    },
+    admin: {
+      title: t("nav.adminPanel"),
+      description: "Manage users, approve access requests, and configure settings.",
+      tips: ["Create user accounts", "Approve role requests", "Company branding"]
+    },
+    tools: {
+      title: t("nav.tools"),
+      description: "Access specialized tools for landscape work.",
+      tips: ["Material calculators & converters", "Map plow routes", "AI-powered analysis"]
+    },
+    customer_portal: {
+      title: "Customer Portal",
+      description: "Your dedicated area to communicate and request services.",
+      tips: ["Send messages", "Request work", "Track request status"]
+    },
+    customer_messages: {
+      title: t("nav.messages"),
+      description: "Communicate directly with our team.",
+      tips: ["Start conversations", "Track message status", "Get notified of replies"]
+    },
+    customer_account: {
+      title: t("nav.myAccount"),
+      description: "View and update your account information.",
+      tips: ["Update contact info", "Request role upgrades", "Manage preferences"]
+    },
+    customer_help: {
+      title: t("nav.help"),
+      description: "Get assistance with using the customer portal.",
+      tips: ["View guides", "Contact support", "FAQ answers"]
+    },
+    applicant_portal: {
+      title: t("nav.myApplication"),
+      description: "Track your job application status and required documents.",
+      tips: ["View hiring progress", "Upload required documents", "See next steps"]
+    },
+    calendar: {
+      title: t("nav.calendar"),
+      description: "Schedule and manage events, jobs, and meetings with Google Calendar sync.",
+      tips: ["Create personal or company events", "Sync with Google Calendar", "Assign events to team members"]
+    }
+  };
 
   // Reset main content scroll to top when navigating between pages
   // But preserve sidebar scroll position
@@ -223,24 +223,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     
     if (role !== "Customer") {
       suggestions.push(
-        { label: "SOPs", example: "safety procedures" },
-        { label: "Materials", example: "mulch, pavers, SKU" },
-        { label: "Equipment", example: "truck, mower, VIN" },
-        { label: "Work", example: "client name or address" },
+        { label: t("nav.sopLibrary"), example: "safety procedures" },
+        { label: t("nav.materials"), example: "mulch, pavers, SKU" },
+        { label: t("nav.equipment"), example: "truck, mower, VIN" },
+        { label: t("nav.work"), example: "client name or address" },
         { label: "Candidates", example: "applicant name" }
       );
     }
     if (role === "Admin" || role === "Manager") {
-      suggestions.push({ label: "Campaigns", example: "marketing campaign" });
+      suggestions.push({ label: t("nav.marketing"), example: "marketing campaign" });
     }
     if (role === "Admin") {
       suggestions.push(
         { label: "Users", example: "team member name" },
-        { label: "Forms", example: "form title" }
+        { label: t("nav.forms"), example: "form title" }
       );
     }
     // Resources searchable by all users including customers
-    suggestions.push({ label: "Resources", example: "lawn care guides" });
+    suggestions.push({ label: t("nav.resources"), example: "lawn care guides" });
     
     if (role === "Customer") {
       suggestions.push({ label: "Your Messages", example: "message subject" });
@@ -573,235 +573,234 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <DropdownMenuTrigger asChild>
             <Button 
               variant="ghost" 
-              className="w-full justify-start px-3 py-6 hover:bg-primary/10 rounded-xl border border-sidebar-border/50 bg-sidebar-accent/30 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
-              data-testid="button-user-profile-menu"
+              className="w-full flex items-center justify-between px-2 h-12 hover:bg-white/10 text-sidebar-foreground"
+              data-testid="button-user-menu"
             >
-              <Avatar className="h-10 w-10 mr-3 ring-2 ring-primary/20 ring-offset-2 ring-offset-sidebar">
-                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground text-lg font-bold">
-                  {user?.name?.charAt(0) || "?"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col items-start">
-                <span className="font-semibold text-sm">{user?.name || "User"}</span>
-                <span className="text-xs text-muted-foreground">
-                  {previewRole ? `Viewing: ${previewRole}` : (user?.isMasterAdmin ? "Master Admin" : (user?.role || "N/A"))}
-                </span>
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar className="h-8 w-8 border border-white/20">
+                  <AvatarFallback className="bg-primary/20 text-xs font-bold">
+                    {user?.name?.split(" ").map((n: string) => n[0]).join("") || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="text-left min-w-0">
+                  <p className="text-sm font-bold truncate leading-none mb-1">
+                    {user?.name || user?.username}
+                  </p>
+                  <p className="text-[10px] font-medium opacity-60 uppercase tracking-wider truncate">
+                    {previewRole || effectiveRole || user?.role}
+                  </p>
+                </div>
               </div>
+              <Settings className="h-4 w-4 opacity-40 shrink-0" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end" forceMount>
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{user?.name || "User"}</p>
-                <p className="text-xs text-muted-foreground">{user?.email || user?.username}</p>
-              </div>
-            </DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="w-56 mb-2">
+            <DropdownMenuLabel>{t("nav.myAccount")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild className="cursor-pointer">
-              <Link href="/profile">
+            <Link href="/profile">
+              <DropdownMenuItem className="cursor-pointer" data-testid="link-profile">
                 <User className="mr-2 h-4 w-4" />
-                {t("nav.myProfile")}
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild className="cursor-pointer">
-              <Link href="/settings">
+                <span>{t("nav.myProfile")}</span>
+              </DropdownMenuItem>
+            </Link>
+            <Link href="/settings">
+              <DropdownMenuItem className="cursor-pointer" data-testid="link-settings">
                 <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </Link>
-            </DropdownMenuItem>
+                <span>{t("nav.settings")}</span>
+              </DropdownMenuItem>
+            </Link>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
-              onClick={() => logoutMutation.mutate()} 
-              className="text-destructive focus:text-destructive cursor-pointer"
+              className="text-destructive cursor-pointer" 
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+              data-testid="button-logout"
             >
               <LogOut className="mr-2 h-4 w-4" />
-              {t("nav.logOut")}
+              <span>{t("nav.logOut")}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
     </div>
-  );
+    );
   };
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      <div className="hidden md:block w-64 shrink-0 border-r border-border bg-sidebar overflow-y-auto">
+    <div className="flex h-screen overflow-hidden bg-background">
+      {/* Sidebar - Desktop */}
+      <aside className="hidden lg:flex flex-col w-[260px] border-r border-sidebar-border bg-sidebar overflow-hidden">
         <NavContent />
-      </div>
+      </aside>
 
-      <div className="md:hidden">
-        <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50 md:hidden">
-              <Menu className="h-6 w-6" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64 border-r border-sidebar-border sidebar-themed">
-            <NavContent />
-          </SheetContent>
-        </Sheet>
-      </div>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 relative h-full">
+        {/* Header - Desktop & Mobile */}
+        <header className="h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between px-4 lg:px-6 z-30 shrink-0">
+          <div className="flex items-center gap-4 lg:hidden">
+            <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9" data-testid="button-mobile-menu">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-[280px] border-r-0">
+                <NavContent />
+              </SheetContent>
+            </Sheet>
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded bg-primary flex items-center justify-center">
+                <Building2 className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <span className="font-bold text-lg tracking-tight">HQ</span>
+            </Link>
+          </div>
 
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-16 border-b bg-card px-8 flex items-center justify-between sticky top-0 z-10">
-           <div ref={searchRef} className="relative w-full max-w-md">
-             <form onSubmit={handleSearch} className="relative">
-               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-               <input 
-                  type="text" 
-                  placeholder={t("header.searchPlaceholder")} 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setShowSuggestions(true)}
-                  className="w-full bg-secondary/50 h-9 rounded-md pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  data-testid="input-global-search"
-               />
-             </form>
-             {showSuggestions && !searchQuery && (
-               <div className="absolute top-full left-0 right-0 mt-1 bg-card border rounded-md shadow-lg z-50 p-3">
-                 <p className="text-xs text-muted-foreground mb-2 font-medium">You can search for:</p>
-                 <div className="space-y-1.5">
-                   {getSuggestions().map((s, i) => (
-                     <div key={i} className="flex items-center gap-2 text-sm">
-                       <span className="font-medium text-primary">{s.label}</span>
-                       <span className="text-muted-foreground text-xs">e.g. "{s.example}"</span>
-                     </div>
-                   ))}
-                 </div>
-                 <p className="text-xs text-muted-foreground mt-3 pt-2 border-t">
-                   Type to search, press Enter to see results
-                 </p>
-               </div>
-             )}
-           </div>
-           <div className="flex items-center gap-2">
-              <TooltipProvider delayDuration={300}>
+          <div className="hidden lg:flex items-center flex-1 max-w-xl mx-4 relative" ref={searchRef}>
+            <form onSubmit={handleSearch} className="w-full relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                placeholder={t("common.searchPlaceholder")}
+                className="w-full h-10 pl-10 pr-4 bg-muted/50 border-none rounded-full text-sm focus:ring-2 focus:ring-primary/20 transition-all"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setShowSuggestions(true)}
+                data-testid="input-global-search"
+              />
+            </form>
+            {showSuggestions && (
+              <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-popover border rounded-xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">
+                  Try searching for:
+                </p>
+                <div className="grid grid-cols-2 gap-1">
+                  {getSuggestions().map((suggestion, i) => (
+                    <button
+                      key={i}
+                      className="flex flex-col items-start p-2 rounded-lg hover:bg-muted transition-colors text-left"
+                      onClick={() => {
+                        setSearchQuery(suggestion.label);
+                        setShowSuggestions(false);
+                        window.location.href = `/search?q=${encodeURIComponent(suggestion.label)}`;
+                      }}
+                    >
+                      <span className="text-xs font-semibold">{suggestion.label}</span>
+                      <span className="text-[10px] text-muted-foreground truncate w-full">e.g. {suggestion.example}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 lg:gap-3">
+            <GlobalMicButton />
+            
+            <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="relative gap-2 h-10 hover:bg-accent hover:scale-105 transition-all"
-                    onClick={() => setIsCalendarOpen(true)}
-                    data-testid="button-calendar-header"
-                  >
-                    <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-indigo-400 via-indigo-500 to-indigo-600 shadow-md shadow-indigo-500/30">
-                      <CalendarDays className="h-4 w-4 text-white drop-shadow-sm" />
-                    </div>
-                    <span className="hidden md:inline font-medium">{t("nav.calendar")}</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{t("calendar.openCalendar")}</p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="relative gap-2 h-10 hover:bg-accent hover:scale-105 transition-all"
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-9 w-9 text-muted-foreground relative"
                     onClick={() => setIsUpdatesOpen(true)}
-                    data-testid="button-updates-header"
+                    data-testid="button-updates"
                   >
-                    <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 shadow-md shadow-amber-500/30">
-                      <Bell className="h-4 w-4 text-white drop-shadow-sm" />
-                    </div>
-                    <span className="hidden md:inline font-medium">{t("nav.updates")}</span>
+                    <Bell className="h-5 w-5" />
                     {totalBellCount > 0 && (
-                      <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
-                        {totalBellCount > 9 ? "9+" : totalBellCount}
-                      </span>
+                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-background animate-pulse" />
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>{t("header.whatsNew")}</p>
-                </TooltipContent>
+                <TooltipContent>{t("nav.updates")}</TooltipContent>
               </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Link href="/help">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="relative gap-2 h-10 hover:bg-accent hover:scale-105 transition-all"
-                      data-testid="button-help-header"
-                    >
-                      <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-600 shadow-md shadow-emerald-500/30">
-                        <LifeBuoy className="h-4 w-4 text-white drop-shadow-sm" />
-                      </div>
-                      <span className="hidden md:inline font-medium">{t("nav.help")}</span>
-                    </Button>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{t("header.helpCenter")}</p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="relative gap-1.5 h-10 hover:bg-accent hover:scale-105 transition-all font-semibold"
-                    onClick={async () => {
-                      const newLang = i18n.language === "es" ? "en" : "es";
-                      i18n.changeLanguage(newLang);
-                      try {
-                        await apiRequest("PATCH", "/api/profile", { language: newLang });
-                        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-                      } catch (e) {}
-                    }}
-                    data-testid="button-language-toggle"
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-9 w-9 text-muted-foreground"
+                    onClick={() => setIsCalendarOpen(true)}
+                    data-testid="button-calendar"
                   >
-                    <Globe className="h-4 w-4" />
-                    <span className="text-xs font-bold">{i18n.language === "es" ? "ES" : "EN"}</span>
+                    <CalendarDays className="h-5 w-5" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>{t("language.switchTo")}</p>
-                </TooltipContent>
+                <TooltipContent>{t("nav.calendar")}</TooltipContent>
               </Tooltip>
-              </TooltipProvider>
-           </div>
+            </TooltipProvider>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 p-0 overflow-hidden rounded-full border border-border/50">
+                  <Globe className="h-5 w-5 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-32">
+                <DropdownMenuLabel>{t("profile.language")}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  className={cn("cursor-pointer justify-between", i18n.language === "en" && "bg-muted font-bold")}
+                  onClick={() => i18n.changeLanguage("en")}
+                >
+                  English {i18n.language === "en" && <CheckSquare className="h-3 w-3" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className={cn("cursor-pointer justify-between", i18n.language === "es" && "bg-muted font-bold")}
+                  onClick={() => i18n.changeLanguage("es")}
+                >
+                  Español {i18n.language === "es" && <CheckSquare className="h-3 w-3" />}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Link href="/assistant">
+              <Button variant="outline" size="sm" className="hidden sm:flex h-9 rounded-full px-4 gap-2 bg-primary/5 hover:bg-primary/10 border-primary/20" data-testid="link-assistant">
+                <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+                <span className="text-xs font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">AI Assistant</span>
+              </Button>
+            </Link>
+          </div>
         </header>
 
-        <div ref={contentRef} className="flex-1 overflow-y-auto">
-          <div className="p-4 md:p-8 pb-24">
-            {children}
-          </div>
-        </div>
-      </main>
-
-      {isCalendarOpen && (
-        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
-          <div className="flex items-center justify-between px-6 py-3 border-b bg-card">
-            <h2 className="text-lg font-semibold">Calendar</h2>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsCalendarOpen(false)}
-              data-testid="button-close-calendar-overlay"
-            >
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 md:p-8">
-            <CalendarPage />
-          </div>
-        </div>
-      )}
-      
-      {user && effectiveRole && (
-        <>
-          <GlobalMicButton />
+        {/* Dynamic Content Container */}
+        <main 
+          ref={contentRef}
+          className="flex-1 overflow-y-auto bg-muted/5 p-4 lg:p-8 relative"
+        >
+          {children}
           <AIAssistantPanel />
-        </>
-      )}
-      
-      <UpdatesPopup isOpen={isUpdatesOpen} onClose={() => setIsUpdatesOpen(false)} />
+        </main>
+
+        {/* Global Popups */}
+        <UpdatesPopup 
+          isOpen={isUpdatesOpen} 
+          onClose={() => setIsUpdatesOpen(false)} 
+        />
+
+        <Sheet open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+          <SheetContent side="right" className="p-0 sm:max-w-[1000px] w-full border-l shadow-2xl">
+            <div className="h-full flex flex-col">
+              <div className="p-4 border-b flex items-center justify-between bg-muted/30">
+                <div className="flex items-center gap-3">
+                  <CalendarDays className="h-6 w-6 text-primary" />
+                  <h2 className="text-xl font-bold">{t("calendar.title")}</h2>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setIsCalendarOpen(false)}>
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-hidden relative">
+                <CalendarPage />
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
     </div>
   );
 }

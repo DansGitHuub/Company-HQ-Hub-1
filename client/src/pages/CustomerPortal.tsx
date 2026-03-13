@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,7 @@ type AccessRequest = {
 };
 
 export default function CustomerPortal() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
   const [messageOpen, setMessageOpen] = useState(false);
@@ -92,8 +94,8 @@ export default function CustomerPortal() {
   return (
     <div className="space-y-4 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-2xl font-heading font-bold text-foreground">Welcome, {user?.name?.split(" ")[0]}</h1>
-        <p className="text-muted-foreground">Manage your requests and communicate with our team</p>
+        <h1 className="text-2xl font-heading font-bold text-foreground">{t("customerPortal.welcome")}, {user?.name?.split(" ")[0]}</h1>
+        <p className="text-muted-foreground">{t("customerPortal.subtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -105,7 +107,7 @@ export default function CustomerPortal() {
               </div>
               <div>
                 <div className="text-2xl font-bold">{messages.length}</div>
-                <p className="text-sm text-muted-foreground">Messages</p>
+                <p className="text-sm text-muted-foreground">{t("customerPortal.messages")}</p>
               </div>
             </div>
           </CardContent>
@@ -118,7 +120,7 @@ export default function CustomerPortal() {
               </div>
               <div>
                 <div className="text-2xl font-bold">{workRequests.filter(r => r.status === "pending").length}</div>
-                <p className="text-sm text-muted-foreground">Pending Requests</p>
+                <p className="text-sm text-muted-foreground">{t("customerPortal.pendingRequests")}</p>
               </div>
             </div>
           </CardContent>
@@ -131,7 +133,7 @@ export default function CustomerPortal() {
               </div>
               <div>
                 <div className="text-2xl font-bold">{workRequests.filter(r => r.status === "completed").length}</div>
-                <p className="text-sm text-muted-foreground">Completed</p>
+                <p className="text-sm text-muted-foreground">{t("customerPortal.completed")}</p>
               </div>
             </div>
           </CardContent>
@@ -147,13 +149,13 @@ export default function CustomerPortal() {
                   <ClipboardCheck className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-lg">Job Application</h3>
-                  <p className="text-sm text-muted-foreground">Track your hiring progress and submit required documents</p>
+                  <h3 className="font-semibold text-lg">{t("customerPortal.jobApplication")}</h3>
+                  <p className="text-sm text-muted-foreground">{t("customerPortal.jobApplicationDesc")}</p>
                 </div>
               </div>
               <Link href="/applicant">
                 <Button className="gap-2" data-testid="button-view-application">
-                  View Application <ArrowRight className="h-4 w-4" />
+                  {t("customerPortal.viewApplication")} <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
             </div>
@@ -164,10 +166,10 @@ export default function CustomerPortal() {
       <Tabs defaultValue="messages" className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="messages" className="gap-2">
-            <MessageSquare className="h-4 w-4" /> Messages
+            <MessageSquare className="h-4 w-4" /> {t("customerPortal.messages")}
           </TabsTrigger>
           <TabsTrigger value="requests" className="gap-2">
-            <FileText className="h-4 w-4" /> Work Requests
+            <FileText className="h-4 w-4" /> {t("customerPortal.workRequests")}
           </TabsTrigger>
         </TabsList>
 
@@ -175,8 +177,8 @@ export default function CustomerPortal() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Messages</CardTitle>
-                <CardDescription>Send and receive messages from our team</CardDescription>
+                <CardTitle>{t("customerPortal.messages")}</CardTitle>
+                <CardDescription>{t("customerPortal.messagesDesc")}</CardDescription>
               </div>
               <NewMessageDialog open={messageOpen} onOpenChange={setMessageOpen} />
             </CardHeader>
@@ -188,9 +190,9 @@ export default function CustomerPortal() {
               ) : messages.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No messages yet</p>
+                  <p>{t("customerPortal.noMessages")}</p>
                   <Button className="mt-4" onClick={() => setMessageOpen(true)}>
-                    Send Your First Message
+                    {t("customerPortal.sendFirstMessage")}
                   </Button>
                 </div>
               ) : (
@@ -204,12 +206,12 @@ export default function CustomerPortal() {
                       <p className="text-sm text-muted-foreground mb-3">{msg.message}</p>
                       {msg.adminReply && (
                         <div className="bg-secondary/50 rounded-lg p-3 mt-3">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Reply from team:</p>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">{t("customerPortal.teamReply")}:</p>
                           <p className="text-sm">{msg.adminReply}</p>
                         </div>
                       )}
                       <p className="text-xs text-muted-foreground mt-2">
-                        Sent {new Date(msg.createdAt).toLocaleDateString()}
+                        {t("customerPortal.sent")} {new Date(msg.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                   ))}
@@ -223,8 +225,8 @@ export default function CustomerPortal() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Work Requests</CardTitle>
-                <CardDescription>Request landscaping services</CardDescription>
+                <CardTitle>{t("customerPortal.workRequests")}</CardTitle>
+                <CardDescription>{t("customerPortal.workRequestsDesc")}</CardDescription>
               </div>
               <NewWorkRequestDialog open={requestOpen} onOpenChange={setRequestOpen} />
             </CardHeader>
@@ -236,9 +238,9 @@ export default function CustomerPortal() {
               ) : workRequests.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No work requests yet</p>
+                  <p>{t("customerPortal.noWorkRequests")}</p>
                   <Button className="mt-4" onClick={() => setRequestOpen(true)}>
-                    Request Work
+                    {t("customerPortal.requestWork")}
                   </Button>
                 </div>
               ) : (
@@ -269,7 +271,7 @@ export default function CustomerPortal() {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-3">
-                        Submitted {new Date(req.createdAt).toLocaleDateString()}
+                        {t("customerPortal.submitted")} {new Date(req.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                   ))}
@@ -283,25 +285,25 @@ export default function CustomerPortal() {
       <Card className="border-dashed">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" /> Account Access
+            <Shield className="h-5 w-5" /> {t("customerPortal.accountAccess")}
           </CardTitle>
-          <CardDescription>Need team member access? Request an account upgrade</CardDescription>
+          <CardDescription>{t("customerPortal.accountAccessDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           {pendingAccessRequest ? (
             <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-lg">
               <Clock className="h-5 w-5 text-amber-600" />
               <div>
-                <p className="font-medium">Upgrade Request Pending</p>
+                <p className="font-medium">{t("customerPortal.upgradePending")}</p>
                 <p className="text-sm text-muted-foreground">
-                  Your request for <Badge variant="outline">{pendingAccessRequest.requestedRole}</Badge> access is being reviewed
+                  {t("customerPortal.upgradePendingDesc")} <Badge variant="outline">{pendingAccessRequest.requestedRole}</Badge> {t("customerPortal.accessReviewing")}
                 </p>
               </div>
             </div>
           ) : (
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                If you're a team member, you can request upgraded access to view operational features.
+                {t("customerPortal.upgradeRequestPrompt")}
               </p>
               <RequestUpgradeDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
             </div>
@@ -337,6 +339,7 @@ type ContactableEmployee = {
 };
 
 function NewMessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { t } = useTranslation();
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [targetEmployeeId, setTargetEmployeeId] = useState<string>("");
@@ -481,6 +484,7 @@ function NewMessageDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
 }
 
 function NewWorkRequestDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -610,6 +614,7 @@ function NewWorkRequestDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 }
 
 function RequestUpgradeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { t } = useTranslation();
   const [requestedRole, setRequestedRole] = useState("");
   const [reason, setReason] = useState("");
   const { toast } = useToast();

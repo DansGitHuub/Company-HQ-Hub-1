@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Shield, CheckCircle } from "lucide-react";
 
 export default function AdminSetup() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
   const [code, setCode] = useState("");
@@ -47,8 +49,8 @@ export default function AdminSetup() {
       <div className="flex items-center justify-center min-h-screen p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Please Log In First</CardTitle>
-            <CardDescription>You need to be logged in to set up master admin.</CardDescription>
+            <CardTitle>{t("admin.pleaseLoginFirst")}</CardTitle>
+            <CardDescription>{t("admin.loginToSetupMaster")}</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -61,12 +63,12 @@ export default function AdminSetup() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-            <CardTitle>You're now the Master Admin!</CardTitle>
-            <CardDescription>Refresh the page to access all admin features.</CardDescription>
+            <CardTitle>{t("admin.masterAdminSuccess")}</CardTitle>
+            <CardDescription>{t("admin.masterAdminSuccessDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button className="w-full" onClick={() => window.location.href = "/"}>
-              Go to Dashboard
+              {t("common.backToDashboard")}
             </Button>
           </CardContent>
         </Card>
@@ -79,16 +81,16 @@ export default function AdminSetup() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <Shield className="h-12 w-12 text-primary mx-auto mb-2" />
-          <CardTitle>Master Admin Setup</CardTitle>
+          <CardTitle>{t("admin.masterAdminSetup")}</CardTitle>
           <CardDescription>
-            Enter your setup code to become the master admin of this system.
+            {t("admin.masterAdminSetupDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <Input
               type="password"
-              placeholder="Enter setup code"
+              placeholder={t("admin.enterSetupCode")}
               value={code}
               onChange={(e) => setCode(e.target.value)}
               data-testid="input-setup-code"
@@ -100,7 +102,7 @@ export default function AdminSetup() {
             disabled={isLoading}
             data-testid="button-setup-admin"
           >
-            {isLoading ? "Setting up..." : "Activate Master Admin"}
+            {isLoading ? t("admin.settingUp") : t("admin.activateMasterAdmin")}
           </Button>
         </CardContent>
       </Card>

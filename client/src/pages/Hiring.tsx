@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import DocumentsPanel from "@/components/DocumentsPanel";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ function getInitials(name: string) {
 }
 
 export default function Hiring() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -76,9 +78,9 @@ export default function Hiring() {
       const res = await apiRequest("POST", `/api/candidates/${id}/stage`, { stage });
       return res.json();
     },
-    onSuccess: () => {
+        onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
-      toast({ title: "Stage updated" });
+      toast({ title: t("hiring.stageUpdated") });
     },
   });
 
@@ -90,7 +92,7 @@ export default function Hiring() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
       setShowAddDialog(false);
-      toast({ title: "Applicant added" });
+      toast({ title: t("hiring.applicantAdded") });
     },
   });
 
@@ -112,7 +114,7 @@ export default function Hiring() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
       setSelectedCandidate(null);
-      toast({ title: "Applicant removed" });
+      toast({ title: t("hiring.applicantRemoved") });
     },
   });
 
@@ -134,7 +136,7 @@ export default function Hiring() {
     <div className="space-y-4" data-testid="hiring-page">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold" data-testid="text-hiring-title">Hiring & HR</h1>
+          <h1 className="text-2xl font-heading font-bold" data-testid="text-hiring-title">{t("hiring.title")}</h1>
           <p className="text-muted-foreground mt-1">Manage applicants and employee records</p>
         </div>
         <div className="flex gap-2">
@@ -143,18 +145,18 @@ export default function Hiring() {
             onClick={() => setView("pipeline")}
             data-testid="button-view-pipeline"
           >
-            <ClipboardList className="h-4 w-4 mr-2" /> Pipeline
+            <ClipboardList className="h-4 w-4 mr-2" /> {t("hiring.pipeline")}
           </Button>
           <Button
             variant={view === "employees" ? "default" : "outline"}
             onClick={() => setView("employees")}
             data-testid="button-view-employees"
           >
-            <Users className="h-4 w-4 mr-2" /> Employees
+            <Users className="h-4 w-4 mr-2" /> {t("employees.title")}
           </Button>
           {view === "pipeline" && (
             <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-applicant">
-              <Plus className="h-4 w-4 mr-2" /> Add Applicant
+              <Plus className="h-4 w-4 mr-2" /> {t("hiring.addApplicant")}
             </Button>
           )}
         </div>
@@ -257,6 +259,7 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
   onSave: (data: any) => void;
   isPending: boolean;
 }) {
+  const { t } = useTranslation();
   const defaultForm = {
     name: "", role: "", email: "", phone: "", address: "", city: "", state: "", zip: "",
     source: "", rating: "green",
@@ -277,17 +280,17 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Applicant</DialogTitle>
+          <DialogTitle>{t("hiring.addApplicant")}</DialogTitle>
           <DialogDescription>Enter the new applicant's information</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label>Full Name *</Label>
+              <Label>{t("auth.fullName")} *</Label>
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} data-testid="input-applicant-name" />
             </div>
             <div className="space-y-1">
-              <Label>Position *</Label>
+              <Label>{t("employees.position")} *</Label>
               <Select value={form.role || undefined} onValueChange={v => setForm({ ...form, role: v })}>
                 <SelectTrigger data-testid="select-applicant-role"><SelectValue placeholder="Select position..." /></SelectTrigger>
                 <SelectContent>
@@ -298,43 +301,43 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label>Email</Label>
+              <Label>{t("common.email")}</Label>
               <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} data-testid="input-applicant-email" />
             </div>
             <div className="space-y-1">
-              <Label>Phone</Label>
+              <Label>{t("common.phone")}</Label>
               <Input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} data-testid="input-applicant-phone" />
             </div>
           </div>
           <div className="space-y-1">
-            <Label>Source</Label>
+            <Label>{t("hiring.stage")}</Label>
             <Select value={form.source || undefined} onValueChange={v => setForm({ ...form, source: v })}>
-              <SelectTrigger data-testid="select-source"><SelectValue placeholder="Select..." /></SelectTrigger>
+              <SelectTrigger data-testid="select-source"><SelectValue placeholder={t("common.select")} /></SelectTrigger>
               <SelectContent>
                 {SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>Address</Label>
+            <Label>{t("common.address")}</Label>
             <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} data-testid="input-applicant-address" />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label>City</Label>
+              <Label>{t("common.city")}</Label>
               <Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
             </div>
             <div className="space-y-1">
-              <Label>State</Label>
+              <Label>{t("common.state")}</Label>
               <Input value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} />
             </div>
             <div className="space-y-1">
-              <Label>Zip</Label>
+              <Label>{t("common.zip")}</Label>
               <Input value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} />
             </div>
           </div>
           <div className="space-y-1">
-            <Label>Status</Label>
+            <Label>{t("common.status")}</Label>
             <div className="flex gap-2">
               {(["green", "yellow", "red"] as const).map(r => (
                 <Button
@@ -346,20 +349,20 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
                   data-testid={`button-rating-${r}`}
                 >
                   <div className={`h-3 w-3 rounded-full mr-1 ${getRatingColor(r)}`} />
-                  {r === "green" ? "Active" : r === "yellow" ? "Needs Attention" : "Overdue"}
+                  {r === "green" ? t("status.active") : r === "yellow" ? t("status.needsAttention") : t("status.overdue")}
                 </Button>
               ))}
             </div>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>Cancel</Button>
+          <Button variant="outline" onClick={handleClose}>{t("common.cancel")}</Button>
           <Button
             onClick={handleSave}
             disabled={!form.name || !form.role || isPending}
             data-testid="button-save-applicant"
           >
-            {isPending ? "Adding..." : "Add Applicant"}
+            {isPending ? t("hiring.adding") : t("hiring.addApplicant")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -375,6 +378,7 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
   tab: string;
   onTabChange: (tab: string) => void;
 }) {
+  const { t } = useTranslation();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const showOnboarding = candidate.stage === "Hired";
   const availableTabs = ["profile", "documents", "communication", "interview"];
@@ -408,13 +412,13 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Applicant</AlertDialogTitle>
+            <AlertDialogTitle>{t("hiring.applicantRemoved")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove <strong>{candidate.name}</strong> from the hiring pipeline? This action cannot be undone.
+              {t("common.areYouSure")} <strong>{candidate.name}</strong> {t("hiring.applicantRemoved")}? {t("common.cannotUndo")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-delete">{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setShowDeleteConfirm(false);
@@ -423,7 +427,7 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-confirm-delete"
             >
-              Delete
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -431,11 +435,11 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
 
       <Tabs value={tab} onValueChange={onTabChange} className="flex-1 flex flex-col overflow-hidden">
         <TabsList className="mx-4 mt-2 justify-start">
-          <TabsTrigger value="profile" data-testid="tab-profile">Profile</TabsTrigger>
-          <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
-          <TabsTrigger value="communication" data-testid="tab-communication">Comms</TabsTrigger>
-          <TabsTrigger value="interview" data-testid="tab-interview">Interview</TabsTrigger>
-          {showOnboarding && <TabsTrigger value="onboarding" data-testid="tab-onboarding">Onboarding</TabsTrigger>}
+          <TabsTrigger value="profile" data-testid="tab-profile">{t("profile.title")}</TabsTrigger>
+          <TabsTrigger value="documents" data-testid="tab-documents">{t("employees.documents")}</TabsTrigger>
+          <TabsTrigger value="communication" data-testid="tab-communication">{t("hiring.communications")}</TabsTrigger>
+          <TabsTrigger value="interview" data-testid="tab-interview">{t("hiring.interview")}</TabsTrigger>
+          {showOnboarding && <TabsTrigger value="onboarding" data-testid="tab-onboarding">{t("hiring.onboarding")}</TabsTrigger>}
         </TabsList>
 
         <div className="flex-1 overflow-y-auto p-4">
@@ -476,6 +480,7 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
 }
 
 function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (data: any) => void }) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     name: candidate.name,
@@ -493,7 +498,7 @@ function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="font-semibold">Contact Information</h3>
+        <h3 className="font-semibold">{t("employees.contactInfo")}</h3>
         <Button variant="outline" size="sm" onClick={() => {
           if (editing) {
             onUpdate(form);
@@ -502,28 +507,28 @@ function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (
             setEditing(true);
           }
         }} data-testid="button-edit-profile">
-          {editing ? "Save" : "Edit"}
+          {editing ? t("common.save") : t("common.edit")}
         </Button>
       </div>
 
       {editing ? (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div><Label>Name</Label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-            <div><Label>Position</Label><Input value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} /></div>
-            <div><Label>Email</Label><Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
-            <div><Label>Phone</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
+            <div><Label>{t("common.name")}</Label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
+            <div><Label>{t("employees.position")}</Label><Input value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} /></div>
+            <div><Label>{t("common.email")}</Label><Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
+            <div><Label>{t("common.phone")}</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
           </div>
-          <div><Label>Address</Label><Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} /></div>
+          <div><Label>{t("common.address")}</Label><Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} /></div>
           <div className="grid grid-cols-3 gap-3">
-            <div><Label>City</Label><Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} /></div>
-            <div><Label>State</Label><Input value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} /></div>
-            <div><Label>Zip</Label><Input value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} /></div>
+            <div><Label>{t("common.city")}</Label><Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} /></div>
+            <div><Label>{t("common.state")}</Label><Input value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} /></div>
+            <div><Label>{t("common.zip")}</Label><Input value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} /></div>
           </div>
           <div>
-            <Label>Source</Label>
+            <Label>{t("hiring.stage")}</Label>
             <Select value={form.source} onValueChange={v => setForm({ ...form, source: v })}>
-              <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
               <SelectContent>{SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
             </Select>
           </div>

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, FileText, Loader2, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { useTranslation } from "react-i18next";
 
 const FORM_LABELS: Record<string, string> = {
   w4: "W-4 (Federal Tax Withholding)",
@@ -37,6 +38,7 @@ const FORM_DESCRIPTIONS: Record<string, string> = {
 };
 
 export default function FormHub() {
+  const { t } = useTranslation();
   const params = useParams<{ formType?: string; submissionId?: string }>();
   const [, navigate] = useLocation();
   const { user } = useAuth();
@@ -53,6 +55,7 @@ export default function FormHub() {
 }
 
 function FormList() {
+  const { t } = useTranslation();
   const [, navigate] = useLocation();
   const { user } = useAuth();
 
@@ -72,15 +75,15 @@ function FormList() {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6" data-testid="form-hub">
       <div>
-        <h1 className="text-2xl font-bold">Forms</h1>
-        <p className="text-muted-foreground mt-1">Complete and manage your required forms</p>
+        <h1 className="text-2xl font-bold">{t("forms.title")}</h1>
+        <p className="text-muted-foreground mt-1">{t("forms.subtitle")}</p>
       </div>
 
       {pendingForms.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Badge variant="destructive">{pendingForms.length}</Badge>
-            Action Required
+            {t("forms.actionRequired")}
           </h2>
           {pendingForms.map((form: any) => (
             <Card
@@ -100,7 +103,7 @@ function FormList() {
                   </div>
                 </div>
                 <Badge variant={form.status === "draft" ? "outline" : "secondary"}>
-                  {form.status === "draft" ? "Not Started" : form.status}
+                  {form.status === "draft" ? t("forms.notStarted") : form.status}
                 </Badge>
               </CardContent>
             </Card>
@@ -110,7 +113,7 @@ function FormList() {
 
       {completedForms.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Completed Forms</h2>
+          <h2 className="text-lg font-semibold">{t("forms.completedForms")}</h2>
           {completedForms.map((form: any) => (
             <Card key={form.id} className="opacity-75" data-testid={`completed-form-${form.id}`}>
               <CardContent className="flex items-center justify-between p-4">
@@ -135,12 +138,12 @@ function FormList() {
       {pendingForms.length === 0 && completedForms.length === 0 && (
         <div className="text-center py-12">
           <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-          <p className="text-muted-foreground">No forms assigned yet</p>
+          <p className="text-muted-foreground">{t("forms.noFormsAssigned")}</p>
         </div>
       )}
 
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold">All Forms</h2>
+        <h2 className="text-lg font-semibold">{t("forms.allForms")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {Object.entries(FORM_LABELS).map(([type, label]) => (
             <Card
@@ -167,6 +170,7 @@ function FormList() {
 }
 
 function FormRenderer({ formType, submissionId }: { formType: string; submissionId?: string }) {
+  const { t } = useTranslation();
   const [, navigate] = useLocation();
   const { user } = useAuth();
 
@@ -211,7 +215,7 @@ function FormRenderer({ formType, submissionId }: { formType: string; submission
   return (
     <div className="max-w-4xl mx-auto p-6">
       <Button variant="ghost" onClick={() => navigate("/onboarding-forms")} className="mb-4" data-testid="button-back-to-forms">
-        <ArrowLeft className="h-4 w-4 mr-2" /> Back to Forms
+        <ArrowLeft className="h-4 w-4 mr-2" /> {t("common.backToForms")}
       </Button>
 
       <div className="mb-6">
@@ -223,8 +227,8 @@ function FormRenderer({ formType, submissionId }: { formType: string; submission
         <Card>
           <CardContent className="py-12 text-center">
             <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-            <p className="text-muted-foreground">This form is not yet available</p>
-            <p className="text-xs text-muted-foreground mt-1">Form type: {formType}</p>
+            <p className="text-muted-foreground">{t("forms.notAvailable")}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("forms.formType")}: {formType}</p>
           </CardContent>
         </Card>
       ) : FormComponent ? (

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Bell, Sparkles, AlertCircle, Info, Check, Clock, Users, Briefcase, Wrench, FileText, Plus, Calendar, MessageSquare, TrendingUp, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ interface UpdatesPopupProps {
 }
 
 export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -171,7 +173,7 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
             <div className="flex items-center justify-between p-4 border-b bg-muted/30">
               <div className="flex items-center gap-2">
                 <Bell className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold">Notifications</h3>
+                <h3 className="font-semibold">{t("nav.updates")}</h3>
               </div>
               <Button variant="ghost" size="icon" onClick={onClose} data-testid="close-updates">
                 <X className="h-4 w-4" />
@@ -182,7 +184,7 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
               <Tabs defaultValue="activity">
                 <TabsList className="w-full grid grid-cols-2 mx-0 rounded-none border-b">
                   <TabsTrigger value="activity" className="relative" data-testid="tab-activity">
-                    Activity
+                    {t("updates.activity")}
                     {unseenActivityCount > 0 && (
                       <Badge variant="destructive" className="ml-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]">
                         {unseenActivityCount}
@@ -190,7 +192,7 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
                     )}
                   </TabsTrigger>
                   <TabsTrigger value="updates" className="relative" data-testid="tab-app-updates">
-                    Updates
+                    {t("nav.updates")}
                     {updates.length > 0 && (
                       <Badge variant="secondary" className="ml-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]">
                         {updates.length}
@@ -210,15 +212,15 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
                           onClick={() => markActivitySeenMutation.mutate()}
                           data-testid="mark-all-activity-seen"
                         >
-                          <Check className="h-3 w-3 mr-1" /> Mark all seen
+                          <Check className="h-3 w-3 mr-1" /> {t("updates.markAllSeen")}
                         </Button>
                       </div>
                     )}
                     {activityItems.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground">
                         <Bell className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                        <p className="font-medium">No activity yet</p>
-                        <p className="text-sm mt-1">Recent activity will appear here.</p>
+                        <p className="font-medium">{t("updates.noActivity")}</p>
+                        <p className="text-sm mt-1">{t("updates.recentActivityWillAppear")}</p>
                       </div>
                     ) : (
                       <div className="p-2">
@@ -267,7 +269,7 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
                           onClick={() => setShowPostForm(true)}
                           data-testid="button-post-update"
                         >
-                          <Plus className="h-3 w-3 mr-1" /> Post Update
+                          <Plus className="h-3 w-3 mr-1" /> {t("updates.postUpdate")}
                         </Button>
                       ) : (
                         <InlinePostUpdateForm
@@ -294,6 +296,7 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
 }
 
 function InlinePostUpdateForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("feature");
@@ -315,14 +318,14 @@ function InlinePostUpdateForm({ onClose, onSuccess }: { onClose: () => void; onS
   return (
     <div className="border rounded-lg p-3 space-y-2 bg-muted/20" data-testid="post-update-form">
       <Input
-        placeholder="Update title"
+        placeholder={t("updates.updateTitle")}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         className="text-sm h-8"
         data-testid="input-update-title"
       />
       <Textarea
-        placeholder="Brief description..."
+        placeholder={t("updates.briefDescription")}
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         rows={2}
@@ -334,10 +337,10 @@ function InlinePostUpdateForm({ onClose, onSuccess }: { onClose: () => void; onS
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="feature">Feature</SelectItem>
-          <SelectItem value="improvement">Improvement</SelectItem>
-          <SelectItem value="bugfix">Bug Fix</SelectItem>
-          <SelectItem value="announcement">Announcement</SelectItem>
+          <SelectItem value="feature">{t("updates.categories.feature")}</SelectItem>
+          <SelectItem value="improvement">{t("updates.categories.improvement")}</SelectItem>
+          <SelectItem value="bugfix">{t("updates.categories.bugfix")}</SelectItem>
+          <SelectItem value="announcement">{t("updates.categories.announcement")}</SelectItem>
         </SelectContent>
       </Select>
       <div className="flex gap-2">
@@ -348,10 +351,10 @@ function InlinePostUpdateForm({ onClose, onSuccess }: { onClose: () => void; onS
           disabled={!title.trim() || !description.trim() || postMutation.isPending}
           data-testid="button-submit-update"
         >
-          <Check className="h-3 w-3 mr-1" /> Post
+          <Check className="h-3 w-3 mr-1" /> {t("updates.post")}
         </Button>
         <Button variant="ghost" size="sm" className="text-xs h-7" onClick={onClose}>
-          Cancel
+          {t("common.cancel")}
         </Button>
       </div>
     </div>
@@ -368,20 +371,21 @@ function renderUpdates(
   getUpdateTypeColor: (type: string) => string,
   formatDate: (d: string) => string
 ) {
+  const { t } = useTranslation();
   return (
     <ScrollArea className="max-h-[55vh]">
       {updates.length > 0 && (
         <div className="flex justify-end p-2 pb-0">
           <Button variant="ghost" size="sm" className="text-xs" onClick={acknowledgeAll} data-testid="mark-all-read">
-            <Check className="h-3 w-3 mr-1" /> Mark all read
+            <Check className="h-3 w-3 mr-1" /> {t("updates.markAllRead")}
           </Button>
         </div>
       )}
       {updates.length === 0 ? (
         <div className="p-8 text-center text-muted-foreground">
           <Bell className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">You're all caught up!</p>
-          <p className="text-sm mt-1">No new updates at this time.</p>
+          <p className="font-medium">{t("updates.allCaughtUp")}</p>
+          <p className="text-sm mt-1">{t("updates.noNewUpdates")}</p>
         </div>
       ) : (
         <div className="p-2">

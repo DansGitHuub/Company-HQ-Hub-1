@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ import type { Material, MaterialCategory, CategoryField } from "@shared/schema";
 type WizardStep = "name" | "category" | "ai-fill" | "review" | "confirm";
 
 export default function Materials() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -309,14 +311,14 @@ export default function Materials() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Materials Catalog</h1>
+          <h1 className="text-2xl font-heading font-bold text-foreground">{t("materials.catalogTitle")}</h1>
           <p className="text-muted-foreground">
-            {isAdmin ? "Manage materials and categories" : "Browse materials"}
+            {isAdmin ? t("materials.manageDesc") : t("materials.browseDesc")}
           </p>
         </div>
         {isAdmin && (
           <Button onClick={() => setShowAddWizard(true)} data-testid="button-add-material">
-            <Sparkles className="w-4 h-4 mr-2" /> Add Material with AI
+            <Sparkles className="w-4 h-4 mr-2" /> {t("materials.addWithAI")}
           </Button>
         )}
       </div>
@@ -324,16 +326,16 @@ export default function Materials() {
       {isAdmin && (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
-            <TabsTrigger value="materials" data-testid="tab-materials">Materials</TabsTrigger>
-            <TabsTrigger value="categories" data-testid="tab-categories">Categories</TabsTrigger>
+            <TabsTrigger value="materials" data-testid="tab-materials">{t("materials.materialsTab")}</TabsTrigger>
+            <TabsTrigger value="categories" data-testid="tab-categories">{t("materials.categoriesTab")}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="categories" className="mt-4">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Material Categories</h2>
+                <h2 className="text-xl font-semibold">{t("materials.categoriesTitle")}</h2>
                 <Button onClick={() => { setEditingCategory(null); setShowCategoryDialog(true); }} data-testid="button-add-category">
-                  <FolderPlus className="w-4 h-4 mr-2" /> Add Category
+                  <FolderPlus className="w-4 h-4 mr-2" /> {t("materials.addCategory")}
                 </Button>
               </div>
               
@@ -344,7 +346,7 @@ export default function Materials() {
                       <div className="flex items-center gap-3">
                         <span className="font-medium">{cat.name}</span>
                         <Badge variant="secondary">
-                          {getCategoryMaterialCount(cat.id)} materials
+                          {t("materials.itemCount", { count: getCategoryMaterialCount(cat.id) })}
                         </Badge>
                       </div>
                       <div className="flex gap-2">
@@ -354,7 +356,7 @@ export default function Materials() {
                           onClick={() => { setEditingCategory(cat); setShowCategoryDialog(true); }}
                           data-testid={`button-edit-category-${cat.id}`}
                         >
-                          <Edit className="w-4 h-4 mr-1" /> Rename
+                          <Edit className="w-4 h-4 mr-1" /> {t("common.rename")}
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -364,21 +366,21 @@ export default function Materials() {
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Delete "{cat.name}"?</AlertDialogTitle>
+                              <AlertDialogTitle>{t("materials.deleteCategoryTitle", { name: cat.name })}</AlertDialogTitle>
                               <AlertDialogDescription>
                                 {getCategoryMaterialCount(cat.id) > 0 
-                                  ? `This will also delete ${getCategoryMaterialCount(cat.id)} materials in this category.`
-                                  : "This action cannot be undone."
+                                  ? t("materials.deleteCategoryWithMaterials", { count: getCategoryMaterialCount(cat.id) })
+                                  : t("common.cannotUndo")
                                 }
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => deleteCategoryMutation.mutate(cat.id)}
                                 className="bg-destructive text-destructive-foreground"
                               >
-                                Delete
+                                {t("common.delete")}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -388,7 +390,7 @@ export default function Materials() {
                   </Card>
                 ))}
                 {sortedCategories.length === 0 && (
-                  <p className="text-muted-foreground text-center py-8">No categories yet.</p>
+                  <p className="text-muted-foreground text-center py-8">{t("materials.noCategories")}</p>
                 )}
               </div>
             </div>

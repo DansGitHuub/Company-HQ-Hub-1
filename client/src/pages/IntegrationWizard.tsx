@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -68,6 +69,7 @@ const categoryIcons: Record<string, any> = {
 };
 
 export default function IntegrationWizard() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("discover");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -213,15 +215,15 @@ export default function IntegrationWizard() {
         <div className="flex items-center gap-3">
           <Puzzle className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-2xl font-heading font-bold text-foreground">Integration Wizard</h1>
+            <h1 className="text-2xl font-heading font-bold text-foreground">{t("integrations.wizardTitle")}</h1>
             <p className="text-muted-foreground">
-              Connect your business software with AI-powered setup
+              {t("integrations.wizardSubtitle")}
             </p>
           </div>
         </div>
         <Badge variant="outline" className="gap-1">
           <Sparkles className="h-3 w-3" />
-          AI-Powered
+          {t("integrations.aiPowered")}
         </Badge>
       </div>
 
@@ -229,11 +231,11 @@ export default function IntegrationWizard() {
         <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="discover" data-testid="tab-discover">
             <Search className="h-4 w-4 mr-2" />
-            Discover
+            {t("common.discover")}
           </TabsTrigger>
           <TabsTrigger value="active" data-testid="tab-active">
             <Link2 className="h-4 w-4 mr-2" />
-            Active ({configuredIntegrations.length})
+            {t("status.active")} ({configuredIntegrations.length})
           </TabsTrigger>
         </TabsList>
 
@@ -242,17 +244,17 @@ export default function IntegrationWizard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Search className="h-5 w-5" />
-                Find Software to Integrate
+                {t("integrations.findSoftware")}
               </CardTitle>
               <CardDescription>
-                Search for any business software - AI will research its capabilities
+                {t("integrations.findSoftwareDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-3">
                 <div className="flex-1">
                   <Input
-                    placeholder="Enter software name (e.g., SynkedUp, QuickBooks, ServiceTitan...)"
+                    placeholder={t("integrations.softwareSearchPlaceholder")}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -261,10 +263,10 @@ export default function IntegrationWizard() {
                 </div>
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <SelectTrigger className="w-[180px]" data-testid="select-category">
-                    <SelectValue placeholder="Category" />
+                    <SelectValue placeholder={t("common.category")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Categories</SelectItem>
+                    <SelectItem value="">{t("common.allCategories")}</SelectItem>
                     {categories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         {cat.name}
@@ -282,7 +284,7 @@ export default function IntegrationWizard() {
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
-                  <span className="ml-2">Research</span>
+                  <span className="ml-2">{t("integrations.research")}</span>
                 </Button>
               </div>
 
@@ -290,8 +292,8 @@ export default function IntegrationWizard() {
                 <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg">
                   <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
                   <div>
-                    <p className="font-medium text-sm">AI is researching {searchQuery}...</p>
-                    <p className="text-xs text-muted-foreground">Discovering API capabilities and setup requirements</p>
+                    <p className="font-medium text-sm">{t("integrations.aiResearching", { name: searchQuery })}</p>
+                    <p className="text-xs text-muted-foreground">{t("integrations.discoveringCapabilities")}</p>
                   </div>
                 </div>
               )}

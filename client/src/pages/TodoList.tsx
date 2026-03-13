@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -80,27 +81,28 @@ const FREQUENCIES = [
   { value: "custom", label: "Custom" },
 ];
 
-function formatDate(d: string | null): string {
+function formatDate(d: string | null, t: any): string {
   if (!d) return "";
   const date = new Date(d);
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const taskDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const diff = (taskDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
-  if (diff === 0) return "Today";
-  if (diff === 1) return "Tomorrow";
-  if (diff === -1) return "Yesterday";
-  if (diff < -1) return `${Math.abs(Math.floor(diff))} days ago`;
-  if (diff <= 7) return `In ${Math.floor(diff)} days`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (diff === 0) return t("common.today");
+  if (diff === 1) return t("common.tomorrow");
+  if (diff === -1) return t("common.yesterday");
+  if (diff < -1) return `${Math.abs(Math.floor(diff))} ${t("common.daysAgo")}`;
+  if (diff <= 7) return `${t("common.in")} ${Math.floor(diff)} ${t("common.days")}`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function formatDateTime(d: string | null): string {
   if (!d) return "";
-  return new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return new Date(d).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function PriorityBadge({ priority }: { priority: string }) {
+  const { t } = useTranslation();
   const cfg = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.p3_normal;
   return (
     <span
@@ -108,18 +110,20 @@ function PriorityBadge({ priority }: { priority: string }) {
       className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold text-white"
       style={{ backgroundColor: cfg.color }}
     >
-      {cfg.label}
+      {t(`tasks.${priority.split("_")[1] || priority}`)}
     </span>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.assigned;
   const Icon = cfg.icon;
+  const labelKey = status === "in_progress" ? "inProgress" : status;
   return (
     <span data-testid={`status-badge-${status}`} className={`inline-flex items-center gap-1 text-xs font-medium ${cfg.color}`}>
       <Icon className="w-3.5 h-3.5" />
-      {cfg.label}
+      {t(`tasks.statusLabels.${labelKey}`)}
     </span>
   );
 }
@@ -127,6 +131,7 @@ function StatusBadge({ status }: { status: string }) {
 function TaskCard({ task, onClick, onAction, currentUserId }: {
   task: Task; onClick: () => void; onAction: (action: string) => void; currentUserId: string;
 }) {
+  const { t } = useTranslation();
   const isAssignee = task.assignedToUserId === currentUserId;
   const p = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.p3_normal;
 
@@ -147,7 +152,7 @@ function TaskCard({ task, onClick, onAction, currentUserId }: {
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <StatusBadge status={task.status} />
                 <span className="text-xs text-gray-400">{task.taskId}</span>
-                {task.category && <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">{task.category}</span>}
+                {task.category && <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">{t(`tasks.categories.${task.category.toLowerCase()}`)}</span>}
               </div>
             </div>
             <PriorityBadge priority={task.priority} />
@@ -157,13 +162,13 @@ function TaskCard({ task, onClick, onAction, currentUserId }: {
             {task.dueDate && (
               <span className={`flex items-center gap-1 ${task.isOverdue ? "text-red-600 font-semibold" : ""}`}>
                 <Clock className="w-3 h-3" />
-                {formatDate(task.dueDate)}
+                {formatDate(task.dueDate, t)}
                 {task.dueTime && ` ${task.dueTime}`}
               </span>
             )}
             <span className="flex items-center gap-1">
               <User className="w-3 h-3" />
-              {task.assigneeName || "Unassigned"}
+              {task.assigneeName || t("common.unassigned")}
             </span>
             {task.location && (
               <span className="flex items-center gap-1">
@@ -181,7 +186,7 @@ function TaskCard({ task, onClick, onAction, currentUserId }: {
                   onClick={() => onAction("acknowledged")}
                   className="px-3 py-1.5 text-xs rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 font-medium transition-colors"
                 >
-                  Acknowledge
+                  {t("tasks.statusLabels.acknowledged")}
                 </button>
               )}
               {task.status === "acknowledged" && (
@@ -190,7 +195,7 @@ function TaskCard({ task, onClick, onAction, currentUserId }: {
                   onClick={() => onAction("in_progress")}
                   className="px-3 py-1.5 text-xs rounded-lg bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-100 font-medium transition-colors"
                 >
-                  Start
+                  {t("common.on")}
                 </button>
               )}
               {(task.status === "in_progress" || task.status === "overdue") && (
@@ -199,7 +204,7 @@ function TaskCard({ task, onClick, onAction, currentUserId }: {
                   onClick={() => onAction("completed")}
                   className="px-3 py-1.5 text-xs rounded-lg bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-100 font-medium transition-colors"
                 >
-                  Complete
+                  {t("common.done")}
                 </button>
               )}
             </div>
@@ -244,6 +249,7 @@ function TaskSection({ title, tasks, color, defaultOpen = true, onClick, onActio
 function FullTaskForm({ users, currentUser, onClose, initialData }: {
   users: any[]; currentUser: any; onClose: () => void; initialData?: any;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState(initialData?.title || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -334,40 +340,40 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("common.type")}</label>
               <select
                 data-testid="full-form-select-type"
                 value={type} onChange={e => setType(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
-                <option value="standard">Standard</option>
-                <option value="checklist">Checklist</option>
-                <option value="delegated">Delegated</option>
-                <option value="recurring">Recurring</option>
+                <option value="standard">{t("common.normal")}</option>
+                <option value="checklist">{t("tasks.checklist")}</option>
+                <option value="delegated">{t("tasks.assignedByMe")}</option>
+                <option value="recurring">{t("tasks.recurring")}</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Priority</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("common.priority")}</label>
               <select
                 data-testid="full-form-select-priority"
                 value={priority} onChange={e => setPriority(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
                 {Object.entries(PRIORITY_CONFIG).map(([k, v]) => (
-                  <option key={k} value={k}>{v.label}</option>
+                  <option key={k} value={k}>{t(`tasks.${k.split("_")[1] || k}`)}</option>
                 ))}
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Assign To</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("common.assignedTo")}</label>
             <select
               data-testid="full-form-select-assignee"
               value={assigneeId} onChange={e => setAssigneeId(e.target.value)}
               className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
             >
-              <option value="">Select...</option>
+              <option value="">{t("common.select")}...</option>
               {users.map(u => (
                 <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
               ))}
@@ -376,7 +382,7 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Due Date</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("tasks.dueDate")}</label>
               <input
                 data-testid="full-form-input-duedate"
                 type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
@@ -384,7 +390,7 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Due Time</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("common.time")}</label>
               <input
                 data-testid="full-form-input-duetime"
                 type="time" value={dueTime} onChange={e => setDueTime(e.target.value)}
@@ -395,18 +401,18 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("common.category")}</label>
               <select
                 data-testid="full-form-select-category"
                 value={category} onChange={e => setCategory(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
-                <option value="">None</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="">{t("common.none")}</option>
+                {CATEGORIES.map(c => <option key={c} value={c}>{t(`tasks.categories.${c.toLowerCase()}`)}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Est. Minutes</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("tasks.timeEstimate")}</label>
               <input
                 data-testid="full-form-input-minutes"
                 type="number" value={estimatedMinutes} onChange={e => setEstimatedMinutes(e.target.value)}
@@ -417,12 +423,12 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("tasks.location")}</label>
             <input
               data-testid="full-form-input-location"
               value={location} onChange={e => setLocation(e.target.value)}
               className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              placeholder="Job site address or description"
+              placeholder={t("tasks.jobSiteAddress")}
             />
           </div>
 
@@ -433,7 +439,7 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
                 type="checkbox" checked={requiresConfirmation} onChange={e => setRequiresConfirmation(e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300 text-green-600"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Requires confirmation</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">{t("tasks.requiresConfirmation")}</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -441,23 +447,23 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
                 type="checkbox" checked={isRecurring} onChange={e => setIsRecurring(e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300 text-green-600"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Recurring task</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">{t("tasks.recurring")}</span>
             </label>
           </div>
 
           {isRecurring && (
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl space-y-3">
-              <label className="block text-sm font-medium text-blue-800 dark:text-blue-300">Frequency</label>
+              <label className="block text-sm font-medium text-blue-800 dark:text-blue-300">{t("tasks.frequency")}</label>
               <select
                 data-testid="full-form-select-frequency"
                 value={frequency} onChange={e => setFrequency(e.target.value)}
                 className="w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800"
               >
-                {FREQUENCIES.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                {FREQUENCIES.map(f => <option key={f.value} value={f.value}>{t(`tasks.${f.value}`)}</option>)}
               </select>
               {frequency === "custom" && (
                 <div>
-                  <label className="block text-xs text-blue-700 dark:text-blue-400 mb-1">Every X days</label>
+                  <label className="block text-xs text-blue-700 dark:text-blue-400 mb-1">{t("tasks.everyXDays")}</label>
                   <input
                     data-testid="full-form-input-interval"
                     type="number" value={intervalDays} onChange={e => setIntervalDays(e.target.value)}
@@ -470,7 +476,7 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
 
           {type === "checklist" && (
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Checklist Items</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t("tasks.checklistItems")}</label>
               {checklistItems.map((item, i) => (
                 <div key={i} className="flex gap-2">
                   <input
@@ -482,7 +488,7 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
                       setChecklistItems(updated);
                     }}
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
-                    placeholder={`Item ${i + 1}`}
+                    placeholder={`${t("common.item")} ${i + 1}`}
                   />
                   {checklistItems.length > 1 && (
                     <button
@@ -501,7 +507,7 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
                 onClick={() => setChecklistItems([...checklistItems, ""])}
                 className="text-sm text-green-600 hover:text-green-700 flex items-center gap-1"
               >
-                <Plus className="w-4 h-4" /> Add item
+                <Plus className="w-4 h-4" /> {t("common.add")}
               </button>
             </div>
           )}
@@ -518,14 +524,14 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
               className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
             >
               {createMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-              Create Task
+              {t("tasks.addTask")}
             </button>
             <button
               type="button"
               onClick={onClose}
               className="px-6 py-3 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
           </div>
         </form>
@@ -535,6 +541,7 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
 }
 
 function TaskDetail({ taskId, onClose, currentUser }: { taskId: string; onClose: () => void; currentUser: any }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const invalidateAll = () => {
@@ -550,7 +557,7 @@ function TaskDetail({ taskId, onClose, currentUser }: { taskId: string; onClose:
     queryKey: ["/api/tasks", taskId],
     queryFn: async () => {
       const res = await fetch(`/api/tasks/${taskId}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load task");
+      if (!res.ok) throw new Error(t("tasks.failedToLoad"));
       return res.json();
     },
   });
@@ -955,6 +962,7 @@ function TaskDetail({ taskId, onClose, currentUser }: { taskId: string; onClose:
 }
 
 function ReportsView({ currentUser }: { currentUser: any }) {
+  const { t } = useTranslation();
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: "", end: "" });
   const [selectedUser, setSelectedUser] = useState("");
 

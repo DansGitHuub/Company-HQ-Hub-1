@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { useApp } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CheckCircle, ExternalLink, RefreshCw, Construction, Wrench, Plug } from "lucide-react";
 
 export default function Integrations() {
+  const { t } = useTranslation();
   const { integrations } = useApp();
 
   return (
@@ -18,10 +20,9 @@ export default function Integrations() {
             <Construction className="w-10 h-10 text-primary" />
           </div>
           <div>
-            <h2 className="text-2xl font-heading font-bold text-foreground">Coming Soon</h2>
+            <h2 className="text-2xl font-heading font-bold text-foreground">{t("common.comingSoon")}</h2>
             <p className="text-muted-foreground max-w-md mx-auto mt-2">
-              We're building powerful integrations with QuickBooks, CompanyCam, Jobber, and more. 
-              Stay tuned for seamless connections to your favorite tools!
+              {t("integrations.comingSoonDesc")}
             </p>
           </div>
           <div className="flex items-center justify-center gap-4 pt-4">
@@ -38,21 +39,21 @@ export default function Integrations() {
               <span>Jobber</span>
             </div>
           </div>
-          <Badge variant="secondary" className="mt-4">Work in Progress</Badge>
+          <Badge variant="secondary" className="mt-4">{t("status.inProgress")}</Badge>
         </div>
       </div>
 
       {/* Original content (greyed out behind overlay) */}
       <div className="opacity-30 pointer-events-none">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Integrations Hub</h1>
-          <p className="text-muted-foreground">Manage API connections and webhooks</p>
+          <h1 className="text-2xl font-heading font-bold text-foreground">{t("nav.integrations")}</h1>
+          <p className="text-muted-foreground">{t("integrations.subtitle")}</p>
         </div>
 
         <div className="grid gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Connected Services</CardTitle>
+              <CardTitle>{t("integrations.connectedServices")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -64,11 +65,11 @@ export default function Integrations() {
                       </div>
                       <div>
                         <h3 className="font-semibold">{int.name}</h3>
-                        <p className="text-xs text-muted-foreground">{int.connected ? 'Syncing daily' : 'Not connected'}</p>
+                        <p className="text-xs text-muted-foreground">{int.connected ? t("integrations.syncingDaily") : t("common.disabled")}</p>
                       </div>
                     </div>
                     <Button variant={int.connected ? "outline" : "default"} disabled>
-                      {int.connected ? 'Disconnect' : 'Connect'}
+                      {int.connected ? t("common.disconnect") : t("common.connect")}
                     </Button>
                   </div>
                 ))}
@@ -79,18 +80,18 @@ export default function Integrations() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Webhook Inbox</CardTitle>
-                <Button variant="ghost" size="sm" className="gap-2" disabled><RefreshCw className="w-4 h-4" /> Refresh</Button>
+                <CardTitle>{t("integrations.webhookInbox")}</CardTitle>
+                <Button variant="ghost" size="sm" className="gap-2" disabled><RefreshCw className="w-4 h-4" /> {t("common.refresh")}</Button>
               </div>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Payload</TableHead>
-                    <TableHead className="text-right">Time</TableHead>
+                    <TableHead>{t("common.status")}</TableHead>
+                    <TableHead>{t("common.source")}</TableHead>
+                    <TableHead>{t("integrations.payload")}</TableHead>
+                    <TableHead className="text-right">{t("common.time")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -119,25 +120,25 @@ export default function Integrations() {
 
           <Card>
             <CardHeader>
-              <CardTitle>API Credentials</CardTitle>
+              <CardTitle>{t("integrations.apiCredentials")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Public API Key</label>
+                <label className="text-sm font-medium">{t("integrations.publicKey")}</label>
                 <div className="flex gap-2">
                   <div className="flex-1 p-2 bg-secondary rounded border font-mono text-sm truncate">
                     pk_live_51M0dXXXXXXXXXXXXXXXXXXXXXX
                   </div>
-                  <Button variant="outline" disabled>Copy</Button>
+                  <Button variant="outline" disabled>{t("common.copy")}</Button>
                 </div>
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Secret Key</label>
+                <label className="text-sm font-medium">{t("integrations.secretKey")}</label>
                 <div className="flex gap-2">
                   <div className="flex-1 p-2 bg-secondary rounded border font-mono text-sm truncate">
                     sk_live_28J9dXXXXXXXXXXXXXXXXXXXXXX
                   </div>
-                  <Button variant="outline" disabled>Roll Key</Button>
+                  <Button variant="outline" disabled>{t("integrations.rollKey")}</Button>
                 </div>
               </div>
             </CardContent>

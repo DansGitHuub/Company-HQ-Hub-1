@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,7 @@ const brandColors = {
 type Section = "dashboard" | "jobs" | "documents" | "care-library" | "messages";
 
 export default function CustomerHub() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const [, params] = useRoute("/customer-hub/:section?");
@@ -79,7 +81,7 @@ export default function CustomerHub() {
         <div className="flex items-center gap-3">
           <Leaf className="h-6 w-6" style={{ color: brandColors.gold }} />
           <h1 className="text-lg font-bold" style={{ color: brandColors.gold }}>
-            Chapin Landscapes
+            {t("nav.companyHQ")}
           </h1>
         </div>
         <div className="flex items-center gap-3">
@@ -189,6 +191,7 @@ function NotificationBell() {
 }
 
 function SuggestButton() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -228,29 +231,29 @@ function SuggestButton() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Lightbulb className="h-5 w-5" style={{ color: brandColors.gold }} />
-              Suggest an Improvement
+              {t("customerHub.suggestTitle")}
             </DialogTitle>
             <DialogDescription>
-              Share your ideas to help us serve you better.
+              {t("customerHub.suggestSubtitle")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-sm font-medium mb-1 block">What's your idea? *</label>
+              <label className="text-sm font-medium mb-1 block">{t("customerHub.suggestIdeaLabel")} *</label>
               <Input
                 value={title}
                 onChange={e => setTitle(e.target.value.slice(0, 200))}
-                placeholder="Brief summary of your suggestion"
+                placeholder={t("customerHub.suggestPlaceholder")}
                 data-testid="input-suggestion-title"
               />
               <p className="text-xs text-muted-foreground mt-1">{title.length}/200</p>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Tell us more (optional)</label>
+              <label className="text-sm font-medium mb-1 block">{t("customerHub.suggestMoreLabel")}</label>
               <Textarea
                 value={description}
                 onChange={e => setDescription(e.target.value.slice(0, 1000))}
-                placeholder="Any additional details..."
+                placeholder={t("customerHub.suggestMorePlaceholder")}
                 rows={4}
                 data-testid="input-suggestion-description"
               />
@@ -258,14 +261,14 @@ function SuggestButton() {
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)} data-testid="button-suggestion-cancel">Cancel</Button>
+            <Button variant="outline" onClick={() => setOpen(false)} data-testid="button-suggestion-cancel">{t("common.cancel")}</Button>
             <Button
               onClick={() => submitMutation.mutate()}
               disabled={!title.trim() || submitMutation.isPending}
               style={{ backgroundColor: brandColors.darkGreen }}
               data-testid="button-suggestion-submit"
             >
-              {submitMutation.isPending ? "Submitting..." : "Submit"}
+              {submitMutation.isPending ? t("common.submitting") : t("common.submit")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -283,6 +286,7 @@ const SUGGESTION_STATUS_CONFIG: Record<string, { label: string; color: string; b
 };
 
 function MySuggestionsSection() {
+  const { t } = useTranslation();
   const { data: suggestions = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/suggestions/mine"],
     queryFn: async () => (await apiRequest("GET", "/api/suggestions/mine")).json(),
@@ -300,7 +304,7 @@ function MySuggestionsSection() {
           <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: brandColors.gold + "20" }}>
             <Lightbulb className="h-4 w-4" style={{ color: brandColors.gold }} />
           </div>
-          <h3 className="font-semibold text-sm">My Suggestions</h3>
+          <h3 className="font-semibold text-sm">{t("customerHub.mySuggestions")}</h3>
         </div>
         <div className="space-y-2">
           {suggestions.slice(0, 5).map((s: any) => {
@@ -336,7 +340,7 @@ function MySuggestionsSection() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Lightbulb className="h-5 w-5" style={{ color: brandColors.gold }} />
-              Suggestion Details
+              {t("customerHub.suggestionDetails")}
             </DialogTitle>
           </DialogHeader>
           {selected && (
@@ -344,14 +348,14 @@ function MySuggestionsSection() {
               <div>
                 <p className="font-semibold" style={{ color: brandColors.darkGreen }}>{selected.title}</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Submitted {new Date(selected.createdAt).toLocaleDateString()}
+                  {t("customerHub.submittedOn")} {new Date(selected.createdAt).toLocaleDateString()}
                 </p>
               </div>
               {selected.description && (
                 <p className="text-sm text-gray-600">{selected.description}</p>
               )}
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Status:</span>
+                <span className="text-sm font-medium">{t("common.status")}:</span>
                 <Badge
                   variant="secondary"
                   style={{
@@ -364,7 +368,7 @@ function MySuggestionsSection() {
               </div>
               {selected.adminNote && (
                 <div className="bg-gray-50 border rounded-lg p-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Note from our team</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{t("customerHub.teamNote")}</p>
                   <p className="text-sm text-gray-700">{selected.adminNote}</p>
                 </div>
               )}
@@ -377,6 +381,7 @@ function MySuggestionsSection() {
 }
 
 function DashboardSection({ onNavigate, onSelectJob }: { onNavigate: (s: Section) => void; onSelectJob: (id: string) => void }) {
+  const { t } = useTranslation();
   const { data: dashboard, isLoading } = useQuery({
     queryKey: ["/api/customer-hub/dashboard"],
     queryFn: async () => (await apiRequest("GET", "/api/customer-hub/dashboard")).json(),
@@ -388,9 +393,9 @@ function DashboardSection({ onNavigate, onSelectJob }: { onNavigate: (s: Section
     <div className="space-y-6 max-w-3xl mx-auto" data-testid="dashboard-section">
       <div>
         <h2 className="text-2xl font-bold" style={{ color: brandColors.darkGreen }} data-testid="text-welcome">
-          Welcome back, {dashboard?.user?.name?.split(" ")[0] || "there"}
+          {t("customerHub.welcome")}, {dashboard?.user?.name?.split(" ")[0] || "there"}
         </h2>
-        <p className="text-gray-500 mt-1">Here's what's happening with your projects</p>
+        <p className="text-gray-500 mt-1">{t("customerHub.welcomeSubtitle")}</p>
       </div>
 
       {dashboard?.activeJob && (
@@ -403,7 +408,7 @@ function DashboardSection({ onNavigate, onSelectJob }: { onNavigate: (s: Section
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: brandColors.gold }}>Active Project</p>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: brandColors.gold }}>{t("customerHub.activeProject")}</p>
                 <h3 className="font-semibold text-lg mt-1" style={{ color: brandColors.darkGreen }}>{dashboard.activeJob.type}</h3>
                 <p className="text-sm text-gray-500">{dashboard.activeJob.client}</p>
               </div>
@@ -422,10 +427,10 @@ function DashboardSection({ onNavigate, onSelectJob }: { onNavigate: (s: Section
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <QuickStat label="Total Jobs" value={dashboard?.totalJobs || 0} icon={Briefcase} onClick={() => onNavigate("jobs")} />
-        <QuickStat label="Unread Messages" value={dashboard?.unreadMessages || 0} icon={MessageSquare} onClick={() => onNavigate("messages")} highlight={dashboard?.unreadMessages > 0} />
-        <QuickStat label="Action Items" value={dashboard?.actionItems || 0} icon={AlertCircle} onClick={() => onNavigate("documents")} highlight={dashboard?.actionItems > 0} />
-        <QuickStat label="Documents" value={dashboard?.recentDocuments?.length || 0} icon={FileText} onClick={() => onNavigate("documents")} />
+        <QuickStat label={t("customerHub.totalJobs")} value={dashboard?.totalJobs || 0} icon={Briefcase} onClick={() => onNavigate("jobs")} />
+        <QuickStat label={t("customerHub.unreadMessages")} value={dashboard?.unreadMessages || 0} icon={MessageSquare} onClick={() => onNavigate("messages")} highlight={dashboard?.unreadMessages > 0} />
+        <QuickStat label={t("customerHub.actionItems")} value={dashboard?.actionItems || 0} icon={AlertCircle} onClick={() => onNavigate("documents")} highlight={dashboard?.actionItems > 0} />
+        <QuickStat label={t("customerHub.documents")} value={dashboard?.recentDocuments?.length || 0} icon={FileText} onClick={() => onNavigate("documents")} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -435,14 +440,14 @@ function DashboardSection({ onNavigate, onSelectJob }: { onNavigate: (s: Section
               <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: brandColors.darkGreen + "15" }}>
                 <Briefcase className="h-4 w-4" style={{ color: brandColors.darkGreen }} />
               </div>
-              <h3 className="font-semibold text-sm">Quick Links</h3>
+              <h3 className="font-semibold text-sm">{t("customerHub.quickLinks")}</h3>
             </div>
             <div className="space-y-2">
               {[
-                { label: "My Documents", section: "documents" as Section },
-                { label: "Care Library", section: "care-library" as Section },
-                { label: "Service History", section: "jobs" as Section },
-                { label: "Send a Message", section: "messages" as Section },
+                { label: t("customerHub.myDocuments"), section: "documents" as Section },
+                { label: t("customerHub.careLibrary"), section: "care-library" as Section },
+                { label: t("customerHub.serviceHistory"), section: "jobs" as Section },
+                { label: t("customerHub.sendMessage"), section: "messages" as Section },
               ].map(link => (
                 <button
                   key={link.label}
@@ -510,6 +515,7 @@ function DashboardSkeleton() {
 }
 
 function MyJobsSection({ onSelectJob }: { onSelectJob: (id: string) => void }) {
+  const { t } = useTranslation();
   const { data: jobs = [], isLoading } = useQuery({
     queryKey: ["/api/customer-hub/jobs"],
     queryFn: async () => (await apiRequest("GET", "/api/customer-hub/jobs")).json(),
@@ -671,6 +677,7 @@ function JobDetail({ jobId, onBack }: { jobId: string; onBack: () => void }) {
 }
 
 function DocumentsSection() {
+  const { t } = useTranslation();
   const [activeFolder, setActiveFolder] = useState("All");
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const { toast } = useToast();
@@ -820,6 +827,7 @@ function RequestDocumentDialog({ open, onClose, onSubmit, isPending }: {
 }
 
 function CareLibrarySection({ onSelectGuide }: { onSelectGuide: (id: string) => void }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [tab, setTab] = useState<"all" | "saved">("all");
@@ -968,6 +976,7 @@ function GuideDetail({ guideId, onBack }: { guideId: string; onBack: () => void 
 }
 
 function MessagesSection({ onSelectThread }: { onSelectThread: (id: string) => void }) {
+  const { t } = useTranslation();
   const [showNewMessage, setShowNewMessage] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();

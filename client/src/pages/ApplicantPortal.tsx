@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -75,6 +76,7 @@ function getStageProgress(stage: string): number {
 }
 
 export default function ApplicantPortal() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -105,8 +107,8 @@ export default function ApplicantPortal() {
     return (
       <div className="max-w-3xl mx-auto space-y-6">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Applicant Portal</h1>
-          <p className="text-muted-foreground">Track your job application status</p>
+          <h1 className="text-2xl font-heading font-bold text-foreground">{t("hiring.applicantPortal")}</h1>
+          <p className="text-muted-foreground">{t("hiring.trackApplicationStatus")}</p>
         </div>
         
         <Card className="card-interactive">
@@ -114,14 +116,14 @@ export default function ApplicantPortal() {
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
               <Briefcase className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h2 className="text-xl font-semibold">No Active Application</h2>
+            <h2 className="text-xl font-semibold">{t("hiring.noActiveApplication")}</h2>
             <p className="text-muted-foreground">
-              You don't have an active job application. Check out our open positions!
+              {t("hiring.noActiveApplicationDesc")}
             </p>
             <Link href="/careers">
               <Button className="btn-glow" data-testid="button-view-open-positions">
                 <Briefcase className="mr-2 h-4 w-4" />
-                View Open Positions
+                {t("hiring.viewOpenPositions")}
               </Button>
             </Link>
           </CardContent>

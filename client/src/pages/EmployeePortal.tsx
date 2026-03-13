@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,21 +29,22 @@ import {
 type Section = "profile" | "address" | "payroll" | "health" | "vacation";
 
 export default function EmployeePortal() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<Section>("profile");
 
   const handleSave = () => {
     toast({
-      title: "Changes Saved",
-      description: "Your information has been updated successfully.",
+      title: t("common.saved"),
+      description: t("common.changesSaved"),
     });
   };
 
   const handleDiscard = () => {
     toast({
-      title: "Changes Discarded",
-      description: "Your changes have been reverted.",
+      title: t("common.cancelled"),
+      description: t("common.changesSaved"),
     });
   };
 
@@ -74,33 +76,33 @@ export default function EmployeePortal() {
         return (
           <>
             <CardHeader className="border-b">
-              <CardTitle>Personal Information</CardTitle>
+              <CardTitle>{t("employees.personalDetails")}</CardTitle>
               <CardDescription>Update your basic profile information.</CardDescription>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
+                  <Label htmlFor="firstName">{t("employees.firstName")}</Label>
                   <Input id="firstName" defaultValue={user?.name?.split(" ")[0] || ""} data-testid="input-first-name" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
+                  <Label htmlFor="lastName">{t("employees.lastName")}</Label>
                   <Input id="lastName" defaultValue={user?.name?.split(" ").slice(1).join(" ") || ""} data-testid="input-last-name" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Work Email</Label>
+                  <Label htmlFor="email">{t("common.email")}</Label>
                   <Input id="email" defaultValue={user?.email || ""} data-testid="input-email" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="phone">{t("common.phone")}</Label>
                   <Input id="phone" placeholder="(555) 123-4567" data-testid="input-phone" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="startDate">Start Date</Label>
+                  <Label htmlFor="startDate">{t("employees.startDate")}</Label>
                   <Input id="startDate" type="date" defaultValue="2024-01-15" data-testid="input-start-date" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="department">Department</Label>
+                  <Label htmlFor="department">{t("employees.department")}</Label>
                   <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" data-testid="select-department">
                     <option>Field Operations</option>
                     <option>Design Team</option>
@@ -112,27 +114,27 @@ export default function EmployeePortal() {
 
               <div className="pt-6 border-t space-y-4">
                 <h3 className="font-heading font-bold text-lg flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-primary" /> Emergency Contact
+                  <FileText className="w-5 h-5 text-primary" /> {t("employees.emergencyContact")}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label>Contact Name</Label>
+                    <Label>{t("common.name")}</Label>
                     <Input placeholder="Jane Doe" data-testid="input-emergency-name" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Relationship</Label>
+                    <Label>{t("common.type")}</Label>
                     <Input placeholder="Spouse" data-testid="input-emergency-relationship" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Phone Number</Label>
+                    <Label>{t("common.phone")}</Label>
                     <Input placeholder="(555) 987-6543" data-testid="input-emergency-phone" />
                   </div>
                 </div>
               </div>
 
               <div className="pt-6 border-t flex justify-end gap-3">
-                <Button variant="outline" onClick={handleDiscard}>Discard Changes</Button>
-                <Button className="gap-2" onClick={handleSave} data-testid="button-save-profile"><Save className="w-4 h-4" /> Save Information</Button>
+                <Button variant="outline" onClick={handleDiscard}>{t("common.cancel")}</Button>
+                <Button className="gap-2" onClick={handleSave} data-testid="button-save-profile"><Save className="w-4 h-4" /> {t("common.saveChanges")}</Button>
               </div>
             </CardContent>
           </>

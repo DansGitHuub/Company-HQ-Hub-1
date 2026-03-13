@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ interface Conversation {
 }
 
 export default function Assistant() {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -52,7 +54,7 @@ export default function Assistant() {
 
   const createConversation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/conversations", { title: "New Chat" });
+      const res = await apiRequest("POST", "/api/conversations", { title: t("assistant.newChat") });
       return res.json();
     },
     onSuccess: (data) => {
@@ -147,7 +149,7 @@ export default function Assistant() {
       }
     } catch (error) {
       console.error("Error sending message:", error);
-      setLocalMessages((prev) => [...prev, { role: "assistant", content: "Sorry, I encountered an error. Please try again." }]);
+      setLocalMessages((prev) => [...prev, { role: "assistant", content: t("assistant.errorMessage") }]);
     } finally {
       setIsStreaming(false);
       setStreamingContent("");
@@ -156,13 +158,13 @@ export default function Assistant() {
   };
 
   const recommendations = [
-    { title: "Equipment Tracker", desc: "Digital maintenance logs and QR code tracking for mowers & blowers.", icon: Wrench },
-    { title: "Safety Inspector", desc: "Weekly safety meeting topics and OSHA compliance checklists.", icon: Zap },
-    { title: "Material Calculator", desc: "Quickly calculate yardage for mulch, stone, and soil on-site.", icon: Lightbulb }
+    { title: t("assistant.recEquipment"), desc: t("assistant.recEquipmentDesc"), icon: Wrench },
+    { title: t("assistant.recSafety"), desc: t("assistant.recSafetyDesc"), icon: Zap },
+    { title: t("assistant.recCalculator"), desc: t("assistant.recCalculatorDesc"), icon: Lightbulb }
   ];
 
   const displayMessages = localMessages.length > 0 ? localMessages : [
-    { role: "assistant", content: "Hello! I'm your HQ AI Assistant. I can help answer questions about landscaping, business operations, or anything else. How can I help you today?" }
+    { role: "assistant", content: t("assistant.welcomeMessage") }
   ];
 
   return (
@@ -170,9 +172,9 @@ export default function Assistant() {
       <div className="flex justify-between items-start">
         <div className="space-y-2">
           <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-3">
-            <Sparkles className="w-8 h-8 text-primary" /> AI Assistant
+            <Sparkles className="w-8 h-8 text-primary" /> {t("assistant.title")}
           </h1>
-          <p className="text-muted-foreground text-sm">Your intelligent companion for landscape business questions.</p>
+          <p className="text-muted-foreground text-sm">{t("assistant.subtitle")}</p>
         </div>
       </div>
 
@@ -180,7 +182,7 @@ export default function Assistant() {
         {/* Conversation List */}
         <div className="space-y-4">
           <Button onClick={() => createConversation.mutate()} className="w-full" data-testid="button-new-chat">
-            <Plus className="w-4 h-4 mr-2" /> New Chat
+            <Plus className="w-4 h-4 mr-2" /> {t("assistant.newChat")}
           </Button>
           <div className="space-y-2 max-h-[500px] overflow-y-auto">
             {conversations.map((convo) => (
@@ -223,8 +225,8 @@ export default function Assistant() {
                 <Bot className="text-primary-foreground w-6 h-6" />
               </div>
               <div>
-                <CardTitle className="text-base">HQ AI Assistant</CardTitle>
-                <CardDescription>Powered by AI</CardDescription>
+                <CardTitle className="text-base">{t("assistant.botName")}</CardTitle>
+                <CardDescription>{t("assistant.poweredByAi")}</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -272,7 +274,7 @@ export default function Assistant() {
           <div className="p-4 border-t bg-muted/10">
             <div className="flex gap-2">
               <Input 
-                placeholder="Ask me anything..." 
+                placeholder={t("assistant.inputPlaceholder")} 
                 className="bg-card"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -292,9 +294,9 @@ export default function Assistant() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Lightbulb className="w-5 h-5 text-amber-500" /> Recommended Additions
+                <Lightbulb className="w-5 h-5 text-amber-500" /> {t("assistant.recommendedAdditions")}
               </CardTitle>
-              <CardDescription>Top requested landscape tools</CardDescription>
+              <CardDescription>{t("assistant.recDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {recommendations.map((rec, i) => (
@@ -315,13 +317,13 @@ export default function Assistant() {
 
           <Card className="bg-primary/5 border-primary/20">
             <CardHeader>
-              <CardTitle className="text-sm uppercase tracking-widest text-primary">In Development</CardTitle>
+              <CardTitle className="text-sm uppercase tracking-widest text-primary">{t("assistant.inDevelopment")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {[
-                "Route Optimization API",
-                "Subcontractor Portal",
-                "Photo Markup Tool"
+                t("assistant.devRouteOpt"),
+                t("assistant.devSubcontractor"),
+                t("assistant.devPhotoMarkup")
               ].map((item, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm font-medium">
                   <CheckCircle2 className="w-4 h-4 text-primary" />

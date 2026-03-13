@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,7 @@ const CATEGORIES = [
 ];
 
 export default function CareGuideManager() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showEditor, setShowEditor] = useState(false);
@@ -96,8 +98,8 @@ export default function CareGuideManager() {
     <div className="space-y-4" data-testid="care-guide-manager">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold" data-testid="text-page-title">Care Guides & Customers</h1>
-          <p className="text-muted-foreground mt-1">Manage care guides and customer accounts</p>
+          <h1 className="text-2xl font-heading font-bold" data-testid="text-page-title">{t("careGuides.title")}</h1>
+          <p className="text-muted-foreground mt-1">{t("careGuides.subtitle")}</p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -105,14 +107,14 @@ export default function CareGuideManager() {
             onClick={() => setTab("guides")}
             data-testid="button-tab-guides"
           >
-            <BookOpen className="h-4 w-4 mr-2" /> Care Guides
+            <BookOpen className="h-4 w-4 mr-2" /> {t("careGuides.careGuides")}
           </Button>
           <Button
             variant={tab === "customers" ? "default" : "outline"}
             onClick={() => setTab("customers")}
             data-testid="button-tab-customers"
           >
-            <Users className="h-4 w-4 mr-2" /> Customers
+            <Users className="h-4 w-4 mr-2" /> {t("nav.employees")}
           </Button>
         </div>
       </div>

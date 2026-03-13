@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   Search,
   HelpCircle,
@@ -39,6 +40,7 @@ interface HelpCategory {
 }
 
 export default function HelpCenter() {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedArticle, setSelectedArticle] = useState<HelpArticle | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -88,7 +90,7 @@ export default function HelpCenter() {
           data-testid="back-to-articles"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Help Center
+          {t("help.backToHelpCenter")}
         </Button>
 
         <motion.article
@@ -116,16 +118,16 @@ export default function HelpCenter() {
         >
           <HelpCircle className="h-8 w-8 text-primary" />
         </motion.div>
-        <h1 className="text-2xl font-heading font-bold text-foreground mb-2">Help Center</h1>
+        <h1 className="text-2xl font-heading font-bold text-foreground mb-2">{t("help.title")}</h1>
         <p className="text-muted-foreground">
-          Find answers to your questions and learn how to use Company HQ
+          {t("help.subtitle")}
         </p>
       </div>
 
       <div className="relative max-w-xl mx-auto mb-8">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
         <Input
-          placeholder="Search for help..."
+          placeholder={t("help.searchPlaceholder")}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-10 h-12 text-lg"
@@ -173,10 +175,10 @@ export default function HelpCenter() {
         {selectedCategory && (
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">
-              {categories.find((c) => c.id === selectedCategory)?.name || "Articles"}
+              {categories.find((c) => c.id === selectedCategory)?.name || t("help.articles")}
             </h2>
             <Button variant="ghost" size="sm" onClick={() => setSelectedCategory(null)}>
-              Show all
+              {t("help.showAll")}
             </Button>
           </div>
         )}
@@ -185,8 +187,8 @@ export default function HelpCenter() {
           <div className="mb-4">
             <h2 className="text-xl font-semibold">
               {isSearching
-                ? "Searching..."
-                : `${searchResults.length} result${searchResults.length !== 1 ? "s" : ""} for "${searchQuery}"`}
+                ? t("common.searching")
+                : `${searchResults.length} ${t("help.resultsFor")} "${searchQuery}"`}
             </h2>
           </div>
         )}
@@ -200,8 +202,8 @@ export default function HelpCenter() {
                 className="text-center py-12 text-muted-foreground"
               >
                 <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <p className="font-medium">No articles found</p>
-                <p className="text-sm mt-1">Try adjusting your search or browse categories</p>
+                <p className="font-medium">{t("help.noArticles")}</p>
+                <p className="text-sm mt-1">{t("help.tryAdjusting")}</p>
               </motion.div>
             ) : (
               <div className="space-y-2">

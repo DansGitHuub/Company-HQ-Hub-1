@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -66,6 +67,7 @@ type WorkRequest = {
 };
 
 export default function AdminInbox() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
@@ -134,34 +136,34 @@ export default function AdminInbox() {
     <div className="space-y-4 max-w-6xl mx-auto">
       <div>
         <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-3">
-          <MessageSquare className="h-8 w-8 text-primary" /> Inbox
+          <MessageSquare className="h-8 w-8 text-primary" /> {t("admin.inbox")}
         </h1>
-        <p className="text-muted-foreground">Manage customer messages and work requests</p>
+        <p className="text-muted-foreground">{t("admin.inboxSubtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-3xl font-bold text-primary">{messages.length}</div>
-            <p className="text-sm text-muted-foreground">Total Messages</p>
+            <p className="text-sm text-muted-foreground">{t("admin.totalMessages")}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <div className="text-3xl font-bold text-amber-600">{unreadMessages}</div>
-            <p className="text-sm text-muted-foreground">Unread</p>
+            <p className="text-sm text-muted-foreground">{t("admin.unread")}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <div className="text-3xl font-bold text-blue-600">{workRequests.length}</div>
-            <p className="text-sm text-muted-foreground">Work Requests</p>
+            <p className="text-sm text-muted-foreground">{t("admin.workRequests")}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <div className="text-3xl font-bold text-orange-600">{pendingRequests}</div>
-            <p className="text-sm text-muted-foreground">Pending Review</p>
+            <p className="text-sm text-muted-foreground">{t("admin.pendingReview")}</p>
           </CardContent>
         </Card>
       </div>
@@ -169,10 +171,10 @@ export default function AdminInbox() {
       <Tabs defaultValue="messages" className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="messages" className="gap-2">
-            <MessageSquare className="h-4 w-4" /> Messages ({unreadMessages})
+            <MessageSquare className="h-4 w-4" /> {t("nav.messages")} ({unreadMessages})
           </TabsTrigger>
           <TabsTrigger value="requests" className="gap-2">
-            <FileText className="h-4 w-4" /> Work Requests ({pendingRequests})
+            <FileText className="h-4 w-4" /> {t("admin.workRequests")} ({pendingRequests})
           </TabsTrigger>
         </TabsList>
 

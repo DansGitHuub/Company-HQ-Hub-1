@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -503,6 +504,7 @@ type DragState =
   | { kind: "resize"; fieldId: string; startX: number; startY: number; originW: number; originH: number };
 
 function FormBuilder1Inner() {
+  const { t: i18n_t } = useTranslation();
   const { user } = useAuth();
   const admin = isAdminOrMaster(user);
 

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Search, Filter, ChevronDown, ChevronRight,
@@ -72,6 +73,7 @@ function formatDate(dateStr: string | null) {
 }
 
 export default function Tasks() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [view, setView] = useState<"board" | "list" | "my">("board");
   const [searchQuery, setSearchQuery] = useState("");

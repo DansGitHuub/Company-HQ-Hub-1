@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useApp } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import FileLibrary from "@/components/FileLibrary";
 
 export default function HQOverview() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [selectedNote, setSelectedNote] = useState<typeof notes[0] | null>(null);
@@ -55,9 +57,9 @@ export default function HQOverview() {
   return (
     <div className="space-y-4 max-w-5xl mx-auto pb-20">
       <section className="text-center space-y-4">
-        <h1 className="text-2xl font-heading font-bold text-foreground">Company HQ</h1>
+        <h1 className="text-2xl font-heading font-bold text-foreground">{t("nav.companyHQ")}</h1>
         <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
-          One team, one vision. Building the most respected landscape company in the region.
+          {t("hq.subtitle")}
         </p>
       </section>
 
@@ -65,29 +67,29 @@ export default function HQOverview() {
         <Card className="bg-primary text-primary-foreground border-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Eye className="w-6 h-6" /> Our Vision
+              <Eye className="w-6 h-6" /> {t("hq.ourVision")}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-lg leading-relaxed">
-            To transform every outdoor space into a sustainable, living masterpiece that enhances the lives of our clients and the health of our environment.
+            {t("hq.visionContent")}
           </CardContent>
         </Card>
 
         <Card className="bg-secondary text-secondary-foreground border-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-primary">
-              <Rocket className="w-6 h-6" /> Our Mission
+              <Rocket className="w-6 h-6" /> {t("hq.ourMission")}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-lg leading-relaxed">
-            Delivering elite landscape installation and maintenance through professional craftsmanship, innovative design, and unwavering commitment to client success.
+            {t("hq.missionContent")}
           </CardContent>
         </Card>
       </div>
 
       <section className="space-y-6">
         <h2 className="text-3xl font-heading font-bold flex items-center gap-2">
-          <Target className="w-8 h-8 text-primary" /> Strategic Goals 2025
+          <Target className="w-8 h-8 text-primary" /> {t("hq.strategicGoals")}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {goals.map((goal, i) => (
@@ -109,11 +111,11 @@ export default function HQOverview() {
       <section className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-3xl font-heading font-bold flex items-center gap-2">
-            <MessageSquare className="w-8 h-8 text-primary" /> Leadership Notes
+            <MessageSquare className="w-8 h-8 text-primary" /> {t("hq.leadershipNotes")}
           </h2>
           <Button variant="outline" onClick={handleViewArchives} className="gap-2">
             <Archive className="w-4 h-4" />
-            View All Archives
+            {t("hq.viewAllArchives")}
           </Button>
         </div>
         <div className="space-y-4">

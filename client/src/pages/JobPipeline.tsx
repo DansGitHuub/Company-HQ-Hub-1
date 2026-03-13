@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,7 @@ function getGoogleMapsLink(address?: string | null, city?: string | null, state?
 }
 
 function SoldJobsBoard() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { uploadFile, isUploading } = useUpload();
@@ -84,7 +86,7 @@ function SoldJobsBoard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
-      toast({ title: "Job created" });
+      toast({ title: t("jobs.jobCreated") });
       setIsModalOpen(false);
     },
   });
@@ -96,7 +98,7 @@ function SoldJobsBoard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
-      toast({ title: "Job updated" });
+      toast({ title: t("jobs.jobUpdated") });
       setIsModalOpen(false);
     },
   });
@@ -107,7 +109,7 @@ function SoldJobsBoard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
-      toast({ title: "Job deleted" });
+      toast({ title: t("jobs.jobDeleted") });
       setIsModalOpen(false);
     },
   });
@@ -119,7 +121,7 @@ function SoldJobsBoard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", selectedJob?.id, "documents"] });
-      toast({ title: "Document uploaded" });
+      toast({ title: t("jobs.documentUploaded") });
     },
   });
 
@@ -129,7 +131,7 @@ function SoldJobsBoard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", selectedJob?.id, "documents"] });
-      toast({ title: "Document deleted" });
+      toast({ title: t("jobs.documentDeleted") });
     },
   });
 
@@ -142,7 +144,7 @@ function SoldJobsBoard() {
       queryClient.invalidateQueries({ queryKey: ["/api/job-pipeline-tabs"] });
       setShowAddTab(false);
       setAddTabName("");
-      toast({ title: "Tab created" });
+      toast({ title: t("jobs.tabCreated") });
     },
   });
 
@@ -164,7 +166,7 @@ function SoldJobsBoard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/job-pipeline-tabs"] });
       if (activeTab === editingTab) setActiveTab("Install");
-      toast({ title: "Tab deleted" });
+      toast({ title: t("jobs.tabDeleted") });
     },
   });
 
@@ -242,7 +244,7 @@ function SoldJobsBoard() {
       <div className="flex justify-between items-center">
         <div />
         <Button className="gap-2" onClick={openNewJobModal} data-testid="button-add-job">
-          <Plus className="w-4 h-4" /> New Job
+          <Plus className="w-4 h-4" /> {t("jobs.addJob")}
         </Button>
       </div>
 
@@ -314,7 +316,7 @@ function SoldJobsBoard() {
             <Input
               value={addTabName}
               onChange={(e) => setAddTabName(e.target.value)}
-              placeholder="Tab name"
+              placeholder={t("jobs.tabName")}
               className="w-32 h-8"
               autoFocus
             />
@@ -347,7 +349,7 @@ function SoldJobsBoard() {
             onClick={() => setShowAddTab(true)}
             data-testid="button-add-tab"
           >
-            <Plus className="w-4 h-4 mr-1" /> Add Tab
+            <Plus className="w-4 h-4 mr-1" /> {t("jobs.addTab")}
           </Button>
         )}
       </div>
@@ -438,22 +440,22 @@ function SoldJobsBoard() {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isNewJob ? "Create New Job" : "Edit Job"}</DialogTitle>
+            <DialogTitle>{isNewJob ? t("jobs.createNewJob") : t("jobs.editJob")}</DialogTitle>
             <DialogDescription>
-              {isNewJob ? "Enter the job details" : "Update job information and documents"}
+              {isNewJob ? t("jobs.enterJobDetails") : t("jobs.updateJobInfo")}
             </DialogDescription>
           </DialogHeader>
 
           <Tabs defaultValue="details" className="mt-4">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="documents" disabled={isNewJob}>Documents</TabsTrigger>
+              <TabsTrigger value="details">{t("common.details")}</TabsTrigger>
+              <TabsTrigger value="documents" disabled={isNewJob}>{t("employees.documents")}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="details" className="space-y-6 mt-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Client Name *</Label>
+                  <Label>{t("jobs.clientName")} *</Label>
                   <Input
                     value={editForm.client || ""}
                     onChange={e => setEditForm({ ...editForm, client: e.target.value })}
@@ -461,13 +463,13 @@ function SoldJobsBoard() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Job Type *</Label>
+                  <Label>{t("jobs.serviceType")} *</Label>
                   <Select
                     value={editForm.type || ""}
                     onValueChange={v => setEditForm({ ...editForm, type: v })}
                   >
                     <SelectTrigger data-testid="select-job-type">
-                      <SelectValue placeholder="Select job type" />
+                      <SelectValue placeholder={t("jobs.selectJobType")} />
                     </SelectTrigger>
                     <SelectContent>
                       {JOB_TYPES.map(t => (
@@ -480,7 +482,7 @@ function SoldJobsBoard() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Category</Label>
+                  <Label>{t("common.category")}</Label>
                   <Select
                     value={editForm.category || "Project"}
                     onValueChange={v => setEditForm({ ...editForm, category: v as JobCategory })}
@@ -489,13 +491,13 @@ function SoldJobsBoard() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Project">Project</SelectItem>
-                      <SelectItem value="Maintenance">Maintenance</SelectItem>
+                      <SelectItem value="Project">{t("jobs.project")}</SelectItem>
+                      <SelectItem value="Maintenance">{t("jobs.maintenance")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Value ($)</Label>
+                  <Label>{t("common.value")} ($)</Label>
                   <Input
                     type="number"
                     value={editForm.value || ""}
@@ -506,32 +508,32 @@ function SoldJobsBoard() {
               </div>
 
               <div className="space-y-2">
-                <Label>Address</Label>
+                <Label>{t("common.address")}</Label>
                 <Input
                   value={editForm.address || ""}
                   onChange={e => setEditForm({ ...editForm, address: e.target.value })}
-                  placeholder="Street address"
+                  placeholder={t("jobs.streetAddress")}
                   data-testid="input-job-address"
                 />
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>City</Label>
+                  <Label>{t("common.city")}</Label>
                   <Input
                     value={editForm.city || ""}
                     onChange={e => setEditForm({ ...editForm, city: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>State</Label>
+                  <Label>{t("common.state")}</Label>
                   <Input
                     value={editForm.state || ""}
                     onChange={e => setEditForm({ ...editForm, state: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>ZIP</Label>
+                  <Label>{t("common.zip")}</Label>
                   <Input
                     value={editForm.zip || ""}
                     onChange={e => setEditForm({ ...editForm, zip: e.target.value })}
@@ -546,13 +548,13 @@ function SoldJobsBoard() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center text-sm text-primary hover:underline"
                 >
-                  <MapPin className="w-4 h-4 mr-1" /> Open in Google Maps
+                  <MapPin className="w-4 h-4 mr-1" /> {t("common.openInGoogleMaps")}
                 </a>
               )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Scheduled Date</Label>
+                  <Label>{t("jobs.scheduledDate")}</Label>
                   <Input
                     type="date"
                     value={editForm.scheduledDate ? new Date(editForm.scheduledDate).toISOString().split('T')[0] : ""}
@@ -562,7 +564,7 @@ function SoldJobsBoard() {
                 </div>
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
-                    Completion Date
+                    {t("jobs.completionDate")}
                     {editForm.isMandatoryDate && <AlertCircle className="w-4 h-4 text-destructive" />}
                   </Label>
                   <Input
@@ -580,55 +582,55 @@ function SoldJobsBoard() {
                   checked={editForm.isMandatoryDate || false}
                   onCheckedChange={(c) => setEditForm({ ...editForm, isMandatoryDate: c === true })}
                 />
-                <Label htmlFor="mandatoryDate" className="text-sm">Mandatory completion date (cannot be rescheduled)</Label>
+                <Label htmlFor="mandatoryDate" className="text-sm">{t("jobs.mandatoryCompletion")}</Label>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Estimated Hours</Label>
+                  <Label>{t("jobs.hoursToComplete")}</Label>
                   <Input
                     type="number"
                     value={editForm.estimatedHours || ""}
                     onChange={e => setEditForm({ ...editForm, estimatedHours: parseInt(e.target.value) || undefined })}
-                    placeholder="Hours to complete"
+                    placeholder={t("jobs.hoursToComplete")}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Estimated Days (for jobs &gt; 72 hours)</Label>
+                  <Label>{t("jobs.daysToComplete")}</Label>
                   <Input
                     type="number"
                     value={editForm.estimatedDays || ""}
                     onChange={e => setEditForm({ ...editForm, estimatedDays: parseInt(e.target.value) || undefined })}
-                    placeholder="Days to complete"
+                    placeholder={t("jobs.daysToComplete")}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>Contact Name</Label>
+                  <Label>{t("jobs.contactName")}</Label>
                   <Input
                     value={editForm.contactName || ""}
                     onChange={e => setEditForm({ ...editForm, contactName: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Contact Phone</Label>
+                  <Label>{t("jobs.contactPhone")}</Label>
                   <Input
                     value={editForm.contactPhone || ""}
                     onChange={e => setEditForm({ ...editForm, contactPhone: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Phone 2</Label>
+                  <Label>{t("jobs.additionalPhone")}</Label>
                   <Input
                     value={editForm.contactPhone2 || ""}
                     onChange={e => setEditForm({ ...editForm, contactPhone2: e.target.value })}
-                    placeholder="Additional phone"
+                    placeholder={t("jobs.additionalPhone")}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Contact Email</Label>
+                  <Label>{t("jobs.contactEmail")}</Label>
                   <Input
                     type="email"
                     value={editForm.contactEmail || ""}
@@ -638,20 +640,20 @@ function SoldJobsBoard() {
               </div>
 
               <div className="space-y-2">
-                <Label>Zone</Label>
+                <Label>{t("jobs.zone")}</Label>
                 <Input
                   value={editForm.zone || ""}
                   onChange={e => setEditForm({ ...editForm, zone: e.target.value })}
-                  placeholder="e.g., Zone A, North Side"
+                  placeholder={t("jobs.zonePlaceholder")}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Notes</Label>
+                <Label>{t("common.notes")}</Label>
                 <Textarea
                   value={editForm.notes || ""}
                   onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
-                  placeholder="Add notes about this job..."
+                  placeholder={t("jobs.notesPlaceholder")}
                   rows={4}
                   data-testid="input-job-notes"
                 />
@@ -662,7 +664,7 @@ function SoldJobsBoard() {
               <div className="space-y-4">
                 <div className="flex gap-4 items-end">
                   <div className="flex-1 space-y-2">
-                    <Label>Document Type</Label>
+                    <Label>{t("common.type")}</Label>
                     <Select value={newDocType} onValueChange={setNewDocType}>
                       <SelectTrigger>
                         <SelectValue />
@@ -679,7 +681,7 @@ function SoldJobsBoard() {
                       <Button asChild disabled={isUploading}>
                         <span>
                           <Upload className="w-4 h-4 mr-2" />
-                          {isUploading ? "Uploading..." : "Upload"}
+                          {isUploading ? t("jobs.uploading") : t("common.upload")}
                         </span>
                       </Button>
                     </Label>
@@ -695,7 +697,7 @@ function SoldJobsBoard() {
 
                 <div className="space-y-2">
                   {jobDocuments.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">No documents uploaded yet</p>
+                    <p className="text-muted-foreground text-center py-8">{t("jobs.noDocuments")}</p>
                   ) : (
                     jobDocuments.map(doc => (
                       <Card key={doc.id} className="p-4">
@@ -739,7 +741,7 @@ function SoldJobsBoard() {
                       canDelete
                       canAttachFromLibrary
                       module="job"
-                      title="Linked Documents"
+                      title={t("jobs.linkedDocuments")}
                       compact
                     />
                   </div>
@@ -748,23 +750,26 @@ function SoldJobsBoard() {
             </TabsContent>
           </Tabs>
 
-          <DialogFooter className="gap-2 mt-6">
+          <DialogFooter className="mt-6 flex justify-between items-center">
             {!isNewJob && (
               <Button
                 variant="destructive"
-                onClick={() => selectedJob && deleteMutation.mutate(selectedJob.id)}
+                onClick={() => {
+                  if (confirm(t("common.deleteConfirm"))) {
+                    deleteMutation.mutate(selectedJob!.id);
+                  }
+                }}
                 data-testid="button-delete-job"
               >
-                Delete
+                {t("common.delete")}
               </Button>
             )}
-            <div className="flex-1" />
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} data-testid="button-save-job">
-              {isNewJob ? "Create & Upload Docs" : "Save Changes"}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsModalOpen(false)}>{t("common.cancel")}</Button>
+              <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending}>
+                {createMutation.isPending || updateMutation.isPending ? t("common.saving") : t("common.save")}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -773,6 +778,7 @@ function SoldJobsBoard() {
 }
 
 function EstimatesBoard() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -797,7 +803,7 @@ function EstimatesBoard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
-      toast({ title: "Estimate created" });
+      toast({ title: t("jobs.estimateCreated") });
       setIsModalOpen(false);
     },
   });
@@ -809,7 +815,7 @@ function EstimatesBoard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
-      toast({ title: "Estimate updated" });
+      toast({ title: t("jobs.estimateUpdated") });
       setIsModalOpen(false);
     },
   });
@@ -820,7 +826,7 @@ function EstimatesBoard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
-      toast({ title: "Estimate deleted" });
+      toast({ title: t("jobs.estimateDeleted") });
       setIsModalOpen(false);
     },
   });
@@ -833,7 +839,7 @@ function EstimatesBoard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
-      toast({ title: "Estimate converted to job!" });
+      toast({ title: t("jobs.convertedToJob") });
       setShowConvertDialog(false);
       setIsModalOpen(false);
     },
@@ -890,12 +896,12 @@ function EstimatesBoard() {
               data-testid="checkbox-notify-on-move"
             />
             <Label htmlFor="notifyOnMove" className="text-sm flex items-center gap-1">
-              <Mail className="w-3 h-3" /> Email customer on stage change
+              <Mail className="w-3 h-3" /> {t("jobs.emailCustomer")}
             </Label>
           </div>
         </div>
         <Button className="gap-2" onClick={openNewEstimateModal} data-testid="button-add-estimate">
-          <Plus className="w-4 h-4" /> New Estimate
+          <Plus className="w-4 h-4" /> {t("jobs.addEstimate")}
         </Button>
       </div>
 
@@ -972,7 +978,7 @@ function EstimatesBoard() {
                                     }}
                                     data-testid={`button-convert-${estimate.id}`}
                                   >
-                                    <ArrowRight className="w-3 h-3" /> Convert to Sold Job
+                                    <ArrowRight className="w-3 h-3" /> {t("jobs.convertToJob")}
                                   </Button>
                                 )}
                               </CardContent>
@@ -999,16 +1005,16 @@ function EstimatesBoard() {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isNewEstimate ? "Create New Estimate" : "Edit Estimate"}</DialogTitle>
+            <DialogTitle>{isNewEstimate ? t("jobs.createNewEstimate") : t("jobs.editEstimate")}</DialogTitle>
             <DialogDescription>
-              {isNewEstimate ? "Enter the estimate details" : "Update estimate information"}
+              {isNewEstimate ? t("jobs.enterEstimateDetails") : t("jobs.updateEstimateInfo")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Client Name *</Label>
+                <Label>{t("jobs.clientName")} *</Label>
                 <Input
                   value={editForm.clientName || ""}
                   onChange={e => setEditForm({ ...editForm, clientName: e.target.value })}
@@ -1016,13 +1022,13 @@ function EstimatesBoard() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Service Type *</Label>
+                <Label>{t("jobs.serviceType")} *</Label>
                 <Select
                   value={editForm.serviceType || undefined}
                   onValueChange={v => setEditForm({ ...editForm, serviceType: v })}
                 >
                   <SelectTrigger data-testid="select-estimate-service">
-                    <SelectValue placeholder="Select service" />
+                    <SelectValue placeholder={t("jobs.selectService")} />
                   </SelectTrigger>
                   <SelectContent>
                     {JOB_TYPES.map(t => (
@@ -1035,7 +1041,7 @@ function EstimatesBoard() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Estimated Value ($)</Label>
+                <Label>{t("jobs.estimatedValue")} ($)</Label>
                 <Input
                   type="number"
                   value={editForm.estimatedValue || ""}
@@ -1044,7 +1050,7 @@ function EstimatesBoard() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Stage</Label>
+                <Label>{t("jobs.stage")}</Label>
                 <Select
                   value={editForm.stage || undefined}
                   onValueChange={v => setEditForm({ ...editForm, stage: v as EstimateStage })}
@@ -1062,41 +1068,41 @@ function EstimatesBoard() {
             </div>
 
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{t("common.description")}</Label>
               <Textarea
                 value={editForm.description || ""}
                 onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                placeholder="Describe the work to be estimated..."
+                placeholder={t("jobs.estimateDescriptionPlaceholder")}
                 rows={3}
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Property Address</Label>
+              <Label>{t("jobs.propertyAddress")}</Label>
               <Input
                 value={editForm.propertyAddress || ""}
                 onChange={e => setEditForm({ ...editForm, propertyAddress: e.target.value })}
-                placeholder="Street address"
+                placeholder={t("jobs.streetAddress")}
               />
             </div>
 
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>City</Label>
+                <Label>{t("common.city")}</Label>
                 <Input
                   value={editForm.city || ""}
                   onChange={e => setEditForm({ ...editForm, city: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>State</Label>
+                <Label>{t("common.state")}</Label>
                 <Input
                   value={editForm.state || ""}
                   onChange={e => setEditForm({ ...editForm, state: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>ZIP</Label>
+                <Label>{t("common.zip")}</Label>
                 <Input
                   value={editForm.zip || ""}
                   onChange={e => setEditForm({ ...editForm, zip: e.target.value })}
@@ -1111,27 +1117,27 @@ function EstimatesBoard() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center text-sm text-primary hover:underline"
               >
-                <MapPin className="w-4 h-4 mr-1" /> Open in Google Maps
+                <MapPin className="w-4 h-4 mr-1" /> {t("common.openInGoogleMaps")}
               </a>
             )}
 
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Contact Name</Label>
+                <Label>{t("jobs.contactName")}</Label>
                 <Input
                   value={editForm.contactName || ""}
                   onChange={e => setEditForm({ ...editForm, contactName: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Contact Phone</Label>
+                <Label>{t("jobs.contactPhone")}</Label>
                 <Input
                   value={editForm.contactPhone || ""}
                   onChange={e => setEditForm({ ...editForm, contactPhone: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Contact Email</Label>
+                <Label>{t("jobs.contactEmail")}</Label>
                 <Input
                   type="email"
                   value={editForm.contactEmail || ""}
@@ -1141,7 +1147,7 @@ function EstimatesBoard() {
             </div>
 
             <div className="space-y-2">
-              <Label>Follow-Up Date</Label>
+              <Label>{t("jobs.followUpDate")}</Label>
               <Input
                 type="date"
                 value={editForm.followUpDate ? new Date(editForm.followUpDate).toISOString().split('T')[0] : ""}
@@ -1150,11 +1156,11 @@ function EstimatesBoard() {
             </div>
 
             <div className="space-y-2">
-              <Label>Notes</Label>
+              <Label>{t("common.notes")}</Label>
               <Textarea
                 value={editForm.notes || ""}
                 onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
-                placeholder="Internal notes..."
+                placeholder={t("jobs.internalNotesPlaceholder")}
                 rows={3}
               />
             </div>
@@ -1164,18 +1170,22 @@ function EstimatesBoard() {
             {!isNewEstimate && isAdmin && (
               <Button
                 variant="destructive"
-                onClick={() => selectedEstimate && deleteMutation.mutate(selectedEstimate.id)}
+                onClick={() => {
+                  if (confirm(t("common.deleteConfirm"))) {
+                    selectedEstimate && deleteMutation.mutate(selectedEstimate.id);
+                  }
+                }}
                 data-testid="button-delete-estimate"
               >
-                Delete
+                {t("common.delete")}
               </Button>
             )}
             <div className="flex-1" />
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleSave} data-testid="button-save-estimate">
-              {isNewEstimate ? "Create Estimate" : "Save Changes"}
+              {isNewEstimate ? t("jobs.createEstimate") : t("common.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1184,14 +1194,14 @@ function EstimatesBoard() {
       <Dialog open={showConvertDialog} onOpenChange={setShowConvertDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Convert to Sold Job</DialogTitle>
+            <DialogTitle>{t("jobs.convertToJob")}</DialogTitle>
             <DialogDescription>
-              This will create a new job from this estimate and mark it as Won.
+              {t("jobs.convertEstimateDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div className="space-y-2">
-              <Label>Job Category</Label>
+              <Label>{t("jobs.selectCategory")}</Label>
               <Select value={convertCategory} onValueChange={setConvertCategory}>
                 <SelectTrigger>
                   <SelectValue />
@@ -1204,7 +1214,7 @@ function EstimatesBoard() {
             </div>
           </div>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowConvertDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowConvertDialog(false)}>{t("common.cancel")}</Button>
             <Button
               onClick={() => {
                 if (selectedEstimate) {
@@ -1213,7 +1223,7 @@ function EstimatesBoard() {
               }}
               data-testid="button-confirm-convert"
             >
-              <ArrowRight className="w-4 h-4 mr-1" /> Convert
+              <ArrowRight className="w-4 h-4 mr-1" /> {t("common.convert")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1223,14 +1233,15 @@ function EstimatesBoard() {
 }
 
 export default function JobPipeline() {
+  const { t } = useTranslation();
   const [topTab, setTopTab] = useState<"sold" | "estimates">("sold");
 
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Work Pipeline</h1>
-          <p className="text-muted-foreground">Track project velocity from lead to completion</p>
+          <h1 className="text-2xl font-heading font-bold text-foreground">{t("jobs.title")}</h1>
+          <p className="text-muted-foreground">{t("jobs.pipelineSubtitle")}</p>
         </div>
       </div>
 
@@ -1244,7 +1255,7 @@ export default function JobPipeline() {
           }`}
           data-testid="top-tab-sold"
         >
-          Sold Jobs
+          {t("jobs.soldJobs")}
         </button>
         <button
           onClick={() => setTopTab("estimates")}
@@ -1255,7 +1266,7 @@ export default function JobPipeline() {
           }`}
           data-testid="top-tab-estimates"
         >
-          Estimates
+          {t("jobs.estimates")}
         </button>
       </div>
 

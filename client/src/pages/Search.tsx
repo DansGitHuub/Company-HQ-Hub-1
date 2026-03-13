@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ type SearchResult = {
 };
 
 export default function SearchPage() {
+  const { t } = useTranslation();
   const [query, setQuery] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("q") || "";
@@ -103,10 +105,10 @@ export default function SearchPage() {
       <div>
         <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-3">
           <SearchIcon className="h-8 w-8" />
-          Search Results
+          {t("search.title")}
         </h1>
         <p className="text-muted-foreground mt-1">
-          {query ? `Showing results for "${query}"` : "Enter a search term"}
+          {query ? t("search.resultsFor", { query }) : t("search.enterTerm")}
         </p>
       </div>
 
@@ -118,7 +120,7 @@ export default function SearchPage() {
         <Card>
           <CardContent className="pt-6 text-center">
             <SearchIcon className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-            <p className="text-muted-foreground">Use the search bar to find SOPs, materials, jobs, candidates, and more.</p>
+            <p className="text-muted-foreground">{t("search.placeholder")}</p>
           </CardContent>
         </Card>
       ) : results && results.length > 0 ? (
@@ -142,7 +144,7 @@ export default function SearchPage() {
                           <p className="text-sm text-muted-foreground line-clamp-2">{result.description}</p>
                         )}
                         {result.category && (
-                          <p className="text-xs text-muted-foreground mt-1">Category: {result.category}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{t("common.category")}: {result.category}</p>
                         )}
                       </div>
                     </div>
@@ -156,8 +158,8 @@ export default function SearchPage() {
         <Card>
           <CardContent className="pt-6 text-center">
             <SearchIcon className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No results found</h3>
-            <p className="text-muted-foreground">Try different keywords or check your spelling.</p>
+            <h3 className="text-lg font-semibold mb-2">{t("search.noResults")}</h3>
+            <p className="text-muted-foreground">{t("search.tryDifferent")}</p>
           </CardContent>
         </Card>
       )}

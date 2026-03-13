@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
   Plus, Wrench, Truck, AlertTriangle, ChevronRight, Trash2, Edit2,
   Upload, FileText, Clock, CheckCircle2, AlertCircle, Search,
@@ -30,6 +31,7 @@ const DOC_FOLDERS = ["manuals", "purchase", "warranty", "registration", "insuran
 type View = "dashboard" | "asset-detail";
 
 export default function EquipmentTracker() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [view, setView] = useState<View>("dashboard");
@@ -151,23 +153,23 @@ function FleetDashboard({
   };
 
   const tiles = [
-    { label: "Total Assets", value: stats?.total ?? 0, icon: Truck, color: "text-blue-600", bg: "bg-blue-50", filter: null },
-    { label: "P1 Critical", value: stats?.p1 ?? 0, icon: AlertCircle, color: "text-red-600", bg: "bg-red-50", filter: "p1" },
-    { label: "P2 Due Soon", value: stats?.p2 ?? 0, icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-50", filter: "p2" },
-    { label: "P3 Approaching", value: stats?.p3 ?? 0, icon: Clock, color: "text-yellow-600", bg: "bg-yellow-50", filter: "p3" },
-    { label: "In Repair", value: stats?.inRepair ?? 0, icon: Wrench, color: "text-purple-600", bg: "bg-purple-50", filter: "repair" },
-    { label: "Compliance", value: stats?.complianceAlerts ?? 0, icon: Shield, color: "text-pink-600", bg: "bg-pink-50", filter: null },
+    { label: t("equipment.totalAssets"), value: stats?.total ?? 0, icon: Truck, color: "text-blue-600", bg: "bg-blue-50", filter: null },
+    { label: t("equipment.p1Critical"), value: stats?.p1 ?? 0, icon: AlertCircle, color: "text-red-600", bg: "bg-red-50", filter: "p1" },
+    { label: t("equipment.p2DueSoon"), value: stats?.p2 ?? 0, icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-50", filter: "p2" },
+    { label: t("equipment.p3Approaching"), value: stats?.p3 ?? 0, icon: Clock, color: "text-yellow-600", bg: "bg-yellow-50", filter: "p3" },
+    { label: t("equipment.inRepair"), value: stats?.inRepair ?? 0, icon: Wrench, color: "text-purple-600", bg: "bg-purple-50", filter: "repair" },
+    { label: t("equipment.compliance"), value: stats?.complianceAlerts ?? 0, icon: Shield, color: "text-pink-600", bg: "bg-pink-50", filter: null },
   ];
 
   return (
     <div className="space-y-4" data-testid="fleet-dashboard">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold" data-testid="text-page-title">Fleet Management</h1>
-          <p className="text-muted-foreground">Equipment tracking, maintenance scheduling, and fleet health</p>
+          <h1 className="text-2xl font-heading font-bold" data-testid="text-page-title">{t("equipment.fleetManagement")}</h1>
+          <p className="text-muted-foreground">{t("equipment.fleetDesc")}</p>
         </div>
         <Button onClick={onAddNew} data-testid="button-add-equipment">
-          <Plus className="h-4 w-4 mr-2" /> Add Equipment
+          <Plus className="h-4 w-4 mr-2" /> {t("equipment.addEquipment")}
         </Button>
       </div>
 

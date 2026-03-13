@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -654,6 +655,7 @@ function getCollectorsForCategory(category: string): CollectorGroup[] {
 }
 
 export default function Forms() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [view, setView] = useState<View>("home");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -1055,10 +1057,11 @@ function FormsHome({
   hoveredId: string | null;
   setHoveredId: (id: string | null) => void;
 }) {
+  const { t } = useTranslation();
   const topButton = {
     id: "build-new" as View,
-    label: "Build a New Form",
-    description: "Create a form from scratch with our step-by-step builder",
+    label: t("forms.buildNewForm"),
+    description: t("forms.buildNewFormDesc"),
     icon: FilePlus2,
     color: "from-emerald-500 to-emerald-700",
     hoverColor: "from-emerald-600 to-emerald-800",
@@ -1072,18 +1075,18 @@ function FormsHome({
     color: string;
     hoverColor: string;
   }[] = [
-    { id: "form-library", label: "Form Library", description: "Browse and manage all your published forms", icon: Library, color: "from-blue-500 to-blue-700", hoverColor: "from-blue-600 to-blue-800" },
-    { id: "update-existing", label: "Update an Existing Form", description: "Edit and modify forms that are already in use", icon: RefreshCw, color: "from-violet-500 to-violet-700", hoverColor: "from-violet-600 to-violet-800" },
-    { id: "form-drafts", label: "Form Drafts", description: "Continue working on forms you haven't finished yet", icon: FileEdit, color: "from-amber-500 to-amber-700", hoverColor: "from-amber-600 to-amber-800" },
-    { id: "share-forms", label: "Share Forms", description: "Send forms to employees, customers, or external contacts", icon: Share2, color: "from-cyan-500 to-cyan-700", hoverColor: "from-cyan-600 to-cyan-800" },
-    { id: "build-packet", label: "Build a Packet", description: "Bundle multiple forms together into a single packet", icon: Package, color: "from-rose-500 to-rose-700", hoverColor: "from-rose-600 to-rose-800" },
-    { id: "pdf-forms", label: "PDF Forms", description: "Import, fill, and export PDF forms digitally", icon: FileDown, color: "from-indigo-500 to-indigo-700", hoverColor: "from-indigo-600 to-indigo-800" },
-    { id: "discontinued", label: "Discontinued Forms", description: "View and restore forms that have been retired", icon: XCircle, color: "from-slate-500 to-slate-700", hoverColor: "from-slate-600 to-slate-800" },
+    { id: "form-library", label: t("forms.formLibrary"), description: t("forms.formLibraryDesc"), icon: Library, color: "from-blue-500 to-blue-700", hoverColor: "from-blue-600 to-blue-800" },
+    { id: "update-existing", label: t("forms.updateExisting"), description: t("forms.updateExistingDesc"), icon: RefreshCw, color: "from-violet-500 to-violet-700", hoverColor: "from-violet-600 to-violet-800" },
+    { id: "form-drafts", label: t("forms.formDrafts"), description: t("forms.formDraftsDesc"), icon: FileEdit, color: "from-amber-500 to-amber-700", hoverColor: "from-amber-600 to-amber-800" },
+    { id: "share-forms", label: t("forms.shareForms"), description: t("forms.shareFormsDesc"), icon: Share2, color: "from-cyan-500 to-cyan-700", hoverColor: "from-cyan-600 to-cyan-800" },
+    { id: "build-packet", label: t("forms.buildPacket"), description: t("forms.buildPacketDesc"), icon: Package, color: "from-rose-500 to-rose-700", hoverColor: "from-rose-600 to-rose-800" },
+    { id: "pdf-forms", label: t("forms.pdfForms"), description: t("forms.pdfFormsDesc"), icon: FileDown, color: "from-indigo-500 to-indigo-700", hoverColor: "from-indigo-600 to-indigo-800" },
+    { id: "discontinued", label: t("forms.discontinued"), description: t("forms.discontinuedDesc"), icon: XCircle, color: "from-slate-500 to-slate-700", hoverColor: "from-slate-600 to-slate-800" },
   ];
 
   return (
     <div className="max-w-4xl mx-auto" data-testid="forms-page">
-      <h1 className="text-2xl font-heading font-bold text-foreground mb-6" data-testid="text-forms-title">Forms</h1>
+      <h1 className="text-2xl font-heading font-bold text-foreground mb-6" data-testid="text-forms-title">{t("forms.title")}</h1>
       <button
         onClick={() => onNavigate(topButton.id)}
         className={`w-full mb-6 rounded-2xl bg-gradient-to-br ${hoveredId === topButton.id ? topButton.hoverColor : topButton.color} p-8 text-white text-left transition-all duration-200 ${hoveredId === topButton.id ? "scale-[1.01] shadow-xl" : "shadow-lg"}`}

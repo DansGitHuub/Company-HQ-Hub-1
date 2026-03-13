@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -90,6 +91,7 @@ type SafeUser = Omit<User, "password">;
 type TodoActiveUser = { id: string; userId: string; activatedBy: string | null; activatedAt: Date | null };
 
 function TodoActiveUsersManager() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   
   const { data: users = [] } = useQuery<SafeUser[]>({
@@ -201,6 +203,7 @@ function TodoActiveUsersManager() {
 }
 
 export default function AdminPanel() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -455,10 +458,10 @@ export default function AdminPanel() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-3">
-            <Shield className="w-8 h-8 text-primary" /> Admin Panel
+            <Shield className="w-8 h-8 text-primary" /> {t("nav.adminPanel")}
             {isMasterAdmin && <Badge className="bg-amber-100 text-amber-800"><Crown className="w-3 h-3 mr-1" /> Master</Badge>}
           </h1>
-          <p className="text-muted-foreground">Manage users, roles, and access control</p>
+          <p className="text-muted-foreground">{t("settings.adminSettingsDesc")}</p>
         </div>
         <CreateUserDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} isMasterAdmin={isMasterAdmin} />
       </div>
@@ -467,7 +470,7 @@ export default function AdminPanel() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-3xl font-bold text-primary">{users.length}</div>
-            <p className="text-sm text-muted-foreground">Total Users</p>
+            <p className="text-sm text-muted-foreground">{t("common.total")} {t("nav.employees")}</p>
           </CardContent>
         </Card>
         <Card>
@@ -475,7 +478,7 @@ export default function AdminPanel() {
             <div className="text-3xl font-bold text-green-600">
               {users.filter(u => u.isActive).length}
             </div>
-            <p className="text-sm text-muted-foreground">Active</p>
+            <p className="text-sm text-muted-foreground">{t("status.active")}</p>
           </CardContent>
         </Card>
         <Card>
@@ -483,7 +486,7 @@ export default function AdminPanel() {
             <div className="text-3xl font-bold text-orange-600">
               {pendingRequests.length}
             </div>
-            <p className="text-sm text-muted-foreground">Pending Requests</p>
+            <p className="text-sm text-muted-foreground">{t("status.pending")} {t("hiring.communications")}</p>
           </CardContent>
         </Card>
         <Card>
@@ -491,43 +494,43 @@ export default function AdminPanel() {
             <div className="text-3xl font-bold text-amber-600">
               {users.filter(u => u.role === "Admin").length}
             </div>
-            <p className="text-sm text-muted-foreground">Admins</p>
+            <p className="text-sm text-muted-foreground">{t("common.roles.admin")}</p>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="users" className="w-full">
         <TabsList className="flex flex-wrap w-full max-w-5xl gap-1 h-auto">
-          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="users">{t("nav.employees")}</TabsTrigger>
           <TabsTrigger value="requests" className="gap-2">
-            Requests {pendingRequests.length > 0 && <Badge variant="destructive" className="ml-1">{pendingRequests.length}</Badge>}
+            {t("hiring.communications")} {pendingRequests.length > 0 && <Badge variant="destructive" className="ml-1">{pendingRequests.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="todos" className="gap-2">
-            To-Do Users
+            To-Do {t("nav.employees")}
           </TabsTrigger>
           <TabsTrigger value="help-reports" className="gap-2">
-            <HelpCircle className="h-4 w-4" /> Help Reports
+            <HelpCircle className="h-4 w-4" /> {t("nav.help")}
           </TabsTrigger>
           <TabsTrigger value="company" className="gap-2">
-            <Building2 className="h-4 w-4" /> Company
+            <Building2 className="h-4 w-4" /> {t("nav.companyHQ")}
           </TabsTrigger>
           <TabsTrigger value="assistant-agents" className="gap-2" data-testid="tab-assistant-agents">
-            <Sparkles className="h-4 w-4" /> Assistant
+            <Sparkles className="h-4 w-4" /> {t("nav.assistant")}
           </TabsTrigger>
           <TabsTrigger value="ai-logs" className="gap-2" data-testid="tab-ai-logs">
             <Bot className="h-4 w-4" /> AI Logs
           </TabsTrigger>
           <TabsTrigger value="documents" className="gap-2" data-testid="tab-documents">
-            <FileText className="h-4 w-4" /> Documents
+            <FileText className="h-4 w-4" /> {t("employees.documents")}
           </TabsTrigger>
           <TabsTrigger value="shared-links" className="gap-2" data-testid="tab-shared-links">
-            <ExternalLink className="h-4 w-4" /> Shared Links
+            <ExternalLink className="h-4 w-4" /> {t("common.share")}
           </TabsTrigger>
           <TabsTrigger value="suggestions" className="gap-2" data-testid="tab-suggestions">
             <Lightbulb className="h-4 w-4" /> Suggestions
           </TabsTrigger>
           <TabsTrigger value="app-testing" className="gap-2" data-testid="tab-app-testing">
-            <Eye className="h-4 w-4" /> App Testing
+            <Eye className="h-4 w-4" /> {t("common.preview")}
           </TabsTrigger>
           {user?.isMasterAdmin && (
             <TabsTrigger value="ai-agents" className="gap-2">

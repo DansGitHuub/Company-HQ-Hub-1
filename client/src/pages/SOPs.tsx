@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -26,6 +27,7 @@ import { Clock, PlayCircle, Brain, Printer, Download, Mail, Eye, EyeOff, Bold, I
 import { apiRequest } from "@/lib/queryClient";
 
 export default function SOPs() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -463,29 +465,29 @@ export default function SOPs() {
       <div className="space-y-6 max-w-4xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between">
           <Button variant="ghost" onClick={() => setSelectedSOP(null)} className="pl-0 gap-2 text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="w-4 h-4" /> Back to Library
+            <ArrowLeft className="w-4 h-4" /> {t("sops.backToLibrary")}
           </Button>
           <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setEditingSOP(selectedSOP)} data-testid="button-edit-sop">
-              <Edit className="w-4 h-4 mr-2" /> Edit
+              <Edit className="w-4 h-4 mr-2" /> {t("common.edit")}
             </Button>
             <Button variant="outline" onClick={handlePrint} data-testid="button-print-sop">
-              <Printer className="w-4 h-4 mr-2" /> Print
+              <Printer className="w-4 h-4 mr-2" /> {t("common.print")}
             </Button>
             <Button variant="outline" onClick={handleDownload} data-testid="button-download-sop">
-              <Download className="w-4 h-4 mr-2" /> Download
+              <Download className="w-4 h-4 mr-2" /> {t("common.download")}
             </Button>
             <Button variant="outline" onClick={() => {
-              const email = prompt("Enter email address to send this SOP to:");
+              const email = prompt(t("sops.enterEmailPrompt"));
               if (!email || !email.includes("@")) {
-                if (email) toast({ title: "Please enter a valid email address", variant: "destructive" });
+                if (email) toast({ title: t("sops.invalidEmail"), variant: "destructive" });
                 return;
               }
               apiRequest("POST", "/api/sop-email", { sopId: selectedSOP.id, toEmail: email })
-                .then(() => toast({ title: "SOP sent!", description: `Emailed to ${email}` }))
-                .catch(() => toast({ title: "Failed to send email", variant: "destructive" }));
+                .then(() => toast({ title: t("sops.emailSent"), description: t("sops.emailedTo", { email }) }))
+                .catch(() => toast({ title: t("sops.emailFailed"), variant: "destructive" }));
             }} data-testid="button-email-sop">
-              <Mail className="w-4 h-4 mr-2" /> Email
+              <Mail className="w-4 h-4 mr-2" /> {t("common.email")}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -495,24 +497,24 @@ export default function SOPs() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => { setCopyingSopId(selectedSOP.id); setCopyDialogOpen(true); }}>
-                  <Copy className="w-4 h-4 mr-2" /> Copy to...
+                  <Copy className="w-4 h-4 mr-2" /> {t("sops.copyTo")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setMovingSopId(selectedSOP.id); setMoveDialogOpen(true); }}>
-                  <Move className="w-4 h-4 mr-2" /> Move
+                  <Move className="w-4 h-4 mr-2" /> {t("common.move")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleArchive(selectedSOP)}>
-                  <Archive className="w-4 h-4 mr-2" /> {selectedSOP.isArchived ? "Restore" : "Archive"}
+                  <Archive className="w-4 h-4 mr-2" /> {selectedSOP.isArchived ? t("common.restore") : t("common.archive")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   onClick={() => {
-                    if (confirm(`Are you sure you want to delete "${selectedSOP.title}"?`)) {
+                    if (confirm(t("sops.deleteConfirm", { title: selectedSOP.title }))) {
                       deleteMutation.mutate(selectedSOP.id);
                     }
                   }}
                   className="text-destructive"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" /> Delete
+                  <Trash2 className="w-4 h-4 mr-2" /> {t("common.delete")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -720,8 +722,8 @@ export default function SOPs() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">SOP Library</h1>
-          <p className="text-muted-foreground">Standard Operating Procedures & Knowledge Base</p>
+          <h1 className="text-2xl font-heading font-bold text-foreground">{t("sops.title")}</h1>
+          <p className="text-muted-foreground">{t("sops.manageSopTemplates")}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button
@@ -729,10 +731,10 @@ export default function SOPs() {
             className="gap-2 px-5 py-2.5 text-sm font-semibold shadow-md hover:shadow-lg hover:brightness-110 transition-all ring-1 ring-primary/20"
             data-testid="button-sop-builder"
           >
-            <ClipboardList className="w-5 h-5" /> SOP Builder
+            <ClipboardList className="w-5 h-5" /> {t("sops.sopBuilder")}
           </Button>
           <Button variant="outline" onClick={() => setAiGenerateOpen(true)} className="gap-2" data-testid="button-ai-generate-sop">
-            <Sparkles className="w-4 h-4" /> Generate with AI
+            <Sparkles className="w-4 h-4" /> {t("sops.generateWithAI")}
           </Button>
         </div>
       </div>
@@ -742,7 +744,7 @@ export default function SOPs() {
           <div className="relative flex-1 max-w-xl">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search all SOPs..."
+              placeholder={t("sops.searchSOPs")}
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
               className="pl-9 pr-20"
@@ -762,7 +764,7 @@ export default function SOPs() {
             data-testid="button-toggle-content-search"
           >
             <SearchCheck className="w-3.5 h-3.5" />
-            {searchContentToo ? "Title + Content" : "Title Only"}
+            {searchContentToo ? t("sops.titleAndContent") : t("sops.titleOnly")}
           </Button>
         </div>
 
@@ -790,13 +792,13 @@ export default function SOPs() {
               <CardHeader className="py-3 pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Search className="w-4 h-4" />
-                  {totalCount} result{totalCount !== 1 ? "s" : ""} for "{globalSearch}"
-                  <span className="text-xs text-muted-foreground font-normal">({searchContentToo ? "searching titles & content" : "searching titles only"})</span>
+                  {t("sops.searchResults", { count: totalCount, query: globalSearch })}
+                  <span className="text-xs text-muted-foreground font-normal">({searchContentToo ? t("sops.searchingTitleContent") : t("sops.searchingTitleOnly")})</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
                 {totalCount === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">Nothing found matching your search.</p>
+                  <p className="text-sm text-muted-foreground py-4 text-center">{t("sops.noResults")}</p>
                 ) : (
                   <div className="divide-y">
                     {sopResults.map(sop => {
@@ -890,16 +892,16 @@ export default function SOPs() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full max-w-lg grid-cols-4">
           <TabsTrigger value="topics" className="gap-2">
-            <FolderPlus className="w-4 h-4" /> Topics
+            <FolderPlus className="w-4 h-4" /> {t("sops.allTopics")}
           </TabsTrigger>
           <TabsTrigger value="drafts" className="gap-2" data-testid="tab-drafts">
-            <Clock className="w-4 h-4" /> Drafts {drafts.length > 0 && <Badge variant="secondary" className="ml-1 text-xs px-1.5">{drafts.length}</Badge>}
+            <Clock className="w-4 h-4" /> {t("status.draft")} {drafts.length > 0 && <Badge variant="secondary" className="ml-1 text-xs px-1.5">{drafts.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="templates" className="gap-2">
-            <LayoutTemplate className="w-4 h-4" /> Templates
+            <LayoutTemplate className="w-4 h-4" /> {t("sops.templates")}
           </TabsTrigger>
           <TabsTrigger value="examples" className="gap-2">
-            <BookMarked className="w-4 h-4" /> Examples
+            <BookMarked className="w-4 h-4" /> {t("sops.examples")}
           </TabsTrigger>
         </TabsList>
 
@@ -910,10 +912,10 @@ export default function SOPs() {
               onClick={() => setShowArchived(!showArchived)}
               size="sm"
             >
-              <Archive className="w-4 h-4 mr-2" /> {showArchived ? "Showing Archived" : "Show Archived"}
+              <Archive className="w-4 h-4 mr-2" /> {showArchived ? t("sops.showingArchived") : t("sops.showArchived")}
             </Button>
             <Button variant="outline" onClick={() => setNewCategoryOpen(true)} size="sm" className="gap-2">
-              <FolderPlus className="w-4 h-4" /> New Topic
+              <FolderPlus className="w-4 h-4" /> {t("sops.newTopic")}
             </Button>
           </div>
 

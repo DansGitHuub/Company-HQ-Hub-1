@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -171,6 +172,7 @@ const customerWalkthrough: WalkthroughStep[] = [
 ];
 
 function WalkthroughDialog({ steps, triggerText }: { steps: WalkthroughStep[]; triggerText: string }) {
+  const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
   const [open, setOpen] = useState(false);
   
@@ -217,7 +219,7 @@ function WalkthroughDialog({ steps, triggerText }: { steps: WalkthroughStep[]; t
               onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
               disabled={currentStep === 0}
             >
-              <ChevronLeft className="h-4 w-4 mr-2" /> Previous
+              <ChevronLeft className="h-4 w-4 mr-2" /> {t("common.previous")}
             </Button>
             <div className="flex gap-1">
               {steps.map((_, i) => (
@@ -232,11 +234,11 @@ function WalkthroughDialog({ steps, triggerText }: { steps: WalkthroughStep[]; t
             </div>
             {currentStep < steps.length - 1 ? (
               <Button onClick={() => setCurrentStep(currentStep + 1)}>
-                Next <ChevronRight className="h-4 w-4 ml-2" />
+                {t("common.next")} <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             ) : (
               <Button onClick={() => { setOpen(false); setCurrentStep(0); }}>
-                Done
+                {t("common.done")}
               </Button>
             )}
           </div>
@@ -297,6 +299,7 @@ const staffFAQs = [
 ];
 
 export default function Help() {
+  const { t } = useTranslation();
   const { user, effectiveRole, previewRole } = useAuth();
   const isCustomer = effectiveRole === "Customer";
   
@@ -305,10 +308,10 @@ export default function Help() {
       <div>
         <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-3">
           <LifeBuoy className="h-8 w-8 text-primary" />
-          {isCustomer ? "Customer Help" : "Help Center"}
+          {isCustomer ? t("help.customerHelp") : t("help.title")}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {isCustomer ? "Everything you need to know as a valued customer" : "Learn how to use Company HQ effectively"}
+          {isCustomer ? t("help.customerSubtitle") : t("help.subtitle")}
         </p>
       </div>
 
@@ -316,11 +319,11 @@ export default function Help() {
         <TabsList className="grid w-full grid-cols-2 mb-6">
           <TabsTrigger value="articles" className="gap-2" data-testid="tab-articles">
             <FileText className="h-4 w-4" />
-            Help Articles
+            {t("help.helpArticles")}
           </TabsTrigger>
           <TabsTrigger value="walkthroughs" className="gap-2" data-testid="tab-walkthroughs">
             <BookOpen className="h-4 w-4" />
-            Walkthroughs & FAQs
+            {t("help.walkthroughsFaqs")}
           </TabsTrigger>
         </TabsList>
         
@@ -334,16 +337,16 @@ export default function Help() {
               <div className="flex flex-col md:flex-row items-center gap-6">
                 <div className="flex-1">
                   <h2 className="text-2xl font-heading font-bold mb-2">
-                    {isCustomer ? "Welcome to Your Customer Portal" : "New Here?"}
+                    {isCustomer ? t("help.welcomeCustomer") : t("help.newHere")}
                   </h2>
                   <p className="text-muted-foreground mb-4">
                     {isCustomer 
-                      ? "Learn how to communicate with our team, request services, and access helpful resources for your landscaping."
-                      : "Take a quick walkthrough to learn the basics of Company HQ. We'll show you where everything is and how to get started."}
+                      ? t("help.customerIntro")
+                      : t("help.staffIntro")}
                   </p>
                   <WalkthroughDialog 
                     steps={isCustomer ? customerWalkthrough : adminWalkthrough} 
-                    triggerText={isCustomer ? "Take the Tour" : "Start Walkthrough"} 
+                    triggerText={isCustomer ? t("help.takeTour") : t("help.startWalkthrough")} 
                   />
                 </div>
                 <div className="p-6 bg-background rounded-xl shadow-sm">
@@ -363,9 +366,9 @@ export default function Help() {
                         <MessageSquare className="h-6 w-6 text-blue-500" />
                       </div>
                       <div>
-                        <h3 className="font-semibold mb-1">Send a Message</h3>
+                        <h3 className="font-semibold mb-1">{t("help.sendMessage")}</h3>
                         <p className="text-sm text-muted-foreground">
-                          Questions? Reach out anytime through your portal.
+                          {t("help.sendMessageDesc")}
                         </p>
                       </div>
                     </div>
@@ -378,9 +381,9 @@ export default function Help() {
                         <Calendar className="h-6 w-6 text-green-500" />
                       </div>
                       <div>
-                        <h3 className="font-semibold mb-1">Request Service</h3>
+                        <h3 className="font-semibold mb-1">{t("help.requestService")}</h3>
                         <p className="text-sm text-muted-foreground">
-                          Need work done? Submit a request and we'll follow up.
+                          {t("help.requestServiceDesc")}
                         </p>
                       </div>
                     </div>
@@ -393,9 +396,9 @@ export default function Help() {
                         <Leaf className="h-6 w-6 text-purple-500" />
                       </div>
                       <div>
-                        <h3 className="font-semibold mb-1">Care Guides</h3>
+                        <h3 className="font-semibold mb-1">{t("help.careGuides")}</h3>
                         <p className="text-sm text-muted-foreground">
-                          Find tips for maintaining your beautiful landscape.
+                          {t("help.careGuidesDesc")}
                         </p>
                       </div>
                     </div>
@@ -404,7 +407,7 @@ export default function Help() {
               </div>
 
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Frequently Asked Questions</h2>
+                <h2 className="text-xl font-semibold">{t("help.faqs")}</h2>
                 <div className="space-y-4">
                   {customerFAQs.map((faq, i) => (
                     <Card key={i}>
@@ -426,9 +429,9 @@ export default function Help() {
                       <Phone className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-1">Need More Help?</h3>
+                      <h3 className="font-semibold mb-1">{t("help.needMoreHelp")}</h3>
                       <p className="text-sm text-muted-foreground">
-                        If you can't find what you're looking for, send us a message through your Customer Portal. We're here to help!
+                        {t("help.needMoreHelpDesc")}
                       </p>
                     </div>
                   </div>
@@ -444,9 +447,9 @@ export default function Help() {
                       <LifeBuoy className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-1">Quick Tip: Info Icons</h3>
+                      <h3 className="font-semibold mb-1">{t("help.quickTip")}</h3>
                       <p className="text-sm text-muted-foreground">
-                        Hover over any menu item in the sidebar to see an info icon. Click it for a quick description and tips about that feature.
+                        {t("help.quickTipDesc")}
                       </p>
                     </div>
                   </div>
@@ -454,7 +457,7 @@ export default function Help() {
               </Card>
 
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Common Questions</h2>
+                <h2 className="text-xl font-semibold">{t("help.commonQuestions")}</h2>
                 <div className="space-y-4">
                   {staffFAQs.map((faq, i) => (
                     <Card key={i}>
@@ -477,6 +480,7 @@ export default function Help() {
 }
 
 function ReportArticleButton({ articleId, articleTitle }: { articleId: string; articleTitle: string }) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -516,56 +520,56 @@ function ReportArticleButton({ articleId, articleTitle }: { articleId: string; a
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground" data-testid="report-article-btn">
           <Flag className="h-4 w-4" />
-          Report Issue
+          {t("help.reportIssue")}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-yellow-500" />
-            Report an Issue
+            {t("help.reportAnIssue")}
           </DialogTitle>
           <DialogDescription>
-            Let us know if this article needs updating
+            {t("help.reportDescription")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div>
-            <label className="text-sm font-medium mb-1 block">Article</label>
+            <label className="text-sm font-medium mb-1 block">{t("help.article")}</label>
             <p className="text-muted-foreground">{articleTitle}</p>
           </div>
           <div>
-            <label className="text-sm font-medium mb-1 block">Issue Type</label>
+            <label className="text-sm font-medium mb-1 block">{t("help.issueType")}</label>
             <Select value={reportType} onValueChange={setReportType}>
               <SelectTrigger data-testid="report-type-select">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="outdated">Outdated information</SelectItem>
-                <SelectItem value="incorrect">Incorrect information</SelectItem>
-                <SelectItem value="unclear">Unclear or confusing</SelectItem>
-                <SelectItem value="missing">Missing information</SelectItem>
+                <SelectItem value="outdated">{t("help.outdated")}</SelectItem>
+                <SelectItem value="incorrect">{t("help.incorrect")}</SelectItem>
+                <SelectItem value="unclear">{t("help.unclear")}</SelectItem>
+                <SelectItem value="missing">{t("help.missing")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div>
-            <label className="text-sm font-medium mb-1 block">Description (optional)</label>
+            <label className="text-sm font-medium mb-1 block">{t("help.descriptionOptional")}</label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Tell us what's wrong or what could be improved..."
+              placeholder={t("help.tellUsWhat")}
               data-testid="report-description"
             />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
           <Button 
             onClick={() => reportMutation.mutate()} 
             disabled={reportMutation.isPending}
             data-testid="submit-report-btn"
           >
-            {reportMutation.isPending ? "Submitting..." : "Submit Report"}
+            {reportMutation.isPending ? t("common.submitting") : t("help.submitReport")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -574,6 +578,7 @@ function ReportArticleButton({ articleId, articleTitle }: { articleId: string; a
 }
 
 function HelpArticlesSection() {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedArticle, setSelectedArticle] = useState<HelpArticle | null>(null);
   
@@ -604,7 +609,7 @@ function HelpArticlesSection() {
           data-testid="back-to-articles"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Articles
+          {t("help.backToArticles")}
         </Button>
         
         <Card>
@@ -634,11 +639,11 @@ function HelpArticlesSection() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Help Articles</h2>
+        <h2 className="text-xl font-semibold">{t("help.helpArticles")}</h2>
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search articles..."
+            placeholder={t("help.searchArticles")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -651,7 +656,7 @@ function HelpArticlesSection() {
         <Card className="bg-muted/30">
           <CardContent className="py-8 text-center text-muted-foreground">
             <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p>No articles found</p>
+            <p>{t("help.noArticles")}</p>
           </CardContent>
         </Card>
       ) : (

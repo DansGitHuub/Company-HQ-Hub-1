@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -707,6 +708,7 @@ const WIZARD_PAGES = [
 ] as const;
 
 export default function CalculatorPage() {
+  const { t } = useTranslation();
   const [state, setState] = useState<WizardState>({ values: {} });
   const [pageIndex, setPageIndex] = useState(0);
 
@@ -810,10 +812,10 @@ export default function CalculatorPage() {
         <div>
           <div className="flex items-center gap-2">
             <CalcIcon className="h-5 w-5 text-primary" />
-            <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="text-calculator-title">Universal Calculator</h1>
+            <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="text-calculator-title">{t("calculator.title")}</h1>
           </div>
           <p className="text-muted-foreground mt-1">
-            Pick one thing at a time, get the exact calculation + references.
+            {t("calculator.subtitle")}
           </p>
         </div>
 

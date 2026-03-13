@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -162,6 +163,7 @@ function ScoreBar({ score, maxScore }: { score: number; maxScore: number }) {
 }
 
 export default function LeadQualifier() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [view, setView] = useState<"qualifier" | "saved">("qualifier");
   const [step, setStep] = useState(0);
@@ -260,10 +262,10 @@ export default function LeadQualifier() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="text-qualifier-title">
-            Lead Qualifier
+            {t("leadQualifier.title")}
           </h1>
           <p className="text-muted-foreground mt-1">
-            Score and qualify prospects to focus on the best opportunities.
+            {t("leadQualifier.subtitle")}
           </p>
         </div>
         <div className="flex gap-2">
@@ -272,14 +274,14 @@ export default function LeadQualifier() {
             onClick={() => setView("qualifier")}
             data-testid="button-view-qualifier"
           >
-            <Target className="h-4 w-4 mr-2" /> Qualify
+            <Target className="h-4 w-4 mr-2" /> {t("leadQualifier.qualify")}
           </Button>
           <Button
             variant={view === "saved" ? "default" : "outline"}
             onClick={() => setView("saved")}
             data-testid="button-view-saved"
           >
-            <Users className="h-4 w-4 mr-2" /> Saved ({savedLeads.length})
+            <Users className="h-4 w-4 mr-2" /> {t("common.saved")} ({savedLeads.length})
           </Button>
         </div>
       </div>

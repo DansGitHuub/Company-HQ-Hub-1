@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -88,6 +89,7 @@ type UserInfo = {
 };
 
 export default function MessagingInbox() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedThread, setSelectedThread] = useState<MessagingThread | null>(null);
@@ -181,7 +183,7 @@ export default function MessagingInbox() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messaging-threads"] });
-      toast({ title: "Conversation updated" });
+      toast({ title: t("messaging.conversationUpdated") });
     },
   });
 
@@ -195,13 +197,13 @@ export default function MessagingInbox() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "open":
-        return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Open</Badge>;
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800">{t("status.open")}</Badge>;
       case "in_progress":
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">In Progress</Badge>;
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">{t("status.inProgress")}</Badge>;
       case "resolved":
-        return <Badge variant="secondary" className="bg-green-100 text-green-800">Resolved</Badge>;
+        return <Badge variant="secondary" className="bg-green-100 text-green-800">{t("status.resolved")}</Badge>;
       case "closed":
-        return <Badge variant="outline">Closed</Badge>;
+        return <Badge variant="outline">{t("status.closed")}</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -210,13 +212,13 @@ export default function MessagingInbox() {
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
       case "urgent":
-        return <Badge variant="destructive">Urgent</Badge>;
+        return <Badge variant="destructive">{t("common.urgent")}</Badge>;
       case "high":
-        return <Badge variant="secondary" className="bg-orange-100 text-orange-800">High</Badge>;
+        return <Badge variant="secondary" className="bg-orange-100 text-orange-800">{t("common.high")}</Badge>;
       case "normal":
         return null;
       case "low":
-        return <Badge variant="outline" className="text-muted-foreground">Low</Badge>;
+        return <Badge variant="outline" className="text-muted-foreground">{t("common.low")}</Badge>;
       default:
         return null;
     }
@@ -228,10 +230,10 @@ export default function MessagingInbox() {
         <div>
           <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-2">
             <Mail className="h-8 w-8" />
-            {isAdmin ? "Communications Center" : "Messages"}
+            {isAdmin ? t("messaging.communicationsCenter") : t("nav.messages")}
           </h1>
           <p className="text-muted-foreground">
-            {isAdmin ? "Monitor and manage all customer conversations" : "View and manage your conversations"}
+            {isAdmin ? t("messaging.adminDescription") : t("messaging.userDescription")}
           </p>
         </div>
         <NewThreadDialog 
@@ -249,14 +251,14 @@ export default function MessagingInbox() {
         <Card className="lg:col-span-1">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Conversations</CardTitle>
+              <CardTitle className="text-lg">{t("messaging.conversations")}</CardTitle>
               <Badge variant="secondary">{filteredThreads.length}</Badge>
             </div>
             <div className="flex flex-col gap-2 mt-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search conversations..."
+                  placeholder={t("messaging.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -266,14 +268,14 @@ export default function MessagingInbox() {
               <div className="flex gap-2">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="flex-1" data-testid="select-status-filter">
-                    <SelectValue placeholder="Status" />
+                    <SelectValue placeholder={t("common.status")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
+                    <SelectItem value="all">{t("messaging.allStatus")}</SelectItem>
+                    <SelectItem value="open">{t("status.open")}</SelectItem>
+                    <SelectItem value="in_progress">{t("status.inProgress")}</SelectItem>
+                    <SelectItem value="resolved">{t("status.resolved")}</SelectItem>
+                    <SelectItem value="closed">{t("status.closed")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -281,11 +283,11 @@ export default function MessagingInbox() {
                 <div className="flex gap-2">
                   <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
                     <SelectTrigger className="flex-1" data-testid="select-employee-filter">
-                      <SelectValue placeholder="Employee" />
+                      <SelectValue placeholder={t("common.item")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="mine">My Conversations</SelectItem>
-                      <SelectItem value="all">All Employees</SelectItem>
+                      <SelectItem value="mine">{t("messaging.myConversations")}</SelectItem>
+                      <SelectItem value="all">{t("messaging.allEmployees")}</SelectItem>
                       {employees.map(emp => (
                         <SelectItem key={emp.id} value={emp.id}>{emp.name || emp.username}</SelectItem>
                       ))}
@@ -304,7 +306,7 @@ export default function MessagingInbox() {
               ) : filteredThreads.length === 0 ? (
                 <div className="text-center p-8 text-muted-foreground">
                   <Mail className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                  <p>No conversations found</p>
+                  <p>{t("messaging.noConversations")}</p>
                 </div>
               ) : (
                 filteredThreads.map((thread) => {
@@ -377,7 +379,7 @@ export default function MessagingInbox() {
                         <User className="h-4 w-4" />
                         <span>{getUserName(selectedThread.customerId)}</span>
                         <span>•</span>
-                        <span>Started {format(new Date(selectedThread.createdAt), "MMM d, yyyy")}</span>
+                        <span>{t("messaging.startedOn")} {format(new Date(selectedThread.createdAt), "MMM d, yyyy")}</span>
                       </div>
                     </div>
                   </div>
@@ -392,10 +394,10 @@ export default function MessagingInbox() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="open">Open</SelectItem>
-                          <SelectItem value="in_progress">In Progress</SelectItem>
-                          <SelectItem value="resolved">Resolved</SelectItem>
-                          <SelectItem value="closed">Closed</SelectItem>
+                          <SelectItem value="open">{t("status.open")}</SelectItem>
+                          <SelectItem value="in_progress">{t("status.inProgress")}</SelectItem>
+                          <SelectItem value="resolved">{t("status.resolved")}</SelectItem>
+                          <SelectItem value="closed">{t("status.closed")}</SelectItem>
                         </SelectContent>
                       </Select>
                     )}
@@ -404,7 +406,7 @@ export default function MessagingInbox() {
                 {isStaff && (
                   <div className="flex items-center gap-4 mt-3 pt-3 border-t text-sm">
                     <div className="flex items-center gap-2">
-                      <Label>Assigned to:</Label>
+                      <Label>{t("common.assignedTo")}:</Label>
                       <Select 
                         value={selectedThread.assignedEmployeeId || "unassigned"}
                         onValueChange={(val) => updateThreadMutation.mutate({ 
@@ -412,10 +414,10 @@ export default function MessagingInbox() {
                         })}
                       >
                         <SelectTrigger className="w-40" data-testid="select-assign-employee">
-                          <SelectValue placeholder="Select employee" />
+                          <SelectValue placeholder={t("common.select")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          <SelectItem value="unassigned">{t("common.unassigned")}</SelectItem>
                           {employees.map(emp => (
                             <SelectItem key={emp.id} value={emp.id}>{emp.name || emp.username}</SelectItem>
                           ))}
@@ -423,7 +425,7 @@ export default function MessagingInbox() {
                       </Select>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Label>Priority:</Label>
+                      <Label>{t("common.priority")}:</Label>
                       <Select 
                         value={selectedThread.priority || "normal"}
                         onValueChange={(val) => updateThreadMutation.mutate({ priority: val })}
@@ -432,10 +434,10 @@ export default function MessagingInbox() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="normal">Normal</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                          <SelectItem value="urgent">Urgent</SelectItem>
+                          <SelectItem value="low">{t("common.low")}</SelectItem>
+                          <SelectItem value="normal">{t("common.normal")}</SelectItem>
+                          <SelectItem value="high">{t("common.high")}</SelectItem>
+                          <SelectItem value="urgent">{t("common.urgent")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -451,7 +453,7 @@ export default function MessagingInbox() {
                   ) : messages.length === 0 ? (
                     <div className="text-center p-8 text-muted-foreground">
                       <Mail className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                      <p>No messages yet</p>
+                      <p>{t("messaging.noMessages")}</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -472,7 +474,7 @@ export default function MessagingInbox() {
                             {msg.isInternalNote && (
                               <div className="flex items-center gap-1 text-xs text-yellow-700 mb-1">
                                 <Lock className="h-3 w-3" />
-                                Internal Note
+                                {t("messaging.internalNote")}
                               </div>
                             )}
                             <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -506,13 +508,13 @@ export default function MessagingInbox() {
                           />
                           <Label htmlFor="internal-note" className="text-sm flex items-center gap-1">
                             <Lock className="h-3 w-3" />
-                            Internal note (not visible to customer)
+                            {t("messaging.internalNoteDescription")}
                           </Label>
                         </div>
                       )}
                       <div className="flex gap-2">
                         <Textarea
-                          placeholder={isInternalNote ? "Add an internal note..." : "Type your message..."}
+                          placeholder={isInternalNote ? t("messaging.internalNotePlaceholder") : t("messaging.messagePlaceholder")}
                           value={newMessageContent}
                           onChange={(e) => setNewMessageContent(e.target.value)}
                           className="min-h-[80px]"
@@ -530,14 +532,14 @@ export default function MessagingInbox() {
                           ) : (
                             <Send className="h-4 w-4 mr-2" />
                           )}
-                          {isInternalNote ? "Add Note" : "Send Message"}
+                          {isInternalNote ? t("messaging.addNote") : t("common.send")}
                         </Button>
                       </div>
                     </div>
                   ) : (
                     <div className="text-center py-4 text-muted-foreground">
                       <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                      <p>This conversation is closed</p>
+                      <p>{t("messaging.conversationClosed")}</p>
                     </div>
                   )}
                 </div>
@@ -546,8 +548,8 @@ export default function MessagingInbox() {
           ) : (
             <div className="flex flex-col items-center justify-center h-[500px] text-muted-foreground">
               <Mail className="h-16 w-16 mb-4 opacity-30" />
-              <p className="text-lg">Select a conversation to view</p>
-              <p className="text-sm">Or start a new conversation</p>
+              <p className="text-lg">{t("messaging.selectConversation")}</p>
+              <p className="text-sm">{t("messaging.orStartNew")}</p>
             </div>
           )}
         </Card>
