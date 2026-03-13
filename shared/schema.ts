@@ -2544,3 +2544,39 @@ export const insertCustomerSuggestionSchema = createInsertSchema(customerSuggest
 
 export type CustomerSuggestion = typeof customerSuggestions.$inferSelect;
 export type InsertCustomerSuggestion = z.infer<typeof insertCustomerSuggestionSchema>;
+
+export const ESTIMATE_STAGES = ["New Lead", "Contact Made", "Site Visit", "Proposal Sent", "Follow Up", "Won", "Lost"] as const;
+export type EstimateStage = typeof ESTIMATE_STAGES[number];
+
+export const estimates = pgTable("estimates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  clientName: text("client_name").notNull(),
+  serviceType: text("service_type").notNull(),
+  stage: text("stage").$type<EstimateStage>().notNull().default("New Lead"),
+  estimatedValue: integer("estimated_value").default(0),
+  description: text("description"),
+  propertyAddress: text("property_address"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
+  contactName: text("contact_name"),
+  contactPhone: text("contact_phone"),
+  contactEmail: text("contact_email"),
+  notes: text("notes"),
+  source: text("source").default("manual"),
+  workRequestId: varchar("work_request_id", { length: 36 }),
+  assignedTo: varchar("assigned_to", { length: 36 }).references(() => users.id),
+  customerId: varchar("customer_id", { length: 36 }).references(() => users.id),
+  followUpDate: timestamp("follow_up_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEstimateSchema = createInsertSchema(estimates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertEstimate = z.infer<typeof insertEstimateSchema>;
+export type Estimate = typeof estimates.$inferSelect;

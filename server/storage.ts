@@ -104,7 +104,8 @@ import {
   documents, type Document, type InsertDocument,
   documentLinks, type DocumentLink, type InsertDocumentLink,
   documentShares, type DocumentShare, type InsertDocumentShare,
-  onboardingFormSubmissions, type OnboardingFormSubmission, type InsertOnboardingFormSubmission
+  onboardingFormSubmissions, type OnboardingFormSubmission, type InsertOnboardingFormSubmission,
+  estimates, type Estimate, type InsertEstimate
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull, notInArray, sql } from "drizzle-orm";
@@ -717,6 +718,12 @@ export interface IStorage {
   incrementSharedLinkViewCount(id: string): Promise<void>;
   logSharedLinkAccess(sharedLinkId: string, ipAddress: string | null, userAgent: string | null): Promise<SharedLinkAccessLog>;
   getSharedLinkAccessLogs(sharedLinkId: string): Promise<SharedLinkAccessLog[]>;
+
+  getEstimates(): Promise<Estimate[]>;
+  getEstimate(id: string): Promise<Estimate | undefined>;
+  createEstimate(data: InsertEstimate): Promise<Estimate>;
+  updateEstimate(id: string, data: Partial<InsertEstimate>): Promise<Estimate | undefined>;
+  deleteEstimate(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3371,6 +3378,30 @@ export class DatabaseStorage implements IStorage {
   async updateOnboardingFormSubmission(id: string, data: Partial<InsertOnboardingFormSubmission>): Promise<OnboardingFormSubmission | undefined> {
     const [sub] = await db.update(onboardingFormSubmissions).set(data).where(eq(onboardingFormSubmissions.id, id)).returning();
     return sub;
+  }
+
+  async getEstimates(): Promise<Estimate[]> {
+    return await db.select().from(estimates).orderBy(desc(estimates.createdAt));
+  }
+
+  async getEstimate(id: string): Promise<Estimate | undefined> {
+    const [est] = await db.select().from(estimates).where(eq(estimates.id, id));
+    return est;
+  }
+
+  async createEstimate(data: InsertEstimate): Promise<Estimate> {
+    const [est] = await db.insert(estimates).values(data).returning();
+    return est;
+  }
+
+  async updateEstimate(id: string, data: Partial<InsertEstimate>): Promise<Estimate | undefined> {
+    const [est] = await db.update(estimates).set({ ...data, updatedAt: new Date() }).where(eq(estimates.id, id)).returning();
+    return est;
+  }
+
+  async deleteEstimate(id: string): Promise<boolean> {
+    const result = await db.delete(estimates).where(eq(estimates.id, id));
+    return true;
   }
 }
 

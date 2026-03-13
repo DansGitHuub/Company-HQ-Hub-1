@@ -12,7 +12,7 @@ import { registerCalendarRoutes } from "./calendarRoutes";
 import { registerSuggestionsRoutes } from "./suggestionsRoutes";
 import { registerTaskRoutes } from "./taskRoutes";
 import { registerAssistantRoutes } from "./assistantRoutes";
-import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail } from "./email";
+import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail } from "./email";
 import { checkAndSendReminders } from "./maintenanceScheduler";
 import OpenAI from "openai";
 import { 
@@ -3889,6 +3889,42 @@ Generate detailed information for this landscaping material.`;
         urgency: req.body.urgency,
         photos: req.body.photos || [],
       });
+
+      const customerUser = req.user!;
+      try {
+        await storage.createEstimate({
+          clientName: customerUser.fullName || customerUser.username,
+          serviceType: req.body.serviceType,
+          stage: "New Lead",
+          description: req.body.description,
+          propertyAddress: req.body.propertyAddress,
+          contactName: customerUser.fullName || customerUser.username,
+          contactEmail: customerUser.email || undefined,
+          source: "work_request",
+          workRequestId: request.id,
+          customerId: customerUser.id,
+        });
+      } catch (estErr) {
+        console.error("Error auto-creating estimate from work request:", estErr);
+      }
+
+      try {
+        const allUsers = await storage.getAllUsers();
+        const admins = allUsers.filter((u: User) => u.role === "Admin" || u.role === "Master Admin");
+        for (const admin of admins) {
+          await storage.createStaffNotification({
+            userId: admin.id,
+            type: "work_request",
+            title: "New Work Request",
+            message: `${customerUser.fullName || customerUser.username} submitted a work request: "${req.body.title}"`,
+            link: "/jobs",
+            isRead: false,
+          });
+        }
+      } catch (notifErr) {
+        console.error("Error sending admin notifications:", notifErr);
+      }
+
       res.status(201).json(request);
     } catch (err) {
       res.status(500).json({ message: "Error creating work request" });
@@ -3926,6 +3962,121 @@ Generate detailed information for this landscaping material.`;
       res.json(request);
     } catch (err) {
       res.status(500).json({ message: "Error updating work request" });
+    }
+  });
+
+  app.get("/api/estimates", requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== "Admin" && req.user?.role !== "Manager" && req.user?.role !== "Master Admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const allEstimates = await storage.getEstimates();
+      res.json(allEstimates);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching estimates" });
+    }
+  });
+
+  app.post("/api/estimates", requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== "Admin" && req.user?.role !== "Manager" && req.user?.role !== "Master Admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const estimate = await storage.createEstimate(req.body);
+      res.status(201).json(estimate);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating estimate" });
+    }
+  });
+
+  app.patch("/api/estimates/:id", requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== "Admin" && req.user?.role !== "Manager" && req.user?.role !== "Master Admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const existing = await storage.getEstimate(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Estimate not found" });
+
+      const oldStage = existing.stage;
+      const estimate = await storage.updateEstimate(req.params.id, req.body);
+
+      if (req.body.stage && req.body.stage !== oldStage && estimate?.contactEmail && req.body.notifyCustomer) {
+        try {
+          await sendCustomerNotificationEmail(
+            estimate.contactEmail,
+            estimate.clientName,
+            `Your estimate status has been updated`,
+            `Your estimate for ${estimate.serviceType} has moved to "${req.body.stage}". We'll be in touch with more details soon.`,
+            "View Details",
+            "/customer"
+          );
+        } catch (emailErr) {
+          console.error("Error sending estimate stage notification:", emailErr);
+        }
+      }
+
+      if (req.body.stage && req.body.stage !== oldStage && estimate?.customerId) {
+        try {
+          await storage.createCustomerNotification({
+            customerId: estimate.customerId,
+            type: "estimate_update",
+            title: "Estimate Updated",
+            message: `Your estimate for ${estimate.serviceType} has been updated to "${req.body.stage}".`,
+            link: "/customer",
+            isRead: false,
+          });
+        } catch (notifErr) {
+          console.error("Error creating customer notification:", notifErr);
+        }
+      }
+
+      res.json(estimate);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating estimate" });
+    }
+  });
+
+  app.delete("/api/estimates/:id", requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== "Admin" && req.user?.role !== "Master Admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      await storage.deleteEstimate(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting estimate" });
+    }
+  });
+
+  app.post("/api/estimates/:id/convert-to-job", requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== "Admin" && req.user?.role !== "Master Admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const estimate = await storage.getEstimate(req.params.id);
+      if (!estimate) return res.status(404).json({ message: "Estimate not found" });
+
+      const job = await storage.createJob({
+        client: estimate.clientName,
+        type: estimate.serviceType,
+        category: req.body.category || "Install",
+        stage: "Lead",
+        value: estimate.estimatedValue || 0,
+        address: estimate.propertyAddress || undefined,
+        city: estimate.city || undefined,
+        state: estimate.state || undefined,
+        zip: estimate.zip || undefined,
+        contactName: estimate.contactName || undefined,
+        contactPhone: estimate.contactPhone || undefined,
+        contactEmail: estimate.contactEmail || undefined,
+        notes: estimate.notes || undefined,
+      });
+
+      await storage.updateEstimate(req.params.id, { stage: "Won" });
+
+      res.json({ job, estimate });
+    } catch (err) {
+      res.status(500).json({ message: "Error converting estimate to job" });
     }
   });
 

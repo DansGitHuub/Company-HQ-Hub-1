@@ -222,7 +222,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         { label: "SOPs", example: "safety procedures" },
         { label: "Materials", example: "mulch, pavers, SKU" },
         { label: "Equipment", example: "truck, mower, VIN" },
-        { label: "Jobs", example: "client name or address" },
+        { label: "Work", example: "client name or address" },
         { label: "Candidates", example: "applicant name" }
       );
     }
@@ -333,7 +333,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     todos: { icon: CheckSquare, label: "Tasks", href: "/todos" },
     hiring: { icon: Users, label: "Hiring", href: "/hiring" },
     employees: { icon: User, label: "Employees", href: "/employees" },
-    jobs: { icon: LayoutDashboard, label: "Jobs", href: "/jobs" },
+    jobs: { icon: LayoutDashboard, label: "Work", href: "/jobs" },
     education: { icon: GraduationCap, label: "Customer Hub", href: "/education" },
     help: { icon: LifeBuoy, label: "Help", href: "/help" },
     hq: { icon: Building2, label: "CompanyHQ", href: "/hq" },

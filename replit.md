@@ -21,7 +21,7 @@ The frontend is built with React and TypeScript, leveraging React Query for serv
 - **Inventory Management**: Comprehensive materials catalog with an AI-powered creation wizard.
 - **Hiring & HR Module**: Full hiring pipeline with a 7-column Kanban board, drag-and-drop functionality, applicant detail panels, employee records, onboarding checklists, document management, and HR email templates.
 - **Marketing Campaigns**: Tools for managing marketing efforts.
-- **Job Tracking**: Tabbed interface for various job types and detailed job cards.
+- **Work Pipeline** (formerly "Jobs"): Renamed to "Work" in sidebar. Features two top-level views: **Sold Jobs** (kanban board with Lead→Completed stages, custom category tabs, drag-and-drop, job documents) and **Estimates** (separate kanban with stages: New Lead, Contact Made, Site Visit, Proposal Sent, Follow Up, Won, Lost). Estimates support role-based drag (Admin only), "Convert to Sold Job" on Won estimates, email-customer-on-stage-change checkbox, and auto-creation from customer work requests. Routes: `/jobs`, API: `/api/estimates/*`, `/api/estimates/:id/convert-to-job`. Table: `estimates`.
 - **Customer Hub / Resource Library**: Centralized educational content for customers with bookmarking.
 - **Employee Management**: Employee Portal for payroll, time off, and personal details.
 - **Equipment / Fleet Management**: Full fleet management system with a health dashboard, sortable asset table, detailed profiles, OEM maintenance library, priority engine, VIN decode via NHTSA API, and document management.

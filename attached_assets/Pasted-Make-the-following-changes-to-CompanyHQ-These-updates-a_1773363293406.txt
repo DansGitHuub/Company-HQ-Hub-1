@@ -1,0 +1,126 @@
+Make the following changes to CompanyHQ. These updates affect the Jobs module, the Messages module, and the Kanban pipeline.
+
+
+CHANGE 1 — Rename "Jobs" to "Work" throughout the app
+
+Rename every instance of "Jobs" to "Work" across the entire app:
+•	Left sidebar navigation label: Jobs → Work
+•	Page titles, headings, and breadcrumbs
+•	Button labels (e.g. "Add Job" → "Add Work")
+•	Table column headers
+•	Filter and search labels
+•	Any database display labels (do not rename database columns or table names — only the visible UI text)
+
+
+CHANGE 2 — Work pipeline gets two tabs
+
+The existing Kanban board in the Work module currently shows one pipeline. Add a tab system at the top with two tabs:
+
+•	Tab 1: Sold (the existing pipeline — no changes to its stages or functionality)
+•	Tab 2: Estimates (new pipeline — built below)
+
+The selected tab is highlighted. Switching tabs shows the correct kanban board. Default tab on page load is Sold.
+
+
+CHANGE 3 — Estimates pipeline (new kanban)
+
+Build a second kanban board under the Estimates tab with these stages in order:
+
+1. New Request
+2. Contacted
+3. Estimate Scheduled
+4. Estimate Sent
+5. Won
+
+Card contents
+Each estimate card shows:
+•	Customer name
+•	Service description (first 100 characters)
+•	Date the request was submitted
+•	Days in current stage
+•	Assigned admin (avatar/initials)
+•	A status indicator dot matching the stage color
+
+Moving cards
+•	Only Admin users can drag cards between stages
+•	Managers and Employees can view the board but cannot move cards
+•	When a card is moved to a new stage, the customer is automatically notified in-app
+•	On each card move there is a checkbox option "Also send email notification" — if checked, also send a SendGrid email to the customer in addition to the in-app notification
+
+Won — convert to Sold job
+When a card is moved to the Won stage:
+•	Show a confirmation modal: "Convert this estimate to a Sold job?"
+•	If confirmed, automatically create a new job card in the Sold pipeline with the following fields carried over:
+•	Customer name and contact info
+•	Service description
+•	Scheduled date (if one was set on the estimate)
+•	Notes and file attachments
+•	The estimate card in the Estimates pipeline is marked as Won and becomes read-only — it stays visible in the Won column as a record but cannot be moved further
+•	The new Sold job card opens automatically so Admin can review and fill in any remaining details
+
+
+CHANGE 4 — Work Request tab in Messages connects to Admin
+
+The Messages module has a Work Request tab for customers to submit new work requests. Make the following updates:
+
+Admin notification
+•	When a customer submits a work request, immediately send an in-app notification to ALL admin users
+•	The notification appears in the bell/activity panel with the message: "New work request from [Customer Name]" with a link to view the request
+•	Also send a SendGrid email to all admin users notifying them of the new request
+•	FROM: dan@chapinlandscapes.com
+•	Subject: "New Work Request — [Customer Name]"
+•	Body: Customer name, what they requested (first 200 characters), date submitted, and a link to log in and view it
+
+Auto-create estimate card
+•	When a customer submits a work request through the Messages tab, automatically create a new card in the Estimates pipeline under the "New Request" stage
+•	The card is pre-filled with the customer's name, contact info, and their service description from the request form
+•	All admin users can see this card immediately
+
+What the work request form should collect
+Make sure the work request form in the Messages tab collects:
+•	Service type or description (text area, required)
+•	Preferred date or timeframe (optional)
+•	Any additional notes (optional)
+•	The customer's contact info should be pulled automatically from their profile — no need to re-enter it
+
+
+CHANGE 5 — Customer notifications as estimate moves through stages
+
+Each time an Admin moves an estimate card to a new stage the customer receives an in-app notification. The message for each stage:
+
+•	Contacted: "We have received your request and will be in touch shortly."
+•	Estimate Scheduled: "Your estimate has been scheduled. We will see you soon."
+•	Estimate Sent: "Your estimate has been sent. Please review it and let us know if you have any questions."
+•	Won: "Great news — your estimate has been approved and your job is being scheduled."
+
+If the "Also send email notification" checkbox was checked when moving the card, send the same message via SendGrid email to the customer.
+FROM: dan@chapinlandscapes.com
+Subject: "Update on your request from Chapin Landscapes"
+
+
+DATABASE
+
+Add a new table `estimates`:
+•	id
+•	customer_id (foreign key)
+•	work_request_id (optional foreign key to the original work request message)
+•	title (string — auto-generated from service description if blank)
+•	service_description (text)
+•	scheduled_date (date, optional)
+•	notes (text, optional)
+•	stage (enum: new_request, contacted, estimate_scheduled, estimate_sent, won)
+•	assigned_to (user id, optional)
+•	converted_to_job_id (integer, optional — set when converted to Sold job)
+•	created_at
+•	updated_at
+
+Add a `file_attachments` relationship so estimates can have files attached.
+
+
+NOTES
+
+•	Do not change any existing Sold pipeline stages or functionality
+•	Do not break the existing Messages module
+•	All new UI should match existing styling patterns
+•	Admins see both pipelines, Managers see both pipelines read-only, Employees see Sold pipeline only
+•	Customers never see the kanban boards — only their own request status via notifications

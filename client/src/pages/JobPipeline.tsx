@@ -13,17 +13,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { 
   Plus, MapPin, Calendar, FileText, Upload, Trash2, 
-  ExternalLink, Clock, AlertCircle, Layers, X, Edit2, Check
+  ExternalLink, Clock, AlertCircle, Layers, X, Edit2, Check,
+  DollarSign, ArrowRight, Mail
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { showErrorToast } from "@/lib/errorToast";
 import DocumentsPanel from "@/components/DocumentsPanel";
 import { useUpload } from "@/hooks/use-upload";
-import type { Job, JobDocument, JobPipelineTab, JobCategory } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import type { Job, JobDocument, JobPipelineTab, JobCategory, Estimate, EstimateStage } from "@shared/schema";
 
 const PIPELINE_STAGES = ["Lead", "Quoted", "Scheduled", "In Progress", "Quality Check", "Completed"];
 const JOB_TYPES = ["Full Install", "Maintenance", "Hardscape", "Planting", "Irrigation", "Lawn Care", "Design", "Other"];
+const ESTIMATE_STAGES: EstimateStage[] = ["New Lead", "Contact Made", "Site Visit", "Proposal Sent", "Follow Up", "Won", "Lost"];
 
 const DOCUMENT_TYPES = [
   { value: "permit", label: "Permit" },
@@ -40,7 +43,7 @@ function getGoogleMapsLink(address?: string | null, city?: string | null, state?
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts)}`;
 }
 
-export default function JobPipeline() {
+function SoldJobsBoard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { uploadFile, isUploading } = useUpload();
@@ -222,10 +225,8 @@ export default function JobPipeline() {
     e.target.value = "";
   };
 
-  // Filter jobs by the active tab category
   const filteredJobs = jobs.filter(j => j.category === activeTab);
 
-  // Built-in tabs plus any custom tabs from database (filter out duplicates)
   const builtInTabs = [
     { id: "Install", name: "Install", isBuiltIn: true },
     { id: "Maintenance", name: "Maintenance", isBuiltIn: true },
@@ -237,12 +238,9 @@ export default function JobPipeline() {
   const allTabs = [...builtInTabs, ...customTabs];
 
   return (
-    <div className="h-[calc(100vh-140px)] flex flex-col space-y-4">
+    <>
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Job Pipeline</h1>
-          <p className="text-muted-foreground">Track project velocity from lead to completion</p>
-        </div>
+        <div />
         <Button className="gap-2" onClick={openNewJobModal} data-testid="button-add-job">
           <Plus className="w-4 h-4" /> New Job
         </Button>
@@ -298,7 +296,6 @@ export default function JobPipeline() {
                 size="sm"
                 onClick={() => setActiveTab(tab.id)}
                 onDoubleClick={() => {
-                  // Only allow editing custom tabs, not built-in ones
                   if (!tab.isBuiltIn) {
                     setEditingTab(tab.id);
                     setNewTabName(tab.name);
@@ -771,6 +768,498 @@ export default function JobPipeline() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  );
+}
+
+function EstimatesBoard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "Admin" || user?.role === "Master Admin";
+  
+  const [selectedEstimate, setSelectedEstimate] = useState<Estimate | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isNewEstimate, setIsNewEstimate] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<Estimate>>({});
+  const [notifyOnMove, setNotifyOnMove] = useState(false);
+  const [showConvertDialog, setShowConvertDialog] = useState(false);
+  const [convertCategory, setConvertCategory] = useState("Install");
+
+  const { data: allEstimates = [] } = useQuery<Estimate[]>({
+    queryKey: ["/api/estimates"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: Partial<Estimate>) => {
+      const res = await apiRequest("POST", "/api/estimates", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      toast({ title: "Estimate created" });
+      setIsModalOpen(false);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await apiRequest("PATCH", `/api/estimates/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      toast({ title: "Estimate updated" });
+      setIsModalOpen(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/estimates/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      toast({ title: "Estimate deleted" });
+      setIsModalOpen(false);
+    },
+  });
+
+  const convertMutation = useMutation({
+    mutationFn: async ({ id, category }: { id: string; category: string }) => {
+      const res = await apiRequest("POST", `/api/estimates/${id}/convert-to-job`, { category });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      toast({ title: "Estimate converted to job!" });
+      setShowConvertDialog(false);
+      setIsModalOpen(false);
+    },
+  });
+
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination || !isAdmin) return;
+    const estimateId = result.draggableId;
+    const newStage = result.destination.droppableId as EstimateStage;
+    updateMutation.mutate({ id: estimateId, data: { stage: newStage, notifyCustomer: notifyOnMove } });
+  };
+
+  const openEstimateModal = (estimate: Estimate) => {
+    setSelectedEstimate(estimate);
+    setEditForm(estimate);
+    setIsNewEstimate(false);
+    setIsModalOpen(true);
+  };
+
+  const openNewEstimateModal = () => {
+    setSelectedEstimate(null);
+    setEditForm({ 
+      clientName: "",
+      serviceType: "Full Install",
+      stage: "New Lead",
+    });
+    setIsNewEstimate(true);
+    setIsModalOpen(true);
+  };
+
+  const handleSave = () => {
+    if (isNewEstimate) {
+      createMutation.mutate(editForm);
+    } else if (selectedEstimate) {
+      const { id, createdAt, updatedAt, ...updateData } = editForm as any;
+      updateMutation.mutate({ id: selectedEstimate.id, data: updateData });
+    }
+  };
+
+  const getSourceBadge = (source: string | null) => {
+    if (source === "work_request") return <Badge variant="outline" className="text-[10px] border-amber-500 text-amber-600">Work Request</Badge>;
+    return <Badge variant="outline" className="text-[10px]">Manual</Badge>;
+  };
+
+  return (
+    <>
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="notifyOnMove"
+              checked={notifyOnMove}
+              onCheckedChange={(c) => setNotifyOnMove(c === true)}
+              data-testid="checkbox-notify-on-move"
+            />
+            <Label htmlFor="notifyOnMove" className="text-sm flex items-center gap-1">
+              <Mail className="w-3 h-3" /> Email customer on stage change
+            </Label>
+          </div>
+        </div>
+        <Button className="gap-2" onClick={openNewEstimateModal} data-testid="button-add-estimate">
+          <Plus className="w-4 h-4" /> New Estimate
+        </Button>
+      </div>
+
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="flex-1 flex gap-4 overflow-x-auto pb-4">
+          {ESTIMATE_STAGES.map((stage) => {
+            const stageEstimates = allEstimates.filter(e => e.stage === stage);
+            
+            return (
+              <Droppable key={stage} droppableId={stage} isDropDisabled={!isAdmin}>
+                {(provided) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`w-64 shrink-0 flex flex-col rounded-xl p-3 ${
+                      stage === "Won" ? "bg-green-100/70 dark:bg-green-950/30" :
+                      stage === "Lost" ? "bg-red-100/70 dark:bg-red-950/30" :
+                      "bg-stone-200/70 dark:bg-secondary/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3 px-1">
+                      <h3 className="font-semibold text-xs uppercase tracking-widest text-muted-foreground">
+                        {stage}
+                      </h3>
+                      <Badge variant="secondary" className="rounded-full px-2 py-0">{stageEstimates.length}</Badge>
+                    </div>
+
+                    <div className="flex-1 space-y-3 min-h-[100px]">
+                      {stageEstimates.map((estimate, index) => (
+                        <Draggable key={estimate.id} draggableId={estimate.id} index={index} isDragDisabled={!isAdmin}>
+                          {(provided) => (
+                            <Card
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              onClick={() => openEstimateModal(estimate)}
+                              className={`hover-elevate cursor-pointer border-l-4 shadow-sm ${
+                                stage === "Won" ? "border-l-green-500" :
+                                stage === "Lost" ? "border-l-red-500" :
+                                "border-l-amber-500"
+                              }`}
+                              data-testid={`card-estimate-${estimate.id}`}
+                            >
+                              <CardContent className="p-3 space-y-2">
+                                <div className="flex justify-between items-start">
+                                  {getSourceBadge(estimate.source)}
+                                </div>
+                                <div>
+                                  <h4 className="font-bold text-foreground leading-tight text-sm">{estimate.clientName}</h4>
+                                  <p className="text-xs text-muted-foreground">{estimate.serviceType}</p>
+                                  {estimate.estimatedValue ? (
+                                    <p className="text-base font-heading text-primary mt-1">
+                                      ${(estimate.estimatedValue || 0).toLocaleString()}
+                                    </p>
+                                  ) : null}
+                                </div>
+
+                                {estimate.propertyAddress && (
+                                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground pt-1 border-t">
+                                    <MapPin className="w-3 h-3" />
+                                    <span className="truncate">{estimate.propertyAddress}</span>
+                                  </div>
+                                )}
+
+                                {estimate.stage === "Won" && isAdmin && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="w-full mt-1 text-xs gap-1"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedEstimate(estimate);
+                                      setShowConvertDialog(true);
+                                    }}
+                                    data-testid={`button-convert-${estimate.id}`}
+                                  >
+                                    <ArrowRight className="w-3 h-3" /> Convert to Sold Job
+                                  </Button>
+                                )}
+                              </CardContent>
+                            </Card>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                      
+                      {stageEstimates.length === 0 && (
+                        <div className="h-24 border-2 border-dashed rounded-lg flex items-center justify-center text-muted-foreground/50">
+                          <DollarSign className="w-5 h-5" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Droppable>
+            );
+          })}
+        </div>
+      </DragDropContext>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{isNewEstimate ? "Create New Estimate" : "Edit Estimate"}</DialogTitle>
+            <DialogDescription>
+              {isNewEstimate ? "Enter the estimate details" : "Update estimate information"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Client Name *</Label>
+                <Input
+                  value={editForm.clientName || ""}
+                  onChange={e => setEditForm({ ...editForm, clientName: e.target.value })}
+                  data-testid="input-estimate-client"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Service Type *</Label>
+                <Select
+                  value={editForm.serviceType || undefined}
+                  onValueChange={v => setEditForm({ ...editForm, serviceType: v })}
+                >
+                  <SelectTrigger data-testid="select-estimate-service">
+                    <SelectValue placeholder="Select service" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {JOB_TYPES.map(t => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Estimated Value ($)</Label>
+                <Input
+                  type="number"
+                  value={editForm.estimatedValue || ""}
+                  onChange={e => setEditForm({ ...editForm, estimatedValue: parseInt(e.target.value) || 0 })}
+                  data-testid="input-estimate-value"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Stage</Label>
+                <Select
+                  value={editForm.stage || undefined}
+                  onValueChange={v => setEditForm({ ...editForm, stage: v as EstimateStage })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ESTIMATE_STAGES.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={editForm.description || ""}
+                onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                placeholder="Describe the work to be estimated..."
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Property Address</Label>
+              <Input
+                value={editForm.propertyAddress || ""}
+                onChange={e => setEditForm({ ...editForm, propertyAddress: e.target.value })}
+                placeholder="Street address"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>City</Label>
+                <Input
+                  value={editForm.city || ""}
+                  onChange={e => setEditForm({ ...editForm, city: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>State</Label>
+                <Input
+                  value={editForm.state || ""}
+                  onChange={e => setEditForm({ ...editForm, state: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>ZIP</Label>
+                <Input
+                  value={editForm.zip || ""}
+                  onChange={e => setEditForm({ ...editForm, zip: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {(editForm.propertyAddress || editForm.city) && (
+              <a
+                href={getGoogleMapsLink(editForm.propertyAddress, editForm.city, editForm.state, editForm.zip)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center text-sm text-primary hover:underline"
+              >
+                <MapPin className="w-4 h-4 mr-1" /> Open in Google Maps
+              </a>
+            )}
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Contact Name</Label>
+                <Input
+                  value={editForm.contactName || ""}
+                  onChange={e => setEditForm({ ...editForm, contactName: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contact Phone</Label>
+                <Input
+                  value={editForm.contactPhone || ""}
+                  onChange={e => setEditForm({ ...editForm, contactPhone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contact Email</Label>
+                <Input
+                  type="email"
+                  value={editForm.contactEmail || ""}
+                  onChange={e => setEditForm({ ...editForm, contactEmail: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Follow-Up Date</Label>
+              <Input
+                type="date"
+                value={editForm.followUpDate ? new Date(editForm.followUpDate).toISOString().split('T')[0] : ""}
+                onChange={e => setEditForm({ ...editForm, followUpDate: e.target.value ? new Date(e.target.value) : undefined })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={editForm.notes || ""}
+                onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
+                placeholder="Internal notes..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 mt-6">
+            {!isNewEstimate && isAdmin && (
+              <Button
+                variant="destructive"
+                onClick={() => selectedEstimate && deleteMutation.mutate(selectedEstimate.id)}
+                data-testid="button-delete-estimate"
+              >
+                Delete
+              </Button>
+            )}
+            <div className="flex-1" />
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} data-testid="button-save-estimate">
+              {isNewEstimate ? "Create Estimate" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showConvertDialog} onOpenChange={setShowConvertDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Convert to Sold Job</DialogTitle>
+            <DialogDescription>
+              This will create a new job from this estimate and mark it as Won.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>Job Category</Label>
+              <Select value={convertCategory} onValueChange={setConvertCategory}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Install">Install</SelectItem>
+                  <SelectItem value="Maintenance">Maintenance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowConvertDialog(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (selectedEstimate) {
+                  convertMutation.mutate({ id: selectedEstimate.id, category: convertCategory });
+                }
+              }}
+              data-testid="button-confirm-convert"
+            >
+              <ArrowRight className="w-4 h-4 mr-1" /> Convert
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+export default function JobPipeline() {
+  const [topTab, setTopTab] = useState<"sold" | "estimates">("sold");
+
+  return (
+    <div className="h-[calc(100vh-140px)] flex flex-col space-y-4">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-heading font-bold text-foreground">Work Pipeline</h1>
+          <p className="text-muted-foreground">Track project velocity from lead to completion</p>
+        </div>
+      </div>
+
+      <div className="flex gap-1 border-b pb-0">
+        <button
+          onClick={() => setTopTab("sold")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            topTab === "sold"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+          data-testid="top-tab-sold"
+        >
+          Sold Jobs
+        </button>
+        <button
+          onClick={() => setTopTab("estimates")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            topTab === "estimates"
+              ? "border-amber-500 text-amber-600"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+          data-testid="top-tab-estimates"
+        >
+          Estimates
+        </button>
+      </div>
+
+      {topTab === "sold" ? <SoldJobsBoard /> : <EstimatesBoard />}
     </div>
   );
 }
