@@ -1090,6 +1090,25 @@
     "post": "Post",
     "justNow": "Just now"
   },
+  "updates": {
+    "activity": "Activity",
+    "allCaughtUp": "You're all caught up!",
+    "noNewUpdates": "No new updates at this time.",
+    "noActivity": "No activity yet",
+    "recentActivityWillAppear": "Recent activity will appear here.",
+    "markAllSeen": "Mark all seen",
+    "markAllRead": "Mark all read",
+    "postUpdate": "+ Post Update",
+    "updateTitle": "Update title",
+    "briefDescription": "Brief description...",
+    "post": "Post",
+    "categories": {
+      "feature": "Feature",
+      "improvement": "Improvement",
+      "bugfix": "Bug Fix",
+      "announcement": "Announcement"
+    }
+  },
   "help": {
     "title": "Help",
     "helpCenter": "Help Center",

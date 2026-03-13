@@ -282,11 +282,11 @@ export default function UpdatesPopup({ isOpen, onClose }: UpdatesPopupProps) {
                       )}
                     </div>
                   )}
-                  {renderUpdates(updates, expandedId, setExpandedId, acknowledgeMutation, acknowledgeAll, getUpdateIcon, getUpdateTypeColor, formatDate)}
+                  <RenderUpdates updates={updates} expandedId={expandedId} setExpandedId={setExpandedId} acknowledgeMutation={acknowledgeMutation} acknowledgeAll={acknowledgeAll} getUpdateIcon={getUpdateIcon} getUpdateTypeColor={getUpdateTypeColor} formatDate={formatDate} />
                 </TabsContent>
               </Tabs>
             ) : (
-              renderUpdates(updates, expandedId, setExpandedId, acknowledgeMutation, acknowledgeAll, getUpdateIcon, getUpdateTypeColor, formatDate)
+              <RenderUpdates updates={updates} expandedId={expandedId} setExpandedId={setExpandedId} acknowledgeMutation={acknowledgeMutation} acknowledgeAll={acknowledgeAll} getUpdateIcon={getUpdateIcon} getUpdateTypeColor={getUpdateTypeColor} formatDate={formatDate} />
             )}
           </motion.div>
         </>
@@ -361,16 +361,25 @@ function InlinePostUpdateForm({ onClose, onSuccess }: { onClose: () => void; onS
   );
 }
 
-function renderUpdates(
-  updates: AppUpdate[],
-  expandedId: string | null,
-  setExpandedId: (id: string | null) => void,
-  acknowledgeMutation: any,
-  acknowledgeAll: () => void,
-  getUpdateIcon: (type: string) => React.ReactNode,
-  getUpdateTypeColor: (type: string) => string,
-  formatDate: (d: string) => string
-) {
+function RenderUpdates({
+  updates,
+  expandedId,
+  setExpandedId,
+  acknowledgeMutation,
+  acknowledgeAll,
+  getUpdateIcon,
+  getUpdateTypeColor,
+  formatDate,
+}: {
+  updates: AppUpdate[];
+  expandedId: string | null;
+  setExpandedId: (id: string | null) => void;
+  acknowledgeMutation: any;
+  acknowledgeAll: () => void;
+  getUpdateIcon: (type: string) => React.ReactNode;
+  getUpdateTypeColor: (type: string) => string;
+  formatDate: (d: string) => string;
+}) {
   const { t } = useTranslation();
   return (
     <ScrollArea className="max-h-[55vh]">

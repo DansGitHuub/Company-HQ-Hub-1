@@ -1090,6 +1090,25 @@
     "post": "Publicar",
     "justNow": "Ahora mismo"
   },
+  "updates": {
+    "activity": "Actividad",
+    "allCaughtUp": "¡Estás al día!",
+    "noNewUpdates": "No hay nuevas actualizaciones en este momento.",
+    "noActivity": "Aún no hay actividad",
+    "recentActivityWillAppear": "La actividad reciente aparecerá aquí.",
+    "markAllSeen": "Marcar todo como visto",
+    "markAllRead": "Marcar todo como leído",
+    "postUpdate": "+ Publicar Actualización",
+    "updateTitle": "Título de la actualización",
+    "briefDescription": "Descripción breve...",
+    "post": "Publicar",
+    "categories": {
+      "feature": "Funcionalidad",
+      "improvement": "Mejora",
+      "bugfix": "Corrección",
+      "announcement": "Anuncio"
+    }
+  },
   "help": {
     "title": "Ayuda",
     "helpCenter": "Centro de Ayuda",
