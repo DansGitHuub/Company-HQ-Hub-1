@@ -702,11 +702,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-9 w-9 text-muted-foreground relative"
+                    className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/80 relative transition-colors"
                     onClick={() => setIsUpdatesOpen(true)}
                     data-testid="button-updates"
                   >
-                    <Bell className="h-5 w-5" />
+                    <Bell className="h-[18px] w-[18px]" />
                     {totalBellCount > 0 && (
                       <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-background animate-pulse" />
                     )}
@@ -722,11 +722,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-9 w-9 text-muted-foreground"
+                    className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
                     onClick={() => setIsCalendarOpen(true)}
                     data-testid="button-calendar"
                   >
-                    <CalendarDays className="h-5 w-5" />
+                    <CalendarDays className="h-[18px] w-[18px]" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{t("nav.calendar")}</TooltipContent>
@@ -735,8 +735,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 p-0 overflow-hidden rounded-full border border-border/50">
-                  <Globe className="h-5 w-5 text-muted-foreground" />
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors">
+                  <Globe className="h-[18px] w-[18px]" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-32">
