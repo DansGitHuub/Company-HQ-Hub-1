@@ -9,6 +9,7 @@ import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { showErrorToast } from "@/lib/errorToast";
 import { getTheme, applyTheme } from "@/lib/themes";
+import i18n from "@/lib/i18n";
 
 type Role = "Admin" | "Manager" | "Crew" | "Customer";
 
@@ -51,6 +52,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       applyTheme(defaultTheme);
     }
   }, [user?.theme]);
+
+  useEffect(() => {
+    if (user?.language && i18n.language !== user.language) {
+      i18n.changeLanguage(user.language);
+    }
+  }, [user?.language]);
   
   const isAdmin = user?.role === "Admin";
   const effectiveRole = (isAdmin && previewRole) ? previewRole : (user?.role as Role | null);

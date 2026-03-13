@@ -1,0 +1,133 @@
+Add full English/Spanish language support to CompanyHQ. Every user can switch between English and Spanish in their profile settings. The entire app updates instantly when they change it.
+
+
+PART 1 — Language setting in user profile
+
+Add a "Language" preference to the user profile/settings page with two options:
+•	English (default)
+•	Español
+
+Selecting a language saves it to the user's profile immediately and reloads the app in that language. The setting persists across sessions — when the user logs back in the app opens in their chosen language.
+
+Store the preference as a `language` column on the users table (string, default "en", values: "en" or "es").
+
+
+PART 2 — Translation system
+
+Use i18next (or the translation library already in the project if one exists) to manage translations.
+
+Set up two translation files:
+•	`locales/en.json` — English (all existing text)
+•	`locales/es.json` — Spanish translations
+
+Every piece of visible text in the app must use the translation system — no hardcoded English strings. This includes:
+•	All navigation labels
+•	All page titles and headings
+•	All button labels
+•	All form field labels and placeholders
+•	All error messages and validation text
+•	All empty state messages
+•	All modal titles and body text
+•	All table column headers
+•	All status labels and badges
+•	All notification and alert text
+•	All email subject lines and body text sent through SendGrid
+•	All tooltip text
+•	All confirmation dialogs
+
+
+PART 3 — Spanish translations
+
+Translate every string in the app into natural, professional Spanish appropriate for a workplace setting. Use formal but approachable language (use "usted" forms for instructions directed at the user). Key translations to get right:
+
+Navigation
+•	Dashboard → Panel principal
+•	Employees → Empleados
+•	Hiring → Contratación
+•	Calendar → Calendario
+•	Tasks → Tareas
+•	Messages → Mensajes
+•	Documents → Documentos
+•	Equipment → Equipos
+•	Customers → Clientes
+•	Reports → Informes
+•	Tools → Herramientas
+•	Admin Panel → Panel de administración
+•	Settings → Configuración
+•	Help → Ayuda
+•	Log out → Cerrar sesión
+
+Common UI
+•	Save → Guardar
+•	Cancel → Cancelar
+•	Delete → Eliminar
+•	Edit → Editar
+•	Add → Agregar
+•	Search → Buscar
+•	Filter → Filtrar
+•	Submit → Enviar
+•	Back → Volver
+•	Next → Siguiente
+•	Close → Cerrar
+•	Confirm → Confirmar
+•	Yes → Sí
+•	No → No
+•	Loading → Cargando
+•	Error → Error
+•	Success → Éxito
+•	Required → Obligatorio
+
+Status labels
+•	Active → Activo
+•	Inactive → Inactivo
+•	Pending → Pendiente
+•	Completed → Completado
+•	In Progress → En progreso
+•	Approved → Aprobado
+•	Rejected → Rechazado
+
+HR / Employee terms
+•	Full Name → Nombre completo
+•	First Name → Nombre
+•	Last Name → Apellido
+•	Date of Birth → Fecha de nacimiento
+•	Address → Dirección
+•	Phone → Teléfono
+•	Email → Correo electrónico
+•	Position → Puesto
+•	Start Date → Fecha de inicio
+•	Signature → Firma
+•	Date → Fecha
+•	Social Security Number → Número de seguro social
+
+
+PART 4 — Email notifications in Spanish
+
+When a user's language is set to Spanish, all automated emails sent to them through SendGrid should be in Spanish. This includes:
+•	New message notifications
+•	Calendar event notifications
+•	Task assignment notifications
+•	Document shared notifications
+•	Customer suggestion status updates (for Spanish-speaking customers)
+
+Use the same i18next translation files to manage email template strings.
+
+
+PART 5 — Language toggle in the UI
+
+Add a small language toggle in the top right header bar next to the other icons. It should show:
+•	"EN" when in English — clicking switches to Spanish
+•	"ES" when in Spanish — clicking switches to English
+
+This is a quick toggle in addition to the full setting in the profile page. Changing it here also saves to the user's profile.
+
+
+NOTES
+
+•	Default language for all existing users is English — no disruption to current users
+•	New users default to English unless Admin sets it differently during employee creation
+•	Admin can see each employee's language preference on their profile
+•	The translation system must be set up so additional languages can be added later by just adding a new locale file — do not hardcode English/Spanish as the only options in the logic
+•	Do not break any existing functionality
+•	Use existing styling patterns
+

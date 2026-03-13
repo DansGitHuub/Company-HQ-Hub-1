@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { 
   BookOpen, 
   Hammer, 
@@ -247,18 +248,19 @@ const allTiles: TileDef[] = [
 
 export default function Home() {
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   const userRole = user?.role || "Crew";
-  const tiles = allTiles.filter(t => t.roles.includes(userRole));
+  const tiles = allTiles.filter(tile => tile.roles.includes(userRole));
 
   return (
     <div className="space-y-4">
       <div className="flex items-baseline gap-3">
         <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="heading-workspace">
-          My Workspace
+          {t("dashboard.title")}
         </h1>
         <p className="text-sm text-muted-foreground">
-          Welcome back, {user?.name?.split(" ")[0]}. Here's what's happening today.
+          {t("dashboard.welcome", { name: user?.name?.split(" ")[0] })}
         </p>
       </div>
 

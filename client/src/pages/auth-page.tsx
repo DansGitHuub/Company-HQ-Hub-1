@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -149,6 +150,7 @@ export default function AuthPage() {
     return shapeClass;
   };
 
+  const { t } = useTranslation();
   const hasLogo = !!companySettings?.logoUrl;
   const companyName = companySettings?.companyName || "Company HQ";
   const logoShapeClass = getLogoClasses();
@@ -164,7 +166,7 @@ export default function AuthPage() {
               className={`mx-auto w-20 h-20 object-cover mb-4 ${hasLogo ? logoShapeClass : 'rounded-xl'}`}
             />
             <CardTitle className="text-2xl font-heading text-foreground">{companyName}</CardTitle>
-            <CardDescription className="text-muted-foreground">Sign in to manage your landscape business</CardDescription>
+            <CardDescription className="text-muted-foreground">{t("auth.signInDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
             {showResetForm ? (
@@ -175,10 +177,10 @@ export default function AuthPage() {
                   className="mb-4"
                   onClick={() => setShowResetForm(false)}
                 >
-                  <ArrowLeft className="w-4 h-4 mr-2" /> Back to Login
+                  <ArrowLeft className="w-4 h-4 mr-2" /> {t("auth.backToLogin")}
                 </Button>
                 <div className="space-y-2">
-                  <Label htmlFor="reset-token">Recovery Token</Label>
+                  <Label htmlFor="reset-token">{t("auth.recoveryToken")}</Label>
                   <Input
                     id="reset-token"
                     value={resetToken}
@@ -188,7 +190,7 @@ export default function AuthPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="new-password">New Password</Label>
+                  <Label htmlFor="new-password">{t("profile.newPassword")}</Label>
                   <div className="relative">
                     <Input
                       id="new-password"
@@ -217,19 +219,19 @@ export default function AuthPage() {
                     </Button>
                   </div>
                 </div>
-                <Button type="submit" className="w-full">Reset Password</Button>
+                <Button type="submit" className="w-full">{t("auth.resetPassword")}</Button>
               </form>
             ) : (
               <Tabs defaultValue="login" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="login">Sign In</TabsTrigger>
-                  <TabsTrigger value="register">Create Account</TabsTrigger>
+                  <TabsTrigger value="login">{t("auth.signIn")}</TabsTrigger>
+                  <TabsTrigger value="register">{t("auth.createAccount")}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="login">
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="login-username">Username</Label>
+                      <Label htmlFor="login-username">{t("auth.username")}</Label>
                       <Input
                         id="login-username"
                         data-testid="input-login-username"
@@ -240,7 +242,7 @@ export default function AuthPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="login-password">Password</Label>
+                      <Label htmlFor="login-password">{t("auth.password")}</Label>
                       <div className="relative">
                         <Input
                           id="login-password"
@@ -279,7 +281,7 @@ export default function AuthPage() {
                       {loginMutation.isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                       ) : null}
-                      Sign In
+                      {t("auth.signIn")}
                     </Button>
                     <div className="flex flex-col gap-2">
                       <Button
@@ -288,7 +290,7 @@ export default function AuthPage() {
                         className="text-sm text-muted-foreground"
                         onClick={() => setRecoveryOpen(true)}
                       >
-                        Forgot password?
+                        {t("auth.forgotPassword")}
                       </Button>
                       <Button
                         type="button"
@@ -297,22 +299,22 @@ export default function AuthPage() {
                         onClick={() => setShowResetForm(true)}
                         className="text-xs"
                       >
-                        Have a recovery token?
+                        {t("auth.haveRecoveryToken")}
                       </Button>
                     </div>
                   </form>
                   <Dialog open={recoveryOpen} onOpenChange={setRecoveryOpen}>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Password Recovery</DialogTitle>
+                        <DialogTitle>{t("auth.passwordRecovery")}</DialogTitle>
                         <DialogDescription>
-                          Enter your email address to receive a password recovery link.
+                          {t("auth.recoveryDescription")}
                         </DialogDescription>
                       </DialogHeader>
                       {recoverySent ? (
                         <div className="text-center py-6">
                           <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                          <p className="font-medium">Recovery instructions sent!</p>
+                          <p className="font-medium">{t("auth.recoverySent")}</p>
                           <p className="text-sm text-muted-foreground mt-2">
                             We've sent a recovery token to <strong>{recoveryEmail}</strong>. Check your inbox and then click below to reset your password.
                           </p>
@@ -324,13 +326,13 @@ export default function AuthPage() {
                               setRecoverySent(false);
                             }}
                           >
-                            Enter Recovery Token
+                            {t("auth.enterRecoveryToken")}
                           </Button>
                         </div>
                       ) : (
                         <form onSubmit={handleRecovery} className="space-y-4 mt-4">
                           <div className="space-y-2">
-                            <Label htmlFor="recovery-email">Email Address</Label>
+                            <Label htmlFor="recovery-email">{t("profile.emailAddress")}</Label>
                             <Input
                               id="recovery-email"
                               type="email"
@@ -348,7 +350,7 @@ export default function AuthPage() {
                             {recoveryLoading ? (
                               <Loader2 className="h-4 w-4 animate-spin mr-2" />
                             ) : null}
-                            Send Recovery Email
+                            {t("auth.sendRecoveryEmail")}
                           </Button>
                         </form>
                       )}
@@ -359,7 +361,7 @@ export default function AuthPage() {
                 <TabsContent value="register">
                   <form onSubmit={handleRegister} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="reg-name">Full Name</Label>
+                      <Label htmlFor="reg-name">{t("auth.fullName")}</Label>
                       <Input
                         id="reg-name"
                         data-testid="input-register-name"
@@ -370,7 +372,7 @@ export default function AuthPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="reg-email">Email</Label>
+                      <Label htmlFor="reg-email">{t("common.email")}</Label>
                       <Input
                         id="reg-email"
                         data-testid="input-register-email"
@@ -382,7 +384,7 @@ export default function AuthPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="reg-username">Username</Label>
+                      <Label htmlFor="reg-username">{t("auth.username")}</Label>
                       <Input
                         id="reg-username"
                         data-testid="input-register-username"
@@ -393,7 +395,7 @@ export default function AuthPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="reg-password">Password</Label>
+                      <Label htmlFor="reg-password">{t("auth.password")}</Label>
                       <div className="relative">
                         <Input
                           id="reg-password"
@@ -432,7 +434,7 @@ export default function AuthPage() {
                       {registerMutation.isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                       ) : null}
-                      Create Account
+                      {t("auth.createAccount")}
                     </Button>
                   </form>
                 </TabsContent>
@@ -453,21 +455,21 @@ export default function AuthPage() {
               />
               <div>
                 <h2 className="text-2xl font-heading font-bold">{companyName}</h2>
-                <p className="text-sidebar-foreground/60">Landscape Management</p>
+                <p className="text-sidebar-foreground/60">{t("auth.landscapeManagement")}</p>
               </div>
             </div>
-            <h1 className="text-3xl font-heading font-bold">Landscape Management, Simplified</h1>
+            <h1 className="text-3xl font-heading font-bold">{t("auth.heroTitle")}</h1>
             <p className="text-lg text-sidebar-foreground/80">
-              Everything your team needs to run a professional landscape company in one place.
+              {t("auth.heroSubtitle")}
             </p>
           </div>
 
           <div className="space-y-4">
             {[
-              { icon: TreePine, text: "SOP Library & Knowledge Base" },
-              { icon: Users, text: "Hiring Pipeline & Team Management" },
-              { icon: Building2, text: "Materials Catalog & Job Tracking" },
-              { icon: Shield, text: "Role-Based Access Control" },
+              { icon: TreePine, text: t("auth.featureSop") },
+              { icon: Users, text: t("auth.featureHiring") },
+              { icon: Building2, text: t("auth.featureMaterials") },
+              { icon: Shield, text: t("auth.featureRbac") },
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-4">
                 <div className="p-2 bg-sidebar-foreground/10 rounded-lg">

@@ -161,7 +161,7 @@ export function setupAuth(app: Express) {
       await storage.setRecoveryToken(user.id, token, expires);
       
       try {
-        await sendPasswordRecoveryEmail(user.email!, token, user.name || user.username);
+        await sendPasswordRecoveryEmail(user.email!, token, user.name || user.username, user.language || "en");
         console.log(`[email] Recovery email sent successfully to ${email}`);
         res.json({ message: "Recovery email sent!", email, sent: true });
       } catch (emailErr: any) {

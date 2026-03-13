@@ -2,11 +2,13 @@ import React from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useTranslation } from "react-i18next";
 import type { CompanySettings } from "@shared/schema";
 import AIAssistantPanel from "@/components/AIAssistantPanel";
 import UpdatesPopup from "@/components/UpdatesPopup";
 import GlobalMicButton from "@/components/GlobalMicButton";
 import CalendarPage from "@/pages/Calendar";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -34,7 +36,8 @@ import {
   Brain,
   CalendarDays,
   X,
-  LifeBuoy
+  LifeBuoy,
+  Globe
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -181,6 +184,7 @@ const menuHelpContent: Record<string, { title: string; description: string; tips
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation, effectiveRole, previewRole } = useAuth();
+  const { t, i18n } = useTranslation();
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = React.useState(false);
   const [, navigate] = useLocation();
@@ -314,39 +318,45 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return { shapeClass, sizeClass };
   };
 
-  // Customer navigation is completely separate and not reorderable
   const customerNav = [
-    { id: "customer_hub", icon: LayoutDashboard, label: "My Portal", href: "/customer-hub" },
-    ...(user?.isApplicant ? [{ id: "applicant_portal", icon: ClipboardCheck, label: "My Application", href: "/applicant" }] : []),
-    { id: "customer_resources", icon: GraduationCap, label: "Resources", href: "/education" },
-    { id: "customer_account", icon: User, label: "My Account", href: "/profile" },
-    { id: "customer_help", icon: LifeBuoy, label: "Help", href: "/help" },
+    { id: "customer_hub", icon: LayoutDashboard, label: t("nav.myPortal"), href: "/customer-hub" },
+    ...(user?.isApplicant ? [{ id: "applicant_portal", icon: ClipboardCheck, label: t("nav.myApplication"), href: "/applicant" }] : []),
+    { id: "customer_resources", icon: GraduationCap, label: t("nav.resources"), href: "/education" },
+    { id: "customer_account", icon: User, label: t("nav.myAccount"), href: "/profile" },
+    { id: "customer_help", icon: LifeBuoy, label: t("nav.help"), href: "/help" },
   ];
 
   const internalNavItems: Record<string, { icon: any; label: string; href: string }> = {
-    dashboard: { icon: LayoutDashboard, label: "My Workspace", href: "/" },
-    applicant_portal: { icon: ClipboardCheck, label: "My Application", href: "/applicant" },
-    sops: { icon: BookOpen, label: "SOP Library", href: "/sops" },
-    testing: { icon: Brain, label: "Quizzes", href: "/testing" },
-    materials: { icon: Hammer, label: "Materials", href: "/materials" },
-    equipment: { icon: Truck, label: "Equipment", href: "/equipment" },
-    todos: { icon: CheckSquare, label: "Tasks", href: "/todos" },
-    hiring: { icon: Users, label: "Hiring", href: "/hiring" },
-    employees: { icon: User, label: "Employees", href: "/employees" },
-    jobs: { icon: LayoutDashboard, label: "Work", href: "/jobs" },
-    education: { icon: GraduationCap, label: "Customer Hub", href: "/education" },
-    help: { icon: LifeBuoy, label: "Help", href: "/help" },
-    hq: { icon: Building2, label: "CompanyHQ", href: "/hq" },
-    marketing: { icon: Megaphone, label: "Marketing", href: "/marketing" },
-    forms: { icon: FileText, label: "Forms", href: "/forms" },
-    inbox: { icon: Mail, label: "Messages", href: "/inbox" },
-    integrations: { icon: Settings, label: "Integrations", href: "/integrations" },
-    admin: { icon: Shield, label: "Admin Panel", href: "/admin" },
-    tools: { icon: Snowflake, label: "Tools", href: "/tools" },
-    plow_mapper: { icon: Snowflake, label: "Plow Mapper", href: "/tools/plow-mapper" },
+    dashboard: { icon: LayoutDashboard, label: t("nav.myWorkspace"), href: "/" },
+    applicant_portal: { icon: ClipboardCheck, label: t("nav.myApplication"), href: "/applicant" },
+    sops: { icon: BookOpen, label: t("nav.sopLibrary"), href: "/sops" },
+    testing: { icon: Brain, label: t("nav.quizzes"), href: "/testing" },
+    materials: { icon: Hammer, label: t("nav.materials"), href: "/materials" },
+    equipment: { icon: Truck, label: t("nav.equipment"), href: "/equipment" },
+    todos: { icon: CheckSquare, label: t("nav.tasks"), href: "/todos" },
+    hiring: { icon: Users, label: t("nav.hiring"), href: "/hiring" },
+    employees: { icon: User, label: t("nav.employees"), href: "/employees" },
+    jobs: { icon: LayoutDashboard, label: t("nav.work"), href: "/jobs" },
+    education: { icon: GraduationCap, label: t("nav.customerHub"), href: "/education" },
+    help: { icon: LifeBuoy, label: t("nav.help"), href: "/help" },
+    hq: { icon: Building2, label: t("nav.companyHQ"), href: "/hq" },
+    marketing: { icon: Megaphone, label: t("nav.marketing"), href: "/marketing" },
+    forms: { icon: FileText, label: t("nav.forms"), href: "/forms" },
+    inbox: { icon: Mail, label: t("nav.messages"), href: "/inbox" },
+    integrations: { icon: Settings, label: t("nav.integrations"), href: "/integrations" },
+    admin: { icon: Shield, label: t("nav.adminPanel"), href: "/admin" },
+    tools: { icon: Snowflake, label: t("nav.tools"), href: "/tools" },
+    plow_mapper: { icon: Snowflake, label: t("nav.plowMapper"), href: "/tools/plow-mapper" },
   };
 
   type NavSection = { label: string; items: string[] };
+
+  const sectionLabels: Record<string, string> = {
+    "WORK": t("nav.sections.work"),
+    "PEOPLE": t("nav.sections.people"),
+    "COMPANY": t("nav.sections.company"),
+    "ADMIN": t("nav.sections.admin"),
+  };
 
   const sidebarSections: NavSection[] = [
     { label: "", items: ["dashboard"] },
@@ -450,7 +460,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {section.label && (
               <div className="px-4 py-1.5 mb-1">
                 <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-sidebar-foreground/40" data-testid={`section-header-${section.label.toLowerCase().replace(' ', '-')}`}>
-                  {section.label}
+                  {sectionLabels[section.label] || section.label}
                 </span>
               </div>
             )}
@@ -583,7 +593,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <DropdownMenuItem asChild className="cursor-pointer">
               <Link href="/profile">
                 <User className="mr-2 h-4 w-4" />
-                My Profile
+                {t("nav.myProfile")}
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -592,7 +602,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               className="text-destructive focus:text-destructive cursor-pointer"
             >
               <LogOut className="mr-2 h-4 w-4" />
-              Log out
+              {t("nav.logOut")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -627,7 +637,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                <input 
                   type="text" 
-                  placeholder="Search everything..." 
+                  placeholder={t("header.searchPlaceholder")} 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setShowSuggestions(true)}
@@ -666,11 +676,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-indigo-400 via-indigo-500 to-indigo-600 shadow-md shadow-indigo-500/30">
                       <CalendarDays className="h-4 w-4 text-white drop-shadow-sm" />
                     </div>
-                    <span className="hidden md:inline font-medium">Calendar</span>
+                    <span className="hidden md:inline font-medium">{t("nav.calendar")}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Open calendar</p>
+                  <p>{t("calendar.openCalendar")}</p>
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
@@ -685,7 +695,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 shadow-md shadow-amber-500/30">
                       <Bell className="h-4 w-4 text-white drop-shadow-sm" />
                     </div>
-                    <span className="hidden md:inline font-medium">Updates</span>
+                    <span className="hidden md:inline font-medium">{t("nav.updates")}</span>
                     {totalBellCount > 0 && (
                       <span className="absolute top-0 left-5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
                         {totalBellCount > 9 ? "9+" : totalBellCount}
@@ -694,7 +704,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>See what's new and recent updates</p>
+                  <p>{t("header.whatsNew")}</p>
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
@@ -709,12 +719,36 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       <div className="relative w-7 h-7 flex items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-600 shadow-md shadow-emerald-500/30">
                         <LifeBuoy className="h-4 w-4 text-white drop-shadow-sm" />
                       </div>
-                      <span className="hidden md:inline font-medium">Help</span>
+                      <span className="hidden md:inline font-medium">{t("nav.help")}</span>
                     </Button>
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Help Center</p>
+                  <p>{t("header.helpCenter")}</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="relative gap-1.5 h-10 hover:bg-accent hover:scale-105 transition-all font-semibold"
+                    onClick={async () => {
+                      const newLang = i18n.language === "es" ? "en" : "es";
+                      i18n.changeLanguage(newLang);
+                      try {
+                        await apiRequest("PATCH", "/api/profile", { language: newLang });
+                        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                      } catch (e) {}
+                    }}
+                    data-testid="button-language-toggle"
+                  >
+                    <Globe className="h-4 w-4" />
+                    <span className="text-xs font-bold">{i18n.language === "es" ? "ES" : "EN"}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{t("language.switchTo")}</p>
                 </TooltipContent>
               </Tooltip>
               </TooltipProvider>

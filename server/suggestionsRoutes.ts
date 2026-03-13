@@ -39,7 +39,8 @@ export function registerSuggestionsRoutes(app: Express, requireAuth: RequestHand
       sendSuggestionConfirmationEmail(
         req.user.email,
         req.user.name,
-        title.trim()
+        title.trim(),
+        req.user.language || "en"
       ).catch(err => console.error("[suggestions] Failed to send confirmation email:", err));
 
       const adminUsers = await db.select().from(users).where(eq(users.role, "Admin"));
@@ -124,7 +125,8 @@ export function registerSuggestionsRoutes(app: Express, requireAuth: RequestHand
             customer.name,
             existing.title,
             status,
-            adminNote || updateData.adminNote
+            adminNote || updateData.adminNote,
+            customer.language || "en"
           ).catch(err => console.error("[suggestions] Failed to send status update email:", err));
         }
       }

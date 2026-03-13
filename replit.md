@@ -33,6 +33,7 @@ The frontend is built with React and TypeScript, leveraging React Query for serv
 - **Customer Suggestions**: Customers can submit improvement suggestions via a lightbulb button in the Customer Hub header. Submissions include title (max 200 chars) and optional description (max 1000 chars). Customers see their own suggestions with status badges in a "My Suggestions" dashboard section. Admins review all suggestions in Admin Panel "Suggestions" tab with status management (Received/Reviewing/Planned/Completed/Not Planned) and optional notes. Email notifications sent on submission (confirmation to customer) and status changes (update to customer). Routes: `/api/suggestions` (POST create, GET admin list), `/api/suggestions/mine` (GET customer's own), `/api/suggestions/:id` (PATCH admin update). Table: `customer_suggestions`.
 - **User Tools**: Features customizable User Profiles, an Interactive Calendar with external integrations, a Document Sharing system with token-based access and configurable security, a unified Document Management System with cross-linking, and an Onboarding Forms System with 11 fillable digital forms, signature pads, and PDF generation.
 - **Customer Hub**: A customer-facing portal providing a branded UI with a dashboard, job details, document access, a care library, and messaging functionality.
+- **Internationalization (i18n)**: Full English/Spanish language support using `i18next` and `react-i18next`. Users select language via a globe toggle in the header bar (EN↔ES) or a dropdown in Profile settings. Language preference is stored per-user in the `users` table (`language` column, default `"en"`). Translation files: `client/src/locales/en.json` and `client/src/locales/es.json`. i18n config: `client/src/lib/i18n.ts`. Language syncs on login via `use-auth.tsx`. Email templates are also translated using `server/emailTranslations.ts`. Pattern: use `const { t } = useTranslation()` then `t("namespace.key")` with nested dot notation keys.
 
 ## External Dependencies
 
@@ -47,6 +48,7 @@ The frontend is built with React and TypeScript, leveraging React Query for serv
 - Framer Motion
 - Recharts
 - @hello-pangea/dnd
+- i18next / react-i18next (internationalization)
 
 ### Backend Libraries
 - Express

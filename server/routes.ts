@@ -844,7 +844,8 @@ Respond with a JSON object:
       if (!sopId || !toEmail) return res.status(400).json({ message: "Missing sopId or toEmail" });
       const sop = await storage.getSop(sopId);
       if (!sop) return res.status(404).json({ message: "SOP not found" });
-      await sendSOPEmail(toEmail, sop.title, sop.category || "", sop.content, sop.lastUpdated || undefined);
+      const user = req.user as any;
+      await sendSOPEmail(toEmail, sop.title, sop.category || "", sop.content, sop.lastUpdated || undefined, user?.language || "en");
       res.json({ success: true });
     } catch (err: any) {
       console.error("Error sending SOP email:", err);
@@ -3693,7 +3694,8 @@ Generate detailed information for this landscaping material.`;
                 user.name,
                 subject,
                 initialMessage,
-                thread.id
+                thread.id,
+                recipient.language || "en"
               );
             }
           } catch (emailErr: any) {
@@ -3839,7 +3841,8 @@ Generate detailed information for this landscaping material.`;
                 user.name,
                 thread.subject,
                 content,
-                req.params.id
+                req.params.id,
+                recipient.language || "en"
               );
             }
           } catch (emailErr: any) {
@@ -4970,7 +4973,7 @@ SECTION GENERATION RULES:
 
   app.patch("/api/profile", requireAuth, async (req, res) => {
     try {
-      const { name, email, bio, phone, profilePicture, theme, emailNotifications, currentPassword, newPassword } = req.body;
+      const { name, email, bio, phone, profilePicture, theme, emailNotifications, language, currentPassword, newPassword } = req.body;
       const updates: any = { updatedAt: new Date() };
       if (name !== undefined) updates.name = name;
       if (email !== undefined) updates.email = email;
@@ -4979,6 +4982,7 @@ SECTION GENERATION RULES:
       if (profilePicture !== undefined) updates.profilePicture = profilePicture;
       if (theme !== undefined) updates.theme = theme;
       if (emailNotifications !== undefined) updates.emailNotifications = emailNotifications;
+      if (language !== undefined) updates.language = language;
       
       // Self-service password change
       if (newPassword) {

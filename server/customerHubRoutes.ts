@@ -409,7 +409,7 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
       }
 
       try {
-        await sendCustomerWelcomeEmail(email, name, tempPassword);
+        await sendCustomerWelcomeEmail(email, name, tempPassword, "en");
       } catch (emailErr: any) {
         console.error("Failed to send welcome email:", emailErr.message);
       }

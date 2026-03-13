@@ -17,6 +17,7 @@ import { runCalendarMigration } from "./calendarMigration";
 import { runDocumentSharesMigration } from "./documentSharesMigration";
 import { runSuggestionsMigration } from "./suggestionsMigration";
 import { runEstimatesMigration } from "./estimatesMigration";
+import { runLanguageMigration } from "./languageMigration";
 
 const app = express();
 const httpServer = createServer(app);
@@ -87,6 +88,7 @@ app.use((req, res, next) => {
   await runCalendarMigration();
   await runSuggestionsMigration();
   await runEstimatesMigration();
+  await runLanguageMigration();
   await registerRoutes(httpServer, app);
   
   await seedUsers();

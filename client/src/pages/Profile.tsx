@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Camera, Save, User, Mail, Phone, FileText, Palette, Check, Lock, Eye, EyeOff, Bell, BellOff, Volume2, VolumeX, Mic, Play } from "lucide-react";
+import { Loader2, Camera, Save, User, Mail, Phone, FileText, Palette, Check, Lock, Eye, EyeOff, Bell, BellOff, Volume2, VolumeX, Mic, Play, Globe } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -229,6 +230,7 @@ function VoiceSettingsSection() {
 export default function Profile() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t, i18n } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<ThemeId>("forest");
@@ -426,8 +428,8 @@ export default function Profile() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-heading font-bold text-foreground">My Profile</h1>
-        <p className="text-muted-foreground">Manage your personal information and profile picture</p>
+        <h1 className="text-2xl font-heading font-bold text-foreground">{t("profile.title")}</h1>
+        <p className="text-muted-foreground">{t("profile.subtitle")}</p>
       </div>
 
       <Card>
@@ -474,67 +476,100 @@ export default function Profile() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-          <CardDescription>Update your profile details</CardDescription>
+          <CardTitle>{t("profile.personalInfo")}</CardTitle>
+          <CardDescription>{t("profile.updateDetails")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name" className="flex items-center gap-2">
-                <User className="h-4 w-4" /> Full Name
+                <User className="h-4 w-4" /> {t("profile.fullName")}
               </Label>
               <Input
                 id="name"
                 value={formData.name || displayProfile?.name || ""}
                 onChange={(e) => handleChange("name", e.target.value)}
-                placeholder="Your full name"
+                placeholder={t("profile.namePlaceholder")}
                 data-testid="input-profile-name"
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="email" className="flex items-center gap-2">
-                <Mail className="h-4 w-4" /> Email Address
+                <Mail className="h-4 w-4" /> {t("profile.emailAddress")}
               </Label>
               <Input
                 id="email"
                 type="email"
                 value={formData.email || displayProfile?.email || ""}
                 onChange={(e) => handleChange("email", e.target.value)}
-                placeholder="your.email@example.com"
+                placeholder={t("profile.emailPlaceholder")}
                 data-testid="input-profile-email"
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="phone" className="flex items-center gap-2">
-                <Phone className="h-4 w-4" /> Phone Number
+                <Phone className="h-4 w-4" /> {t("profile.phoneNumber")}
               </Label>
               <Input
                 id="phone"
                 type="tel"
                 value={formData.phone || displayProfile?.phone || ""}
                 onChange={(e) => handleChange("phone", e.target.value)}
-                placeholder="(555) 123-4567"
+                placeholder={t("profile.phonePlaceholder")}
                 data-testid="input-profile-phone"
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="bio" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" /> Bio
+                <FileText className="h-4 w-4" /> {t("profile.bio")}
               </Label>
               <Textarea
                 id="bio"
                 value={formData.bio || displayProfile?.bio || ""}
                 onChange={(e) => handleChange("bio", e.target.value)}
-                placeholder="Tell us a little about yourself..."
+                placeholder={t("profile.bioPlaceholder")}
                 rows={4}
                 data-testid="input-profile-bio"
               />
             </div>
 
             <EmailNotificationToggle profile={displayProfile} />
+
+            <div className="border rounded-lg p-4 space-y-2 bg-muted/30">
+              <Label className="flex items-center gap-2">
+                <Globe className="h-4 w-4" /> {t("profile.language")}
+              </Label>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  {t("profile.languageDesc")}
+                </p>
+                <Select
+                  value={i18n.language}
+                  onValueChange={async (value) => {
+                    i18n.changeLanguage(value);
+                    try {
+                      await apiRequest("PATCH", "/api/profile", { language: value });
+                      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+                      toast({ title: t("profile.languageUpdated") });
+                    } catch {
+                      toast({ title: t("profile.languageUpdateFailed"), variant: "destructive" });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-40" data-testid="select-language">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en" data-testid="option-language-en">{t("language.english")}</SelectItem>
+                    <SelectItem value="es" data-testid="option-language-es">{t("language.spanish")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
             <div className="flex justify-end pt-4">
               <Button 
@@ -547,7 +582,7 @@ export default function Profile() {
                 ) : (
                   <Save className="h-4 w-4 mr-2" />
                 )}
-                Save Changes
+                {t("common.saveChanges")}
               </Button>
             </div>
           </form>
@@ -556,24 +591,24 @@ export default function Profile() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Account Information</CardTitle>
-          <CardDescription>These details are managed by an administrator</CardDescription>
+          <CardTitle>{t("profile.accountInfo")}</CardTitle>
+          <CardDescription>{t("profile.accountInfoDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex justify-between items-center py-2 border-b">
-            <span className="text-muted-foreground">Username</span>
+            <span className="text-muted-foreground">{t("auth.username")}</span>
             <span className="font-medium">{displayProfile?.username}</span>
           </div>
           <div className="flex justify-between items-center py-2 border-b">
-            <span className="text-muted-foreground">Role</span>
+            <span className="text-muted-foreground">{t("employees.role")}</span>
             <Badge variant="outline">{displayProfile?.isMasterAdmin ? "Master Admin" : displayProfile?.role}</Badge>
           </div>
           <div className="flex justify-between items-center py-2">
-            <span className="text-muted-foreground">Member Since</span>
+            <span className="text-muted-foreground">{t("profile.memberSince")}</span>
             <span className="font-medium">
               {displayProfile?.createdAt 
                 ? new Date(displayProfile.createdAt).toLocaleDateString() 
-                : "Unknown"}
+                : t("profile.unknown")}
             </span>
           </div>
         </CardContent>
@@ -583,21 +618,21 @@ export default function Profile() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Lock className="h-5 w-5" />
-            Change Password
+            {t("profile.changePassword")}
           </CardTitle>
-          <CardDescription>Update your account password</CardDescription>
+          <CardDescription>{t("profile.changePasswordDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handlePasswordChange} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="current-password">Current Password</Label>
+              <Label htmlFor="current-password">{t("profile.currentPassword")}</Label>
               <div className="relative">
                 <Input
                   id="current-password"
                   type={showCurrentPassword ? "text" : "password"}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Enter your current password"
+                  placeholder={t("profile.currentPasswordPlaceholder")}
                   data-testid="input-current-password"
                 />
                 <button
@@ -611,14 +646,14 @@ export default function Profile() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
+              <Label htmlFor="new-password">{t("profile.newPassword")}</Label>
               <div className="relative">
                 <Input
                   id="new-password"
                   type={showNewPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter your new password"
+                  placeholder={t("profile.newPasswordPlaceholder")}
                   data-testid="input-new-password"
                 />
                 <button
@@ -632,13 +667,13 @@ export default function Profile() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <Label htmlFor="confirm-password">{t("profile.confirmNewPassword")}</Label>
               <Input
                 id="confirm-password"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your new password"
+                placeholder={t("profile.confirmPasswordPlaceholder")}
                 data-testid="input-confirm-password"
               />
             </div>
@@ -654,7 +689,7 @@ export default function Profile() {
                 ) : (
                   <Lock className="h-4 w-4 mr-2" />
                 )}
-                Change Password
+                {t("profile.changePassword")}
               </Button>
             </div>
           </form>

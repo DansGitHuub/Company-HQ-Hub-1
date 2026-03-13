@@ -1,0 +1,123 @@
+There are two issues to fix. Please address both in one pass.
+
+
+
+ISSUE 1 — /settings returns a 404 "Did you forget to add the page to the router?"
+
+The URL https://companyhq.app/settings exists somewhere in the codebase (linked or referenced) but has never been added to the router. Fix this by:
+
+1.	Search the codebase for any existing Settings component or page file (look for Settings.tsx, SettingsPage.tsx, or similar under client/src/pages or client/src/screens)
+2.	If a Settings component already exists, register it in the router at the path /settings
+3.	If no Settings component exists, create a proper Settings page at client/src/pages/Settings.tsx and register it in the router at /settings
+
+The Settings page should include the following sections, each as a card or collapsible panel:
+
+Profile & Account
+•	Display name, email, phone number (editable fields with Save button)
+•	Change password (current password, new password, confirm new password)
+•	Profile photo upload
+
+Notifications
+•	Toggle: In-app notifications (on/off)
+•	Toggle: Email notifications for messages (on/off)
+•	Toggle: Email notifications for calendar events (on/off)
+•	Toggle: Email notifications for job/work updates (on/off)
+•	Toggle: Email notifications for new work requests (Admin only — hidden from other roles)
+
+Language & Display
+•	Language preference dropdown: English / Español
+•	Saving language preference reloads the app in the selected language
+
+Appearance (placeholder for future)
+•	A note that theme options are coming soon — no functional controls needed yet
+
+Admin Settings (visible to Admin role only)
+•	Link/button to open the Admin Panel (same as the existing Admin Panel nav item)
+•	A note: "Full system settings and user management are available in the Admin Panel"
+
+The Settings page should be accessible:
+•	From the user avatar / profile menu in the top right header
+•	As a route at /settings
+
+Do not change any existing functionality — this is additive only.
+
+
+
+ISSUE 2 — Bell panel Updates and Activity tabs are not showing content
+
+The bell panel has Activity, Updates, and Roadmap tabs but they appear empty. Fix both Activity and Updates so they show real data.
+
+Activity tab — fix
+
+The Activity tab should automatically show a feed of recent events that happen inside CompanyHQ. Wire it up to track and display the following event types:
+
+•	Job/Work card moved to a new stage — "Work card [title] moved to [stage]"
+•	New estimate created — "New estimate created for [customer name]"
+•	Estimate converted to a Sold job — "Estimate for [customer] converted to a Sold job"
+•	New message received — "New message from [sender name]"
+•	New work request submitted by a customer — "New work request from [customer name]"
+•	Calendar event created — "[event title] added to calendar"
+•	Document uploaded — "[filename] uploaded to Document Library"
+•	Employee record updated (Admin only) — "[employee name] profile updated"
+
+Each activity item should show:
+•	The event description (from the list above)
+•	The time it happened (e.g. "2 hours ago", "yesterday")
+•	A small icon indicating the type
+•	A link to the relevant record where applicable
+
+Activity items should be stored in the database in a new table called `activity_log`:
+•	id
+•	user_id (who triggered it — optional, system events may be null)
+•	event_type (string)
+•	description (string)
+•	link (string — path to the related record, optional)
+•	created_at
+
+Fetch the 50 most recent activity items when the bell panel opens. Mark all as "seen" when the panel is opened.
+
+Updates tab — fix
+
+The Updates tab lets Admins post updates that all employees can see. If this functionality was partially built, verify and fix the following:
+
+4.	Admin can open the Updates tab and click "+ Post Update"
+5.	A form appears with: Title (required), Body/message (required, multiline), optional attachment
+6.	Clicking Post saves the update and it immediately appears in the Updates list
+7.	All users (Admin, Manager, Employee) can see updates in the Updates tab
+8.	Each update shows: title, body, poster's name, time posted, and a comment area
+9.	Unread updates increment the badge count on the bell icon
+10.	Badge count clears for updates when the Updates tab is opened
+
+If the Updates feature was never built at all, build it now following the spec above.
+
+Bell icon badge
+
+The bell icon badge should show the TOTAL count of:
+•	Unread activity items
+•	Unread updates
+
+The badge should update in real time (or at minimum refresh every 60 seconds via polling).
+
+
+
+DATABASE
+
+If the activity_log table does not already exist, create it via a new Drizzle migration:
+
+activity_log:
+id (serial primary key)
+user_id (integer, nullable, foreign key to users)
+event_type (varchar)
+description (text)
+link (varchar, nullable)
+created_at (timestamp, default now())
+seen_by (jsonb, default [] — array of user IDs who have seen this item)
+
+
+
+NOTES
+
+•	Do not break any existing features
+•	All new UI should match existing styling patterns in CompanyHQ
+•	The Settings page should feel consistent with the rest of the app
+•	Admin-only sections should be hidden from Manager, Employee, and Customer roles
