@@ -416,7 +416,7 @@
   <!-- PDF CANVAS AREA -->
   <div id="canvas-area">
     <div id="drop-zone">
-      <label for="pdf-upload-center" id="big-load-btn">
+      <div id="big-load-btn" onclick="document.getElementById('pdf-upload-center').click();" style="cursor:pointer">
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#c8a96e" stroke-width="1.5" style="margin-bottom:10px">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
           <polyline points="14 2 14 8 20 8"/>
@@ -424,9 +424,9 @@
           <polyline points="9 15 12 12 15 15"/>
         </svg>
         <span style="font-size:18px;letter-spacing:1px">Load PDF</span>
-        <span style="font-size:12px;opacity:0.7;margin-top:6px">click to browse</span>
-      </label>
-      <input type="file" id="pdf-upload-center" accept=".pdf" style="display:none">
+        <span style="font-size:12px;opacity:0.7;margin-top:6px">click to browse or drag &amp; drop</span>
+      </div>
+      <input type="file" id="pdf-upload-center" accept=".pdf,.PDF" style="display:none">
     </div>
     <div id="pdf-wrapper" style="display:none">
       <canvas id="pdf-canvas"></canvas>
@@ -473,20 +473,59 @@ let originalPdfFile = null;
 
 // ── PDF LOADING ────────────────────────────────────────────────
 document.getElementById('pdf-upload-center').addEventListener('change', loadPdfFile);
+document.getElementById('pdf-upload-center').addEventListener('click', function() {
+  this.value = '';
+});
+
+// Drag-and-drop support
+const dropZone = document.getElementById('drop-zone');
+const canvasArea = document.getElementById('canvas-area');
+[dropZone, canvasArea].forEach(el => {
+  if (!el) return;
+  el.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); if (dropZone) dropZone.style.borderColor = '#c8a96e'; });
+  el.addEventListener('dragleave', function(e) { e.preventDefault(); e.stopPropagation(); if (dropZone) dropZone.style.borderColor = '#333'; });
+  el.addEventListener('drop', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    if (dropZone) dropZone.style.borderColor = '#333';
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        loadPdfFile({ target: { files: [file] } });
+      } else {
+        status('Please drop a PDF file.');
+      }
+    }
+  });
+});
 
 async function loadPdfFile(e) {
   const file = e.target.files[0];
   if (!file) return;
-  originalPdfFile = file;
-  const data = await file.arrayBuffer();
-  pdfDoc = await pdfjsLib.getDocument({data}).promise;
-  currentPage = 1;
-  status(`Loaded: ${file.name} — ${pdfDoc.numPages} page(s)`);
-  await renderPage();
-  document.getElementById('drop-zone').style.display = 'none';
-  document.getElementById('pdf-wrapper').style.display = 'inline-block';
-  document.getElementById('btn-create-pdf').disabled = false;
-  document.getElementById('btn-save').disabled = false;
+  status('Loading: ' + file.name + '...');
+  try {
+    originalPdfFile = file;
+    const data = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(data) });
+    pdfDoc = await loadingTask.promise;
+    currentPage = 1;
+    fields = [];
+    selectedId = null;
+    colorIdx = 0;
+    status('Loaded: ' + file.name + ' — ' + pdfDoc.numPages + ' page(s)');
+    await renderPage();
+    document.getElementById('drop-zone').style.display = 'none';
+    document.getElementById('pdf-wrapper').style.display = 'inline-block';
+    document.getElementById('btn-create-pdf').disabled = false;
+    document.getElementById('btn-save').disabled = false;
+    renderFieldBoxes();
+    renderSidebar();
+  } catch (err) {
+    console.error('PDF load error:', err);
+    status('Error loading PDF: ' + (err.message || 'Unknown error — check console'));
+    pdfDoc = null;
+    originalPdfFile = null;
+  }
 }
 
 async function renderPage() {
