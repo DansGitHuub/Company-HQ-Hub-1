@@ -265,14 +265,28 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
     source: "", rating: "green",
   };
   const [form, setForm] = useState(defaultForm);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validate = () => {
+    const errs: Record<string, string> = {};
+    if (!form.name.trim()) errs.name = t("hiring.nameRequired");
+    if (!form.role) errs.role = t("hiring.positionRequired");
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = t("hiring.invalidEmail");
+    if (form.phone && !/^[\d\s()+-]{7,20}$/.test(form.phone)) errs.phone = t("hiring.invalidPhone");
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   const handleSave = () => {
+    if (!validate()) return;
     onSave({ ...form, stage: "New Application" });
     setForm(defaultForm);
+    setErrors({});
   };
 
   const handleClose = () => {
     setForm(defaultForm);
+    setErrors({});
     onClose();
   };
 
@@ -287,26 +301,30 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>{t("auth.fullName")} *</Label>
-              <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} data-testid="input-applicant-name" />
+              <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} data-testid="input-applicant-name" className={errors.name ? "border-red-500" : ""} />
+              {errors.name && <p className="text-xs text-red-500" data-testid="error-applicant-name">{errors.name}</p>}
             </div>
             <div className="space-y-1">
               <Label>{t("employees.position")} *</Label>
               <Select value={form.role || undefined} onValueChange={v => setForm({ ...form, role: v })}>
-                <SelectTrigger data-testid="select-applicant-role"><SelectValue placeholder="Select position..." /></SelectTrigger>
+                <SelectTrigger data-testid="select-applicant-role" className={errors.role ? "border-red-500" : ""}><SelectValue placeholder="Select position..." /></SelectTrigger>
                 <SelectContent>
                   {JOB_TYPES.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {errors.role && <p className="text-xs text-red-500" data-testid="error-applicant-role">{errors.role}</p>}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>{t("common.email")}</Label>
-              <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} data-testid="input-applicant-email" />
+              <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} data-testid="input-applicant-email" className={errors.email ? "border-red-500" : ""} />
+              {errors.email && <p className="text-xs text-red-500" data-testid="error-applicant-email">{errors.email}</p>}
             </div>
             <div className="space-y-1">
               <Label>{t("common.phone")}</Label>
-              <Input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} data-testid="input-applicant-phone" />
+              <Input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} data-testid="input-applicant-phone" className={errors.phone ? "border-red-500" : ""} />
+              {errors.phone && <p className="text-xs text-red-500" data-testid="error-applicant-phone">{errors.phone}</p>}
             </div>
           </div>
           <div className="space-y-1">
@@ -890,8 +908,12 @@ function OnboardingTab({ candidateId }: { candidateId: string }) {
   const { data: employee } = useQuery({
     queryKey: [`/api/candidates/${candidateId}/employee`],
     queryFn: async () => {
-      const employees = await (await apiRequest("GET", "/api/employees")).json();
-      return employees.find((e: any) => e.candidateId === candidateId);
+      try {
+        const res = await apiRequest("GET", `/api/candidates/${candidateId}/employee`);
+        return res.json();
+      } catch {
+        return undefined;
+      }
     },
   });
 

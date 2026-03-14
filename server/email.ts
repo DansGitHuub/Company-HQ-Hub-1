@@ -1,5 +1,25 @@
 import { sendEmail, escapeHtml, getAppUrl } from "./emailService";
 import { emailT } from "./emailTranslations";
+import { storage } from "./storage";
+
+let cachedCompanyName: string | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 60_000;
+
+async function getCompanyName(): Promise<string> {
+  const now = Date.now();
+  if (cachedCompanyName && now - cacheTimestamp < CACHE_TTL) {
+    return cachedCompanyName;
+  }
+  try {
+    const settings = await storage.getCompanySettings();
+    cachedCompanyName = settings?.companyName || "Company HQ";
+    cacheTimestamp = now;
+  } catch {
+    cachedCompanyName = cachedCompanyName || "Company HQ";
+  }
+  return cachedCompanyName;
+}
 
 export async function sendPasswordRecoveryEmail(toEmail: string, recoveryToken: string, userName: string, language?: string) {
   console.log("[email] Sending password recovery email to:", toEmail);
@@ -157,17 +177,18 @@ export async function sendHiringStageEmail(
   subject: string,
   body: string
 ) {
+  const companyName = await getCompanyName();
   return sendEmail(toEmail, subject, `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background-color: #166534; padding: 20px; text-align: center;">
-        <h1 style="color: white; margin: 0;">Chapin Landscapes</h1>
+        <h1 style="color: white; margin: 0;">${escapeHtml(companyName)}</h1>
       </div>
       <div style="padding: 30px; background-color: #f9fafb;">
         <p style="color: #4b5563;">Hi ${escapeHtml(recipientName || "there")},</p>
         <p style="color: #374151; line-height: 1.6;">${escapeHtml(body)}</p>
       </div>
       <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
-        <p>Chapin Landscapes — Hiring Team</p>
+        <p>${escapeHtml(companyName)} — Hiring Team</p>
       </div>
     </div>
   `);
@@ -180,11 +201,12 @@ export async function sendHiringWelcomeEmail(
   startDate: string,
   language?: string
 ) {
+  const companyName = await getCompanyName();
   const t = (key: string) => emailT(language, key);
   return sendEmail(toEmail, t("welcomeOnboarding"), `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background-color: #166534; padding: 20px; text-align: center;">
-        <h1 style="color: white; margin: 0;">Chapin Landscapes</h1>
+        <h1 style="color: white; margin: 0;">${escapeHtml(companyName)}</h1>
       </div>
       <div style="padding: 30px; background-color: #f9fafb;">
         <h2 style="color: #1f2937;">${t("welcomeTeam")}</h2>
@@ -204,7 +226,7 @@ export async function sendHiringWelcomeEmail(
         <p style="color: #4b5563;">${t("questionsBeforeStart")}</p>
       </div>
       <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
-        <p>Chapin Landscapes — ${t("hiringTeam")}</p>
+        <p>${escapeHtml(companyName)} — ${t("hiringTeam")}</p>
       </div>
     </div>
   `);
@@ -216,12 +238,13 @@ export async function sendCustomerWelcomeEmail(
   tempPassword: string,
   language?: string
 ) {
+  const companyName = await getCompanyName();
   const appUrl = getAppUrl();
   const t = (key: string) => emailT(language, key);
   return sendEmail(toEmail, t("welcomePortalSubject"), `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #F7F3EC;">
       <div style="background-color: #1E3A2F; padding: 30px; text-align: center;">
-        <h1 style="color: #C9A84C; margin: 0; font-size: 24px;">Chapin Landscapes</h1>
+        <h1 style="color: #C9A84C; margin: 0; font-size: 24px;">${escapeHtml(companyName)}</h1>
         <p style="color: #F7F3EC; margin: 8px 0 0; font-size: 14px;">${t("customerPortal")}</p>
       </div>
       <div style="padding: 30px;">
@@ -235,7 +258,7 @@ export async function sendCustomerWelcomeEmail(
         <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">${t("changePasswordPrompt")}</p>
       </div>
       <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
-        <p>Chapin Landscapes</p>
+        <p>${escapeHtml(companyName)}</p>
       </div>
     </div>
   `);
@@ -250,6 +273,7 @@ export async function sendCustomerNotificationEmail(
   ctaLink?: string,
   language?: string
 ) {
+  const companyName = await getCompanyName();
   const appUrl = getAppUrl();
   const t = (key: string) => emailT(language, key);
   const ctaHtml = ctaText && ctaLink
@@ -259,7 +283,7 @@ export async function sendCustomerNotificationEmail(
   return sendEmail(toEmail, subject, `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #F7F3EC;">
       <div style="background-color: #1E3A2F; padding: 20px; text-align: center;">
-        <h1 style="color: #C9A84C; margin: 0; font-size: 20px;">Chapin Landscapes</h1>
+        <h1 style="color: #C9A84C; margin: 0; font-size: 20px;">${escapeHtml(companyName)}</h1>
       </div>
       <div style="padding: 30px;">
         <p style="color: #4b5563;">${t("hi")} ${escapeHtml(customerName)},</p>
@@ -267,18 +291,19 @@ export async function sendCustomerNotificationEmail(
         ${ctaHtml}
       </div>
       <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
-        <p>Chapin Landscapes</p>
+        <p>${escapeHtml(companyName)}</p>
       </div>
     </div>
   `);
 }
 
 export async function sendSuggestionConfirmationEmail(toEmail: string, customerName: string, suggestionTitle: string, language?: string) {
+  const companyName = await getCompanyName();
   const t = (key: string) => emailT(language, key);
   return sendEmail(toEmail, t("suggestionReceived"), `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #F7F3EC;">
       <div style="background-color: #1E3A2F; padding: 20px; text-align: center;">
-        <h1 style="color: #C9A84C; margin: 0; font-size: 20px;">Chapin Landscapes</h1>
+        <h1 style="color: #C9A84C; margin: 0; font-size: 20px;">${escapeHtml(companyName)}</h1>
       </div>
       <div style="padding: 30px;">
         <p style="color: #4b5563;">${t("hi")} ${escapeHtml(customerName)},</p>
@@ -290,7 +315,7 @@ export async function sendSuggestionConfirmationEmail(toEmail: string, customerN
         <p style="color: #374151; line-height: 1.6;">${t("suggestionFollowUp")}</p>
       </div>
       <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
-        <p>Chapin Landscapes</p>
+        <p>${escapeHtml(companyName)}</p>
       </div>
     </div>
   `);
@@ -321,10 +346,11 @@ export async function sendSuggestionStatusUpdateEmail(
       </div>`
     : "";
 
+  const companyName = await getCompanyName();
   return sendEmail(toEmail, `${t("updateOnSuggestion")}: ${suggestionTitle}`, `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #F7F3EC;">
       <div style="background-color: #1E3A2F; padding: 20px; text-align: center;">
-        <h1 style="color: #C9A84C; margin: 0; font-size: 20px;">Chapin Landscapes</h1>
+        <h1 style="color: #C9A84C; margin: 0; font-size: 20px;">${escapeHtml(companyName)}</h1>
       </div>
       <div style="padding: 30px;">
         <p style="color: #4b5563;">${t("hi")} ${escapeHtml(customerName)},</p>
@@ -337,7 +363,7 @@ export async function sendSuggestionStatusUpdateEmail(
         <p style="color: #374151; line-height: 1.6;">${t("suggestionFeedbackThanks")}</p>
       </div>
       <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
-        <p>Chapin Landscapes</p>
+        <p>${escapeHtml(companyName)}</p>
       </div>
     </div>
   `);
