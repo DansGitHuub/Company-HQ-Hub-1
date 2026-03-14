@@ -692,11 +692,7 @@
     "documentUploaded": "Document uploaded",
     "sendDoc": "Send",
     "interviewDate": "Interview Date",
-    "needsAttention": "Needs Attention",
-    "nameRequired": "Name is required",
-    "positionRequired": "Position is required",
-    "invalidEmail": "Please enter a valid email address",
-    "invalidPhone": "Please enter a valid phone number"
+    "needsAttention": "Needs Attention"
   },
   "equipment": {
     "title": "Equipment",
