@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "0Qgsu64vE5zaFbVRRYNWb"
+uri = "file://.local/companyhq-system-report.md"
+type = "text"
+title = "CompanyHQ System Report — March 2026"
