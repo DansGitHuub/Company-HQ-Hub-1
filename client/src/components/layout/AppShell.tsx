@@ -120,7 +120,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       tips: ["Use tabs for job types", "Upload permits and contracts", "Track with Google Maps"]
     },
     education: {
-      title: t("nav.customerHub"),
+      title: t("nav.resourceLibrary"),
       description: "Resource library with care guides, instructions, and documents for customers.",
       tips: ["Create guides and instructions", "Upload manufacturer documents", "Customers can bookmark favorites"]
     },
@@ -343,7 +343,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     hiring: { icon: Users, label: t("nav.hiring"), href: "/hiring" },
     employees: { icon: User, label: t("nav.employees"), href: "/employees" },
     jobs: { icon: LayoutDashboard, label: t("nav.work"), href: "/jobs" },
-    education: { icon: GraduationCap, label: t("nav.customerHub"), href: "/education" },
+    education: { icon: GraduationCap, label: t("nav.resourceLibrary"), href: "/education" },
     help: { icon: LifeBuoy, label: t("nav.help"), href: "/help" },
     hq: { icon: Building2, label: t("nav.companyHQ"), href: "/hq" },
     marketing: { icon: Megaphone, label: t("nav.marketing"), href: "/marketing" },
