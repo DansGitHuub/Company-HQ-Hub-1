@@ -349,7 +349,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     marketing: { icon: Megaphone, label: t("nav.marketing"), href: "/marketing" },
     forms: { icon: FileText, label: t("nav.forms"), href: "/forms" },
     inbox: { icon: Mail, label: t("nav.messages"), href: "/inbox" },
-    integrations: { icon: Settings, label: t("nav.integrations"), href: "/integrations" },
     admin: { icon: Shield, label: t("nav.adminPanel"), href: "/admin" },
     tools: { icon: Snowflake, label: t("nav.tools"), href: "/tools" },
     plow_mapper: { icon: Snowflake, label: t("nav.plowMapper"), href: "/tools/plow-mapper" },

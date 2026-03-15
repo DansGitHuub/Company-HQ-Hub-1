@@ -72,7 +72,7 @@ export default function IntegrationWizard() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("discover");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSoftware, setSelectedSoftware] = useState<SoftwareIntegration | null>(null);
   const [showSetupDialog, setShowSetupDialog] = useState(false);
@@ -86,7 +86,7 @@ export default function IntegrationWizard() {
   const { data: softwareIntegrations = [], refetch: refetchSoftware } = useQuery<SoftwareIntegration[]>({
     queryKey: ["/api/software-integrations", selectedCategory],
     queryFn: async () => {
-      const url = selectedCategory 
+      const url = selectedCategory && selectedCategory !== "all"
         ? `/api/software-integrations?category=${selectedCategory}` 
         : "/api/software-integrations";
       return apiRequest("GET", url).then(r => r.json());
@@ -266,7 +266,7 @@ export default function IntegrationWizard() {
                     <SelectValue placeholder={t("common.category")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{t("common.allCategories")}</SelectItem>
+                    <SelectItem value="all">{t("common.allCategories")}</SelectItem>
                     {categories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         {cat.name}
@@ -309,7 +309,7 @@ export default function IntegrationWizard() {
                   key={cat.id}
                   variant={isSelected ? "default" : "outline"}
                   className="h-auto py-3 flex flex-col gap-1"
-                  onClick={() => setSelectedCategory(isSelected ? "" : cat.id)}
+                  onClick={() => setSelectedCategory(isSelected ? "all" : cat.id)}
                   data-testid={`category-${cat.id}`}
                 >
                   <Icon className="h-5 w-5" />
@@ -322,7 +322,7 @@ export default function IntegrationWizard() {
           <Card>
             <CardHeader>
               <CardTitle>
-                {selectedCategory 
+                {selectedCategory && selectedCategory !== "all"
                   ? `${categories.find(c => c.id === selectedCategory)?.name || ""} Software`
                   : "Available Integrations"
                 }

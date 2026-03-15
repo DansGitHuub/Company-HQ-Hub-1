@@ -216,7 +216,7 @@ const allTiles: TileDef[] = [
     title: "Integrations", 
     desc: "Services & API Keys", 
     icon: Settings, 
-    href: "/integrations", 
+    href: "/tools/integration-wizard", 
     image: imgIntegrations,
     color: "bg-slate-100 text-slate-900",
     colSpan: "col-span-1",

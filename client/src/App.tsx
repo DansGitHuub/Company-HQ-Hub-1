@@ -22,7 +22,6 @@ import Materials from "@/pages/Materials";
 import Hiring from "@/pages/Hiring";
 import Marketing from "@/pages/Marketing";
 import Forms from "@/pages/Forms";
-import Integrations from "@/pages/Integrations";
 import Education from "@/pages/Education";
 import EmployeePortal from "@/pages/EmployeePortal";
 import Employees from "@/pages/Employees";
@@ -88,7 +87,6 @@ function AppRoutes() {
         <Route path="/hiring" component={Hiring} />
         <Route path="/marketing" component={Marketing} />
         <Route path="/forms" component={Forms} />
-        <Route path="/integrations" component={Integrations} />
         <Route path="/education" component={Education} />
         <Route path="/profile" component={Profile} />
         <Route path="/employees" component={Employees} />
