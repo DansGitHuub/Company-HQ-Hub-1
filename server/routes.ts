@@ -7450,29 +7450,12 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
   
-  // Get activity logs with optional filters
-  app.get("/api/admin/diagnostics/activities", requireAuth, requireMasterAdmin, async (req, res) => {
-    try {
-      const filters: any = {};
-      if (req.query.feature) filters.feature = req.query.feature as string;
-      if (req.query.action) filters.action = req.query.action as string;
-      if (req.query.userId) filters.userId = req.query.userId as string;
-      if (req.query.limit) filters.limit = parseInt(req.query.limit as string);
-      
-      const activities = await storage.getActivityLogs(filters);
-      res.json(activities);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching activity logs" });
-    }
-  });
   
   // Generate diagnostic report (Simple mode - high-level summary)
   app.get("/api/admin/diagnostics/report/simple", requireAuth, requireMasterAdmin, async (req, res) => {
     try {
       const errorStats = await storage.getErrorStats();
       const recentErrors = await storage.getErrorLogs({ limit: 10, isResolved: false });
-      const recentActivities = await storage.getActivityLogs({ limit: 20 });
-      
       // Get system summary data
       const users = await storage.getAllUsers();
       const sops = await storage.getSops();
@@ -7503,12 +7486,6 @@ Provide accurate information based on publicly available documentation.`;
           summary: e.errorMessage.substring(0, 100) + (e.errorMessage.length > 100 ? "..." : ""),
           severity: e.severity,
         })),
-        recentActivity: recentActivities.slice(0, 10).map((a: any) => ({
-          when: a.createdAt,
-          action: a.action,
-          feature: a.feature,
-          description: a.description,
-        })),
       };
       
       res.json(report);
@@ -7523,8 +7500,6 @@ Provide accurate information based on publicly available documentation.`;
     try {
       const errorStats = await storage.getErrorStats();
       const allErrors = await storage.getErrorLogs({ limit: 100 });
-      const allActivities = await storage.getActivityLogs({ limit: 100 });
-      
       // Get comprehensive system data
       const users = await storage.getAllUsers();
       const sops = await storage.getSops();
@@ -7545,14 +7520,6 @@ Provide accurate information based on publicly available documentation.`;
         
         const hour = new Date(e.createdAt).toISOString().substring(0, 13);
         errorsByTime[hour] = (errorsByTime[hour] || 0) + 1;
-      });
-      
-      // Calculate user activity
-      const userActivityCounts: Record<string, number> = {};
-      allActivities.forEach((a: any) => {
-        if (a.userId) {
-          userActivityCounts[a.userId] = (userActivityCounts[a.userId] || 0) + 1;
-        }
       });
       
       const report = {
@@ -7626,20 +7593,7 @@ Provide accurate information based on publicly available documentation.`;
           createdAt: e.createdAt,
           stackTrace: e.stackTrace,
         })),
-        recentActivity: allActivities.slice(0, 30).map((a: any) => ({
-          id: a.id,
-          action: a.action,
-          feature: a.feature,
-          description: a.description,
-          entityType: a.entityType,
-          entityId: a.entityId,
-          userId: a.userId,
-          userRole: a.userRole,
-          success: a.success,
-          createdAt: a.createdAt,
-          metadata: a.metadata ? JSON.parse(a.metadata) : null,
-        })),
-        mostActiveUsers: Object.entries(userActivityCounts)
+        mostActiveUsers: Object.entries({} as Record<string, number>)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 10)
           .map(([userId, count]) => {

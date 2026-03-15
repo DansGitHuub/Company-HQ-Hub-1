@@ -1978,31 +1978,6 @@ export const insertErrorLogSchema = createInsertSchema(errorLogs).omit({
 export type InsertErrorLog = z.infer<typeof insertErrorLogSchema>;
 export type ErrorLog = typeof errorLogs.$inferSelect;
 
-// Activity Logs - for tracking key user actions
-export const activityLogs = pgTable("activity_logs", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  action: text("action").notNull(), // login, logout, create, update, delete, view
-  feature: text("feature").notNull(), // sops, materials, jobs, hiring, todos, users, settings, etc.
-  description: text("description"), // Human-readable description
-  entityType: text("entity_type"), // user, sop, material, job, etc.
-  entityId: text("entity_id"), // ID of the affected entity
-  userId: varchar("user_id", { length: 36 }).references(() => users.id),
-  userRole: text("user_role"),
-  metadata: text("metadata"), // JSON string with additional details
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  success: boolean("success").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertActivityLogsSchema = createInsertSchema(activityLogs).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertActivityLogs = z.infer<typeof insertActivityLogsSchema>;
-export type ActivityLogs = typeof activityLogs.$inferSelect;
-
 // Development Tracker - for tracking incomplete features and systems
 export const developmentTracker = pgTable("development_tracker", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),

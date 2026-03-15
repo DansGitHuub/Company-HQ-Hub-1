@@ -63,7 +63,6 @@ import {
   articleUpdateNotifications, type ArticleUpdateNotification, type InsertArticleUpdateNotification,
   calendarConnections, type CalendarConnection, type InsertCalendarConnection,
   errorLogs, type ErrorLog, type InsertErrorLog,
-  activityLogs, type ActivityLogs, type InsertActivityLogs,
   developmentTracker, type DevelopmentTracker, type InsertDevelopmentTracker,
   sopMedia, type SopMedia, type InsertSopMedia,
   aiGenerationEvents, type AiGenerationEvent, type InsertAiGenerationEvent,
@@ -517,10 +516,6 @@ export interface IStorage {
   updateErrorLog(id: string, updates: Partial<ErrorLog>): Promise<ErrorLog | undefined>;
   getErrorStats(): Promise<{ total: number; unresolved: number; bySeverity: Record<string, number>; byFeature: Record<string, number> }>;
   
-  // Activity Logs
-  getActivityLogs(filters?: { feature?: string; action?: string; userId?: string; limit?: number }): Promise<ActivityLogs[]>;
-  createActivityLog(log: InsertActivityLogs): Promise<ActivityLogs>;
-  
   // Development Tracker
   getDevelopmentItems(filters?: { status?: string; category?: string; priority?: string }): Promise<DevelopmentTracker[]>;
   getDevelopmentItem(id: string): Promise<DevelopmentTracker | undefined>;
@@ -777,7 +772,6 @@ export class DatabaseStorage implements IStorage {
       await db.delete(aiGenerationEvents).where(eq(aiGenerationEvents.userId, id));
       await db.delete(plowSiteManagerPermissions).where(eq(plowSiteManagerPermissions.userId, id));
       await db.delete(errorLogs).where(eq(errorLogs.userId, id));
-      await db.delete(activityLogs).where(eq(activityLogs.userId, id));
       await db.delete(featureRequests).where(eq(featureRequests.userId, id));
       const userConversations = await db.select({ id: conversations.id }).from(conversations).where(eq(conversations.userId, id));
       for (const c of userConversations) {
@@ -2529,33 +2523,6 @@ export class DatabaseStorage implements IStorage {
     });
     
     return { total, unresolved, bySeverity, byFeature };
-  }
-
-  // Activity Logs
-  async getActivityLogs(filters?: { feature?: string; action?: string; userId?: string; limit?: number }): Promise<ActivityLog[]> {
-    let query = db.select().from(activityLogs);
-    const conditions: any[] = [];
-    
-    if (filters?.feature) {
-      conditions.push(eq(activityLogs.feature, filters.feature));
-    }
-    if (filters?.action) {
-      conditions.push(eq(activityLogs.action, filters.action));
-    }
-    if (filters?.userId) {
-      conditions.push(eq(activityLogs.userId, filters.userId));
-    }
-    
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions)) as any;
-    }
-    
-    return await query.orderBy(desc(activityLogs.createdAt)).limit(filters?.limit || 100);
-  }
-
-  async createActivityLog(log: InsertActivityLogs): Promise<ActivityLogs> {
-    const [created] = await db.insert(activityLogs).values(log).returning();
-    return created;
   }
 
   // Development Tracker

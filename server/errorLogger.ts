@@ -1,6 +1,6 @@
 import { Request } from "express";
 import { storage } from "./storage";
-import type { InsertErrorLog, InsertActivityLogs } from "@shared/schema";
+import type { InsertErrorLog } from "@shared/schema";
 
 type ErrorSeverity = "info" | "warning" | "error" | "critical";
 type FeatureType = "sops" | "materials" | "jobs" | "hiring" | "todos" | "equipment" | "forms" | "messages" | "users" | "settings" | "auth" | "calendar" | "plow_sites" | "ai_agents" | "help" | "updates" | "frontend" | "general";
@@ -16,17 +16,6 @@ interface ErrorLogOptions {
   requestBody?: Record<string, any>;
   feature?: FeatureType;
   severity?: ErrorSeverity;
-  req?: Request;
-}
-
-interface ActivityLogOptions {
-  action: string;
-  feature: FeatureType;
-  description?: string;
-  entityType?: string;
-  entityId?: string;
-  metadata?: Record<string, any>;
-  success?: boolean;
   req?: Request;
 }
 
@@ -83,30 +72,6 @@ export async function logError(options: ErrorLogOptions): Promise<void> {
     await storage.createErrorLog(log);
   } catch (e) {
     console.error("Failed to log error:", e);
-  }
-}
-
-export async function logActivity(options: ActivityLogOptions): Promise<void> {
-  try {
-    const userInfo = extractUserFromRequest(options.req);
-    
-    const log: InsertActivityLogs = {
-      action: options.action,
-      feature: options.feature,
-      description: options.description,
-      entityType: options.entityType,
-      entityId: options.entityId,
-      userId: userInfo.userId,
-      userRole: userInfo.userRole,
-      metadata: options.metadata ? JSON.stringify(options.metadata) : undefined,
-      ipAddress: userInfo.ipAddress,
-      userAgent: userInfo.userAgent,
-      success: options.success !== false,
-    };
-    
-    await storage.createActivityLog(log);
-  } catch (e) {
-    console.error("Failed to log activity:", e);
   }
 }
 
