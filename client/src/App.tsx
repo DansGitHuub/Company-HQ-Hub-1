@@ -38,7 +38,6 @@ import SearchPage from "@/pages/Search";
 import TodoList from "@/pages/TodoList";
 
 import PlowSiteMapper from "@/pages/PlowSiteMapper";
-import MessagingInbox from "@/pages/MessagingInbox";
 import ProcessAuditor from "@/pages/ProcessAuditor";
 import IntegrationWizard from "@/pages/IntegrationWizard";
 import TestingKnowledge from "@/pages/TestingKnowledge";
@@ -113,7 +112,6 @@ function AppRoutes() {
         <Route path="/care-guides" component={CareGuideManager} />
         <Route path="/tools" component={Tools} />
         <Route path="/calendar" component={CalendarPage} />
-        <Route path="/communications" component={MessagingInbox} />
         <Route path="/testing" component={TestingKnowledge} />
         <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />
