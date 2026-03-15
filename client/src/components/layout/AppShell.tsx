@@ -31,12 +31,12 @@ import {
   ClipboardCheck,
   CheckSquare,
   Snowflake,
-  Bell,
+  BellRing,
   Brain,
-  CalendarDays,
+  CalendarCheck,
   X,
   LifeBuoy,
-  Globe
+  Languages
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -705,7 +705,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     onClick={() => setIsUpdatesOpen(true)}
                     data-testid="button-updates"
                   >
-                    <Bell className="h-[18px] w-[18px]" />
+                    <BellRing className="h-[18px] w-[18px]" />
                     {totalBellCount > 0 && (
                       <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-background animate-pulse" />
                     )}
@@ -725,7 +725,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     onClick={() => setIsCalendarOpen(true)}
                     data-testid="button-calendar"
                   >
-                    <CalendarDays className="h-[18px] w-[18px]" />
+                    <CalendarCheck className="h-[18px] w-[18px]" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{t("nav.calendar")}</TooltipContent>
@@ -735,7 +735,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors">
-                  <Globe className="h-[18px] w-[18px]" />
+                  <Languages className="h-[18px] w-[18px]" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-32">
@@ -779,7 +779,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="h-full flex flex-col">
               <div className="p-4 border-b flex items-center justify-between bg-muted/30">
                 <div className="flex items-center gap-3">
-                  <CalendarDays className="h-6 w-6 text-primary" />
+                  <CalendarCheck className="h-6 w-6 text-primary" />
                   <h2 className="text-xl font-bold">{t("calendar.title")}</h2>
                 </div>
               </div>
