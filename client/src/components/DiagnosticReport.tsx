@@ -52,20 +52,6 @@ interface ErrorLog {
   createdAt: string;
 }
 
-interface ActivityLog {
-  id: string;
-  action: string;
-  feature: string;
-  description?: string;
-  entityType?: string;
-  entityId?: string;
-  userId?: string;
-  userRole?: string;
-  success: boolean;
-  createdAt: string;
-  metadata?: Record<string, any>;
-}
-
 interface SimpleReport {
   generatedAt: string;
   mode: string;
@@ -88,12 +74,6 @@ interface SimpleReport {
     what: string;
     summary: string;
     severity: string;
-  }>;
-  recentActivity: Array<{
-    when: string;
-    action: string;
-    feature: string;
-    description?: string;
   }>;
 }
 
@@ -122,7 +102,6 @@ interface AdvancedReport {
     byTimeHour: Array<{ hour: string; count: number }>;
   };
   recentErrors: ErrorLog[];
-  recentActivity: ActivityLog[];
   mostActiveUsers: Array<{
     userId: string;
     username: string;
@@ -257,30 +236,6 @@ function SimpleReportView({ report }: { report: SimpleReport }) {
         </Card>
       )}
 
-      {report.recentActivity.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-48">
-              <div className="space-y-2">
-                {report.recentActivity.map((activity, i) => (
-                  <div key={i} className="flex items-center gap-3 p-2 text-sm">
-                    <Badge variant="outline" className="shrink-0">{activity.action}</Badge>
-                    <span className="text-muted-foreground">{activity.feature}</span>
-                    {activity.description && <span className="truncate">{activity.description}</span>}
-                    <span className="text-xs text-muted-foreground ml-auto shrink-0">{formatDate(activity.when)}</span>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
@@ -391,8 +346,7 @@ function AdvancedReportView({ report }: { report: AdvancedReport }) {
 
       <Tabs defaultValue="errors">
         <TabsList>
-          <TabsTrigger value="errors">Recent Errors ({report.recentErrors.length})</TabsTrigger>
-          <TabsTrigger value="activity">Recent Activity ({report.recentActivity.length})</TabsTrigger>
+          <TabsTrigger value="errors">Recent Errors ({report.recentErrors?.length || 0})</TabsTrigger>
           <TabsTrigger value="users">Most Active Users</TabsTrigger>
         </TabsList>
 
@@ -456,45 +410,6 @@ function AdvancedReportView({ report }: { report: AdvancedReport }) {
                     </Collapsible>
                   ))}
                 </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="activity" className="mt-4">
-          <Card>
-            <CardContent className="pt-4">
-              <ScrollArea className="h-[400px]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Action</TableHead>
-                      <TableHead>Feature</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {report.recentActivity.map((activity) => (
-                      <TableRow key={activity.id}>
-                        <TableCell className="text-xs">{formatDate(activity.createdAt)}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{activity.action}</Badge>
-                        </TableCell>
-                        <TableCell className="capitalize">{activity.feature.replace(/_/g, " ")}</TableCell>
-                        <TableCell className="text-sm max-w-[200px] truncate">{activity.description || "-"}</TableCell>
-                        <TableCell>
-                          {activity.success ? (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <AlertCircle className="h-4 w-4 text-red-500" />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
               </ScrollArea>
             </CardContent>
           </Card>
