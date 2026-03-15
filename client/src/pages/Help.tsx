@@ -129,7 +129,7 @@ const customerWalkthrough: WalkthroughStep[] = [
     title: "Your Customer Portal",
     description: "Welcome to your dedicated customer area! Here you can communicate with our team and request services.",
     icon: <Home className="h-8 w-8" />,
-    path: "/customer",
+    path: "/customer-hub",
     tips: [
       "View all your messages and requests in one place",
       "Track the status of your service requests",
@@ -140,7 +140,7 @@ const customerWalkthrough: WalkthroughStep[] = [
     title: "Send Messages",
     description: "Communicate directly with our team. Ask questions, provide feedback, or discuss your projects.",
     icon: <MessageSquare className="h-8 w-8" />,
-    path: "/customer",
+    path: "/customer-hub",
     tips: [
       "Click 'New Message' to start a conversation",
       "Track message status (sent, read, replied)",
@@ -151,7 +151,7 @@ const customerWalkthrough: WalkthroughStep[] = [
     title: "Work Requests",
     description: "Request landscaping services easily. Describe what you need and we'll get back to you.",
     icon: <ClipboardList className="h-8 w-8" />,
-    path: "/customer",
+    path: "/customer-hub",
     tips: [
       "Choose from service types like Lawn Maintenance or Landscape Design",
       "Set urgency level for your request",
@@ -162,7 +162,7 @@ const customerWalkthrough: WalkthroughStep[] = [
     title: "Account Access",
     description: "If you're a team member, request upgraded access to see operational features.",
     icon: <Shield className="h-8 w-8" />,
-    path: "/customer",
+    path: "/customer-hub",
     tips: [
       "Request Crew, Manager, or Admin access",
       "Provide a reason for your request",

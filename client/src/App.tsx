@@ -14,7 +14,6 @@ import Home from "@/pages/Home";
 import AuthPage from "@/pages/auth-page";
 import AdminPanel from "@/pages/AdminPanel";
 import AdminInbox from "@/pages/AdminInbox";
-import CustomerPortal from "@/pages/CustomerPortal";
 import CustomerHub from "@/pages/CustomerHub";
 import CareGuideManager from "@/pages/CareGuideManager";
 import ApplicantPortal from "@/pages/ApplicantPortal";
@@ -81,7 +80,6 @@ function AppRoutes() {
           <Redirect to={defaultPath} />
         </Route>
         <Route path="/customer-hub/:section?" component={CustomerHub} />
-        <Route path="/customer" component={CustomerPortal} />
         <Route path="/applicant" component={ApplicantPortal} />
         <Route path="/admin" component={AdminPanel} />
         <Route path="/inbox" component={AdminInbox} />

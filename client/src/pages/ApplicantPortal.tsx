@@ -325,7 +325,7 @@ export default function ApplicantPortal() {
 
             <div className="pt-2">
               <h4 className="font-medium mb-2">Have Questions?</h4>
-              <Link href="/customer">
+              <Link href="/customer-hub">
                 <Button variant="outline" className="w-full gap-2" data-testid="button-contact-team">
                   <MessageSquare className="h-4 w-4" />
                   Contact Our Team
