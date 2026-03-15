@@ -782,9 +782,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <CalendarDays className="h-6 w-6 text-primary" />
                   <h2 className="text-xl font-bold">{t("calendar.title")}</h2>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setIsCalendarOpen(false)}>
-                  <X className="h-5 w-5" />
-                </Button>
               </div>
               <div className="flex-1 overflow-hidden relative">
                 <CalendarPage />
