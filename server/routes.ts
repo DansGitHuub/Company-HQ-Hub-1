@@ -35,7 +35,7 @@ import {
   activityLog
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { z } from "zod";
 import { autoClassifySOPTitle, getTaxonomy } from "@shared/sopClassification";
 
@@ -7352,6 +7352,55 @@ Provide accurate information based on publicly available documentation.`;
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Error deleting connection" });
+    }
+  });
+
+  // ========== SYSTEM STATUS REPORT (Admin only) ==========
+  app.get("/api/admin/system-status", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const counts: Record<string, number> = {};
+      const tables = [
+        { key: "users", query: "SELECT count(*)::int as c FROM users" },
+        { key: "jobs", query: "SELECT count(*)::int as c FROM jobs" },
+        { key: "estimates", query: "SELECT count(*)::int as c FROM estimates" },
+        { key: "equipment", query: "SELECT count(*)::int as c FROM equipment" },
+        { key: "sops", query: "SELECT count(*)::int as c FROM sops" },
+        { key: "materials", query: "SELECT count(*)::int as c FROM materials" },
+        { key: "candidates", query: "SELECT count(*)::int as c FROM candidates" },
+        { key: "employees", query: "SELECT count(*)::int as c FROM employees" },
+        { key: "todos", query: "SELECT count(*)::int as c FROM todos" },
+        { key: "tasks", query: "SELECT count(*)::int as c FROM tasks" },
+        { key: "calendarEvents", query: "SELECT count(*)::int as c FROM calendar_events" },
+        { key: "documents", query: "SELECT count(*)::int as c FROM documents" },
+        { key: "customerMessages", query: "SELECT count(*)::int as c FROM customer_messages" },
+        { key: "careGuides", query: "SELECT count(*)::int as c FROM care_guides" },
+        { key: "customerSuggestions", query: "SELECT count(*)::int as c FROM customer_suggestions" },
+        { key: "sopQuizzes", query: "SELECT count(*)::int as c FROM sop_quizzes" },
+        { key: "quizAttempts", query: "SELECT count(*)::int as c FROM user_quiz_attempts" },
+        { key: "maintenanceSchedules", query: "SELECT count(*)::int as c FROM maintenance_schedules" },
+        { key: "repairRequests", query: "SELECT count(*)::int as c FROM repair_requests" },
+        { key: "campaigns", query: "SELECT count(*)::int as c FROM campaigns" },
+        { key: "forms", query: "SELECT count(*)::int as c FROM builder_forms" },
+        { key: "plowSites", query: "SELECT count(*)::int as c FROM plow_sites" },
+        { key: "appUpdates", query: "SELECT count(*)::int as c FROM app_updates" },
+        { key: "activityLog", query: "SELECT count(*)::int as c FROM activity_log" },
+      ];
+      for (const t of tables) {
+        try {
+          const result = await db.execute(sql.raw(t.query));
+          counts[t.key] = (result as any).rows?.[0]?.c ?? 0;
+        } catch { counts[t.key] = -1; }
+      }
+      const roleCounts: Record<string, number> = {};
+      try {
+        const roleResult = await db.execute(sql.raw("SELECT role, count(*)::int as c FROM users GROUP BY role"));
+        for (const row of (roleResult as any).rows || []) {
+          roleCounts[row.role] = row.c;
+        }
+      } catch {}
+      res.json({ counts, roleCounts, generatedAt: new Date().toISOString() });
+    } catch (err) {
+      res.status(500).json({ message: "Error generating system status" });
     }
   });
 

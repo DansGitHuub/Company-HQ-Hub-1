@@ -63,6 +63,7 @@ import {
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
 import ConversationLogViewer from "@/components/ConversationLogViewer";
+import SystemStatusReport from "@/components/SystemStatusReport";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -531,6 +532,9 @@ export default function AdminPanel() {
           </TabsTrigger>
           <TabsTrigger value="app-testing" className="gap-2" data-testid="tab-app-testing">
             <Eye className="h-4 w-4" /> {t("common.preview")}
+          </TabsTrigger>
+          <TabsTrigger value="system-status" className="gap-2" data-testid="tab-system-status">
+            <AlertCircle className="h-4 w-4" /> System Status
           </TabsTrigger>
           {user?.isMasterAdmin && (
             <TabsTrigger value="ai-agents" className="gap-2">
@@ -1090,6 +1094,20 @@ export default function AdminPanel() {
 
         <TabsContent value="app-testing" className="mt-6">
           <AppTestingPanel />
+        </TabsContent>
+
+        <TabsContent value="system-status" className="mt-6">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-semibold text-lg">System Status Report</h3>
+                  <p className="text-sm text-muted-foreground">View the current status of all platform modules, connections, and live system data.</p>
+                </div>
+              </div>
+              <SystemStatusReport />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {user?.isMasterAdmin && (
