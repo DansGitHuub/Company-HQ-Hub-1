@@ -692,24 +692,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </div>
 
-          <div className="flex items-center gap-2 lg:gap-3">
+          <div className="flex items-center gap-1.5 lg:gap-2">
             <GlobalMicButton />
             
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/80 relative transition-colors"
+                  <button 
+                    className="relative h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-md shadow-orange-500/20 hover:shadow-lg hover:shadow-orange-500/30 hover:scale-105 active:scale-95 transition-all duration-200"
                     onClick={() => setIsUpdatesOpen(true)}
                     data-testid="button-updates"
                   >
-                    <BellRing className="h-[18px] w-[18px]" />
+                    <BellRing className="h-[22px] w-[22px] drop-shadow-sm" strokeWidth={2.25} />
                     {totalBellCount > 0 && (
-                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-background animate-pulse" />
+                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-background px-1 shadow-sm">
+                        {totalBellCount > 9 ? '9+' : totalBellCount}
+                      </span>
                     )}
-                  </Button>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent>{t("nav.updates")}</TooltipContent>
               </Tooltip>
@@ -718,15 +718,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                  <button 
+                    className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 to-blue-500 text-white shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all duration-200"
                     onClick={() => setIsCalendarOpen(true)}
                     data-testid="button-calendar"
                   >
-                    <CalendarCheck className="h-[18px] w-[18px]" />
-                  </Button>
+                    <CalendarCheck className="h-[22px] w-[22px] drop-shadow-sm" strokeWidth={2.25} />
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent>{t("nav.calendar")}</TooltipContent>
               </Tooltip>
@@ -734,9 +732,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors">
-                  <Languages className="h-[18px] w-[18px]" />
-                </Button>
+                <button className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-md shadow-teal-500/20 hover:shadow-lg hover:shadow-teal-500/30 hover:scale-105 active:scale-95 transition-all duration-200">
+                  <Languages className="h-[22px] w-[22px] drop-shadow-sm" strokeWidth={2.25} />
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-32">
                 <DropdownMenuLabel>{t("profile.language")}</DropdownMenuLabel>
