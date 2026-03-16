@@ -770,58 +770,32 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUser(id: string): Promise<boolean> {
     try {
-      await db.delete(todoAssignments).where(eq(todoAssignments.userId, id));
-      await db.delete(todoActiveUsers).where(eq(todoActiveUsers.userId, id));
-      await db.delete(userUpdateAcknowledgments).where(eq(userUpdateAcknowledgments.userId, id));
-      await db.delete(savedResources).where(eq(savedResources.userId, id));
-      await db.delete(calendarConnections).where(eq(calendarConnections.userId, id));
-      await db.delete(accessRequests).where(eq(accessRequests.userId, id));
-      await db.delete(articleUpdateNotifications).where(eq(articleUpdateNotifications.userId, id));
-      await db.delete(aiGenerationEvents).where(eq(aiGenerationEvents.userId, id));
-      await db.delete(plowSiteManagerPermissions).where(eq(plowSiteManagerPermissions.userId, id));
-      await db.delete(errorLogs).where(eq(errorLogs.userId, id));
-      await db.delete(featureRequests).where(eq(featureRequests.userId, id));
-      const userConversations = await db.select({ id: conversations.id }).from(conversations).where(eq(conversations.userId, id));
-      for (const c of userConversations) {
-        await db.delete(chatMessages).where(eq(chatMessages.conversationId, c.id));
+      const { pool } = await import("./db");
+      const fkQuery = await pool.query(`
+        SELECT tc.table_name, kcu.column_name
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+        JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+          AND ccu.table_name = 'users'
+          AND ccu.column_name = 'id'
+          AND tc.table_name != 'sessions'
+      `);
+
+      for (const row of fkQuery.rows) {
+        const { table_name, column_name } = row;
+        const isNullable = await pool.query(`
+          SELECT is_nullable FROM information_schema.columns
+          WHERE table_name = $1 AND column_name = $2
+        `, [table_name, column_name]);
+
+        if (isNullable.rows[0]?.is_nullable === 'YES') {
+          await pool.query(`UPDATE "${table_name}" SET "${column_name}" = NULL WHERE "${column_name}" = $1`, [id]);
+        } else {
+          await pool.query(`DELETE FROM "${table_name}" WHERE "${column_name}" = $1`, [id]);
+        }
       }
-      await db.delete(conversations).where(eq(conversations.userId, id));
-      await db.delete(customerMessages).where(eq(customerMessages.customerId, id));
-      await db.update(customerMessages).set({ repliedBy: null }).where(eq(customerMessages.repliedBy, id));
-      await db.update(customerMessages).set({ targetEmployeeId: null }).where(eq(customerMessages.targetEmployeeId, id));
-      await db.delete(sopDrafts).where(eq(sopDrafts.ownerId, id));
-      const userThreads = await db.select({ id: messagingThreads.id }).from(messagingThreads).where(eq(messagingThreads.customerId, id));
-      for (const t of userThreads) {
-        await db.delete(threadMessages).where(eq(threadMessages.threadId, t.id));
-      }
-      await db.delete(threadMessages).where(eq(threadMessages.senderId, id));
-      await db.delete(messagingThreads).where(eq(messagingThreads.customerId, id));
-      await db.update(messagingThreads).set({ assignedEmployeeId: null }).where(eq(messagingThreads.assignedEmployeeId, id));
-      await db.update(messagingThreads).set({ lastMessageBy: null }).where(eq(messagingThreads.lastMessageBy, id));
-      await db.update(messagingThreads).set({ closedBy: null }).where(eq(messagingThreads.closedBy, id));
-      await db.update(workRequests).set({ assignedTo: null }).where(eq(workRequests.assignedTo, id));
-      await db.delete(workRequests).where(eq(workRequests.customerId, id));
-      await db.update(sops).set({ ownerId: null }).where(eq(sops.ownerId, id));
-      await db.update(todos).set({ createdBy: null }).where(eq(todos.createdBy, id));
-      await db.update(todoHistory).set({ changedBy: null }).where(eq(todoHistory.changedBy, id));
-      await db.update(customForms).set({ createdBy: null }).where(eq(customForms.createdBy, id));
-      await db.update(formSubmissions).set({ submittedBy: null }).where(eq(formSubmissions.submittedBy, id));
-      await db.update(formSubmissions).set({ reviewedBy: null }).where(eq(formSubmissions.reviewedBy, id));
-      await db.update(customerResources).set({ createdBy: null }).where(eq(customerResources.createdBy, id));
-      await db.update(candidates).set({ userId: null }).where(eq(candidates.userId, id));
-      await db.update(maintenanceLogs).set({ performedBy: null }).where(eq(maintenanceLogs.performedBy, id));
-      await db.update(equipmentUploads).set({ uploadedBy: null }).where(eq(equipmentUploads.uploadedBy, id));
-      await db.update(plowSiteGroups).set({ createdBy: null }).where(eq(plowSiteGroups.createdBy, id));
-      await db.update(plowSites).set({ createdBy: null }).where(eq(plowSites.createdBy, id));
-      await db.delete(helpArticleReports).where(eq(helpArticleReports.reportedBy, id));
-      await db.update(helpArticleReports).set({ resolvedBy: null }).where(eq(helpArticleReports.resolvedBy, id));
-      await db.update(developmentTracker).set({ updatedBy: null }).where(eq(developmentTracker.updatedBy, id));
-      await db.update(sitePhotos).set({ createdBy: null }).where(eq(sitePhotos.createdBy, id));
-      await db.update(sitePhotoVariants).set({ createdBy: null }).where(eq(sitePhotoVariants.createdBy, id));
-      await db.update(siteMapFeatures).set({ createdBy: null }).where(eq(siteMapFeatures.createdBy, id));
-      await db.update(sopMedia).set({ createdBy: null }).where(eq(sopMedia.createdBy, id));
-      await db.update(accessRequests).set({ reviewedBy: null }).where(eq(accessRequests.reviewedBy, id));
-      await db.update(errorLogs).set({ resolvedBy: null }).where(eq(errorLogs.resolvedBy, id));
+
       await db.delete(users).where(eq(users.id, id));
       return true;
     } catch (error) {
