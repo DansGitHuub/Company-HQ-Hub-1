@@ -77,16 +77,16 @@ export async function seedUsers(): Promise<void> {
     }
 
     // Clean up test accounts created by automated tests
-    const testPrefixes = ["e2eadmin", "testadmin", "testcustomer", "tester", "profile_test_"];
-    const testSuffixes = ["_customer"];
+    const REAL_USERNAMES = ["Chapin123", "Matt H"];
+    const testPrefixes = ["e2e", "testadmin", "testcustomer", "tester", "profile_test_", "calc_", "quiztest_", "soptype_", "tools_", "TestCustomer"];
     for (const user of allUsers) {
+      if (REAL_USERNAMES.includes(user.username)) continue;
       const isTestAccount = testPrefixes.some(prefix => user.username.startsWith(prefix)) ||
-        testSuffixes.some(suffix => user.username.endsWith(suffix) && user.email?.includes("test")) ||
-        (user.email?.includes("@test.com") && user.username.includes("_customer")) ||
-        (user.email?.includes("@example.com") && user.username !== "Chapin123" && user.username !== "Matt H");
+        (user.email?.includes("@test.com")) ||
+        (user.email?.includes("@example.com"));
       if (isTestAccount) {
-        await storage.deleteUser(user.id);
-        console.log(`[seed] Removed test account: ${user.username}`);
+        const deleted = await storage.deleteUser(user.id);
+        if (deleted) console.log(`[seed] Removed test account: ${user.username}`);
       }
     }
   } catch (error) {
