@@ -88,6 +88,110 @@ import ArticleReportsCenter from "@/components/ArticleReportsCenter";
 import DiagnosticReport from "@/components/DiagnosticReport";
 import AdminDocumentLibrary from "@/components/AdminDocumentLibrary";
 
+function AdminCategoryNav({ pendingRequests, isMasterAdmin, t }: { pendingRequests: any[]; isMasterAdmin: boolean; t: any }) {
+  const [activeCategory, setActiveCategory] = useState("people");
+
+  const categories = [
+    {
+      id: "people",
+      label: "People",
+      icon: Users,
+      tabs: [
+        { value: "users", label: t("nav.employees"), icon: Users },
+        { value: "requests", label: t("hiring.communications"), icon: Megaphone, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
+        { value: "todos", label: `To-Do ${t("nav.employees")}`, icon: CheckCircle },
+        { value: "suggestions", label: "Suggestions", icon: Lightbulb },
+      ],
+    },
+    {
+      id: "content",
+      label: "Content",
+      icon: FileText,
+      tabs: [
+        { value: "documents", label: t("employees.documents"), icon: FileText },
+        { value: "shared-links", label: t("common.share"), icon: ExternalLink },
+        { value: "help-reports", label: t("nav.help"), icon: HelpCircle },
+        { value: "company", label: t("nav.companyHQ"), icon: Building2 },
+      ],
+    },
+    {
+      id: "ai",
+      label: "AI & Tools",
+      icon: Sparkles,
+      tabs: [
+        { value: "assistant-agents", label: t("nav.assistant"), icon: Sparkles },
+        { value: "ai-logs", label: "AI Logs", icon: Bot },
+        ...(isMasterAdmin ? [{ value: "ai-agents", label: "AI Agents", icon: Bot }] : []),
+      ],
+    },
+    {
+      id: "system",
+      label: "System",
+      icon: AlertCircle,
+      tabs: [
+        { value: "app-testing", label: t("common.preview"), icon: Eye },
+        { value: "system-status", label: "System Status", icon: AlertCircle },
+        ...(isMasterAdmin ? [{ value: "diagnostics", label: "Diagnostics", icon: Wrench }] : []),
+      ],
+    },
+  ];
+
+  const activeGroup = categories.find(c => c.id === activeCategory);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2 border-b pb-3">
+        {categories.map((cat) => {
+          const Icon = cat.icon;
+          const hasBadge = cat.tabs.some(tab => tab.badge);
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id)}
+              data-testid={`admin-category-${cat.id}`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeCategory === cat.id
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {cat.label}
+              {hasBadge && (
+                <Badge variant="destructive" className="ml-1 h-5 min-w-[20px] px-1 text-xs">
+                  {cat.tabs.find(tab => tab.badge)?.badge}
+                </Badge>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeGroup && (
+        <TabsList className="flex flex-wrap gap-1 h-auto w-auto bg-transparent p-0">
+          {activeGroup.tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <TabsTrigger
+                key={tab.value}
+                value={tab.value}
+                className="gap-2"
+                data-testid={`tab-${tab.value}`}
+              >
+                <Icon className="h-4 w-4" />
+                {tab.label}
+                {tab.badge && (
+                  <Badge variant="destructive" className="ml-1">{tab.badge}</Badge>
+                )}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      )}
+    </div>
+  );
+}
+
 type SafeUser = Omit<User, "password">;
 type TodoActiveUser = { id: string; userId: string; activatedBy: string | null; activatedAt: Date | null };
 
@@ -501,52 +605,7 @@ export default function AdminPanel() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="flex flex-wrap w-full max-w-5xl gap-1 h-auto">
-          <TabsTrigger value="users">{t("nav.employees")}</TabsTrigger>
-          <TabsTrigger value="requests" className="gap-2">
-            {t("hiring.communications")} {pendingRequests.length > 0 && <Badge variant="destructive" className="ml-1">{pendingRequests.length}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="todos" className="gap-2">
-            To-Do {t("nav.employees")}
-          </TabsTrigger>
-          <TabsTrigger value="help-reports" className="gap-2">
-            <HelpCircle className="h-4 w-4" /> {t("nav.help")}
-          </TabsTrigger>
-          <TabsTrigger value="company" className="gap-2">
-            <Building2 className="h-4 w-4" /> {t("nav.companyHQ")}
-          </TabsTrigger>
-          <TabsTrigger value="assistant-agents" className="gap-2" data-testid="tab-assistant-agents">
-            <Sparkles className="h-4 w-4" /> {t("nav.assistant")}
-          </TabsTrigger>
-          <TabsTrigger value="ai-logs" className="gap-2" data-testid="tab-ai-logs">
-            <Bot className="h-4 w-4" /> AI Logs
-          </TabsTrigger>
-          <TabsTrigger value="documents" className="gap-2" data-testid="tab-documents">
-            <FileText className="h-4 w-4" /> {t("employees.documents")}
-          </TabsTrigger>
-          <TabsTrigger value="shared-links" className="gap-2" data-testid="tab-shared-links">
-            <ExternalLink className="h-4 w-4" /> {t("common.share")}
-          </TabsTrigger>
-          <TabsTrigger value="suggestions" className="gap-2" data-testid="tab-suggestions">
-            <Lightbulb className="h-4 w-4" /> Suggestions
-          </TabsTrigger>
-          <TabsTrigger value="app-testing" className="gap-2" data-testid="tab-app-testing">
-            <Eye className="h-4 w-4" /> {t("common.preview")}
-          </TabsTrigger>
-          <TabsTrigger value="system-status" className="gap-2" data-testid="tab-system-status">
-            <AlertCircle className="h-4 w-4" /> System Status
-          </TabsTrigger>
-          {user?.isMasterAdmin && (
-            <TabsTrigger value="ai-agents" className="gap-2">
-              <Bot className="h-4 w-4" /> AI Agents
-            </TabsTrigger>
-          )}
-          {user?.isMasterAdmin && (
-            <TabsTrigger value="diagnostics" className="gap-2" data-testid="tab-diagnostics">
-              <AlertCircle className="h-4 w-4" /> Diagnostics
-            </TabsTrigger>
-          )}
-        </TabsList>
+        <AdminCategoryNav pendingRequests={pendingRequests} isMasterAdmin={isMasterAdmin} t={t} />
 
         <TabsContent value="users" className="mt-6">
           <Card>
