@@ -367,8 +367,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "", items: ["dashboard"] },
     { label: "WORK", items: ["jobs", "todos", "equipment"] },
     { label: "PEOPLE", items: ["employees", "education", "hiring"] },
-    { label: "COMPANY", items: ["inbox", "forms", "sops", "testing"] },
-    { label: "ADMIN", items: ["admin", "tools", "hq"] },
+    { label: "COMPANY", items: ["inbox", "forms", "sops", "testing", "hq"] },
+    { label: "ADMIN", items: ["admin", "tools"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {
