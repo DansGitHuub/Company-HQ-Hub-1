@@ -28,6 +28,7 @@ import {
   insertConfiguredIntegrationSchema,
   insertIntegrationResearchSessionSchema,
   insertBuilderFormSchema,
+  insertCampaignSchema,
   calendarEvents,
   todoAssignments,
   users,
@@ -7634,6 +7635,49 @@ Provide accurate information based on publicly available documentation.`;
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Error logging frontend error" });
+    }
+  });
+
+  // Marketing Campaigns
+  app.get("/api/campaigns", requireAuth, async (req, res) => {
+    try {
+      const campaigns = await storage.getCampaigns();
+      res.json(campaigns);
+    } catch (error: any) {
+      res.status(500).json({ message: "Error fetching campaigns" });
+    }
+  });
+
+  app.post("/api/campaigns", requireAdmin, async (req, res) => {
+    try {
+      const data = insertCampaignSchema.parse(req.body);
+      const campaign = await storage.createCampaign({ ...data, createdBy: (req.user as any).id });
+      res.status(201).json(campaign);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Invalid campaign data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Error creating campaign" });
+    }
+  });
+
+  app.patch("/api/campaigns/:id", requireAdmin, async (req, res) => {
+    try {
+      const campaign = await storage.updateCampaign(req.params.id, req.body);
+      if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+      res.json(campaign);
+    } catch (error: any) {
+      res.status(500).json({ message: "Error updating campaign" });
+    }
+  });
+
+  app.delete("/api/campaigns/:id", requireAdmin, async (req, res) => {
+    try {
+      const deleted = await storage.deleteCampaign(req.params.id);
+      if (!deleted) return res.status(404).json({ message: "Campaign not found" });
+      res.json({ message: "Campaign deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: "Error deleting campaign" });
     }
   });
 

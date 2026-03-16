@@ -63,6 +63,7 @@ import {
   articleUpdateNotifications, type ArticleUpdateNotification, type InsertArticleUpdateNotification,
   calendarConnections, type CalendarConnection, type InsertCalendarConnection,
   errorLogs, type ErrorLog, type InsertErrorLog,
+  campaigns, type Campaign, type InsertCampaign,
   developmentTracker, type DevelopmentTracker, type InsertDevelopmentTracker,
   sopMedia, type SopMedia, type InsertSopMedia,
   aiGenerationEvents, type AiGenerationEvent, type InsertAiGenerationEvent,
@@ -516,6 +517,13 @@ export interface IStorage {
   updateErrorLog(id: string, updates: Partial<ErrorLog>): Promise<ErrorLog | undefined>;
   getErrorStats(): Promise<{ total: number; unresolved: number; bySeverity: Record<string, number>; byFeature: Record<string, number> }>;
   
+  // Marketing Campaigns
+  getCampaigns(): Promise<Campaign[]>;
+  getCampaign(id: string): Promise<Campaign | undefined>;
+  createCampaign(campaign: InsertCampaign): Promise<Campaign>;
+  updateCampaign(id: string, updates: Partial<Campaign>): Promise<Campaign | undefined>;
+  deleteCampaign(id: string): Promise<boolean>;
+
   // Development Tracker
   getDevelopmentItems(filters?: { status?: string; category?: string; priority?: string }): Promise<DevelopmentTracker[]>;
   getDevelopmentItem(id: string): Promise<DevelopmentTracker | undefined>;
@@ -2523,6 +2531,31 @@ export class DatabaseStorage implements IStorage {
     });
     
     return { total, unresolved, bySeverity, byFeature };
+  }
+
+  // Marketing Campaigns
+  async getCampaigns(): Promise<Campaign[]> {
+    return await db.select().from(campaigns).orderBy(desc(campaigns.createdAt));
+  }
+
+  async getCampaign(id: string): Promise<Campaign | undefined> {
+    const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, id));
+    return campaign;
+  }
+
+  async createCampaign(campaign: InsertCampaign): Promise<Campaign> {
+    const [created] = await db.insert(campaigns).values(campaign).returning();
+    return created;
+  }
+
+  async updateCampaign(id: string, updates: Partial<Campaign>): Promise<Campaign | undefined> {
+    const [updated] = await db.update(campaigns).set(updates).where(eq(campaigns.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCampaign(id: string): Promise<boolean> {
+    const result = await db.delete(campaigns).where(eq(campaigns.id, id)).returning();
+    return result.length > 0;
   }
 
   // Development Tracker

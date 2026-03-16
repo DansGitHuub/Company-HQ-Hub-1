@@ -487,18 +487,18 @@ export const campaigns = pgTable("campaigns", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   platform: text("platform").notNull(),
-  status: text("status").notNull().default("Draft"),
+  status: text("status").notNull().default("Active"),
   spend: integer("spend").default(0),
   leads: integer("leads").default(0),
   cpl: integer("cpl").default(0),
+  budget: integer("budget").default(0),
+  createdBy: varchar("created_by", { length: 36 }),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertCampaignSchema = createInsertSchema(campaigns).pick({
-  name: true,
-  platform: true,
-  status: true,
-  spend: true,
-  leads: true,
+export const insertCampaignSchema = createInsertSchema(campaigns).omit({
+  id: true,
+  createdAt: true,
 });
 
 export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
