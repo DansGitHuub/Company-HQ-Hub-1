@@ -15,7 +15,7 @@ const MAX_MESSAGE_LENGTH = 2000;
 const MAX_HISTORY_LENGTH = 50;
 const MAX_SESSION_ID_LENGTH = 128;
 const CONFIRMATION_TTL_MS = 5 * 60 * 1000;
-const INTERNAL_ROLES = ["Admin", "Master Admin", "Manager", "Crew Lead", "Crew", "New Hire", "HR", "Sales"];
+const INTERNAL_ROLES = ["Admin", "Master Admin", "Manager", "Crew Lead", "Crew", "New Hire", "HR", "Sales", "Customer"];
 
 interface PendingConfirmation {
   userId: string;
@@ -132,6 +132,8 @@ async function getAgentContext(userRole: string) {
   }
 }
 
+const CUSTOMER_TOOLS = ["navigateTo", "searchGlobal", "submitRepairRequest"];
+
 function buildSystemPrompt(user: any, appContext: any, currentModule: string, agentAddition?: string) {
   const now = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
 
@@ -141,7 +143,21 @@ User ID: ${user.id}
 Current time: ${now}
 Current module: ${currentModule || "unknown"}`;
 
-  const layer2 = `Behavioral Rules:
+  let layer2: string;
+
+  if (user.role === "Customer") {
+    layer2 = `Behavioral Rules:
+- You are speaking with a CUSTOMER of the landscape company. Be warm, helpful, and professional.
+- Help them with: their service requests, job status, property care questions, scheduling, documents, and account information.
+- You can help with general landscaping advice, plant care tips, seasonal maintenance guidance, and property improvement ideas.
+- NEVER share internal company information such as: employee details, internal SOPs, financial data, hiring info, equipment details, other customer data, or internal operations.
+- If asked about internal operations, politely explain you can only help with their account and services.
+- Keep responses short and friendly — 2-3 sentences when possible.
+- Remember the full conversation context.
+- You can navigate the user to pages in their portal.
+- Use a warm, professional tone appropriate for a valued customer.`;
+  } else {
+    layer2 = `Behavioral Rules:
 - Always confirm before creating or modifying any data — use the appropriate tool and the system will handle confirmation
 - Never make up records or data that doesn't exist — always use search tools to find real data
 - Keep responses short and direct — 2-3 sentences when possible
@@ -153,6 +169,7 @@ Current module: ${currentModule || "unknown"}`;
 - When asked to look up a user to assign tasks, use searchEmployees first to find their ID
 - Be proactive — if you notice something urgent in the context, mention it briefly
 - Use a professional but friendly tone`;
+  }
 
   const contextParts: string[] = [];
   if (appContext.overdueTasks > 0) contextParts.push(`${appContext.overdueTasks} overdue task(s)`);
@@ -269,18 +286,24 @@ export function registerAssistantRoutes(app: Express) {
       chatMessages.push({ role: "user", content: message });
 
       let tools = allToolDefinitions;
-      if (agentContext.allowedTools.length > 0) {
+      if (user.role === "Customer") {
+        tools = allToolDefinitions.filter(t => CUSTOMER_TOOLS.includes(t.function.name));
+      } else if (agentContext.allowedTools.length > 0) {
         tools = allToolDefinitions.filter(t => agentContext.allowedTools.includes(t.function.name));
         if (tools.length === 0) tools = allToolDefinitions;
       }
 
-      const completion = await openai.chat.completions.create({
+      const chatOptions: any = {
         model: "gpt-4o",
         messages: chatMessages,
-        tools,
-        tool_choice: "auto",
         max_tokens: 1000,
-      });
+      };
+      if (tools.length > 0) {
+        chatOptions.tools = tools;
+        chatOptions.tool_choice = "auto";
+      }
+
+      const completion = await openai.chat.completions.create(chatOptions);
 
       const choice = completion.choices[0];
       const tokensUsed = completion.usage?.total_tokens;
@@ -388,6 +411,17 @@ export function registerAssistantRoutes(app: Express) {
   app.get("/api/assistant/suggestions", requireAuth, requireInternalRole, async (req: Request, res: Response) => {
     try {
       const user = req.user as any;
+
+      if (user.role === "Customer") {
+        const hour = new Date().getHours();
+        const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+        return res.json({ suggestions: [
+          `${greeting} — how can I help with your property?`,
+          "What seasonal care does my lawn need right now?",
+          "I'd like to request a service",
+        ] });
+      }
+
       const context = await getAppContext(user.id, user.role);
       const suggestions: string[] = [];
 
