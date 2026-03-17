@@ -5026,6 +5026,29 @@ SECTION GENERATION RULES:
     }
   });
 
+  app.get("/api/dashboard-config", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json({ widgets: user.dashboardWidgets || null });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching dashboard config" });
+    }
+  });
+
+  app.put("/api/dashboard-config", requireAuth, async (req, res) => {
+    try {
+      const { widgets } = req.body;
+      if (!Array.isArray(widgets)) {
+        return res.status(400).json({ message: "widgets must be an array" });
+      }
+      await storage.updateUser(req.user!.id, { dashboardWidgets: widgets });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error saving dashboard config" });
+    }
+  });
+
   // Equipment routes
   app.get("/api/equipment", requireAuth, async (req, res) => {
     try {

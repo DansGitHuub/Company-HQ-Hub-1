@@ -31,6 +31,7 @@ export const users = pgTable("users", {
   voiceAutoSpeak: boolean("voice_auto_speak").notNull().default(false),
   voiceSelection: text("voice_selection").default("alloy"),
   language: text("language").default("en"),
+  dashboardWidgets: jsonb("dashboard_widgets"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

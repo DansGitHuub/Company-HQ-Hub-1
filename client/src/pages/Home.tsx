@@ -1,319 +1,401 @@
-import React from "react";
-import { Link } from "wouter";
-import { motion } from "framer-motion";
+import React, { useState, useCallback, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
-import { 
-  BookOpen, 
-  Hammer, 
-  Users, 
-  Megaphone, 
-  FileText, 
-  Settings, 
-  GraduationCap,
-  Building2,
-  ArrowRight,
-  Truck,
-  LayoutDashboard,
-  CheckSquare,
-  Brain,
-  Mail,
-  Snowflake,
-  Shield,
-  HelpCircle
+import {
+  Plus,
+  GripVertical,
+  X,
+  Settings2,
+  RotateCcw,
+  Maximize2,
+  Minimize2,
+  Check,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-
-import imgPlanning from "@assets/generated_images/landscape_architecture_plans_and_tools.png";
-import imgMaterials from "@assets/generated_images/landscaping_materials_stone_and_plants.png";
-import imgCrew from "@assets/generated_images/modern_landscape_crew_working.png";
-import imgMarketing from "@assets/generated_images/office_desk_with_marketing_charts.png";
-import imgQuizzes from "@assets/generated_images/training_quizzes_knowledge.png";
-import imgEquipment from "@assets/generated_images/equipment_fleet_tracking.png";
-import imgTodos from "@assets/generated_images/todo_list_tasks.png";
-import imgJobs from "@assets/generated_images/active_job_site.png";
-import imgEducation from "@assets/generated_images/customer_education_hub.png";
-import imgMessages from "@assets/generated_images/team_messaging.png";
-import imgTools from "@assets/generated_images/landscape_tools.png";
-import imgHQ from "@assets/generated_images/company_hq_office.png";
-import imgForms from "@assets/generated_images/forms_checklists.png";
-import imgIntegrations from "@assets/generated_images/integrations_tech.png";
-import imgAdmin from "@assets/generated_images/admin_panel_settings.png";
-import imgHelp from "@assets/generated_images/help_center_support.png";
-
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.04
-    }
-  }
-};
-
-const item = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0 }
-};
-
-type TileDef = {
-  id: string;
-  title: string;
-  desc: string;
-  icon: any;
-  href: string;
-  image: string | null;
-  color: string;
-  colSpan: string;
-  roles: string[];
-};
-
-const allTiles: TileDef[] = [
-  { 
-    id: "sops",
-    title: "SOP Library", 
-    desc: "Standard Operating Procedures", 
-    icon: BookOpen, 
-    href: "/sops", 
-    image: imgPlanning,
-    color: "bg-emerald-900/10 text-emerald-900",
-    colSpan: "col-span-1 md:col-span-2",
-    roles: ["Admin", "Manager", "Crew"]
-  },
-  { 
-    id: "quizzes",
-    title: "Quizzes", 
-    desc: "Training & Knowledge Tests", 
-    icon: Brain, 
-    href: "/testing", 
-    image: imgQuizzes,
-    color: "bg-violet-100 text-violet-900",
-    colSpan: "col-span-1",
-    roles: ["Admin", "Manager", "Crew"]
-  },
-  { 
-    id: "materials",
-    title: "Materials Catalog", 
-    desc: "Inventory, Pricing & Suppliers", 
-    icon: Hammer, 
-    href: "/materials", 
-    image: imgMaterials,
-    color: "bg-stone-100 text-stone-900",
-    colSpan: "col-span-1 md:col-span-2",
-    roles: ["Admin", "Manager", "Crew"]
-  },
-  { 
-    id: "equipment",
-    title: "Equipment", 
-    desc: "Fleet Tracking & Maintenance", 
-    icon: Truck, 
-    href: "/equipment", 
-    image: imgEquipment,
-    color: "bg-orange-100 text-orange-900",
-    colSpan: "col-span-1",
-    roles: ["Admin", "Manager", "Crew"]
-  },
-  { 
-    id: "todos",
-    title: "To-Do List", 
-    desc: "Tasks, Priorities & Deadlines", 
-    icon: CheckSquare, 
-    href: "/todos", 
-    image: imgTodos,
-    color: "bg-green-100 text-green-900",
-    colSpan: "col-span-1",
-    roles: ["Admin", "Manager", "Crew"]
-  },
-  { 
-    id: "hiring",
-    title: "Hiring", 
-    desc: "Pipeline & Onboarding", 
-    icon: Users, 
-    href: "/hiring", 
-    image: imgCrew,
-    color: "bg-blue-100 text-blue-900",
-    colSpan: "col-span-1 md:col-span-2",
-    roles: ["Admin", "Manager", "Crew"]
-  },
-  { 
-    id: "jobs",
-    title: "Jobs", 
-    desc: "Active Projects & Tracking", 
-    icon: LayoutDashboard, 
-    href: "/jobs", 
-    image: imgJobs,
-    color: "bg-teal-100 text-teal-900",
-    colSpan: "col-span-1",
-    roles: ["Admin", "Manager", "Crew"]
-  },
-  { 
-    id: "education",
-    title: "Customer Hub", 
-    desc: "Resources & Content", 
-    icon: GraduationCap, 
-    href: "/education", 
-    image: imgEducation,
-    color: "bg-cyan-100 text-cyan-900",
-    colSpan: "col-span-1",
-    roles: ["Admin", "Manager", "Crew"]
-  },
-  { 
-    id: "messages",
-    title: "Messages", 
-    desc: "Internal Communications", 
-    icon: Mail, 
-    href: "/inbox", 
-    image: imgMessages,
-    color: "bg-indigo-100 text-indigo-900",
-    colSpan: "col-span-1",
-    roles: ["Admin", "Manager", "Crew"]
-  },
-  { 
-    id: "tools",
-    title: "Tools", 
-    desc: "Plow Mapper & More", 
-    icon: Snowflake, 
-    href: "/tools", 
-    image: imgTools,
-    color: "bg-sky-100 text-sky-900",
-    colSpan: "col-span-1",
-    roles: ["Admin", "Manager", "Crew"]
-  },
-  { 
-    id: "hq",
-    title: "Company HQ", 
-    desc: "Mission, Vision & Team", 
-    icon: Building2, 
-    href: "/hq", 
-    image: imgHQ,
-    color: "bg-primary/10 text-primary",
-    colSpan: "col-span-1",
-    roles: ["Admin"]
-  },
-  { 
-    id: "marketing",
-    title: "Marketing", 
-    desc: "Campaigns & Lead Gen", 
-    icon: Megaphone, 
-    href: "/marketing", 
-    image: imgMarketing,
-    color: "bg-purple-100 text-purple-900",
-    colSpan: "col-span-1",
-    roles: ["Admin"]
-  },
-  { 
-    id: "forms",
-    title: "Forms", 
-    desc: "Checklists & Intake", 
-    icon: FileText, 
-    href: "/forms", 
-    image: imgForms,
-    color: "bg-rose-100 text-rose-900",
-    colSpan: "col-span-1",
-    roles: ["Admin"]
-  },
-  { 
-    id: "integrations",
-    title: "Integrations", 
-    desc: "Services & API Keys", 
-    icon: Settings, 
-    href: "/tools/integration-wizard", 
-    image: imgIntegrations,
-    color: "bg-slate-100 text-slate-900",
-    colSpan: "col-span-1",
-    roles: ["Admin"]
-  },
-  { 
-    id: "admin",
-    title: "Admin Panel", 
-    desc: "Users & Settings", 
-    icon: Shield, 
-    href: "/admin", 
-    image: imgAdmin,
-    color: "bg-red-100 text-red-900",
-    colSpan: "col-span-1",
-    roles: ["Admin"]
-  },
-  { 
-    id: "help",
-    title: "Help Center", 
-    desc: "FAQs & Support", 
-    icon: HelpCircle, 
-    href: "/help", 
-    image: imgHelp,
-    color: "bg-amber-100 text-amber-900",
-    colSpan: "col-span-1",
-    roles: ["Admin", "Manager", "Crew"]
-  },
-];
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from "@hello-pangea/dnd";
+import {
+  WIDGET_DEFINITIONS,
+  getDefaultWidgets,
+  getAvailableWidgets,
+  type WidgetConfig,
+  type WidgetSize,
+} from "@/components/dashboard/widgetRegistry";
+import { WIDGET_COMPONENTS } from "@/components/dashboard/widgets";
 
 export default function Home() {
   const { user } = useAuth();
   const { t } = useTranslation();
-
   const userRole = user?.role || "Crew";
-  const tiles = allTiles.filter(tile => tile.roles.includes(userRole));
+
+  const [widgets, setWidgets] = useState<WidgetConfig[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [showAddPicker, setShowAddPicker] = useState(false);
+  const [initialized, setInitialized] = useState(false);
+
+  const { data: config, isLoading } = useQuery<{ widgets: WidgetConfig[] | null }>({
+    queryKey: ["/api/dashboard-config"],
+  });
+
+  useEffect(() => {
+    if (config && !initialized) {
+      if (config.widgets && Array.isArray(config.widgets) && config.widgets.length > 0) {
+        setWidgets(config.widgets);
+      } else {
+        setWidgets(getDefaultWidgets(userRole));
+      }
+      setInitialized(true);
+    }
+  }, [config, initialized, userRole]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (newWidgets: WidgetConfig[]) => {
+      await apiRequest("PUT", "/api/dashboard-config", { widgets: newWidgets });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard-config"] });
+    },
+  });
+
+  const saveWidgets = useCallback(
+    (newWidgets: WidgetConfig[]) => {
+      setWidgets(newWidgets);
+      saveMutation.mutate(newWidgets);
+    },
+    [saveMutation]
+  );
+
+  const handleDragEnd = useCallback(
+    (result: DropResult) => {
+      if (!result.destination) return;
+      const items = Array.from(widgets);
+      const [moved] = items.splice(result.source.index, 1);
+      items.splice(result.destination.index, 0, moved);
+      saveWidgets(items);
+    },
+    [widgets, saveWidgets]
+  );
+
+  const addWidget = useCallback(
+    (widgetType: string) => {
+      const def = WIDGET_DEFINITIONS.find((w) => w.type === widgetType);
+      if (!def) return;
+      const newWidget: WidgetConfig = {
+        id: `widget-${widgetType}-${Date.now()}`,
+        widgetType,
+        size: def.defaultSize,
+      };
+      saveWidgets([...widgets, newWidget]);
+      setShowAddPicker(false);
+    },
+    [widgets, saveWidgets]
+  );
+
+  const removeWidget = useCallback(
+    (id: string) => {
+      saveWidgets(widgets.filter((w) => w.id !== id));
+    },
+    [widgets, saveWidgets]
+  );
+
+  const cycleSize = useCallback(
+    (id: string) => {
+      const updated = widgets.map((w) => {
+        if (w.id !== id) return w;
+        const def = WIDGET_DEFINITIONS.find((d) => d.type === w.widgetType);
+        if (!def) return w;
+        const sizes = def.sizes;
+        const currentIdx = sizes.indexOf(w.size);
+        const nextSize = sizes[(currentIdx + 1) % sizes.length];
+        return { ...w, size: nextSize };
+      });
+      saveWidgets(updated);
+    },
+    [widgets, saveWidgets]
+  );
+
+  const resetToDefaults = useCallback(() => {
+    const defaults = getDefaultWidgets(userRole);
+    saveWidgets(defaults);
+    setIsEditing(false);
+  }, [userRole, saveWidgets]);
+
+  const available = getAvailableWidgets(userRole);
+  const addedTypes = widgets.map((w) => w.widgetType);
+  const notAdded = available.filter((w) => !addedTypes.includes(w.type));
+
+  const getGridClass = (size: WidgetSize) => {
+    switch (size) {
+      case "small":
+        return "col-span-1";
+      case "medium":
+        return "col-span-1 md:col-span-2";
+      case "large":
+        return "col-span-1 md:col-span-2 lg:col-span-3";
+    }
+  };
+
+  const getSizeLabel = (size: WidgetSize) => {
+    switch (size) {
+      case "small":
+        return "S";
+      case "medium":
+        return "M";
+      case "large":
+        return "L";
+    }
+  };
+
+  if (isLoading || !initialized) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-baseline gap-3">
-        <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="heading-workspace">
-          {t("dashboard.title")}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {t("dashboard.welcome", { name: user?.name?.split(" ")[0] })}
-        </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-baseline gap-3">
+          <h1
+            className="text-2xl font-heading font-bold text-foreground"
+            data-testid="heading-workspace"
+          >
+            {t("dashboard.title")}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {t("dashboard.welcome", { name: user?.name?.split(" ")[0] })}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isEditing && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetToDefaults}
+                className="gap-1 text-xs"
+                data-testid="button-reset-dashboard"
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Reset
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddPicker(true)}
+                className="gap-1 text-xs"
+                data-testid="button-add-widget"
+                disabled={notAdded.length === 0}
+              >
+                <Plus className="h-3.5 w-3.5" /> Add Widget
+              </Button>
+            </>
+          )}
+          <Button
+            variant={isEditing ? "default" : "outline"}
+            size="sm"
+            onClick={() => setIsEditing(!isEditing)}
+            className="gap-1 text-xs"
+            data-testid="button-edit-dashboard"
+          >
+            {isEditing ? (
+              <>
+                <Check className="h-3.5 w-3.5" /> Done
+              </>
+            ) : (
+              <>
+                <Settings2 className="h-3.5 w-3.5" /> Customize
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
-      <motion.div 
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3"
-      >
-        {tiles.map((tile) => (
-          <motion.div 
-            key={tile.id} 
-            variants={item}
-            className={tile.colSpan}
-          >
-            <Link href={tile.href}>
-              <div 
-                className="tile-dash group relative h-32 w-full cursor-pointer"
-                data-testid={`tile-${tile.id}`}
+      {widgets.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <Settings2 className="h-10 w-10 text-muted-foreground mb-3" />
+            <h3 className="text-lg font-semibold mb-1">No widgets yet</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Add widgets to customize your dashboard
+            </p>
+            <Button
+              onClick={() => {
+                setIsEditing(true);
+                setShowAddPicker(true);
+              }}
+              className="gap-2"
+              data-testid="button-add-first-widget"
+            >
+              <Plus className="h-4 w-4" /> Add Your First Widget
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="dashboard" direction="horizontal" type="widget">
+            {(provided) => (
+              <div
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3"
               >
-                {tile.image && (
-                  <div className="absolute inset-0 z-0 rounded-xl overflow-hidden">
-                    <img 
-                      src={tile.image} 
-                      alt={tile.title} 
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/20 group-hover:from-black/60 group-hover:via-black/30 transition-colors duration-300" />
-                  </div>
-                )}
+                {widgets.map((widget, index) => {
+                  const def = WIDGET_DEFINITIONS.find(
+                    (d) => d.type === widget.widgetType
+                  );
+                  const Component = WIDGET_COMPONENTS[widget.widgetType];
+                  if (!def || !Component) return null;
 
-                <div className={`relative z-10 h-full flex flex-col justify-between p-3 ${tile.image ? 'text-white' : ''}`}>
-                  <div className="flex justify-between items-start">
-                    <div className={`p-2 rounded-lg transition-all duration-300 group-hover:scale-110 ${tile.image ? 'bg-white/20 backdrop-blur-md text-white group-hover:bg-white/30' : tile.color}`}>
-                      <tile.icon className="w-4 h-4" />
-                    </div>
-                    <div className="p-1.5 rounded-full bg-primary/10 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                      <ArrowRight className={`w-3.5 h-3.5 ${tile.image ? 'text-white' : 'text-primary'}`} />
-                    </div>
-                  </div>
-                  
-                  <div className="transform transition-transform duration-300 group-hover:translate-x-1">
-                    <h3 className="text-base font-heading font-bold mb-0.5 drop-shadow-md leading-tight">{tile.title}</h3>
-                    <p className={`text-xs leading-tight ${tile.image ? 'text-white/90' : 'text-muted-foreground'}`}>
-                      {tile.desc}
-                    </p>
-                  </div>
-                </div>
+                  const Icon = def.icon;
+
+                  return (
+                    <Draggable
+                      key={widget.id}
+                      draggableId={widget.id}
+                      index={index}
+                      isDragDisabled={!isEditing}
+                    >
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          className={`${getGridClass(widget.size)} ${
+                            snapshot.isDragging ? "z-50" : ""
+                          }`}
+                        >
+                          <Card
+                            className={`h-full transition-shadow ${
+                              isEditing
+                                ? "ring-1 ring-dashed ring-primary/30 hover:ring-primary/50"
+                                : ""
+                            } ${snapshot.isDragging ? "shadow-lg rotate-1" : ""}`}
+                            data-testid={`widget-card-${widget.widgetType}`}
+                          >
+                            <CardHeader className="pb-2 pt-3 px-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {isEditing && (
+                                    <div
+                                      {...provided.dragHandleProps}
+                                      className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-manipulation"
+                                      data-testid={`drag-handle-${widget.widgetType}`}
+                                    >
+                                      <GripVertical className="h-4 w-4" />
+                                    </div>
+                                  )}
+                                  <Icon className="h-4 w-4 text-primary shrink-0" />
+                                  <CardTitle className="text-sm truncate">
+                                    {def.label}
+                                  </CardTitle>
+                                </div>
+                                {isEditing && (
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {def.sizes.length > 1 && (
+                                      <button
+                                        onClick={() => cycleSize(widget.id)}
+                                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors hidden md:flex items-center"
+                                        title="Change size"
+                                        data-testid={`resize-${widget.widgetType}`}
+                                      >
+                                        {widget.size === "large" ? (
+                                          <Minimize2 className="h-3.5 w-3.5" />
+                                        ) : (
+                                          <Maximize2 className="h-3.5 w-3.5" />
+                                        )}
+                                        <span className="text-[10px] ml-0.5 font-medium">
+                                          {getSizeLabel(widget.size)}
+                                        </span>
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => removeWidget(widget.id)}
+                                      className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                      title="Remove widget"
+                                      data-testid={`remove-${widget.widgetType}`}
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                                {!isEditing && (
+                                  <div {...provided.dragHandleProps} />
+                                )}
+                              </div>
+                            </CardHeader>
+                            <CardContent className="px-4 pb-3 pt-0">
+                              <Component size={widget.size} />
+                            </CardContent>
+                          </Card>
+                        </div>
+                      )}
+                    </Draggable>
+                  );
+                })}
+                {provided.placeholder}
               </div>
-            </Link>
-          </motion.div>
-        ))}
-      </motion.div>
+            )}
+          </Droppable>
+        </DragDropContext>
+      )}
+
+      <Dialog open={showAddPicker} onOpenChange={setShowAddPicker}>
+        <DialogContent className="max-w-md max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Add Widget</DialogTitle>
+            <DialogDescription>
+              Choose a widget to add to your dashboard
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 overflow-y-auto max-h-[60vh] pr-1">
+            {notAdded.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                All available widgets have been added
+              </p>
+            ) : (
+              notAdded.map((def) => {
+                const Icon = def.icon;
+                return (
+                  <button
+                    key={def.type}
+                    onClick={() => addWidget(def.type)}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-muted transition-colors text-left"
+                    data-testid={`add-widget-${def.type}`}
+                  >
+                    <div className="p-2 rounded-md bg-primary/10">
+                      <Icon className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{def.label}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {def.description}
+                      </p>
+                    </div>
+                    <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
