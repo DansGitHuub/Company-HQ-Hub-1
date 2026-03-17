@@ -502,6 +502,121 @@ export function HelpWidget({ size }: WidgetProps) {
   );
 }
 
+export function DevTrackerWidget({ size }: WidgetProps) {
+  const { data: items = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/development-tracker"],
+  });
+
+  const statusColors: Record<string, string> = {
+    done: "text-emerald-600 bg-emerald-50 border-emerald-200",
+    in_progress: "text-blue-600 bg-blue-50 border-blue-200",
+    blocked: "text-red-600 bg-red-50 border-red-200",
+    not_started: "text-slate-500 bg-slate-50 border-slate-200",
+    needs_review: "text-amber-600 bg-amber-50 border-amber-200",
+  };
+
+  const statusLabels: Record<string, string> = {
+    done: "Done",
+    in_progress: "In Progress",
+    blocked: "Blocked",
+    not_started: "Not Started",
+    needs_review: "Needs Review",
+  };
+
+  const statusIcons: Record<string, typeof CheckSquare> = {
+    done: CheckSquare,
+    in_progress: Clock,
+    blocked: AlertTriangle,
+    not_started: Clock,
+    needs_review: AlertTriangle,
+  };
+
+  const counts = {
+    done: items.filter(i => i.status === "done").length,
+    in_progress: items.filter(i => i.status === "in_progress").length,
+    blocked: items.filter(i => i.status === "blocked").length,
+    not_started: items.filter(i => i.status === "not_started").length,
+    needs_review: items.filter(i => i.status === "needs_review").length,
+  };
+
+  const activeItems = items
+    .filter(i => i.status !== "done")
+    .sort((a, b) => {
+      const order = { blocked: 0, needs_review: 1, in_progress: 2, not_started: 3 };
+      return (order[a.status as keyof typeof order] ?? 4) - (order[b.status as keyof typeof order] ?? 4);
+    });
+
+  const maxItems = size === "medium" ? 5 : 10;
+
+  return (
+    <WidgetShell loading={isLoading}>
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(counts).filter(([, c]) => c > 0).map(([status, count]) => (
+            <div key={status} className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusColors[status] || ""}`}>
+              <span>{count}</span>
+              <span>{statusLabels[status]}</span>
+            </div>
+          ))}
+        </div>
+
+        {activeItems.length === 0 ? (
+          <p className="text-sm text-emerald-600 font-medium">All features complete!</p>
+        ) : (
+          <div className="space-y-1.5">
+            {activeItems.slice(0, maxItems).map((item) => {
+              const StatusIcon = statusIcons[item.status] || Clock;
+              const colorClass = statusColors[item.status] || "";
+              const blockers = (() => {
+                try { return JSON.parse(item.blockers || "[]"); } catch { return []; }
+              })();
+
+              return (
+                <div key={item.id} className="group" data-testid={`devtracker-item-${item.id}`}>
+                  <div className="flex items-start gap-2 text-xs">
+                    <StatusIcon className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${colorClass.split(" ")[0]}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate">{item.featureName}</span>
+                        <span className={`text-[10px] px-1.5 py-0 rounded-full border shrink-0 ${colorClass}`}>
+                          {statusLabels[item.status]}
+                        </span>
+                      </div>
+                      {item.percentComplete != null && item.percentComplete < 100 && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary rounded-full transition-all"
+                              style={{ width: `${item.percentComplete}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">{item.percentComplete}%</span>
+                        </div>
+                      )}
+                      {blockers.length > 0 && (
+                        <div className="mt-1 space-y-0.5">
+                          {blockers.slice(0, 2).map((b: string, i: number) => (
+                            <p key={i} className="text-[10px] text-red-500 flex items-center gap-1">
+                              <AlertTriangle className="h-2.5 w-2.5 shrink-0" /> {b}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {activeItems.length > maxItems && (
+              <p className="text-[10px] text-muted-foreground">+{activeItems.length - maxItems} more items</p>
+            )}
+          </div>
+        )}
+      </div>
+    </WidgetShell>
+  );
+}
+
 export const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>> = {
   messages: MessagesWidget,
   todos: TodosWidget,
@@ -518,4 +633,5 @@ export const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>>
   tools: ToolsWidget,
   companyhq: CompanyHQWidget,
   help: HelpWidget,
+  devtracker: DevTrackerWidget,
 };

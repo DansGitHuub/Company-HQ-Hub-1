@@ -14,6 +14,7 @@ import {
   HelpCircle,
   Brain,
   Hammer,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 
@@ -31,6 +32,7 @@ export interface WidgetDefinition {
   description: string;
   icon: LucideIcon;
   roles: string[];
+  masterAdminOnly?: boolean;
   defaultSize: WidgetSize;
   sizes: WidgetSize[];
 }
@@ -171,6 +173,16 @@ export const WIDGET_DEFINITIONS: WidgetDefinition[] = [
     defaultSize: "small",
     sizes: ["small", "medium"],
   },
+  {
+    type: "devtracker",
+    label: "Dev Tracker",
+    description: "Development status and feature tracker",
+    icon: ClipboardList,
+    roles: ["Admin"],
+    masterAdminOnly: true,
+    defaultSize: "large",
+    sizes: ["medium", "large"],
+  },
 ];
 
 export function getDefaultWidgets(role: string): WidgetConfig[] {
@@ -188,6 +200,10 @@ export function getDefaultWidgets(role: string): WidgetConfig[] {
   }));
 }
 
-export function getAvailableWidgets(role: string): WidgetDefinition[] {
-  return WIDGET_DEFINITIONS.filter(w => w.roles.includes(role));
+export function getAvailableWidgets(role: string, isMasterAdmin?: boolean): WidgetDefinition[] {
+  return WIDGET_DEFINITIONS.filter(w => {
+    if (!w.roles.includes(role)) return false;
+    if (w.masterAdminOnly && !isMasterAdmin) return false;
+    return true;
+  });
 }

@@ -136,7 +136,7 @@ export default function Home() {
     setIsEditing(false);
   }, [userRole, saveWidgets]);
 
-  const available = getAvailableWidgets(userRole);
+  const available = getAvailableWidgets(userRole, user?.isMasterAdmin === true);
   const addedTypes = widgets.map((w) => w.widgetType);
   const notAdded = available.filter((w) => !addedTypes.includes(w.type));
 
