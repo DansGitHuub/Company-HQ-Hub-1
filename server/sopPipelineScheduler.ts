@@ -227,6 +227,17 @@ Generate comprehensive content with 5-8 detailed steps and image prompts.`
     } as any);
 
     console.log(`[SOP-Scheduler] Auto-generated SOP: "${item.title}" (${newSop.id})`);
+
+    try {
+      const { generateQuizForSop } = await import("./sopQuizGenerator");
+      const quizSuccess = await generateQuizForSop(newSop.id);
+      if (quizSuccess) {
+        console.log(`[SOP-Scheduler] Auto-generated quiz for "${item.title}"`);
+      }
+    } catch (quizErr) {
+      console.error(`[SOP-Scheduler] Quiz auto-generation failed (non-blocking):`, quizErr);
+    }
+
     return true;
   } catch (err) {
     console.error(`[SOP-Scheduler] Auto-generation failed for item ${itemId}:`, err);

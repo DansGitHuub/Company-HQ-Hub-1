@@ -1061,99 +1061,19 @@ Respond with a JSON object:
       const sop = await storage.getSop(req.params.id as string);
       if (!sop) return res.status(404).json({ message: "SOP not found" });
 
-      await storage.deleteSopQuizzesBySop(sop.id);
-
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a training quiz generator for landscape installation and maintenance companies. Generate adaptive difficulty quiz questions based on Standard Operating Procedures (SOPs). Return valid JSON only.`
-          },
-          {
-            role: "user",
-            content: `Based on this SOP, generate an adaptive difficulty quiz for employee training.
-
-SOP Title: ${sop.title}
-SOP Type: ${sop.sopType || "standard"}
-SOP Content:
-${sop.content}
-
-Generate a JSON object with this exact structure:
-{
-  "questions": [
-    {
-      "question": "text of question",
-      "options": ["option A", "option B", "option C", "option D"],
-      "correctIndex": 0,
-      "explanation": "why this is the correct answer",
-      "difficultyLevel": 1,
-      "audienceRoles": ["Crew", "Crew Lead", "New Hire"]
-    }
-  ]
-}
-
-DIFFICULTY LEVELS (generate at least 2-3 questions per level):
-- Level 1 (Foundational): Basic terminology, fundamental safety, step-by-step comprehension. For all roles.
-- Level 2 (Competent): Practical application, correct procedure ordering, identifying hazards. For Crew and above.
-- Level 3 (Proficient): Troubleshooting, efficiency improvements, handling variations. For Crew Lead and above.
-- Level 4 (Advanced): Edge cases, optimization, quality standards, mentoring scenarios. For Manager and above.
-- Level 5 (Expert): Complex analysis, cross-system integration, policy creation, training design. For Admin/Manager.
-
-AUDIENCE ROLES - tag each question with applicable roles from: ["New Hire", "Crew", "Crew Lead", "Manager", "Admin", "HR", "Sales"]
-- Level 1-2 questions: include all field roles ["New Hire", "Crew", "Crew Lead", "Manager"]
-- Level 3 questions: ["Crew", "Crew Lead", "Manager"]
-- Level 4-5 questions: ["Crew Lead", "Manager", "Admin"]
-
-RULES:
-- Generate 12-15 total questions spread across all 5 difficulty levels
-- At least 2 questions per difficulty level
-- Each question must have exactly 4 options
-- correctIndex is 0-based (0=first option, 3=last option)
-- Questions must directly relate to the SOP content
-- Include practical, real-world scenarios relevant to landscaping
-- Provide brief, helpful explanations for correct answers`
-          }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.7,
-      });
-
-      const responseText = completion.choices[0]?.message?.content || "{}";
-      let quizData: any;
-      try {
-        quizData = JSON.parse(responseText);
-      } catch {
-        return res.status(500).json({ message: "Failed to parse AI quiz response" });
+      const { generateQuizForSop } = await import("./sopQuizGenerator");
+      const success = await generateQuizForSop(sop.id);
+      if (!success) {
+        return res.status(500).json({ message: "Failed to generate quiz" });
       }
 
-      const questions = quizData.questions || [];
-
-      const quiz = await storage.createSopQuiz({
-        sopId: sop.id,
-        skillLevel: "adaptive",
-        title: `${sop.title} - Adaptive Quiz`,
-        description: "Adaptive difficulty quiz that adjusts to your skill level. Questions get harder as you answer correctly.",
-        questionCount: questions.length,
-      });
-
-      const questionsToInsert = questions.map((q: any, index: number) => ({
-        quizId: quiz.id,
-        question: q.question,
-        options: q.options,
-        correctIndex: q.correctIndex,
-        isStandard: false,
-        explanation: q.explanation || null,
-        sortOrder: index,
-        difficultyLevel: Math.min(Math.max(q.difficultyLevel || 1, 1), 5),
-        audienceRoles: q.audienceRoles || [],
-      }));
-
-      if (questionsToInsert.length > 0) {
-        await storage.createQuizQuestionsBatch(questionsToInsert);
+      const quizzes = await storage.getSopQuizzes(sop.id);
+      if (quizzes.length > 0) {
+        const quiz = await storage.getSopQuiz(quizzes[0].id);
+        res.status(201).json([quiz]);
+      } else {
+        res.status(201).json([]);
       }
-
-      res.status(201).json([{ ...quiz, questions: questionsToInsert }]);
     } catch (err: any) {
       console.error("[QUIZ] Generation error:", err);
       res.status(500).json({ message: "Error generating quiz", errorCode: "SOP-003" });
@@ -1954,7 +1874,19 @@ Generate comprehensive content with 5-8 detailed steps and image prompts for eve
             generatedSopId: sop.id,
           });
 
-          pipelineGenerationJobs.set(jobId, { status: "complete", progress: 100, step: "SOP published!", sopId: sop.id });
+          pipelineGenerationJobs.set(jobId, { status: "complete", progress: 95, step: "Generating training quiz...", sopId: sop.id });
+
+          try {
+            const { generateQuizForSop } = await import("./sopQuizGenerator");
+            const quizSuccess = await generateQuizForSop(sop.id);
+            if (quizSuccess) {
+              console.log(`[SOP-Pipeline] Auto-generated quiz for "${item.title}"`);
+            }
+          } catch (quizErr) {
+            console.error(`[SOP-Pipeline] Quiz auto-generation failed (non-blocking):`, quizErr);
+          }
+
+          pipelineGenerationJobs.set(jobId, { status: "complete", progress: 100, step: "SOP published with quiz!", sopId: sop.id });
           console.log(`[SOP-Pipeline] Generated SOP "${item.title}" → ${sop.id} with ${Object.keys(stepImageUrls).length} step images`);
 
           setTimeout(() => pipelineGenerationJobs.delete(jobId), 5 * 60 * 1000);

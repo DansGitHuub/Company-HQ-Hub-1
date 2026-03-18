@@ -44,6 +44,7 @@ import {
   ExternalLink,
   Settings,
   Timer,
+  GraduationCap,
 } from "lucide-react";
 import type { SopPipeline, SopCategory, SopPipelineSettings } from "@shared/schema";
 
@@ -475,7 +476,7 @@ export default function SOPPipeline() {
                         </div>
                       )}
                       {item.status === "published" && item.generatedSopId && (
-                        <div className="mt-2">
+                        <div className="mt-2 flex items-center gap-3 flex-wrap">
                           <a
                             href={`/sops`}
                             className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -484,6 +485,10 @@ export default function SOPPipeline() {
                             <ExternalLink className="h-3 w-3" />
                             View in SOP Library
                           </a>
+                          <span className="inline-flex items-center gap-1 text-sm text-emerald-600" data-testid={`quiz-status-${item.id}`}>
+                            <GraduationCap className="h-3.5 w-3.5" />
+                            Quiz Auto-Generated
+                          </span>
                         </div>
                       )}
                     </div>
