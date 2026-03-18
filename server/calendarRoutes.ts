@@ -426,11 +426,11 @@ export function registerCalendarRoutes(app: Express, requireAuth: any) {
 
       const calendarId = user.googleCalendarId || "primary";
       const now = new Date();
-      const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      const threeMonthsAhead = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+      const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+      const oneYearAhead = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
 
       const googleEvents = await googleOAuth.getUserCalendarEvents(
-        token, threeMonthsAgo, threeMonthsAhead, calendarId
+        token, oneYearAgo, oneYearAhead, calendarId
       );
 
       await db.delete(googleCalendarEvents).where(eq(googleCalendarEvents.userId, user.id));

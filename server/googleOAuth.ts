@@ -67,17 +67,26 @@ export async function getUserCalendarEvents(
   calendarId: string = 'primary'
 ) {
   const calendar = getCalendarClient(accessToken);
-  
-  const response = await calendar.events.list({
-    calendarId,
-    timeMin: startDate.toISOString(),
-    timeMax: endDate.toISOString(),
-    singleEvents: true,
-    orderBy: 'startTime',
-    maxResults: 100
-  });
-  
-  return response.data.items || [];
+  const allItems: any[] = [];
+  let pageToken: string | undefined = undefined;
+
+  do {
+    const response: any = await calendar.events.list({
+      calendarId,
+      timeMin: startDate.toISOString(),
+      timeMax: endDate.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+      maxResults: 2500,
+      ...(pageToken ? { pageToken } : {}),
+    });
+
+    const items = response.data.items || [];
+    allItems.push(...items);
+    pageToken = response.data.nextPageToken || undefined;
+  } while (pageToken);
+
+  return allItems;
 }
 
 export async function createCalendarEvent(
