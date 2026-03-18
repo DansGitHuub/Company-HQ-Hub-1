@@ -15,6 +15,7 @@ import {
   Brain,
   Hammer,
   ClipboardList,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -182,6 +183,15 @@ export const WIDGET_DEFINITIONS: WidgetDefinition[] = [
     masterAdminOnly: true,
     defaultSize: "large",
     sizes: ["medium", "large"],
+  },
+  {
+    type: "soppipeline",
+    label: "SOP Pipeline",
+    description: "AI-generated SOP pipeline status and queue",
+    icon: Sparkles,
+    roles: ["Admin"],
+    defaultSize: "medium",
+    sizes: ["small", "medium", "large"],
   },
 ];
 

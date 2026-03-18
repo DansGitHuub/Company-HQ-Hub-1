@@ -24,6 +24,8 @@ import {
   MapPin,
   Zap,
   FileText,
+  Sparkles,
+  GraduationCap,
 } from "lucide-react";
 import type { WidgetSize } from "./widgetRegistry";
 
@@ -617,6 +619,78 @@ export function DevTrackerWidget({ size }: WidgetProps) {
   );
 }
 
+export function SOPPipelineWidget({ size }: WidgetProps) {
+  const { data: items = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/sop-pipeline"],
+  });
+  const { data: settings } = useQuery<any>({
+    queryKey: ["/api/sop-pipeline/settings"],
+  });
+
+  const counts = {
+    suggested: items.filter(i => i.status === "suggested").length,
+    approved: items.filter(i => i.status === "approved").length,
+    generating: items.filter(i => i.status === "generating").length,
+    published: items.filter(i => i.status === "published").length,
+    rejected: items.filter(i => i.status === "rejected").length,
+  };
+
+  const statusColors: Record<string, string> = {
+    suggested: "text-blue-600 bg-blue-50",
+    approved: "text-green-600 bg-green-50",
+    generating: "text-amber-600 bg-amber-50",
+    published: "text-emerald-600 bg-emerald-50",
+    rejected: "text-red-600 bg-red-50",
+  };
+
+  const recentItems = items
+    .sort((a, b) => new Date(b.suggestedAt || b.createdAt).getTime() - new Date(a.suggestedAt || a.createdAt).getTime())
+    .slice(0, size === "small" ? 3 : size === "medium" ? 5 : 8);
+
+  return (
+    <WidgetShell loading={isLoading} href="/admin">
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-1.5">
+          {Object.entries(counts).filter(([, c]) => c > 0).map(([status, count]) => (
+            <div key={status} className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${statusColors[status]}`}>
+              {count} {status}
+            </div>
+          ))}
+        </div>
+
+        {settings?.autoGenerateEnabled && (
+          <div className="flex items-center gap-1.5 text-[10px] text-emerald-600" data-testid="widget-pipeline-schedule-active">
+            <Sparkles className="h-3 w-3" />
+            <span>Auto-generating {settings.generateFrequency}</span>
+          </div>
+        )}
+
+        {recentItems.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No pipeline items yet</p>
+        ) : (
+          <div className="space-y-1.5">
+            {recentItems.map((item: any) => (
+              <div key={item.id} className="flex items-start gap-2 text-xs" data-testid={`widget-pipeline-item-${item.id}`}>
+                {item.status === "published" ? (
+                  <GraduationCap className="h-3 w-3 mt-0.5 shrink-0 text-emerald-500" />
+                ) : (
+                  <Sparkles className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <span className="truncate block">{item.title}</span>
+                </div>
+                <span className={`text-[10px] px-1.5 py-0 rounded-full shrink-0 ${statusColors[item.status] || "text-muted-foreground bg-muted"}`}>
+                  {item.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </WidgetShell>
+  );
+}
+
 export const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>> = {
   messages: MessagesWidget,
   todos: TodosWidget,
@@ -634,4 +708,5 @@ export const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>>
   companyhq: CompanyHQWidget,
   help: HelpWidget,
   devtracker: DevTrackerWidget,
+  soppipeline: SOPPipelineWidget,
 };
