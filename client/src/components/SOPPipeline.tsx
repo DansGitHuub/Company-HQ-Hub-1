@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -37,6 +38,8 @@ import {
   Zap,
   FileText,
   AlertTriangle,
+  Play,
+  ExternalLink,
 } from "lucide-react";
 import type { SopPipeline, SopCategory } from "@shared/schema";
 
@@ -80,6 +83,8 @@ export default function SOPPipeline() {
   const [rejectTarget, setRejectTarget] = useState<SopPipeline | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [generatingJobs, setGeneratingJobs] = useState<Record<string, { jobId: string; progress: number; step: string; status: string; sopId?: string }>>({});
+  const pollingRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
   const { data: items = [], isLoading } = useQuery<SopPipeline[]>({
     queryKey: ["/api/sop-pipeline"],
@@ -164,6 +169,46 @@ export default function SOPPipeline() {
     });
     toast({ title: "Updated", description: "Topic details have been saved." });
     setEditItem(null);
+  };
+
+  const startPolling = useCallback((itemId: string, jobId: string) => {
+    if (pollingRef.current[itemId]) clearInterval(pollingRef.current[itemId]);
+    pollingRef.current[itemId] = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/sop-pipeline/generate-status/${jobId}`, { credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json();
+        setGeneratingJobs(prev => ({ ...prev, [itemId]: { jobId, ...data } }));
+        if (data.status === "complete" || data.status === "error") {
+          clearInterval(pollingRef.current[itemId]);
+          delete pollingRef.current[itemId];
+          queryClient.invalidateQueries({ queryKey: ["/api/sop-pipeline"] });
+          if (data.status === "complete") {
+            toast({ title: "SOP Published!", description: "The SOP has been generated and added to your library." });
+          } else {
+            toast({ title: "Generation Failed", description: data.error || "An error occurred.", variant: "destructive" });
+          }
+        }
+      } catch {}
+    }, 2000);
+  }, [toast]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(pollingRef.current).forEach(interval => clearInterval(interval));
+    };
+  }, []);
+
+  const handleGenerate = async (item: SopPipeline) => {
+    try {
+      const res = await apiRequest("POST", `/api/sop-pipeline/${item.id}/generate`);
+      const data = await res.json();
+      setGeneratingJobs(prev => ({ ...prev, [item.id]: { jobId: data.jobId, progress: 0, step: "Starting...", status: "processing" } }));
+      startPolling(item.id, data.jobId);
+      queryClient.invalidateQueries({ queryKey: ["/api/sop-pipeline"] });
+    } catch {
+      toast({ title: "Error", description: "Failed to start generation.", variant: "destructive" });
+    }
   };
 
   const filteredItems = statusFilter === "all" ? items : items.filter(i => i.status === statusFilter);
@@ -316,6 +361,29 @@ export default function SOPPipeline() {
                           <span>{item.rejectedReason}</span>
                         </div>
                       )}
+                      {(item.status === "generating" || generatingJobs[item.id]?.status === "processing") && (
+                        <div className="mt-3 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-amber-500" />
+                            <span className="text-sm text-amber-700 font-medium">
+                              {generatingJobs[item.id]?.step || "Generating SOP content and images..."}
+                            </span>
+                          </div>
+                          <Progress value={generatingJobs[item.id]?.progress || 5} className="h-2" />
+                        </div>
+                      )}
+                      {item.status === "published" && item.generatedSopId && (
+                        <div className="mt-2">
+                          <a
+                            href={`/sops`}
+                            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                            data-testid={`link-view-sop-${item.id}`}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            View in SOP Library
+                          </a>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {item.status === "suggested" && (
@@ -342,23 +410,39 @@ export default function SOPPipeline() {
                           </Button>
                         </>
                       )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleEdit(item)}
-                        data-testid={`button-edit-${item.id}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-red-500 hover:text-red-700"
-                        onClick={() => setDeleteTarget(item)}
-                        data-testid={`button-delete-${item.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {item.status === "approved" && !generatingJobs[item.id] && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="bg-amber-600 hover:bg-amber-700"
+                          onClick={() => handleGenerate(item)}
+                          data-testid={`button-generate-${item.id}`}
+                        >
+                          <Play className="h-4 w-4 mr-1" />
+                          Generate SOP
+                        </Button>
+                      )}
+                      {item.status !== "generating" && !generatingJobs[item.id]?.status && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEdit(item)}
+                            data-testid={`button-edit-${item.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-500 hover:text-red-700"
+                            onClick={() => setDeleteTarget(item)}
+                            data-testid={`button-delete-${item.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardContent>

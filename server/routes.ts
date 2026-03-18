@@ -1436,6 +1436,325 @@ Respond with valid JSON only: { "suggestions": [...] }`
     }
   });
 
+  const pipelineGenerationJobs = new Map<string, { status: string; progress: number; step: string; error?: string; sopId?: string }>();
+
+  app.post("/api/sop-pipeline/:id/generate", requireAdmin, async (req, res) => {
+    try {
+      const item = await storage.getSopPipelineItem(req.params.id);
+      if (!item) return res.status(404).json({ message: "Pipeline item not found" });
+      if (item.status !== "approved") return res.status(400).json({ message: "Only approved items can be generated" });
+
+      await storage.updateSopPipelineItem(item.id, { status: "generating" });
+
+      const jobId = crypto.randomUUID();
+      pipelineGenerationJobs.set(jobId, { status: "processing", progress: 0, step: "Starting content generation..." });
+
+      res.status(202).json({ jobId, status: "processing" });
+
+      (async () => {
+        try {
+          pipelineGenerationJobs.set(jobId, { status: "processing", progress: 10, step: "Generating SOP content with AI..." });
+
+          const existingSops = await storage.getSops();
+          const sampleTitles = existingSops.slice(0, 5).map(s => s.title).join(", ");
+
+          const contentCompletion = await openai.chat.completions.create({
+            model: "gpt-4o",
+            temperature: 0.7,
+            messages: [
+              {
+                role: "system",
+                content: `You are an expert technical writer specializing in landscape installation and maintenance SOPs for "Chapin Landscapes". Write comprehensive, practical SOPs that field crews can actually follow.
+
+Your SOPs must include:
+- A clear desired outcome
+- Required tools, materials, and PPE (personal protective equipment)
+- Detailed step-by-step instructions (5-8 steps typically)
+- Each step needs: a title, detailed instruction, why it matters, success criteria, and common mistakes to avoid
+- Safety notes relevant to the procedure
+- Appropriate audience and skill level
+
+The company already has these SOPs: ${sampleTitles}
+
+Write content that matches professional landscaping industry standards. Be specific with measurements, techniques, and safety requirements.
+
+Respond with valid JSON matching this exact structure:
+{
+  "outcome": "What the completed procedure should look like",
+  "outcomeType": "completion|quality|safety",
+  "audience": "Who should follow this SOP",
+  "skillLevel": "beginner|intermediate|advanced|all",
+  "timingTarget": "Estimated time (e.g., '30 minutes')",
+  "timingMax": "Maximum time allowed (e.g., '1 hour')",
+  "tools": "Tool 1\\nTool 2\\nTool 3",
+  "materials": "Material 1\\nMaterial 2",
+  "ppe": "PPE item 1\\nPPE item 2",
+  "safetyNotes": "Important safety information",
+  "complianceNotes": "Any regulatory or compliance notes",
+  "steps": [
+    {
+      "title": "Step title",
+      "instruction": "Detailed step instructions",
+      "why": "Why this step matters",
+      "successCriteria": "How to know this step is done correctly",
+      "commonMistakes": "What to watch out for",
+      "proofRequired": false,
+      "isQCCheckpoint": false
+    }
+  ],
+  "imagePrompts": {
+    "header": "Detailed image prompt for the SOP header/overview image showing the main topic in a landscaping context",
+    "steps": [
+      "Detailed image prompt for step 1 showing a landscape crew performing the action described",
+      "Detailed image prompt for step 2..."
+    ]
+  }
+}`
+              },
+              {
+                role: "user",
+                content: `Write a complete ${item.sopType} SOP for: "${item.title}"
+                
+Category: ${item.category}
+Description: ${item.description || "No additional description provided"}
+
+Generate comprehensive content with 5-8 detailed steps and image prompts for every step plus a header image.`
+              }
+            ],
+            response_format: { type: "json_object" },
+          });
+
+          const sopContent = JSON.parse(contentCompletion.choices[0].message.content || "{}");
+          pipelineGenerationJobs.set(jobId, { status: "processing", progress: 30, step: "Content generated. Generating images..." });
+
+          const steps = (sopContent.steps || []).map((s: any, i: number) => ({
+            id: crypto.randomUUID(),
+            title: s.title || `Step ${i + 1}`,
+            instruction: s.instruction || "",
+            why: s.why || undefined,
+            successCriteria: s.successCriteria || undefined,
+            commonMistakes: s.commonMistakes || undefined,
+            proofRequired: s.proofRequired || false,
+            proofType: undefined,
+            isQCCheckpoint: s.isQCCheckpoint || false,
+          }));
+
+          const imagePrompts = sopContent.imagePrompts || {};
+          const stepImagePrompts = imagePrompts.steps || [];
+          const headerPrompt = imagePrompts.header || `Professional landscaping scene showing: ${item.title}`;
+
+          const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+          const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1";
+          const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+          const SIDECAR = "http://127.0.0.1:1106";
+
+          async function generateAndUploadImage(prompt: string, label: string): Promise<string | null> {
+            try {
+              const fullPrompt = `Landscaping/outdoor work context: ${prompt}. Professional, clear, educational illustration style, high quality.`;
+              const imageApiRes = await fetch(`${baseURL}/images/generations`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(apiKey ? { "Authorization": `Bearer ${apiKey}` } : {}),
+                },
+                body: JSON.stringify({ model: "gpt-image-1", prompt: fullPrompt, size: "1024x1024" }),
+              });
+              if (!imageApiRes.ok) {
+                console.error(`[SOP-Pipeline] Image gen failed for ${label}: ${imageApiRes.status}`);
+                return null;
+              }
+              const imageData = await imageApiRes.json() as any;
+              const b64 = imageData?.data?.[0]?.b64_json;
+              if (!b64) return null;
+
+              const imageBuffer = Buffer.from(b64, "base64");
+              const imageId = crypto.randomUUID();
+              const objectPath = `${privateDir}/sop-media/${imageId}.png`;
+              const pathParts = objectPath.startsWith("/") ? objectPath.slice(1).split("/") : objectPath.split("/");
+              const bucketName = pathParts[0];
+              const objectName = pathParts.slice(1).join("/");
+
+              const signRes = await fetch(`${SIDECAR}/object-storage/signed-object-url`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  bucket_name: bucketName,
+                  object_name: objectName,
+                  method: "PUT",
+                  expires_at: new Date(Date.now() + 900 * 1000).toISOString(),
+                }),
+              });
+              if (!signRes.ok) return null;
+              const { signed_url } = await signRes.json() as { signed_url: string };
+
+              const uploadRes = await fetch(signed_url, {
+                method: "PUT",
+                headers: { "Content-Type": "image/png" },
+                body: imageBuffer,
+              });
+              if (!uploadRes.ok) return null;
+
+              return `/objects/sop-media/${imageId}.png`;
+            } catch (err) {
+              console.error(`[SOP-Pipeline] Image error for ${label}:`, err);
+              return null;
+            }
+          }
+
+          let headerImageUrl: string | null = null;
+          if (privateDir) {
+            headerImageUrl = await generateAndUploadImage(headerPrompt, "header");
+            pipelineGenerationJobs.set(jobId, { status: "processing", progress: 40, step: "Header image done. Generating step images..." });
+          }
+
+          const stepImageUrls: Record<string, string> = {};
+          if (privateDir) {
+            for (let i = 0; i < steps.length; i++) {
+              const prompt = stepImagePrompts[i] || `Landscape crew performing: ${steps[i].title}`;
+              const imgUrl = await generateAndUploadImage(prompt, `step-${i + 1}`);
+              if (imgUrl) {
+                stepImageUrls[steps[i].id] = imgUrl;
+              }
+              const progress = 40 + Math.round(((i + 1) / steps.length) * 40);
+              pipelineGenerationJobs.set(jobId, { status: "processing", progress, step: `Step ${i + 1}/${steps.length} image done...` });
+            }
+          }
+
+          pipelineGenerationJobs.set(jobId, { status: "processing", progress: 85, step: "Creating SOP record..." });
+
+          const SOP_TYPE_LABELS: Record<string, string> = {
+            standard: "Standard Procedure", safety: "Safety Procedure",
+            maintenance: "Maintenance", training: "Training Guide",
+            quality: "Quality Control", emergency: "Emergency Response",
+          };
+          const SKILL_LABELS: Record<string, string> = {
+            beginner: "Beginner & Above", intermediate: "Intermediate & Above",
+            advanced: "Advanced", all: "All Levels",
+          };
+          const OUTCOME_LABELS: Record<string, string> = {
+            completion: "Task Completion", quality: "Quality Standard", safety: "Safety Compliance",
+          };
+
+          let contentHtml = "";
+
+          if (headerImageUrl) {
+            contentHtml += `<div class="sop-header-image" style="margin-bottom:16px;text-align:center;">`;
+            contentHtml += `<img src="${headerImageUrl}" alt="${item.title}" style="max-width:100%;max-height:300px;border-radius:8px;" />`;
+            contentHtml += `<p style="font-size:11px;color:#888;margin-top:4px;">AI Generated</p></div>`;
+          }
+
+          contentHtml += `<div class="sop-header">`;
+          contentHtml += `<p><strong>Type:</strong> ${SOP_TYPE_LABELS[item.sopType] || item.sopType}</p>`;
+          if (sopContent.audience) contentHtml += `<p><strong>Audience:</strong> ${sopContent.audience}</p>`;
+          if (sopContent.skillLevel) contentHtml += `<p><strong>Skill Level:</strong> ${SKILL_LABELS[sopContent.skillLevel] || sopContent.skillLevel}</p>`;
+          if (sopContent.timingTarget) contentHtml += `<p><strong>Target Time:</strong> ${sopContent.timingTarget}${sopContent.timingMax ? ` (Max: ${sopContent.timingMax})` : ""}</p>`;
+          contentHtml += `</div>`;
+
+          if (sopContent.outcome) {
+            const outcomeLabel = OUTCOME_LABELS[sopContent.outcomeType] || "";
+            contentHtml += `<h2>Desired Outcome</h2>`;
+            if (outcomeLabel) contentHtml += `<p><em>${outcomeLabel}</em></p>`;
+            contentHtml += `<p>${sopContent.outcome}</p>`;
+          }
+
+          if (sopContent.tools || sopContent.materials || sopContent.ppe) {
+            contentHtml += `<h2>Before You Start</h2>`;
+            if (sopContent.tools) { contentHtml += `<h3>Tools Required</h3><ul>`; sopContent.tools.split("\n").filter(Boolean).forEach((t: string) => contentHtml += `<li>${t.trim()}</li>`); contentHtml += `</ul>`; }
+            if (sopContent.materials) { contentHtml += `<h3>Materials Needed</h3><ul>`; sopContent.materials.split("\n").filter(Boolean).forEach((m: string) => contentHtml += `<li>${m.trim()}</li>`); contentHtml += `</ul>`; }
+            if (sopContent.ppe) { contentHtml += `<h3>PPE Required</h3><ul>`; sopContent.ppe.split("\n").filter(Boolean).forEach((p: string) => contentHtml += `<li>${p.trim()}</li>`); contentHtml += `</ul>`; }
+          }
+
+          if (sopContent.safetyNotes) {
+            contentHtml += `<h2>⚠️ Safety Notes</h2>`;
+            contentHtml += `<p>${sopContent.safetyNotes.replace(/\n/g, "<br>")}</p>`;
+          }
+
+          contentHtml += `<h2>Procedure Steps</h2><ol>`;
+          steps.forEach((step: any, i: number) => {
+            contentHtml += `<li><strong>${step.title}</strong>`;
+            if (step.instruction) contentHtml += `<p>${step.instruction.replace(/\n/g, "<br>")}</p>`;
+            if (stepImageUrls[step.id]) {
+              contentHtml += `<div style="margin:8px 0;"><img src="${stepImageUrls[step.id]}" alt="${step.title}" style="max-width:100%;max-height:200px;border-radius:6px;border:1px solid #eee;" />`;
+              contentHtml += `<span style="font-size:10px;color:#888;"> AI Generated</span></div>`;
+            }
+            if (step.why) contentHtml += `<p><em>Why: ${step.why}</em></p>`;
+            if (step.successCriteria) contentHtml += `<p>✅ <strong>Success:</strong> ${step.successCriteria}</p>`;
+            if (step.commonMistakes) contentHtml += `<p>⚠️ <strong>Avoid:</strong> ${step.commonMistakes}</p>`;
+            if (step.proofRequired) contentHtml += `<p>📋 <strong>Proof Required</strong></p>`;
+            if (step.isQCCheckpoint) contentHtml += `<p>🔍 <strong>QC Checkpoint</strong> — Verify before continuing</p>`;
+            contentHtml += `</li>`;
+          });
+          contentHtml += `</ol>`;
+
+          if (sopContent.complianceNotes) {
+            contentHtml += `<h2>Compliance</h2>`;
+            contentHtml += `<p>${sopContent.complianceNotes.replace(/\n/g, "<br>")}</p>`;
+          }
+
+          const structuredData = {
+            outcome: sopContent.outcome,
+            outcomeType: sopContent.outcomeType,
+            audience: sopContent.audience,
+            skillLevel: sopContent.skillLevel,
+            timingTarget: sopContent.timingTarget,
+            timingMax: sopContent.timingMax,
+            ppe: sopContent.ppe,
+            tools: sopContent.tools,
+            materials: sopContent.materials,
+            steps: steps.map((s: any) => ({
+              ...s,
+              imageUrl: stepImageUrls[s.id] || undefined,
+            })),
+            safetyNotes: sopContent.safetyNotes,
+            complianceNotes: sopContent.complianceNotes,
+            headerImageUrl: headerImageUrl || undefined,
+            generatedByPipeline: true,
+            pipelineItemId: item.id,
+          };
+
+          const classification = autoClassifySOPTitle(item.title);
+          const user = req.user as User;
+
+          const sop = await storage.createSop({
+            title: item.title,
+            category: item.category,
+            categoryId: item.categoryId || undefined,
+            content: contentHtml,
+            structuredData,
+            superCategory: classification.confidence >= 0.5 ? classification.superCategory : undefined,
+            subCategory: classification.confidence >= 0.5 ? classification.subCategory : undefined,
+            sopType: item.sopType,
+            ownerId: user.id,
+          });
+
+          await storage.updateSopPipelineItem(item.id, {
+            status: "published",
+            completedAt: new Date(),
+            generatedSopId: sop.id,
+          });
+
+          pipelineGenerationJobs.set(jobId, { status: "complete", progress: 100, step: "SOP published!", sopId: sop.id });
+          console.log(`[SOP-Pipeline] Generated SOP "${item.title}" → ${sop.id} with ${Object.keys(stepImageUrls).length} step images`);
+
+          setTimeout(() => pipelineGenerationJobs.delete(jobId), 5 * 60 * 1000);
+        } catch (err: any) {
+          console.error("[SOP-Pipeline] Generation error:", err);
+          pipelineGenerationJobs.set(jobId, { status: "error", progress: 0, step: "Generation failed", error: err.message });
+          await storage.updateSopPipelineItem(item.id, { status: "approved" });
+          setTimeout(() => pipelineGenerationJobs.delete(jobId), 5 * 60 * 1000);
+        }
+      })();
+    } catch (err) {
+      res.status(500).json({ message: "Error starting generation" });
+    }
+  });
+
+  app.get("/api/sop-pipeline/generate-status/:jobId", requireAdmin, async (req, res) => {
+    const job = pipelineGenerationJobs.get(req.params.jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+    res.json(job);
+  });
+
   // SOP Categories
   app.get("/api/sop-categories", requireAuth, async (req, res) => {
     try {
