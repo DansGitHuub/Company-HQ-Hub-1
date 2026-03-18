@@ -821,6 +821,200 @@ Respond with a JSON object:
     }
   });
 
+  app.get("/api/sops/:id/versions", requireAuth, async (req, res) => {
+    try {
+      const versions = await storage.getSopVersions(req.params.id);
+      res.json(versions);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching versions" });
+    }
+  });
+
+  app.post("/api/sops/:id/save-version", requireAuth, async (req, res) => {
+    try {
+      if ((req.user as any)?.role !== "Admin") return res.status(403).json({ message: "Admin only" });
+      const sop = await storage.getSop(req.params.id);
+      if (!sop) return res.status(404).json({ message: "SOP not found" });
+      const existingVersions = await storage.getSopVersions(sop.id);
+      const nextVersion = existingVersions.length > 0 ? Math.max(...existingVersions.map(v => v.versionNumber)) + 1 : 1;
+      const version = await storage.createSopVersion({
+        sopId: sop.id,
+        versionNumber: nextVersion,
+        title: sop.title,
+        content: sop.content,
+        structuredData: sop.structuredData,
+        savedBy: (req.user as any)?.id || null,
+        changeSummary: req.body.changeSummary || "Manual save",
+      });
+      res.json(version);
+    } catch (err) {
+      res.status(500).json({ message: "Error saving version" });
+    }
+  });
+
+  app.post("/api/sops/:id/restore-version/:versionId", requireAuth, async (req, res) => {
+    try {
+      if ((req.user as any)?.role !== "Admin") return res.status(403).json({ message: "Admin only" });
+      const sop = await storage.getSop(req.params.id);
+      if (!sop) return res.status(404).json({ message: "SOP not found" });
+      const version = await storage.getSopVersion(req.params.versionId);
+      if (!version || version.sopId !== sop.id) return res.status(404).json({ message: "Version not found" });
+      const existingVersions = await storage.getSopVersions(sop.id);
+      const nextVersion = existingVersions.length > 0 ? Math.max(...existingVersions.map(v => v.versionNumber)) + 1 : 1;
+      await storage.createSopVersion({
+        sopId: sop.id,
+        versionNumber: nextVersion,
+        title: sop.title,
+        content: sop.content,
+        structuredData: sop.structuredData,
+        savedBy: (req.user as any)?.id || null,
+        changeSummary: `Snapshot before restoring to version ${version.versionNumber}`,
+      });
+      const restored = await storage.updateSop(sop.id, {
+        title: version.title,
+        content: version.content,
+        structuredData: version.structuredData,
+      });
+      res.json(restored);
+    } catch (err) {
+      res.status(500).json({ message: "Error restoring version" });
+    }
+  });
+
+  app.post("/api/sops/:id/ai-rewrite", requireAuth, async (req, res) => {
+    try {
+      if ((req.user as any)?.role !== "Admin") return res.status(403).json({ message: "Admin only" });
+      const sop = await storage.getSop(req.params.id);
+      if (!sop) return res.status(404).json({ message: "SOP not found" });
+      const { field, stepIndex, instruction } = req.body;
+      if (!field || !instruction) return res.status(400).json({ message: "field and instruction required" });
+      const structuredData = (sop.structuredData || {}) as any;
+
+      const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+      const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1";
+      if (!apiKey) return res.status(500).json({ message: "AI not configured" });
+
+      let currentText = "";
+      let contextLabel = "";
+      if (field === "step" && stepIndex !== undefined) {
+        const step = structuredData.steps?.[stepIndex];
+        if (!step) return res.status(400).json({ message: "Step not found" });
+        currentText = JSON.stringify(step);
+        contextLabel = `Step ${stepIndex + 1}: ${step.title}`;
+      } else if (field === "outcome") {
+        currentText = structuredData.outcome || "";
+        contextLabel = "Outcome / Purpose";
+      } else if (field === "safetyNotes") {
+        currentText = structuredData.safetyNotes || "";
+        contextLabel = "Safety Notes";
+      } else if (field === "complianceNotes") {
+        currentText = structuredData.complianceNotes || "";
+        contextLabel = "Compliance Notes";
+      } else if (field === "ppe") {
+        currentText = structuredData.ppe || "";
+        contextLabel = "PPE Requirements";
+      } else if (field === "tools") {
+        currentText = structuredData.tools || "";
+        contextLabel = "Tools Required";
+      } else if (field === "materials") {
+        currentText = structuredData.materials || "";
+        contextLabel = "Materials Required";
+      } else {
+        return res.status(400).json({ message: "Invalid field" });
+      }
+
+      const systemPrompt = field === "step"
+        ? `You are rewriting a step in a landscape company SOP titled "${sop.title}". The user wants changes to ${contextLabel}. Return ONLY valid JSON matching this format: {"title":"...","instruction":"...","why":"...","successCriteria":"...","commonMistakes":"..."}. Keep any fields the user didn't mention. Do NOT add explanation text.`
+        : `You are rewriting the "${contextLabel}" section of a landscape company SOP titled "${sop.title}". Return ONLY the rewritten text, no JSON wrapping, no explanation. Keep similar length and tone unless the user asks otherwise.`;
+
+      const aiRes = await fetch(`${baseURL}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Current content:\n${currentText}\n\nInstruction: ${instruction}` },
+          ],
+          temperature: 0.7,
+        }),
+      });
+      if (!aiRes.ok) return res.status(500).json({ message: "AI request failed" });
+      const aiData = await aiRes.json() as any;
+      const rewritten = aiData.choices?.[0]?.message?.content?.trim();
+      if (!rewritten) return res.status(500).json({ message: "AI returned empty response" });
+
+      res.json({ field, stepIndex, rewritten });
+    } catch (err) {
+      console.error("[SOP AI Rewrite] Error:", err);
+      res.status(500).json({ message: "Error rewriting content" });
+    }
+  });
+
+  app.post("/api/sops/:id/ai-regenerate-image", requireAuth, async (req, res) => {
+    try {
+      if ((req.user as any)?.role !== "Admin") return res.status(403).json({ message: "Admin only" });
+      const sop = await storage.getSop(req.params.id);
+      if (!sop) return res.status(404).json({ message: "SOP not found" });
+      const { imageType, stepIndex, instruction } = req.body;
+      if (!imageType) return res.status(400).json({ message: "imageType required (header or step)" });
+
+      const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+      const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1";
+      const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+      const SIDECAR = "http://127.0.0.1:1106";
+
+      if (!apiKey || !privateDir) return res.status(500).json({ message: "AI or storage not configured" });
+
+      const structuredData = (sop.structuredData || {}) as any;
+      let imagePrompt = "";
+      if (imageType === "header") {
+        imagePrompt = instruction || `Professional landscape crew performing: ${sop.title}`;
+      } else if (imageType === "step" && stepIndex !== undefined) {
+        const step = structuredData.steps?.[stepIndex];
+        if (!step) return res.status(400).json({ message: "Step not found" });
+        imagePrompt = instruction || `Landscape crew performing: ${step.title} - ${step.instruction}`;
+      } else {
+        return res.status(400).json({ message: "Invalid imageType or missing stepIndex" });
+      }
+
+      const fullPrompt = `Landscaping/outdoor work context: ${imagePrompt}. Professional, clear, educational illustration style, high quality.`;
+      const imageApiRes = await fetch(`${baseURL}/images/generations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({ model: "gpt-image-1", prompt: fullPrompt, size: "1024x1024" }),
+      });
+      if (!imageApiRes.ok) return res.status(500).json({ message: "Image generation failed" });
+      const imageData = await imageApiRes.json() as any;
+      const b64 = imageData?.data?.[0]?.b64_json;
+      if (!b64) return res.status(500).json({ message: "No image data returned" });
+
+      const imageBuffer = Buffer.from(b64, "base64");
+      const imageId = crypto.randomUUID();
+      const objectPath = `${privateDir}/sop-media/${imageId}.png`;
+      const pathParts = objectPath.startsWith("/") ? objectPath.slice(1).split("/") : objectPath.split("/");
+      const bucketName = pathParts[0];
+      const objectName = pathParts.slice(1).join("/");
+
+      const signRes = await fetch(`${SIDECAR}/object-storage/signed-object-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bucket_name: bucketName, object_name: objectName, method: "PUT", expires_at: new Date(Date.now() + 900 * 1000).toISOString() }),
+      });
+      if (!signRes.ok) return res.status(500).json({ message: "Storage signing failed" });
+      const { signed_url } = await signRes.json() as { signed_url: string };
+
+      const uploadRes = await fetch(signed_url, { method: "PUT", headers: { "Content-Type": "image/png" }, body: imageBuffer });
+      if (!uploadRes.ok) return res.status(500).json({ message: "Image upload failed" });
+
+      const newImageUrl = `/objects/sop-media/${imageId}.png`;
+      res.json({ imageType, stepIndex, imageUrl: newImageUrl });
+    } catch (err) {
+      console.error("[SOP AI Image] Error:", err);
+      res.status(500).json({ message: "Error regenerating image" });
+    }
+  });
+
   app.delete("/api/sops/:id", requireAuth, async (req, res) => {
     try {
       await storage.deleteSop(req.params.id as string);

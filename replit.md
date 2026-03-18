@@ -17,7 +17,7 @@ The frontend is built with React and TypeScript, leveraging React Query for serv
 ### Feature Specifications
 - **Role-Based Access Control (RBAC)**: Supports Admin, Manager, Crew, Customer, and Master Admin roles with differentiated access.
 - **AI Assistant**: Integrates OpenAI for AI chat with streaming responses, per-user conversation history, a tool library for system functionalities, and full voice capabilities (speech-to-text, text-to-speech with 6 voice options, per-user voice settings).
-- **SOP Management**: Centralized SOPs with AI-powered quiz generation and an adaptive quiz system. Includes an AI-powered SOP Pipeline for topic suggestion and generation.
+- **SOP Management**: Centralized SOPs with AI-powered quiz generation and an adaptive quiz system. Includes an AI-powered SOP Pipeline for topic suggestion and full content generation (with AI images). Features an AI Editor for inline section rewriting and image regeneration with version history for rollback. Routes: `/api/sops/:id/ai-rewrite`, `/api/sops/:id/ai-regenerate-image`, `/api/sops/:id/versions`, `/api/sops/:id/save-version`, `/api/sops/:id/restore-version/:versionId`. Table: `sop_versions`. Component: `client/src/components/SOPAIEditor.tsx`.
 - **Inventory Management**: Comprehensive materials catalog with an AI-powered creation wizard.
 - **Hiring & HR Module**: Full hiring pipeline with a 7-column Kanban board, applicant detail panels, employee records, and HR email templates.
 - **Marketing Campaigns**: Database-backed campaign management with CRUD operations, a summary dashboard, and performance visualization.

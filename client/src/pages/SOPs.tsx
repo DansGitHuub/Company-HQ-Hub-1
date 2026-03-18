@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import SOPBuilder, { type SOPBuilderData } from "@/components/SOPBuilder";
 import SOPTemplateRenderer, { generateSOPPrintHTML, type SOPStructuredData } from "@/components/SOPTemplateRenderer";
+import SOPAIEditor from "@/components/SOPAIEditor";
 import type { Sop, SopCategory, SopTemplate, SopExample, SopDraft, SopQuiz, CompanySettings } from "@shared/schema";
 import { Clock, PlayCircle, Brain, Printer, Download, Mail, Eye, EyeOff, Bold, Italic, Underline, Heading2, Heading3, List, ToggleLeft, ToggleRight, SearchCheck } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -35,6 +36,7 @@ export default function SOPs() {
   const [search, setSearch] = useState("");
   const [selectedSOP, setSelectedSOP] = useState<Sop | null>(null);
   const [editingSOP, setEditingSOP] = useState<Sop | null>(null);
+  const [aiEditingSOP, setAiEditingSOP] = useState<Sop | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createCategoryId, setCreateCategoryId] = useState<string | null>(null);
   const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
@@ -402,6 +404,25 @@ export default function SOPs() {
 
   const isLoading = categoriesLoading || sopsLoading;
 
+  if (aiEditingSOP) {
+    return (
+      <SOPAIEditor
+        sop={aiEditingSOP}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/sops"] });
+          const refetch = async () => {
+            const res = await fetch(`/api/sops`, { credentials: "include" });
+            const allSops = await res.json();
+            const updated = allSops.find((s: any) => s.id === aiEditingSOP.id);
+            if (updated) { setSelectedSOP(updated); setAiEditingSOP(updated); }
+          };
+          refetch();
+        }}
+        onClose={() => { setAiEditingSOP(null); }}
+      />
+    );
+  }
+
   if (editingSOP) {
     return <SOPEditor sop={editingSOP} categories={categories} onSave={(data) => updateMutation.mutate({ id: editingSOP.id, data })} onCancel={() => setEditingSOP(null)} isSaving={updateMutation.isPending} />;
   }
@@ -471,6 +492,11 @@ export default function SOPs() {
             <Button variant="outline" onClick={() => setEditingSOP(selectedSOP)} data-testid="button-edit-sop">
               <Edit className="w-4 h-4 mr-2" /> {t("common.edit")}
             </Button>
+            {user?.role === "Admin" && hasStructuredView && (
+              <Button variant="outline" onClick={() => setAiEditingSOP(selectedSOP)} data-testid="button-ai-edit-sop" className="border-primary/30 text-primary hover:bg-primary/5">
+                <Sparkles className="w-4 h-4 mr-2" /> AI Edit
+              </Button>
+            )}
             <Button variant="outline" onClick={handlePrint} data-testid="button-print-sop">
               <Printer className="w-4 h-4 mr-2" /> {t("common.print")}
             </Button>
