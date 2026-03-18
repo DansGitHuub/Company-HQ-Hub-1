@@ -1318,6 +1318,124 @@ RULES:
     }
   });
 
+  // SOP Pipeline
+  app.get("/api/sop-pipeline", requireAdmin, async (req, res) => {
+    try {
+      const items = await storage.getSopPipelineItems();
+      res.json(items);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching pipeline items" });
+    }
+  });
+
+  app.post("/api/sop-pipeline/suggest", requireAdmin, async (req, res) => {
+    try {
+      const existingSops = await storage.getSops();
+      const categories = await storage.getSopCategories();
+      const pipelineItems = await storage.getSopPipelineItems();
+
+      const existingTitles = existingSops.map(s => s.title);
+      const pipelineTitles = pipelineItems.map(p => p.title);
+      const allExisting = [...existingTitles, ...pipelineTitles];
+
+      const categoryNames = categories.map(c => c.name);
+      const categoryMap = Object.fromEntries(categories.map(c => [c.name, c.id]));
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        temperature: 0.8,
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert in landscape installation and maintenance business operations. Generate SOP (Standard Operating Procedure) topic suggestions for a landscaping company called "Chapin Landscapes".
+
+The company has these SOP categories: ${categoryNames.join(", ")}
+
+These SOPs already exist or are in the pipeline (do NOT suggest these again):
+${allExisting.map(t => `- ${t}`).join("\n")}
+
+Generate 5 new SOP topic suggestions. For each, provide:
+- title: Clear, specific SOP title
+- description: 2-3 sentence description of what this SOP will cover and why it matters
+- category: Must be one of the existing categories listed above
+- sopType: One of: standard, safety, maintenance, training, quality, emergency
+- priority: 1 (low) to 5 (critical)
+
+Focus on practical, actionable procedures that landscape crews actually need. Consider safety, quality, efficiency, and customer satisfaction.
+
+Respond with valid JSON only: { "suggestions": [...] }`
+          },
+          {
+            role: "user",
+            content: req.body.prompt
+              ? `Generate SOP suggestions with this focus: ${req.body.prompt}`
+              : "Generate 5 diverse SOP topic suggestions covering different categories."
+          }
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const parsed = JSON.parse(completion.choices[0].message.content || "{}");
+      const suggestions = parsed.suggestions || [];
+
+      const created: any[] = [];
+      for (const s of suggestions) {
+        const item = await storage.createSopPipelineItem({
+          title: s.title,
+          description: s.description,
+          category: s.category,
+          categoryId: categoryMap[s.category] || null,
+          sopType: s.sopType || "standard",
+          status: "suggested",
+          priority: s.priority || 0,
+          aiContext: { suggestedReason: s.description, generatedAt: new Date().toISOString() },
+          rejectedReason: null,
+          scheduledFor: null,
+        });
+        created.push(item);
+      }
+
+      res.json({ count: created.length, items: created });
+    } catch (err: any) {
+      console.error("[SOP Pipeline] Suggestion error:", err);
+      res.status(500).json({ message: "Error generating suggestions" });
+    }
+  });
+
+  app.patch("/api/sop-pipeline/:id", requireAdmin, async (req, res) => {
+    try {
+      const { status, rejectedReason, title, description, category, categoryId, sopType, priority, scheduledFor } = req.body;
+      const updates: any = {};
+      if (status) {
+        updates.status = status;
+        if (status === "approved") updates.approvedAt = new Date();
+        if (status === "rejected" && rejectedReason) updates.rejectedReason = rejectedReason;
+      }
+      if (title !== undefined) updates.title = title;
+      if (description !== undefined) updates.description = description;
+      if (category !== undefined) updates.category = category;
+      if (categoryId !== undefined) updates.categoryId = categoryId;
+      if (sopType !== undefined) updates.sopType = sopType;
+      if (priority !== undefined) updates.priority = priority;
+      if (scheduledFor !== undefined) updates.scheduledFor = scheduledFor ? new Date(scheduledFor) : null;
+
+      const updated = await storage.updateSopPipelineItem(req.params.id, updates);
+      if (!updated) return res.status(404).json({ message: "Pipeline item not found" });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating pipeline item" });
+    }
+  });
+
+  app.delete("/api/sop-pipeline/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteSopPipelineItem(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting pipeline item" });
+    }
+  });
+
   // SOP Categories
   app.get("/api/sop-categories", requireAuth, async (req, res) => {
     try {

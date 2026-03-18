@@ -58,12 +58,14 @@ import {
   Globe,
   Wrench,
   Star,
-  Lightbulb
+  Lightbulb,
+  Zap
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
 import ConversationLogViewer from "@/components/ConversationLogViewer";
 import SystemStatusReport from "@/components/SystemStatusReport";
+import SOPPipeline from "@/components/SOPPipeline";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -108,6 +110,7 @@ function AdminCategoryNav({ pendingRequests, isMasterAdmin, t }: { pendingReques
       label: "Content",
       icon: FileText,
       tabs: [
+        { value: "sop-pipeline", label: "SOP Pipeline", icon: Zap },
         { value: "documents", label: t("employees.documents"), icon: FileText },
         { value: "shared-links", label: t("common.share"), icon: ExternalLink },
         { value: "help-reports", label: t("nav.help"), icon: HelpCircle },
@@ -1137,6 +1140,10 @@ export default function AdminPanel() {
 
         <TabsContent value="ai-logs" className="mt-6">
           <ConversationLogViewer />
+        </TabsContent>
+
+        <TabsContent value="sop-pipeline" className="mt-6">
+          <SOPPipeline />
         </TabsContent>
 
         <TabsContent value="documents" className="mt-6">

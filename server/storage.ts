@@ -105,7 +105,8 @@ import {
   documentLinks, type DocumentLink, type InsertDocumentLink,
   documentShares, type DocumentShare, type InsertDocumentShare,
   onboardingFormSubmissions, type OnboardingFormSubmission, type InsertOnboardingFormSubmission,
-  estimates, type Estimate, type InsertEstimate
+  estimates, type Estimate, type InsertEstimate,
+  sopPipeline, type SopPipeline, type InsertSopPipeline
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ilike, or, and, desc, isNull, notInArray, sql } from "drizzle-orm";
@@ -727,6 +728,12 @@ export interface IStorage {
   createEstimate(data: InsertEstimate): Promise<Estimate>;
   updateEstimate(id: string, data: Partial<InsertEstimate>): Promise<Estimate | undefined>;
   deleteEstimate(id: string): Promise<boolean>;
+
+  getSopPipelineItems(): Promise<SopPipeline[]>;
+  getSopPipelineItem(id: string): Promise<SopPipeline | undefined>;
+  createSopPipelineItem(item: InsertSopPipeline): Promise<SopPipeline>;
+  updateSopPipelineItem(id: string, updates: Partial<SopPipeline>): Promise<SopPipeline | undefined>;
+  deleteSopPipelineItem(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3375,6 +3382,30 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEstimate(id: string): Promise<boolean> {
     const result = await db.delete(estimates).where(eq(estimates.id, id));
+    return true;
+  }
+
+  async getSopPipelineItems(): Promise<SopPipeline[]> {
+    return db.select().from(sopPipeline).orderBy(desc(sopPipeline.suggestedAt));
+  }
+
+  async getSopPipelineItem(id: string): Promise<SopPipeline | undefined> {
+    const [item] = await db.select().from(sopPipeline).where(eq(sopPipeline.id, id));
+    return item;
+  }
+
+  async createSopPipelineItem(item: InsertSopPipeline): Promise<SopPipeline> {
+    const [created] = await db.insert(sopPipeline).values(item).returning();
+    return created;
+  }
+
+  async updateSopPipelineItem(id: string, updates: Partial<SopPipeline>): Promise<SopPipeline | undefined> {
+    const [updated] = await db.update(sopPipeline).set(updates).where(eq(sopPipeline.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSopPipelineItem(id: string): Promise<boolean> {
+    await db.delete(sopPipeline).where(eq(sopPipeline.id, id));
     return true;
   }
 }

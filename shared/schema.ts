@@ -2576,3 +2576,32 @@ export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
 
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLog.$inferSelect;
+
+export const sopPipeline = pgTable("sop_pipeline", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category").notNull(),
+  categoryId: varchar("category_id", { length: 36 }).references(() => sopCategories.id),
+  sopType: text("sop_type").notNull().default("standard"),
+  status: text("status").notNull().default("suggested"),
+  priority: integer("priority").notNull().default(0),
+  aiContext: jsonb("ai_context"),
+  rejectedReason: text("rejected_reason"),
+  generatedSopId: varchar("generated_sop_id", { length: 36 }).references(() => sops.id),
+  suggestedAt: timestamp("suggested_at").defaultNow(),
+  approvedAt: timestamp("approved_at"),
+  scheduledFor: timestamp("scheduled_for"),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertSopPipelineSchema = createInsertSchema(sopPipeline).omit({
+  id: true,
+  suggestedAt: true,
+  approvedAt: true,
+  completedAt: true,
+  generatedSopId: true,
+});
+
+export type InsertSopPipeline = z.infer<typeof insertSopPipelineSchema>;
+export type SopPipeline = typeof sopPipeline.$inferSelect;
