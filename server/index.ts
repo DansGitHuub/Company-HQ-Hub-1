@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { seedUsers, seedSampleData } from "./seed";
+import { seedUsers, seedSampleData, seedDevelopmentTracker } from "./seed";
 import { startMaintenanceScheduler } from "./maintenanceScheduler";
 import { runEquipmentMigration } from "./equipmentMigration";
 import { runTaskMigration } from "./taskMigration";
@@ -97,6 +97,7 @@ app.use((req, res, next) => {
   await seedUsers();
   await seedSampleData();
   await seedOemTemplates();
+  await seedDevelopmentTracker();
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

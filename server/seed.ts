@@ -351,6 +351,96 @@ async function seedSopTopics(): Promise<void> {
   }
 }
 
+export async function seedDevelopmentTracker(): Promise<void> {
+  try {
+    const all = await storage.getDevelopmentItems();
+
+    const CORRECT_ENTRIES: Array<{
+      featureName: string;
+      category: string;
+      status: string;
+      priority: string;
+      percentComplete: number;
+      description: string;
+      currentState: string;
+      remainingWork: string;
+      blockers: string;
+      suggestions: string;
+      additionalInfo: string;
+    }> = [
+      {
+        featureName: "Google Calendar Integration",
+        category: "integration",
+        status: "completed",
+        priority: "high",
+        percentComplete: 100,
+        description: "OAuth-based Google Calendar sync — two-way event push/pull with ±1 year range and full pagination.",
+        currentState: "Fully implemented and working. OAuth flow with Google, connect/disconnect per user, auto-push CompanyHQ events to Google Calendar, Sync Now button that pulls all Google events into CompanyHQ (covering ±1 year from today with full pagination up to 2500 events per page). Google events shown in amber color on the calendar. GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI all configured and active.",
+        remainingWork: "[]",
+        blockers: "[]",
+        suggestions: "[]",
+        additionalInfo: "All credentials configured. Redirect URI registered in Google Cloud Console. OAuth consent screen set up for Chapin Landscapes. Calendar API enabled in Google Cloud project.",
+      },
+      {
+        featureName: "Email Notifications - Resend Integration",
+        category: "integration",
+        status: "in_progress",
+        priority: "medium",
+        percentComplete: 80,
+        description: "Transactional email system via Resend using verified chapinlandscapes.com domain.",
+        currentState: "Five email functions fully built and connected:\n1. Password Reset Emails\n2. SOP Email Sharing\n3. Equipment Maintenance Reminders\n4. Automated Maintenance Scheduler (hourly background check)\n5. New Hire Account Credentials Email — sent automatically when admin creates a CompanyHQ login for a hired candidate, includes username, temporary password, and login link.\n\nAll use verified domain: noreply@chapinlandscapes.com",
+        remainingWork: JSON.stringify([
+          "Job Assignment Email Alerts - notify crew members when assigned to new jobs",
+          "Customer Communication Emails - quotes, invoices, and project updates to customers",
+          "Internal Team Announcements via Email - broadcast important updates to staff",
+        ]),
+        blockers: "[]",
+        suggestions: JSON.stringify([
+          "Consider adding email templates that match company branding settings",
+          "Add email delivery tracking/logs in Admin Panel",
+          "Consider adding email preferences per user (opt-in/opt-out)",
+        ]),
+        additionalInfo: "Resend DNS is verified and connected. Sender domain: chapinlandscapes.com. Current email functions are in server/email.ts.",
+      },
+      {
+        featureName: "Hiring Pipeline Automation",
+        category: "core",
+        status: "in_progress",
+        priority: "high",
+        percentComplete: 70,
+        description: "Full recruitment pipeline with kanban board, applicant tracking, employee creation, and new hire account provisioning.",
+        currentState: "Substantial hiring module built. Full 7-column Kanban pipeline (New Application, Review, Phone Screen, Interview, Offer Extended, Hired, Not a Fit). Detailed applicant panels with candidate info, notes, documents, and history. Employee records with full HR profiles. HR email templates. Document upload per applicant. New hire user account provisioning: 'Create Account' button on Hired candidates auto-generates a CompanyHQ login (Crew role), links it to both candidate and employee records, sends welcome email with credentials, shows Account Active badge once provisioned.",
+        remainingWork: JSON.stringify([
+          "Create public job application submission page for candidates",
+          "Implement automated stage transition triggers",
+          "Add email notifications when candidates move pipeline stages",
+          "Create interview scheduling integration",
+          "Build candidate scoring and ranking system",
+          "Add hiring analytics and reports dashboard",
+        ]),
+        blockers: "[]",
+        suggestions: JSON.stringify([
+          "Form builder can create custom application forms",
+          "Email notifications can use existing Resend integration",
+          "Could add offer letter generation via document system",
+        ]),
+        additionalInfo: "Form builder feature can be leveraged for application forms. Resend email integration already set up. Employee records table supports full HR profiles.",
+      },
+    ];
+
+    for (const entry of CORRECT_ENTRIES) {
+      const existing = all.find((i: any) => i.featureName === entry.featureName);
+      if (existing) {
+        await storage.updateDevelopmentItem(existing.id, entry as any);
+      }
+    }
+
+    console.log("[seed] Development tracker entries verified and corrected");
+  } catch (err) {
+    console.error("[seed] Error correcting development tracker:", err);
+  }
+}
+
 export async function seedSampleData(): Promise<void> {
   try {
     await seedSopTopics();
