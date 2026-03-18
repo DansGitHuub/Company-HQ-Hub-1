@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -40,8 +42,10 @@ import {
   AlertTriangle,
   Play,
   ExternalLink,
+  Settings,
+  Timer,
 } from "lucide-react";
-import type { SopPipeline, SopCategory } from "@shared/schema";
+import type { SopPipeline, SopCategory, SopPipelineSettings } from "@shared/schema";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   suggested: { label: "Suggested", color: "text-blue-700", bg: "bg-blue-100" },
@@ -92,6 +96,26 @@ export default function SOPPipeline() {
 
   const { data: categories = [] } = useQuery<SopCategory[]>({
     queryKey: ["/api/sop-categories"],
+  });
+
+  const { data: pipelineSettings } = useQuery<SopPipelineSettings>({
+    queryKey: ["/api/sop-pipeline/settings"],
+  });
+
+  const [showScheduleSettings, setShowScheduleSettings] = useState(false);
+
+  const settingsMutation = useMutation({
+    mutationFn: async (updates: Partial<SopPipelineSettings>) => {
+      const res = await apiRequest("PATCH", "/api/sop-pipeline/settings", updates);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sop-pipeline/settings"] });
+      toast({ title: "Schedule settings updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update settings", variant: "destructive" });
+    },
   });
 
   const suggestMutation = useMutation({
@@ -253,6 +277,84 @@ export default function SOPPipeline() {
           </CardContent>
         </Card>
       </div>
+
+      <Card data-testid="card-schedule-settings">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Timer className="h-5 w-5 text-purple-600" />
+              <div>
+                <p className="font-medium text-sm">Auto-Generation Schedule</p>
+                <p className="text-xs text-muted-foreground">
+                  {pipelineSettings?.autoGenerateEnabled
+                    ? `Generating ${pipelineSettings.maxPerRun} SOP(s) ${pipelineSettings.generateFrequency}${pipelineSettings.nextScheduledRun ? ` — next run: ${new Date(pipelineSettings.nextScheduledRun).toLocaleString()}` : ""}`
+                    : "Disabled — approved topics require manual generation"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={pipelineSettings?.autoGenerateEnabled || false}
+                  onCheckedChange={(checked) => settingsMutation.mutate({ autoGenerateEnabled: checked } as any)}
+                  data-testid="switch-auto-generate"
+                />
+                <Label className="text-sm">{pipelineSettings?.autoGenerateEnabled ? "On" : "Off"}</Label>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowScheduleSettings(!showScheduleSettings)}
+                data-testid="button-schedule-settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          {showScheduleSettings && (
+            <div className="mt-4 pt-4 border-t grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm">Frequency</Label>
+                <Select
+                  value={pipelineSettings?.generateFrequency || "daily"}
+                  onValueChange={(val) => settingsMutation.mutate({ generateFrequency: val } as any)}
+                >
+                  <SelectTrigger data-testid="select-frequency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hourly">Every Hour</SelectItem>
+                    <SelectItem value="daily">Once Daily</SelectItem>
+                    <SelectItem value="weekly">Once Weekly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">SOPs Per Run</Label>
+                <Select
+                  value={String(pipelineSettings?.maxPerRun || 1)}
+                  onValueChange={(val) => settingsMutation.mutate({ maxPerRun: parseInt(val) } as any)}
+                >
+                  <SelectTrigger data-testid="select-max-per-run">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 SOP</SelectItem>
+                    <SelectItem value="2">2 SOPs</SelectItem>
+                    <SelectItem value="3">3 SOPs</SelectItem>
+                    <SelectItem value="5">5 SOPs</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {pipelineSettings?.lastAutoRun && (
+                <div className="col-span-full text-xs text-muted-foreground">
+                  Last auto-run: {new Date(pipelineSettings.lastAutoRun).toLocaleString()}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card data-testid="card-suggest-topics">
         <CardHeader>

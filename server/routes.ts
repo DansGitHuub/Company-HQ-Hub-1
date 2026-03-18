@@ -1596,6 +1596,33 @@ Respond with valid JSON only: { "suggestions": [...] }`
     }
   });
 
+  app.get("/api/sop-pipeline/settings", requireAdmin, async (req, res) => {
+    try {
+      const settings = await storage.getSopPipelineSettings();
+      res.json(settings || {});
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching pipeline settings" });
+    }
+  });
+
+  app.patch("/api/sop-pipeline/settings", requireAdmin, async (req, res) => {
+    try {
+      const { autoGenerateEnabled, generateFrequency, maxPerRun } = req.body;
+      const updates: any = {};
+      if (autoGenerateEnabled !== undefined) updates.autoGenerateEnabled = autoGenerateEnabled;
+      if (generateFrequency !== undefined) updates.generateFrequency = generateFrequency;
+      if (maxPerRun !== undefined) updates.maxPerRun = Math.min(Math.max(maxPerRun, 1), 5);
+      if (autoGenerateEnabled === true) {
+        const freqMs: Record<string, number> = { hourly: 3600000, daily: 86400000, weekly: 604800000 };
+        updates.nextScheduledRun = new Date(Date.now() + (freqMs[generateFrequency || "daily"] || freqMs.daily));
+      }
+      const settings = await storage.updateSopPipelineSettings(updates);
+      res.json(settings);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating pipeline settings" });
+    }
+  });
+
   app.patch("/api/sop-pipeline/:id", requireAdmin, async (req, res) => {
     try {
       const { status, rejectedReason, title, description, category, categoryId, sopType, priority, scheduledFor } = req.body;

@@ -10,6 +10,7 @@ import { runAssistantMigration } from "./assistantMigration";
 import { runQuizAdaptiveMigration } from "./quizMigration";
 import { runNotificationMigration } from "./notificationMigration";
 import { startTaskScheduler } from "./taskScheduler";
+import { startSopPipelineScheduler } from "./sopPipelineScheduler";
 import { seedOemTemplates } from "./equipmentSeed";
 import { runSharedLinksMigration } from "./sharedLinksMigration";
 import { runDocumentMigration } from "./documentMigration";
@@ -135,6 +136,7 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
       startMaintenanceScheduler();
       startTaskScheduler();
+      startSopPipelineScheduler();
     },
   );
 })();

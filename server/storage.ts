@@ -3,6 +3,7 @@ import {
   sopCategories, type SopCategory, type InsertSopCategory,
   sops, type Sop, type InsertSop,
   sopVersions, type SopVersion, type InsertSopVersion,
+  sopPipelineSettings, type SopPipelineSettings,
   sopTemplates, type SopTemplate, type InsertSopTemplate,
   sopExamples, type SopExample, type InsertSopExample,
   materialCategories, type MaterialCategory, type InsertMaterialCategory,
@@ -740,6 +741,9 @@ export interface IStorage {
   getSopVersions(sopId: string): Promise<SopVersion[]>;
   getSopVersion(id: string): Promise<SopVersion | undefined>;
   createSopVersion(version: InsertSopVersion): Promise<SopVersion>;
+
+  getSopPipelineSettings(): Promise<SopPipelineSettings | undefined>;
+  updateSopPipelineSettings(updates: Partial<SopPipelineSettings>): Promise<SopPipelineSettings | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3432,6 +3436,18 @@ export class DatabaseStorage implements IStorage {
   async createSopVersion(version: InsertSopVersion): Promise<SopVersion> {
     const [newVersion] = await db.insert(sopVersions).values(version).returning();
     return newVersion;
+  }
+
+  async getSopPipelineSettings(): Promise<SopPipelineSettings | undefined> {
+    const [settings] = await db.select().from(sopPipelineSettings).limit(1);
+    return settings || undefined;
+  }
+
+  async updateSopPipelineSettings(updates: Partial<SopPipelineSettings>): Promise<SopPipelineSettings | undefined> {
+    const existing = await this.getSopPipelineSettings();
+    if (!existing) return undefined;
+    const [updated] = await db.update(sopPipelineSettings).set({ ...updates, updatedAt: new Date() }).where(eq(sopPipelineSettings.id, existing.id)).returning();
+    return updated || undefined;
   }
 }
 

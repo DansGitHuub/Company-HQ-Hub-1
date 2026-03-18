@@ -2621,3 +2621,15 @@ export const insertSopPipelineSchema = createInsertSchema(sopPipeline).omit({
 
 export type InsertSopPipeline = z.infer<typeof insertSopPipelineSchema>;
 export type SopPipeline = typeof sopPipeline.$inferSelect;
+
+export const sopPipelineSettings = pgTable("sop_pipeline_settings", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  autoGenerateEnabled: boolean("auto_generate_enabled").notNull().default(false),
+  generateFrequency: text("generate_frequency").notNull().default("daily"),
+  maxPerRun: integer("max_per_run").notNull().default(1),
+  lastAutoRun: timestamp("last_auto_run"),
+  nextScheduledRun: timestamp("next_scheduled_run"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type SopPipelineSettings = typeof sopPipelineSettings.$inferSelect;
