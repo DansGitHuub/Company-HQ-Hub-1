@@ -3523,7 +3523,9 @@ Generate detailed information for this landscaping material.`;
 
   app.delete("/api/jobs/:id", requireAuth, async (req, res) => {
     try {
+      const job = await storage.getJob(req.params.id as string);
       await storage.deleteJob(req.params.id as string);
+      logActivity("job_deleted", `Work card "${job?.client || "Unknown"}" was deleted`, "/jobs", req.user?.id);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Error deleting job" });
@@ -3545,6 +3547,7 @@ Generate detailed information for this landscaping material.`;
         jobId: req.params.id as string,
         ...req.body,
       });
+      logActivity("job_document_uploaded", `Document "${req.body.name || "file"}" uploaded for job`, "/jobs", req.user?.id);
       res.status(201).json(doc);
     } catch (err) {
       res.status(500).json({ message: "Error creating job document" });
@@ -3572,6 +3575,7 @@ Generate detailed information for this landscaping material.`;
   app.post("/api/job-pipeline-tabs", requireAuth, async (req, res) => {
     try {
       const tab = await storage.createJobPipelineTab(req.body);
+      logActivity("pipeline_tab_created", `Pipeline tab "${req.body.name}" created`, "/jobs", req.user?.id);
       res.status(201).json(tab);
     } catch (err) {
       res.status(500).json({ message: "Error creating job pipeline tab" });
@@ -3582,6 +3586,7 @@ Generate detailed information for this landscaping material.`;
     try {
       const tab = await storage.updateJobPipelineTab(req.params.id as string, req.body);
       if (!tab) return res.status(404).json({ message: "Tab not found" });
+      logActivity("pipeline_tab_updated", `Pipeline tab renamed to "${req.body.name}"`, "/jobs", req.user?.id);
       res.json(tab);
     } catch (err) {
       res.status(500).json({ message: "Error updating job pipeline tab" });
@@ -3590,7 +3595,19 @@ Generate detailed information for this landscaping material.`;
 
   app.delete("/api/job-pipeline-tabs/:id", requireAuth, async (req, res) => {
     try {
+      const tab = await storage.getJobPipelineTab(req.params.id as string);
+      if (tab) {
+        const allJobs = await storage.getJobs();
+        const orphanedJobs = allJobs.filter(j => j.category === tab.name);
+        for (const job of orphanedJobs) {
+          await storage.updateJob(job.id, { category: "Install" });
+        }
+        if (orphanedJobs.length > 0) {
+          logActivity("jobs_reassigned", `${orphanedJobs.length} job(s) reassigned from "${tab.name}" to "Install"`, "/jobs", req.user?.id);
+        }
+      }
       await storage.deleteJobPipelineTab(req.params.id as string);
+      logActivity("pipeline_tab_deleted", `Pipeline tab "${tab?.name || "Unknown"}" deleted`, "/jobs", req.user?.id);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Error deleting job pipeline tab" });
@@ -4186,10 +4203,11 @@ Generate detailed information for this landscaping material.`;
       const estimate = await storage.getEstimate(req.params.id);
       if (!estimate) return res.status(404).json({ message: "Estimate not found" });
 
+      const inferredCategory = estimate.serviceType === "Maintenance" ? "Maintenance" : "Install";
       const job = await storage.createJob({
         client: estimate.clientName,
         type: estimate.serviceType,
-        category: req.body.category || "Install",
+        category: req.body.category || inferredCategory,
         stage: "Lead",
         value: estimate.estimatedValue || 0,
         address: estimate.propertyAddress || undefined,

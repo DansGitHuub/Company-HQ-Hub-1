@@ -211,6 +211,7 @@ export interface IStorage {
   deleteJobDocument(id: string): Promise<boolean>;
   
   getJobPipelineTabs(): Promise<JobPipelineTab[]>;
+  getJobPipelineTab(id: string): Promise<JobPipelineTab | undefined>;
   createJobPipelineTab(tab: InsertJobPipelineTab): Promise<JobPipelineTab>;
   updateJobPipelineTab(id: string, updates: Partial<JobPipelineTab>): Promise<JobPipelineTab | undefined>;
   deleteJobPipelineTab(id: string): Promise<boolean>;
@@ -1127,7 +1128,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createJob(job: InsertJob): Promise<Job> {
-    const [newJob] = await db.insert(jobs).values(job as any).returning();
+    const [newJob] = await db.insert(jobs).values(job).returning();
     return newJob;
   }
 
@@ -1162,6 +1163,11 @@ export class DatabaseStorage implements IStorage {
 
   async getJobPipelineTabs(): Promise<JobPipelineTab[]> {
     return db.select().from(jobPipelineTabs);
+  }
+
+  async getJobPipelineTab(id: string): Promise<JobPipelineTab | undefined> {
+    const [tab] = await db.select().from(jobPipelineTabs).where(eq(jobPipelineTabs.id, id));
+    return tab || undefined;
   }
 
   async createJobPipelineTab(tab: InsertJobPipelineTab): Promise<JobPipelineTab> {

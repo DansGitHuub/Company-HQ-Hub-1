@@ -200,7 +200,7 @@ function SoldJobsBoard() {
     if (isNewJob) {
       createMutation.mutate(editForm);
     } else if (selectedJob) {
-      const { id, createdAt, updatedAt, ...updateData } = editForm as any;
+      const { id: _id, createdAt: _ca, updatedAt: _ua, ...updateData } = editForm as Partial<Job> & { id?: string; createdAt?: unknown; updatedAt?: unknown };
       updateMutation.mutate({ id: selectedJob.id, data: updateData });
     }
   };
@@ -484,15 +484,20 @@ function SoldJobsBoard() {
                 <div className="space-y-2">
                   <Label>{t("common.category")}</Label>
                   <Select
-                    value={editForm.category || "Project"}
+                    value={editForm.category || "Install"}
                     onValueChange={v => setEditForm({ ...editForm, category: v as JobCategory })}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Project">{t("jobs.project")}</SelectItem>
+                      <SelectItem value="Install">{t("jobs.install")}</SelectItem>
                       <SelectItem value="Maintenance">{t("jobs.maintenance")}</SelectItem>
+                      {pipelineTabs
+                        .filter(tab => !["Install", "Maintenance"].includes(tab.name))
+                        .map(tab => (
+                          <SelectItem key={tab.name} value={tab.name}>{tab.name}</SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -974,6 +979,7 @@ function EstimatesBoard() {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setSelectedEstimate(estimate);
+                                      setConvertCategory(estimate.serviceType === "Maintenance" ? "Maintenance" : "Install");
                                       setShowConvertDialog(true);
                                     }}
                                     data-testid={`button-convert-${estimate.id}`}
