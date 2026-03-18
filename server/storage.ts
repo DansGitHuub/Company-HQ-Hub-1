@@ -2,6 +2,7 @@ import {
   users, type User, type InsertUser,
   sopCategories, type SopCategory, type InsertSopCategory,
   sops, type Sop, type InsertSop,
+  sopVersions, type SopVersion, type InsertSopVersion,
   sopTemplates, type SopTemplate, type InsertSopTemplate,
   sopExamples, type SopExample, type InsertSopExample,
   materialCategories, type MaterialCategory, type InsertMaterialCategory,
@@ -735,6 +736,10 @@ export interface IStorage {
   createSopPipelineItem(item: InsertSopPipeline): Promise<SopPipeline>;
   updateSopPipelineItem(id: string, updates: Partial<SopPipeline>): Promise<SopPipeline | undefined>;
   deleteSopPipelineItem(id: string): Promise<boolean>;
+
+  getSopVersions(sopId: string): Promise<SopVersion[]>;
+  getSopVersion(id: string): Promise<SopVersion | undefined>;
+  createSopVersion(version: InsertSopVersion): Promise<SopVersion>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3413,6 +3418,20 @@ export class DatabaseStorage implements IStorage {
   async deleteSopPipelineItem(id: string): Promise<boolean> {
     await db.delete(sopPipeline).where(eq(sopPipeline.id, id));
     return true;
+  }
+
+  async getSopVersions(sopId: string): Promise<SopVersion[]> {
+    return db.select().from(sopVersions).where(eq(sopVersions.sopId, sopId)).orderBy(sql`${sopVersions.versionNumber} DESC`);
+  }
+
+  async getSopVersion(id: string): Promise<SopVersion | undefined> {
+    const [version] = await db.select().from(sopVersions).where(eq(sopVersions.id, id));
+    return version || undefined;
+  }
+
+  async createSopVersion(version: InsertSopVersion): Promise<SopVersion> {
+    const [newVersion] = await db.insert(sopVersions).values(version).returning();
+    return newVersion;
   }
 }
 

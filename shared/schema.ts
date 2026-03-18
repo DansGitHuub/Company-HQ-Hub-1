@@ -92,6 +92,22 @@ export const insertSopSchema = createInsertSchema(sops).pick({
 export type InsertSop = z.infer<typeof insertSopSchema>;
 export type Sop = typeof sops.$inferSelect;
 
+export const sopVersions = pgTable("sop_versions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  sopId: varchar("sop_id", { length: 36 }).notNull().references(() => sops.id, { onDelete: "cascade" }),
+  versionNumber: integer("version_number").notNull().default(1),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  structuredData: jsonb("structured_data"),
+  savedBy: varchar("saved_by", { length: 36 }).references(() => users.id),
+  changeSummary: text("change_summary"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSopVersionSchema = createInsertSchema(sopVersions).omit({ id: true, createdAt: true });
+export type InsertSopVersion = z.infer<typeof insertSopVersionSchema>;
+export type SopVersion = typeof sopVersions.$inferSelect;
+
 // SOP Templates for quick creation
 export const sopTemplates = pgTable("sop_templates", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
