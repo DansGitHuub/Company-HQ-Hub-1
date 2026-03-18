@@ -210,6 +210,43 @@ export async function sendHiringWelcomeEmail(
   `);
 }
 
+export async function sendNewHireAccountEmail(
+  toEmail: string,
+  employeeName: string,
+  username: string,
+  tempPassword: string,
+  position: string,
+  language?: string
+) {
+  const appUrl = getAppUrl();
+  const t = (key: string) => emailT(language, key);
+  return sendEmail(toEmail, `Your Company HQ Account is Ready — ${escapeHtml(position)}`, `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #166534; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Chapin Landscapes</h1>
+        <p style="color: #bbf7d0; margin: 6px 0 0; font-size: 14px;">Company HQ — Employee Portal</p>
+      </div>
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937;">Welcome to the team, ${escapeHtml(employeeName)}!</h2>
+        <p style="color: #4b5563; line-height: 1.6;">Your Company HQ account has been created. You can log in to complete your onboarding forms and access your employee portal.</p>
+        <div style="background-color: #dcfce7; border: 1px solid #16a34a; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #166534; margin: 0 0 12px 0;">Your Login Credentials</h3>
+          <p style="margin: 6px 0; color: #374151;"><strong>Username:</strong> <code style="background:#fff; padding:2px 6px; border-radius:4px; font-size:15px;">${escapeHtml(username)}</code></p>
+          <p style="margin: 6px 0; color: #374151;"><strong>Temporary Password:</strong> <code style="background:#fff; padding:2px 6px; border-radius:4px; font-size:15px;">${escapeHtml(tempPassword)}</code></p>
+        </div>
+        <p style="color: #6b7280; font-size: 13px;">Please log in and change your password on your first visit. Keep these credentials private.</p>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${appUrl}" style="background-color: #166534; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">Log In to Company HQ</a>
+        </div>
+        <p style="color: #4b5563; font-size: 14px;">Once logged in, head to your <strong>Onboarding</strong> section to complete your new hire paperwork.</p>
+      </div>
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+        <p>Chapin Landscapes — HR Team</p>
+      </div>
+    </div>
+  `);
+}
+
 export async function sendCustomerWelcomeEmail(
   toEmail: string,
   customerName: string,

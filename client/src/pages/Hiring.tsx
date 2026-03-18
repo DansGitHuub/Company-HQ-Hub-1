@@ -16,7 +16,8 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import {
   Plus, Phone, Mail, MapPin, FileText, Trash2, User, Star, Clock,
   MessageSquare, Calendar, ChevronRight, X, GripVertical, Upload,
-  Send, CheckCircle2, Circle, AlertCircle, ClipboardList, Users
+  Send, CheckCircle2, Circle, AlertCircle, ClipboardList, Users,
+  UserPlus, Copy, Eye, EyeOff, ShieldCheck
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -379,16 +380,47 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
   onTabChange: (tab: string) => void;
 }) {
   const { t } = useTranslation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showAccountDialog, setShowAccountDialog] = useState(false);
+  const [accountInfo, setAccountInfo] = useState<{ username: string; tempPassword: string; emailSent: boolean } | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const showOnboarding = candidate.stage === "Hired";
   const availableTabs = ["profile", "documents", "communication", "interview"];
   if (showOnboarding) availableTabs.push("onboarding");
 
+  const createAccountMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/candidates/${candidate.id}/create-account`, {});
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to create account");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
+      setAccountInfo({ username: data.username, tempPassword: data.tempPassword, emailSent: data.emailSent });
+      setShowPassword(false);
+      setShowAccountDialog(true);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Account creation failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({ title: `${label} copied to clipboard` });
+    });
+  };
+
   return (
     <div className="fixed inset-y-0 right-0 w-full max-w-xl bg-background border-l shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300" data-testid="applicant-detail-panel">
       <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary flex-shrink-0">
             {getInitials(candidate.name)}
           </div>
           <div>
@@ -398,8 +430,27 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
           <Badge className={`${STAGE_COLORS[candidate.stage]} text-white ml-2`}>
             {candidate.stage}
           </Badge>
+          {candidate.stage === "Hired" && candidate.userId && (
+            <Badge className="bg-blue-600 text-white flex items-center gap-1">
+              <ShieldCheck className="h-3 w-3" />
+              Account Active
+            </Badge>
+          )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {candidate.stage === "Hired" && !candidate.userId && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex items-center gap-1.5 text-green-700 border-green-300 hover:bg-green-50"
+              onClick={() => createAccountMutation.mutate()}
+              disabled={createAccountMutation.isPending}
+              data-testid="button-create-account"
+            >
+              <UserPlus className="h-4 w-4" />
+              {createAccountMutation.isPending ? "Creating…" : "Create Account"}
+            </Button>
+          )}
           <Button variant="ghost" size="icon" onClick={() => setShowDeleteConfirm(true)} data-testid="button-delete-candidate">
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
@@ -408,6 +459,79 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
           </Button>
         </div>
       </div>
+
+      {/* Account Created Dialog */}
+      <Dialog open={showAccountDialog} onOpenChange={setShowAccountDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-700">
+              <ShieldCheck className="h-5 w-5" />
+              Account Created
+            </DialogTitle>
+            <DialogDescription>
+              A Company HQ account has been created for <strong>{candidate.name}</strong>.
+              {accountInfo?.emailSent
+                ? " Their login credentials have been sent to their email."
+                : " No email on file — share these credentials directly."}
+            </DialogDescription>
+          </DialogHeader>
+          {accountInfo && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Username</p>
+                    <p className="font-mono font-semibold text-sm">{accountInfo.username}</p>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => copyToClipboard(accountInfo.username, "Username")}
+                    data-testid="button-copy-username"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground mb-0.5">Temporary Password</p>
+                    <p className="font-mono font-semibold text-sm tracking-wider">
+                      {showPassword ? accountInfo.tempPassword : "••••••••••"}
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={() => setShowPassword(!showPassword)}
+                      data-testid="button-toggle-password"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={() => copyToClipboard(accountInfo.tempPassword, "Password")}
+                      data-testid="button-copy-password"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                The new hire should log in and change their password on first use. Their role is set to <strong>Crew</strong> and their onboarding checklist is ready.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setShowAccountDialog(false)} data-testid="button-close-account-dialog">Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>

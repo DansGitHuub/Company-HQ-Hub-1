@@ -1,6 +1,39 @@
 import type { Express, RequestHandler } from "express";
 import { storage } from "./storage";
-import { sendHiringStageEmail, sendHiringWelcomeEmail } from "./email";
+import { sendHiringStageEmail, sendHiringWelcomeEmail, sendNewHireAccountEmail } from "./email";
+import { hashPassword } from "./auth";
+
+function generateTempPassword(): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghjkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const special = "!@#$";
+  const chars = [
+    upper[Math.floor(Math.random() * upper.length)],
+    upper[Math.floor(Math.random() * upper.length)],
+    lower[Math.floor(Math.random() * lower.length)],
+    lower[Math.floor(Math.random() * lower.length)],
+    lower[Math.floor(Math.random() * lower.length)],
+    lower[Math.floor(Math.random() * lower.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    special[Math.floor(Math.random() * special.length)],
+  ];
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}
+
+function slugifyName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim()
+    .replace(/\s+/g, ".");
+}
 
 const ONBOARDING_EMPLOYEE_ITEMS = [
   "Fill out W-4",
@@ -512,6 +545,85 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
       if (!updated) return res.status(404).json({ message: "Template not found" });
       res.json(updated);
     } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Create CompanyHQ user account for a hired candidate
+  app.post("/api/candidates/:id/create-account", requireAuth, requireManagerAccess, async (req, res) => {
+    try {
+      const candidateId = req.params.id;
+      const candidate = await storage.getCandidate(candidateId);
+      if (!candidate) return res.status(404).json({ message: "Candidate not found" });
+      if (candidate.stage !== "Hired") {
+        return res.status(400).json({ message: "Account can only be created for hired candidates" });
+      }
+      if (candidate.userId) {
+        return res.status(400).json({ message: "This candidate already has an account" });
+      }
+
+      // Build a unique username from their name
+      const baseUsername = slugifyName(candidate.name) || "crew.member";
+      let username = baseUsername;
+      let suffix = 1;
+      while (await storage.getUserByUsername(username)) {
+        username = `${baseUsername}${suffix++}`;
+      }
+
+      // Check email uniqueness if email exists
+      if (candidate.email) {
+        const existingByEmail = await storage.getUserByEmail(candidate.email);
+        if (existingByEmail) {
+          return res.status(400).json({ message: "A user with this email already exists" });
+        }
+      }
+
+      const tempPassword = generateTempPassword();
+      const hashedPassword = await hashPassword(tempPassword);
+
+      const newUser = await storage.createUser({
+        username,
+        password: hashedPassword,
+        email: candidate.email || `${username}@chapinlandscapes.com`,
+        name: candidate.name,
+        role: "Crew",
+        storedPassword: tempPassword,
+      });
+
+      // Link user to candidate
+      await storage.updateCandidate(candidateId, { userId: newUser.id });
+
+      // Link user to the employee record if one exists
+      const employees = await storage.getEmployees();
+      const employeeRecord = employees.find((e: any) => e.candidateId === candidateId);
+      if (employeeRecord) {
+        await storage.updateEmployee(employeeRecord.id, { userId: newUser.id });
+      }
+
+      // Send credentials email if candidate has an email address
+      if (candidate.email) {
+        try {
+          await sendNewHireAccountEmail(
+            candidate.email,
+            candidate.name,
+            username,
+            tempPassword,
+            candidate.role || "Team Member"
+          );
+        } catch (emailErr: any) {
+          console.error("[hiring] Failed to send account credentials email:", emailErr.message);
+        }
+      }
+
+      res.json({
+        success: true,
+        username,
+        tempPassword,
+        userId: newUser.id,
+        emailSent: !!candidate.email,
+      });
+    } catch (err: any) {
+      console.error("[hiring] create-account error:", err);
       res.status(500).json({ message: err.message });
     }
   });
