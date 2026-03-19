@@ -2172,6 +2172,7 @@ export const builderForms = pgTable("builder_forms", {
   toolsAndMedia: jsonb("tools_and_media").notNull().default(sql`'{}'::jsonb`),
   externalConnections: jsonb("external_connections").notNull().default(sql`'{}'::jsonb`),
   pages: jsonb("pages").notNull().default(sql`'[]'::jsonb`),
+  templateVariant: integer("template_variant").notNull().default(0),
   archived: boolean("archived").notNull().default(false),
   archivedAt: timestamp("archived_at"),
   createdBy: varchar("created_by", { length: 36 }).references(() => users.id),

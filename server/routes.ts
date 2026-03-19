@@ -5112,6 +5112,7 @@ SECTION GENERATION RULES:
         toolsAndMedia: req.body.toolsAndMedia || {},
         externalConnections: req.body.externalConnections || {},
         pages: req.body.pages || [],
+        templateVariant: typeof req.body.templateVariant === "number" ? req.body.templateVariant : 0,
         archived: false,
         createdBy: user.id,
       });
@@ -5133,6 +5134,7 @@ SECTION GENERATION RULES:
         language: z.string().optional(),
         exportTarget: z.string().optional(),
         pages: z.any().optional(),
+        templateVariant: z.number().int().min(0).max(4).optional(),
         archived: z.boolean().optional(),
         archivedAt: z.any().optional(),
       });

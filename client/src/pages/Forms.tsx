@@ -60,6 +60,7 @@ import {
   FileDown,
   Eye,
   Download,
+  Palette,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -73,6 +74,8 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
+import StepTemplate from "@/components/StepTemplate";
+import FormTemplate, { FORM_THEMES } from "@/components/FormTemplate";
 
 type View =
   | "home"
@@ -135,6 +138,7 @@ type WizardData = {
   sections: FormSection[];
   toolsAndMedia: ToolsAndMedia;
   externalConnections: ExternalConnections;
+  templateVariant: number;
 };
 
 type SmartQuestion = {
@@ -178,6 +182,7 @@ const EMPTY_WIZARD: WizardData = {
     approver: "",
     integratesWithCRM: false,
   },
+  templateVariant: 0,
 };
 
 const WIZARD_STEPS = [
@@ -187,7 +192,8 @@ const WIZARD_STEPS = [
   { num: 4, key: "sections", label: "Steps / Sections", desc: "Breakdown of Different Sections", icon: LayoutList },
   { num: 5, key: "tools", label: "Tools & Media", desc: "Added Features & Illustrations", icon: Image },
   { num: 6, key: "connections", label: "External Connections", desc: "Is Any Info Sent Out", icon: Globe },
-  { num: 7, key: "review", label: "Final Review", desc: "Confirm Form & Take Action", icon: ClipboardCheck },
+  { num: 7, key: "template", label: "Template", desc: "Choose Your Form Style", icon: Palette },
+  { num: 8, key: "review", label: "Final Review", desc: "Confirm Form & Take Action", icon: ClipboardCheck },
 ] as const;
 
 const OUTCOME_TYPES = [
@@ -734,6 +740,7 @@ export default function Forms() {
         sections: wizardData.sections,
         toolsAndMedia: wizardData.toolsAndMedia,
         externalConnections: wizardData.externalConnections,
+        templateVariant: wizardData.templateVariant ?? 0,
         status: "draft",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/builder-forms"] });
@@ -890,19 +897,20 @@ export default function Forms() {
           setStep={setWizardStep}
           titlePlaceholder={titlePlaceholder}
           purpose={selectedPurpose}
-          onFinish={async () => {
+          onFinish={async (finalData) => {
             try {
               await apiRequest("POST", "/api/builder-forms", {
-                name: wizardData.title || "Untitled Form",
-                category: wizardData.category,
-                purpose: wizardData.purpose,
-                outcome: wizardData.outcome,
-                outcomeType: wizardData.outcomeType,
-                audience: wizardData.audience,
-                audienceRoles: wizardData.audienceRoles,
-                sections: wizardData.sections,
-                toolsAndMedia: wizardData.toolsAndMedia,
-                externalConnections: wizardData.externalConnections,
+                name: finalData.title || "Untitled Form",
+                category: finalData.category,
+                purpose: finalData.purpose,
+                outcome: finalData.outcome,
+                outcomeType: finalData.outcomeType,
+                audience: finalData.audience,
+                audienceRoles: finalData.audienceRoles,
+                sections: finalData.sections,
+                toolsAndMedia: finalData.toolsAndMedia,
+                externalConnections: finalData.externalConnections,
+                templateVariant: finalData.templateVariant ?? 0,
               });
               queryClient.invalidateQueries({ queryKey: ["/api/builder-forms"] });
               setHasUnsavedWork(false);
@@ -935,6 +943,7 @@ export default function Forms() {
                 sections: wizardData.sections,
                 toolsAndMedia: wizardData.toolsAndMedia,
                 externalConnections: wizardData.externalConnections,
+                templateVariant: wizardData.templateVariant ?? 0,
                 status: "draft",
               });
               queryClient.invalidateQueries({ queryKey: ["/api/builder-forms"] });
@@ -1288,7 +1297,7 @@ function FormWizard({
   setStep: React.Dispatch<React.SetStateAction<number>>;
   titlePlaceholder: string;
   purpose: PurposeOption | null;
-  onFinish: () => void | Promise<void>;
+  onFinish: (finalData: WizardData) => void | Promise<void>;
   onCancel: () => void;
   onSaveDraft: () => void | Promise<void>;
 }) {
@@ -1422,7 +1431,14 @@ function FormWizard({
           {step === 3 && <StepSections data={data} update={update} category={data.category} />}
           {step === 4 && <StepToolsMedia data={data} update={update} />}
           {step === 5 && <StepConnections data={data} update={update} />}
-          {step === 6 && <StepReview data={data} onFinish={onFinish} />}
+          {step === 6 && (
+            <StepTemplate
+              selected={data.templateVariant}
+              onSelect={(v) => update({ templateVariant: v })}
+              sampleTitle={data.title || "Your Form Title"}
+            />
+          )}
+          {step === 7 && <StepReview data={data} onFinish={() => onFinish(data)} />}
         </CardContent>
       </Card>
 
@@ -1478,7 +1494,7 @@ function FormWizard({
             onClick={async () => {
               setIsSaving(true);
               try {
-                await onFinish();
+                await onFinish(data);
                 toast({ title: "Form saved!", description: "Your form has been saved to the Form Library." });
               } catch {
                 toast({ title: "Failed to save form", variant: "destructive" });
@@ -2268,6 +2284,17 @@ function StepReview({ data, onFinish }: { data: WizardData; onFinish: () => void
           </CardContent>
         </Card>
       </div>
+
+      <Card data-testid="review-template">
+        <CardContent className="p-4">
+          <div className="text-xs text-muted-foreground mb-1">Form Template</div>
+          <div className="flex items-center gap-2">
+            <Palette className="h-4 w-4 text-primary" />
+            <span className="font-semibold">{FORM_THEMES[data.templateVariant]?.name ?? "Classic"}</span>
+            <span className="text-sm text-muted-foreground">— {FORM_THEMES[data.templateVariant]?.description}</span>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -2512,6 +2539,49 @@ function FormDetail({ formId, onFillForm }: { formId: string; onFillForm: () => 
           </CardContent>
         </Card>
       </div>
+
+      {/* Template Preview */}
+      {sections.length > 0 && (() => {
+        const variant = typeof form.templateVariant === "number" ? form.templateVariant : 0;
+        const theme = FORM_THEMES[variant] ?? FORM_THEMES[0];
+        const flatFields = sections.flatMap((s: any, sIdx: number) =>
+          (Array.isArray(s.fields) ? s.fields : []).map((f: any, fIdx: number) => ({
+            id: `s${sIdx}_f${fIdx}`,
+            type: f.type || "text",
+            label: f.label || `Field ${fIdx + 1}`,
+            placeholder: f.placeholder,
+            required: !!f.required,
+            options: f.options,
+          }))
+        );
+        return (
+          <div className="mb-4" data-testid="form-detail-template-preview">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Palette className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold">Form Template</h2>
+                <Badge variant="secondary">{theme.name}</Badge>
+              </div>
+              <span className="text-xs text-muted-foreground">Preview of how this form will appear</span>
+            </div>
+            <div
+              className="rounded-xl border overflow-hidden"
+              style={{ maxHeight: "540px", overflowY: "auto" }}
+            >
+              <div style={{ transform: "scale(0.85)", transformOrigin: "top center", width: "117.6%" }}>
+                <FormTemplate
+                  formTitle={form.name}
+                  formDescription={form.outcome || undefined}
+                  companyName="Chapin Landscapes"
+                  fields={flatFields}
+                  mode="preview"
+                  variant={variant}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
