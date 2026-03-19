@@ -128,6 +128,7 @@ interface FormTemplateProps {
   submittedAt?: string;
   mode: "fill" | "preview" | "submitted";
   variant?: number;
+  onSubmit?: () => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -342,7 +343,7 @@ const FieldList: React.FC<{ fields: FormField[]; mode: string }> = ({ fields, mo
 
 const FormTemplate: React.FC<FormTemplateProps> = ({
   formTitle, formDescription, companyName, logoUrl,
-  fields, submittedBy, submittedAt, mode, variant = 0,
+  fields, submittedBy, submittedAt, mode, variant = 0, onSubmit,
 }) => {
   const theme = FORM_THEMES[variant] ?? FORM_THEMES[0];
 
@@ -438,7 +439,14 @@ const FormTemplate: React.FC<FormTemplateProps> = ({
           {/* FORM BODY */}
           <main className="px-10 py-9">
             {isFill(mode) ? (
-              <form noValidate onSubmit={(e) => e.preventDefault()} className="space-y-7">
+              <form
+                noValidate
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  onSubmit?.();
+                }}
+                className="space-y-7"
+              >
                 <FieldList fields={fields} mode={mode} />
                 <div className="no-print pt-2">
                   <button

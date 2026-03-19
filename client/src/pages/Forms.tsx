@@ -2775,14 +2775,6 @@ function FormFill({ formId, onSubmitted }: { formId: string; onSubmitted: () => 
     },
   });
 
-  const [formValues, setFormValues] = useState<Record<string, any>>({});
-
-  const fieldKey = (sIdx: number, fIdx: number) => `s${sIdx}_f${fIdx}`;
-
-  const updateField = (sIdx: number, fIdx: number, value: any) => {
-    setFormValues((prev) => ({ ...prev, [fieldKey(sIdx, fIdx)]: value }));
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16" data-testid="view-form-fill">
@@ -2801,268 +2793,41 @@ function FormFill({ formId, onSubmitted }: { formId: string; onSubmitted: () => 
 
   const sections: any[] = Array.isArray(form.sections) ? form.sections : [];
 
-  const renderField = (field: any, sIdx: number, fIdx: number) => {
-    const key = fieldKey(sIdx, fIdx);
-    const val = formValues[key] ?? "";
-
-    switch (field.type) {
-      case "textarea":
-        return (
-          <Textarea
-            value={val}
-            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
-            placeholder={field.placeholder || ""}
-            rows={3}
-            data-testid={`fill-field-${sIdx}-${fIdx}`}
-          />
-        );
-      case "number":
-        return (
-          <Input
-            type="number"
-            value={val}
-            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
-            placeholder={field.placeholder || ""}
-            data-testid={`fill-field-${sIdx}-${fIdx}`}
-          />
-        );
-      case "email":
-        return (
-          <Input
-            type="email"
-            value={val}
-            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
-            placeholder={field.placeholder || ""}
-            data-testid={`fill-field-${sIdx}-${fIdx}`}
-          />
-        );
-      case "phone":
-        return (
-          <Input
-            type="tel"
-            value={val}
-            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
-            placeholder={field.placeholder || ""}
-            data-testid={`fill-field-${sIdx}-${fIdx}`}
-          />
-        );
-      case "date": {
-        const sectionFields = sections[sIdx]?.fields || [];
-        const label = (field.label || "").toLowerCase();
-        const startKw = ["start date", "begin date", "from date", "first day", "start of leave", "leave start", "absence start", "departure date", "pto start", "time off start", "days off start", "vacation start"];
-        const endKw = ["end date", "return date", "to date", "last day", "end of leave", "leave end", "absence end", "pto end", "time off end", "days off end", "vacation end"];
-        const isStart = startKw.some((k) => label.includes(k));
-        const isEnd = endKw.some((k) => label.includes(k));
-
-        let businessDaysBadge = null;
-        if (isStart || isEnd) {
-          const pairKw = isStart ? endKw : startKw;
-          const pairIdx = sectionFields.findIndex((f: any) => {
-            const l = (f.label || "").toLowerCase();
-            return f.type === "date" && pairKw.some((k) => l.includes(k));
-          });
-          if (pairIdx >= 0) {
-            const pairVal = formValues[fieldKey(sIdx, pairIdx)] || "";
-            if (pairVal && val) {
-              const startVal = isStart ? val : pairVal;
-              const endVal = isStart ? pairVal : val;
-              const days = calcBusinessDays(startVal, endVal);
-              if (days > 0) {
-                businessDaysBadge = (
-                  <div className="mt-1.5 flex items-center gap-2" data-testid={`fill-business-days-${sIdx}-${fIdx}`}>
-                    <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-xs gap-1">
-                      <Clock className="h-3 w-3" /> {days} business day{days !== 1 ? "s" : ""} (Mon-Fri)
-                    </Badge>
-                  </div>
-                );
-              }
-            }
-          }
-        }
-
-        return (
-          <div>
-            <Input
-              type="date"
-              value={val}
-              onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
-              data-testid={`fill-field-${sIdx}-${fIdx}`}
-            />
-            {businessDaysBadge}
-          </div>
-        );
-      }
-      case "time":
-        return (
-          <Input
-            type="time"
-            value={val}
-            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
-            data-testid={`fill-field-${sIdx}-${fIdx}`}
-          />
-        );
-      case "select":
-        return (
-          <Select value={val} onValueChange={(v) => updateField(sIdx, fIdx, v)}>
-            <SelectTrigger data-testid={`fill-field-${sIdx}-${fIdx}`}>
-              <SelectValue placeholder={field.placeholder || "Select an option..."} />
-            </SelectTrigger>
-            <SelectContent>
-              {(field.options || []).map((opt: string) => (
-                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        );
-      case "checkbox":
-        if (Array.isArray(field.options) && field.options.length > 0) {
-          const checked: string[] = val || [];
-          return (
-            <div className="space-y-2">
-              {field.options.map((opt: string) => (
-                <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox
-                    checked={checked.includes(opt)}
-                    onCheckedChange={(c) => {
-                      const next = c ? [...checked, opt] : checked.filter((v: string) => v !== opt);
-                      updateField(sIdx, fIdx, next);
-                    }}
-                    data-testid={`fill-checkbox-${sIdx}-${fIdx}-${opt}`}
-                  />
-                  <span className="text-sm">{opt}</span>
-                </label>
-              ))}
-            </div>
-          );
-        }
-        return (
-          <label className="flex items-center gap-2 cursor-pointer">
-            <Checkbox
-              checked={!!val}
-              onCheckedChange={(c) => updateField(sIdx, fIdx, !!c)}
-              data-testid={`fill-field-${sIdx}-${fIdx}`}
-            />
-            <span className="text-sm">{field.placeholder || "Check if applicable"}</span>
-          </label>
-        );
-      case "radio":
-        return (
-          <div className="space-y-2">
-            {(field.options || []).map((opt: string) => (
-              <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name={key}
-                  value={opt}
-                  checked={val === opt}
-                  onChange={() => updateField(sIdx, fIdx, opt)}
-                  className="h-4 w-4 text-primary"
-                  data-testid={`fill-radio-${sIdx}-${fIdx}-${opt}`}
-                />
-                <span className="text-sm">{opt}</span>
-              </label>
-            ))}
-          </div>
-        );
-      case "signature":
-        return (
-          <SignaturePad
-            value={val || ""}
-            onChange={(dataUrl) => updateField(sIdx, fIdx, dataUrl)}
-            testId={`fill-field-${sIdx}-${fIdx}`}
-          />
-        );
-      case "file":
-        return (
-          <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 p-4 text-center text-sm text-muted-foreground" data-testid={`fill-field-${sIdx}-${fIdx}`}>
-            <Upload className="h-5 w-5 mx-auto mb-2 text-muted-foreground/50" />
-            File upload area
-          </div>
-        );
-      case "address":
-        return (
-          <div className="space-y-2">
-            <Input value={val?.street || ""} onChange={(e) => updateField(sIdx, fIdx, { ...val, street: e.target.value })} placeholder="Street Address" data-testid={`fill-field-${sIdx}-${fIdx}-street`} />
-            <div className="grid grid-cols-3 gap-2">
-              <Input value={val?.city || ""} onChange={(e) => updateField(sIdx, fIdx, { ...val, city: e.target.value })} placeholder="City" data-testid={`fill-field-${sIdx}-${fIdx}-city`} />
-              <Input value={val?.state || ""} onChange={(e) => updateField(sIdx, fIdx, { ...val, state: e.target.value })} placeholder="State" data-testid={`fill-field-${sIdx}-${fIdx}-state`} />
-              <Input value={val?.zip || ""} onChange={(e) => updateField(sIdx, fIdx, { ...val, zip: e.target.value })} placeholder="ZIP" data-testid={`fill-field-${sIdx}-${fIdx}-zip`} />
-            </div>
-          </div>
-        );
-      default:
-        return (
-          <Input
-            value={val}
-            onChange={(e) => updateField(sIdx, fIdx, e.target.value)}
-            placeholder={field.placeholder || ""}
-            data-testid={`fill-field-${sIdx}-${fIdx}`}
-          />
-        );
-    }
-  };
+  const flatFields = sections.flatMap((section: any, sIdx: number) =>
+    (Array.isArray(section.fields) ? section.fields : []).map((field: any, fIdx: number) => ({
+      id: `s${sIdx}_f${fIdx}`,
+      type: field.type || "text",
+      label: field.label || `Field ${fIdx + 1}`,
+      placeholder: field.placeholder || undefined,
+      required: !!field.required,
+      options: Array.isArray(field.options) && field.options.length > 0 ? field.options : undefined,
+    }))
+  );
 
   const handleSubmit = () => {
-    toast({ title: "Form submitted!", description: "This is a test submission. In production, responses would be saved to the database." });
+    toast({ title: "Form submitted!", description: "This is a test submission. In production, responses would be saved." });
     setTimeout(() => onSubmitted(), 1500);
   };
 
   return (
     <div data-testid="view-form-fill">
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Test Mode</Badge>
-        </div>
-        <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="text-form-fill-name">{form.name}</h1>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {form.category && <Badge variant="secondary">{form.category}</Badge>}
-          {form.purpose && <Badge variant="outline">{form.purpose}</Badge>}
-        </div>
-        {form.outcome && (
-          <p className="text-sm text-muted-foreground mt-2">{form.outcome}</p>
-        )}
+      <div className="mb-5 flex items-center justify-between">
+        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-xs" data-testid="badge-test-mode">Test Mode — Preview Only</Badge>
+        <p className="text-xs text-muted-foreground">Fields filled here are not saved to the database</p>
       </div>
-
-      <div className="space-y-6">
-        {sections.map((section: any, sIdx: number) => (
-          <Card key={sIdx} className="border-l-4 border-l-primary" data-testid={`fill-section-${sIdx}`}>
-            <CardContent className="p-5">
-              <h2 className="text-lg font-semibold mb-1">{section.title || `Section ${sIdx + 1}`}</h2>
-              {section.description && (
-                <p className="text-sm text-muted-foreground mb-4">{section.description}</p>
-              )}
-              <div className="space-y-4">
-                {Array.isArray(section.fields) && section.fields.map((field: any, fIdx: number) => (
-                  <div key={fIdx}>
-                    <Label className="text-sm font-medium">
-                      {field.label || `Field ${fIdx + 1}`}
-                      {field.required && <span className="text-red-500 ml-1">*</span>}
-                    </Label>
-                    {field.helpText && (
-                      <p className="text-xs text-muted-foreground mt-0.5 mb-1">{field.helpText}</p>
-                    )}
-                    <div className="mt-1">
-                      {renderField(field, sIdx, fIdx)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="flex items-center justify-center gap-4 mt-6 pb-8">
-        <Button variant="outline" onClick={() => setFormValues({})} className="gap-2" data-testid="button-clear-form">
-          <RefreshCw className="h-4 w-4" /> Clear Form
-        </Button>
-        <Button onClick={handleSubmit} className="gap-2" data-testid="button-submit-form">
-          <Send className="h-4 w-4" /> Submit (Test)
-        </Button>
-      </div>
+      <FormTemplate
+        formTitle={form.name}
+        formDescription={form.outcome || undefined}
+        companyName="Chapin Landscapes"
+        fields={flatFields}
+        mode="fill"
+        variant={typeof form.templateVariant === "number" ? form.templateVariant : 0}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }
+
 
 function UpdateExisting() {
   return (
