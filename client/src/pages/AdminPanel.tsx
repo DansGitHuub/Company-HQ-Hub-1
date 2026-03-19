@@ -90,108 +90,90 @@ import ArticleReportsCenter from "@/components/ArticleReportsCenter";
 import DiagnosticReport from "@/components/DiagnosticReport";
 import AdminDocumentLibrary from "@/components/AdminDocumentLibrary";
 
-function AdminCategoryNav({ pendingRequests, isMasterAdmin, t }: { pendingRequests: any[]; isMasterAdmin: boolean; t: any }) {
-  const [activeCategory, setActiveCategory] = useState("people");
-
-  const categories = [
+function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin, t }: {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  pendingRequests: any[];
+  isMasterAdmin: boolean;
+  t: any;
+}) {
+  const groups = [
     {
-      id: "people",
-      label: "People",
-      icon: Users,
-      tabs: [
+      label: "People & HR",
+      items: [
         { value: "users", label: t("nav.employees"), icon: Users },
-        { value: "requests", label: t("hiring.communications"), icon: Megaphone, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
-        { value: "todos", label: `To-Do ${t("nav.employees")}`, icon: CheckCircle },
+        { value: "requests", label: "HR Communications", icon: Megaphone, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
+        { value: "todos", label: "Task Access", icon: CheckCircle },
         { value: "suggestions", label: "Suggestions", icon: Lightbulb },
       ],
     },
     {
-      id: "content",
       label: "Content",
-      icon: FileText,
-      tabs: [
+      items: [
         { value: "sop-pipeline", label: "SOP Pipeline", icon: Zap },
-        { value: "documents", label: t("employees.documents"), icon: FileText },
-        { value: "shared-links", label: t("common.share"), icon: ExternalLink },
-        { value: "help-reports", label: t("nav.help"), icon: HelpCircle },
-        { value: "company", label: t("nav.companyHQ"), icon: Building2 },
+        { value: "documents", label: "Documents", icon: FileText },
+        { value: "shared-links", label: "Shared Links", icon: ExternalLink },
+        { value: "help-reports", label: "Help Reports", icon: HelpCircle },
       ],
     },
     {
-      id: "ai",
-      label: "AI & Tools",
-      icon: Sparkles,
-      tabs: [
-        { value: "assistant-agents", label: t("nav.assistant"), icon: Sparkles },
+      label: "Company",
+      items: [
+        { value: "company", label: "Branding & Settings", icon: Building2 },
+      ],
+    },
+    {
+      label: "AI & Automation",
+      items: [
+        { value: "assistant-agents", label: "AI Assistant", icon: Sparkles },
         { value: "ai-logs", label: "AI Logs", icon: Bot },
         ...(isMasterAdmin ? [{ value: "ai-agents", label: "AI Agents", icon: Bot }] : []),
       ],
     },
     {
-      id: "system",
       label: "System",
-      icon: AlertCircle,
-      tabs: [
-        { value: "app-testing", label: t("common.preview"), icon: Eye },
+      items: [
+        { value: "app-testing", label: "App Testing", icon: Eye },
         { value: "system-status", label: "System Status", icon: AlertCircle },
         ...(isMasterAdmin ? [{ value: "diagnostics", label: "Diagnostics", icon: Wrench }] : []),
       ],
     },
   ];
 
-  const activeGroup = categories.find(c => c.id === activeCategory);
-
   return (
-    <div className="space-y-3">
-      <div className="flex gap-2 border-b pb-3">
-        {categories.map((cat) => {
-          const Icon = cat.icon;
-          const hasBadge = cat.tabs.some(tab => tab.badge);
-          return (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              data-testid={`admin-category-${cat.id}`}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeCategory === cat.id
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {cat.label}
-              {hasBadge && (
-                <Badge variant="destructive" className="ml-1 h-5 min-w-[20px] px-1 text-xs">
-                  {cat.tabs.find(tab => tab.badge)?.badge}
-                </Badge>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {activeGroup && (
-        <TabsList className="flex flex-wrap gap-1 h-auto w-auto bg-transparent p-0">
-          {activeGroup.tabs.map((tab) => {
-            const Icon = tab.icon;
+    <nav className="flex flex-col gap-1 py-1" data-testid="admin-sidebar">
+      {groups.map((group) => (
+        <div key={group.label} className="mb-3">
+          <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 select-none">
+            {group.label}
+          </p>
+          {group.items.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.value;
             return (
-              <TabsTrigger
-                key={tab.value}
-                value={tab.value}
-                className="gap-2"
-                data-testid={`tab-${tab.value}`}
+              <button
+                key={item.value}
+                onClick={() => setActiveTab(item.value)}
+                data-testid={`admin-nav-${item.value}`}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
               >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-                {tab.badge && (
-                  <Badge variant="destructive" className="ml-1">{tab.badge}</Badge>
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="truncate">{item.label}</span>
+                {item.badge && (
+                  <Badge variant="destructive" className="ml-auto h-5 min-w-[20px] px-1 text-xs shrink-0">
+                    {item.badge}
+                  </Badge>
                 )}
-              </TabsTrigger>
+              </button>
             );
           })}
-        </TabsList>
-      )}
-    </div>
+        </div>
+      ))}
+    </nav>
   );
 }
 
@@ -314,6 +296,7 @@ export default function AdminPanel() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("users");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [resetPasswordUser, setResetPasswordUser] = useState<SafeUser | null>(null);
   const [newPassword, setNewPassword] = useState("");
@@ -607,8 +590,21 @@ export default function AdminPanel() {
         </Card>
       </div>
 
-      <Tabs defaultValue="users" className="w-full">
-        <AdminCategoryNav pendingRequests={pendingRequests} isMasterAdmin={isMasterAdmin} t={t} />
+      <div className="flex gap-6 items-start">
+        {/* Left sidebar nav */}
+        <div className="w-48 shrink-0 sticky top-4">
+          <AdminSidebar
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            pendingRequests={pendingRequests}
+            isMasterAdmin={isMasterAdmin}
+            t={t}
+          />
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 min-w-0">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 
         <TabsContent value="users" className="mt-6">
           <Card>
@@ -1188,6 +1184,8 @@ export default function AdminPanel() {
           </TabsContent>
         )}
       </Tabs>
+        </div>
+      </div>
 
       {/* Password Reset Dialog */}
       <Dialog open={!!resetPasswordUser} onOpenChange={(open) => !open && setResetPasswordUser(null)}>
