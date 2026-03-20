@@ -379,3 +379,29 @@ export async function sendSuggestionStatusUpdateEmail(
     </div>
   `);
 }
+
+export async function sendNewApplicationNotificationEmail(
+  toEmail: string,
+  applicantName: string,
+  position: string,
+  appUrl: string
+) {
+  return sendEmail(toEmail, `New Job Application Received — ${applicantName}`, `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #166534; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Chapin Landscapes</h1>
+        <p style="color: #bbf7d0; margin: 4px 0 0 0; font-size: 14px;">New Application Received</p>
+      </div>
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937;">New Application from ${escapeHtml(applicantName)}</h2>
+        <p style="color: #4b5563;">A new job application has been submitted for the position of <strong>${escapeHtml(position)}</strong>.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${appUrl}/hiring" style="background-color: #166534; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">View in Company HQ</a>
+        </div>
+      </div>
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
+        <p>Chapin Landscapes · 440.724.8006 · chapinlandscapes.com</p>
+      </div>
+    </div>
+  `);
+}

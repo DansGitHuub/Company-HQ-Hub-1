@@ -44,6 +44,7 @@ import LeadQualifier from "@/pages/LeadQualifier";
 import CalendarPage from "@/pages/Calendar";
 import SharedDocument from "@/pages/SharedDocument";
 import SettingsPage from "@/pages/Settings";
+import PublicApplicationForm from "@/pages/PublicApplicationForm";
 import NotFound from "@/pages/not-found";
 
 function AppRoutes() {
@@ -51,6 +52,10 @@ function AppRoutes() {
 
   if (window.location.pathname.startsWith("/shared/")) {
     return <SharedDocument />;
+  }
+
+  if (window.location.pathname.startsWith("/apply/")) {
+    return <PublicApplicationForm />;
   }
 
   if (isLoading) {

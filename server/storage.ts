@@ -1,5 +1,6 @@
 import { 
   users, type User, type InsertUser,
+  jobApplications, type JobApplication, type InsertJobApplication,
   sopCategories, type SopCategory, type InsertSopCategory,
   sops, type Sop, type InsertSop,
   sopVersions, type SopVersion, type InsertSopVersion,
@@ -247,6 +248,13 @@ export interface IStorage {
   getFormSubmission(id: string): Promise<FormSubmission | undefined>;
   createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
   updateFormSubmission(id: string, updates: Partial<FormSubmission>): Promise<FormSubmission | undefined>;
+
+  // Job Applications (public hiring form)
+  getJobApplications(): Promise<JobApplication[]>;
+  getJobApplicationByToken(token: string): Promise<JobApplication | undefined>;
+  getJobApplicationById(id: string): Promise<JobApplication | undefined>;
+  createJobApplication(application: Omit<InsertJobApplication, "token"> & { token: string }): Promise<JobApplication>;
+  updateJobApplication(id: string, updates: Partial<JobApplication>): Promise<JobApplication | undefined>;
   
   // Form Folders
   getFormFolders(): Promise<FormFolder[]>;
@@ -3492,6 +3500,31 @@ export class DatabaseStorage implements IStorage {
     if (!existing) return undefined;
     const [updated] = await db.update(sopPipelineSettings).set({ ...updates, updatedAt: new Date() }).where(eq(sopPipelineSettings.id, existing.id)).returning();
     return updated || undefined;
+  }
+
+  // Job Applications (public hiring form)
+  async getJobApplications(): Promise<JobApplication[]> {
+    return db.select().from(jobApplications).orderBy(desc(jobApplications.createdAt));
+  }
+
+  async getJobApplicationByToken(token: string): Promise<JobApplication | undefined> {
+    const [app] = await db.select().from(jobApplications).where(eq(jobApplications.token, token));
+    return app || undefined;
+  }
+
+  async getJobApplicationById(id: string): Promise<JobApplication | undefined> {
+    const [app] = await db.select().from(jobApplications).where(eq(jobApplications.id, id));
+    return app || undefined;
+  }
+
+  async createJobApplication(application: Omit<InsertJobApplication, "token"> & { token: string }): Promise<JobApplication> {
+    const [app] = await db.insert(jobApplications).values(application as any).returning();
+    return app;
+  }
+
+  async updateJobApplication(id: string, updates: Partial<JobApplication>): Promise<JobApplication | undefined> {
+    const [app] = await db.update(jobApplications).set(updates).where(eq(jobApplications.id, id)).returning();
+    return app || undefined;
   }
 }
 

@@ -12,7 +12,7 @@ import { registerCalendarRoutes } from "./calendarRoutes";
 import { registerSuggestionsRoutes } from "./suggestionsRoutes";
 import { registerTaskRoutes } from "./taskRoutes";
 import { registerAssistantRoutes } from "./assistantRoutes";
-import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail } from "./email";
+import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail } from "./email";
 import { logActivity } from "./activityLogger";
 import { checkAndSendReminders } from "./maintenanceScheduler";
 import OpenAI from "openai";
@@ -9630,6 +9630,147 @@ Provide accurate information based on publicly available documentation.`;
       }
     }
   );
+
+  // ─── Job Application Public + Admin Routes ───────────────────────────────
+
+  // PUBLIC: Get application by token (no auth required)
+  app.get("/api/apply/:token", async (req, res) => {
+    try {
+      const app = await storage.getJobApplicationByToken(req.params.token);
+      if (!app) return res.status(404).json({ message: "Application link not found" });
+      if (new Date() > new Date(app.expiresAt)) return res.status(410).json({ message: "This application link has expired" });
+      if (app.status === "submitted") return res.status(409).json({ message: "This application has already been submitted" });
+      return res.json(app);
+    } catch (err) {
+      console.error("[apply] Error fetching application:", err);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // PUBLIC: Autosave application data (no auth required)
+  app.patch("/api/apply/:token", async (req, res) => {
+    try {
+      const app = await storage.getJobApplicationByToken(req.params.token);
+      if (!app) return res.status(404).json({ message: "Not found" });
+      if (new Date() > new Date(app.expiresAt)) return res.status(410).json({ message: "Link expired" });
+      if (app.status === "submitted") return res.status(409).json({ message: "Already submitted" });
+      const updated = await storage.updateJobApplication(app.id, {
+        data: req.body.data ?? app.data,
+        applicantName: req.body.applicantName ?? app.applicantName,
+        applicantEmail: req.body.applicantEmail ?? app.applicantEmail,
+        applicantPhone: req.body.applicantPhone ?? app.applicantPhone,
+        position: req.body.position ?? app.position,
+      });
+      return res.json(updated);
+    } catch (err) {
+      console.error("[apply] Autosave error:", err);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // PUBLIC: Submit application (no auth required)
+  app.post("/api/apply/:token/submit", async (req, res) => {
+    try {
+      const app = await storage.getJobApplicationByToken(req.params.token);
+      if (!app) return res.status(404).json({ message: "Not found" });
+      if (new Date() > new Date(app.expiresAt)) return res.status(410).json({ message: "Link expired" });
+      if (app.status === "submitted") return res.status(409).json({ message: "Already submitted" });
+
+      const data = req.body.data as Record<string, any>;
+      const firstName = data?.firstName || "";
+      const lastName = data?.lastName || "";
+      const fullName = `${firstName} ${lastName}`.trim();
+      const position = data?.positionAppliedFor || "Landscaping Position";
+
+      // Mark as submitted
+      const updated = await storage.updateJobApplication(app.id, {
+        status: "submitted",
+        submittedAt: new Date(),
+        data: data ?? app.data,
+        applicantName: fullName,
+        applicantEmail: data?.email || app.applicantEmail,
+        applicantPhone: data?.phone || app.applicantPhone,
+        position,
+      });
+
+      // Auto-create candidate in "Application Received"
+      try {
+        const candidate = await storage.createCandidate({
+          name: fullName || "Unknown Applicant",
+          role: position,
+          stage: "Application Received",
+          email: data?.email || "",
+          phone: data?.phone || "",
+          address: data?.streetAddress || "",
+          city: data?.city || "",
+          state: data?.state || "",
+          zip: data?.zip || "",
+          source: "Other",
+          notes: `Applied via online application form. Token: ${req.params.token}`,
+        });
+        await storage.updateJobApplication(app.id, { candidateId: candidate.id });
+      } catch (candidateErr) {
+        console.error("[apply] Could not create candidate:", candidateErr);
+      }
+
+      // Notify all Admins and Managers
+      try {
+        const allUsers = await storage.getUsers();
+        const notifyUsers = allUsers.filter(u => u.role === "Admin" || u.role === "Manager");
+        const appUrl = process.env.APP_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+        for (const u of notifyUsers) {
+          await logActivity(
+            "new_application",
+            `New application received from ${fullName || "an applicant"} for ${position}`,
+            "/hiring",
+            u.id
+          );
+          if (u.email) {
+            sendNewApplicationNotificationEmail(u.email, fullName || "an applicant", position, appUrl).catch(() => {});
+          }
+        }
+      } catch (notifyErr) {
+        console.error("[apply] Notification error:", notifyErr);
+      }
+
+      return res.json({ message: "Application submitted successfully" });
+    } catch (err) {
+      console.error("[apply] Submit error:", err);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // ADMIN: Generate a new application link
+  app.post("/api/apply/generate", requireAdmin, async (req, res) => {
+    try {
+      const { expiryDays = 30 } = req.body as { expiryDays?: number };
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + expiryDays);
+      const application = await storage.createJobApplication({
+        token,
+        status: "draft",
+        expiryDays,
+        expiresAt,
+        createdBy: (req.user as User)?.id,
+        data: {},
+      });
+      return res.json(application);
+    } catch (err) {
+      console.error("[apply] Generate error:", err);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // ADMIN: List all applications
+  app.get("/api/apply", requireAdmin, async (req, res) => {
+    try {
+      const apps = await storage.getJobApplications();
+      return res.json(apps);
+    } catch (err) {
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
 
   return httpServer;
 }
