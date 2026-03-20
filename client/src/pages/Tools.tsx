@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Snowflake, Calculator, ClipboardCheck, Wrench, Target, FileText, X, ClipboardList } from "lucide-react";
+import { Snowflake, Calculator, Target, FileText, X, ClipboardList } from "lucide-react";
 
 const PropertyReportCard = lazy(() => import("@/tools/property-report-card/PropertyReportCard"));
 
@@ -59,20 +59,6 @@ const toolDefs: Tool[] = [
     descKey: "tools.plowMapperDesc",
     icon: Snowflake,
     href: "/tools/plow-mapper",
-  },
-  {
-    id: "process-auditor",
-    titleKey: "tools.processAuditor",
-    descKey: "tools.processAuditorDesc",
-    icon: ClipboardCheck,
-    href: "/tools/process-auditor",
-  },
-  {
-    id: "integration-wizard",
-    titleKey: "tools.integrationWizard",
-    descKey: "tools.integrationWizardDesc",
-    icon: Wrench,
-    href: "/tools/integration-wizard",
   },
   {
     id: "lead-qualifier",

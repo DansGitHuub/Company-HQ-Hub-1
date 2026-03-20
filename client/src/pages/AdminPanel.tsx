@@ -59,13 +59,17 @@ import {
   Wrench,
   Star,
   Lightbulb,
-  Zap
+  Zap,
+  ClipboardCheck,
+  Puzzle
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
 import ConversationLogViewer from "@/components/ConversationLogViewer";
 import SystemStatusReport from "@/components/SystemStatusReport";
 import SOPPipeline from "@/components/SOPPipeline";
+import ProcessAuditor from "@/pages/ProcessAuditor";
+import IntegrationWizard from "@/pages/IntegrationWizard";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -128,6 +132,13 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "assistant-agents", label: "AI Assistant", icon: Sparkles },
         { value: "ai-logs", label: "AI Logs", icon: Bot },
         ...(isMasterAdmin ? [{ value: "ai-agents", label: "AI Agents", icon: Bot }] : []),
+      ],
+    },
+    {
+      label: "Operations",
+      items: [
+        { value: "process-auditor", label: "Process Auditor", icon: ClipboardCheck },
+        { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle },
       ],
     },
     {
@@ -1183,6 +1194,14 @@ export default function AdminPanel() {
             <DiagnosticReport />
           </TabsContent>
         )}
+
+        <TabsContent value="process-auditor" className="mt-6">
+          <ProcessAuditor />
+        </TabsContent>
+
+        <TabsContent value="integration-wizard" className="mt-6">
+          <IntegrationWizard />
+        </TabsContent>
       </Tabs>
         </div>
       </div>
