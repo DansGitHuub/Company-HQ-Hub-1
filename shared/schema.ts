@@ -258,8 +258,8 @@ export type MaterialFieldValue = typeof materialFieldValues.$inferSelect;
 export type CandidateJobType = "Crew Member" | "Crew Lead" | "Manager" | "Office" | "Sales";
 export type CandidateWorkType = "Maintenance" | "Project";
 export type CandidateRating = "green" | "yellow" | "red" | null;
-export type ApplicantStage = "New Application" | "Review" | "Phone Screen" | "Interview" | "Offer Extended" | "Hired" | "Not a Fit";
-export type ApplicantSource = "Indeed" | "Referral" | "Walk-in" | "Website" | "Other";
+export type ApplicantStage = "Application Received" | "Interview Scheduled" | "1st Interview" | "2nd Interview" | "Offer Extended" | "Hired" | "Declined / Not a Fit";
+export type ApplicantSource = "BetterTeam" | "Indeed" | "Walk-in" | "Phone call" | "Email" | "Other";
 
 export const candidates = pgTable("candidates", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),

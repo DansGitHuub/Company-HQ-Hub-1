@@ -26,26 +26,26 @@ import { useUpload } from "@/hooks/use-upload";
 import type { Candidate, CandidateDocument, ApplicantNote, ApplicantCommunication } from "@shared/schema";
 
 const STAGES = [
-  "New Application",
-  "Review",
-  "Phone Screen",
-  "Interview",
+  "Application Received",
+  "Interview Scheduled",
+  "1st Interview",
+  "2nd Interview",
   "Offer Extended",
   "Hired",
-  "Not a Fit",
-];
+  "Declined / Not a Fit",
+] as const;
 
 const STAGE_COLORS: Record<string, string> = {
-  "New Application": "bg-blue-500",
-  "Review": "bg-purple-500",
-  "Phone Screen": "bg-cyan-500",
-  "Interview": "bg-amber-500",
+  "Application Received": "bg-blue-500",
+  "Interview Scheduled": "bg-cyan-500",
+  "1st Interview": "bg-amber-500",
+  "2nd Interview": "bg-orange-500",
   "Offer Extended": "bg-emerald-500",
   "Hired": "bg-green-600",
-  "Not a Fit": "bg-gray-400",
+  "Declined / Not a Fit": "bg-gray-400",
 };
 
-const SOURCES = ["Indeed", "Referral", "Walk-in", "Website", "Other"];
+const SOURCES = ["BetterTeam", "Indeed", "Walk-in", "Phone call", "Email", "Other"];
 const JOB_TYPES = ["Crew Member", "Crew Lead", "Manager", "Office", "Sales"];
 const RECOMMENDATIONS = ["Strong Yes", "Yes", "Maybe", "No"];
 
@@ -69,6 +69,8 @@ export default function Hiring() {
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [detailTab, setDetailTab] = useState("profile");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [showDeclined, setShowDeclined] = useState(false);
 
   const { data: candidates = [] } = useQuery<Candidate[]>({
     queryKey: ["/api/candidates"],
@@ -128,10 +130,16 @@ export default function Hiring() {
     stageMutation.mutate({ id: candidateId, stage: newStage });
   }
 
+  const filteredCandidates = sourceFilter === "all"
+    ? candidates
+    : candidates.filter(c => c.source === sourceFilter);
+
   const candidatesByStage = STAGES.reduce<Record<string, Candidate[]>>((acc, stage) => {
-    acc[stage] = candidates.filter(c => c.stage === stage);
+    acc[stage] = filteredCandidates.filter(c => c.stage === stage);
     return acc;
   }, {});
+
+  const visibleStages = STAGES.filter(s => s !== "Declined / Not a Fit" || showDeclined);
 
   return (
     <div className="space-y-4" data-testid="hiring-page">
@@ -164,69 +172,123 @@ export default function Hiring() {
       </div>
 
       {view === "pipeline" ? (
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: "70vh" }}>
-            {STAGES.map((stage) => (
-              <Droppable key={stage} droppableId={stage}>
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={`flex-shrink-0 w-64 rounded-lg border p-3 transition-colors ${
-                      snapshot.isDraggingOver ? "bg-primary/5 border-primary/30" : "bg-muted/30"
-                    }`}
-                    data-testid={`column-${stage.toLowerCase().replace(/\s+/g, "-")}`}
-                  >
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className={`h-3 w-3 rounded-full ${STAGE_COLORS[stage]}`} />
-                      <h3 className="font-semibold text-sm">{stage}</h3>
-                      <Badge variant="secondary" className="ml-auto text-xs">
-                        {candidatesByStage[stage]?.length || 0}
-                      </Badge>
-                    </div>
-                    <div className="space-y-2 min-h-[100px]">
-                      {candidatesByStage[stage]?.map((candidate, index) => (
-                        <Draggable key={candidate.id} draggableId={candidate.id} index={index}>
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className={`bg-card border rounded-lg p-3 cursor-pointer transition-shadow hover:shadow-md ${
-                                snapshot.isDragging ? "shadow-lg ring-2 ring-primary/20" : ""
-                              }`}
-                              onClick={() => {
-                                setSelectedCandidate(candidate);
-                                setDetailTab("profile");
-                              }}
-                              data-testid={`card-candidate-${candidate.id}`}
-                            >
-                              <div className="flex items-start gap-2">
-                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-                                  {getInitials(candidate.name)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-sm truncate">{candidate.name}</p>
-                                  <p className="text-xs text-muted-foreground truncate">{candidate.role}</p>
-                                </div>
-                                <div className={`h-2.5 w-2.5 rounded-full flex-shrink-0 mt-1 ${getRatingColor(candidate.rating)}`} />
-                              </div>
-                              <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                                <Clock className="h-3 w-3" />
-                                {candidate.appliedDate ? new Date(candidate.appliedDate).toLocaleDateString() : "N/A"}
-                              </div>
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  </div>
-                )}
-              </Droppable>
-            ))}
+        <>
+          {/* Board filter bar */}
+          <div className="flex items-center gap-3 flex-wrap" data-testid="board-filter-bar">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-muted-foreground font-medium">Source:</label>
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger className="h-8 w-36 text-xs" data-testid="select-source-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  {SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant={showDeclined ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setShowDeclined(v => !v)}
+              data-testid="button-toggle-declined"
+            >
+              {showDeclined ? "Hide Declined" : "Show Declined"}
+              {!showDeclined && candidatesByStage["Declined / Not a Fit"]?.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 text-xs h-4 px-1">
+                  {candidatesByStage["Declined / Not a Fit"].length}
+                </Badge>
+              )}
+            </Button>
           </div>
-        </DragDropContext>
+
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: "70vh" }}>
+              {visibleStages.map((stage) => {
+                const isOptional = stage === "2nd Interview";
+                const isDeclined = stage === "Declined / Not a Fit";
+                return (
+                  <Droppable key={stage} droppableId={stage}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`flex-shrink-0 w-64 rounded-lg border p-3 transition-colors ${
+                          isDeclined ? "opacity-75 border-dashed" :
+                          snapshot.isDraggingOver ? "bg-primary/5 border-primary/30" : "bg-muted/30"
+                        }`}
+                        data-testid={`column-${stage.toLowerCase().replace(/[\s/]+/g, "-")}`}
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className={`h-3 w-3 rounded-full flex-shrink-0 ${STAGE_COLORS[stage]}`} />
+                          <h3 className="font-semibold text-sm leading-tight">{stage}</h3>
+                          {isOptional && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200 shrink-0" data-testid="badge-optional">
+                              Optional
+                            </span>
+                          )}
+                          <Badge variant="secondary" className="ml-auto text-xs shrink-0">
+                            {candidatesByStage[stage]?.length || 0}
+                          </Badge>
+                        </div>
+                        {isOptional && (
+                          <p className="text-[10px] text-muted-foreground mb-2 leading-tight">
+                            Cards can skip directly to Offer Extended
+                          </p>
+                        )}
+                        <div className="space-y-2 min-h-[100px]">
+                          {candidatesByStage[stage]?.map((candidate, index) => (
+                            <Draggable key={candidate.id} draggableId={candidate.id} index={index}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className={`bg-card border rounded-lg p-3 cursor-pointer transition-shadow hover:shadow-md ${
+                                    snapshot.isDragging ? "shadow-lg ring-2 ring-primary/20" : ""
+                                  }`}
+                                  onClick={() => {
+                                    setSelectedCandidate(candidate);
+                                    setDetailTab("profile");
+                                  }}
+                                  data-testid={`card-candidate-${candidate.id}`}
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                                      {getInitials(candidate.name)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-sm truncate">{candidate.name}</p>
+                                      <p className="text-xs text-muted-foreground truncate">{candidate.role}</p>
+                                    </div>
+                                    <div className={`h-2.5 w-2.5 rounded-full flex-shrink-0 mt-1 ${getRatingColor(candidate.rating)}`} />
+                                  </div>
+                                  <div className="flex items-center justify-between mt-2">
+                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                      <Clock className="h-3 w-3" />
+                                      {candidate.appliedDate ? new Date(candidate.appliedDate).toLocaleDateString() : "N/A"}
+                                    </div>
+                                    {candidate.source && (
+                                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded" data-testid={`source-badge-${candidate.id}`}>
+                                        {candidate.source}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      </div>
+                    )}
+                  </Droppable>
+                );
+              })}
+            </div>
+          </DragDropContext>
+        </>
       ) : (
         <EmployeeRecords />
       )}
@@ -268,7 +330,7 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
   const [form, setForm] = useState(defaultForm);
 
   const handleSave = () => {
-    onSave({ ...form, stage: "New Application" });
+    onSave({ ...form, stage: "Application Received" });
     setForm(defaultForm);
   };
 
