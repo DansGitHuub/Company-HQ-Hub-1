@@ -405,3 +405,82 @@ export async function sendNewApplicationNotificationEmail(
     </div>
   `);
 }
+
+export async function sendZoomInterviewEmail(
+  toEmail: string,
+  applicantName: string,
+  position: string,
+  interviewDate: string,
+  interviewTime: string,
+  zoomUrl: string,
+  passcode: string,
+  interviewerName?: string,
+  notes?: string
+) {
+  return sendEmail(toEmail, `Interview Scheduled — Chapin Landscapes`, `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #166534; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Chapin Landscapes</h1>
+        <p style="color: #bbf7d0; margin: 4px 0 0 0; font-size: 14px;">Interview Confirmation</p>
+      </div>
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937;">Hi ${escapeHtml(applicantName)},</h2>
+        <p style="color: #4b5563;">We are pleased to invite you to an interview for the <strong>${escapeHtml(position)}</strong> position at Chapin Landscapes.</p>
+        <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <p style="margin: 0 0 8px 0; color: #374151;"><strong>📅 Date:</strong> ${escapeHtml(interviewDate)}</p>
+          <p style="margin: 0 0 8px 0; color: #374151;"><strong>🕐 Time:</strong> ${escapeHtml(interviewTime)}</p>
+          <p style="margin: 0 0 8px 0; color: #374151;"><strong>📹 Format:</strong> Zoom Video Call</p>
+          ${interviewerName ? `<p style="margin: 0 0 8px 0; color: #374151;"><strong>👤 Interviewer:</strong> ${escapeHtml(interviewerName)}</p>` : ""}
+        </div>
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+          <p style="margin: 0 0 12px 0; color: #1e40af; font-weight: bold;">Join Your Zoom Interview</p>
+          <a href="${zoomUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Join Zoom Meeting</a>
+          ${passcode ? `<p style="margin: 12px 0 0 0; color: #4b5563; font-size: 13px;">Passcode: <strong>${escapeHtml(passcode)}</strong></p>` : ""}
+          <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 11px; word-break: break-all;">${escapeHtml(zoomUrl)}</p>
+        </div>
+        ${notes ? `<p style="color: #4b5563;"><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ""}
+        <p style="color: #4b5563;">If you have any questions or need to reschedule, please contact us:</p>
+        <p style="color: #374151;"><strong>Email:</strong> office@chapinlandscapes.com<br><strong>Phone/Text:</strong> 440.226.0518</p>
+      </div>
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
+        <p>Chapin Landscapes · design • build • maintain · 440.724.8006 · chapinlandscapes.com</p>
+      </div>
+    </div>
+  `);
+}
+
+export async function sendInPersonInterviewEmail(
+  toEmail: string,
+  applicantName: string,
+  position: string,
+  interviewDate: string,
+  interviewTime: string,
+  location: string,
+  interviewerName?: string,
+  notes?: string
+) {
+  return sendEmail(toEmail, `Interview Scheduled — Chapin Landscapes`, `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #166534; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Chapin Landscapes</h1>
+        <p style="color: #bbf7d0; margin: 4px 0 0 0; font-size: 14px;">Interview Confirmation</p>
+      </div>
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937;">Hi ${escapeHtml(applicantName)},</h2>
+        <p style="color: #4b5563;">We are pleased to invite you to an interview for the <strong>${escapeHtml(position)}</strong> position at Chapin Landscapes.</p>
+        <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <p style="margin: 0 0 8px 0; color: #374151;"><strong>📅 Date:</strong> ${escapeHtml(interviewDate)}</p>
+          <p style="margin: 0 0 8px 0; color: #374151;"><strong>🕐 Time:</strong> ${escapeHtml(interviewTime)}</p>
+          <p style="margin: 0 0 8px 0; color: #374151;"><strong>📍 Location:</strong> ${escapeHtml(location || "To be confirmed")}</p>
+          ${interviewerName ? `<p style="margin: 0 0 8px 0; color: #374151;"><strong>👤 Interviewer:</strong> ${escapeHtml(interviewerName)}</p>` : ""}
+        </div>
+        ${notes ? `<p style="color: #4b5563;"><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ""}
+        <p style="color: #4b5563;">If you have any questions or need to reschedule, please contact us:</p>
+        <p style="color: #374151;"><strong>Email:</strong> office@chapinlandscapes.com<br><strong>Phone/Text:</strong> 440.226.0518</p>
+      </div>
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
+        <p>Chapin Landscapes · design • build • maintain · 440.724.8006 · chapinlandscapes.com</p>
+      </div>
+    </div>
+  `);
+}

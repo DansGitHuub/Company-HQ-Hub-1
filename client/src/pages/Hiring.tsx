@@ -17,7 +17,7 @@ import {
   Plus, Phone, Mail, MapPin, FileText, Trash2, User, Star, Clock,
   MessageSquare, Calendar, ChevronRight, X, GripVertical, Upload,
   Send, CheckCircle2, Circle, AlertCircle, ClipboardList, Users,
-  UserPlus, Copy, Eye, EyeOff, ShieldCheck
+  UserPlus, Copy, Eye, EyeOff, ShieldCheck, Video, ExternalLink, Loader2
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -71,6 +71,9 @@ export default function Hiring() {
   const [detailTab, setDetailTab] = useState("profile");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [showDeclined, setShowDeclined] = useState(false);
+  const [pendingSchedule, setPendingSchedule] = useState<{ candidateId: string; candidate: Candidate } | null>(null);
+  const [scheduleForm, setScheduleForm] = useState({ date: "", time: "", duration: 30, type: "zoom", location: "", notes: "", interviewerName: "" });
+  const [scheduling, setScheduling] = useState(false);
 
   const { data: candidates = [] } = useQuery<Candidate[]>({
     queryKey: ["/api/candidates"],
@@ -127,7 +130,35 @@ export default function Hiring() {
     const newStage = result.destination.droppableId;
     const candidate = candidates.find(c => c.id === candidateId);
     if (!candidate || candidate.stage === newStage) return;
+
+    if (newStage === "Interview Scheduled") {
+      setPendingSchedule({ candidateId, candidate });
+      setScheduleForm({ date: "", time: "", duration: 30, type: "zoom", location: "", notes: "", interviewerName: "" });
+      return;
+    }
+
     stageMutation.mutate({ id: candidateId, stage: newStage });
+  }
+
+  async function handleScheduleSubmit() {
+    if (!pendingSchedule || !scheduleForm.date || !scheduleForm.time) return;
+    setScheduling(true);
+    try {
+      const res = await apiRequest("POST", `/api/candidates/${pendingSchedule.candidateId}/schedule-interview`, scheduleForm);
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
+      toast({
+        title: "Interview Scheduled",
+        description: data.zoomMeeting
+          ? `Zoom meeting created. ${data.emailSent ? "Confirmation email sent." : "No applicant email on file."}`
+          : `Interview scheduled. ${data.emailSent ? "Confirmation email sent." : "No applicant email on file."}`,
+      });
+      setPendingSchedule(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to schedule interview", variant: "destructive" });
+    } finally {
+      setScheduling(false);
+    }
   }
 
   const filteredCandidates = sourceFilter === "all"
@@ -275,6 +306,32 @@ export default function Hiring() {
                                       </span>
                                     )}
                                   </div>
+                                  {/* Interview details on card */}
+                                  {candidate.interviewDate && (
+                                    <div className="mt-2 pt-2 border-t border-border space-y-1">
+                                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <Calendar className="h-3 w-3 flex-shrink-0" />
+                                        <span>{new Date(candidate.interviewDate).toLocaleDateString()} {candidate.interviewTime && `· ${candidate.interviewTime}`}</span>
+                                      </div>
+                                      {(candidate as any).zoomMeetingUrl ? (
+                                        <a
+                                          href={(candidate as any).zoomMeetingUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={e => e.stopPropagation()}
+                                          className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                          data-testid={`link-zoom-${candidate.id}`}
+                                        >
+                                          <Video className="h-3 w-3" /> Join Zoom
+                                        </a>
+                                      ) : candidate.interviewType ? (
+                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                          <MapPin className="h-3 w-3" />
+                                          <span className="capitalize">{candidate.interviewType}{candidate.interviewLocation ? ` · ${candidate.interviewLocation}` : ""}</span>
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </Draggable>
@@ -312,6 +369,136 @@ export default function Hiring() {
           onTabChange={setDetailTab}
         />
       )}
+
+      {/* Interview Schedule Modal */}
+      <Dialog open={!!pendingSchedule} onOpenChange={(open) => { if (!open && !scheduling) setPendingSchedule(null); }}>
+        <DialogContent className="max-w-md" data-testid="dialog-schedule-interview">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              Schedule Interview
+            </DialogTitle>
+            {pendingSchedule && (
+              <DialogDescription>
+                Scheduling interview for <strong>{pendingSchedule.candidate.name}</strong> — {pendingSchedule.candidate.role}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Date <span className="text-red-500">*</span></Label>
+                <Input
+                  type="date"
+                  value={scheduleForm.date}
+                  onChange={e => setScheduleForm(f => ({ ...f, date: e.target.value }))}
+                  data-testid="input-schedule-date"
+                />
+              </div>
+              <div>
+                <Label>Time <span className="text-red-500">*</span></Label>
+                <Input
+                  type="time"
+                  value={scheduleForm.time}
+                  onChange={e => setScheduleForm(f => ({ ...f, time: e.target.value }))}
+                  data-testid="input-schedule-time"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Duration</Label>
+                <Select value={String(scheduleForm.duration)} onValueChange={v => setScheduleForm(f => ({ ...f, duration: Number(v) }))}>
+                  <SelectTrigger data-testid="select-duration">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15 min</SelectItem>
+                    <SelectItem value="30">30 min</SelectItem>
+                    <SelectItem value="45">45 min</SelectItem>
+                    <SelectItem value="60">60 min</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Interview Type</Label>
+                <Select value={scheduleForm.type} onValueChange={v => setScheduleForm(f => ({ ...f, type: v }))}>
+                  <SelectTrigger data-testid="select-interview-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="zoom">
+                      <div className="flex items-center gap-2"><Video className="h-4 w-4 text-blue-500" /> Zoom</div>
+                    </SelectItem>
+                    <SelectItem value="in-person">
+                      <div className="flex items-center gap-2"><MapPin className="h-4 w-4" /> In-Person</div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {scheduleForm.type === "zoom" && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700 flex items-center gap-2">
+                <Video className="h-3.5 w-3.5 flex-shrink-0" />
+                A Zoom meeting will be created and the applicant will receive a link via email.
+              </div>
+            )}
+
+            {scheduleForm.type === "in-person" && (
+              <div>
+                <Label>Location</Label>
+                <Input
+                  value={scheduleForm.location}
+                  onChange={e => setScheduleForm(f => ({ ...f, location: e.target.value }))}
+                  placeholder="e.g. 123 Main St, Chardon OH"
+                  data-testid="input-schedule-location"
+                />
+              </div>
+            )}
+
+            <div>
+              <Label>Interviewer Name</Label>
+              <Input
+                value={scheduleForm.interviewerName}
+                onChange={e => setScheduleForm(f => ({ ...f, interviewerName: e.target.value }))}
+                placeholder="e.g. Dan Chapin"
+                data-testid="input-schedule-interviewer"
+              />
+            </div>
+
+            <div>
+              <Label>Notes (optional)</Label>
+              <Textarea
+                value={scheduleForm.notes}
+                onChange={e => setScheduleForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="Any notes to include in the email..."
+                rows={2}
+                data-testid="textarea-schedule-notes"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingSchedule(null)} disabled={scheduling}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleScheduleSubmit}
+              disabled={!scheduleForm.date || !scheduleForm.time || scheduling}
+              data-testid="button-confirm-schedule"
+            >
+              {scheduling ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Scheduling...</>
+              ) : (
+                <><Calendar className="h-4 w-4 mr-2" /> Schedule Interview</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

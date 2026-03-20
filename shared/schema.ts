@@ -287,6 +287,9 @@ export const candidates = pgTable("candidates", {
   interviewNotes: text("interview_notes"),
   interviewRating: integer("interview_rating"),
   interviewRecommendation: text("interview_recommendation"),
+  zoomMeetingUrl: text("zoom_meeting_url"),
+  zoomMeetingId: text("zoom_meeting_id"),
+  zoomPasscode: text("zoom_passcode"),
   lastNotifiedAt: timestamp("last_notified_at"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

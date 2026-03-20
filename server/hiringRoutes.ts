@@ -1,7 +1,12 @@
 import type { Express, RequestHandler } from "express";
 import { storage } from "./storage";
-import { sendHiringStageEmail, sendHiringWelcomeEmail, sendNewHireAccountEmail } from "./email";
+import { sendHiringStageEmail, sendHiringWelcomeEmail, sendNewHireAccountEmail, sendZoomInterviewEmail, sendInPersonInterviewEmail } from "./email";
 import { hashPassword } from "./auth";
+import { createZoomMeeting, isZoomConfigured } from "./zoomService";
+import { createCalendarEvent, refreshAccessToken, isTokenExpired } from "./googleOAuth";
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 function generateTempPassword(): string {
   const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -627,4 +632,143 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
       res.status(500).json({ message: err.message });
     }
   });
+
+  // POST /api/candidates/:id/schedule-interview
+  app.post("/api/candidates/:id/schedule-interview", requireAuth, requireHRAccess, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { date, time, duration = 30, type = "zoom", location = "", notes = "", interviewerName = "" } = req.body as {
+        date: string; time: string; duration?: number; type?: string;
+        location?: string; notes?: string; interviewerName?: string;
+      };
+
+      if (!date || !time) return res.status(400).json({ message: "Date and time are required" });
+
+      const candidate = await storage.getCandidate(id);
+      if (!candidate) return res.status(404).json({ message: "Candidate not found" });
+
+      // Build the start datetime
+      const startDatetime = new Date(`${date}T${convertTo24h(time)}`);
+      const endDatetime = new Date(startDatetime.getTime() + duration * 60_000);
+
+      let zoomResult: { joinUrl: string; meetingId: string; passcode: string } | null = null;
+      let calendarEventCreated = false;
+
+      // ── Zoom meeting ──────────────────────────────────────────────────────
+      if (type === "zoom") {
+        if (!isZoomConfigured()) {
+          console.warn("[hiring] Zoom credentials not configured, skipping Zoom meeting creation");
+        } else {
+          try {
+            zoomResult = await createZoomMeeting(
+              `Interview — ${candidate.name} for ${candidate.role}`,
+              startDatetime,
+              duration
+            );
+          } catch (zoomErr: any) {
+            console.error("[hiring] Zoom meeting creation failed:", zoomErr.message);
+          }
+        }
+      }
+
+      // ── Google Calendar event ─────────────────────────────────────────────
+      try {
+        const currentUser = req.user;
+        let accessToken: string | null = null;
+
+        if (currentUser?.googleRefreshToken) {
+          if (currentUser.googleAccessToken && currentUser.googleTokenExpiry && !isTokenExpired(new Date(currentUser.googleTokenExpiry))) {
+            accessToken = currentUser.googleAccessToken;
+          } else {
+            const creds = await refreshAccessToken(currentUser.googleRefreshToken);
+            accessToken = creds.access_token || null;
+            if (creds.access_token) {
+              await db.update(users).set({
+                googleAccessToken: creds.access_token,
+                googleTokenExpiry: creds.expiry_date ? new Date(creds.expiry_date) : undefined,
+              }).where(eq(users.id, currentUser.id));
+            }
+          }
+        }
+
+        if (accessToken) {
+          const description = type === "zoom" && zoomResult
+            ? `Zoom Interview\nJoin: ${zoomResult.joinUrl}\nPasscode: ${zoomResult.passcode}\n\n${notes}`
+            : `In-Person Interview\nLocation: ${location}\n\n${notes}`;
+
+          await createCalendarEvent(accessToken, {
+            summary: `Interview: ${candidate.name} — ${candidate.role}`,
+            description,
+            location: type === "zoom" ? (zoomResult?.joinUrl || "") : location,
+            start: { dateTime: startDatetime.toISOString() },
+            end: { dateTime: endDatetime.toISOString() },
+          });
+          calendarEventCreated = true;
+        }
+      } catch (calErr: any) {
+        console.error("[hiring] Calendar event creation failed:", calErr.message);
+      }
+
+      // ── Update candidate record ───────────────────────────────────────────
+      const updates: Record<string, any> = {
+        stage: "Interview Scheduled",
+        interviewDate: startDatetime,
+        interviewTime: time,
+        interviewType: type,
+        interviewLocation: type === "in-person" ? location : "",
+        interviewerName,
+        interviewNotes: notes,
+        ...(zoomResult ? {
+          zoomMeetingUrl: zoomResult.joinUrl,
+          zoomMeetingId: zoomResult.meetingId,
+          zoomPasscode: zoomResult.passcode,
+        } : {}),
+      };
+
+      await storage.updateCandidate(id, updates);
+
+      // ── Send email to applicant ───────────────────────────────────────────
+      let emailSent = false;
+      if (candidate.email) {
+        try {
+          const dateLabel = startDatetime.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+          if (type === "zoom" && zoomResult) {
+            await sendZoomInterviewEmail(candidate.email, candidate.name, candidate.role, dateLabel, time, zoomResult.joinUrl, zoomResult.passcode, interviewerName, notes);
+          } else {
+            await sendInPersonInterviewEmail(candidate.email, candidate.name, candidate.role, dateLabel, time, location, interviewerName, notes);
+          }
+          emailSent = true;
+        } catch (emailErr: any) {
+          console.error("[hiring] Interview email failed:", emailErr.message);
+        }
+      }
+
+      return res.json({
+        success: true,
+        zoomMeeting: zoomResult,
+        calendarEventCreated,
+        emailSent,
+        message: "Interview scheduled successfully",
+      });
+    } catch (err: any) {
+      console.error("[hiring] schedule-interview error:", err);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // GET /api/zoom/status — check if Zoom is configured
+  app.get("/api/zoom/status", requireAuth, requireHRAccess, (req, res) => {
+    res.json({ configured: isZoomConfigured() });
+  });
+}
+
+function convertTo24h(timeStr: string): string {
+  const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return timeStr.includes(":") ? timeStr : "09:00:00";
+  let hours = parseInt(match[1], 10);
+  const minutes = match[2];
+  const period = match[3]?.toUpperCase();
+  if (period === "PM" && hours < 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+  return `${String(hours).padStart(2, "0")}:${minutes}:00`;
 }
