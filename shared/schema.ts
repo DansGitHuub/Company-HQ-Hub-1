@@ -2666,3 +2666,30 @@ export const sopPipelineSettings = pgTable("sop_pipeline_settings", {
 });
 
 export type SopPipelineSettings = typeof sopPipelineSettings.$inferSelect;
+
+export const jobApplications = pgTable("job_applications", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  status: text("status").notNull().default("draft"),
+  applicantName: text("applicant_name"),
+  applicantEmail: text("applicant_email"),
+  applicantPhone: text("applicant_phone"),
+  position: text("position"),
+  source: text("source"),
+  data: jsonb("data").notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  submittedAt: timestamp("submitted_at"),
+  candidateId: varchar("candidate_id", { length: 36 }),
+  expiryDays: integer("expiry_days").notNull().default(30),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+});
+
+export const insertJobApplicationSchema = createInsertSchema(jobApplications).omit({
+  id: true,
+  createdAt: true,
+  submittedAt: true,
+  candidateId: true,
+});
+export type InsertJobApplication = z.infer<typeof insertJobApplicationSchema>;
+export type JobApplication = typeof jobApplications.$inferSelect;

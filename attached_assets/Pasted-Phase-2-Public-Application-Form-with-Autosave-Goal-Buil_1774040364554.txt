@@ -1,0 +1,34 @@
+Phase 2 — Public Application Form with Autosave
+Goal: Build the "form token" system so applicants can fill out the application at their own pace via a shareable link, with no login required.
+Step 2.1 [NEW] — Create a form_submissions table in the database. It needs the following fields:
+•	id — unique identifier
+•	form_id — which form template is being filled
+•	token — unique randomly generated string used in the public URL
+•	status — values: draft, submitted
+•	applicant_email — collected as first field on the form
+•	data — JSON field storing all field responses as they are saved
+•	created_at — timestamp when the link was generated
+•	expires_at — timestamp for link expiry (default 30 days from creation)
+•	submitted_at — timestamp when the applicant clicks Submit
+Step 2.2 [NEW] — Build a public route at /apply/:token that:
+•	Validates the token exists and has not expired
+•	Validates the token status is not already submitted
+•	Renders the application form without requiring the visitor to be logged in
+•	Shows an error page if the token is invalid, expired, or already submitted
+Step 2.3 [NEW] — Implement autosave on the public form. As the applicant types in any field, the response should be saved to the data JSON column in the form_submissions table. Use debounced saves (wait ~1.5 seconds after the user stops typing before sending the save request). The applicant should see a subtle "Saved" indicator so they know their progress is safe.
+Step 2.4 [NEW] — When the applicant returns to the same link after closing the browser, all previously entered fields should be pre-populated from the saved data column. They should be able to pick up exactly where they left off.
+Step 2.5 [NEW] — Implement the required field submit lock. The Submit button should be disabled and visually grayed out until all required fields are filled. Show a counter such as "3 of 8 required fields remaining" that updates in real time as fields are completed. When all required fields are filled, the Submit button becomes active.
+Step 2.6 [NEW] — When the applicant clicks Submit:
+•	Set the status field to submitted and record the submitted_at timestamp
+•	Show the applicant a confirmation screen: "Your application has been submitted. We will be in touch soon."
+•	Lock the form so it cannot be edited or resubmitted
+Step 2.7 [CONNECT] — When a form is submitted, trigger a notification to Admin and Manager users via both channels:
+•	In-app bell notification: "New application received from [applicant name]"
+•	Email via Resend: same message with a link to view the submission in CompanyHQ
+Step 2.8 [NEW] — In the Admin Panel, add a "Generate Application Link" action. When clicked, it:
+•	Creates a new record in form_submissions with status draft
+•	Generates a unique token
+•	Displays a copyable link in the format [app URL]/apply/[token]
+•	Allows the Admin to set the expiry to 14 days or 30 days before generating
+•	This is the link HR pastes into the email they send to the applicant
+Step 2.9 [MODIFY] — When an application is submitted, automatically create a new applicant card in the Hiring Kanban in the "Application Received" column. Populate the card with the applicant's name, email, phone, position applied for, and source. Link the card to the form submission so the full application is viewable from the card.
