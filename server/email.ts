@@ -484,3 +484,37 @@ export async function sendInPersonInterviewEmail(
     </div>
   `);
 }
+
+export async function sendHiredNotificationEmail(
+  toEmail: string,
+  adminName: string,
+  candidateName: string,
+  position: string,
+  username: string
+) {
+  const appUrl = getAppUrl();
+  return sendEmail(toEmail, `New Hire — ${escapeHtml(candidateName)} (${escapeHtml(position)})`, `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #166534; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Chapin Landscapes</h1>
+        <p style="color: #bbf7d0; margin: 4px 0 0 0; font-size: 14px;">HR — New Hire Notification</p>
+      </div>
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937;">Hi ${escapeHtml(adminName)},</h2>
+        <p style="color: #4b5563; line-height: 1.6;"><strong>${escapeHtml(candidateName)}</strong> has been hired as <strong>${escapeHtml(position)}</strong>.</p>
+        <div style="background: #dcfce7; border: 1px solid #16a34a; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <p style="margin: 0 0 8px 0; color: #166534; font-size: 14px;">Employee record created automatically</p>
+          <p style="margin: 0 0 8px 0; color: #166534; font-size: 14px;">Onboarding checklist generated (I-9, W-4, NDA and more)</p>
+          <p style="margin: 0 0 8px 0; color: #166534; font-size: 14px;">Crew account created — username: <strong>${escapeHtml(username)}</strong></p>
+          <p style="margin: 0; color: #166534; font-size: 14px;">Welcome email with login credentials sent to employee</p>
+        </div>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${appUrl}/hiring" style="background-color: #166534; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">View Hiring Pipeline</a>
+        </div>
+      </div>
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
+        <p>Chapin Landscapes - design, build, maintain - 440.724.8006 - chapinlandscapes.com</p>
+      </div>
+    </div>
+  `);
+}

@@ -1,6 +1,6 @@
 import type { Express, RequestHandler } from "express";
 import { storage } from "./storage";
-import { sendHiringStageEmail, sendHiringWelcomeEmail, sendNewHireAccountEmail, sendZoomInterviewEmail, sendInPersonInterviewEmail } from "./email";
+import { sendHiringStageEmail, sendHiringWelcomeEmail, sendNewHireAccountEmail, sendZoomInterviewEmail, sendInPersonInterviewEmail, sendHiredNotificationEmail } from "./email";
 import { hashPassword } from "./auth";
 import { createZoomMeeting, isZoomConfigured } from "./zoomService";
 import { createCalendarEvent, refreshAccessToken, isTokenExpired } from "./googleOAuth";
@@ -759,6 +759,186 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
   // GET /api/zoom/status — check if Zoom is configured
   app.get("/api/zoom/status", requireAuth, requireHRAccess, (req, res) => {
     res.json({ configured: isZoomConfigured() });
+  });
+
+  // GET /api/candidates/:id/offer-letter-upload-url — signed URL for direct-to-storage upload
+  app.get("/api/candidates/:id/offer-letter-upload-url", requireAuth, requireHRAccess, async (req, res) => {
+    try {
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+      const objService = new ObjectStorageService();
+      const signedUrl = await objService.getObjectEntityUploadURL();
+      const objectKey = signedUrl.split("?")[0].split("/uploads/").pop() || "";
+      res.json({ signedUrl, objectKey });
+    } catch (err: any) {
+      console.error("[hiring] offer-letter upload URL error:", err.message);
+      res.status(500).json({ message: "Failed to get upload URL. Object storage may not be configured." });
+    }
+  });
+
+  // POST /api/candidates/:id/hire — full hire automation (Steps 4.2–4.5)
+  app.post("/api/candidates/:id/hire", requireAuth, requireHRAccess, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { startDate } = req.body;
+
+      const candidate = await storage.getCandidate(id);
+      if (!candidate) return res.status(404).json({ message: "Candidate not found" });
+
+      // ── 4.2: Create employee record ──────────────────────────────────────
+      const nameParts = candidate.name.trim().split(/\s+/);
+      const firstName = nameParts[0] || candidate.name;
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      let employee: any = null;
+      const existingEmployees = await storage.getEmployees();
+      const alreadyLinked = existingEmployees.find((e: any) => e.candidateId === id);
+
+      if (!alreadyLinked) {
+        employee = await storage.createEmployee({
+          candidateId: id,
+          firstName,
+          lastName,
+          personalEmail: candidate.email || undefined,
+          personalPhone: candidate.phone || undefined,
+          jobTitle: candidate.role || undefined,
+          startDate: startDate || undefined,
+          status: "Active",
+          employmentType: "Full-time",
+        });
+      } else {
+        employee = alreadyLinked;
+      }
+
+      // Move candidate to Hired stage
+      await storage.updateCandidate(id, { stage: "Hired" });
+
+      // ── 4.3: Onboarding checklist ─────────────────────────────────────────
+      const ONBOARDING_FORMS = [
+        { title: "Emergency Contact Form", category: "Forms" },
+        { title: "I-9 Employment Eligibility Verification", category: "Compliance" },
+        { title: "W-4 Federal Tax Withholding", category: "Compliance" },
+        { title: "IT-4 State Tax Withholding (Ohio)", category: "Compliance" },
+        { title: "NDA Agreement", category: "Legal" },
+        { title: "OSHA 301 Incident Report Acknowledgment", category: "Safety" },
+        { title: "Employee Handbook Acknowledgment", category: "Policy" },
+        { title: "Offer Letter Review & Acceptance", category: "HR" },
+        { title: "Direct Deposit Form", category: "Payroll" },
+      ];
+
+      const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 1 week
+      for (const form of ONBOARDING_FORMS) {
+        await storage.createOnboardingItem({
+          employeeId: employee.id,
+          title: form.title,
+          category: form.category,
+          assignedTo: candidate.name,
+          status: "Pending",
+          dueDate,
+        });
+      }
+
+      // Link any existing offer letter document to the employee record via hrFormSubmissions
+      const candidateDocs = await storage.getCandidateDocuments(id);
+      const offerLetter = candidateDocs.find((d: any) => d.type === "offer_letter");
+      if (offerLetter) {
+        await storage.createHrFormSubmission({
+          employeeId: employee.id,
+          candidateId: id,
+          formType: "offer_letter",
+          formData: { documentId: offerLetter.id, url: offerLetter.url, uploadedAt: offerLetter.uploadedAt },
+          status: "Completed",
+        });
+      }
+
+      // ── 4.4: Create Crew account ──────────────────────────────────────────
+      let username = "";
+      let tempPassword = "";
+      let accountCreated = false;
+      let emailSent = false;
+
+      if (!candidate.userId) {
+        const baseUsername = slugifyName(candidate.name) || "crew.member";
+        username = baseUsername;
+        let suffix = 1;
+        while (await storage.getUserByUsername(username)) {
+          username = `${baseUsername}${suffix++}`;
+        }
+
+        const existingByEmail = candidate.email ? await storage.getUserByEmail(candidate.email) : null;
+        if (!existingByEmail) {
+          tempPassword = generateTempPassword();
+          const hashedPassword = await hashPassword(tempPassword);
+
+          const newUser = await storage.createUser({
+            username,
+            password: hashedPassword,
+            email: candidate.email || `${username}@chapinlandscapes.com`,
+            name: candidate.name,
+            role: "Crew",
+            storedPassword: tempPassword,
+          });
+
+          await storage.updateCandidate(id, { userId: newUser.id });
+          await storage.updateEmployee(employee.id, { userId: newUser.id });
+          accountCreated = true;
+
+          if (candidate.email) {
+            try {
+              await sendNewHireAccountEmail(candidate.email, candidate.name, username, tempPassword, candidate.role || "Team Member");
+              emailSent = true;
+            } catch (emailErr: any) {
+              console.error("[hiring] Welcome email failed:", emailErr.message);
+            }
+          }
+        } else {
+          username = existingByEmail.username;
+          await storage.updateCandidate(id, { userId: existingByEmail.id });
+          await storage.updateEmployee(employee.id, { userId: existingByEmail.id });
+        }
+      } else {
+        const existingUser = await storage.getUser(candidate.userId);
+        username = existingUser?.username || "";
+      }
+
+      // ── 4.5: Notify Admins + Managers ────────────────────────────────────
+      try {
+        const allUsers = await storage.getAllUsers();
+        const recipients = allUsers.filter((u: any) => u.role === "Admin" || u.role === "Manager" || u.role === "Master Admin");
+        for (const recipient of recipients) {
+          await storage.createStaffNotification({
+            userId: recipient.id,
+            type: "candidate_hired",
+            title: "New Hire",
+            message: `${candidate.name} has been hired as ${candidate.role || "Team Member"}. Employee record, onboarding checklist, and Crew account created.`,
+            link: "/hiring",
+            isRead: false,
+          });
+
+          if (recipient.email) {
+            try {
+              await sendHiredNotificationEmail(recipient.email, recipient.name || recipient.username, candidate.name, candidate.role || "Team Member", username);
+            } catch (notifEmailErr: any) {
+              console.error("[hiring] Admin notification email failed:", notifEmailErr.message);
+            }
+          }
+        }
+      } catch (notifErr: any) {
+        console.error("[hiring] Notification error:", notifErr.message);
+      }
+
+      res.json({
+        success: true,
+        employeeId: employee.id,
+        accountCreated,
+        emailSent,
+        username,
+        onboardingItems: ONBOARDING_FORMS.length,
+        message: "Candidate hired — employee record, onboarding, and account all created.",
+      });
+    } catch (err: any) {
+      console.error("[hiring] hire error:", err);
+      res.status(500).json({ message: err.message });
+    }
   });
 }
 

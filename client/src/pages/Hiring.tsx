@@ -17,7 +17,8 @@ import {
   Plus, Phone, Mail, MapPin, FileText, Trash2, User, Star, Clock,
   MessageSquare, Calendar, ChevronRight, X, GripVertical, Upload,
   Send, CheckCircle2, Circle, AlertCircle, ClipboardList, Users,
-  UserPlus, Copy, Eye, EyeOff, ShieldCheck, Video, ExternalLink, Loader2
+  UserPlus, Copy, Eye, EyeOff, ShieldCheck, Video, ExternalLink, Loader2,
+  FileCheck, UserCheck, Briefcase
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -74,6 +75,13 @@ export default function Hiring() {
   const [pendingSchedule, setPendingSchedule] = useState<{ candidateId: string; candidate: Candidate } | null>(null);
   const [scheduleForm, setScheduleForm] = useState({ date: "", time: "", duration: 30, type: "zoom", location: "", notes: "", interviewerName: "" });
   const [scheduling, setScheduling] = useState(false);
+  const [pendingOfferExtended, setPendingOfferExtended] = useState<{ candidateId: string; candidate: Candidate } | null>(null);
+  const [offerFile, setOfferFile] = useState<File | null>(null);
+  const [offerUploading, setOfferUploading] = useState(false);
+  const [pendingHire, setPendingHire] = useState<{ candidateId: string; candidate: Candidate } | null>(null);
+  const [hireStartDate, setHireStartDate] = useState("");
+  const [hiring, setHiring] = useState(false);
+  const [hireResult, setHireResult] = useState<any>(null);
 
   const { data: candidates = [] } = useQuery<Candidate[]>({
     queryKey: ["/api/candidates"],
@@ -137,6 +145,19 @@ export default function Hiring() {
       return;
     }
 
+    if (newStage === "Offer Extended") {
+      setPendingOfferExtended({ candidateId, candidate });
+      setOfferFile(null);
+      return;
+    }
+
+    if (newStage === "Hired") {
+      setPendingHire({ candidateId, candidate });
+      setHireStartDate("");
+      setHireResult(null);
+      return;
+    }
+
     stageMutation.mutate({ id: candidateId, stage: newStage });
   }
 
@@ -158,6 +179,53 @@ export default function Hiring() {
       toast({ title: "Error", description: err.message || "Failed to schedule interview", variant: "destructive" });
     } finally {
       setScheduling(false);
+    }
+  }
+
+  async function handleOfferExtendedSubmit(skipUpload = false) {
+    if (!pendingOfferExtended) return;
+    setOfferUploading(true);
+    try {
+      if (!skipUpload && offerFile) {
+        const urlRes = await apiRequest("GET", `/api/candidates/${pendingOfferExtended.candidateId}/offer-letter-upload-url`);
+        const { signedUrl, objectKey } = await urlRes.json();
+        if (signedUrl) {
+          await fetch(signedUrl, { method: "PUT", headers: { "Content-Type": offerFile.type }, body: offerFile });
+          await apiRequest("POST", `/api/candidates/${pendingOfferExtended.candidateId}/documents`, {
+            name: offerFile.name,
+            type: "offer_letter",
+            url: `/objects/uploads/${objectKey}`,
+            status: "Sent",
+            requiresAcknowledgment: true,
+          });
+        }
+      }
+      await apiRequest("POST", `/api/candidates/${pendingOfferExtended.candidateId}/stage`, { stage: "Offer Extended" });
+      queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/candidates/${pendingOfferExtended.candidateId}/documents`] });
+      toast({ title: "Offer Extended", description: offerFile && !skipUpload ? "Offer letter uploaded and card moved." : "Card moved to Offer Extended." });
+      setPendingOfferExtended(null);
+      setOfferFile(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to process offer", variant: "destructive" });
+    } finally {
+      setOfferUploading(false);
+    }
+  }
+
+  async function handleHireConfirm() {
+    if (!pendingHire) return;
+    setHiring(true);
+    try {
+      const res = await apiRequest("POST", `/api/candidates/${pendingHire.candidateId}/hire`, { startDate: hireStartDate });
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
+      setHireResult(data);
+    } catch (err: any) {
+      toast({ title: "Error hiring candidate", description: err.message || "Something went wrong", variant: "destructive" });
+      setHiring(false);
+    } finally {
+      setHiring(false);
     }
   }
 
@@ -306,6 +374,12 @@ export default function Hiring() {
                                       </span>
                                     )}
                                   </div>
+                                  {/* Offer letter badge on card */}
+                                  {(candidate as any).hasOfferLetter && (
+                                    <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-1.5 font-medium">
+                                      <FileCheck className="h-3 w-3" /> Offer Letter Attached
+                                    </div>
+                                  )}
                                   {/* Interview details on card */}
                                   {candidate.interviewDate && (
                                     <div className="mt-2 pt-2 border-t border-border space-y-1">
@@ -369,6 +443,126 @@ export default function Hiring() {
           onTabChange={setDetailTab}
         />
       )}
+
+      {/* Offer Extended Modal — Step 4.1 */}
+      <Dialog open={!!pendingOfferExtended} onOpenChange={(open) => { if (!open && !offerUploading) { setPendingOfferExtended(null); setOfferFile(null); } }}>
+        <DialogContent className="max-w-md" data-testid="dialog-offer-extended">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileCheck className="h-5 w-5 text-primary" />
+              Offer Extended
+            </DialogTitle>
+            {pendingOfferExtended && (
+              <DialogDescription>
+                Moving <strong>{pendingOfferExtended.candidate.name}</strong> to Offer Extended.
+                You can optionally attach the offer letter now.
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
+              <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground mb-3">Upload offer letter (PDF or Word) — optional</p>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                className="hidden"
+                id="offer-letter-file"
+                onChange={e => setOfferFile(e.target.files?.[0] || null)}
+                data-testid="input-offer-letter-file"
+              />
+              <label htmlFor="offer-letter-file">
+                <Button variant="outline" size="sm" className="cursor-pointer" asChild>
+                  <span><Upload className="h-3.5 w-3.5 mr-1.5" />Choose File</span>
+                </Button>
+              </label>
+              {offerFile && (
+                <div className="mt-3 flex items-center justify-center gap-2 text-sm text-emerald-600 font-medium">
+                  <FileCheck className="h-4 w-4" /> {offerFile.name}
+                  <button onClick={() => setOfferFile(null)} className="text-muted-foreground hover:text-destructive ml-1">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              The file will be logged with a timestamp on the applicant record.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => handleOfferExtendedSubmit(true)} disabled={offerUploading}>
+              Skip Upload
+            </Button>
+            <Button onClick={() => handleOfferExtendedSubmit(false)} disabled={offerUploading} data-testid="button-confirm-offer">
+              {offerUploading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Uploading…</> : <><FileCheck className="h-4 w-4 mr-2" />Confirm Offer Extended</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hired Modal — Steps 4.2–4.5 */}
+      <Dialog open={!!pendingHire} onOpenChange={(open) => { if (!open && !hiring && !hireResult) { setPendingHire(null); setHireResult(null); } }}>
+        <DialogContent className="max-w-md" data-testid="dialog-hire-candidate">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-emerald-600" />
+              Confirm Hire
+            </DialogTitle>
+            {pendingHire && !hireResult && (
+              <DialogDescription>
+                Hiring <strong>{pendingHire.candidate.name}</strong> will automatically create their employee record,
+                onboarding checklist, and Crew account.
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          {!hireResult ? (
+            <div className="space-y-4 py-2">
+              <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground"><Briefcase className="h-4 w-4 text-primary" /> Employee record created from application data</div>
+                <div className="flex items-center gap-2 text-muted-foreground"><ClipboardList className="h-4 w-4 text-primary" /> Onboarding checklist (I-9, W-4, NDA, OSHA + more)</div>
+                <div className="flex items-center gap-2 text-muted-foreground"><UserCheck className="h-4 w-4 text-primary" /> Crew account with login credentials</div>
+                <div className="flex items-center gap-2 text-muted-foreground"><Send className="h-4 w-4 text-primary" /> Welcome email to employee + admin notification</div>
+              </div>
+              <div>
+                <Label>Start Date (optional)</Label>
+                <Input
+                  type="date"
+                  value={hireStartDate}
+                  onChange={e => setHireStartDate(e.target.value)}
+                  data-testid="input-hire-start-date"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="py-4 space-y-3">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-2">
+                <p className="font-semibold text-emerald-800 flex items-center gap-2"><CheckCircle2 className="h-5 w-5" /> Hired successfully!</p>
+                {hireResult.accountCreated && (
+                  <p className="text-sm text-emerald-700">Crew account created — username: <strong>{hireResult.username}</strong></p>
+                )}
+                {hireResult.emailSent && (
+                  <p className="text-sm text-emerald-700">Welcome email sent to employee.</p>
+                )}
+                <p className="text-sm text-emerald-700">{hireResult.onboardingItems} onboarding checklist items created.</p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            {!hireResult ? (
+              <>
+                <Button variant="outline" onClick={() => setPendingHire(null)} disabled={hiring}>Cancel</Button>
+                <Button onClick={handleHireConfirm} disabled={hiring} className="bg-emerald-600 hover:bg-emerald-700" data-testid="button-confirm-hire">
+                  {hiring ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Processing…</> : <><UserCheck className="h-4 w-4 mr-2" />Hire & Create Account</>}
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => { setPendingHire(null); setHireResult(null); }} data-testid="button-hire-done">Done</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Interview Schedule Modal */}
       <Dialog open={!!pendingSchedule} onOpenChange={(open) => { if (!open && !scheduling) setPendingSchedule(null); }}>
