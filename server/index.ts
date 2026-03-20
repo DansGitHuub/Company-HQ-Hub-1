@@ -21,6 +21,7 @@ import { runSuggestionsMigration } from "./suggestionsMigration";
 import { runEstimatesMigration } from "./estimatesMigration";
 import { runLanguageMigration } from "./languageMigration";
 import { runActivityLogMigration } from "./activityLogMigration";
+import { seedHiringEmailTemplates, startApplicationTokenScheduler } from "./applicationTokenScheduler";
 
 const app = express();
 const httpServer = createServer(app);
@@ -99,6 +100,7 @@ app.use((req, res, next) => {
   await seedSampleData();
   await seedOemTemplates();
   await seedDevelopmentTracker();
+  await seedHiringEmailTemplates();
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -140,6 +142,7 @@ app.use((req, res, next) => {
       startTaskScheduler();
       startSopPipelineScheduler();
       startProcessAuditScheduler();
+      startApplicationTokenScheduler();
     },
   );
 })();

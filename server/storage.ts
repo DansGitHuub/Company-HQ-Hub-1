@@ -641,6 +641,8 @@ export interface IStorage {
   getHiringEmailTemplates(): Promise<HiringEmailTemplate[]>;
   getHiringEmailTemplate(stage: string): Promise<HiringEmailTemplate | undefined>;
   updateHiringEmailTemplate(id: string, updates: Partial<HiringEmailTemplate>): Promise<HiringEmailTemplate | undefined>;
+  upsertHiringEmailTemplate(stage: string, data: { subject: string; body: string; isEnabled: boolean }): Promise<HiringEmailTemplate>;
+  getExpiringApplicationTokens(withinDays: number): Promise<any[]>;
 
   // Customer Hub - Customer Jobs
   getCustomerJobs(customerId: string): Promise<CustomerJob[]>;
@@ -2964,6 +2966,37 @@ export class DatabaseStorage implements IStorage {
   async updateHiringEmailTemplate(id: string, updates: Partial<HiringEmailTemplate>): Promise<HiringEmailTemplate | undefined> {
     const [updated] = await db.update(hiringEmailTemplates).set({ ...updates, updatedAt: new Date() }).where(eq(hiringEmailTemplates.id, id)).returning();
     return updated;
+  }
+
+  async upsertHiringEmailTemplate(stage: string, data: { subject: string; body: string; isEnabled: boolean }): Promise<HiringEmailTemplate> {
+    const existing = await this.getHiringEmailTemplate(stage);
+    if (existing) {
+      const [updated] = await db.update(hiringEmailTemplates)
+        .set({ subject: data.subject, body: data.body, isEnabled: data.isEnabled, updatedAt: new Date() })
+        .where(eq(hiringEmailTemplates.stage, stage))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(hiringEmailTemplates)
+      .values({ stage, subject: data.subject, body: data.body, isEnabled: data.isEnabled })
+      .returning();
+    return created;
+  }
+
+  async getExpiringApplicationTokens(withinDays: number): Promise<any[]> {
+    const { pool } = await import("./db");
+    const now = new Date();
+    const future = new Date(now.getTime() + withinDays * 24 * 60 * 60 * 1000);
+    const result = await pool.query(
+      `SELECT id, token, applicant_name, applicant_email, position, expires_at, created_by
+       FROM job_applications
+       WHERE status = 'draft'
+         AND expires_at > NOW()
+         AND expires_at <= $1
+         AND expiry_notification_sent_at IS NULL`,
+      [future]
+    );
+    return result.rows;
   }
 
   // Customer Hub - Customer Jobs

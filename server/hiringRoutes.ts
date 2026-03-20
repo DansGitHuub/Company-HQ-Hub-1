@@ -133,7 +133,7 @@ async function notifyHRAndManagers(type: string, title: string, message: string,
 async function handleStageChange(candidateId: string, newStage: string, candidate: any, userId?: string) {
   const template = await storage.getHiringEmailTemplate(newStage);
 
-  if (template && candidate.email) {
+  if (template && template.isEnabled && candidate.email) {
     let subject = template.subject;
     let body = template.body;
     const replacements: Record<string, string> = {
@@ -590,6 +590,18 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
     }
   });
 
+  app.put("/api/hiring-email-templates/:stage", requireAuth, requireManagerAccess, async (req, res) => {
+    try {
+      const { stage } = req.params;
+      const { subject, body, isEnabled } = req.body;
+      if (!subject || !body) return res.status(400).json({ message: "subject and body are required" });
+      const template = await storage.upsertHiringEmailTemplate(stage, { subject, body, isEnabled: isEnabled !== false });
+      res.json(template);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Create CompanyHQ user account for a hired candidate
   app.post("/api/candidates/:id/create-account", requireAuth, requireManagerAccess, async (req, res) => {
     try {
@@ -778,6 +790,16 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
           console.error("[hiring] Interview email failed:", emailErr.message);
         }
       }
+
+      // ── Notify HR / Managers ─────────────────────────────────────────────
+      const updatedCandidate = await storage.getCandidate(id);
+      await notifyHRAndManagers(
+        "hiring_stage_change",
+        `Interview Scheduled: ${candidate.name}`,
+        `${candidate.name} has been scheduled for a ${type === "zoom" ? "Zoom" : "In-Person"} interview on ${startDatetime.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} at ${time}.`,
+        "/hiring",
+        { candidateId: id, newStage: "Interview Scheduled", candidateName: candidate.name, position: candidate.role }
+      );
 
       return res.json({
         success: true,

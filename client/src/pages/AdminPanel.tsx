@@ -61,7 +61,8 @@ import {
   Lightbulb,
   Zap,
   ClipboardCheck,
-  Puzzle
+  Puzzle,
+  Mail
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
@@ -93,6 +94,7 @@ import { Switch } from "@/components/ui/switch";
 import ArticleReportsCenter from "@/components/ArticleReportsCenter";
 import DiagnosticReport from "@/components/DiagnosticReport";
 import AdminDocumentLibrary from "@/components/AdminDocumentLibrary";
+import HiringEmailTemplates from "@/components/HiringEmailTemplates";
 
 function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin, t }: {
   activeTab: string;
@@ -110,6 +112,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "todos", label: "Task Access", icon: CheckCircle },
         { value: "suggestions", label: "Suggestions", icon: Lightbulb },
         { value: "application-links", label: "Application Links", icon: ExternalLink },
+        { value: "email-templates", label: "Email Templates", icon: Mail },
       ],
     },
     {
@@ -1168,6 +1171,10 @@ export default function AdminPanel() {
 
         <TabsContent value="application-links" className="mt-6">
           <ApplicationLinksPanel />
+        </TabsContent>
+
+        <TabsContent value="email-templates" className="mt-6">
+          <HiringEmailTemplates />
         </TabsContent>
 
         <TabsContent value="app-testing" className="mt-6">

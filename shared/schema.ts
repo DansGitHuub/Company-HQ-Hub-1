@@ -496,6 +496,7 @@ export const hiringEmailTemplates = pgTable("hiring_email_templates", {
   stage: text("stage").notNull().unique(),
   subject: text("subject").notNull(),
   body: text("body").notNull(),
+  isEnabled: boolean("is_enabled").notNull().default(true),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -2686,6 +2687,7 @@ export const jobApplications = pgTable("job_applications", {
   candidateId: varchar("candidate_id", { length: 36 }),
   expiryDays: integer("expiry_days").notNull().default(30),
   createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  expiryNotificationSentAt: timestamp("expiry_notification_sent_at"),
 });
 
 export const insertJobApplicationSchema = createInsertSchema(jobApplications).omit({
