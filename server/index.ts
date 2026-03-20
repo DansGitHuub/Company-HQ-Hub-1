@@ -11,6 +11,7 @@ import { runQuizAdaptiveMigration } from "./quizMigration";
 import { runNotificationMigration } from "./notificationMigration";
 import { startTaskScheduler } from "./taskScheduler";
 import { startSopPipelineScheduler } from "./sopPipelineScheduler";
+import { startProcessAuditScheduler } from "./processAuditScheduler";
 import { seedOemTemplates } from "./equipmentSeed";
 import { runSharedLinksMigration } from "./sharedLinksMigration";
 import { runDocumentMigration } from "./documentMigration";
@@ -138,6 +139,7 @@ app.use((req, res, next) => {
       startMaintenanceScheduler();
       startTaskScheduler();
       startSopPipelineScheduler();
+      startProcessAuditScheduler();
     },
   );
 })();

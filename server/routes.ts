@@ -6794,7 +6794,7 @@ SECTION GENERATION RULES:
   });
   
   // ================== PROCESS AUDIT RESULTS ==================
-  
+
   app.get("/api/process-audits", requireAuth, requireRole(["Admin"]), async (req, res) => {
     try {
       const { processId } = req.query;
@@ -6804,7 +6804,7 @@ SECTION GENERATION RULES:
       res.status(500).json({ message: "Error fetching audit results" });
     }
   });
-  
+
   app.get("/api/process-audits/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
     try {
       const result = await storage.getProcessAuditResult(req.params.id);
@@ -6814,134 +6814,353 @@ SECTION GENERATION RULES:
       res.status(500).json({ message: "Error fetching audit result" });
     }
   });
-  
+
   app.post("/api/process-audits/run", requireAuth, requireRole(["Admin"]), async (req, res) => {
     try {
       const { processId } = req.body;
-      if (!processId) {
-        return res.status(400).json({ message: "Process ID is required" });
-      }
-      
-      const process = await storage.getBusinessProcess(processId);
-      if (!process) {
-        return res.status(404).json({ message: "Process not found" });
-      }
-      
-      // Create a pending audit result
+      if (!processId) return res.status(400).json({ message: "Process ID is required" });
+      const proc = await storage.getBusinessProcess(processId);
+      if (!proc) return res.status(404).json({ message: "Process not found" });
       const auditResult = await storage.createProcessAuditResult({
         processId,
         status: "running",
+        auditPhase: "researching",
       });
-      
-      // Start the audit in background (non-blocking)
       runProcessAudit(processId, auditResult.id);
-      
-      res.status(202).json({ 
+      res.status(202).json({
         message: "Audit started",
         auditId: auditResult.id,
         estimatedTime: "30-60 seconds",
-        estimatedCost: "$0.02-0.05"
       });
     } catch (err) {
       res.status(500).json({ message: "Error starting audit" });
     }
   });
-  
-  // Background function to run the actual audit
+
+  // Connector health check — programmatic analysis of process wiring
+  function checkProcessConnectors(proc: any): any[] {
+    const issues: any[] = [];
+    const steps: any[] = proc.stepsJson as any[] || [];
+    const notifications: any[] = proc.notificationsJson as any[] || [];
+    const validRoles = ["Admin", "Manager", "Crew", "Customer"];
+
+    if (steps.length === 0) {
+      issues.push({
+        type: "no_steps",
+        severity: "critical",
+        title: "No steps defined",
+        description: "This process has no steps. No one knows what to do or when.",
+        suggestedFix: "Define at least the core steps of this workflow.",
+      });
+    }
+
+    steps.forEach((step: any) => {
+      if (!step.role || !validRoles.includes(step.role)) {
+        issues.push({
+          type: "missing_role",
+          severity: "high",
+          title: `Step "${step.name || "Unnamed"}" has no valid role assigned`,
+          description: "Without a role, no one is responsible for completing this step.",
+          affectedStep: step.name || "Unnamed",
+          suggestedFix: `Assign one of: Admin, Manager, Crew, or Customer to this step.`,
+        });
+      }
+      if (!step.name || step.name.trim() === "") {
+        issues.push({
+          type: "unnamed_step",
+          severity: "medium",
+          title: "A step has no name",
+          description: "Unnamed steps are confusing for team members following the process.",
+          suggestedFix: "Give every step a clear, action-oriented name.",
+        });
+      }
+    });
+
+    if (steps.length > 0 && notifications.length === 0) {
+      issues.push({
+        type: "no_notifications",
+        severity: "high",
+        title: "No notification triggers configured",
+        description: "Team members and customers won't be automatically notified of progress or completion.",
+        suggestedFix: "Add at least a start notification and a completion notification for this process.",
+      });
+    }
+
+    notifications.forEach((notif: any) => {
+      if (!notif.recipient || notif.recipient.trim() === "") {
+        issues.push({
+          type: "notification_no_recipient",
+          severity: "high",
+          title: `Notification "${notif.trigger || "Unnamed"}" has no recipient`,
+          description: "This notification will never be sent because no recipient is defined.",
+          suggestedFix: "Set a recipient (e.g., Customer, Manager) for this notification trigger.",
+        });
+      }
+      if (!notif.channel || notif.channel.trim() === "") {
+        issues.push({
+          type: "notification_no_channel",
+          severity: "medium",
+          title: `Notification "${notif.trigger || "Unnamed"}" has no delivery channel`,
+          description: "No channel (email, SMS, in-app) is defined, so this notification cannot be delivered.",
+          suggestedFix: "Set a delivery channel (email recommended for customer notifications).",
+        });
+      }
+    });
+
+    const hasCustomerStep = steps.some((s: any) => s.role === "Customer");
+    const hasCustomerNotification = notifications.some((n: any) =>
+      (n.recipient || "").toLowerCase().includes("customer")
+    );
+    if (steps.length > 2 && !hasCustomerStep && !hasCustomerNotification) {
+      issues.push({
+        type: "no_customer_touchpoint",
+        severity: "medium",
+        title: "No customer touchpoint in this process",
+        description: "Customers are not involved or notified at any point. This is a missed opportunity to build trust.",
+        suggestedFix: "Add at least one customer notification (e.g., when work is complete or scheduled).",
+      });
+    }
+
+    const stepRoles = steps.map((s: any) => s.role).filter(Boolean);
+    if (stepRoles.length > 0 && new Set(stepRoles).size === 1 && steps.length > 3) {
+      issues.push({
+        type: "single_role_bottleneck",
+        severity: "low",
+        title: `All steps assigned to ${stepRoles[0]} — potential bottleneck`,
+        description: "If one person is responsible for everything, the process stalls if they're unavailable.",
+        suggestedFix: "Distribute steps across multiple roles where appropriate.",
+      });
+    }
+
+    return issues;
+  }
+
+  // Full 3-phase audit engine
   async function runProcessAudit(processId: string, auditId: string) {
     const startTime = Date.now();
     try {
-      const process = await storage.getBusinessProcess(processId);
-      if (!process) return;
-      
-      // Analyze the process using AI
-      const systemPrompt = `You are a business process auditor for a landscape management company. Analyze the given process and provide detailed scores and recommendations.
+      const proc = await storage.getBusinessProcess(processId);
+      if (!proc) return;
 
-You will evaluate the process on these criteria (each 0-100):
-1. Efficiency - Are there unnecessary steps? Can steps be combined?
-2. Reliability - Are there failure points? What happens if someone misses a step?
-3. Customer Experience - Is the customer kept informed? Is it easy for them to understand?
-4. Communication - Are the right people notified at the right times?
-
-Respond with a JSON object containing:
-{
-  "overallScore": <number 0-100>,
-  "efficiencyScore": <number 0-100>,
-  "reliabilityScore": <number 0-100>,
-  "customerExperienceScore": <number 0-100>,
-  "communicationScore": <number 0-100>,
-  "findings": [
-    {"type": "issue|opportunity|strength", "title": "string", "description": "string", "severity": "low|medium|high"}
-  ],
-  "recommendations": [
-    {"title": "string", "description": "string", "priority": "low|medium|high", "estimatedEffort": "string", "expectedImpact": "string"}
-  ],
-  "estimatedImprovementTime": "string"
-}`;
-
-      const userPrompt = `Analyze this business process:
-
-Name: ${process.name}
-Description: ${process.description || "No description provided"}
-Category: ${process.category}
-Roles Involved: ${process.rolesInvolved?.join(", ") || "Not specified"}
-Estimated Duration: ${process.estimatedDuration || "Not specified"}
-
-Process Steps:
-${JSON.stringify(process.stepsJson, null, 2)}
-
-Notifications:
-${JSON.stringify(process.notificationsJson, null, 2)}
-
-Provide a comprehensive audit with specific, actionable recommendations for this landscaping business.`;
-
-      const response = await fetch("https://modelfarm.replit.app/v1beta2/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.AI_INTEGRATIONS_OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          response_format: { type: "json_object" }
-        })
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1",
       });
 
-      const data = await response.json();
-      const auditData = JSON.parse(data.choices[0].message.content);
-      const tokensUsed = (data.usage?.total_tokens || 0);
-      const cost = (tokensUsed / 1000) * 0.00015; // Approximate cost
-      
+      // Phase 1+2: Research + Analysis (combined AI call)
+      await storage.updateProcessAuditResult(auditId, { auditPhase: "researching" });
+
+      const stepsText = (proc.stepsJson as any[] || []).length > 0
+        ? JSON.stringify(proc.stepsJson, null, 2)
+        : "No steps defined";
+      const notificationsText = (proc.notificationsJson as any[] || []).length > 0
+        ? JSON.stringify(proc.notificationsJson, null, 2)
+        : "No notifications configured";
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        temperature: 0.4,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert business process auditor with deep knowledge of landscaping and outdoor services businesses (Chapin Landscapes).
+
+Your job is to:
+1. RESEARCH - Based on industry knowledge, describe what a complete best-practice version of this process should look like for a professional landscaping company
+2. ANALYZE - Compare the current process against best practices and identify gaps
+3. SCORE - Rate the process on four dimensions (0-100 each)
+4. SUGGEST - Provide specific ready-to-add steps the process is missing
+
+Respond with this exact JSON structure:
+{
+  "overallScore": <0-100>,
+  "efficiencyScore": <0-100>,
+  "reliabilityScore": <0-100>,
+  "customerExperienceScore": <0-100>,
+  "communicationScore": <0-100>,
+  "estimatedImprovementTime": "string (e.g., '2-3 hours of setup')",
+  "bestPractices": [
+    {
+      "aspect": "string (e.g., 'Customer Communication')",
+      "description": "string - what a best-practice process includes for this aspect",
+      "currentStatus": "string - how the current process compares",
+      "gap": "none|minor|major"
+    }
+  ],
+  "findings": [
+    {
+      "type": "issue|opportunity|strength",
+      "title": "string",
+      "description": "string - specific, actionable detail",
+      "severity": "low|medium|high"
+    }
+  ],
+  "suggestedSteps": [
+    {
+      "name": "string - clear action-oriented step name",
+      "description": "string - exactly what to do in this step",
+      "role": "Admin|Manager|Crew|Customer",
+      "timing": "string - e.g., 'Before step 2' or 'At the end'",
+      "priority": "low|medium|high",
+      "reason": "string - why this step is important for the business"
+    }
+  ],
+  "recommendations": [
+    {
+      "title": "string",
+      "description": "string",
+      "priority": "low|medium|high",
+      "estimatedEffort": "string",
+      "expectedImpact": "string"
+    }
+  ]
+}`
+          },
+          {
+            role: "user",
+            content: `Audit this business process for a landscaping company:
+
+Process Name: ${proc.name}
+Description: ${proc.description || "None provided"}
+Category: ${proc.category || "General"}
+Roles Involved: ${(proc.rolesInvolved as string[] || []).join(", ") || "Not specified"}
+Estimated Duration: ${proc.estimatedDuration || "Not specified"}
+
+Current Steps:
+${stepsText}
+
+Current Notifications:
+${notificationsText}
+
+Research what this process should ideally look like for a professional landscaping company. Identify every gap between the current process and best practice. Provide specific suggested steps they can add immediately.`
+          }
+        ],
+      });
+
+      await storage.updateProcessAuditResult(auditId, { auditPhase: "checking" });
+
+      const auditData = JSON.parse(completion.choices[0].message.content || "{}");
+      const tokensUsed = completion.usage?.total_tokens || 0;
+      const cost = (tokensUsed / 1000000) * 5.00;
+
+      // Phase 3: Connector check (programmatic)
+      const connectorIssues = checkProcessConnectors(proc);
+
       await storage.updateProcessAuditResult(auditId, {
         status: "completed",
+        auditPhase: "completed",
         overallScore: auditData.overallScore,
         efficiencyScore: auditData.efficiencyScore,
         reliabilityScore: auditData.reliabilityScore,
         customerExperienceScore: auditData.customerExperienceScore,
         communicationScore: auditData.communicationScore,
-        findingsJson: auditData.findings,
-        recommendationsJson: auditData.recommendations,
-        estimatedImprovementTime: auditData.estimatedImprovementTime,
+        findingsJson: auditData.findings || [],
+        recommendationsJson: auditData.recommendations || [],
+        suggestedStepsJson: auditData.suggestedSteps || [],
+        connectorIssuesJson: connectorIssues,
+        bestPracticesJson: auditData.bestPractices || [],
+        estimatedImprovementTime: auditData.estimatedImprovementTime || "Unknown",
         estimatedCost: cost.toFixed(4),
         tokensUsed,
         runDurationMs: Date.now() - startTime,
-        completedAt: new Date()
+        completedAt: new Date(),
       });
-      
-      // Update the process's lastAuditedAt
+
       await storage.updateBusinessProcess(processId, { lastAuditedAt: new Date() });
-      
-    } catch (err) {
-      console.error("Process audit failed:", err);
+      console.log(`[ProcessAudit] Completed audit for "${proc.name}" — score: ${auditData.overallScore}/100, connectors: ${connectorIssues.length} issues`);
+
+    } catch (err: any) {
+      console.error("[ProcessAudit] Audit failed:", err);
       await storage.updateProcessAuditResult(auditId, {
         status: "failed",
+        auditPhase: "failed",
+        errorMessage: err?.message || "An unexpected error occurred during the audit.",
         runDurationMs: Date.now() - startTime,
-        completedAt: new Date()
+        completedAt: new Date(),
       });
+    }
+  }
+
+  // Register runProcessAudit globally so the scheduler can trigger it
+  (global as any).__runProcessAudit = runProcessAudit;
+
+  // Add a step from audit suggestion directly to the process
+  app.post("/api/business-processes/:id/add-step", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const proc = await storage.getBusinessProcess(req.params.id);
+      if (!proc) return res.status(404).json({ message: "Process not found" });
+      const { step } = req.body;
+      const currentSteps = (proc.stepsJson as any[] || []);
+      const newSteps = [...currentSteps, { ...step, order: currentSteps.length + 1 }];
+      const updated = await storage.updateBusinessProcess(req.params.id, { stepsJson: newSteps });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Error adding step" });
+    }
+  });
+
+  // ================== PROCESS AUDIT SCHEDULES ==================
+
+  app.get("/api/process-audit-schedules/:processId", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const schedule = await storage.getProcessAuditSchedule(req.params.processId);
+      res.json(schedule || null);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching schedule" });
+    }
+  });
+
+  app.post("/api/process-audit-schedules", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const { processId, frequency, customIntervalDays, isEnabled } = req.body;
+      if (!processId) return res.status(400).json({ message: "processId is required" });
+      const nextRunAt = computeNextRunAt(frequency, customIntervalDays);
+      const schedule = await storage.upsertProcessAuditSchedule({
+        processId,
+        frequency: frequency || "weekly",
+        customIntervalDays: customIntervalDays || 7,
+        isEnabled: isEnabled !== false,
+        nextRunAt,
+      });
+      res.json(schedule);
+    } catch (err) {
+      res.status(500).json({ message: "Error saving schedule" });
+    }
+  });
+
+  app.patch("/api/process-audit-schedules/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const updates = req.body;
+      if (updates.frequency || updates.customIntervalDays) {
+        updates.nextRunAt = computeNextRunAt(updates.frequency, updates.customIntervalDays);
+      }
+      const schedule = await storage.updateProcessAuditSchedule(req.params.id, updates);
+      res.json(schedule);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating schedule" });
+    }
+  });
+
+  app.delete("/api/process-audit-schedules/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      await storage.deleteProcessAuditSchedule(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting schedule" });
+    }
+  });
+
+  function computeNextRunAt(frequency: string, customIntervalDays?: number): Date {
+    const now = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
+    switch (frequency) {
+      case "daily": return new Date(now + DAY);
+      case "weekly": return new Date(now + 7 * DAY);
+      case "monthly": return new Date(now + 30 * DAY);
+      case "custom": return new Date(now + (customIntervalDays || 7) * DAY);
+      default: return new Date(now + 7 * DAY);
     }
   }
 

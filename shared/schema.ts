@@ -1653,17 +1653,22 @@ export const processAuditResults = pgTable("process_audit_results", {
   processId: varchar("process_id", { length: 36 }).references(() => businessProcesses.id, { onDelete: "cascade" }).notNull(),
   agentId: varchar("agent_id", { length: 36 }).references(() => aiAgents.id),
   status: text("status").default("pending"), // pending, running, completed, failed
-  overallScore: integer("overall_score"), // 0-100 score
+  auditPhase: text("audit_phase").default("pending"), // pending, researching, analyzing, checking, completed
+  overallScore: integer("overall_score"),
   efficiencyScore: integer("efficiency_score"),
   reliabilityScore: integer("reliability_score"),
   customerExperienceScore: integer("customer_experience_score"),
   communicationScore: integer("communication_score"),
-  findingsJson: jsonb("findings_json").default([]), // Array of findings
-  recommendationsJson: jsonb("recommendations_json").default([]), // Array of recommendations
+  findingsJson: jsonb("findings_json").default([]),
+  recommendationsJson: jsonb("recommendations_json").default([]),
+  suggestedStepsJson: jsonb("suggested_steps_json").default([]),
+  connectorIssuesJson: jsonb("connector_issues_json").default([]),
+  bestPracticesJson: jsonb("best_practices_json").default([]),
   estimatedImprovementTime: text("estimated_improvement_time"),
   estimatedCost: text("estimated_cost").default("0.00"),
   tokensUsed: integer("tokens_used").default(0),
   runDurationMs: integer("run_duration_ms"),
+  errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),
 });
@@ -1672,6 +1677,7 @@ export const insertProcessAuditResultSchema = createInsertSchema(processAuditRes
   processId: true,
   agentId: true,
   status: true,
+  auditPhase: true,
   overallScore: true,
   efficiencyScore: true,
   reliabilityScore: true,
@@ -1679,14 +1685,40 @@ export const insertProcessAuditResultSchema = createInsertSchema(processAuditRes
   communicationScore: true,
   findingsJson: true,
   recommendationsJson: true,
+  suggestedStepsJson: true,
+  connectorIssuesJson: true,
+  bestPracticesJson: true,
   estimatedImprovementTime: true,
   estimatedCost: true,
   tokensUsed: true,
   runDurationMs: true,
+  errorMessage: true,
 });
 
 export type InsertProcessAuditResult = z.infer<typeof insertProcessAuditResultSchema>;
 export type ProcessAuditResult = typeof processAuditResults.$inferSelect;
+
+export const processAuditSchedules = pgTable("process_audit_schedules", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  processId: varchar("process_id", { length: 36 }).references(() => businessProcesses.id, { onDelete: "cascade" }).notNull(),
+  frequency: text("frequency").notNull().default("weekly"), // daily, weekly, monthly, custom
+  customIntervalDays: integer("custom_interval_days").default(7),
+  isEnabled: boolean("is_enabled").default(true),
+  nextRunAt: timestamp("next_run_at"),
+  lastRunAt: timestamp("last_run_at"),
+  lastAuditId: varchar("last_audit_id", { length: 36 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertProcessAuditScheduleSchema = createInsertSchema(processAuditSchedules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertProcessAuditSchedule = z.infer<typeof insertProcessAuditScheduleSchema>;
+export type ProcessAuditSchedule = typeof processAuditSchedules.$inferSelect;
 
 // Integration Wizard - Software catalog and configured integrations
 export const softwareIntegrations = pgTable("software_integrations", {

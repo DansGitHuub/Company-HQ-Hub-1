@@ -52,6 +52,7 @@ import {
   aiAgentSuggestions, type AiAgentSuggestion, type InsertAiAgentSuggestion,
   businessProcesses, type BusinessProcess, type InsertBusinessProcess,
   processAuditResults, type ProcessAuditResult, type InsertProcessAuditResult,
+  processAuditSchedules, type ProcessAuditSchedule, type InsertProcessAuditSchedule,
   softwareIntegrations, type SoftwareIntegration, type InsertSoftwareIntegration,
   configuredIntegrations, type ConfiguredIntegration, type InsertConfiguredIntegration,
   integrationCapabilities, type IntegrationCapability, type InsertIntegrationCapability,
@@ -441,7 +442,14 @@ export interface IStorage {
   getProcessAuditResult(id: string): Promise<ProcessAuditResult | undefined>;
   createProcessAuditResult(result: InsertProcessAuditResult): Promise<ProcessAuditResult>;
   updateProcessAuditResult(id: string, updates: Partial<ProcessAuditResult>): Promise<ProcessAuditResult | undefined>;
-  
+
+  // Process Audit Schedules
+  getProcessAuditSchedules(): Promise<ProcessAuditSchedule[]>;
+  getProcessAuditSchedule(processId: string): Promise<ProcessAuditSchedule | undefined>;
+  upsertProcessAuditSchedule(schedule: InsertProcessAuditSchedule): Promise<ProcessAuditSchedule>;
+  updateProcessAuditSchedule(id: string, updates: Partial<ProcessAuditSchedule>): Promise<ProcessAuditSchedule | undefined>;
+  deleteProcessAuditSchedule(id: string): Promise<void>;
+
   // Integration Wizard
   getSoftwareIntegrations(category?: string): Promise<SoftwareIntegration[]>;
   getSoftwareIntegration(id: string): Promise<SoftwareIntegration | undefined>;
@@ -2131,6 +2139,42 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(processAuditResults).set(updates)
       .where(eq(processAuditResults.id, id)).returning();
     return updated || undefined;
+  }
+
+  // Process Audit Schedules
+  async getProcessAuditSchedules(): Promise<ProcessAuditSchedule[]> {
+    return await db.select().from(processAuditSchedules).orderBy(processAuditSchedules.createdAt);
+  }
+
+  async getProcessAuditSchedule(processId: string): Promise<ProcessAuditSchedule | undefined> {
+    const [schedule] = await db.select().from(processAuditSchedules)
+      .where(eq(processAuditSchedules.processId, processId));
+    return schedule || undefined;
+  }
+
+  async upsertProcessAuditSchedule(schedule: InsertProcessAuditSchedule): Promise<ProcessAuditSchedule> {
+    const existing = await this.getProcessAuditSchedule(schedule.processId);
+    if (existing) {
+      const [updated] = await db.update(processAuditSchedules)
+        .set({ ...schedule, updatedAt: new Date() })
+        .where(eq(processAuditSchedules.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(processAuditSchedules).values(schedule).returning();
+    return created;
+  }
+
+  async updateProcessAuditSchedule(id: string, updates: Partial<ProcessAuditSchedule>): Promise<ProcessAuditSchedule | undefined> {
+    const [updated] = await db.update(processAuditSchedules)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(processAuditSchedules.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteProcessAuditSchedule(id: string): Promise<void> {
+    await db.delete(processAuditSchedules).where(eq(processAuditSchedules.id, id));
   }
 
   // Integration Wizard implementations
