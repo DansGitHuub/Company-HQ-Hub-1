@@ -21,6 +21,7 @@ import { useUpload } from "@/hooks/use-upload";
 import ShareExternallyDialog from "@/components/ShareExternallyDialog";
 import DocumentDropZone from "@/components/DocumentDropZone";
 import DocumentsPanel from "@/components/DocumentsPanel";
+import OnboardingChecklist from "@/components/OnboardingChecklist";
 
 function getInitials(name: string) {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
@@ -636,91 +637,7 @@ function AssignFormDialog({ open, onOpenChange, employeeId }: { open: boolean; o
 }
 
 function OnboardingTab({ employeeId }: { employeeId: string }) {
-  const queryClient = useQueryClient();
-
-  const { data: items = [] } = useQuery({
-    queryKey: [`/api/employees/${employeeId}/onboarding`],
-    queryFn: async () => (await apiRequest("GET", `/api/employees/${employeeId}/onboarding`)).json(),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const res = await apiRequest("PATCH", `/api/onboarding-items/${id}`, { status });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/employees/${employeeId}/onboarding`] });
-    },
-  });
-
-  const completed = items.filter((i: any) => i.status === "Complete").length;
-  const total = items.length;
-  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-  const overdue = items.filter((i: any) => i.status !== "Complete" && i.dueDate && new Date(i.dueDate) < new Date());
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">Onboarding ({pct}%)</CardTitle>
-        <Badge variant={pct === 100 ? "default" : "outline"}>{completed}/{total}</Badge>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {total === 0 ? (
-          <div className="text-center py-6">
-            <CheckCircle2 className="h-10 w-10 mx-auto mb-2 text-muted-foreground/30" />
-            <p className="text-sm text-muted-foreground">No onboarding items assigned yet.</p>
-          </div>
-        ) : (
-          <>
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
-            </div>
-
-            {overdue.length > 0 && (
-              <div className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" /> {overdue.length} overdue item(s)
-              </div>
-            )}
-
-            {["Employee", "Office/HR"].map(category => {
-              const catItems = items.filter((i: any) => i.category === category);
-              if (catItems.length === 0) return null;
-              return (
-                <div key={category}>
-                  <h4 className="text-sm font-semibold mb-2 text-muted-foreground">{category} Tasks</h4>
-                  <div className="space-y-1">
-                    {catItems.map((item: any) => {
-                      const isOverdue = item.status !== "Complete" && item.dueDate && new Date(item.dueDate) < new Date();
-                      return (
-                        <div
-                          key={item.id}
-                          className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-muted/50 ${isOverdue ? "bg-red-50" : ""}`}
-                          onClick={() => updateMutation.mutate({ id: item.id, status: item.status === "Complete" ? "Pending" : "Complete" })}
-                          data-testid={`onboarding-item-${item.id}`}
-                        >
-                          {item.status === "Complete" ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
-                          ) : (
-                            <Circle className={`h-4 w-4 flex-shrink-0 ${isOverdue ? "text-red-500" : "text-muted-foreground"}`} />
-                          )}
-                          <span className={`text-sm flex-1 ${item.status === "Complete" ? "line-through text-muted-foreground" : ""}`}>
-                            {item.title}
-                          </span>
-                          {item.status === "Complete" && item.completedAt && (
-                            <span className="text-xs text-muted-foreground">{new Date(item.completedAt).toLocaleDateString()}</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
+  return <OnboardingChecklist employeeId={employeeId} showCard={true} />;
 }
 
 function PayTab({ employee, onUpdate }: { employee: any; onUpdate: (data: any) => void }) {
