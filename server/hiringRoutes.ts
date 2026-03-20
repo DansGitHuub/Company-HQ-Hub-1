@@ -306,6 +306,42 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
   });
 
   // Employees
+  app.get("/api/employees/me", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
+      const { pool } = await import("./db");
+      const result = await pool.query(
+        `SELECT * FROM employees WHERE user_id = $1 LIMIT 1`,
+        [userId]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ message: "No employee record found" });
+      const emp = result.rows[0];
+      res.json({
+        id: emp.id,
+        userId: emp.user_id,
+        firstName: emp.first_name,
+        lastName: emp.last_name,
+        jobTitle: emp.job_title,
+        department: emp.department,
+        startDate: emp.start_date,
+        personalEmail: emp.personal_email,
+        personalPhone: emp.personal_phone,
+        address: emp.address,
+        city: emp.city,
+        state: emp.state,
+        zip: emp.zip,
+        emergencyContactName: emp.emergency_contact_name,
+        emergencyContactRelationship: emp.emergency_contact_relationship,
+        emergencyContactPhone: emp.emergency_contact_phone,
+        profilePhoto: emp.profile_photo,
+        status: emp.status,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/employees", requireAuth, requireHRAccess, async (req, res) => {
     try {
       const emps = await storage.getEmployees();

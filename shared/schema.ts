@@ -2696,3 +2696,59 @@ export const insertJobApplicationSchema = createInsertSchema(jobApplications).om
 });
 export type InsertJobApplication = z.infer<typeof insertJobApplicationSchema>;
 export type JobApplication = typeof jobApplications.$inferSelect;
+
+// ─── Time Off Requests ────────────────────────────────────────────────────────
+export const timeOffRequests = pgTable("time_off_requests", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id", { length: 36 }).references(() => employees.id).notNull(),
+  requestType: varchar("request_type", { length: 50 }).notNull(), // Vacation | Sick | Personal | Unpaid
+  startDate: varchar("start_date", { length: 20 }).notNull(),
+  endDate: varchar("end_date", { length: 20 }).notNull(),
+  totalDays: integer("total_days").notNull(),
+  notes: text("notes"),
+  status: varchar("status", { length: 20 }).notNull().default("Pending"), // Pending | Approved | Denied
+  reviewedBy: varchar("reviewed_by", { length: 36 }).references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertTimeOffRequestSchema = createInsertSchema(timeOffRequests).omit({ id: true, createdAt: true, submittedAt: true, reviewedAt: true });
+export type InsertTimeOffRequest = z.infer<typeof insertTimeOffRequestSchema>;
+export type TimeOffRequest = typeof timeOffRequests.$inferSelect;
+
+// ─── Resignation Letters ──────────────────────────────────────────────────────
+export const resignationLetters = pgTable("resignation_letters", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id", { length: 36 }).references(() => employees.id).notNull(),
+  lastDayOfWork: varchar("last_day_of_work", { length: 20 }).notNull(),
+  reasonForLeaving: text("reason_for_leaving"),
+  additionalNotes: text("additional_notes"),
+  signatureDataUrl: text("signature_data_url").notNull(),
+  signatureDate: varchar("signature_date", { length: 20 }).notNull(),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertResignationLetterSchema = createInsertSchema(resignationLetters).omit({ id: true, createdAt: true, submittedAt: true });
+export type InsertResignationLetter = z.infer<typeof insertResignationLetterSchema>;
+export type ResignationLetter = typeof resignationLetters.$inferSelect;
+
+// ─── Corrective Action Reports ────────────────────────────────────────────────
+export const correctiveActions = pgTable("corrective_actions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id", { length: 36 }).references(() => employees.id).notNull(),
+  issuedByUserId: varchar("issued_by_user_id", { length: 36 }).references(() => users.id).notNull(),
+  dateOfIncident: varchar("date_of_incident", { length: 20 }).notNull(),
+  descriptionOfIssue: text("description_of_issue").notNull(),
+  previousWarnings: boolean("previous_warnings").notNull().default(false),
+  previousWarningsDescription: text("previous_warnings_description"),
+  actionTaken: varchar("action_taken", { length: 50 }).notNull(), // Verbal Warning | Written Warning | Final Warning | Suspension | Termination
+  employeeAcknowledgmentSignature: text("employee_acknowledgment_signature"),
+  employeeAcknowledgmentDate: varchar("employee_acknowledgment_date", { length: 20 }),
+  managerSignature: text("manager_signature").notNull(),
+  managerSignatureDate: varchar("manager_signature_date", { length: 20 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertCorrectiveActionSchema = createInsertSchema(correctiveActions).omit({ id: true, createdAt: true });
+export type InsertCorrectiveAction = z.infer<typeof insertCorrectiveActionSchema>;
+export type CorrectiveAction = typeof correctiveActions.$inferSelect;

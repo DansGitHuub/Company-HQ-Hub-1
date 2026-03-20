@@ -485,6 +485,76 @@ export async function sendInPersonInterviewEmail(
   `);
 }
 
+export async function sendResignationNotificationEmail(
+  toEmail: string,
+  adminName: string,
+  employeeName: string,
+  position: string,
+  lastDayOfWork: string
+) {
+  const appUrl = getAppUrl();
+  return sendEmail(toEmail, `Resignation Notice — ${escapeHtml(employeeName)}`, `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #7c2d12; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Chapin Landscapes</h1>
+        <p style="color: #fed7aa; margin: 4px 0 0 0; font-size: 14px;">HR — Resignation Notice</p>
+      </div>
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937;">Hi ${escapeHtml(adminName)},</h2>
+        <p style="color: #4b5563; line-height: 1.6;"><strong>${escapeHtml(employeeName)}</strong> (${escapeHtml(position)}) has submitted a resignation letter.</p>
+        <div style="background: #fff7ed; border: 1px solid #ea580c; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <p style="margin: 0; color: #9a3412; font-size: 14px;"><strong>Last Day of Work:</strong> ${escapeHtml(lastDayOfWork)}</p>
+        </div>
+        <p style="color: #4b5563; line-height: 1.6;">Please review the resignation letter in the employee's file and take appropriate next steps.</p>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${appUrl}/employees" style="background-color: #7c2d12; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">View Employee File</a>
+        </div>
+      </div>
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
+        <p>Chapin Landscapes - design, build, maintain - 440.724.8006 - chapinlandscapes.com</p>
+      </div>
+    </div>
+  `);
+}
+
+export async function sendTimeOffRequestEmail(
+  toEmail: string,
+  adminName: string,
+  employeeName: string,
+  requestType: string,
+  startDate: string,
+  endDate: string,
+  totalDays: number,
+  notes?: string
+) {
+  const appUrl = getAppUrl();
+  return sendEmail(toEmail, `Time Off Request — ${escapeHtml(employeeName)}`, `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #1e40af; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Chapin Landscapes</h1>
+        <p style="color: #bfdbfe; margin: 4px 0 0 0; font-size: 14px;">HR — Time Off Request</p>
+      </div>
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937;">Hi ${escapeHtml(adminName)},</h2>
+        <p style="color: #4b5563; line-height: 1.6;"><strong>${escapeHtml(employeeName)}</strong> has submitted a time off request.</p>
+        <div style="background: #eff6ff; border: 1px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <p style="margin: 0 0 8px 0; color: #1e40af; font-size: 14px;"><strong>Type:</strong> ${escapeHtml(requestType)}</p>
+          <p style="margin: 0 0 8px 0; color: #1e40af; font-size: 14px;"><strong>Start Date:</strong> ${escapeHtml(startDate)}</p>
+          <p style="margin: 0 0 8px 0; color: #1e40af; font-size: 14px;"><strong>End Date:</strong> ${escapeHtml(endDate)}</p>
+          <p style="margin: 0 0 8px 0; color: #1e40af; font-size: 14px;"><strong>Total Days:</strong> ${totalDays}</p>
+          ${notes ? `<p style="margin: 0; color: #1e40af; font-size: 14px;"><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ""}
+        </div>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${appUrl}/employees" style="background-color: #1e40af; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Review Request</a>
+        </div>
+      </div>
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
+        <p>Chapin Landscapes - design, build, maintain - 440.724.8006 - chapinlandscapes.com</p>
+      </div>
+    </div>
+  `);
+}
+
 export async function sendHiredNotificationEmail(
   toEmail: string,
   adminName: string,

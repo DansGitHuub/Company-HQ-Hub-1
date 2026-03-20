@@ -10,9 +10,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import {
   Plus, Phone, Mail, MapPin, FileText, User, Clock,
-  ChevronLeft, Upload, CheckCircle2, Circle, AlertCircle, Users, ExternalLink, ClipboardList
+  ChevronLeft, Upload, CheckCircle2, Circle, AlertCircle, Users, ExternalLink, ClipboardList,
+  LogOut, ThumbsUp, ThumbsDown, ShieldAlert, Loader2, X
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +24,8 @@ import ShareExternallyDialog from "@/components/ShareExternallyDialog";
 import DocumentDropZone from "@/components/DocumentDropZone";
 import DocumentsPanel from "@/components/DocumentsPanel";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
+import CorrectiveActionForm from "@/components/forms/CorrectiveActionForm";
+import ResignationLetterForm from "@/components/forms/ResignationLetterForm";
 
 function getInitials(name: string) {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
@@ -293,20 +297,7 @@ function EmployeeProfile({ employee, onBack }: { employee: any; onBack: () => vo
           <EmploymentTab employee={employee} onUpdate={(data) => updateMutation.mutate(data)} />
         </TabsContent>
         <TabsContent value="documents">
-          <DocumentsTab employeeId={employee.id} />
-          <div className="mt-4">
-            <DocumentsPanel
-              entityType="employee"
-              entityId={employee.id}
-              canUpload
-              canShare
-              canLink
-              canDelete
-              canAttachFromLibrary
-              module="employee"
-              title="Additional Documents"
-            />
-          </div>
+          <DocumentsTab employee={employee} />
         </TabsContent>
         <TabsContent value="onboarding">
           <OnboardingTab employeeId={employee.id} />
@@ -469,18 +460,87 @@ function EmploymentTab({ employee, onUpdate }: { employee: any; onUpdate: (data:
   );
 }
 
-function DocumentsTab({ employeeId }: { employeeId: string }) {
+const TOR_STATUS_COLOR: Record<string, string> = {
+  Pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
+  Approved: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200",
+  Denied: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
+};
+
+const CA_BADGE_COLOR: Record<string, string> = {
+  "Verbal Warning": "bg-yellow-50 text-yellow-700 border-yellow-200",
+  "Written Warning": "bg-orange-50 text-orange-700 border-orange-200",
+  "Final Warning": "bg-red-50 text-red-700 border-red-200",
+  "Suspension": "bg-red-100 text-red-800 border-red-300",
+  "Termination": "bg-red-200 text-red-900 border-red-400",
+};
+
+function SectionHeader({ icon: Icon, title, action }: { icon: React.ElementType; title: string; action?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <h3 className="font-semibold text-sm flex items-center gap-2 text-foreground">
+        <Icon className="h-4 w-4 text-primary" /> {title}
+      </h3>
+      {action}
+    </div>
+  );
+}
+
+function DocumentsTab({ employee }: { employee: any }) {
+  const employeeId = employee.id;
+  const employeeName = `${employee.firstName} ${employee.lastName}`;
   const queryClient = useQueryClient();
   const { uploadFile } = useUpload();
   const { toast } = useToast();
   const { user } = useAuth();
+  const isHR = user?.role === "Admin" || user?.role === "Manager" || user?.isMasterAdmin;
   const isAdmin = user?.role === "Admin" || user?.isMasterAdmin;
+
   const [shareDoc, setShareDoc] = useState<any>(null);
   const [assignFormOpen, setAssignFormOpen] = useState(false);
+  const [correctiveActionOpen, setCorrectiveActionOpen] = useState(false);
+  const [viewCAOpen, setViewCAOpen] = useState<any>(null);
+  const [viewResignOpen, setViewResignOpen] = useState<any>(null);
 
   const { data: docs = [] } = useQuery({
     queryKey: [`/api/employees/${employeeId}/documents`],
     queryFn: async () => (await apiRequest("GET", `/api/employees/${employeeId}/documents`)).json(),
+  });
+
+  const { data: timeOffRequests = [], isLoading: torLoading } = useQuery({
+    queryKey: [`/api/employees/${employeeId}/time-off-requests`],
+    queryFn: async () => (await apiRequest("GET", `/api/employees/${employeeId}/time-off-requests`)).json(),
+    enabled: isHR,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+
+  const { data: resignationLetters = [] } = useQuery({
+    queryKey: [`/api/employees/${employeeId}/resignation-letters`],
+    queryFn: async () => (await apiRequest("GET", `/api/employees/${employeeId}/resignation-letters`)).json(),
+    enabled: isHR,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+
+  const { data: correctiveActions = [] } = useQuery({
+    queryKey: [`/api/employees/${employeeId}/corrective-actions`],
+    queryFn: async () => (await apiRequest("GET", `/api/employees/${employeeId}/corrective-actions`)).json(),
+    enabled: isHR,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+
+  const reviewTORMutation = useMutation({
+    mutationFn: async ({ id, status, reviewNotes }: { id: string; status: string; reviewNotes?: string }) => {
+      const res = await apiRequest("PATCH", `/api/time-off-requests/${id}`, { status, reviewNotes });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: (_, vars) => {
+      toast({ title: `Request ${vars.status}` });
+      queryClient.invalidateQueries({ queryKey: [`/api/employees/${employeeId}/time-off-requests`] });
+    },
+    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
 
   const handleDropZoneUpload = React.useCallback(async (files: File[]) => {
@@ -496,52 +556,190 @@ function DocumentsTab({ employeeId }: { employeeId: string }) {
   }, [uploadFile, employeeId, queryClient, toast]);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">Documents</CardTitle>
-        {isAdmin && (
-          <Button size="sm" variant="outline" onClick={() => setAssignFormOpen(true)} data-testid="button-assign-form">
-            <ClipboardList className="h-4 w-4 mr-1" /> Assign Form
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent>
-        <DocumentDropZone
-          onFilesSelected={handleDropZoneUpload}
-          className="mb-3"
-        />
-        {docs.length === 0 ? (
-          <div className="text-center py-6">
-            <FileText className="h-10 w-10 mx-auto mb-2 text-muted-foreground/30" />
-            <p className="text-sm text-muted-foreground font-medium">No documents yet</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {docs.map((doc: any) => (
-              <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`doc-${doc.id}`}>
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">{doc.name}</span>
-                  <Badge variant="outline" className="text-xs">{doc.status}</Badge>
-                </div>
-                <div className="flex gap-1">
-                  {doc.url && isAdmin && (
-                    <Button size="sm" variant="ghost" onClick={() => setShareDoc(doc)} data-testid={`share-doc-${doc.id}`} title="Share Externally">
-                      <ExternalLink className="h-3 w-3" />
-                    </Button>
-                  )}
-                  {doc.url ? (
-                    <Button size="sm" variant="ghost" onClick={() => window.open(doc.url, "_blank")} data-testid={`view-doc-${doc.id}`}>View</Button>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Awaiting upload</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
+    <div className="space-y-5">
 
+      {/* ── SECTION 1: Onboarding Forms ────────────────────────────── */}
+      <Card>
+        <CardContent className="p-4">
+          <SectionHeader
+            icon={ClipboardList}
+            title="Onboarding Forms"
+            action={
+              isHR && (
+                <Button size="sm" variant="outline" onClick={() => setAssignFormOpen(true)} data-testid="button-assign-form">
+                  <Plus className="h-3 w-3 mr-1" /> Assign Form
+                </Button>
+              )
+            }
+          />
+          <OnboardingChecklist employeeId={employeeId} showCard={false} />
+        </CardContent>
+      </Card>
+
+      {/* ── SECTION 2: Employment Documents ────────────────────────── */}
+      <Card>
+        <CardContent className="p-4">
+          <SectionHeader icon={FileText} title="Employment Documents" />
+          <DocumentDropZone onFilesSelected={handleDropZoneUpload} className="mb-3" />
+          {docs.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-3">No documents uploaded yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {docs.map((doc: any) => (
+                <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`doc-${doc.id}`}>
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">{doc.name}</span>
+                    <Badge variant="outline" className="text-xs">{doc.status}</Badge>
+                  </div>
+                  <div className="flex gap-1">
+                    {doc.url && isAdmin && (
+                      <Button size="sm" variant="ghost" onClick={() => setShareDoc(doc)} data-testid={`share-doc-${doc.id}`} title="Share Externally">
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    )}
+                    {doc.url ? (
+                      <Button size="sm" variant="ghost" onClick={() => window.open(doc.url, "_blank")} data-testid={`view-doc-${doc.id}`}>View</Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Awaiting upload</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-3">
+            <DocumentsPanel
+              entityType="employee"
+              entityId={employeeId}
+              canUpload
+              canShare
+              canLink
+              canDelete
+              canAttachFromLibrary
+              module="employee"
+              title="Shared & Library Documents"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── SECTION 3: Corrective Actions ──────────────────────────── */}
+      {isHR && (
+        <Card>
+          <CardContent className="p-4">
+            <SectionHeader
+              icon={ShieldAlert}
+              title="Corrective Actions"
+              action={
+                <Button size="sm" variant="outline" onClick={() => setCorrectiveActionOpen(true)} data-testid="button-issue-corrective-action"
+                  className="text-red-600 border-red-200 hover:bg-red-50">
+                  <Plus className="h-3 w-3 mr-1" /> Issue Report
+                </Button>
+              }
+            />
+            {correctiveActions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No corrective actions on file.</p>
+            ) : (
+              <div className="space-y-2">
+                {correctiveActions.map((ca: any) => (
+                  <div key={ca.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`ca-row-${ca.id}`}>
+                    <div className="flex items-center gap-3">
+                      <Badge className={`${CA_BADGE_COLOR[ca.action_taken] || ""} border text-xs`}>{ca.action_taken}</Badge>
+                      <div>
+                        <p className="text-sm font-medium">{ca.date_of_incident}</p>
+                        <p className="text-xs text-muted-foreground">By: {ca.issued_by_name || ca.issued_by_username}</p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => setViewCAOpen(ca)} data-testid={`view-ca-${ca.id}`}>View</Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── SECTION 4: Employee-Initiated Forms ────────────────────── */}
+      {isHR && (
+        <Card>
+          <CardContent className="p-4 space-y-5">
+            <SectionHeader icon={LogOut} title="Employee-Initiated Forms" />
+
+            {/* Time Off Requests */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Time Off Requests</p>
+              {torLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</div>
+              ) : timeOffRequests.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No time off requests.</p>
+              ) : (
+                <div className="space-y-2">
+                  {timeOffRequests.map((req: any) => (
+                    <div key={req.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`tor-row-${req.id}`}>
+                      <div>
+                        <p className="text-sm font-medium">{req.request_type} · {req.start_date} → {req.end_date}</p>
+                        <p className="text-xs text-muted-foreground">{req.total_days} day{req.total_days !== 1 ? "s" : ""}{req.notes ? ` · ${req.notes}` : ""}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className={TOR_STATUS_COLOR[req.status] || ""}>{req.status}</Badge>
+                        {req.status === "Pending" && isHR && (
+                          <>
+                            <Button
+                              size="sm" variant="ghost"
+                              className="h-7 text-green-600 hover:bg-green-50 hover:text-green-700"
+                              disabled={reviewTORMutation.isPending}
+                              onClick={() => reviewTORMutation.mutate({ id: req.id, status: "Approved" })}
+                              data-testid={`approve-tor-${req.id}`}
+                            >
+                              <ThumbsUp className="h-3.5 w-3.5 mr-1" /> Approve
+                            </Button>
+                            <Button
+                              size="sm" variant="ghost"
+                              className="h-7 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              disabled={reviewTORMutation.isPending}
+                              onClick={() => reviewTORMutation.mutate({ id: req.id, status: "Denied" })}
+                              data-testid={`deny-tor-${req.id}`}
+                            >
+                              <ThumbsDown className="h-3.5 w-3.5 mr-1" /> Deny
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Resignation Letters */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Resignation Letters</p>
+              {resignationLetters.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No resignation letters on file.</p>
+              ) : (
+                <div className="space-y-2">
+                  {resignationLetters.map((rl: any) => (
+                    <div key={rl.id} className="flex items-center justify-between p-3 border rounded-lg border-red-200/70 bg-red-50/20" data-testid={`rl-row-${rl.id}`}>
+                      <div>
+                        <p className="text-sm font-medium flex items-center gap-1.5">
+                          <LogOut className="h-3.5 w-3.5 text-red-500" /> Resignation Notice
+                        </p>
+                        <p className="text-xs text-muted-foreground">Last day: {rl.last_day_of_work} · Submitted: {new Date(rl.submitted_at).toLocaleDateString()}</p>
+                      </div>
+                      <Button size="sm" variant="ghost" onClick={() => setViewResignOpen(rl)} data-testid={`view-rl-${rl.id}`}>View</Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── DIALOGS ──────────────────────────────────────────────── */}
       {shareDoc && (
         <ShareExternallyDialog
           open={!!shareDoc}
@@ -554,13 +752,61 @@ function DocumentsTab({ employeeId }: { employeeId: string }) {
       )}
 
       {assignFormOpen && (
-        <AssignFormDialog
-          open={assignFormOpen}
-          onOpenChange={setAssignFormOpen}
-          employeeId={employeeId}
-        />
+        <AssignFormDialog open={assignFormOpen} onOpenChange={setAssignFormOpen} employeeId={employeeId} />
       )}
-    </Card>
+
+      {/* Issue Corrective Action */}
+      <Dialog open={correctiveActionOpen} onOpenChange={setCorrectiveActionOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <ShieldAlert className="h-5 w-5" /> Issue Corrective Action Report
+            </DialogTitle>
+            <DialogDescription>For: {employeeName}</DialogDescription>
+          </DialogHeader>
+          <CorrectiveActionForm
+            preSelectedEmployeeId={employeeId}
+            onComplete={() => {
+              setCorrectiveActionOpen(false);
+              queryClient.invalidateQueries({ queryKey: [`/api/employees/${employeeId}/corrective-actions`] });
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* View Corrective Action */}
+      {viewCAOpen && (
+        <Dialog open={!!viewCAOpen} onOpenChange={(o) => !o && setViewCAOpen(null)}>
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Corrective Action Report</DialogTitle>
+              <DialogDescription>{employeeName} · {viewCAOpen.date_of_incident}</DialogDescription>
+            </DialogHeader>
+            <CorrectiveActionForm readOnly existingData={viewCAOpen} />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* View Resignation Letter */}
+      {viewResignOpen && (
+        <Dialog open={!!viewResignOpen} onOpenChange={(o) => !o && setViewResignOpen(null)}>
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <LogOut className="h-5 w-5" /> Resignation Letter
+              </DialogTitle>
+              <DialogDescription>{employeeName}</DialogDescription>
+            </DialogHeader>
+            <ResignationLetterForm
+              readOnly
+              existingData={viewResignOpen}
+              employeeId={employeeId}
+              employeeName={employeeName}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
   );
 }
 
