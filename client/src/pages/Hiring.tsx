@@ -1397,6 +1397,19 @@ function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [viewAppOpen, setViewAppOpen] = useState(false);
+
+  const { data: applicationRecord } = useQuery<any | null>({
+    queryKey: [`/api/candidates/${candidate.id}/application`],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/candidates/${candidate.id}/application`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    retry: false,
+  });
+
+  const hasApplication = !!applicationRecord;
+
   const [form, setForm] = useState({
     name: candidate.name,
     email: candidate.email || "",
@@ -1415,16 +1428,18 @@ function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (
       <div className="flex justify-between items-center">
         <h3 className="font-semibold">{t("employees.contactInfo")}</h3>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setViewAppOpen(true)}
-            data-testid="button-view-application"
-            className="flex items-center gap-1.5 text-green-700 border-green-300 hover:bg-green-50"
-          >
-            <FileText className="h-3.5 w-3.5" />
-            View Application
-          </Button>
+          {hasApplication && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setViewAppOpen(true)}
+              data-testid="button-view-application"
+              className="flex items-center gap-1.5 text-green-700 border-green-300 hover:bg-green-50"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              View Application
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => {
             if (editing) {
               onUpdate(form);
