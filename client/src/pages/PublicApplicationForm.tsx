@@ -14,14 +14,23 @@ interface JobApplication {
 }
 
 // Required fields for submit lock
-const REQUIRED_FIELDS = [
-  "firstName", "lastName", "phone", "email",
-  "streetAddress", "city", "state", "zip",
-  "dateAvailable", "positionAppliedFor",
-  "usCitizen", "workedHereBefore", "convictedFelony",
-  "highSchoolName",
-  "ref1FullName", "ref1Phone",
-  "emp1Company", "emp1Phone",
+const REQUIRED_FIELDS: { key: string; label: string }[] = [
+  { key: "firstName", label: "First Name" },
+  { key: "lastName", label: "Last Name" },
+  { key: "phone", label: "Phone" },
+  { key: "email", label: "Email" },
+  { key: "streetAddress", label: "Street Address" },
+  { key: "city", label: "City" },
+  { key: "state", label: "State" },
+  { key: "zip", label: "ZIP Code" },
+  { key: "dateAvailable", label: "Date Available" },
+  { key: "positionAppliedFor", label: "Position Applied For" },
+  { key: "usCitizen", label: "US Citizen (Yes/No)" },
+  { key: "workedHereBefore", label: "Worked Here Before (Yes/No)" },
+  { key: "convictedFelony", label: "Convicted of Felony (Yes/No)" },
+  { key: "highSchoolName", label: "High School Name" },
+  { key: "ref1FullName", label: "Reference 1 — Full Name" },
+  { key: "ref1Phone", label: "Reference 1 — Phone" },
 ];
 
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
@@ -181,8 +190,8 @@ export default function PublicApplicationForm() {
   }, []);
 
   // Required field progress
-  const filledRequired = REQUIRED_FIELDS.filter(f => (data[f] || "").trim().length > 0);
-  const remaining = REQUIRED_FIELDS.length - filledRequired.length;
+  const missingFields = REQUIRED_FIELDS.filter(f => !(data[f.key] || "").trim());
+  const remaining = missingFields.length;
   const allFilled = remaining === 0;
 
   const handleSubmit = async () => {
@@ -587,9 +596,16 @@ export default function PublicApplicationForm() {
             <p>I certify that my answers are true and complete to the best of my knowledge. If this application leads to employment, I understand that false or misleading information in my application or interview may result in my release.</p>
           </div>
           {!allFilled && (
-            <p className="text-amber-600 text-sm mb-4 font-medium">
-              Please complete all required fields before submitting. ({remaining} remaining)
-            </p>
+            <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-amber-800 text-sm font-semibold mb-2">
+                Please complete these required fields before submitting:
+              </p>
+              <ul className="list-disc list-inside space-y-0.5">
+                {missingFields.map(f => (
+                  <li key={f.key} className="text-amber-700 text-sm">{f.label}</li>
+                ))}
+              </ul>
+            </div>
           )}
           <button
             data-testid="button-submit-application"
