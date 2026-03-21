@@ -9765,6 +9765,17 @@ Provide accurate information based on publicly available documentation.`;
   });
 
   // ADMIN: List all applications
+  // Get the submitted job application for a specific candidate (Admin only)
+  app.get("/api/candidates/:id/application", requireAdmin, async (req, res) => {
+    try {
+      const app = await storage.getJobApplicationByCandidateId(req.params.id);
+      if (!app) return res.status(404).json({ message: "No application found for this candidate" });
+      return res.json(app);
+    } catch (err) {
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
   app.get("/api/apply", requireAdmin, async (req, res) => {
     try {
       const apps = await storage.getJobApplications();

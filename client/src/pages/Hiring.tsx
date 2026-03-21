@@ -1236,9 +1236,167 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
   );
 }
 
+function ApplicationViewDialog({ candidateId, candidateName, open, onClose }: {
+  candidateId: string;
+  candidateName: string;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { data: appRecord, isLoading } = useQuery<any>({
+    queryKey: [`/api/candidates/${candidateId}/application`],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/candidates/${candidateId}/application`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: open,
+  });
+
+  const d: Record<string, string> = appRecord?.data || {};
+
+  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div className="mb-6">
+      <div className="bg-green-800 text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-sm mb-3">{title}</div>
+      <div className="grid grid-cols-2 gap-x-8 gap-y-2 px-1">{children}</div>
+    </div>
+  );
+
+  const Field = ({ label, value, full }: { label: string; value?: string; full?: boolean }) =>
+    value ? (
+      <div className={full ? "col-span-2" : ""}>
+        <p className="text-xs text-muted-foreground font-medium">{label}</p>
+        <p className="text-sm font-medium text-foreground">{value}</p>
+      </div>
+    ) : null;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="border-b pb-3">
+          <DialogTitle className="flex items-center gap-2 text-lg">
+            <FileText className="h-5 w-5 text-green-700" />
+            Employment Application — {candidateName}
+          </DialogTitle>
+          {appRecord?.submittedAt && (
+            <DialogDescription>
+              Submitted {new Date(appRecord.submittedAt).toLocaleDateString()} · Position: {appRecord.position || "Not specified"}
+            </DialogDescription>
+          )}
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" /> Loading application...
+          </div>
+        ) : !appRecord ? (
+          <div className="py-10 text-center">
+            <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-40" />
+            <p className="text-sm text-muted-foreground">No online application was submitted for this candidate.</p>
+            <p className="text-xs text-muted-foreground mt-1">This candidate may have been added manually.</p>
+          </div>
+        ) : (
+          <div className="pt-3 text-sm font-sans">
+
+            <Section title="Personal Information">
+              <Field label="First Name" value={d.firstName} />
+              <Field label="Last Name" value={d.lastName} />
+              {d.mi && <Field label="Middle Initial" value={d.mi} />}
+              <Field label="Phone" value={d.phone} />
+              <Field label="Email" value={d.email} />
+              <Field label="Street Address" value={d.streetAddress} full />
+              <Field label="City" value={d.city} />
+              <Field label="State" value={d.state} />
+              <Field label="ZIP" value={d.zip} />
+              {d.ssn && <Field label="SSN" value={`***-**-${d.ssn.slice(-4)}`} />}
+              <Field label="Position Applied For" value={d.positionAppliedFor} />
+              <Field label="Date Available" value={d.dateAvailable} />
+              {d.desiredSalary && <Field label="Desired Salary" value={`$${d.desiredSalary}/hr`} />}
+            </Section>
+
+            <Section title="Eligibility">
+              <Field label="US Citizen or Authorized to Work" value={d.usCitizen} />
+              <Field label="Worked Here Before" value={d.workedHereBefore} />
+              <Field label="Ever Convicted of a Felony" value={d.convictedFelony} />
+              {d.felonyExplanation && <Field label="Felony Explanation" value={d.felonyExplanation} full />}
+            </Section>
+
+            {(d.highSchoolName || d.collegeName) && (
+              <Section title="Education">
+                {d.highSchoolName && <>
+                  <Field label="High School" value={d.highSchoolName} />
+                  <Field label="Location" value={d.highSchoolAddress} />
+                  <Field label="Years Attended" value={[d.highSchoolFrom, d.highSchoolTo].filter(Boolean).join(" – ")} />
+                  <Field label="Graduated" value={d.highSchoolGraduated} />
+                  {d.highSchoolDegree && <Field label="Degree / Diploma" value={d.highSchoolDegree} />}
+                </>}
+                {d.collegeName && <>
+                  <div className="col-span-2 border-t pt-2 mt-1" />
+                  <Field label="College / Trade School" value={d.collegeName} />
+                  <Field label="Location" value={d.collegeAddress} />
+                  <Field label="Years Attended" value={[d.collegeFrom, d.collegeTo].filter(Boolean).join(" – ")} />
+                  <Field label="Graduated" value={d.collegeGraduated} />
+                  {d.collegeDegree && <Field label="Degree" value={d.collegeDegree} />}
+                </>}
+              </Section>
+            )}
+
+            {(d.emp1Company || d.emp2Company || d.emp3Company) && (
+              <Section title="Employment History">
+                {[1, 2, 3].map(n => {
+                  const company = d[`emp${n}Company`];
+                  if (!company) return null;
+                  return (
+                    <React.Fragment key={n}>
+                      {n > 1 && <div className="col-span-2 border-t pt-2 mt-1" />}
+                      <Field label="Company" value={company} />
+                      <Field label="Position" value={d[`emp${n}Position`]} />
+                      <Field label="Address" value={d[`emp${n}Address`]} />
+                      <Field label="Phone" value={d[`emp${n}Phone`]} />
+                      <Field label="Supervisor" value={d[`emp${n}Supervisor`]} />
+                      <Field label="Dates" value={[d[`emp${n}From`], d[`emp${n}To`]].filter(Boolean).join(" – ")} />
+                      <Field label="Reason for Leaving" value={d[`emp${n}Reason`]} full />
+                    </React.Fragment>
+                  );
+                })}
+              </Section>
+            )}
+
+            {(d.ref1FullName || d.ref2FullName || d.ref3FullName) && (
+              <Section title="References">
+                {[1, 2, 3].map(n => {
+                  const name = d[`ref${n}FullName`];
+                  if (!name) return null;
+                  return (
+                    <React.Fragment key={n}>
+                      {n > 1 && <div className="col-span-2 border-t pt-2 mt-1" />}
+                      <Field label="Name" value={name} />
+                      <Field label="Phone" value={d[`ref${n}Phone`]} />
+                      <Field label="Company / Relation" value={d[`ref${n}Company`]} />
+                      <Field label="Address" value={d[`ref${n}Address`]} />
+                    </React.Fragment>
+                  );
+                })}
+              </Section>
+            )}
+
+            {d.signatureName && (
+              <Section title="Signature">
+                <Field label="Signed By" value={d.signatureName} />
+                <Field label="Date Signed" value={d.signatureDate} />
+              </Section>
+            )}
+
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (data: any) => void }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
+  const [viewAppOpen, setViewAppOpen] = useState(false);
   const [form, setForm] = useState({
     name: candidate.name,
     email: candidate.email || "",
@@ -1256,17 +1414,36 @@ function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="font-semibold">{t("employees.contactInfo")}</h3>
-        <Button variant="outline" size="sm" onClick={() => {
-          if (editing) {
-            onUpdate(form);
-            setEditing(false);
-          } else {
-            setEditing(true);
-          }
-        }} data-testid="button-edit-profile">
-          {editing ? t("common.save") : t("common.edit")}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setViewAppOpen(true)}
+            data-testid="button-view-application"
+            className="flex items-center gap-1.5 text-green-700 border-green-300 hover:bg-green-50"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            View Application
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => {
+            if (editing) {
+              onUpdate(form);
+              setEditing(false);
+            } else {
+              setEditing(true);
+            }
+          }} data-testid="button-edit-profile">
+            {editing ? t("common.save") : t("common.edit")}
+          </Button>
+        </div>
       </div>
+
+      <ApplicationViewDialog
+        candidateId={candidate.id}
+        candidateName={candidate.name}
+        open={viewAppOpen}
+        onClose={() => setViewAppOpen(false)}
+      />
 
       {editing ? (
         <div className="space-y-3">
