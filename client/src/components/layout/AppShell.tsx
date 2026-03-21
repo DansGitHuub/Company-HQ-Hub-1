@@ -373,13 +373,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const getSectionsForRole = (role: string): NavSection[] => {
     if (role === "Crew" || role === "New Hire") {
-      return sidebarSections.filter(s => s.label !== "ADMIN");
+      return sidebarSections
+        .filter(s => s.label !== "ADMIN")
+        .map(s => ({ ...s, items: s.items.filter(i => i !== "hiring") }));
     }
     if (role === "Crew Lead") {
-      return sidebarSections.filter(s => s.label !== "ADMIN");
+      return sidebarSections
+        .filter(s => s.label !== "ADMIN")
+        .map(s => ({ ...s, items: s.items.filter(i => i !== "hiring") }));
     }
     if (role === "Manager" || role === "HR" || role === "Sales") {
-      return sidebarSections.filter(s => s.label !== "ADMIN");
+      return sidebarSections
+        .filter(s => s.label !== "ADMIN")
+        .map(s => ({ ...s, items: s.items.filter(i => i !== "hiring") }));
     }
     return sidebarSections;
   };

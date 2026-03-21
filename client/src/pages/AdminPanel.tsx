@@ -94,7 +94,6 @@ import { Switch } from "@/components/ui/switch";
 import ArticleReportsCenter from "@/components/ArticleReportsCenter";
 import DiagnosticReport from "@/components/DiagnosticReport";
 import AdminDocumentLibrary from "@/components/AdminDocumentLibrary";
-import HiringEmailTemplates from "@/components/HiringEmailTemplates";
 
 function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin, t }: {
   activeTab: string;
@@ -111,8 +110,6 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "requests", label: "HR Communications", icon: Megaphone, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
         { value: "todos", label: "Task Access", icon: CheckCircle },
         { value: "suggestions", label: "Suggestions", icon: Lightbulb },
-        { value: "application-links", label: "Application Links", icon: ExternalLink },
-        { value: "email-templates", label: "Email Templates", icon: Mail },
       ],
     },
     {
@@ -1169,13 +1166,6 @@ export default function AdminPanel() {
           <CustomerSuggestionsPanel />
         </TabsContent>
 
-        <TabsContent value="application-links" className="mt-6">
-          <ApplicationLinksPanel />
-        </TabsContent>
-
-        <TabsContent value="email-templates" className="mt-6">
-          <HiringEmailTemplates />
-        </TabsContent>
 
         <TabsContent value="app-testing" className="mt-6">
           <AppTestingPanel />
@@ -2096,146 +2086,6 @@ function CustomerSuggestionsPanel() {
   );
 }
 
-function ApplicationLinksPanel() {
-  const [expiryDays, setExpiryDays] = useState<14 | 30>(30);
-  const [generating, setGenerating] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  const { data: links = [], refetch } = useQuery<any[]>({
-    queryKey: ["/api/apply"],
-    queryFn: async () => {
-      const r = await fetch("/api/apply", { credentials: "include" });
-      if (!r.ok) return [];
-      return r.json();
-    },
-  });
-
-  const appUrl = window.location.origin;
-
-  const generateLink = async () => {
-    setGenerating(true);
-    try {
-      const r = await fetch("/api/apply/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ expiryDays }),
-      });
-      if (!r.ok) throw new Error("Failed to generate");
-      await refetch();
-    } catch {
-      alert("Failed to generate link. Please try again.");
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const copyLink = (token: string, id: string) => {
-    navigator.clipboard.writeText(`${appUrl}/apply/${token}`).then(() => {
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-    });
-  };
-
-  return (
-    <div className="space-y-5">
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <h3 className="text-base font-semibold text-gray-800">Generate Application Link</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Create a unique shareable link for an applicant. Paste it into the email you send them — no login required.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 font-medium">Expires in:</span>
-                {([14, 30] as const).map(d => (
-                  <button
-                    key={d}
-                    data-testid={`button-expiry-${d}`}
-                    onClick={() => setExpiryDays(d)}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
-                      expiryDays === d
-                        ? "bg-green-700 text-white border-green-700"
-                        : "bg-white text-gray-600 border-gray-300 hover:border-green-600"
-                    }`}
-                  >
-                    {d} days
-                  </button>
-                ))}
-              </div>
-              <button
-                data-testid="button-generate-link"
-                onClick={generateLink}
-                disabled={generating}
-                className="flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60"
-              >
-                {generating ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
-                ) : (
-                  <><ExternalLink className="h-4 w-4" /> Generate Link</>
-                )}
-              </button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="pt-6">
-          <h3 className="text-base font-semibold text-gray-800 mb-4">Generated Links</h3>
-          {links.length === 0 ? (
-            <div className="text-center py-10 text-gray-400 text-sm">
-              No application links yet. Generate one above to get started.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {links.map((link: any) => {
-                const url = `${appUrl}/apply/${link.token}`;
-                const expired = new Date() > new Date(link.expiresAt);
-                const statusColor = link.status === "submitted" ? "text-green-700 bg-green-50 border-green-200"
-                  : expired ? "text-red-600 bg-red-50 border-red-200"
-                  : "text-blue-700 bg-blue-50 border-blue-200";
-                const statusLabel = link.status === "submitted" ? "Submitted"
-                  : expired ? "Expired" : "Open";
-                return (
-                  <div key={link.id} data-testid={`card-application-link-${link.id}`} className="border border-gray-200 rounded-lg p-4 space-y-2">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${statusColor}`}>{statusLabel}</span>
-                        {link.applicantName && <span className="text-sm font-medium text-gray-700">{link.applicantName}</span>}
-                        {link.position && <span className="text-xs text-gray-500">— {link.position}</span>}
-                      </div>
-                      <span className="text-xs text-gray-400">
-                        Expires {new Date(link.expiresAt).toLocaleDateString()} · Created {new Date(link.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-gray-600 truncate">{url}</code>
-                      <button
-                        data-testid={`button-copy-link-${link.id}`}
-                        onClick={() => copyLink(link.token, link.id)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap"
-                      >
-                        {copiedId === link.id ? (
-                          <><CheckCircle className="h-3.5 w-3.5 text-green-600" /><span className="text-green-600">Copied!</span></>
-                        ) : (
-                          <><ExternalLink className="h-3.5 w-3.5" /> Copy Link</>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
 function AppTestingPanel() {
   const { user, previewRole, setPreviewRole, effectiveRole } = useAuth();

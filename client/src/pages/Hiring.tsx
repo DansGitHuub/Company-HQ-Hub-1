@@ -18,8 +18,9 @@ import {
   MessageSquare, Calendar, ChevronRight, X, GripVertical, Upload,
   Send, CheckCircle2, Circle, AlertCircle, ClipboardList, Users,
   UserPlus, Copy, Eye, EyeOff, ShieldCheck, Video, ExternalLink, Loader2,
-  FileCheck, UserCheck, Briefcase
+  FileCheck, UserCheck, Briefcase, Lock
 } from "lucide-react";
+import HiringEmailTemplates from "@/components/HiringEmailTemplates";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -67,6 +68,7 @@ export default function Hiring() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("pipeline");
   const [view, setView] = useState<"pipeline" | "employees">("pipeline");
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -241,37 +243,73 @@ export default function Hiring() {
 
   const visibleStages = STAGES.filter(s => s !== "Declined / Not a Fit" || showDeclined);
 
+  const isAdmin = user?.role === "Admin" || user?.role === "Master Admin";
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+          <Lock className="h-8 w-8 text-muted-foreground" />
+        </div>
+        <h2 className="text-xl font-semibold mb-2">Admin Access Only</h2>
+        <p className="text-muted-foreground max-w-sm">
+          The Hiring module is restricted to Admins. Contact your administrator if you need access.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4" data-testid="hiring-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-heading font-bold" data-testid="text-hiring-title">{t("hiring.title")}</h1>
-          <p className="text-muted-foreground mt-1">Manage applicants and employee records</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={view === "pipeline" ? "default" : "outline"}
-            onClick={() => setView("pipeline")}
-            data-testid="button-view-pipeline"
-          >
-            <ClipboardList className="h-4 w-4 mr-2" /> {t("hiring.pipeline")}
-          </Button>
-          <Button
-            variant={view === "employees" ? "default" : "outline"}
-            onClick={() => setView("employees")}
-            data-testid="button-view-employees"
-          >
-            <Users className="h-4 w-4 mr-2" /> {t("employees.title")}
-          </Button>
-          {view === "pipeline" && (
-            <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-applicant">
-              <Plus className="h-4 w-4 mr-2" /> {t("hiring.addApplicant")}
-            </Button>
-          )}
+          <p className="text-muted-foreground mt-1">Manage applicants, application links, and email templates</p>
         </div>
       </div>
 
-      {view === "pipeline" ? (
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <TabsList>
+            <TabsTrigger value="pipeline" data-testid="tab-pipeline">
+              <ClipboardList className="h-4 w-4 mr-2" /> Pipeline
+            </TabsTrigger>
+            <TabsTrigger value="application-links" data-testid="tab-application-links">
+              <ExternalLink className="h-4 w-4 mr-2" /> Application Links
+            </TabsTrigger>
+            <TabsTrigger value="email-templates" data-testid="tab-email-templates">
+              <Mail className="h-4 w-4 mr-2" /> Email Templates
+            </TabsTrigger>
+          </TabsList>
+          {activeTab === "pipeline" && (
+            <div className="flex gap-2">
+              <Button
+                variant={view === "pipeline" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setView("pipeline")}
+                data-testid="button-view-pipeline"
+              >
+                <ClipboardList className="h-4 w-4 mr-2" /> {t("hiring.pipeline")}
+              </Button>
+              <Button
+                variant={view === "employees" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setView("employees")}
+                data-testid="button-view-employees"
+              >
+                <Users className="h-4 w-4 mr-2" /> {t("employees.title")}
+              </Button>
+              {view === "pipeline" && (
+                <Button size="sm" onClick={() => setShowAddDialog(true)} data-testid="button-add-applicant">
+                  <Plus className="h-4 w-4 mr-2" /> {t("hiring.addApplicant")}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <TabsContent value="pipeline" className="mt-2">
+        {view === "pipeline" ? (
         <>
           {/* Board filter bar */}
           <div className="flex items-center gap-3 flex-wrap" data-testid="board-filter-bar">
@@ -424,6 +462,16 @@ export default function Hiring() {
       ) : (
         <EmployeeRecords />
       )}
+        </TabsContent>
+
+        <TabsContent value="application-links" className="mt-4">
+          <ApplicationLinksPanel />
+        </TabsContent>
+
+        <TabsContent value="email-templates" className="mt-4">
+          <HiringEmailTemplates />
+        </TabsContent>
+      </Tabs>
 
       {/* Add Applicant Dialog */}
       <AddApplicantDialog
@@ -694,6 +742,147 @@ export default function Hiring() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function ApplicationLinksPanel() {
+  const [expiryDays, setExpiryDays] = useState<14 | 30>(30);
+  const [generating, setGenerating] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const { data: links = [], refetch } = useQuery<any[]>({
+    queryKey: ["/api/apply"],
+    queryFn: async () => {
+      const r = await fetch("/api/apply", { credentials: "include" });
+      if (!r.ok) return [];
+      return r.json();
+    },
+  });
+
+  const appUrl = window.location.origin;
+
+  const generateLink = async () => {
+    setGenerating(true);
+    try {
+      const r = await fetch("/api/apply/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ expiryDays }),
+      });
+      if (!r.ok) throw new Error("Failed to generate");
+      await refetch();
+    } catch {
+      alert("Failed to generate link. Please try again.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const copyLink = (token: string, id: string) => {
+    navigator.clipboard.writeText(`${appUrl}/apply/${token}`).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
+  return (
+    <div className="space-y-5">
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h3 className="text-base font-semibold text-gray-800">Generate Application Link</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Create a unique shareable link for an applicant. Paste it into the email or text you send them — no login required.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600 font-medium">Expires in:</span>
+                {([14, 30] as const).map(d => (
+                  <button
+                    key={d}
+                    data-testid={`button-expiry-${d}`}
+                    onClick={() => setExpiryDays(d)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+                      expiryDays === d
+                        ? "bg-green-700 text-white border-green-700"
+                        : "bg-white text-gray-600 border-gray-300 hover:border-green-600"
+                    }`}
+                  >
+                    {d} days
+                  </button>
+                ))}
+              </div>
+              <button
+                data-testid="button-generate-link"
+                onClick={generateLink}
+                disabled={generating}
+                className="flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60"
+              >
+                {generating ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
+                ) : (
+                  <><ExternalLink className="h-4 w-4" /> Generate Link</>
+                )}
+              </button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6">
+          <h3 className="text-base font-semibold text-gray-800 mb-4">Generated Links</h3>
+          {links.length === 0 ? (
+            <div className="text-center py-10 text-gray-400 text-sm">
+              No application links yet. Generate one above to get started.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {links.map((link: any) => {
+                const url = `${appUrl}/apply/${link.token}`;
+                const expired = new Date() > new Date(link.expiresAt);
+                const statusColor = link.status === "submitted" ? "text-green-700 bg-green-50 border-green-200"
+                  : expired ? "text-red-600 bg-red-50 border-red-200"
+                  : "text-blue-700 bg-blue-50 border-blue-200";
+                const statusLabel = link.status === "submitted" ? "Submitted"
+                  : expired ? "Expired" : "Open";
+                return (
+                  <div key={link.id} data-testid={`card-application-link-${link.id}`} className="border border-gray-200 rounded-lg p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${statusColor}`}>{statusLabel}</span>
+                        {link.applicantName && <span className="text-sm font-medium text-gray-700">{link.applicantName}</span>}
+                        {link.position && <span className="text-xs text-gray-500">— {link.position}</span>}
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        Expires {new Date(link.expiresAt).toLocaleDateString()} · Created {new Date(link.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-gray-600 truncate">{url}</code>
+                      <button
+                        data-testid={`button-copy-link-${link.id}`}
+                        onClick={() => copyLink(link.token, link.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap"
+                      >
+                        {copiedId === link.id ? (
+                          <><CheckCircle2 className="h-3.5 w-3.5 text-green-600" /><span className="text-green-600">Copied!</span></>
+                        ) : (
+                          <><Copy className="h-3.5 w-3.5" /> Copy Link</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
