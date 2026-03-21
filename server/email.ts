@@ -155,7 +155,8 @@ export async function sendHiringStageEmail(
   toEmail: string,
   recipientName: string,
   subject: string,
-  body: string
+  body: string,
+  statusUrl?: string
 ) {
   return sendEmail(toEmail, subject, `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -165,6 +166,11 @@ export async function sendHiringStageEmail(
       <div style="padding: 30px; background-color: #f9fafb;">
         <p style="color: #4b5563;">Hi ${escapeHtml(recipientName || "there")},</p>
         <p style="color: #374151; line-height: 1.6;">${escapeHtml(body)}</p>
+        ${statusUrl ? `
+        <div style="margin: 24px 0; text-align: center;">
+          <a href="${statusUrl}" style="background-color: #166534; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 14px;">Check Your Application Status</a>
+          <p style="margin: 10px 0 0; color: #9ca3af; font-size: 11px;">Or visit: ${escapeHtml(statusUrl)}</p>
+        </div>` : ""}
       </div>
       <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
         <p>Chapin Landscapes — Hiring Team</p>
@@ -415,7 +421,8 @@ export async function sendZoomInterviewEmail(
   zoomUrl: string,
   passcode: string,
   interviewerName?: string,
-  notes?: string
+  notes?: string,
+  statusUrl?: string
 ) {
   return sendEmail(toEmail, `Interview Scheduled — Chapin Landscapes`, `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -439,6 +446,11 @@ export async function sendZoomInterviewEmail(
           <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 11px; word-break: break-all;">${escapeHtml(zoomUrl)}</p>
         </div>
         ${notes ? `<p style="color: #4b5563;"><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ""}
+        ${statusUrl ? `
+        <div style="margin: 24px 0; text-align: center; padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+          <p style="margin: 0 0 10px; color: #166534; font-weight: bold; font-size: 13px;">Track Your Application</p>
+          <a href="${statusUrl}" style="background-color: #166534; color: white; padding: 10px 22px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 13px;">View Application Status</a>
+        </div>` : ""}
         <p style="color: #4b5563;">If you have any questions or need to reschedule, please contact us:</p>
         <p style="color: #374151;"><strong>Email:</strong> office@chapinlandscapes.com<br><strong>Phone/Text:</strong> 440.226.0518</p>
       </div>
@@ -457,7 +469,8 @@ export async function sendInPersonInterviewEmail(
   interviewTime: string,
   location: string,
   interviewerName?: string,
-  notes?: string
+  notes?: string,
+  statusUrl?: string
 ) {
   return sendEmail(toEmail, `Interview Scheduled — Chapin Landscapes`, `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -475,6 +488,11 @@ export async function sendInPersonInterviewEmail(
           ${interviewerName ? `<p style="margin: 0 0 8px 0; color: #374151;"><strong>👤 Interviewer:</strong> ${escapeHtml(interviewerName)}</p>` : ""}
         </div>
         ${notes ? `<p style="color: #4b5563;"><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ""}
+        ${statusUrl ? `
+        <div style="margin: 24px 0; text-align: center; padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+          <p style="margin: 0 0 10px; color: #166534; font-weight: bold; font-size: 13px;">Track Your Application</p>
+          <a href="${statusUrl}" style="background-color: #166534; color: white; padding: 10px 22px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 13px;">View Application Status</a>
+        </div>` : ""}
         <p style="color: #4b5563;">If you have any questions or need to reschedule, please contact us:</p>
         <p style="color: #374151;"><strong>Email:</strong> office@chapinlandscapes.com<br><strong>Phone/Text:</strong> 440.226.0518</p>
       </div>

@@ -9774,5 +9774,129 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  // PUBLIC: Applicant status page (no auth required)
+  app.get("/api/status/:token", async (req, res) => {
+    try {
+      const application = await storage.getJobApplicationByToken(req.params.token);
+      if (!application) {
+        return res.status(404).json({ message: "Application not found. Please check your link." });
+      }
+
+      const baseInfo = {
+        applicantName: application.applicantName || "Applicant",
+        position: application.position || "Landscaping Position",
+        token: application.token,
+      };
+
+      // Application not yet submitted — still in draft
+      if (application.status !== "submitted" || !application.candidateId) {
+        return res.json({
+          ...baseInfo,
+          status: "draft",
+          stage: null,
+          stageLabel: "Application In Progress",
+          stageMessage: "Your application link is active. Complete and submit your application to be considered.",
+          nextStep: "Submit your application to begin the review process.",
+          contactEmail: "office@chapinlandscapes.com",
+        });
+      }
+
+      // Submitted — look up the candidate for current stage
+      const candidate = await storage.getCandidate(application.candidateId);
+      if (!candidate) {
+        return res.json({
+          ...baseInfo,
+          status: "submitted",
+          stage: "Application Received",
+          stageLabel: "Application Received",
+          stageMessage: "We have received your application and our team is reviewing it.",
+          nextStep: "If selected, we will reach out to schedule a phone screen or interview.",
+          contactEmail: "office@chapinlandscapes.com",
+        });
+      }
+
+      const stage = candidate.stage || "Application Received";
+
+      const STAGE_INFO: Record<string, { label: string; message: string; nextStep: string; progress: number }> = {
+        "Application Received": {
+          label: "Application Received",
+          message: "We have received your application and our team is reviewing it.",
+          nextStep: "If selected, we will reach out to schedule a phone screen or interview.",
+          progress: 1,
+        },
+        "Phone Screen": {
+          label: "Phone Screen",
+          message: "Your application is moving forward — our team will be in touch to schedule a brief phone call.",
+          nextStep: "Look out for a call or email from our hiring team to coordinate a time.",
+          progress: 2,
+        },
+        "1st Interview": {
+          label: "First Interview",
+          message: "You are being considered for a first interview with our team.",
+          nextStep: "We will contact you with interview details. Please keep an eye on your email.",
+          progress: 2,
+        },
+        "Interview Scheduled": {
+          label: "Interview Scheduled",
+          message: "Your interview has been scheduled. Please check your email for all the details.",
+          nextStep: "Attend your scheduled interview. We look forward to speaking with you!",
+          progress: 3,
+        },
+        "2nd Interview": {
+          label: "Second Interview",
+          message: "You are in advanced consideration and have been selected for a second interview.",
+          nextStep: "We will be in touch with details for the second interview.",
+          progress: 3,
+        },
+        "Reference Check": {
+          label: "Reference Check",
+          message: "We are currently checking your references as part of our final review.",
+          nextStep: "We will reach out with our decision shortly.",
+          progress: 4,
+        },
+        "Offer Extended": {
+          label: "Offer Extended",
+          message: "Congratulations! An offer of employment has been extended to you.",
+          nextStep: "Please review the offer details sent to your email and respond at your earliest convenience.",
+          progress: 5,
+        },
+        "Hired": {
+          label: "Hired — Welcome to the Team!",
+          message: "Congratulations — you have been hired by Chapin Landscapes! Welcome to the team.",
+          nextStep: "Check your email for onboarding information and your account credentials.",
+          progress: 6,
+        },
+        "Declined / Not a Fit": {
+          label: "Application Closed",
+          message: "Thank you for your interest in Chapin Landscapes. We have decided to move forward with other candidates at this time.",
+          nextStep: "We encourage you to apply again in the future. We appreciate your time and interest.",
+          progress: 0,
+        },
+      };
+
+      const info = STAGE_INFO[stage] || {
+        label: "In Review",
+        message: "Your application is currently under review by our hiring team.",
+        nextStep: "We will be in touch with next steps soon.",
+        progress: 2,
+      };
+
+      return res.json({
+        ...baseInfo,
+        status: stage === "Hired" ? "hired" : stage === "Declined / Not a Fit" ? "declined" : "active",
+        stage,
+        stageLabel: info.label,
+        stageMessage: info.message,
+        nextStep: info.nextStep,
+        progress: info.progress,
+        contactEmail: "office@chapinlandscapes.com",
+        submittedAt: application.submittedAt,
+      });
+    } catch (err: any) {
+      console.error("[status] Error:", err.message);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
   return httpServer;
 }

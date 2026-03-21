@@ -45,6 +45,7 @@ import CalendarPage from "@/pages/Calendar";
 import SharedDocument from "@/pages/SharedDocument";
 import SettingsPage from "@/pages/Settings";
 import PublicApplicationForm from "@/pages/PublicApplicationForm";
+import ApplicantStatus from "@/pages/ApplicantStatus";
 import NotFound from "@/pages/not-found";
 
 function AppRoutes() {
@@ -56,6 +57,10 @@ function AppRoutes() {
 
   if (window.location.pathname.startsWith("/apply/")) {
     return <PublicApplicationForm />;
+  }
+
+  if (window.location.pathname.startsWith("/status/")) {
+    return <ApplicantStatus />;
   }
 
   if (isLoading) {

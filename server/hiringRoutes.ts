@@ -1,6 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import { storage } from "./storage";
 import { sendHiringStageEmail, sendHiringWelcomeEmail, sendNewHireAccountEmail, sendZoomInterviewEmail, sendInPersonInterviewEmail, sendHiredNotificationEmail } from "./email";
+import { getAppUrl } from "./emailService";
 import { hashPassword } from "./auth";
 import { createZoomMeeting, isZoomConfigured } from "./zoomService";
 import { createCalendarEvent, refreshAccessToken, isTokenExpired } from "./googleOAuth";
@@ -133,6 +134,15 @@ async function notifyHRAndManagers(type: string, title: string, message: string,
 async function handleStageChange(candidateId: string, newStage: string, candidate: any, userId?: string) {
   const template = await storage.getHiringEmailTemplate(newStage);
 
+  // Look up status URL from job application token
+  let statusUrl: string | undefined;
+  try {
+    const jobApp = await storage.getJobApplicationByCandidateId(candidateId);
+    if (jobApp?.token) {
+      statusUrl = `${getAppUrl()}/status/${jobApp.token}`;
+    }
+  } catch {}
+
   if (template && template.isEnabled && candidate.email) {
     let subject = template.subject;
     let body = template.body;
@@ -149,7 +159,7 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
     }
 
     try {
-      const sent = await sendHiringStageEmail(candidate.email, candidate.name, subject, body);
+      const sent = await sendHiringStageEmail(candidate.email, candidate.name, subject, body, statusUrl);
       if (sent) {
         await storage.createApplicantCommunication({
           candidateId,
@@ -777,13 +787,19 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
 
       // ── Send email to applicant ───────────────────────────────────────────
       let emailSent = false;
+      let interviewStatusUrl: string | undefined;
+      try {
+        const jobApp = await storage.getJobApplicationByCandidateId(id);
+        if (jobApp?.token) interviewStatusUrl = `${getAppUrl()}/status/${jobApp.token}`;
+      } catch {}
+
       if (candidate.email) {
         try {
           const dateLabel = startDatetime.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
           if (type === "zoom" && zoomResult) {
-            await sendZoomInterviewEmail(candidate.email, candidate.name, candidate.role, dateLabel, time, zoomResult.joinUrl, zoomResult.passcode, interviewerName, notes);
+            await sendZoomInterviewEmail(candidate.email, candidate.name, candidate.role, dateLabel, time, zoomResult.joinUrl, zoomResult.passcode, interviewerName, notes, interviewStatusUrl);
           } else {
-            await sendInPersonInterviewEmail(candidate.email, candidate.name, candidate.role, dateLabel, time, location, interviewerName, notes);
+            await sendInPersonInterviewEmail(candidate.email, candidate.name, candidate.role, dateLabel, time, location, interviewerName, notes, interviewStatusUrl);
           }
           emailSent = true;
         } catch (emailErr: any) {

@@ -253,6 +253,7 @@ export interface IStorage {
   getJobApplications(): Promise<JobApplication[]>;
   getJobApplicationByToken(token: string): Promise<JobApplication | undefined>;
   getJobApplicationById(id: string): Promise<JobApplication | undefined>;
+  getJobApplicationByCandidateId(candidateId: string): Promise<JobApplication | undefined>;
   createJobApplication(application: Omit<InsertJobApplication, "token"> & { token: string }): Promise<JobApplication>;
   updateJobApplication(id: string, updates: Partial<JobApplication>): Promise<JobApplication | undefined>;
   
@@ -3542,6 +3543,11 @@ export class DatabaseStorage implements IStorage {
 
   async getJobApplicationByToken(token: string): Promise<JobApplication | undefined> {
     const [app] = await db.select().from(jobApplications).where(eq(jobApplications.token, token));
+    return app || undefined;
+  }
+
+  async getJobApplicationByCandidateId(candidateId: string): Promise<JobApplication | undefined> {
+    const [app] = await db.select().from(jobApplications).where(eq(jobApplications.candidateId, candidateId));
     return app || undefined;
   }
 
