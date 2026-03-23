@@ -18,7 +18,7 @@ import {
   MessageSquare, Calendar, ChevronRight, X, GripVertical, Upload,
   Send, CheckCircle2, Circle, AlertCircle, ClipboardList, Users,
   UserPlus, Copy, Eye, EyeOff, ShieldCheck, Video, ExternalLink, Loader2,
-  FileCheck, UserCheck, Briefcase, Lock
+  FileCheck, UserCheck, Briefcase, Lock, HelpCircle
 } from "lucide-react";
 import HiringEmailTemplates from "@/components/HiringEmailTemplates";
 import { apiRequest } from "@/lib/queryClient";
@@ -68,6 +68,7 @@ export default function Hiring() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [showHowToUse, setShowHowToUse] = useState(false);
   const [activeTab, setActiveTab] = useState("pipeline");
   const [view, setView] = useState<"pipeline" | "employees">("pipeline");
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
@@ -262,11 +263,59 @@ export default function Hiring() {
   return (
     <div className="space-y-4" data-testid="hiring-page">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-heading font-bold" data-testid="text-hiring-title">{t("hiring.title")}</h1>
-          <p className="text-muted-foreground mt-1">Manage applicants, application links, and email templates</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-heading font-bold" data-testid="text-hiring-title">{t("hiring.title")}</h1>
+            <p className="text-muted-foreground mt-1">Manage applicants, application links, and email templates</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowHowToUse(true)}
+            data-testid="button-how-to-use"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mt-0.5"
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+            How to Use
+          </Button>
         </div>
       </div>
+
+      <Dialog open={showHowToUse} onOpenChange={setShowHowToUse}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-green-700" />
+              How to Use the Hiring Pipeline
+            </DialogTitle>
+            <DialogDescription>Step-by-step guide for processing applicants from application to hire.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm pt-1">
+            {[
+              { step: 1, stage: "Application Received", color: "bg-blue-500", desc: "The candidate is automatically created here the moment they submit the online form. You'll get an in-app notification and email. Their card is pre-populated with everything from their application." },
+              { step: 2, stage: "Review & Rate", color: "bg-gray-400", desc: "Click the card to open it. Go to the Profile tab to review their info, or click \"View Application\" to see everything they submitted. Set a color rating (green/yellow/red) to flag their potential." },
+              { step: 3, stage: "Phone Screen", color: "bg-purple-500", desc: "Drag here if you want to do a quick call before committing to a full interview. Optional — you can skip this stage." },
+              { step: 4, stage: "Interview Scheduled", color: "bg-cyan-500", desc: "Dragging here opens the scheduling modal. Pick date, time, duration, and Zoom or In-Person. The system automatically creates the Zoom meeting, adds it to Google Calendar, emails the candidate, and texts them." },
+              { step: 5, stage: "1st Interview", color: "bg-amber-500", desc: "Move them here once the first interview is done. Use the Interview tab on the card to record your rating and recommendation." },
+              { step: 6, stage: "2nd Interview", color: "bg-orange-500", desc: "Same process if a second round is needed. Schedule via the same drag-to-schedule flow." },
+              { step: 7, stage: "Offer Extended", color: "bg-emerald-500", desc: "Dragging here prompts you to upload an offer letter (PDF or Word). This is optional — you can skip it. The candidate is notified that an offer is coming." },
+              { step: 8, stage: "Hired", color: "bg-green-600", desc: "The big one. Dragging here automatically: creates an employee record pre-filled from their application, generates their onboarding checklist (I-9, W-4, NDA, etc.), creates a Crew login with a temp password, and sends them a welcome email with credentials." },
+              { step: 9, stage: "Declined / Not a Fit", color: "bg-gray-400", desc: "Moves them out of the active pipeline. A notification email is sent to the candidate if that email template is enabled in Admin Panel → Email Templates." },
+            ].map(({ step, stage, color, desc }) => (
+              <div key={step} className="flex gap-3">
+                <div className="flex-shrink-0 flex flex-col items-center">
+                  <div className={`w-6 h-6 rounded-full ${color} text-white text-xs font-bold flex items-center justify-center`}>{step}</div>
+                  {step < 9 && <div className="w-px flex-1 bg-gray-200 mt-1" />}
+                </div>
+                <div className="pb-3">
+                  <p className="font-semibold text-foreground">{stage}</p>
+                  <p className="text-muted-foreground text-xs mt-0.5 leading-relaxed">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
