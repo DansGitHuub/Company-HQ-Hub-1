@@ -4,6 +4,7 @@ import { sendHiringStageEmail, sendHiringWelcomeEmail, sendNewHireAccountEmail, 
 import { getAppUrl } from "./emailService";
 import { hashPassword } from "./auth";
 import { createZoomMeeting, isZoomConfigured } from "./zoomService";
+import { sendInterviewSms, isSmsConfigured } from "./smsService";
 import { createCalendarEvent, refreshAccessToken, isTokenExpired } from "./googleOAuth";
 import { db } from "./db";
 import { users } from "@shared/schema";
@@ -807,6 +808,25 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
         }
       }
 
+      // ── Send SMS to applicant ─────────────────────────────────────────────
+      let smsSent = false;
+      if (candidate.phone && isSmsConfigured()) {
+        try {
+          const dateLabel = startDatetime.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+          smsSent = await sendInterviewSms(
+            candidate.phone,
+            candidate.name,
+            dateLabel,
+            time,
+            type === "zoom" ? "zoom" : "in-person",
+            zoomResult?.joinUrl,
+            location
+          );
+        } catch (smsErr: any) {
+          console.error("[hiring] Interview SMS failed:", smsErr.message);
+        }
+      }
+
       // ── Notify HR / Managers ─────────────────────────────────────────────
       const updatedCandidate = await storage.getCandidate(id);
       await notifyHRAndManagers(
@@ -822,6 +842,7 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
         zoomMeeting: zoomResult,
         calendarEventCreated,
         emailSent,
+        smsSent,
         message: "Interview scheduled successfully",
       });
     } catch (err: any) {
