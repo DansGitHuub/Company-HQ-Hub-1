@@ -344,6 +344,7 @@ export default function AdminPanel() {
   const [isUploading, setIsUploading] = useState(false);
   const [companySignature, setCompanySignature] = useState("");
   const [editingSignature, setEditingSignature] = useState(false);
+  const [drawingSignature, setDrawingSignature] = useState("");
 
   // All sidebar items that can be reordered
   const allSidebarItems = [
@@ -1062,7 +1063,12 @@ export default function AdminPanel() {
                     <img src={companySignature} alt="Company Signature" className="max-h-20 object-contain" data-testid="img-company-signature" />
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setEditingSignature(true)} data-testid="button-edit-signature">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setEditingSignature(true); setDrawingSignature(""); }}
+                      data-testid="button-edit-signature"
+                    >
                       Update Signature
                     </Button>
                     <Button
@@ -1072,6 +1078,7 @@ export default function AdminPanel() {
                       onClick={async () => {
                         await updateCompanySettingsMutation.mutateAsync({ companySignature: "" });
                         setCompanySignature("");
+                        setDrawingSignature("");
                       }}
                       data-testid="button-clear-signature"
                     >
@@ -1086,8 +1093,8 @@ export default function AdminPanel() {
                   </Label>
                   <div className="max-w-md">
                     <SignaturePad
-                      value={editingSignature ? "" : companySignature}
-                      onChange={setCompanySignature}
+                      value={drawingSignature}
+                      onChange={setDrawingSignature}
                       height={120}
                       testId="company-signature-pad"
                     />
@@ -1096,18 +1103,24 @@ export default function AdminPanel() {
                     <Button
                       size="sm"
                       onClick={async () => {
-                        if (!companySignature) return;
-                        await updateCompanySettingsMutation.mutateAsync({ companySignature });
+                        if (!drawingSignature) return;
+                        await updateCompanySettingsMutation.mutateAsync({ companySignature: drawingSignature });
+                        setCompanySignature(drawingSignature);
+                        setDrawingSignature("");
                         setEditingSignature(false);
                       }}
-                      disabled={!companySignature || updateCompanySettingsMutation.isPending}
+                      disabled={!drawingSignature || updateCompanySettingsMutation.isPending}
                       data-testid="button-save-signature"
                     >
                       {updateCompanySettingsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                       Save Signature
                     </Button>
                     {editingSignature && (
-                      <Button variant="outline" size="sm" onClick={() => { setEditingSignature(false); setCompanySignature(companySettings?.companySignature || ""); }}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setEditingSignature(false); setDrawingSignature(""); }}
+                      >
                         Cancel
                       </Button>
                     )}
