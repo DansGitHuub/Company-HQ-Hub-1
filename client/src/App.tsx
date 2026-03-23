@@ -46,6 +46,7 @@ import SharedDocument from "@/pages/SharedDocument";
 import SettingsPage from "@/pages/Settings";
 import PublicApplicationForm from "@/pages/PublicApplicationForm";
 import ApplicantStatus from "@/pages/ApplicantStatus";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import NotFound from "@/pages/not-found";
 
 function AppRoutes() {
@@ -61,6 +62,10 @@ function AppRoutes() {
 
   if (window.location.pathname.startsWith("/status/")) {
     return <ApplicantStatus />;
+  }
+
+  if (window.location.pathname === "/privacy") {
+    return <PrivacyPolicy />;
   }
 
   if (isLoading) {
