@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import SignaturePad from "@/components/forms/SignaturePad";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -339,6 +340,8 @@ export default function AdminPanel() {
   const [logoCornerRadius, setLogoCornerRadius] = useState(0);
   const [companyName, setCompanyName] = useState("Company HQ");
   const [isUploading, setIsUploading] = useState(false);
+  const [companySignature, setCompanySignature] = useState("");
+  const [editingSignature, setEditingSignature] = useState(false);
 
   // All sidebar items that can be reordered
   const allSidebarItems = [
@@ -369,6 +372,7 @@ export default function AdminPanel() {
       setLogoShape(companySettings.logoShape || "square");
       setLogoCornerRadius(companySettings.logoCornerRadius || 0);
       setCompanyName(companySettings.companyName || "Company HQ");
+      setCompanySignature(companySettings.companySignature || "");
       if (companySettings.sidebarOrder && Array.isArray(companySettings.sidebarOrder)) {
         setSidebarOrder(companySettings.sidebarOrder as string[]);
       }
@@ -994,6 +998,74 @@ export default function AdminPanel() {
                   </p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Company Signature</CardTitle>
+              <CardDescription>Draw and save your official company signature. Use it on offer letters, contracts, and other documents with one click.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {companySignature && !editingSignature ? (
+                <div className="space-y-3">
+                  <Label className="text-sm text-muted-foreground">Saved Signature</Label>
+                  <div className="border rounded-lg bg-white p-4 flex items-center justify-center" style={{ minHeight: 100 }}>
+                    <img src={companySignature} alt="Company Signature" className="max-h-20 object-contain" data-testid="img-company-signature" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setEditingSignature(true)} data-testid="button-edit-signature">
+                      Update Signature
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={async () => {
+                        await updateCompanySettingsMutation.mutateAsync({ companySignature: "" });
+                        setCompanySignature("");
+                      }}
+                      data-testid="button-clear-signature"
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Label className="text-sm text-muted-foreground">
+                    {editingSignature ? "Draw your new signature below" : "No signature saved yet — draw one below"}
+                  </Label>
+                  <div className="max-w-md">
+                    <SignaturePad
+                      value={editingSignature ? "" : companySignature}
+                      onChange={setCompanySignature}
+                      height={120}
+                      testId="company-signature-pad"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        if (!companySignature) return;
+                        await updateCompanySettingsMutation.mutateAsync({ companySignature });
+                        setEditingSignature(false);
+                      }}
+                      disabled={!companySignature || updateCompanySettingsMutation.isPending}
+                      data-testid="button-save-signature"
+                    >
+                      {updateCompanySettingsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      Save Signature
+                    </Button>
+                    {editingSignature && (
+                      <Button variant="outline" size="sm" onClick={() => { setEditingSignature(false); setCompanySignature(companySettings?.companySignature || ""); }}>
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
