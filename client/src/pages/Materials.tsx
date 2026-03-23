@@ -499,7 +499,7 @@ export default function Materials() {
             {wizardStep === "category" && (
               <div className="space-y-4">
                 <Label>Select a category for "{wizardData.name}"</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {sortedCategories.map(cat => (
                     <Button
                       key={cat.id}
@@ -545,7 +545,7 @@ export default function Materials() {
                     data-testid="input-description"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label>Unit of Measure</Label>
                     <Input
@@ -780,7 +780,7 @@ function EditMaterialForm({ material, categories, onSave, isPending }: {
         <Label>Description</Label>
         <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label>Unit of Measure</Label>
           <Input value={unitOfMeasure} onChange={(e) => setUnitOfMeasure(e.target.value)} />

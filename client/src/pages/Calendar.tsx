@@ -1215,7 +1215,7 @@ function EventFormDialog({
             <Label>{t("common.description")}</Label>
             <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder={t("common.description")} data-testid="event-description-input" rows={2} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>{t("common.type")}</Label>
               <Select value={eventType} onValueChange={setEventType}>
@@ -1257,7 +1257,7 @@ function EventFormDialog({
               <Label htmlFor="allDay">{t("calendar.allDay")}</Label>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>{t("calendar.startDate")} *</Label>
               <Input
@@ -1287,7 +1287,7 @@ function EventFormDialog({
               <User className="h-3.5 w-3.5" /> {t("calendar.contactName")}
             </Label>
             <Input value={contactName} onChange={e => setContactName(e.target.value)} placeholder={t("calendar.contactName")} data-testid="event-contact-name" />
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <Input value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder={t("calendar.contactEmail")} type="email" data-testid="event-contact-email" />
               <Input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder={t("calendar.contactPhone")} type="tel" data-testid="event-contact-phone" />
             </div>

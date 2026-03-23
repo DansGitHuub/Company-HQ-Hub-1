@@ -338,7 +338,7 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("common.type")}</label>
               <select
@@ -380,7 +380,7 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("tasks.dueDate")}</label>
               <input
@@ -399,7 +399,7 @@ function FullTaskForm({ users, currentUser, onClose, initialData }: {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("common.category")}</label>
               <select
@@ -701,7 +701,7 @@ function TaskDetail({ taskId, onClose, currentUser }: { taskId: string; onClose:
                   <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap" data-testid="task-detail-description">{task.description}</p>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-gray-500">Created by</span>
                   <p className="font-medium text-gray-900 dark:text-white" data-testid="task-detail-creator">{task.creatorName}</p>

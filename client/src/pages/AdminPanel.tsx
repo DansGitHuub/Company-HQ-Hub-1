@@ -83,7 +83,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -606,9 +608,55 @@ export default function AdminPanel() {
         </Card>
       </div>
 
+      {/* Mobile section picker — visible only on small screens */}
+      <div className="block md:hidden">
+        <Select value={activeTab} onValueChange={setActiveTab}>
+          <SelectTrigger className="w-full" data-testid="admin-mobile-nav">
+            <SelectValue placeholder="Select section…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel>People &amp; HR</SelectLabel>
+              <SelectItem value="users">{t("nav.employees")}</SelectItem>
+              <SelectItem value="requests">HR Communications</SelectItem>
+              <SelectItem value="todos">Task Access</SelectItem>
+              <SelectItem value="suggestions">Suggestions</SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>Content</SelectLabel>
+              <SelectItem value="sop-pipeline">SOP Pipeline</SelectItem>
+              <SelectItem value="documents">Documents</SelectItem>
+              <SelectItem value="shared-links">Shared Links</SelectItem>
+              <SelectItem value="help-reports">Help Reports</SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>Company</SelectLabel>
+              <SelectItem value="company">Branding &amp; Settings</SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>AI &amp; Automation</SelectLabel>
+              <SelectItem value="assistant-agents">AI Assistant</SelectItem>
+              <SelectItem value="ai-logs">AI Logs</SelectItem>
+              {isMasterAdmin && <SelectItem value="ai-agents">AI Agents</SelectItem>}
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>Operations</SelectLabel>
+              <SelectItem value="process-auditor">Process Auditor</SelectItem>
+              <SelectItem value="integration-wizard">Integration Wizard</SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>System</SelectLabel>
+              <SelectItem value="app-testing">App Testing</SelectItem>
+              <SelectItem value="system-status">System Status</SelectItem>
+              {isMasterAdmin && <SelectItem value="diagnostics">Diagnostics</SelectItem>}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="flex gap-6 items-start">
-        {/* Left sidebar nav */}
-        <div className="w-48 shrink-0 sticky top-4">
+        {/* Left sidebar nav — hidden on mobile, shown on md+ */}
+        <div className="hidden md:block w-48 shrink-0 sticky top-4">
           <AdminSidebar
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -1168,7 +1216,7 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Daily Limit (per user)</Label>
                   <Input

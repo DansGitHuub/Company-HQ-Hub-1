@@ -647,7 +647,7 @@ function TaskModal({ task, isOpen, onClose, users, currentUser, isManagerOrAdmin
             <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Description..." rows={3} data-testid="input-task-description" />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>Status</Label>
               <Select value={status} onValueChange={setStatus}>
@@ -682,7 +682,7 @@ function TaskModal({ task, isOpen, onClose, users, currentUser, isManagerOrAdmin
 
           <Separator />
           <p className="text-sm font-medium text-muted-foreground">Scheduling</p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>Start Date</Label>
               <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} data-testid="input-start-date" />
@@ -693,7 +693,7 @@ function TaskModal({ task, isOpen, onClose, users, currentUser, isManagerOrAdmin
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>Time Estimate</Label>
               <div className="flex gap-2">
@@ -734,7 +734,7 @@ function TaskModal({ task, isOpen, onClose, users, currentUser, isManagerOrAdmin
 
           <Separator />
           <p className="text-sm font-medium text-muted-foreground">Links</p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>Link Type</Label>
               <Select value={linkedRecordType} onValueChange={setLinkedRecordType}>

@@ -507,7 +507,7 @@ function DashboardSkeleton() {
     <div className="space-y-6 max-w-3xl mx-auto animate-pulse">
       <div className="h-8 bg-gray-200 rounded w-64" />
       <div className="h-24 bg-gray-200 rounded" />
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-gray-200 rounded" />)}
       </div>
     </div>

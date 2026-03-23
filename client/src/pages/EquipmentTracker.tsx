@@ -904,7 +904,7 @@ function QuickServiceDialog({ assetId, onClose }: { assetId: string; onClose: ()
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div><Label>Service Name *</Label><Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} data-testid="input-service-name" /></div>
             <div><Label>Type</Label>
               <Select value={form.logType} onValueChange={v => setForm({...form, logType: v})}>
@@ -918,11 +918,11 @@ function QuickServiceDialog({ assetId, onClose }: { assetId: string; onClose: ()
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div><Label>Date</Label><Input type="date" value={form.completedDate} onChange={e => setForm({...form, completedDate: e.target.value})} /></div>
             <div><Label>Hours at Service</Label><Input type="number" value={form.hoursAtService} onChange={e => setForm({...form, hoursAtService: e.target.value})} /></div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div><Label>Performed By</Label>
               <Select value={form.performedBy || ""} onValueChange={v => setForm({...form, performedBy: v})}>
                 <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
@@ -953,7 +953,7 @@ function QuickServiceDialog({ assetId, onClose }: { assetId: string; onClose: ()
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div><Label>Labor Cost ($)</Label><Input type="number" value={form.laborCost} onChange={e => setForm({...form, laborCost: e.target.value})} /></div>
             <div><Label>Total Cost ($)</Label><Input type="number" value={form.totalCost} onChange={e => setForm({...form, totalCost: e.target.value})} /></div>
           </div>
@@ -1003,7 +1003,7 @@ function RepairRequestDialog({ assetId, onClose }: { assetId: string; onClose: (
         </DialogHeader>
         <div className="space-y-3">
           <div><Label>Problem Description *</Label><Textarea value={form.problemDescription} onChange={e => setForm({...form, problemDescription: e.target.value})} rows={3} data-testid="input-problem" /></div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div><Label>Severity</Label>
               <Select value={form.severity} onValueChange={v => setForm({...form, severity: v})}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1082,7 +1082,7 @@ function AddScheduleDialog({ open, onClose, assetId }: { open: boolean; onClose:
         <div className="space-y-3">
           <div><Label>Task Name *</Label><Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
           <div><Label>Description</Label><Textarea value={form.taskDescription} onChange={e => setForm({...form, taskDescription: e.target.value})} rows={2} /></div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div><Label>Interval Type</Label>
               <Select value={form.intervalType} onValueChange={v => setForm({...form, intervalType: v})}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1225,7 +1225,7 @@ function AddEquipmentWizard({ open, onClose }: { open: boolean; onClose: () => v
 
         {step === 1 && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div><Label>Category *</Label>
                 <Select value={form.category} onValueChange={v => setForm({...form, category: v, type: ["Truck", "Trailer"].includes(v) ? "Vehicle" : "Equipment"})}>
                   <SelectTrigger data-testid="select-category"><SelectValue placeholder="Select..." /></SelectTrigger>
@@ -1296,7 +1296,7 @@ function AddEquipmentWizard({ open, onClose }: { open: boolean; onClose: () => v
 
         {step === 3 && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div><Label>Tracking Type</Label>
                 <Select value={form.trackingType} onValueChange={v => setForm({...form, trackingType: v})}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1309,7 +1309,7 @@ function AddEquipmentWizard({ open, onClose }: { open: boolean; onClose: () => v
                 <div><Label>Current Hours</Label><Input type="number" value={form.currentHours} onChange={e => setForm({...form, currentHours: e.target.value})} /></div>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div><Label>Purchase Date</Label><Input type="date" value={form.purchaseDate} onChange={e => setForm({...form, purchaseDate: e.target.value})} /></div>
               <div><Label>Purchase Price ($)</Label><Input type="number" value={form.purchasePrice} onChange={e => setForm({...form, purchasePrice: e.target.value})} /></div>
             </div>

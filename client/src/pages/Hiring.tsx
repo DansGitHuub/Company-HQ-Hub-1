@@ -678,7 +678,7 @@ export default function Hiring() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>Date <span className="text-red-500">*</span></Label>
                 <Input
@@ -699,7 +699,7 @@ export default function Hiring() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>Duration</Label>
                 <Select value={String(scheduleForm.duration)} onValueChange={v => setScheduleForm(f => ({ ...f, duration: Number(v) }))}>
@@ -967,7 +967,7 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
           <DialogDescription>Enter the new applicant's information</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>{t("auth.fullName")} *</Label>
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} data-testid="input-applicant-name" />
@@ -982,7 +982,7 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>{t("common.email")}</Label>
               <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} data-testid="input-applicant-email" />
@@ -1005,7 +1005,7 @@ function AddApplicantDialog({ open, onClose, onSave, isPending }: {
             <Label>{t("common.address")}</Label>
             <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} data-testid="input-applicant-address" />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label>{t("common.city")}</Label>
               <Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
@@ -1306,7 +1306,7 @@ function ApplicationViewDialog({ candidateId, candidateName, open, onClose }: {
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div className="mb-6">
       <div className="bg-green-800 text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-sm mb-3">{title}</div>
-      <div className="grid grid-cols-2 gap-x-8 gap-y-2 px-1">{children}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 px-1">{children}</div>
     </div>
   );
 
@@ -1511,14 +1511,14 @@ function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (
 
       {editing ? (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><Label>{t("common.name")}</Label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
             <div><Label>{t("employees.position")}</Label><Input value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} /></div>
             <div><Label>{t("common.email")}</Label><Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
             <div><Label>{t("common.phone")}</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
           </div>
           <div><Label>{t("common.address")}</Label><Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} /></div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div><Label>{t("common.city")}</Label><Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} /></div>
             <div><Label>{t("common.state")}</Label><Input value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} /></div>
             <div><Label>{t("common.zip")}</Label><Input value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} /></div>
@@ -1809,11 +1809,11 @@ function InterviewTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate:
 
       {editing ? (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><Label>Date</Label><Input type="date" value={form.interviewDate} onChange={e => setForm({ ...form, interviewDate: e.target.value })} data-testid="input-interview-date" /></div>
             <div><Label>Time</Label><Input value={form.interviewTime} onChange={e => setForm({ ...form, interviewTime: e.target.value })} placeholder="e.g. 2:00 PM" data-testid="input-interview-time" /></div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Type</Label>
               <Select value={form.interviewType} onValueChange={v => setForm({ ...form, interviewType: v })}>
@@ -2034,19 +2034,19 @@ function AddEmployeeForm({ onSave, isPending }: { onSave: (data: any) => void; i
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div><Label>First Name *</Label><Input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} data-testid="input-emp-first-name" /></div>
         <div><Label>Last Name *</Label><Input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} data-testid="input-emp-last-name" /></div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div><Label>Email</Label><Input value={form.personalEmail} onChange={e => setForm({ ...form, personalEmail: e.target.value })} /></div>
         <div><Label>Phone</Label><Input value={form.personalPhone} onChange={e => setForm({ ...form, personalPhone: e.target.value })} /></div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div><Label>Job Title</Label><Input value={form.jobTitle} onChange={e => setForm({ ...form, jobTitle: e.target.value })} /></div>
         <div><Label>Department</Label><Input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} /></div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label>Employment Type</Label>
           <Select value={form.employmentType} onValueChange={v => setForm({ ...form, employmentType: v })}>
@@ -2169,7 +2169,7 @@ function EmployeePersonalTab({ employee, onUpdate }: { employee: any; onUpdate: 
       <CardContent>
         {editing ? (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><Label>First Name</Label><Input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} /></div>
               <div><Label>Last Name</Label><Input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} /></div>
               <div><Label>Preferred Name</Label><Input value={form.preferredName} onChange={e => setForm({ ...form, preferredName: e.target.value })} /></div>
@@ -2179,13 +2179,13 @@ function EmployeePersonalTab({ employee, onUpdate }: { employee: any; onUpdate: 
               <div><Label>Phone</Label><Input value={form.personalPhone} onChange={e => setForm({ ...form, personalPhone: e.target.value })} /></div>
             </div>
             <div><Label>Address</Label><Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} /></div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div><Label>City</Label><Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} /></div>
               <div><Label>State</Label><Input value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} /></div>
               <div><Label>Zip</Label><Input value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} /></div>
             </div>
             <h4 className="font-semibold text-sm mt-4">Emergency Contact</h4>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div><Label>Name</Label><Input value={form.emergencyContactName} onChange={e => setForm({ ...form, emergencyContactName: e.target.value })} /></div>
               <div><Label>Relationship</Label><Input value={form.emergencyContactRelationship} onChange={e => setForm({ ...form, emergencyContactRelationship: e.target.value })} /></div>
               <div><Label>Phone</Label><Input value={form.emergencyContactPhone} onChange={e => setForm({ ...form, emergencyContactPhone: e.target.value })} /></div>
@@ -2193,7 +2193,7 @@ function EmployeePersonalTab({ employee, onUpdate }: { employee: any; onUpdate: 
           </div>
         ) : (
           <div className="space-y-2 text-sm">
-            <div className="grid grid-cols-2 gap-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2">
               <div><span className="text-muted-foreground">Name:</span> {employee.firstName} {employee.lastName}</div>
               {employee.preferredName && <div><span className="text-muted-foreground">Preferred:</span> {employee.preferredName}</div>}
               {employee.pronouns && <div><span className="text-muted-foreground">Pronouns:</span> {employee.pronouns}</div>}
@@ -2235,7 +2235,7 @@ function EmployeeEmploymentTab({ employee, onUpdate }: { employee: any; onUpdate
       <CardContent>
         {editing ? (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><Label>Job Title</Label><Input value={form.jobTitle} onChange={e => setForm({ ...form, jobTitle: e.target.value })} /></div>
               <div><Label>Department</Label><Input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} /></div>
               <div>
@@ -2269,7 +2269,7 @@ function EmployeeEmploymentTab({ employee, onUpdate }: { employee: any; onUpdate
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-y-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 text-sm">
             {employee.employeeNumber && <div><span className="text-muted-foreground">Employee ID:</span> {employee.employeeNumber}</div>}
             <div><span className="text-muted-foreground">Title:</span> {employee.jobTitle || "—"}</div>
             <div><span className="text-muted-foreground">Department:</span> {employee.department || "—"}</div>
@@ -2307,7 +2307,7 @@ function EmployeePayTab({ employee, onUpdate }: { employee: any; onUpdate: (data
       </CardHeader>
       <CardContent className="space-y-4">
         {editing ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><Label>Pay Rate</Label><Input value={form.payRate} onChange={e => setForm({ ...form, payRate: e.target.value })} placeholder="e.g. $18.00" /></div>
             <div>
               <Label>Pay Type</Label>
@@ -2341,7 +2341,7 @@ function EmployeePayTab({ employee, onUpdate }: { employee: any; onUpdate: (data
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-y-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 text-sm">
             <div><span className="text-muted-foreground">Rate:</span> {employee.payRate || "—"} ({employee.payType || "hourly"})</div>
             <div><span className="text-muted-foreground">Period:</span> {employee.payPeriod || "—"}</div>
             <div><span className="text-muted-foreground">Method:</span> {employee.paymentMethod || "—"}</div>
