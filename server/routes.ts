@@ -7,6 +7,7 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerHiringRoutes } from "./hiringRoutes";
 import { registerEmployeeFormsRoutes } from "./employeeFormsRoutes";
+import { registerAgreementRoutes } from "./agreementRoutes";
 import { registerCustomerHubRoutes } from "./customerHubRoutes";
 import { registerEquipmentRoutes } from "./equipmentRoutes";
 import { registerCalendarRoutes } from "./calendarRoutes";
@@ -9362,6 +9363,7 @@ Provide accurate information based on publicly available documentation.`;
 
   registerHiringRoutes(app, requireAuth);
   registerEmployeeFormsRoutes(app, requireAuth);
+  registerAgreementRoutes(app, requireAuth, requireAdmin);
   registerCustomerHubRoutes(app, requireAuth);
   registerSuggestionsRoutes(app, requireAuth);
   registerEquipmentRoutes(app, requireAuth);

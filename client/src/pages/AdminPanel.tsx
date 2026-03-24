@@ -63,7 +63,8 @@ import {
   Zap,
   ClipboardCheck,
   Puzzle,
-  Mail
+  Mail,
+  FileSignature
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
@@ -72,6 +73,7 @@ import SystemStatusReport from "@/components/SystemStatusReport";
 import SOPPipeline from "@/components/SOPPipeline";
 import ProcessAuditor from "@/pages/ProcessAuditor";
 import IntegrationWizard from "@/pages/IntegrationWizard";
+import AgreementTemplatesPanel from "@/components/admin/AgreementTemplatesPanel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -111,6 +113,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
       items: [
         { value: "users", label: t("nav.employees"), icon: Users },
         { value: "requests", label: "HR Communications", icon: Megaphone, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
+        { value: "agreements", label: "Agreement Templates", icon: FileSignature },
         { value: "todos", label: "Task Access", icon: CheckCircle },
         { value: "suggestions", label: "Suggestions", icon: Lightbulb },
       ],
@@ -620,6 +623,7 @@ export default function AdminPanel() {
               <SelectLabel>People &amp; HR</SelectLabel>
               <SelectItem value="users">{t("nav.employees")}</SelectItem>
               <SelectItem value="requests">HR Communications</SelectItem>
+              <SelectItem value="agreements">Agreement Templates</SelectItem>
               <SelectItem value="todos">Task Access</SelectItem>
               <SelectItem value="suggestions">Suggestions</SelectItem>
             </SelectGroup>
@@ -1336,6 +1340,10 @@ export default function AdminPanel() {
 
         <TabsContent value="integration-wizard" className="mt-6">
           <IntegrationWizard />
+        </TabsContent>
+
+        <TabsContent value="agreements" className="mt-6">
+          <AgreementTemplatesPanel />
         </TabsContent>
       </Tabs>
         </div>

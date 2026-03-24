@@ -30,6 +30,7 @@ The frontend is built with React and TypeScript, using React Query for server st
 - **Task Management System**: Full task system with Kanban board (To Do, In Progress, Waiting, Complete, Cancelled), list view, open pool, quick add, and scheduling.
 - **Document Sharing System**: Cross-module document sharing from a central Document Library.
 - **Customer Suggestions**: Customers can submit improvement suggestions for admin review.
+- **Employee Agreement System**: Admin manages position-based agreement templates with HTML body + variable placeholders ({{employee_name}}, {{pay_rate}}, {{start_date}}, {{year}}, {{position}}). Send to any employee with pay rate and start date; employee receives a signing link at /agreement/:token, reviews the rendered agreement, signs digitally, and the signed copy is archived. Admin sees all sent agreements (Pending/Signed) in the employee's Documents tab. Templates managed from Admin Panel → Agreement Templates.
 - **Customizable Dashboard**: Widget-based homepage for internal staff with role-filtered widget picker.
 - **Settings Page**: Centralized settings for Profile & Account, Notifications, Language & Display, Appearance, and Admin Settings.
 - **Activity Log System**: Backend activity tracking with per-user seen tracking.

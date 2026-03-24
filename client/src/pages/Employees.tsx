@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Plus, Phone, Mail, MapPin, FileText, User, Clock,
   ChevronLeft, Upload, CheckCircle2, Circle, AlertCircle, Users, ExternalLink, ClipboardList,
-  LogOut, ThumbsUp, ThumbsDown, ShieldAlert, Loader2, X
+  LogOut, ThumbsUp, ThumbsDown, ShieldAlert, Loader2, X, FileSignature, Send
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -500,6 +500,10 @@ function DocumentsTab({ employee }: { employee: any }) {
   const [correctiveActionOpen, setCorrectiveActionOpen] = useState(false);
   const [viewCAOpen, setViewCAOpen] = useState<any>(null);
   const [viewResignOpen, setViewResignOpen] = useState<any>(null);
+  const [sendAgreementOpen, setSendAgreementOpen] = useState(false);
+  const [sendAgreementTemplateId, setSendAgreementTemplateId] = useState("");
+  const [sendAgreementPayRate, setSendAgreementPayRate] = useState("");
+  const [sendAgreementStartDate, setSendAgreementStartDate] = useState("");
 
   const { data: docs = [] } = useQuery({
     queryKey: [`/api/employees/${employeeId}/documents`],
@@ -541,6 +545,42 @@ function DocumentsTab({ employee }: { employee: any }) {
       queryClient.invalidateQueries({ queryKey: [`/api/employees/${employeeId}/time-off-requests`] });
     },
     onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+  });
+
+  const { data: agreementTemplates = [] } = useQuery<any[]>({
+    queryKey: ["/api/agreement-templates"],
+    queryFn: async () => (await apiRequest("GET", "/api/agreement-templates")).json(),
+    enabled: isAdmin,
+  });
+
+  const { data: employeeAgreements = [] } = useQuery<any[]>({
+    queryKey: [`/api/employees/${employeeId}/agreements`],
+    queryFn: async () => (await apiRequest("GET", `/api/employees/${employeeId}/agreements`)).json(),
+    enabled: isAdmin,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+
+  const sendAgreementMutation = useMutation({
+    mutationFn: async () => {
+      if (!sendAgreementTemplateId) throw new Error("Please select a template.");
+      const res = await apiRequest("POST", `/api/employees/${employeeId}/send-agreement`, {
+        templateId: sendAgreementTemplateId,
+        payRate: sendAgreementPayRate,
+        startDate: sendAgreementStartDate,
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Agreement sent", description: "The employee will receive an email with a signing link." });
+      queryClient.invalidateQueries({ queryKey: [`/api/employees/${employeeId}/agreements`] });
+      setSendAgreementOpen(false);
+      setSendAgreementTemplateId("");
+      setSendAgreementPayRate("");
+      setSendAgreementStartDate("");
+    },
+    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
 
   const handleDropZoneUpload = React.useCallback(async (files: File[]) => {
@@ -623,6 +663,100 @@ function DocumentsTab({ employee }: { employee: any }) {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── SECTION 2b: Employment Agreements ──────────────────────── */}
+      {isAdmin && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <FileSignature className="h-4 w-4 text-primary" />
+                <span className="font-semibold text-sm">Employment Agreements</span>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setSendAgreementOpen(true)} data-testid="button-send-agreement">
+                <Send className="h-3 w-3 mr-1" /> Send Agreement
+              </Button>
+            </div>
+
+            {employeeAgreements.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No agreements sent yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {employeeAgreements.map((ag: any) => (
+                  <div key={ag.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`agreement-row-${ag.id}`}>
+                    <div>
+                      <p className="text-sm font-medium">{ag.year} {ag.position_title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Sent {new Date(ag.sent_at).toLocaleDateString()}
+                        {ag.signed_at ? ` · Signed ${new Date(ag.signed_at).toLocaleDateString()}` : ""}
+                      </p>
+                    </div>
+                    <Badge className={
+                      ag.status === "Signed"
+                        ? "bg-green-100 text-green-800 border-green-200"
+                        : "bg-amber-100 text-amber-800 border-amber-200"
+                    }>{ag.status}</Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Send Agreement Dialog */}
+      <Dialog open={sendAgreementOpen} onOpenChange={setSendAgreementOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Employment Agreement</DialogTitle>
+            <DialogDescription>Select a template and fill in the details. The employee will receive an email with a secure signing link.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Agreement Template</Label>
+              <Select value={sendAgreementTemplateId} onValueChange={setSendAgreementTemplateId}>
+                <SelectTrigger data-testid="select-agreement-template">
+                  <SelectValue placeholder="Select a template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {agreementTemplates.map((t: any) => (
+                    <SelectItem key={t.id} value={t.id}>{t.year} — {t.position_title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Pay Rate ($/hr) <span className="text-muted-foreground text-xs">optional</span></Label>
+              <Input
+                type="text"
+                placeholder="e.g. 22.50"
+                value={sendAgreementPayRate}
+                onChange={e => setSendAgreementPayRate(e.target.value)}
+                data-testid="input-agreement-pay-rate"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Start Date <span className="text-muted-foreground text-xs">optional</span></Label>
+              <Input
+                type="date"
+                value={sendAgreementStartDate}
+                onChange={e => setSendAgreementStartDate(e.target.value)}
+                data-testid="input-agreement-start-date"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSendAgreementOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => sendAgreementMutation.mutate()}
+              disabled={sendAgreementMutation.isPending || !sendAgreementTemplateId}
+              data-testid="button-confirm-send-agreement"
+            >
+              {sendAgreementMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</> : <><Send className="h-4 w-4 mr-2" /> Send Agreement</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── SECTION 3: Corrective Actions ──────────────────────────── */}
       {isHR && (

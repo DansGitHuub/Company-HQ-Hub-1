@@ -2771,3 +2771,39 @@ export const correctiveActions = pgTable("corrective_actions", {
 export const insertCorrectiveActionSchema = createInsertSchema(correctiveActions).omit({ id: true, createdAt: true });
 export type InsertCorrectiveAction = z.infer<typeof insertCorrectiveActionSchema>;
 export type CorrectiveAction = typeof correctiveActions.$inferSelect;
+
+// ─── Agreement Templates ──────────────────────────────────────────────────────
+export const agreementTemplates = pgTable("agreement_templates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  positionTitle: text("position_title").notNull(),
+  year: integer("year").notNull(),
+  templateBody: text("template_body").notNull(),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertAgreementTemplateSchema = createInsertSchema(agreementTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAgreementTemplate = z.infer<typeof insertAgreementTemplateSchema>;
+export type AgreementTemplate = typeof agreementTemplates.$inferSelect;
+
+// ─── Employee Agreements (sent instances) ────────────────────────────────────
+export const employeeAgreements = pgTable("employee_agreements", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id", { length: 36 }).references(() => employees.id).notNull(),
+  templateId: varchar("template_id", { length: 36 }).references(() => agreementTemplates.id).notNull(),
+  sentByUserId: varchar("sent_by_user_id", { length: 36 }).references(() => users.id).notNull(),
+  token: text("token").unique(),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  sentAt: timestamp("sent_at").defaultNow(),
+  signedAt: timestamp("signed_at"),
+  signatureDataUrl: text("signature_data_url"),
+  signerName: text("signer_name"),
+  payRate: text("pay_rate"),
+  startDate: varchar("start_date", { length: 20 }),
+  renderedBody: text("rendered_body"),
+  status: varchar("status", { length: 20 }).notNull().default("Pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertEmployeeAgreementSchema = createInsertSchema(employeeAgreements).omit({ id: true, createdAt: true, sentAt: true, signedAt: true });
+export type InsertEmployeeAgreement = z.infer<typeof insertEmployeeAgreementSchema>;
+export type EmployeeAgreement = typeof employeeAgreements.$inferSelect;
