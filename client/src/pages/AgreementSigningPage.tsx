@@ -1,17 +1,99 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle2, FileSignature, Clock, XCircle } from "lucide-react";
+import { Loader2, CheckCircle2, FileSignature, Clock, XCircle, PenLine, Type } from "lucide-react";
 import SignaturePad from "@/components/forms/SignaturePad";
+import { cn } from "@/lib/utils";
+
+type SignMode = "draw" | "type";
+
+function TypedSignature({ onChange }: { onChange: (dataUrl: string) => void }) {
+  const [name, setName] = useState("");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const render = useCallback(async (text: string) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.offsetWidth || 480;
+    const h = 120;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+    if (!text.trim()) { onChange(""); return; }
+    // Wait for font
+    try { await document.fonts.load(`bold 52px "Dancing Script"`); } catch (_) {}
+    ctx.font = `bold 52px "Dancing Script", cursive`;
+    ctx.fillStyle = "#1a1a2e";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, w / 2, h / 2 - 4);
+    // Signature line
+    ctx.strokeStyle = "#d1d5db";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(20, h - 18);
+    ctx.lineTo(w - 20, h - 18);
+    ctx.stroke();
+    onChange(canvas.toDataURL("image/png"));
+  }, [onChange]);
+
+  useEffect(() => { render(name); }, [name, render]);
+
+  return (
+    <div className="space-y-3">
+      <Input
+        placeholder="Type your full legal name"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        className="text-base"
+        data-testid="input-typed-signature"
+      />
+      {name.trim() && (
+        <div className="rounded-lg border-2 border-muted-foreground/20 bg-white overflow-hidden relative">
+          <canvas
+            ref={canvasRef}
+            className="w-full"
+            style={{ display: "block", height: 120 }}
+            data-testid="canvas-typed-signature"
+          />
+          <p className="text-[10px] text-muted-foreground/40 absolute bottom-1 left-3">Your signature</p>
+        </div>
+      )}
+      {!name.trim() && (
+        <div className="rounded-lg border-2 border-dashed border-muted-foreground/20 bg-white h-[120px] flex items-center justify-center">
+          <p className="text-sm text-muted-foreground/50">Your signature preview will appear here</p>
+        </div>
+      )}
+      {name.trim() && (
+        <button
+          className="text-xs text-muted-foreground underline"
+          onClick={() => { setName(""); onChange(""); }}
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function AgreementSigningPage() {
   const token = window.location.pathname.split("/agreement/")[1]?.split("?")[0] || "";
-  const [signature, setSignature] = useState<string | null>(null);
+  const [signature, setSignature] = useState<string>("");
   const [agreed, setAgreed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [countdown, setCountdown] = useState(10);
+  const [signMode, setSignMode] = useState<SignMode>("type");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["/api/agreement", token],
@@ -139,21 +221,57 @@ export default function AgreementSigningPage() {
 
         {/* Signature section */}
         <div className="bg-white rounded-xl border shadow-sm p-6 space-y-5">
-          <h3 className="font-semibold text-lg flex items-center gap-2">
-            <FileSignature className="h-5 w-5 text-primary" />
-            Your Signature
-          </h3>
-
           <div>
-            <p className="text-sm text-muted-foreground mb-3">
-              Sign below using your mouse, trackpad, or finger (on mobile).
+            <h3 className="font-semibold text-lg flex items-center gap-2 mb-1">
+              <FileSignature className="h-5 w-5 text-primary" />
+              Sign This Agreement
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Choose how you'd like to sign — no printing required. Your electronic signature is legally binding.
             </p>
-            <SignaturePad
-              onChange={setSignature}
-              data-testid="signature-pad-agreement"
-            />
           </div>
 
+          {/* Mode toggle */}
+          <div className="flex rounded-lg border overflow-hidden w-fit">
+            <button
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors",
+                signMode === "type" ? "bg-primary text-primary-foreground" : "bg-white text-muted-foreground hover:bg-muted/50"
+              )}
+              onClick={() => { setSignMode("type"); setSignature(""); }}
+              data-testid="tab-type-signature"
+            >
+              <Type className="h-4 w-4" /> Type Your Name
+            </button>
+            <button
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-l",
+                signMode === "draw" ? "bg-primary text-primary-foreground" : "bg-white text-muted-foreground hover:bg-muted/50"
+              )}
+              onClick={() => { setSignMode("draw"); setSignature(""); }}
+              data-testid="tab-draw-signature"
+            >
+              <PenLine className="h-4 w-4" /> Draw
+            </button>
+          </div>
+
+          {/* Signature input */}
+          {signMode === "type" ? (
+            <TypedSignature onChange={setSignature} />
+          ) : (
+            <div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Sign using your mouse, trackpad, or finger on mobile.
+              </p>
+              <SignaturePad
+                value={signature}
+                onChange={setSignature}
+                data-testid="signature-pad-agreement"
+              />
+            </div>
+          )}
+
+          {/* Acknowledgment */}
           <div className="flex items-start gap-3 p-4 rounded-lg border bg-muted/30">
             <Checkbox
               id="agreement-ack"
@@ -179,12 +297,16 @@ export default function AgreementSigningPage() {
           >
             {signMutation.isPending ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Submitting...</>
-            ) : "I Accept &amp; Sign This Agreement"}
+            ) : "I Accept & Sign This Agreement"}
           </Button>
 
           {!canSubmit && (
             <p className="text-xs text-center text-muted-foreground">
-              {!signature ? "Please provide your signature above." : "Please check the acknowledgment box to continue."}
+              {!signature
+                ? signMode === "type"
+                  ? "Type your full name above to create your signature."
+                  : "Please draw your signature above."
+                : "Please check the acknowledgment box to continue."}
             </p>
           )}
         </div>

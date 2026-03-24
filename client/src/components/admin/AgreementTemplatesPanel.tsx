@@ -260,21 +260,12 @@ export default function AgreementTemplatesPanel() {
       <Dialog open={viewOpen} onOpenChange={open => { if (!open) { setViewOpen(false); setIsEditing(false); } }}>
         <DialogContent className="max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
           <DialogHeader>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <DialogTitle>
-                  {isEditing ? "Editing: " : ""}{viewTemplate?.year} {viewTemplate?.position_title}
-                </DialogTitle>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {isEditing ? "Make changes below and save when ready." : "Read-only view. Click Edit to make changes."}
-                </p>
-              </div>
-              {!isEditing && (
-                <Button size="sm" onClick={startEditing} data-testid="button-edit-template">
-                  <Pencil className="h-4 w-4 mr-2" /> Edit
-                </Button>
-              )}
-            </div>
+            <DialogTitle>
+              {viewTemplate?.year} {viewTemplate?.position_title}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {isEditing ? "Make changes below and save when ready." : "Read-only view. Click Edit in the toolbar below to make changes."}
+            </p>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto py-2">
@@ -330,7 +321,12 @@ export default function AgreementTemplatesPanel() {
                 </Button>
               </>
             ) : (
-              <Button variant="outline" onClick={() => setViewOpen(false)}>Close</Button>
+              <>
+                <Button variant="outline" onClick={() => setViewOpen(false)}>Close</Button>
+                <Button onClick={startEditing} data-testid="button-edit-template">
+                  <Pencil className="h-4 w-4 mr-2" /> Edit Template
+                </Button>
+              </>
             )}
           </DialogFooter>
         </DialogContent>
