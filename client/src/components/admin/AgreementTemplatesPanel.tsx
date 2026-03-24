@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Plus, Pencil, Trash2, FileSignature, Send, Info, Users } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, FileSignature, Send, Info, Users, Eye } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 
 type Template = {
@@ -23,8 +23,8 @@ type Template = {
 
 type Employee = {
   id: string;
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
   position: string;
   email?: string;
 };
@@ -41,10 +41,17 @@ export default function AgreementTemplatesPanel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [editOpen, setEditOpen] = useState(false);
+  // View / Edit dialog state
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewTemplate, setViewTemplate] = useState<Template | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ positionTitle: "", year: new Date().getFullYear(), templateBody: "" });
+
+  // New template dialog
+  const [newOpen, setNewOpen] = useState(false);
+  const [newForm, setNewForm] = useState({ positionTitle: "", year: new Date().getFullYear(), templateBody: "" });
+
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewHtml, setPreviewHtml] = useState("");
   const [showHints, setShowHints] = useState(false);
 
   // Bulk send state
@@ -54,9 +61,6 @@ export default function AgreementTemplatesPanel() {
   const [bulkPayRate, setBulkPayRate] = useState("");
   const [bulkStartDate, setBulkStartDate] = useState("");
   const [applyToAll, setApplyToAll] = useState(true);
-
-  const [form, setForm] = useState({ id: "", positionTitle: "", year: new Date().getFullYear(), templateBody: "" });
-  const isEditing = !!form.id;
 
   const { data: templates = [], isLoading } = useQuery<Template[]>({
     queryKey: ["/api/agreement-templates"],
@@ -71,16 +75,30 @@ export default function AgreementTemplatesPanel() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = { positionTitle: form.positionTitle, year: form.year, templateBody: form.templateBody };
-      if (isEditing) return (await apiRequest("PUT", `/api/agreement-templates/${form.id}`, payload)).json();
+      const payload = { positionTitle: editForm.positionTitle, year: editForm.year, templateBody: editForm.templateBody };
+      return (await apiRequest("PUT", `/api/agreement-templates/${viewTemplate!.id}`, payload)).json();
+    },
+    onSuccess: (updated: any) => {
+      toast({ title: "Template saved" });
+      queryClient.invalidateQueries({ queryKey: ["/api/agreement-templates"] });
+      setViewTemplate(prev => prev ? { ...prev, ...updated, position_title: updated.position_title || editForm.positionTitle, year: editForm.year, template_body: editForm.templateBody } : prev);
+      setIsEditing(false);
+    },
+    onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const payload = { positionTitle: newForm.positionTitle, year: newForm.year, templateBody: newForm.templateBody };
       return (await apiRequest("POST", "/api/agreement-templates", payload)).json();
     },
     onSuccess: () => {
-      toast({ title: isEditing ? "Template updated" : "Template created" });
+      toast({ title: "Template created" });
       queryClient.invalidateQueries({ queryKey: ["/api/agreement-templates"] });
-      setEditOpen(false);
+      setNewOpen(false);
+      setNewForm({ positionTitle: "", year: new Date().getFullYear(), templateBody: "" });
     },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Failed to create", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -90,7 +108,7 @@ export default function AgreementTemplatesPanel() {
       queryClient.invalidateQueries({ queryKey: ["/api/agreement-templates"] });
       setDeleteId(null);
     },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Failed to delete", description: e.message, variant: "destructive" }),
   });
 
   const bulkSendMutation = useMutation({
@@ -121,14 +139,23 @@ export default function AgreementTemplatesPanel() {
     onError: (e: any) => toast({ title: "Partial send", description: e.message, variant: "destructive" }),
   });
 
-  async function openEdit(tmpl?: Template) {
-    if (tmpl) {
-      const full = await (await apiRequest("GET", `/api/agreement-templates/${tmpl.id}`)).json();
-      setForm({ id: full.id, positionTitle: full.position_title, year: full.year, templateBody: full.template_body });
-    } else {
-      setForm({ id: "", positionTitle: "", year: new Date().getFullYear(), templateBody: "" });
+  async function openView(tmpl: Template) {
+    const full = await (await apiRequest("GET", `/api/agreement-templates/${tmpl.id}`)).json();
+    setViewTemplate(full);
+    setEditForm({ positionTitle: full.position_title, year: full.year, templateBody: full.template_body });
+    setIsEditing(false);
+    setViewOpen(true);
+  }
+
+  function startEditing() {
+    if (viewTemplate) {
+      setEditForm({ positionTitle: viewTemplate.position_title, year: viewTemplate.year, templateBody: viewTemplate.template_body || "" });
     }
-    setEditOpen(true);
+    setIsEditing(true);
+  }
+
+  function cancelEditing() {
+    setIsEditing(false);
   }
 
   function openBulkSend(tmpl: Template) {
@@ -140,14 +167,6 @@ export default function AgreementTemplatesPanel() {
     setBulkSendOpen(true);
   }
 
-  function openPreview() {
-    const sample = { employee_name: "Jane Smith", year: String(form.year), pay_rate: "22.50", start_date: new Date().toLocaleDateString(), position: form.positionTitle };
-    let html = form.templateBody;
-    for (const [k, v] of Object.entries(sample)) html = html.replaceAll(`{{${k}}}`, v);
-    setPreviewHtml(html);
-    setPreviewOpen(true);
-  }
-
   function toggleEmployee(empId: string) {
     setSelectedEmployees(prev => {
       const next = { ...prev };
@@ -157,7 +176,13 @@ export default function AgreementTemplatesPanel() {
     });
   }
 
-  const activeEmployees = employees.filter((e: Employee) => e.id);
+  const selectedCount = Object.keys(selectedEmployees).length;
+  const selectedNames = Object.keys(selectedEmployees)
+    .map(id => {
+      const emp = employees.find((e: Employee) => e.id === id);
+      return emp ? `${emp.firstName} ${emp.lastName}` : "";
+    })
+    .filter(Boolean);
 
   return (
     <div className="space-y-6">
@@ -166,7 +191,7 @@ export default function AgreementTemplatesPanel() {
           <h2 className="text-xl font-bold">Agreement Templates</h2>
           <p className="text-sm text-muted-foreground mt-0.5">Create and manage employment agreement templates for each position.</p>
         </div>
-        <Button onClick={() => openEdit()} data-testid="button-new-template">
+        <Button onClick={() => setNewOpen(true)} data-testid="button-new-template">
           <Plus className="h-4 w-4 mr-2" /> New Template
         </Button>
       </div>
@@ -199,7 +224,7 @@ export default function AgreementTemplatesPanel() {
         <Card><CardContent className="p-10 text-center">
           <FileSignature className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
           <p className="font-medium text-muted-foreground">No agreement templates yet.</p>
-          <Button className="mt-4" onClick={() => openEdit()}>Create Template</Button>
+          <Button className="mt-4" onClick={() => setNewOpen(true)}>Create Template</Button>
         </CardContent></Card>
       ) : (
         <div className="space-y-3">
@@ -218,8 +243,8 @@ export default function AgreementTemplatesPanel() {
                   <Button size="sm" variant="outline" onClick={() => openBulkSend(tmpl)} data-testid={`bulk-send-template-${tmpl.id}`}>
                     <Users className="h-3.5 w-3.5 mr-1" /> Send to Employees
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => openEdit(tmpl)} data-testid={`edit-template-${tmpl.id}`}>
-                    <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                  <Button size="sm" variant="outline" onClick={() => openView(tmpl)} data-testid={`view-template-${tmpl.id}`}>
+                    <Eye className="h-3.5 w-3.5 mr-1" /> View
                   </Button>
                   <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setDeleteId(tmpl.id)} data-testid={`delete-template-${tmpl.id}`}>
                     <Trash2 className="h-3.5 w-3.5" />
@@ -231,13 +256,93 @@ export default function AgreementTemplatesPanel() {
         </div>
       )}
 
-      {/* Edit / Create dialog */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      {/* View / Edit dialog */}
+      <Dialog open={viewOpen} onOpenChange={open => { if (!open) { setViewOpen(false); setIsEditing(false); } }}>
         <DialogContent className="max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
           <DialogHeader>
-            <DialogTitle>{isEditing ? `Editing: ${form.positionTitle}` : "Create New Template"}</DialogTitle>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <DialogTitle>
+                  {isEditing ? "Editing: " : ""}{viewTemplate?.year} {viewTemplate?.position_title}
+                </DialogTitle>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {isEditing ? "Make changes below and save when ready." : "Read-only view. Click Edit to make changes."}
+                </p>
+              </div>
+              {!isEditing && (
+                <Button size="sm" onClick={startEditing} data-testid="button-edit-template">
+                  <Pencil className="h-4 w-4 mr-2" /> Edit
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-2">
+            {isEditing ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Position Title</Label>
+                    <Input
+                      value={editForm.positionTitle}
+                      onChange={e => setEditForm(f => ({ ...f, positionTitle: e.target.value }))}
+                      data-testid="input-position-title"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Agreement Year</Label>
+                    <Input
+                      type="number" min={2020} max={2099}
+                      value={editForm.year}
+                      onChange={e => setEditForm(f => ({ ...f, year: parseInt(e.target.value) || f.year }))}
+                      data-testid="input-agreement-year"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Agreement Content</Label>
+                  <RichTextEditor
+                    value={editForm.templateBody}
+                    onChange={html => setEditForm(f => ({ ...f, templateBody: html }))}
+                    minHeight="450px"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div
+                className="bg-white border rounded-lg p-8 agreement-prose"
+                style={{ fontFamily: "Georgia, serif", lineHeight: "1.8", minHeight: "400px" }}
+                dangerouslySetInnerHTML={{ __html: viewTemplate?.template_body || "" }}
+              />
+            )}
+          </div>
+
+          <DialogFooter className="border-t pt-4">
+            {isEditing ? (
+              <>
+                <Button variant="outline" onClick={cancelEditing}>Cancel</Button>
+                <Button
+                  onClick={() => saveMutation.mutate()}
+                  disabled={saveMutation.isPending || !editForm.positionTitle || !editForm.templateBody}
+                  data-testid="button-save-template"
+                >
+                  {saveMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Changes"}
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" onClick={() => setViewOpen(false)}>Close</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Template dialog */}
+      <Dialog open={newOpen} onOpenChange={setNewOpen}>
+        <DialogContent className="max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Create New Template</DialogTitle>
             <DialogDescription>
-              Use the editor below to write your agreement. Format text with the toolbar, and type placeholders like <code>{"{{employee_name}}"}</code> anywhere — they'll fill in automatically when sent.
+              Write your agreement using the editor. Type placeholders like <code>{"{{employee_name}}"}</code> — they fill in automatically when sent.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 overflow-y-auto pr-1 flex-1 py-2">
@@ -246,55 +351,40 @@ export default function AgreementTemplatesPanel() {
                 <Label>Position Title</Label>
                 <Input
                   placeholder="e.g. Softscape Foreman"
-                  value={form.positionTitle}
-                  onChange={e => setForm(f => ({ ...f, positionTitle: e.target.value }))}
-                  data-testid="input-position-title"
+                  value={newForm.positionTitle}
+                  onChange={e => setNewForm(f => ({ ...f, positionTitle: e.target.value }))}
+                  data-testid="input-new-position-title"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label>Agreement Year</Label>
                 <Input
                   type="number" min={2020} max={2099}
-                  value={form.year}
-                  onChange={e => setForm(f => ({ ...f, year: parseInt(e.target.value) || f.year }))}
-                  data-testid="input-agreement-year"
+                  value={newForm.year}
+                  onChange={e => setNewForm(f => ({ ...f, year: parseInt(e.target.value) || f.year }))}
+                  data-testid="input-new-agreement-year"
                 />
               </div>
             </div>
-
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label>Agreement Content</Label>
-                <Button size="sm" variant="ghost" onClick={openPreview} disabled={!form.templateBody} data-testid="button-preview-template" className="text-xs h-7">
-                  Preview with sample data
-                </Button>
-              </div>
+              <Label>Agreement Content</Label>
               <RichTextEditor
-                value={form.templateBody}
-                onChange={html => setForm(f => ({ ...f, templateBody: html }))}
+                value={newForm.templateBody}
+                onChange={html => setNewForm(f => ({ ...f, templateBody: html }))}
                 minHeight="450px"
               />
             </div>
           </div>
           <DialogFooter className="border-t pt-4">
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setNewOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending || !form.positionTitle || !form.templateBody}
-              data-testid="button-save-template"
+              onClick={() => createMutation.mutate()}
+              disabled={createMutation.isPending || !newForm.positionTitle || !newForm.templateBody}
+              data-testid="button-create-template"
             >
-              {saveMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Template"}
+              {createMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creating...</> : "Create Template"}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Preview dialog */}
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Preview (with sample data)</DialogTitle></DialogHeader>
-          <div className="bg-white border rounded p-8 agreement-prose" style={{ fontFamily: "Georgia, serif", lineHeight: "1.8" }} dangerouslySetInnerHTML={{ __html: previewHtml }} />
-          <DialogFooter><Button variant="outline" onClick={() => setPreviewOpen(false)}>Close</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -304,16 +394,16 @@ export default function AgreementTemplatesPanel() {
           <DialogHeader>
             <DialogTitle>Send Agreement to Employees</DialogTitle>
             <DialogDescription>
-              Select the employees to receive the <strong>{bulkTemplate?.year} {bulkTemplate?.position_title}</strong> agreement. Each person gets their own personalized copy with their name filled in.
+              Select who should receive the <strong>{bulkTemplate?.year} {bulkTemplate?.position_title}</strong> agreement. Each person gets their own personalized copy with their name filled in automatically.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* Apply same pay/date to all */}
+            {/* Pay rate / start date */}
             <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
               <div className="flex items-center gap-2">
                 <Checkbox id="apply-all" checked={applyToAll} onCheckedChange={v => setApplyToAll(!!v)} data-testid="checkbox-apply-all" />
-                <label htmlFor="apply-all" className="text-sm font-medium cursor-pointer">Use the same pay rate and start date for everyone selected</label>
+                <label htmlFor="apply-all" className="text-sm font-medium cursor-pointer">Same pay rate and start date for everyone</label>
               </div>
               {applyToAll && (
                 <div className="grid grid-cols-2 gap-3 pt-1">
@@ -329,35 +419,50 @@ export default function AgreementTemplatesPanel() {
               )}
             </div>
 
+            {/* Selected summary */}
+            {selectedCount > 0 && (
+              <div className="text-sm text-muted-foreground px-1">
+                <span className="font-medium text-foreground">{selectedCount} selected:</span>{" "}
+                {selectedNames.join(", ")}
+              </div>
+            )}
+
             {/* Employee list */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <Label>Select Employees</Label>
-                <span className="text-xs text-muted-foreground">{Object.keys(selectedEmployees).length} selected</span>
+                {selectedCount > 0 && (
+                  <button className="text-xs text-muted-foreground underline" onClick={() => setSelectedEmployees({})}>Clear all</button>
+                )}
               </div>
               <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
-                {activeEmployees.length === 0 ? (
-                  <div className="p-4 text-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" /> Loading employees...</div>
-                ) : activeEmployees.map((emp: Employee) => {
+                {employees.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" /> Loading employees...
+                  </div>
+                ) : (employees as Employee[]).map((emp) => {
                   const isSelected = selectedEmployees[emp.id] !== undefined;
+                  const fullName = `${emp.firstName} ${emp.lastName}`;
                   return (
-                    <div key={emp.id} className="p-3 flex items-start gap-3">
+                    <div
+                      key={emp.id}
+                      className={`p-3 flex items-start gap-3 cursor-pointer hover:bg-muted/40 transition-colors ${isSelected ? "bg-primary/5" : ""}`}
+                      onClick={() => toggleEmployee(emp.id)}
+                    >
                       <Checkbox
                         id={`emp-${emp.id}`}
                         checked={isSelected}
                         onCheckedChange={() => toggleEmployee(emp.id)}
                         data-testid={`checkbox-emp-${emp.id}`}
+                        onClick={e => e.stopPropagation()}
                       />
                       <div className="flex-1 min-w-0">
-                        <label htmlFor={`emp-${emp.id}`} className="font-medium text-sm cursor-pointer block">
-                          {emp.first_name} {emp.last_name}
-                        </label>
-                        <p className="text-xs text-muted-foreground">{emp.position || "No position"}</p>
+                        <p className="font-medium text-sm">{fullName}</p>
+                        <p className="text-xs text-muted-foreground">{emp.position || "No position set"}</p>
                         {!applyToAll && isSelected && (
-                          <div className="grid grid-cols-2 gap-2 mt-2">
+                          <div className="grid grid-cols-2 gap-2 mt-2" onClick={e => e.stopPropagation()}>
                             <Input
                               placeholder="Pay rate"
-                              size={8}
                               className="h-7 text-xs"
                               value={selectedEmployees[emp.id]?.payRate || ""}
                               onChange={e => setSelectedEmployees(prev => ({ ...prev, [emp.id]: { ...prev[emp.id], payRate: e.target.value } }))}
@@ -382,13 +487,13 @@ export default function AgreementTemplatesPanel() {
             <Button variant="outline" onClick={() => setBulkSendOpen(false)}>Cancel</Button>
             <Button
               onClick={() => bulkSendMutation.mutate()}
-              disabled={bulkSendMutation.isPending || Object.keys(selectedEmployees).length === 0}
+              disabled={bulkSendMutation.isPending || selectedCount === 0}
               data-testid="button-confirm-bulk-send"
             >
               {bulkSendMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
               ) : (
-                <><Send className="h-4 w-4 mr-2" /> Send to {Object.keys(selectedEmployees).length || ""} Employee{Object.keys(selectedEmployees).length !== 1 ? "s" : ""}</>
+                <><Send className="h-4 w-4 mr-2" /> Send to {selectedCount || ""} {selectedCount === 1 ? "Employee" : "Employees"}</>
               )}
             </Button>
           </DialogFooter>
