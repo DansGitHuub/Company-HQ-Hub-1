@@ -46,6 +46,7 @@ import SharedDocument from "@/pages/SharedDocument";
 import SettingsPage from "@/pages/Settings";
 import PublicApplicationForm from "@/pages/PublicApplicationForm";
 import ApplicantStatus from "@/pages/ApplicantStatus";
+import OfferAcceptancePage from "@/pages/OfferAcceptancePage";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import NotFound from "@/pages/not-found";
 
@@ -62,6 +63,10 @@ function AppRoutes() {
 
   if (window.location.pathname.startsWith("/status/")) {
     return <ApplicantStatus />;
+  }
+
+  if (window.location.pathname.startsWith("/offer/")) {
+    return <OfferAcceptancePage />;
   }
 
   if (window.location.pathname === "/privacy") {

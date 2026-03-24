@@ -1,7 +1,8 @@
 import type { Express, RequestHandler } from "express";
+import { randomBytes } from "crypto";
 import { storage } from "./storage";
 import { sendHiringStageEmail, sendHiringWelcomeEmail, sendNewHireAccountEmail, sendZoomInterviewEmail, sendInPersonInterviewEmail, sendHiredNotificationEmail } from "./email";
-import { getAppUrl } from "./emailService";
+import { getAppUrl, sendOfferAcceptanceEmail } from "./emailService";
 import { hashPassword } from "./auth";
 import { createZoomMeeting, isZoomConfigured } from "./zoomService";
 import { sendInterviewSms, isSmsConfigured } from "./smsService";
@@ -186,6 +187,34 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
     { candidateId, newStage, candidateName: candidate.name, position: candidate.role }
   );
 
+  if (newStage === "Offer Extended" && candidate.email) {
+    try {
+      const token = randomBytes(24).toString("hex");
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await storage.updateCandidate(candidateId, {
+        offerAcceptanceToken: token,
+        offerAcceptanceExpiresAt: expiresAt,
+      } as any);
+      const acceptanceUrl = `${getAppUrl()}/offer/${token}`;
+      let offerLetterUrl: string | undefined;
+      try {
+        const docs = await storage.getCandidateDocuments(candidateId);
+        const offerLetterDoc = docs.find((d: any) => d.type === "offer_letter");
+        if (offerLetterDoc?.url) offerLetterUrl = offerLetterDoc.url;
+      } catch {}
+      await sendOfferAcceptanceEmail(
+        candidate.email,
+        candidate.name,
+        candidate.role || "Team Member",
+        acceptanceUrl,
+        offerLetterUrl
+      );
+      console.log(`[hiring] Offer acceptance email sent to ${candidate.email} with token ${token}`);
+    } catch (err: any) {
+      console.error("[hiring] Failed to send offer acceptance email:", err.message);
+    }
+  }
+
   if (newStage === "Hired") {
     const existingEmployees = await storage.getEmployees();
     const alreadyHired = existingEmployees.find((e: any) => e.candidateId === candidateId);
@@ -228,6 +257,153 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
       }
     }
   }
+}
+
+async function executeHireFlow(candidateId: string, startDate?: string) {
+  const candidate = await storage.getCandidate(candidateId);
+  if (!candidate) throw new Error("Candidate not found");
+
+  const nameParts = candidate.name.trim().split(/\s+/);
+  const firstName = nameParts[0] || candidate.name;
+  const lastName = nameParts.slice(1).join(" ") || "";
+
+  const existingEmployees = await storage.getEmployees();
+  const alreadyLinked = existingEmployees.find((e: any) => e.candidateId === candidateId);
+
+  let employee: any;
+  if (!alreadyLinked) {
+    employee = await storage.createEmployee({
+      candidateId,
+      firstName,
+      lastName,
+      personalEmail: candidate.email || undefined,
+      personalPhone: candidate.phone || undefined,
+      jobTitle: candidate.role || undefined,
+      startDate: startDate || new Date().toISOString().split("T")[0],
+      status: "Active",
+      employmentType: "Full-time",
+    });
+  } else {
+    employee = alreadyLinked;
+  }
+
+  await storage.updateCandidate(candidateId, { stage: "Hired" });
+
+  const ONBOARDING_FORMS = [
+    { title: "Emergency Contact Form", category: "Forms" },
+    { title: "I-9 Employment Eligibility Verification", category: "Compliance" },
+    { title: "W-4 Federal Tax Withholding", category: "Compliance" },
+    { title: "IT-4 State Tax Withholding (Ohio)", category: "Compliance" },
+    { title: "NDA Agreement", category: "Legal" },
+    { title: "OSHA 301 Incident Report Acknowledgment", category: "Safety" },
+    { title: "Employee Handbook Acknowledgment", category: "Policy" },
+    { title: "Offer Letter Review & Acceptance", category: "HR" },
+    { title: "Direct Deposit Form", category: "Payroll" },
+  ];
+
+  const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  for (const form of ONBOARDING_FORMS) {
+    try {
+      await storage.createOnboardingItem({
+        employeeId: employee.id,
+        title: form.title,
+        category: form.category,
+        assignedTo: candidate.name,
+        status: "Pending",
+        dueDate,
+      });
+    } catch {}
+  }
+
+  const candidateDocs = await storage.getCandidateDocuments(candidateId);
+  const offerLetter = candidateDocs.find((d: any) => d.type === "offer_letter");
+  if (offerLetter) {
+    try {
+      await storage.createHrFormSubmission({
+        employeeId: employee.id,
+        candidateId,
+        formType: "offer_letter",
+        formData: { documentId: offerLetter.id, url: offerLetter.url, uploadedAt: offerLetter.uploadedAt },
+        status: "Completed",
+      });
+    } catch {}
+  }
+
+  let username = "";
+  let tempPassword = "";
+  let accountCreated = false;
+  let emailSent = false;
+
+  if (!candidate.userId) {
+    const baseUsername = slugifyName(candidate.name) || "crew.member";
+    username = baseUsername;
+    let suffix = 1;
+    while (await storage.getUserByUsername(username)) {
+      username = `${baseUsername}${suffix++}`;
+    }
+
+    const existingByEmail = candidate.email ? await storage.getUserByEmail(candidate.email) : null;
+    if (!existingByEmail) {
+      tempPassword = generateTempPassword();
+      const hashedPassword = await hashPassword(tempPassword);
+      const newUser = await storage.createUser({
+        username,
+        password: hashedPassword,
+        email: candidate.email || `${username}@chapinlandscapes.com`,
+        name: candidate.name,
+        role: "Crew",
+        storedPassword: tempPassword,
+      });
+      await storage.updateCandidate(candidateId, { userId: newUser.id });
+      await storage.updateEmployee(employee.id, { userId: newUser.id });
+      accountCreated = true;
+      if (candidate.email) {
+        try {
+          await sendNewHireAccountEmail(candidate.email, candidate.name, username, tempPassword, candidate.role || "Team Member");
+          emailSent = true;
+        } catch (err: any) {
+          console.error("[hiring] Welcome email failed:", err.message);
+        }
+      }
+    } else {
+      username = existingByEmail.username;
+      await storage.updateCandidate(candidateId, { userId: existingByEmail.id });
+      await storage.updateEmployee(employee.id, { userId: existingByEmail.id });
+    }
+  } else {
+    const existingUser = await storage.getUser(candidate.userId);
+    username = existingUser?.username || "";
+  }
+
+  try {
+    const allUsers = await storage.getAllUsers();
+    const recipients = allUsers.filter((u: any) => u.role === "Admin" || u.role === "Manager" || u.role === "Master Admin");
+    for (const recipient of recipients) {
+      await storage.createStaffNotification({
+        userId: recipient.id,
+        type: "candidate_hired",
+        title: "New Hire",
+        message: `${candidate.name} has been hired as ${candidate.role || "Team Member"}. Employee record, onboarding checklist, and Crew account created.`,
+        link: "/hiring",
+        isRead: false,
+      });
+      if (recipient.email) {
+        try {
+          await sendHiredNotificationEmail(recipient.email, recipient.name || recipient.username, candidate.name, candidate.role || "Team Member", username);
+        } catch {}
+      }
+    }
+  } catch {}
+
+  return {
+    success: true,
+    employeeId: employee.id,
+    accountCreated,
+    emailSent,
+    username,
+    onboardingItems: ONBOARDING_FORMS.length,
+    message: "Candidate hired — employee record, onboarding, and account all created.",
+  };
 }
 
 export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) {
@@ -870,168 +1046,85 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
     }
   });
 
-  // POST /api/candidates/:id/hire — full hire automation (Steps 4.2–4.5)
+  // POST /api/candidates/:id/hire — full hire automation
   app.post("/api/candidates/:id/hire", requireAuth, requireHRAccess, async (req: any, res) => {
     try {
-      const { id } = req.params;
-      const { startDate } = req.body;
+      const result = await executeHireFlow(req.params.id, req.body.startDate);
+      res.json(result);
+    } catch (err: any) {
+      console.error("[hiring] hire error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
 
-      const candidate = await storage.getCandidate(id);
-      if (!candidate) return res.status(404).json({ message: "Candidate not found" });
+  // ── PUBLIC OFFER ACCEPTANCE ROUTES (no auth required) ────────────────────
 
-      // ── 4.2: Create employee record ──────────────────────────────────────
-      const nameParts = candidate.name.trim().split(/\s+/);
-      const firstName = nameParts[0] || candidate.name;
-      const lastName = nameParts.slice(1).join(" ") || "";
+  // GET /api/offer/:token — fetch offer details for candidate
+  app.get("/api/offer/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const candidates = await storage.getCandidates();
+      const candidate = candidates.find((c: any) => c.offerAcceptanceToken === token);
+      if (!candidate) return res.status(404).json({ message: "Offer link not found or expired." });
 
-      let employee: any = null;
-      const existingEmployees = await storage.getEmployees();
-      const alreadyLinked = existingEmployees.find((e: any) => e.candidateId === id);
-
-      if (!alreadyLinked) {
-        employee = await storage.createEmployee({
-          candidateId: id,
-          firstName,
-          lastName,
-          personalEmail: candidate.email || undefined,
-          personalPhone: candidate.phone || undefined,
-          jobTitle: candidate.role || undefined,
-          startDate: startDate || undefined,
-          status: "Active",
-          employmentType: "Full-time",
-        });
-      } else {
-        employee = alreadyLinked;
+      const now = new Date();
+      if (candidate.offerAcceptanceExpiresAt && new Date(candidate.offerAcceptanceExpiresAt) < now) {
+        return res.status(410).json({ message: "This offer link has expired." });
       }
 
-      // Move candidate to Hired stage
-      await storage.updateCandidate(id, { stage: "Hired" });
+      const docs = await storage.getCandidateDocuments(candidate.id);
+      const offerLetterDoc = docs.find((d: any) => d.type === "offer_letter");
 
-      // ── 4.3: Onboarding checklist ─────────────────────────────────────────
-      const ONBOARDING_FORMS = [
-        { title: "Emergency Contact Form", category: "Forms" },
-        { title: "I-9 Employment Eligibility Verification", category: "Compliance" },
-        { title: "W-4 Federal Tax Withholding", category: "Compliance" },
-        { title: "IT-4 State Tax Withholding (Ohio)", category: "Compliance" },
-        { title: "NDA Agreement", category: "Legal" },
-        { title: "OSHA 301 Incident Report Acknowledgment", category: "Safety" },
-        { title: "Employee Handbook Acknowledgment", category: "Policy" },
-        { title: "Offer Letter Review & Acceptance", category: "HR" },
-        { title: "Direct Deposit Form", category: "Payroll" },
-      ];
+      res.json({
+        candidateId: candidate.id,
+        name: candidate.name,
+        role: candidate.role,
+        alreadyAccepted: !!candidate.offerAcceptedAt,
+        acceptedAt: candidate.offerAcceptedAt,
+        offerLetterUrl: offerLetterDoc?.url || null,
+        expiresAt: candidate.offerAcceptanceExpiresAt,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
 
-      const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 1 week
-      for (const form of ONBOARDING_FORMS) {
-        await storage.createOnboardingItem({
-          employeeId: employee.id,
-          title: form.title,
-          category: form.category,
-          assignedTo: candidate.name,
-          status: "Pending",
-          dueDate,
-        });
+  // POST /api/offer/:token/accept — candidate digitally accepts offer → triggers full hire flow
+  app.post("/api/offer/:token/accept", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { signature } = req.body;
+
+      const candidates = await storage.getCandidates();
+      const candidate = candidates.find((c: any) => c.offerAcceptanceToken === token);
+      if (!candidate) return res.status(404).json({ message: "Offer link not found or expired." });
+
+      const now = new Date();
+      if (candidate.offerAcceptanceExpiresAt && new Date(candidate.offerAcceptanceExpiresAt) < now) {
+        return res.status(410).json({ message: "This offer link has expired." });
       }
 
-      // Link any existing offer letter document to the employee record via hrFormSubmissions
-      const candidateDocs = await storage.getCandidateDocuments(id);
-      const offerLetter = candidateDocs.find((d: any) => d.type === "offer_letter");
-      if (offerLetter) {
-        await storage.createHrFormSubmission({
-          employeeId: employee.id,
-          candidateId: id,
-          formType: "offer_letter",
-          formData: { documentId: offerLetter.id, url: offerLetter.url, uploadedAt: offerLetter.uploadedAt },
-          status: "Completed",
-        });
+      if (candidate.offerAcceptedAt) {
+        return res.status(409).json({ message: "Offer has already been accepted." });
       }
 
-      // ── 4.4: Create Crew account ──────────────────────────────────────────
-      let username = "";
-      let tempPassword = "";
-      let accountCreated = false;
-      let emailSent = false;
+      // Save signature and mark accepted
+      await storage.updateCandidate(candidate.id, {
+        offerAcceptedAt: now,
+        offerAcceptanceSignature: signature || null,
+      } as any);
 
-      if (!candidate.userId) {
-        const baseUsername = slugifyName(candidate.name) || "crew.member";
-        username = baseUsername;
-        let suffix = 1;
-        while (await storage.getUserByUsername(username)) {
-          username = `${baseUsername}${suffix++}`;
-        }
-
-        const existingByEmail = candidate.email ? await storage.getUserByEmail(candidate.email) : null;
-        if (!existingByEmail) {
-          tempPassword = generateTempPassword();
-          const hashedPassword = await hashPassword(tempPassword);
-
-          const newUser = await storage.createUser({
-            username,
-            password: hashedPassword,
-            email: candidate.email || `${username}@chapinlandscapes.com`,
-            name: candidate.name,
-            role: "Crew",
-            storedPassword: tempPassword,
-          });
-
-          await storage.updateCandidate(id, { userId: newUser.id });
-          await storage.updateEmployee(employee.id, { userId: newUser.id });
-          accountCreated = true;
-
-          if (candidate.email) {
-            try {
-              await sendNewHireAccountEmail(candidate.email, candidate.name, username, tempPassword, candidate.role || "Team Member");
-              emailSent = true;
-            } catch (emailErr: any) {
-              console.error("[hiring] Welcome email failed:", emailErr.message);
-            }
-          }
-        } else {
-          username = existingByEmail.username;
-          await storage.updateCandidate(id, { userId: existingByEmail.id });
-          await storage.updateEmployee(employee.id, { userId: existingByEmail.id });
-        }
-      } else {
-        const existingUser = await storage.getUser(candidate.userId);
-        username = existingUser?.username || "";
-      }
-
-      // ── 4.5: Notify Admins + Managers ────────────────────────────────────
-      try {
-        const allUsers = await storage.getAllUsers();
-        const recipients = allUsers.filter((u: any) => u.role === "Admin" || u.role === "Manager" || u.role === "Master Admin");
-        for (const recipient of recipients) {
-          await storage.createStaffNotification({
-            userId: recipient.id,
-            type: "candidate_hired",
-            title: "New Hire",
-            message: `${candidate.name} has been hired as ${candidate.role || "Team Member"}. Employee record, onboarding checklist, and Crew account created.`,
-            link: "/hiring",
-            isRead: false,
-          });
-
-          if (recipient.email) {
-            try {
-              await sendHiredNotificationEmail(recipient.email, recipient.name || recipient.username, candidate.name, candidate.role || "Team Member", username);
-            } catch (notifEmailErr: any) {
-              console.error("[hiring] Admin notification email failed:", notifEmailErr.message);
-            }
-          }
-        }
-      } catch (notifErr: any) {
-        console.error("[hiring] Notification error:", notifErr.message);
-      }
+      // Run the full hire flow
+      const result = await executeHireFlow(candidate.id);
 
       res.json({
         success: true,
-        employeeId: employee.id,
-        accountCreated,
-        emailSent,
-        username,
-        onboardingItems: ONBOARDING_FORMS.length,
-        message: "Candidate hired — employee record, onboarding, and account all created.",
+        message: "Offer accepted! Your account credentials have been sent to your email.",
+        username: result.username,
+        accountCreated: result.accountCreated,
       });
     } catch (err: any) {
-      console.error("[hiring] hire error:", err);
+      console.error("[hiring] offer-accept error:", err);
       res.status(500).json({ message: err.message });
     }
   });

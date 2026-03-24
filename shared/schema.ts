@@ -291,6 +291,10 @@ export const candidates = pgTable("candidates", {
   zoomMeetingId: text("zoom_meeting_id"),
   zoomPasscode: text("zoom_passcode"),
   lastNotifiedAt: timestamp("last_notified_at"),
+  offerAcceptanceToken: text("offer_acceptance_token"),
+  offerAcceptanceExpiresAt: timestamp("offer_acceptance_expires_at"),
+  offerAcceptedAt: timestamp("offer_accepted_at"),
+  offerAcceptanceSignature: text("offer_acceptance_signature"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -298,6 +302,10 @@ export const insertCandidateSchema = createInsertSchema(candidates).omit({
   id: true,
   appliedDate: true,
   lastNotifiedAt: true,
+  offerAcceptanceToken: true,
+  offerAcceptanceExpiresAt: true,
+  offerAcceptedAt: true,
+  offerAcceptanceSignature: true,
   updatedAt: true,
 });
 
