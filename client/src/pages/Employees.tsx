@@ -297,7 +297,7 @@ function EmployeeProfile({ employee, onBack }: { employee: any; onBack: () => vo
           <EmploymentTab employee={employee} onUpdate={(data) => updateMutation.mutate(data)} />
         </TabsContent>
         <TabsContent value="documents">
-          <DocumentsTab employee={employee} />
+          <DocumentsTab employee={employee} onGoToTab={setTab} />
         </TabsContent>
         <TabsContent value="onboarding">
           <OnboardingTab employeeId={employee.id} />
@@ -485,7 +485,7 @@ function SectionHeader({ icon: Icon, title, action }: { icon: React.ElementType;
   );
 }
 
-function DocumentsTab({ employee }: { employee: any }) {
+function DocumentsTab({ employee, onGoToTab }: { employee: any; onGoToTab?: (tab: string) => void }) {
   const employeeId = employee.id;
   const employeeName = `${employee.firstName} ${employee.lastName}`;
   const queryClient = useQueryClient();
@@ -598,7 +598,55 @@ function DocumentsTab({ employee }: { employee: any }) {
   return (
     <div className="space-y-5">
 
-      {/* ── SECTION 1: Onboarding Forms ────────────────────────────── */}
+      {/* ── SECTION 1: Personal Information ────────────────────────── */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-primary" />
+              <span className="font-semibold text-sm">Personal Information</span>
+            </div>
+            {onGoToTab && (
+              <Button size="sm" variant="outline" onClick={() => onGoToTab("personal")} data-testid="button-go-personal-tab">
+                View &amp; Edit
+              </Button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+            {employee.email && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Mail className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{employee.email}</span>
+              </div>
+            )}
+            {employee.phone && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Phone className="h-3.5 w-3.5 shrink-0" />
+                <span>{employee.phone}</span>
+              </div>
+            )}
+            {(employee.address || employee.city) && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {[employee.address, employee.city, employee.state].filter(Boolean).join(", ")}
+                </span>
+              </div>
+            )}
+            {employee.startDate && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                <span>Started {new Date(employee.startDate + "T12:00:00").toLocaleDateString()}</span>
+              </div>
+            )}
+          </div>
+          {!employee.email && !employee.phone && !employee.address && !employee.startDate && (
+            <p className="text-sm text-muted-foreground">No personal details on file. Click "View &amp; Edit" to add them.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── SECTION 2: Onboarding Forms ────────────────────────────── */}
       <Card>
         <CardContent className="p-4">
           <SectionHeader
@@ -616,39 +664,46 @@ function DocumentsTab({ employee }: { employee: any }) {
         </CardContent>
       </Card>
 
-      {/* ── SECTION 2: Employment Documents ────────────────────────── */}
+      {/* ── SECTION 3: Employment Documents ────────────────────────── */}
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-5">
           <SectionHeader icon={FileText} title="Employment Documents" />
-          <DocumentDropZone onFilesSelected={handleDropZoneUpload} className="mb-3" />
-          {docs.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-3">No documents uploaded yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {docs.map((doc: any) => (
-                <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`doc-${doc.id}`}>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">{doc.name}</span>
-                    <Badge variant="outline" className="text-xs">{doc.status}</Badge>
+
+          {/* Uploaded Documents */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Uploaded Files</p>
+            <DocumentDropZone onFilesSelected={handleDropZoneUpload} className="mb-3" />
+            {docs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No documents uploaded yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {docs.map((doc: any) => (
+                  <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`doc-${doc.id}`}>
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">{doc.name}</span>
+                      <Badge variant="outline" className="text-xs">{doc.status}</Badge>
+                    </div>
+                    <div className="flex gap-1">
+                      {doc.url && isAdmin && (
+                        <Button size="sm" variant="ghost" onClick={() => setShareDoc(doc)} data-testid={`share-doc-${doc.id}`} title="Share Externally">
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {doc.url ? (
+                        <Button size="sm" variant="ghost" onClick={() => window.open(doc.url, "_blank")} data-testid={`view-doc-${doc.id}`}>View</Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Awaiting upload</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    {doc.url && isAdmin && (
-                      <Button size="sm" variant="ghost" onClick={() => setShareDoc(doc)} data-testid={`share-doc-${doc.id}`} title="Share Externally">
-                        <ExternalLink className="h-3 w-3" />
-                      </Button>
-                    )}
-                    {doc.url ? (
-                      <Button size="sm" variant="ghost" onClick={() => window.open(doc.url, "_blank")} data-testid={`view-doc-${doc.id}`}>View</Button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Awaiting upload</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="mt-3">
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Shared & Library Documents */}
+          <div>
             <DocumentsPanel
               entityType="employee"
               entityId={employeeId}
@@ -661,48 +716,85 @@ function DocumentsTab({ employee }: { employee: any }) {
               title="Shared & Library Documents"
             />
           </div>
+
+          {/* Employment Agreements */}
+          {isAdmin && (
+            <>
+              <Separator />
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <FileSignature className="h-4 w-4 text-primary" />
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Employment Agreements</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => setSendAgreementOpen(true)} data-testid="button-send-agreement">
+                    <Send className="h-3 w-3 mr-1" /> Send Agreement
+                  </Button>
+                </div>
+                {employeeAgreements.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No agreements sent yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {employeeAgreements.map((ag: any) => (
+                      <div key={ag.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`agreement-row-${ag.id}`}>
+                        <div>
+                          <p className="text-sm font-medium">{ag.year} {ag.position_title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Sent {new Date(ag.sent_at).toLocaleDateString()}
+                            {ag.signed_at ? ` · Signed ${new Date(ag.signed_at).toLocaleDateString()}` : ""}
+                          </p>
+                        </div>
+                        <Badge className={
+                          ag.status === "Signed"
+                            ? "bg-green-100 text-green-800 border-green-200"
+                            : "bg-amber-100 text-amber-800 border-amber-200"
+                        }>{ag.status}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Corrective Actions */}
+          {isHR && (
+            <>
+              <Separator />
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="h-4 w-4 text-red-500" />
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Corrective Actions</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => setCorrectiveActionOpen(true)} data-testid="button-issue-corrective-action"
+                    className="text-red-600 border-red-200 hover:bg-red-50">
+                    <Plus className="h-3 w-3 mr-1" /> Issue Report
+                  </Button>
+                </div>
+                {correctiveActions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No corrective actions on file.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {correctiveActions.map((ca: any) => (
+                      <div key={ca.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`ca-row-${ca.id}`}>
+                        <div className="flex items-center gap-3">
+                          <Badge className={`${CA_BADGE_COLOR[ca.action_taken] || ""} border text-xs`}>{ca.action_taken}</Badge>
+                          <div>
+                            <p className="text-sm font-medium">{ca.date_of_incident}</p>
+                            <p className="text-xs text-muted-foreground">By: {ca.issued_by_name || ca.issued_by_username}</p>
+                          </div>
+                        </div>
+                        <Button size="sm" variant="ghost" onClick={() => setViewCAOpen(ca)} data-testid={`view-ca-${ca.id}`}>View</Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
-
-      {/* ── SECTION 2b: Employment Agreements ──────────────────────── */}
-      {isAdmin && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <FileSignature className="h-4 w-4 text-primary" />
-                <span className="font-semibold text-sm">Employment Agreements</span>
-              </div>
-              <Button size="sm" variant="outline" onClick={() => setSendAgreementOpen(true)} data-testid="button-send-agreement">
-                <Send className="h-3 w-3 mr-1" /> Send Agreement
-              </Button>
-            </div>
-
-            {employeeAgreements.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No agreements sent yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {employeeAgreements.map((ag: any) => (
-                  <div key={ag.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`agreement-row-${ag.id}`}>
-                    <div>
-                      <p className="text-sm font-medium">{ag.year} {ag.position_title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Sent {new Date(ag.sent_at).toLocaleDateString()}
-                        {ag.signed_at ? ` · Signed ${new Date(ag.signed_at).toLocaleDateString()}` : ""}
-                      </p>
-                    </div>
-                    <Badge className={
-                      ag.status === "Signed"
-                        ? "bg-green-100 text-green-800 border-green-200"
-                        : "bg-amber-100 text-amber-800 border-amber-200"
-                    }>{ag.status}</Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Send Agreement Dialog */}
       <Dialog open={sendAgreementOpen} onOpenChange={setSendAgreementOpen}>
@@ -757,42 +849,6 @@ function DocumentsTab({ employee }: { employee: any }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* ── SECTION 3: Corrective Actions ──────────────────────────── */}
-      {isHR && (
-        <Card>
-          <CardContent className="p-4">
-            <SectionHeader
-              icon={ShieldAlert}
-              title="Corrective Actions"
-              action={
-                <Button size="sm" variant="outline" onClick={() => setCorrectiveActionOpen(true)} data-testid="button-issue-corrective-action"
-                  className="text-red-600 border-red-200 hover:bg-red-50">
-                  <Plus className="h-3 w-3 mr-1" /> Issue Report
-                </Button>
-              }
-            />
-            {correctiveActions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No corrective actions on file.</p>
-            ) : (
-              <div className="space-y-2">
-                {correctiveActions.map((ca: any) => (
-                  <div key={ca.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`ca-row-${ca.id}`}>
-                    <div className="flex items-center gap-3">
-                      <Badge className={`${CA_BADGE_COLOR[ca.action_taken] || ""} border text-xs`}>{ca.action_taken}</Badge>
-                      <div>
-                        <p className="text-sm font-medium">{ca.date_of_incident}</p>
-                        <p className="text-xs text-muted-foreground">By: {ca.issued_by_name || ca.issued_by_username}</p>
-                      </div>
-                    </div>
-                    <Button size="sm" variant="ghost" onClick={() => setViewCAOpen(ca)} data-testid={`view-ca-${ca.id}`}>View</Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* ── SECTION 4: Employee-Initiated Forms ────────────────────── */}
       {isHR && (
