@@ -27,7 +27,19 @@ async function createNotification(userId: string, type: string, title: string, m
   );
 }
 
+async function migrateCorrectiveActionsStatus() {
+  try {
+    await pool.query(`ALTER TABLE corrective_actions ADD COLUMN IF NOT EXISTS status VARCHAR(30) NOT NULL DEFAULT 'Pending Signature'`);
+    await pool.query(`UPDATE corrective_actions SET status = 'Signed' WHERE employee_acknowledgment_signature IS NOT NULL AND employee_acknowledgment_signature != '' AND status = 'Pending Signature'`);
+    console.log("[migration] corrective_actions status column ready");
+  } catch (e: any) {
+    console.error("[migration] corrective_actions status error:", e.message);
+  }
+}
+
 export function registerEmployeeFormsRoutes(app: Express, requireAuth: RequestHandler) {
+  migrateCorrectiveActionsStatus();
+
   const requireHR: RequestHandler = (req: any, res, next) => {
     const role = req.user?.role;
     if (!role || (role !== "Admin" && role !== "Manager" && !req.user?.isMasterAdmin)) {
@@ -291,7 +303,20 @@ export function registerEmployeeFormsRoutes(app: Express, requireAuth: RequestHa
 
       const employee = await getEmployee(employeeId);
       const employeeName = employee ? `${employee.first_name} ${employee.last_name}` : "An employee";
+      const issuerName = user?.name || user?.username || "Management";
 
+      // Notify the employee themselves (forced acknowledgment)
+      if (employee?.user_id) {
+        await createNotification(
+          employee.user_id,
+          "corrective_action_pending",
+          "Action Required: Corrective Action Report",
+          `A ${actionTaken} has been issued and requires your signature. Please review and sign in your Employee Portal.`,
+          "/employee-portal?section=corrective"
+        );
+      }
+
+      // Notify other Admins (not the one who issued it)
       const admins = await pool.query(`SELECT id FROM users WHERE role = 'Admin' AND id IS NOT NULL`);
       for (const admin of admins.rows) {
         if (admin.id !== user.id) {
@@ -299,7 +324,7 @@ export function registerEmployeeFormsRoutes(app: Express, requireAuth: RequestHa
             admin.id,
             "corrective_action",
             "Corrective Action Issued",
-            `A ${actionTaken} was issued for ${employeeName}`,
+            `${issuerName} issued a ${actionTaken} for ${employeeName}`,
             "/employees"
           );
         }
@@ -397,6 +422,58 @@ export function registerEmployeeFormsRoutes(app: Express, requireAuth: RequestHa
       const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Employee signs their corrective action ─────────────────────────────────
+  app.post("/api/corrective-actions/:id/employee-sign", requireAuth, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { signatureDataUrl, signatureDate } = req.body;
+      const user = req.user;
+
+      if (!signatureDataUrl || !signatureDate) {
+        return res.status(400).json({ message: "Signature and date are required" });
+      }
+
+      // Find the CA and verify ownership
+      const caResult = await pool.query(`SELECT ca.*, e.user_id as employee_user_id FROM corrective_actions ca JOIN employees e ON e.id = ca.employee_id WHERE ca.id = $1`, [id]);
+      if (caResult.rows.length === 0) return res.status(404).json({ message: "Record not found" });
+      const ca = caResult.rows[0];
+
+      if (ca.employee_user_id !== user.id && user.role !== "Admin" && !user.isMasterAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      if (ca.status === "Signed") {
+        return res.status(400).json({ message: "Already signed" });
+      }
+
+      const updated = await pool.query(
+        `UPDATE corrective_actions SET employee_acknowledgment_signature = $1, employee_acknowledgment_date = $2, status = 'Signed' WHERE id = $3 RETURNING *`,
+        [signatureDataUrl, signatureDate, id]
+      );
+
+      // Get employee name for notification
+      const empResult = await pool.query(`SELECT e.first_name, e.last_name FROM employees e JOIN corrective_actions ca ON ca.employee_id = e.id WHERE ca.id = $1`, [id]);
+      const emp = empResult.rows[0];
+      const employeeName = emp ? `${emp.first_name} ${emp.last_name}` : "An employee";
+
+      // Notify all Admins and Managers that the employee has signed
+      const adminsAndManagers = await getAdminsAndManagers();
+      for (const admin of adminsAndManagers) {
+        await createNotification(
+          admin.id,
+          "corrective_action_signed",
+          "Corrective Action Acknowledged",
+          `${employeeName} has reviewed and signed their ${ca.action_taken} corrective action report.`,
+          "/employees"
+        );
+      }
+
+      res.json(updated.rows[0]);
+    } catch (err: any) {
+      console.error("[CorrectiveAction] employee-sign error:", err);
       res.status(500).json({ message: err.message });
     }
   });

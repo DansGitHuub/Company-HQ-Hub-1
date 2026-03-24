@@ -125,8 +125,11 @@ export default function CorrectiveActionForm({ preSelectedEmployeeId, onComplete
   if (readOnly && existingData) {
     return (
       <div className="space-y-4 text-sm">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Badge className={`${ACTION_BADGE[existingData.action_taken] || ""} border`}>{existingData.action_taken}</Badge>
+          <Badge variant="outline" className={existingData.status === "Signed" ? "text-green-700 border-green-300 bg-green-50" : "text-amber-700 border-amber-300 bg-amber-50"}>
+            {existingData.status || "Pending Signature"}
+          </Badge>
           <span className="text-muted-foreground">Issued: {new Date(existingData.created_at).toLocaleDateString()}</span>
           <span className="text-muted-foreground">By: {existingData.issued_by_name || existingData.issued_by_username}</span>
         </div>

@@ -785,7 +785,12 @@ function DocumentsTab({ employee, onGoToTab }: { employee: any; onGoToTab?: (tab
                             <p className="text-xs text-muted-foreground">By: {ca.issued_by_name || ca.issued_by_username}</p>
                           </div>
                         </div>
-                        <Button size="sm" variant="ghost" onClick={() => setViewCAOpen(ca)} data-testid={`view-ca-${ca.id}`}>View</Button>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={ca.status === "Signed" ? "text-green-700 border-green-300 bg-green-50 text-xs" : "text-amber-700 border-amber-300 bg-amber-50 text-xs"}>
+                            {ca.status || "Pending Signature"}
+                          </Badge>
+                          <Button size="sm" variant="ghost" onClick={() => setViewCAOpen(ca)} data-testid={`view-ca-${ca.id}`}>View</Button>
+                        </div>
                       </div>
                     ))}
                   </div>

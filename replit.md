@@ -23,7 +23,7 @@ The frontend is built with React and TypeScript, using React Query for server st
 - **Marketing Campaigns**: Database-backed campaign management with CRUD, a dashboard, and performance visualization.
 - **Work Pipeline**: Features "Sold Jobs" and "Estimates" Kanban boards with conversion capabilities.
 - **Customer Hub / Resource Library**: Centralized educational content for customers with bookmarking.
-- **Employee Management**: Employee Portal for payroll, time off, and personal details, including a system for Time Off Requests, Resignation Letters, and Corrective Action Reports.
+- **Employee Management**: Employee Portal for payroll, time off, and personal details, including a system for Time Off Requests, Resignation Letters, and Corrective Action Reports. Corrective actions have a two-way signing workflow: Admin/HR issues a report → employee receives an in-app notification and a forced (non-dismissible) modal on their portal that requires their digital signature → after signing, Admin/HR is notified → both sides see the signed record. Status tracks "Pending Signature" / "Signed".
 - **Equipment / Fleet Management**: Full fleet management with health dashboard, asset table, OEM maintenance library, VIN decode, and document management.
 - **Interactive Calendar**: Full calendar module with multiple views, event CRUD, Google Calendar OAuth sync, team assignment, and search/filtering.
 - **Admin Tools**: Includes a dynamic Form Builder with visual templates, Company Branding, Help System, Global Search, Communications Center, Lead Qualifier, Plow Site Mapper, AI Agents System, Update Notification System, Help Articles, Diagnostic Report System, PDF Field Placer, and Property Report Card tool.

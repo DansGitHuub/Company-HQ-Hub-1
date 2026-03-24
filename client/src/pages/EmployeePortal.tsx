@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -9,16 +9,77 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   User, Home, CreditCard, Stethoscope, Plane, Save,
   Shield, Calendar, Clock, DollarSign, Heart, Umbrella,
   CheckCircle2, AlertCircle, FileText, LogOut, Loader2,
-  ClipboardList
+  ClipboardList, ShieldAlert, PenLine, Type, Pen
 } from "lucide-react";
 import ResignationLetterForm from "@/components/forms/ResignationLetterForm";
+import SignaturePad from "@/components/forms/SignaturePad";
+import { cn } from "@/lib/utils";
 
-type Section = "profile" | "address" | "payroll" | "health" | "vacation" | "resignation";
+type Section = "profile" | "address" | "payroll" | "health" | "vacation" | "corrective" | "resignation";
+
+const CA_ACTION_COLORS: Record<string, string> = {
+  "Verbal Warning": "bg-yellow-100 text-yellow-800 border-yellow-300",
+  "Written Warning": "bg-orange-100 text-orange-800 border-orange-300",
+  "Final Warning": "bg-red-100 text-red-800 border-red-300",
+  "Suspension": "bg-purple-100 text-purple-800 border-purple-300",
+  "Termination": "bg-gray-900 text-white border-gray-700",
+};
+
+function TypedSignatureInline({ onChange }: { onChange: (dataUrl: string) => void }) {
+  const [name, setName] = useState("");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const render = useCallback(async (text: string) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.offsetWidth || 400;
+    const h = 100;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    canvas.style.width = `${w}px`; canvas.style.height = `${h}px`;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+    if (!text.trim()) { onChange(""); return; }
+    try { await document.fonts.load(`bold 44px "Dancing Script"`); } catch (_) {}
+    ctx.font = `bold 44px "Dancing Script", cursive`;
+    ctx.fillStyle = "#1a1a2e";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, w / 2, h / 2 - 4);
+    ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(20, h - 14); ctx.lineTo(w - 20, h - 14); ctx.stroke();
+    onChange(canvas.toDataURL("image/png"));
+  }, [onChange]);
+
+  useEffect(() => { render(name); }, [name, render]);
+
+  return (
+    <div className="space-y-2">
+      <Input placeholder="Type your full legal name" value={name} onChange={e => setName(e.target.value)} data-testid="input-ca-typed-sig" />
+      {name.trim() ? (
+        <div className="relative rounded border bg-white overflow-hidden">
+          <canvas ref={canvasRef} className="w-full" style={{ display: "block", height: 100 }} />
+        </div>
+      ) : (
+        <div className="rounded border border-dashed bg-white h-[100px] flex items-center justify-center">
+          <p className="text-xs text-muted-foreground/50">Signature preview</p>
+        </div>
+      )}
+      {name && <button className="text-xs text-muted-foreground underline" onClick={() => { setName(""); onChange(""); }}>Clear</button>}
+    </div>
+  );
+}
 
 const REQUEST_TYPE_OPTIONS = ["Vacation", "Sick Leave", "Personal Day", "Unpaid Leave", "Bereavement", "Other"];
 
@@ -52,6 +113,12 @@ export default function EmployeePortal() {
   const [ptoStart, setPtoStart] = useState("");
   const [ptoEnd, setPtoEnd] = useState("");
   const [ptoNotes, setPtoNotes] = useState("");
+
+  // Corrective action signing state
+  const [forcedCAModal, setForcedCAModal] = useState<any>(null);
+  const [caSignMode, setCASignMode] = useState<"type" | "draw">("type");
+  const [caSignature, setCASignature] = useState("");
+  const [viewCAOpen, setViewCAOpen] = useState<any>(null);
 
   const ptoDays = calcDays(ptoStart, ptoEnd);
 
@@ -87,6 +154,52 @@ export default function EmployeePortal() {
     refetchOnMount: "always",
   });
 
+  const { data: correctiveActions = [], refetch: refetchCAs } = useQuery({
+    queryKey: ["/api/employees", myEmployee?.id, "corrective-actions"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/employees/${myEmployee!.id}/corrective-actions`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!myEmployee?.id,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+
+  const pendingCAs = useMemo(
+    () => (correctiveActions as any[]).filter((ca) => ca.status === "Pending Signature"),
+    [correctiveActions]
+  );
+
+  // Auto-open forced modal for the first pending CA
+  useEffect(() => {
+    if (pendingCAs.length > 0 && !forcedCAModal) {
+      setForcedCAModal(pendingCAs[0]);
+      setCASignature("");
+      setCASignMode("type");
+    }
+  }, [pendingCAs]);
+
+  const signCAmutation = useMutation({
+    mutationFn: async ({ id, signatureDataUrl }: { id: string; signatureDataUrl: string }) => {
+      const res = await apiRequest("POST", `/api/corrective-actions/${id}/employee-sign`, {
+        signatureDataUrl,
+        signatureDate: new Date().toISOString().split("T")[0],
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to submit signature"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Signature submitted", description: "Your acknowledgment has been recorded and HR has been notified." });
+      setForcedCAModal(null);
+      setCASignature("");
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", myEmployee?.id, "corrective-actions"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Signature failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const submitPTO = useMutation({
     mutationFn: async () => {
       if (!myEmployee?.id) throw new Error("No employee record found for your account.");
@@ -120,12 +233,13 @@ export default function EmployeePortal() {
     toast({ title: t("common.cancelled"), description: t("common.changesSaved") });
   };
 
-  const navItems: { id: Section; icon: React.ElementType; label: string }[] = [
+  const navItems: { id: Section; icon: React.ElementType; label: string; badge?: number }[] = [
     { id: "profile", icon: User, label: "Personal Profile" },
     { id: "address", icon: Home, label: "Address & Contact" },
     { id: "payroll", icon: CreditCard, label: "Payroll & Taxes" },
     { id: "health", icon: Stethoscope, label: "Health Insurance" },
     { id: "vacation", icon: Plane, label: "Vacation & Time Off" },
+    { id: "corrective", icon: ShieldAlert, label: "Corrective Actions", badge: pendingCAs.length },
     { id: "resignation", icon: LogOut, label: "Resignation Letter" },
   ];
 
@@ -475,6 +589,59 @@ export default function EmployeePortal() {
           </>
         );
 
+      case "corrective":
+        return (
+          <>
+            <CardHeader className="border-b">
+              <CardTitle className="flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-orange-500" />
+                Corrective Action Reports
+                {pendingCAs.length > 0 && (
+                  <Badge className="bg-red-100 text-red-700 border-red-300 ml-1">{pendingCAs.length} Pending Signature</Badge>
+                )}
+              </CardTitle>
+              <CardDescription>Records of any corrective actions issued to you. Pending reports require your signature.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              {(correctiveActions as any[]).length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground gap-2">
+                  <ShieldAlert className="w-10 h-10 opacity-20" />
+                  <p className="text-sm">No corrective action reports on file.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(correctiveActions as any[]).map((ca: any) => (
+                    <div key={ca.id} className="border rounded-lg p-4 space-y-2" data-testid={`ca-row-${ca.id}`}>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <Badge className={cn("border text-xs", CA_ACTION_COLORS[ca.action_taken] || "bg-gray-100 text-gray-800")}>{ca.action_taken}</Badge>
+                          <span className="text-sm text-muted-foreground">Incident: {ca.date_of_incident}</span>
+                        </div>
+                        <Badge variant="outline" className={ca.status === "Signed" ? "text-green-700 border-green-300 bg-green-50" : "text-amber-700 border-amber-300 bg-amber-50"}>
+                          {ca.status === "Signed" ? <CheckCircle2 className="w-3 h-3 mr-1" /> : <AlertCircle className="w-3 h-3 mr-1" />}
+                          {ca.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm">{ca.description_of_issue}</p>
+                      <div className="flex gap-2 pt-1">
+                        {ca.status === "Pending Signature" ? (
+                          <Button size="sm" variant="destructive" onClick={() => { setForcedCAModal(ca); setCASignature(""); setCASignMode("type"); }} data-testid={`btn-sign-ca-${ca.id}`}>
+                            <PenLine className="w-3.5 h-3.5 mr-1" /> Review & Sign
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={() => setViewCAOpen(ca)} data-testid={`btn-view-ca-${ca.id}`}>
+                            <FileText className="w-3.5 h-3.5 mr-1" /> View Report
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </>
+        );
+
       case "resignation":
         return (
           <>
@@ -527,8 +694,157 @@ export default function EmployeePortal() {
     }
   };
 
+  // ── Forced corrective action sign modal (no dismiss until signed) ────────────
+  const ForcedCAModal = forcedCAModal ? (
+    <Dialog open modal>
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        hideCloseButton
+      >
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-5 h-5 text-orange-500" />
+            <DialogTitle>Corrective Action Report — Signature Required</DialogTitle>
+          </div>
+          <DialogDescription>
+            This report has been issued by management. You must review and acknowledge it with your signature before continuing.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-2">
+          {/* Report details */}
+          <div className="bg-muted/40 border rounded-lg p-4 space-y-3 text-sm">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Badge className={cn("border", CA_ACTION_COLORS[forcedCAModal.action_taken] || "bg-gray-100 text-gray-800")}>
+                {forcedCAModal.action_taken}
+              </Badge>
+              <span className="text-muted-foreground text-xs">Date of Incident: <strong className="text-foreground">{forcedCAModal.date_of_incident}</strong></span>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Description of Issue</Label>
+              <p className="mt-1 whitespace-pre-wrap">{forcedCAModal.description_of_issue}</p>
+            </div>
+            {forcedCAModal.previous_warnings && (
+              <div>
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Previous Warnings</Label>
+                <p className="mt-1">{forcedCAModal.previous_warnings_description || "Yes"}</p>
+              </div>
+            )}
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Manager Signature</Label>
+              {forcedCAModal.manager_signature ? (
+                <img src={forcedCAModal.manager_signature} alt="Manager signature" className="h-14 border rounded bg-white p-1 mt-1" />
+              ) : <p className="mt-1 text-muted-foreground italic">On file</p>}
+              <p className="text-xs text-muted-foreground">{forcedCAModal.manager_signature_date}</p>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Employee signature section */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <PenLine className="w-4 h-4 text-primary" />
+              Your Acknowledgment Signature
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              By signing, you confirm you have received and read this corrective action report. This does not necessarily mean you agree with its contents.
+            </p>
+
+            {/* Sign mode tabs */}
+            <div className="flex gap-1 p-1 bg-muted rounded-md w-fit">
+              <button
+                onClick={() => { setCASignMode("type"); setCASignature(""); }}
+                className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors", caSignMode === "type" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}
+              >
+                <Type className="w-3.5 h-3.5" /> Type
+              </button>
+              <button
+                onClick={() => { setCASignMode("draw"); setCASignature(""); }}
+                className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors", caSignMode === "draw" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}
+              >
+                <Pen className="w-3.5 h-3.5" /> Draw
+              </button>
+            </div>
+
+            {caSignMode === "type" ? (
+              <TypedSignatureInline onChange={setCASignature} />
+            ) : (
+              <SignaturePad value={caSignature} onChange={setCASignature} />
+            )}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button
+              onClick={() => {
+                if (!caSignature) { toast({ title: "Signature required", description: "Please sign before submitting.", variant: "destructive" }); return; }
+                signCAmutation.mutate({ id: forcedCAModal.id, signatureDataUrl: caSignature });
+              }}
+              disabled={signCAmutation.isPending || !caSignature}
+              className="gap-2"
+              data-testid="button-submit-ca-signature"
+            >
+              {signCAmutation.isPending ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</>
+              ) : (
+                <><CheckCircle2 className="w-4 h-4" /> Acknowledge & Sign</>
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  ) : null;
+
+  // ── Read-only view modal for signed CAs ───────────────────────────────────
+  const ViewCAModal = viewCAOpen ? (
+    <Dialog open onOpenChange={() => setViewCAOpen(null)}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" /> Corrective Action Report
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 text-sm">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Badge className={cn("border", CA_ACTION_COLORS[viewCAOpen.action_taken] || "")}>{viewCAOpen.action_taken}</Badge>
+            <span className="text-muted-foreground text-xs">Incident: {viewCAOpen.date_of_incident}</span>
+            <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50"><CheckCircle2 className="w-3 h-3 mr-1" /> Signed</Badge>
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Description</Label>
+            <p className="mt-1 whitespace-pre-wrap">{viewCAOpen.description_of_issue}</p>
+          </div>
+          {viewCAOpen.previous_warnings && (
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Previous Warnings</Label>
+              <p className="mt-1">{viewCAOpen.previous_warnings_description || "Yes"}</p>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Manager Signature</Label>
+              {viewCAOpen.manager_signature && <img src={viewCAOpen.manager_signature} alt="Manager" className="h-14 border rounded bg-white p-1 mt-1" />}
+              <p className="text-xs text-muted-foreground">{viewCAOpen.manager_signature_date}</p>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Your Signature</Label>
+              {viewCAOpen.employee_acknowledgment_signature && <img src={viewCAOpen.employee_acknowledgment_signature} alt="Your signature" className="h-14 border rounded bg-white p-1 mt-1" />}
+              <p className="text-xs text-muted-foreground">{viewCAOpen.employee_acknowledgment_date}</p>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  ) : null;
+
   return (
     <div className="space-y-4 max-w-5xl mx-auto">
+      {ForcedCAModal}
+      {ViewCAModal}
+
       <div className="flex items-center gap-4">
         <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
           <User className="h-8 w-8 text-primary" />
@@ -548,11 +864,20 @@ export default function EmployeePortal() {
               <Button
                 key={item.id}
                 variant="ghost"
-                className={`w-full justify-start gap-3 ${activeSection === item.id ? "bg-secondary" : ""} ${item.id === "resignation" ? "text-destructive hover:text-destructive hover:bg-destructive/10" : ""}`}
+                className={cn(
+                  "w-full justify-start gap-3",
+                  activeSection === item.id ? "bg-secondary" : "",
+                  item.id === "resignation" ? "text-destructive hover:text-destructive hover:bg-destructive/10" : "",
+                  item.id === "corrective" && pendingCAs.length > 0 ? "text-orange-600" : ""
+                )}
                 onClick={() => setActiveSection(item.id)}
                 data-testid={`nav-${item.id}`}
               >
-                <item.icon className="w-4 h-4" /> {item.label}
+                <item.icon className="w-4 h-4 flex-shrink-0" />
+                <span className="flex-1 text-left">{item.label}</span>
+                {item.badge ? (
+                  <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">{item.badge}</span>
+                ) : null}
               </Button>
             ))}
           </nav>

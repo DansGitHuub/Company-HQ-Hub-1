@@ -2766,6 +2766,7 @@ export const correctiveActions = pgTable("corrective_actions", {
   employeeAcknowledgmentDate: varchar("employee_acknowledgment_date", { length: 20 }),
   managerSignature: text("manager_signature").notNull(),
   managerSignatureDate: varchar("manager_signature_date", { length: 20 }).notNull(),
+  status: varchar("status", { length: 30 }).notNull().default("Pending Signature"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 export const insertCorrectiveActionSchema = createInsertSchema(correctiveActions).omit({ id: true, createdAt: true });
