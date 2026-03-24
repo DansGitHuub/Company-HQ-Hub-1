@@ -131,7 +131,7 @@ export default function AgreementSigningPage() {
 
         {/* Agreement body */}
         <div
-          className="bg-white rounded-xl border shadow-sm p-8 mb-6 prose prose-sm max-w-none"
+          className="bg-white rounded-xl border shadow-sm p-8 mb-6 agreement-prose"
           style={{ lineHeight: "1.8" }}
           data-testid="agreement-body"
           dangerouslySetInnerHTML={{ __html: data.renderedBody }}

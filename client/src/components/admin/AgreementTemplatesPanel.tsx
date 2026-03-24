@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, Pencil, Trash2, FileSignature, Eye, EyeOff, Info } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Plus, Pencil, Trash2, FileSignature, Send, Info, Users } from "lucide-react";
+import RichTextEditor from "@/components/RichTextEditor";
 
 type Template = {
   id: string;
@@ -20,10 +21,18 @@ type Template = {
   updated_at: string;
 };
 
+type Employee = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  position: string;
+  email?: string;
+};
+
 const VARIABLE_HINTS = [
   { key: "{{employee_name}}", desc: "Employee's full name" },
   { key: "{{year}}", desc: "Agreement year" },
-  { key: "{{pay_rate}}", desc: "Hourly pay rate (numbers only, $ added automatically)" },
+  { key: "{{pay_rate}}", desc: "Pay rate (e.g. 22.50)" },
   { key: "{{start_date}}", desc: "Employment start date" },
   { key: "{{position}}", desc: "Position title" },
 ];
@@ -38,6 +47,14 @@ export default function AgreementTemplatesPanel() {
   const [previewHtml, setPreviewHtml] = useState("");
   const [showHints, setShowHints] = useState(false);
 
+  // Bulk send state
+  const [bulkSendOpen, setBulkSendOpen] = useState(false);
+  const [bulkTemplate, setBulkTemplate] = useState<Template | null>(null);
+  const [selectedEmployees, setSelectedEmployees] = useState<Record<string, { payRate: string; startDate: string }>>({});
+  const [bulkPayRate, setBulkPayRate] = useState("");
+  const [bulkStartDate, setBulkStartDate] = useState("");
+  const [applyToAll, setApplyToAll] = useState(true);
+
   const [form, setForm] = useState({ id: "", positionTitle: "", year: new Date().getFullYear(), templateBody: "" });
   const isEditing = !!form.id;
 
@@ -46,12 +63,16 @@ export default function AgreementTemplatesPanel() {
     queryFn: async () => (await apiRequest("GET", "/api/agreement-templates")).json(),
   });
 
+  const { data: employees = [] } = useQuery<Employee[]>({
+    queryKey: ["/api/employees"],
+    queryFn: async () => (await apiRequest("GET", "/api/employees")).json(),
+    enabled: bulkSendOpen,
+  });
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = { positionTitle: form.positionTitle, year: form.year, templateBody: form.templateBody };
-      if (isEditing) {
-        return (await apiRequest("PUT", `/api/agreement-templates/${form.id}`, payload)).json();
-      }
+      if (isEditing) return (await apiRequest("PUT", `/api/agreement-templates/${form.id}`, payload)).json();
       return (await apiRequest("POST", "/api/agreement-templates", payload)).json();
     },
     onSuccess: () => {
@@ -72,6 +93,34 @@ export default function AgreementTemplatesPanel() {
     onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
 
+  const bulkSendMutation = useMutation({
+    mutationFn: async () => {
+      const selected = Object.entries(selectedEmployees).filter(([, v]) => v !== undefined);
+      if (!selected.length) throw new Error("Please select at least one employee.");
+      const results = await Promise.allSettled(
+        selected.map(([empId, overrides]) =>
+          apiRequest("POST", `/api/employees/${empId}/send-agreement`, {
+            templateId: bulkTemplate!.id,
+            payRate: applyToAll ? bulkPayRate : overrides.payRate,
+            startDate: applyToAll ? bulkStartDate : overrides.startDate,
+          })
+        )
+      );
+      const failed = results.filter(r => r.status === "rejected").length;
+      const sent = results.filter(r => r.status === "fulfilled").length;
+      if (failed) throw new Error(`${sent} sent, ${failed} failed.`);
+      return { sent };
+    },
+    onSuccess: ({ sent }) => {
+      toast({ title: `Agreement sent to ${sent} employee${sent !== 1 ? "s" : ""}` });
+      setBulkSendOpen(false);
+      setSelectedEmployees({});
+      setBulkPayRate("");
+      setBulkStartDate("");
+    },
+    onError: (e: any) => toast({ title: "Partial send", description: e.message, variant: "destructive" }),
+  });
+
   async function openEdit(tmpl?: Template) {
     if (tmpl) {
       const full = await (await apiRequest("GET", `/api/agreement-templates/${tmpl.id}`)).json();
@@ -82,6 +131,15 @@ export default function AgreementTemplatesPanel() {
     setEditOpen(true);
   }
 
+  function openBulkSend(tmpl: Template) {
+    setBulkTemplate(tmpl);
+    setSelectedEmployees({});
+    setBulkPayRate("");
+    setBulkStartDate("");
+    setApplyToAll(true);
+    setBulkSendOpen(true);
+  }
+
   function openPreview() {
     const sample = { employee_name: "Jane Smith", year: String(form.year), pay_rate: "22.50", start_date: new Date().toLocaleDateString(), position: form.positionTitle };
     let html = form.templateBody;
@@ -89,6 +147,17 @@ export default function AgreementTemplatesPanel() {
     setPreviewHtml(html);
     setPreviewOpen(true);
   }
+
+  function toggleEmployee(empId: string) {
+    setSelectedEmployees(prev => {
+      const next = { ...prev };
+      if (next[empId] !== undefined) delete next[empId];
+      else next[empId] = { payRate: "", startDate: "" };
+      return next;
+    });
+  }
+
+  const activeEmployees = employees.filter((e: Employee) => e.id);
 
   return (
     <div className="space-y-6">
@@ -105,19 +174,17 @@ export default function AgreementTemplatesPanel() {
       {/* Variable hints */}
       <Card className="border-blue-200 bg-blue-50/40">
         <CardContent className="p-4">
-          <button
-            className="flex items-center gap-2 text-sm font-medium text-blue-700 w-full text-left"
-            onClick={() => setShowHints(h => !h)}
-          >
+          <button className="flex items-center gap-2 text-sm font-medium text-blue-700 w-full text-left" onClick={() => setShowHints(h => !h)}>
             <Info className="h-4 w-4" />
-            Template Variables – click to {showHints ? "hide" : "show"}
+            Smart Placeholders — click to {showHints ? "hide" : "show"}
           </button>
           {showHints && (
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="mt-3 space-y-1.5">
+              <p className="text-xs text-muted-foreground mb-2">Type these exactly in your agreement body. When you send, they fill in automatically with each employee's information.</p>
               {VARIABLE_HINTS.map(v => (
                 <div key={v.key} className="flex items-center gap-2 text-sm">
                   <code className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-mono">{v.key}</code>
-                  <span className="text-muted-foreground">{v.desc}</span>
+                  <span className="text-muted-foreground">→ {v.desc}</span>
                 </div>
               ))}
             </div>
@@ -127,23 +194,18 @@ export default function AgreementTemplatesPanel() {
 
       {/* Template list */}
       {isLoading ? (
-        <div className="flex items-center gap-2 text-muted-foreground p-8">
-          <Loader2 className="h-5 w-5 animate-spin" /> Loading templates...
-        </div>
+        <div className="flex items-center gap-2 text-muted-foreground p-8"><Loader2 className="h-5 w-5 animate-spin" /> Loading templates...</div>
       ) : templates.length === 0 ? (
-        <Card>
-          <CardContent className="p-10 text-center">
-            <FileSignature className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-            <p className="font-medium text-muted-foreground">No agreement templates yet.</p>
-            <p className="text-sm text-muted-foreground mt-1">Create your first template to start sending agreements to employees.</p>
-            <Button className="mt-4" onClick={() => openEdit()}>Create Template</Button>
-          </CardContent>
-        </Card>
+        <Card><CardContent className="p-10 text-center">
+          <FileSignature className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+          <p className="font-medium text-muted-foreground">No agreement templates yet.</p>
+          <Button className="mt-4" onClick={() => openEdit()}>Create Template</Button>
+        </CardContent></Card>
       ) : (
         <div className="space-y-3">
           {templates.map(tmpl => (
             <Card key={tmpl.id} data-testid={`template-row-${tmpl.id}`}>
-              <CardContent className="p-4 flex items-center justify-between">
+              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <FileSignature className="h-5 w-5 text-primary shrink-0" />
                   <div>
@@ -151,13 +213,15 @@ export default function AgreementTemplatesPanel() {
                     <p className="text-xs text-muted-foreground">Year: {tmpl.year} · Last updated: {new Date(tmpl.updated_at).toLocaleDateString()}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="secondary">{tmpl.year}</Badge>
+                  <Button size="sm" variant="outline" onClick={() => openBulkSend(tmpl)} data-testid={`bulk-send-template-${tmpl.id}`}>
+                    <Users className="h-3.5 w-3.5 mr-1" /> Send to Employees
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => openEdit(tmpl)} data-testid={`edit-template-${tmpl.id}`}>
                     <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                   </Button>
-                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => setDeleteId(tmpl.id)} data-testid={`delete-template-${tmpl.id}`}>
+                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setDeleteId(tmpl.id)} data-testid={`delete-template-${tmpl.id}`}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -169,13 +233,16 @@ export default function AgreementTemplatesPanel() {
 
       {/* Edit / Create dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Template" : "Create New Template"}</DialogTitle>
+            <DialogTitle>{isEditing ? `Editing: ${form.positionTitle}` : "Create New Template"}</DialogTitle>
+            <DialogDescription>
+              Use the editor below to write your agreement. Format text with the toolbar, and type placeholders like <code>{"{{employee_name}}"}</code> anywhere — they'll fill in automatically when sent.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="flex flex-col gap-4 overflow-y-auto pr-1 flex-1 py-2">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label>Position Title</Label>
                 <Input
                   placeholder="e.g. Softscape Foreman"
@@ -184,12 +251,10 @@ export default function AgreementTemplatesPanel() {
                   data-testid="input-position-title"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label>Agreement Year</Label>
                 <Input
-                  type="number"
-                  min={2020}
-                  max={2099}
+                  type="number" min={2020} max={2099}
                   value={form.year}
                   onChange={e => setForm(f => ({ ...f, year: parseInt(e.target.value) || f.year }))}
                   data-testid="input-agreement-year"
@@ -197,27 +262,21 @@ export default function AgreementTemplatesPanel() {
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label>Agreement Body (HTML)</Label>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={openPreview} disabled={!form.templateBody} data-testid="button-preview-template">
-                    <Eye className="h-3.5 w-3.5 mr-1" /> Preview
-                  </Button>
-                </div>
+                <Label>Agreement Content</Label>
+                <Button size="sm" variant="ghost" onClick={openPreview} disabled={!form.templateBody} data-testid="button-preview-template" className="text-xs h-7">
+                  Preview with sample data
+                </Button>
               </div>
-              <p className="text-xs text-muted-foreground">Use HTML tags for formatting. Use variable placeholders like <code>{"{{employee_name}}"}</code> where dynamic content should appear.</p>
-              <Textarea
+              <RichTextEditor
                 value={form.templateBody}
-                onChange={e => setForm(f => ({ ...f, templateBody: e.target.value }))}
-                rows={20}
-                className="font-mono text-xs"
-                placeholder="Paste HTML content here..."
-                data-testid="textarea-template-body"
+                onChange={html => setForm(f => ({ ...f, templateBody: html }))}
+                minHeight="450px"
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t pt-4">
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button
               onClick={() => saveMutation.mutate()}
@@ -233,12 +292,105 @@ export default function AgreementTemplatesPanel() {
       {/* Preview dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Preview (with sample data)</DialogTitle></DialogHeader>
+          <div className="bg-white border rounded p-8 agreement-prose" style={{ fontFamily: "Georgia, serif", lineHeight: "1.8" }} dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          <DialogFooter><Button variant="outline" onClick={() => setPreviewOpen(false)}>Close</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Send dialog */}
+      <Dialog open={bulkSendOpen} onOpenChange={setBulkSendOpen}>
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Template Preview</DialogTitle>
+            <DialogTitle>Send Agreement to Employees</DialogTitle>
+            <DialogDescription>
+              Select the employees to receive the <strong>{bulkTemplate?.year} {bulkTemplate?.position_title}</strong> agreement. Each person gets their own personalized copy with their name filled in.
+            </DialogDescription>
           </DialogHeader>
-          <div className="bg-white border rounded p-6 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+
+          <div className="space-y-4 py-2">
+            {/* Apply same pay/date to all */}
+            <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox id="apply-all" checked={applyToAll} onCheckedChange={v => setApplyToAll(!!v)} data-testid="checkbox-apply-all" />
+                <label htmlFor="apply-all" className="text-sm font-medium cursor-pointer">Use the same pay rate and start date for everyone selected</label>
+              </div>
+              {applyToAll && (
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Pay Rate ($/hr)</Label>
+                    <Input placeholder="e.g. 22.50" value={bulkPayRate} onChange={e => setBulkPayRate(e.target.value)} data-testid="input-bulk-pay-rate" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Start Date</Label>
+                    <Input type="date" value={bulkStartDate} onChange={e => setBulkStartDate(e.target.value)} data-testid="input-bulk-start-date" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Employee list */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Select Employees</Label>
+                <span className="text-xs text-muted-foreground">{Object.keys(selectedEmployees).length} selected</span>
+              </div>
+              <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+                {activeEmployees.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" /> Loading employees...</div>
+                ) : activeEmployees.map((emp: Employee) => {
+                  const isSelected = selectedEmployees[emp.id] !== undefined;
+                  return (
+                    <div key={emp.id} className="p-3 flex items-start gap-3">
+                      <Checkbox
+                        id={`emp-${emp.id}`}
+                        checked={isSelected}
+                        onCheckedChange={() => toggleEmployee(emp.id)}
+                        data-testid={`checkbox-emp-${emp.id}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <label htmlFor={`emp-${emp.id}`} className="font-medium text-sm cursor-pointer block">
+                          {emp.first_name} {emp.last_name}
+                        </label>
+                        <p className="text-xs text-muted-foreground">{emp.position || "No position"}</p>
+                        {!applyToAll && isSelected && (
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            <Input
+                              placeholder="Pay rate"
+                              size={8}
+                              className="h-7 text-xs"
+                              value={selectedEmployees[emp.id]?.payRate || ""}
+                              onChange={e => setSelectedEmployees(prev => ({ ...prev, [emp.id]: { ...prev[emp.id], payRate: e.target.value } }))}
+                            />
+                            <Input
+                              type="date"
+                              className="h-7 text-xs"
+                              value={selectedEmployees[emp.id]?.startDate || ""}
+                              onChange={e => setSelectedEmployees(prev => ({ ...prev, [emp.id]: { ...prev[emp.id], startDate: e.target.value } }))}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPreviewOpen(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setBulkSendOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => bulkSendMutation.mutate()}
+              disabled={bulkSendMutation.isPending || Object.keys(selectedEmployees).length === 0}
+              data-testid="button-confirm-bulk-send"
+            >
+              {bulkSendMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
+              ) : (
+                <><Send className="h-4 w-4 mr-2" /> Send to {Object.keys(selectedEmployees).length || ""} Employee{Object.keys(selectedEmployees).length !== 1 ? "s" : ""}</>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -248,14 +400,12 @@ export default function AgreementTemplatesPanel() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Template?</AlertDialogTitle>
-            <AlertDialogDescription>This will permanently delete the template. Any agreements already sent will not be affected.</AlertDialogDescription>
+            <AlertDialogDescription>This will permanently delete the template. Agreements already sent will not be affected.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteId && deleteMutation.mutate(deleteId)}>
-              Delete
-            </AlertDialogAction>
+              onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
