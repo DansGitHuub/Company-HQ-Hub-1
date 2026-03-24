@@ -1083,6 +1083,13 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
         acceptedAt: candidate.offerAcceptedAt,
         offerLetterUrl: offerLetterDoc?.url || null,
         expiresAt: candidate.offerAcceptanceExpiresAt,
+        offerPay: candidate.offerPay || null,
+        offerPayType: candidate.offerPayType || null,
+        offerStartDate: candidate.offerStartDate || null,
+        offerEmploymentType: candidate.offerEmploymentType || null,
+        offerSchedule: candidate.offerSchedule || null,
+        offerBenefits: candidate.offerBenefits ? (candidate.offerBenefits as string).split(",").filter(Boolean) : [],
+        offerNotes: candidate.offerNotes || null,
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });

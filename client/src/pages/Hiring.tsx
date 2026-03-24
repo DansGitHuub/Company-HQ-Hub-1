@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
@@ -80,8 +81,16 @@ export default function Hiring() {
   const [scheduleForm, setScheduleForm] = useState({ date: "", time: "", duration: 30, type: "zoom", location: "", notes: "", interviewerName: "" });
   const [scheduling, setScheduling] = useState(false);
   const [pendingOfferExtended, setPendingOfferExtended] = useState<{ candidateId: string; candidate: Candidate } | null>(null);
-  const [offerFile, setOfferFile] = useState<File | null>(null);
   const [offerUploading, setOfferUploading] = useState(false);
+  const [offerForm, setOfferForm] = useState({
+    pay: "",
+    payType: "Hourly",
+    startDate: "",
+    employmentType: "Full-time",
+    schedule: "",
+    benefits: [] as string[],
+    notes: "",
+  });
   const [pendingHire, setPendingHire] = useState<{ candidateId: string; candidate: Candidate } | null>(null);
   const [hireStartDate, setHireStartDate] = useState("");
   const [hiring, setHiring] = useState(false);
@@ -151,7 +160,7 @@ export default function Hiring() {
 
     if (newStage === "Offer Extended") {
       setPendingOfferExtended({ candidateId, candidate });
-      setOfferFile(null);
+      setOfferForm({ pay: "", payType: "Hourly", startDate: "", employmentType: "Full-time", schedule: "", benefits: [], notes: "" });
       return;
     }
 
@@ -186,30 +195,26 @@ export default function Hiring() {
     }
   }
 
-  async function handleOfferExtendedSubmit(skipUpload = false) {
+  async function handleOfferExtendedSubmit() {
     if (!pendingOfferExtended) return;
     setOfferUploading(true);
     try {
-      if (!skipUpload && offerFile) {
-        const urlRes = await apiRequest("GET", `/api/candidates/${pendingOfferExtended.candidateId}/offer-letter-upload-url`);
-        const { signedUrl, objectKey } = await urlRes.json();
-        if (signedUrl) {
-          await fetch(signedUrl, { method: "PUT", headers: { "Content-Type": offerFile.type }, body: offerFile });
-          await apiRequest("POST", `/api/candidates/${pendingOfferExtended.candidateId}/documents`, {
-            name: offerFile.name,
-            type: "offer_letter",
-            url: `/objects/uploads/${objectKey}`,
-            status: "Sent",
-            requiresAcknowledgment: true,
-          });
-        }
-      }
+      // Save offer details to candidate record
+      await apiRequest("PATCH", `/api/candidates/${pendingOfferExtended.candidateId}`, {
+        offerPay: offerForm.pay || null,
+        offerPayType: offerForm.payType || null,
+        offerStartDate: offerForm.startDate || null,
+        offerEmploymentType: offerForm.employmentType || null,
+        offerSchedule: offerForm.schedule || null,
+        offerBenefits: offerForm.benefits.length > 0 ? offerForm.benefits.join(",") : null,
+        offerNotes: offerForm.notes || null,
+      });
+      // Move stage — triggers token generation + email
       await apiRequest("POST", `/api/candidates/${pendingOfferExtended.candidateId}/stage`, { stage: "Offer Extended" });
       queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/candidates/${pendingOfferExtended.candidateId}/documents`] });
-      toast({ title: "Offer Extended", description: offerFile && !skipUpload ? "Offer letter uploaded and card moved." : "Card moved to Offer Extended." });
+      toast({ title: "Offer Extended", description: `Offer details saved and acceptance link sent to ${pendingOfferExtended.candidate.name}.` });
       setPendingOfferExtended(null);
-      setOfferFile(null);
+      setOfferForm({ pay: "", payType: "Hourly", startDate: "", employmentType: "Full-time", schedule: "", benefits: [], notes: "" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to process offer", variant: "destructive" });
     } finally {
@@ -298,7 +303,7 @@ export default function Hiring() {
               { step: 4, stage: "Interview Scheduled", color: "bg-cyan-500", desc: "Dragging here opens the scheduling modal. Pick date, time, duration, and Zoom or In-Person. The system automatically creates the Zoom meeting, adds it to Google Calendar, emails the candidate, and texts them." },
               { step: 5, stage: "1st Interview", color: "bg-amber-500", desc: "Move them here once the first interview is done. Use the Interview tab on the card to record your rating and recommendation." },
               { step: 6, stage: "2nd Interview", color: "bg-orange-500", desc: "Same process if a second round is needed. Schedule via the same drag-to-schedule flow." },
-              { step: 7, stage: "Offer Extended", color: "bg-emerald-500", desc: "Dragging here prompts you to upload an offer letter (PDF or Word). This is optional — you can skip it. The candidate is notified that an offer is coming." },
+              { step: 7, stage: "Offer Extended", color: "bg-emerald-500", desc: "Dragging here opens the Offer Builder. Fill in pay rate, start date, employment type, schedule, benefits, and any additional notes. Click 'Send Offer' and the candidate automatically receives a personalized acceptance link by email. They sign digitally — no paperwork needed." },
               { step: 8, stage: "Hired", color: "bg-green-600", desc: "The big one. Dragging here automatically: creates an employee record pre-filled from their application, generates their onboarding checklist (I-9, W-4, NDA, etc.), creates a Crew login with a temp password, and sends them a welcome email with credentials." },
               { step: 9, stage: "Declined / Not a Fit", color: "bg-gray-400", desc: "Moves them out of the active pipeline. A notification email is sent to the candidate if that email template is enabled in Admin Panel → Email Templates." },
             ].map(({ step, stage, color, desc }) => (
@@ -543,56 +548,156 @@ export default function Hiring() {
       )}
 
       {/* Offer Extended Modal — Step 4.1 */}
-      <Dialog open={!!pendingOfferExtended} onOpenChange={(open) => { if (!open && !offerUploading) { setPendingOfferExtended(null); setOfferFile(null); } }}>
-        <DialogContent className="max-w-md" data-testid="dialog-offer-extended">
+      <Dialog open={!!pendingOfferExtended} onOpenChange={(open) => { if (!open && !offerUploading) { setPendingOfferExtended(null); setOfferForm({ pay: "", payType: "Hourly", startDate: "", employmentType: "Full-time", schedule: "", benefits: [], notes: "" }); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-offer-extended">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileCheck className="h-5 w-5 text-primary" />
-              Offer Extended
+              <FileCheck className="h-5 w-5 text-emerald-600" />
+              Build Offer — {pendingOfferExtended?.candidate.name}
             </DialogTitle>
-            {pendingOfferExtended && (
-              <DialogDescription>
-                Moving <strong>{pendingOfferExtended.candidate.name}</strong> to Offer Extended.
-                You can optionally attach the offer letter now.
-              </DialogDescription>
-            )}
+            <DialogDescription>
+              Fill in the offer details below. Once confirmed, the candidate will receive a personalized offer acceptance link by email.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
-              <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground mb-3">Upload offer letter (PDF or Word) — optional</p>
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                className="hidden"
-                id="offer-letter-file"
-                onChange={e => setOfferFile(e.target.files?.[0] || null)}
-                data-testid="input-offer-letter-file"
-              />
-              <label htmlFor="offer-letter-file">
-                <Button variant="outline" size="sm" className="cursor-pointer" asChild>
-                  <span><Upload className="h-3.5 w-3.5 mr-1.5" />Choose File</span>
-                </Button>
-              </label>
-              {offerFile && (
-                <div className="mt-3 flex items-center justify-center gap-2 text-sm text-emerald-600 font-medium">
-                  <FileCheck className="h-4 w-4" /> {offerFile.name}
-                  <button onClick={() => setOfferFile(null)} className="text-muted-foreground hover:text-destructive ml-1">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+
+          <div className="space-y-6 py-2">
+            {/* Compensation */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-foreground border-b pb-1.5 flex items-center gap-2">
+                <Briefcase className="h-4 w-4 text-emerald-600" /> Compensation
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="offer-pay">Pay Rate</Label>
+                  <Input
+                    id="offer-pay"
+                    placeholder="e.g. 20.00"
+                    value={offerForm.pay}
+                    onChange={e => setOfferForm(f => ({ ...f, pay: e.target.value }))}
+                    data-testid="input-offer-pay"
+                  />
                 </div>
-              )}
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="offer-pay-type">Pay Type</Label>
+                  <Select value={offerForm.payType} onValueChange={v => setOfferForm(f => ({ ...f, payType: v }))}>
+                    <SelectTrigger id="offer-pay-type" data-testid="select-offer-pay-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Hourly">Hourly</SelectItem>
+                      <SelectItem value="Salary">Salary (Annual)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground text-center">
-              The file will be logged with a timestamp on the applicant record.
-            </p>
+
+            {/* Start Date & Employment */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-foreground border-b pb-1.5 flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-emerald-600" /> Start Date &amp; Employment
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="offer-start-date">Start Date</Label>
+                  <Input
+                    id="offer-start-date"
+                    type="date"
+                    value={offerForm.startDate}
+                    onChange={e => setOfferForm(f => ({ ...f, startDate: e.target.value }))}
+                    data-testid="input-offer-start-date"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="offer-emp-type">Employment Type</Label>
+                  <Select value={offerForm.employmentType} onValueChange={v => setOfferForm(f => ({ ...f, employmentType: v }))}>
+                    <SelectTrigger id="offer-emp-type" data-testid="select-offer-employment-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Full-time">Full-time</SelectItem>
+                      <SelectItem value="Part-time">Part-time</SelectItem>
+                      <SelectItem value="Seasonal">Seasonal</SelectItem>
+                      <SelectItem value="Contract">Contract</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="offer-schedule">Work Schedule</Label>
+                <Input
+                  id="offer-schedule"
+                  placeholder="e.g. Monday–Friday, 7:00am – 4:00pm"
+                  value={offerForm.schedule}
+                  onChange={e => setOfferForm(f => ({ ...f, schedule: e.target.value }))}
+                  data-testid="input-offer-schedule"
+                />
+              </div>
+            </div>
+
+            {/* Benefits */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-foreground border-b pb-1.5 flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-emerald-600" /> Benefits Package
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  "Health Insurance",
+                  "Dental Insurance",
+                  "Vision Insurance",
+                  "401(k) Plan",
+                  "Paid Time Off (PTO)",
+                  "Paid Holidays",
+                  "Company Vehicle",
+                  "Fuel Card",
+                  "Uniform Provided",
+                  "Tool Allowance",
+                  "Cell Phone Allowance",
+                  "Overtime Eligible",
+                ].map((benefit) => (
+                  <div key={benefit} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`benefit-${benefit}`}
+                      checked={offerForm.benefits.includes(benefit)}
+                      onCheckedChange={(checked) =>
+                        setOfferForm(f => ({
+                          ...f,
+                          benefits: checked
+                            ? [...f.benefits, benefit]
+                            : f.benefits.filter(b => b !== benefit),
+                        }))
+                      }
+                      data-testid={`checkbox-benefit-${benefit.toLowerCase().replace(/\W+/g, "-")}`}
+                    />
+                    <Label htmlFor={`benefit-${benefit}`} className="text-sm cursor-pointer">{benefit}</Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Additional Notes */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-foreground border-b pb-1.5 flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-emerald-600" /> Additional Notes
+              </h3>
+              <Textarea
+                placeholder="Any other offer details, conditions, or expectations to share with the candidate…"
+                value={offerForm.notes}
+                onChange={e => setOfferForm(f => ({ ...f, notes: e.target.value }))}
+                rows={3}
+                data-testid="textarea-offer-notes"
+              />
+            </div>
           </div>
-          <DialogFooter className="gap-2">
-            <Button variant="ghost" onClick={() => handleOfferExtendedSubmit(true)} disabled={offerUploading}>
-              Skip Upload
+
+          <DialogFooter className="gap-2 pt-2 border-t">
+            <Button variant="ghost" onClick={() => { setPendingOfferExtended(null); setOfferForm({ pay: "", payType: "Hourly", startDate: "", employmentType: "Full-time", schedule: "", benefits: [], notes: "" }); }} disabled={offerUploading}>
+              Cancel
             </Button>
-            <Button onClick={() => handleOfferExtendedSubmit(false)} disabled={offerUploading} data-testid="button-confirm-offer">
-              {offerUploading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Uploading…</> : <><FileCheck className="h-4 w-4 mr-2" />Confirm Offer Extended</>}
+            <Button onClick={handleOfferExtendedSubmit} disabled={offerUploading} className="bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="button-confirm-offer">
+              {offerUploading
+                ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending Offer…</>
+                : <><Send className="h-4 w-4 mr-2" />Send Offer to Candidate</>}
             </Button>
           </DialogFooter>
         </DialogContent>
