@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
@@ -33,7 +33,8 @@ import {
   Droplets,
   Wrench,
   FileUp,
-  Eye
+  Eye,
+  Loader2
 } from "lucide-react";
 
 const CATEGORIES = ["Lawn Care", "Pruning", "Irrigation", "Hardscaping", "Seasonal", "Equipment", "General"];
@@ -56,6 +57,9 @@ export default function Education() {
   const [editingResource, setEditingResource] = useState<CustomerResource | null>(null);
   const [viewingResource, setViewingResource] = useState<CustomerResource | null>(null);
   const [uploadMode, setUploadMode] = useState(false);
+  const [isDraggingDocs, setIsDraggingDocs] = useState(false);
+  const [isUploadingDocs, setIsUploadingDocs] = useState(false);
+  const docFileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -236,6 +240,60 @@ export default function Education() {
       toast({ title: "Failed to upload file", variant: "destructive" });
     }
   };
+
+  const handleDocFileSelect = useCallback(async (file: File) => {
+    if (!file) return;
+    setIsUploadingDocs(true);
+    const formDataUpload = new FormData();
+    formDataUpload.append("file", file);
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        credentials: "include",
+        body: formDataUpload,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+      setEditingResource(null);
+      setUploadMode(true);
+      setFormData({
+        title: nameWithoutExt,
+        description: "",
+        type: "document",
+        category: "General",
+        content: "",
+        fileUrl: url,
+        fileName: file.name,
+        isPublished: true,
+      });
+      setEditDialogOpen(true);
+    } catch {
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setIsUploadingDocs(false);
+    }
+  }, [toast]);
+
+  const handleDocsDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingDocs(true);
+  }, []);
+
+  const handleDocsDragLeave = useCallback(() => setIsDraggingDocs(false), []);
+
+  const handleDocsDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingDocs(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) await handleDocFileSelect(file);
+  }, [handleDocFileSelect]);
+
+  const handleDocsInputChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) await handleDocFileSelect(file);
+    if (docFileInputRef.current) docFileInputRef.current.value = "";
+  }, [handleDocFileSelect]);
 
   const toggleSave = (resourceId: string) => {
     if (savedResourceIds.has(resourceId)) {
@@ -445,7 +503,51 @@ export default function Education() {
           <ResourceGrid items={instructions} emptyMessage="No instructions available yet." />
         </TabsContent>
 
-        <TabsContent value="documents" className="mt-8">
+        <TabsContent value="documents" className="mt-8 space-y-6">
+          {isAdmin && (
+            <div
+              onDragOver={handleDocsDragOver}
+              onDragLeave={handleDocsDragLeave}
+              onDrop={handleDocsDrop}
+              onClick={() => docFileInputRef.current?.click()}
+              className={`relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center cursor-pointer transition-all select-none ${
+                isDraggingDocs
+                  ? "border-primary bg-primary/10 scale-[1.01]"
+                  : "border-muted-foreground/25 bg-muted/30 hover:border-primary/50 hover:bg-muted/50"
+              }`}
+              data-testid="doc-drop-zone"
+            >
+              {isUploadingDocs ? (
+                <>
+                  <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                  <p className="text-sm font-medium text-muted-foreground">Uploading…</p>
+                </>
+              ) : isDraggingDocs ? (
+                <>
+                  <Upload className="w-10 h-10 text-primary" />
+                  <p className="text-sm font-semibold text-primary">Drop to upload</p>
+                </>
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <FileUp className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Drag & drop a document here</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">or click to browse — PDF, Word, Excel and more</p>
+                  </div>
+                </>
+              )}
+              <input
+                ref={docFileInputRef}
+                type="file"
+                className="hidden"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+                onChange={handleDocsInputChange}
+                data-testid="doc-file-input"
+              />
+            </div>
+          )}
           <ResourceGrid items={documents} emptyMessage="No documents have been uploaded yet." />
         </TabsContent>
 
