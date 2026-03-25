@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import SignaturePad from "@/components/forms/SignaturePad";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
@@ -1861,6 +1861,12 @@ function CreateUserDialog({ open, onOpenChange, isMasterAdmin }: { open: boolean
     role: "Crew",
   });
 
+  useEffect(() => {
+    if (open) {
+      setFormData({ username: "", password: "", email: "", name: "", role: "Crew" });
+    }
+  }, [open]);
+
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const res = await apiRequest("POST", "/api/admin/users", data);
@@ -1869,7 +1875,6 @@ function CreateUserDialog({ open, onOpenChange, isMasterAdmin }: { open: boolean
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       onOpenChange(false);
-      setFormData({ username: "", password: "", email: "", name: "", role: "Crew" });
     },
   });
 
@@ -1880,21 +1885,17 @@ function CreateUserDialog({ open, onOpenChange, isMasterAdmin }: { open: boolean
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus className="w-4 h-4" /> Add User
-        </Button>
-      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create New User</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4" autoComplete="off">
           <div className="grid gap-2">
             <Label>Full Name</Label>
             <Input
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              autoComplete="off"
               required
             />
           </div>
@@ -1904,6 +1905,7 @@ function CreateUserDialog({ open, onOpenChange, isMasterAdmin }: { open: boolean
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              autoComplete="off"
               required
             />
           </div>
@@ -1912,6 +1914,7 @@ function CreateUserDialog({ open, onOpenChange, isMasterAdmin }: { open: boolean
             <Input
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              autoComplete="off"
               required
             />
           </div>
@@ -1921,6 +1924,7 @@ function CreateUserDialog({ open, onOpenChange, isMasterAdmin }: { open: boolean
               type="password"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              autoComplete="new-password"
               required
             />
           </div>
