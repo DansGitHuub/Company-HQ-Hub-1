@@ -329,6 +329,17 @@ async function executeHireFlow(candidateId: string, startDate?: string) {
     } catch {}
   }
 
+  // Backfill employeeId on any form submissions already linked to this candidate
+  // (e.g., forms submitted during the pre-hire process that only had candidateId)
+  try {
+    const existingCandidateForms = await storage.getHrFormSubmissions(undefined, candidateId);
+    for (const form of existingCandidateForms) {
+      if (!form.employeeId) {
+        await storage.updateHrFormSubmission(form.id, { employeeId: employee.id });
+      }
+    }
+  } catch {}
+
   let username = "";
   let tempPassword = "";
   let accountCreated = false;
@@ -410,8 +421,8 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
   const requireHRAccess: RequestHandler = (req: any, res, next) => {
     const role = req.user?.role;
     const isMasterAdmin = req.user?.isMasterAdmin;
-    if (role === "Customer" || role === "Crew") {
-      if (!isMasterAdmin) return res.status(403).json({ message: "Not authorized" });
+    if (!["Admin", "Manager"].includes(role) && !isMasterAdmin) {
+      return res.status(403).json({ message: "Not authorized" });
     }
     next();
   };
