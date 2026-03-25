@@ -288,7 +288,7 @@ function EmployeeProfile({ employee, onBack }: { employee: any; onBack: () => vo
           <TabsTrigger value="onboarding" data-testid="tab-onboarding">{t("hiring.onboarding")}</TabsTrigger>
           {isAdmin && <TabsTrigger value="pay" data-testid="tab-pay">{t("employees.payRate")}</TabsTrigger>}
           <TabsTrigger value="quizzes" data-testid="tab-quizzes">Quizzes</TabsTrigger>
-          <TabsTrigger value="history" data-testid="tab-history">{t("common.history")}</TabsTrigger>
+          <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
           {isAdmin && <TabsTrigger value="notes" data-testid="tab-notes">{t("common.notes")}</TabsTrigger>}
         </TabsList>
 
