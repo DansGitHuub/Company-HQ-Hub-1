@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import OpenAI from "openai";
 import { pool } from "./db";
 import { allToolDefinitions, executeTool, shouldRequireConfirmation, getToolNames } from "./assistantTools";
-import { speechToText } from "./replit_integrations/audio/client";
+import { speechToText, textToSpeech } from "./replit_integrations/audio/client";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -678,16 +678,14 @@ export function registerAssistantRoutes(app: Express) {
       const validVoices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
       if (!validVoices.includes(voiceToUse)) voiceToUse = "alloy";
 
-      const response = await openai.audio.speech.create({
-        model: "tts-1",
-        voice: voiceToUse as any,
-        input: truncatedText,
-        response_format: "mp3",
-      });
+      const buffer = await textToSpeech(
+        truncatedText,
+        voiceToUse as "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer",
+        "wav"
+      );
 
-      const buffer = Buffer.from(await response.arrayBuffer());
       res.set({
-        "Content-Type": "audio/mpeg",
+        "Content-Type": "audio/wav",
         "Content-Length": buffer.length.toString(),
         "Cache-Control": "no-cache",
       });
