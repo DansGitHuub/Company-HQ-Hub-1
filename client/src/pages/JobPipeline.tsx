@@ -1247,7 +1247,7 @@ function EstimatesBoard() {
               {t("common.cancel")}
             </Button>
             <Button onClick={handleSave} data-testid="button-save-estimate">
-              {isNewEstimate ? t("jobs.createEstimate") : t("common.saveChanges")}
+              {isNewEstimate ? "Create Estimate" : t("common.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
