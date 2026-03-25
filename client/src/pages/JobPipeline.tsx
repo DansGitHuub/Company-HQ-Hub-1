@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import { 
   Plus, MapPin, Calendar, FileText, Upload, Trash2, 
   ExternalLink, Clock, AlertCircle, Layers, X, Edit2, Check,
-  DollarSign, ArrowRight, Mail
+  DollarSign, ArrowRight, Mail, MailCheck, ArrowRightLeft
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -793,9 +793,16 @@ function EstimatesBoard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewEstimate, setIsNewEstimate] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Estimate>>({});
-  const [notifyOnMove, setNotifyOnMove] = useState(false);
   const [showConvertDialog, setShowConvertDialog] = useState(false);
   const [convertCategory, setConvertCategory] = useState("Install");
+  const [pendingStageChange, setPendingStageChange] = useState<{ estimateId: string; newStage: EstimateStage; clientName: string } | null>(null);
+  const [alwaysNotifyIds, setAlwaysNotifyIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("estimateAlwaysNotify") || "[]")); } catch { return new Set(); }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("estimateAlwaysNotify", JSON.stringify([...alwaysNotifyIds]));
+  }, [alwaysNotifyIds]);
 
   const { data: allEstimates = [] } = useQuery<Estimate[]>({
     queryKey: ["/api/estimates"],
@@ -854,7 +861,23 @@ function EstimatesBoard() {
     if (!result.destination || !isAdmin) return;
     const estimateId = result.draggableId;
     const newStage = result.destination.droppableId as EstimateStage;
-    updateMutation.mutate({ id: estimateId, data: { stage: newStage, notifyCustomer: notifyOnMove } });
+    if (result.destination.droppableId === result.source.droppableId) return;
+    const estimate = allEstimates.find(e => e.id === estimateId);
+    const clientName = estimate?.clientName || "the customer";
+    if (alwaysNotifyIds.has(estimateId)) {
+      updateMutation.mutate({ id: estimateId, data: { stage: newStage, notifyCustomer: true } });
+    } else {
+      setPendingStageChange({ estimateId, newStage, clientName });
+    }
+  };
+
+  const confirmStageChange = (notify: boolean, alwaysNotify = false) => {
+    if (!pendingStageChange) return;
+    if (alwaysNotify) {
+      setAlwaysNotifyIds(prev => new Set([...prev, pendingStageChange.estimateId]));
+    }
+    updateMutation.mutate({ id: pendingStageChange.estimateId, data: { stage: pendingStageChange.newStage, notifyCustomer: notify || alwaysNotify } });
+    setPendingStageChange(null);
   };
 
   const openEstimateModal = (estimate: Estimate) => {
@@ -892,23 +915,51 @@ function EstimatesBoard() {
   return (
     <>
       <div className="flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="notifyOnMove"
-              checked={notifyOnMove}
-              onCheckedChange={(c) => setNotifyOnMove(c === true)}
-              data-testid="checkbox-notify-on-move"
-            />
-            <Label htmlFor="notifyOnMove" className="text-sm flex items-center gap-1">
-              <Mail className="w-3 h-3" /> {t("jobs.emailCustomer")}
-            </Label>
-          </div>
-        </div>
+        <div />
         <Button className="gap-2" onClick={openNewEstimateModal} data-testid="button-add-estimate">
           <Plus className="w-4 h-4" /> {t("jobs.addEstimate")}
         </Button>
       </div>
+
+      {/* Stage-change email popup */}
+      <Dialog open={!!pendingStageChange} onOpenChange={(o) => { if (!o) setPendingStageChange(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-primary" /> Email customer?
+            </DialogTitle>
+            <DialogDescription>
+              <span className="font-medium">{pendingStageChange?.clientName}</span> is being moved to{" "}
+              <span className="font-medium">{pendingStageChange?.newStage}</span>. Would you like to notify them?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-1">
+            <Button
+              className="w-full justify-start gap-2"
+              onClick={() => confirmStageChange(true)}
+              data-testid="button-email-once"
+            >
+              <Mail className="w-4 h-4" /> Email customer this time
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2 border-primary/40 text-primary hover:bg-primary/5"
+              onClick={() => confirmStageChange(true, true)}
+              data-testid="button-always-email"
+            >
+              <MailCheck className="w-4 h-4" /> Always email for this estimate
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2 text-muted-foreground"
+              onClick={() => confirmStageChange(false)}
+              data-testid="button-skip-email"
+            >
+              <ArrowRightLeft className="w-4 h-4" /> Just move, no email
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="flex-1 flex gap-4 overflow-x-auto pb-4">
@@ -953,6 +1004,11 @@ function EstimatesBoard() {
                               <CardContent className="p-3 space-y-2">
                                 <div className="flex justify-between items-start">
                                   {getSourceBadge(estimate.source)}
+                                  {alwaysNotifyIds.has(estimate.id) && (
+                                    <span className="flex items-center gap-0.5 text-[9px] text-primary font-medium" title="Always emails customer on stage change">
+                                      <MailCheck className="w-2.5 h-2.5" /> Auto-email
+                                    </span>
+                                  )}
                                 </div>
                                 <div>
                                   <h4 className="font-bold text-foreground leading-tight text-sm">{estimate.clientName}</h4>
