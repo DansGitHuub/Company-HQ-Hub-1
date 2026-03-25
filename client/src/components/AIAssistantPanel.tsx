@@ -45,8 +45,12 @@ export default function AIAssistantPanel() {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [speakingMessageIdx, setSpeakingMessageIdx] = useState<number | null>(null);
+  const [silenceCountdown, setSilenceCountdown] = useState<number | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const silenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const maxDurationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const silenceAudioCtxRef = useRef<AudioContext | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [, navigate] = useLocation();
@@ -282,6 +286,69 @@ export default function AIAssistantPanel() {
       mediaRecorderRef.current = recorder;
       recorder.start(250);
       setIsRecording(true);
+
+      // ── Silence detection (auto-stop after ~2s of quiet) ──
+      const clearSilenceDetection = () => {
+        if (silenceIntervalRef.current) { clearInterval(silenceIntervalRef.current); silenceIntervalRef.current = null; }
+        if (maxDurationTimerRef.current) { clearTimeout(maxDurationTimerRef.current); maxDurationTimerRef.current = null; }
+        if (silenceAudioCtxRef.current) { silenceAudioCtxRef.current.close().catch(() => {}); silenceAudioCtxRef.current = null; }
+        setSilenceCountdown(null);
+      };
+
+      const doStop = () => {
+        clearSilenceDetection();
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+          mediaRecorderRef.current.stop();
+          mediaRecorderRef.current = null;
+        }
+        setIsRecording(false);
+      };
+
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const audioCtx = new AudioContextClass();
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        const source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
+        silenceAudioCtxRef.current = audioCtx;
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const SILENCE_THRESHOLD = 8;
+        const SILENCE_FRAMES_NEEDED = 20; // 20 × 100ms = 2s
+        const COUNTDOWN_START_FRAME = 10; // show countdown after 1s of silence
+        let silentFrames = 0;
+
+        silenceIntervalRef.current = setInterval(() => {
+          if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
+            clearSilenceDetection();
+            return;
+          }
+          analyser.getByteFrequencyData(dataArray);
+          const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+          if (avg < SILENCE_THRESHOLD) {
+            silentFrames++;
+            if (silentFrames >= COUNTDOWN_START_FRAME) {
+              const remaining = Math.ceil((SILENCE_FRAMES_NEEDED - silentFrames) / 10);
+              setSilenceCountdown(Math.max(remaining, 1));
+            }
+            if (silentFrames >= SILENCE_FRAMES_NEEDED) {
+              doStop();
+            }
+          } else {
+            silentFrames = 0;
+            setSilenceCountdown(null);
+          }
+        }, 100);
+      } catch {
+        // If AudioContext isn't available, silence detection is skipped — hard cap still applies
+      }
+
+      // ── 45-second hard cap ──
+      maxDurationTimerRef.current = setTimeout(() => {
+        doStop();
+      }, 45000);
+
     } catch (err) {
       console.error("MediaRecorder setup failed:", err);
       stream.getTracks().forEach((t) => t.stop());
@@ -289,7 +356,15 @@ export default function AIAssistantPanel() {
     }
   }, [voice.settings?.voiceEnabled]);
 
+  const clearSilenceDetectionRefs = useCallback(() => {
+    if (silenceIntervalRef.current) { clearInterval(silenceIntervalRef.current); silenceIntervalRef.current = null; }
+    if (maxDurationTimerRef.current) { clearTimeout(maxDurationTimerRef.current); maxDurationTimerRef.current = null; }
+    if (silenceAudioCtxRef.current) { silenceAudioCtxRef.current.close().catch(() => {}); silenceAudioCtxRef.current = null; }
+    setSilenceCountdown(null);
+  }, []);
+
   const stopRecording = useCallback(() => {
+    clearSilenceDetectionRefs();
     if (voice.settings?.voiceEnabled && voice.isListening) {
       voice.stopListening();
       setIsRecording(false);
@@ -300,7 +375,7 @@ export default function AIAssistantPanel() {
       mediaRecorderRef.current = null;
     }
     setIsRecording(false);
-  }, [voice.settings?.voiceEnabled, voice.isListening]);
+  }, [voice.settings?.voiceEnabled, voice.isListening, clearSilenceDetectionRefs]);
 
   const toggleRecording = useCallback(() => {
     if (isRecording || voice.isListening) {
@@ -318,6 +393,9 @@ export default function AIAssistantPanel() {
 
   useEffect(() => {
     return () => {
+      if (silenceIntervalRef.current) clearInterval(silenceIntervalRef.current);
+      if (maxDurationTimerRef.current) clearTimeout(maxDurationTimerRef.current);
+      if (silenceAudioCtxRef.current) silenceAudioCtxRef.current.close().catch(() => {});
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         mediaRecorderRef.current.stop();
       }
@@ -606,7 +684,13 @@ export default function AIAssistantPanel() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
               </span>
-              <span className="text-xs text-red-600 dark:text-red-400 font-medium">Recording... tap mic to stop</span>
+              {silenceCountdown !== null ? (
+                <span className="text-xs text-orange-500 dark:text-orange-400 font-medium">
+                  Finishing in {silenceCountdown}s...
+                </span>
+              ) : (
+                <span className="text-xs text-red-600 dark:text-red-400 font-medium">Recording... tap mic to stop</span>
+              )}
             </div>
           )}
           {isTranscribing && (
