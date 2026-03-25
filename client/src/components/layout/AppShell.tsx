@@ -414,7 +414,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return location === item.href;
   };
 
-  const NavContent = () => {
+  const NavContent = ({ isMobileSheet = false }: { isMobileSheet?: boolean } = {}) => {
     const { shapeClass, sizeClass } = getLogoClasses();
     const hasLogo = !!companySettings?.logoUrl;
     
@@ -573,58 +573,109 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="mt-auto p-4 border-t-2 border-primary/20 bg-gradient-to-t from-primary/5 to-transparent">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant="ghost" 
-              className="w-full flex items-center justify-between px-2 h-12 hover:bg-white/10 text-sidebar-foreground"
-              data-testid="button-user-menu"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <Avatar className="h-8 w-8 border border-white/20">
-                  <AvatarFallback className="bg-primary/20 text-xs font-bold">
-                    {user?.name?.split(" ").map((n: string) => n[0]).join("") || "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="text-left min-w-0">
-                  <p className="text-sm font-bold truncate leading-none mb-1">
-                    {user?.name || user?.username}
-                  </p>
-                  <p className="text-[10px] font-medium opacity-60 uppercase tracking-wider truncate">
-                    {previewRole || effectiveRole || user?.role}
-                  </p>
-                </div>
+        {isMobileSheet ? (
+          /* Mobile sheet: direct links — avoids Radix portal z-index issues on Android */
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-3 px-2 py-2 mb-1">
+              <Avatar className="h-8 w-8 border border-white/20 shrink-0">
+                <AvatarFallback className="bg-primary/20 text-xs font-bold">
+                  {user?.name?.split(" ").map((n: string) => n[0]).join("") || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="text-left min-w-0">
+                <p className="text-sm font-bold truncate leading-none mb-1 text-sidebar-foreground">
+                  {user?.name || user?.username}
+                </p>
+                <p className="text-[10px] font-medium opacity-60 uppercase tracking-wider truncate text-sidebar-foreground">
+                  {previewRole || effectiveRole || user?.role}
+                </p>
               </div>
-              <Settings className="h-4 w-4 opacity-40 shrink-0" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 mb-2">
-            <DropdownMenuLabel>{t("nav.myAccount")}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
+            </div>
             <Link href="/profile">
-              <DropdownMenuItem className="cursor-pointer" data-testid="link-profile">
-                <User className="mr-2 h-4 w-4" />
-                <span>{t("nav.myProfile")}</span>
-              </DropdownMenuItem>
+              <button
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-white/10 text-sidebar-foreground transition-colors"
+                onClick={() => setIsMobileOpen(false)}
+                data-testid="link-profile-mobile"
+              >
+                <User className="h-4 w-4 opacity-70 shrink-0" />
+                {t("nav.myProfile")}
+              </button>
             </Link>
             <Link href="/settings">
-              <DropdownMenuItem className="cursor-pointer" data-testid="link-settings">
-                <Settings className="mr-2 h-4 w-4" />
-                <span>{t("nav.settings")}</span>
-              </DropdownMenuItem>
+              <button
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-white/10 text-sidebar-foreground transition-colors"
+                onClick={() => setIsMobileOpen(false)}
+                data-testid="link-settings-mobile"
+              >
+                <Settings className="h-4 w-4 opacity-70 shrink-0" />
+                {t("nav.settings")}
+              </button>
             </Link>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="text-destructive cursor-pointer" 
-              onClick={() => logoutMutation.mutate()}
+            <button
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-white/10 text-red-400 transition-colors"
+              onClick={() => { setIsMobileOpen(false); logoutMutation.mutate(); }}
               disabled={logoutMutation.isPending}
-              data-testid="button-logout"
+              data-testid="button-logout-mobile"
             >
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>{t("nav.logOut")}</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <LogOut className="h-4 w-4 shrink-0" />
+              {t("nav.logOut")}
+            </button>
+          </div>
+        ) : (
+          /* Desktop: DropdownMenu as normal */
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="w-full flex items-center justify-between px-2 h-12 hover:bg-white/10 text-sidebar-foreground"
+                data-testid="button-user-menu"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar className="h-8 w-8 border border-white/20">
+                    <AvatarFallback className="bg-primary/20 text-xs font-bold">
+                      {user?.name?.split(" ").map((n: string) => n[0]).join("") || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="text-left min-w-0">
+                    <p className="text-sm font-bold truncate leading-none mb-1">
+                      {user?.name || user?.username}
+                    </p>
+                    <p className="text-[10px] font-medium opacity-60 uppercase tracking-wider truncate">
+                      {previewRole || effectiveRole || user?.role}
+                    </p>
+                  </div>
+                </div>
+                <Settings className="h-4 w-4 opacity-40 shrink-0" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 mb-2">
+              <DropdownMenuLabel>{t("nav.myAccount")}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <Link href="/profile">
+                <DropdownMenuItem className="cursor-pointer" data-testid="link-profile">
+                  <User className="mr-2 h-4 w-4" />
+                  <span>{t("nav.myProfile")}</span>
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/settings">
+                <DropdownMenuItem className="cursor-pointer" data-testid="link-settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>{t("nav.settings")}</span>
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                className="text-destructive cursor-pointer" 
+                onClick={() => logoutMutation.mutate()}
+                disabled={logoutMutation.isPending}
+                data-testid="button-logout"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>{t("nav.logOut")}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
     );
@@ -649,7 +700,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-[280px] border-r-0">
-                <NavContent />
+                <NavContent isMobileSheet={true} />
               </SheetContent>
             </Sheet>
             <Link href="/" className="flex items-center gap-2">

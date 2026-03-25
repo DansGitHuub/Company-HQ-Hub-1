@@ -108,6 +108,12 @@ function VoiceSettingsSection() {
   const previewVoice = async (voiceName?: string) => {
     setIsPreviewing(true);
     try {
+      // Create AudioContext during the user gesture — this is required so the browser
+      // doesn't block playback after the async API call (autoplay policy).
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx = new AudioContextClass();
+      await audioCtx.resume();
+
       const res = await fetch("/api/ai/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -120,18 +126,16 @@ function VoiceSettingsSection() {
 
       if (!res.ok) throw new Error("Failed to generate preview");
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.onended = () => {
+      const arrayBuffer = await res.arrayBuffer();
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioCtx.destination);
+      source.onended = () => {
         setIsPreviewing(false);
-        URL.revokeObjectURL(url);
+        audioCtx.close();
       };
-      audio.onerror = () => {
-        setIsPreviewing(false);
-        URL.revokeObjectURL(url);
-      };
-      await audio.play();
+      source.start(0);
     } catch (err) {
       setIsPreviewing(false);
       toast({ title: "Failed to preview voice", variant: "destructive" });
