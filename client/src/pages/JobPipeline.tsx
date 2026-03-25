@@ -349,7 +349,7 @@ function SoldJobsBoard() {
             onClick={() => setShowAddTab(true)}
             data-testid="button-add-tab"
           >
-            <Plus className="w-4 h-4 mr-1" /> {t("jobs.addTab")}
+            <Plus className="w-4 h-4 mr-1" /> Add New
           </Button>
         )}
       </div>
