@@ -1269,6 +1269,7 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [showAccountDialog, setShowAccountDialog] = useState(false);
   const [accountInfo, setAccountInfo] = useState<{ username: string; tempPassword: string; emailSent: boolean } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -1419,29 +1420,54 @@ function ApplicantDetailPanel({ candidate, onClose, onUpdate, onDelete, tab, onT
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("hiring.applicantRemoved")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("common.areYouSure")} <strong>{candidate.name}</strong> {t("hiring.applicantRemoved")}? {t("common.cannotUndo")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
+      <Dialog open={showDeleteConfirm} onOpenChange={(open) => { setShowDeleteConfirm(open); if (!open) setDeleteConfirmText(""); }}>
+        <DialogContent className="max-w-sm" data-testid="dialog-delete-candidate">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" /> Delete Applicant
+            </DialogTitle>
+            <DialogDescription>
+              This will permanently remove <strong>{candidate.name}</strong> from the pipeline. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <p className="text-sm text-muted-foreground">
+              Type <span className="font-mono font-bold text-destructive">DELETE</span> to confirm:
+            </p>
+            <Input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Type DELETE to confirm"
+              autoComplete="off"
+              data-testid="input-delete-confirm"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && deleteConfirmText === "DELETE") {
+                  setShowDeleteConfirm(false);
+                  setDeleteConfirmText("");
+                  onDelete();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); }} data-testid="button-cancel-delete">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteConfirmText !== "DELETE"}
               onClick={() => {
                 setShowDeleteConfirm(false);
+                setDeleteConfirmText("");
                 onDelete();
               }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-confirm-delete"
             >
-              {t("common.delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <Trash2 className="h-4 w-4 mr-2" /> Delete Applicant
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Tabs value={tab} onValueChange={onTabChange} className="flex-1 flex flex-col overflow-hidden">
         <TabsList className="mx-4 mt-2 justify-start">
