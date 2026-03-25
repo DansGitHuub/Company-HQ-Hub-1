@@ -896,13 +896,17 @@ function QuickServiceDialog({ assetId, onClose }: { assetId: string; onClose: ()
         <div className="space-y-3">
           <div>
             <Label>Link to Schedule (optional)</Label>
-            <Select value={form.scheduleId || ""} onValueChange={v => {
-              const sched = schedules.find(s => s.id === v);
-              setForm({ ...form, scheduleId: v, name: sched?.name || form.name });
+            <Select value={form.scheduleId || "__none__"} onValueChange={v => {
+              if (v === "__none__") {
+                setForm({ ...form, scheduleId: undefined });
+              } else {
+                const sched = schedules.find(s => s.id === v);
+                setForm({ ...form, scheduleId: v, name: sched?.name || form.name });
+              }
             }}>
               <SelectTrigger><SelectValue placeholder="Select task..." /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="__none__">None</SelectItem>
                 {schedules.filter(s => s.isActive).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
               </SelectContent>
             </Select>
