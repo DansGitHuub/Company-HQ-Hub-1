@@ -1162,6 +1162,44 @@ Respond with a JSON object:
     }
   });
 
+  // Get quiz attempts for a specific user — Admin/Manager only
+  app.get("/api/quiz-attempts/user/:userId", requireAuth, async (req, res) => {
+    try {
+      const requester = req.user as any;
+      if (!["Admin", "Manager"].includes(requester.role) && !requester.isMasterAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const { userId } = req.params;
+      const result = await pool.query(
+        `SELECT
+          uqa.id,
+          uqa.quiz_id,
+          uqa.user_id,
+          uqa.score,
+          uqa.total_questions,
+          uqa.passed,
+          uqa.highest_level_passed,
+          uqa.final_score_label,
+          uqa.completed_at,
+          sq.title       AS quiz_title,
+          sq.is_safety_critical,
+          sq.min_pass_level,
+          s.title        AS sop_title,
+          s.category     AS sop_category
+        FROM user_quiz_attempts uqa
+        JOIN sop_quizzes sq ON sq.id = uqa.quiz_id
+        JOIN sops s ON s.id = sq.sop_id
+        WHERE uqa.user_id = $1
+        ORDER BY uqa.completed_at DESC`,
+        [userId]
+      );
+      res.json(result.rows);
+    } catch (err: any) {
+      console.error("[quiz-attempts] user route error:", err);
+      res.status(500).json({ message: "Error fetching quiz attempts" });
+    }
+  });
+
   // Get all SOPs that have quizzes (for Testing & Knowledge page)
   app.get("/api/quiz-catalog", requireAuth, async (req, res) => {
     try {

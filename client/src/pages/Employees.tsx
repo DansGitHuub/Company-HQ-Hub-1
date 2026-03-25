@@ -287,6 +287,7 @@ function EmployeeProfile({ employee, onBack }: { employee: any; onBack: () => vo
           <TabsTrigger value="documents" data-testid="tab-documents">{t("employees.documents")}</TabsTrigger>
           <TabsTrigger value="onboarding" data-testid="tab-onboarding">{t("hiring.onboarding")}</TabsTrigger>
           {isAdmin && <TabsTrigger value="pay" data-testid="tab-pay">{t("employees.payRate")}</TabsTrigger>}
+          <TabsTrigger value="quizzes" data-testid="tab-quizzes">Quizzes</TabsTrigger>
           <TabsTrigger value="history" data-testid="tab-history">{t("common.history")}</TabsTrigger>
           {isAdmin && <TabsTrigger value="notes" data-testid="tab-notes">{t("common.notes")}</TabsTrigger>}
         </TabsList>
@@ -308,6 +309,9 @@ function EmployeeProfile({ employee, onBack }: { employee: any; onBack: () => vo
             <PayTab employee={employee} onUpdate={(data) => updateMutation.mutate(data)} />
           </TabsContent>
         )}
+        <TabsContent value="quizzes">
+          <QuizHistoryTab employee={employee} />
+        </TabsContent>
         <TabsContent value="history">
           <HistoryTab employeeId={employee.id} />
         </TabsContent>
@@ -1356,5 +1360,163 @@ function NotesTab({ employeeId }: { employeeId: string }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+const LEVEL_LABELS: Record<number, string> = {
+  0: "Not Reached",
+  1: "Foundational",
+  2: "Competent",
+  3: "Proficient",
+  4: "Advanced",
+  5: "Expert",
+};
+
+function QuizHistoryTab({ employee }: { employee: any }) {
+  const userId = employee.userId;
+
+  const { data: attempts = [], isLoading } = useQuery<any[]>({
+    queryKey: [`/api/quiz-attempts/user/${userId}`],
+    queryFn: async () => {
+      if (!userId) return [];
+      const res = await apiRequest("GET", `/api/quiz-attempts/user/${userId}`);
+      return res.json();
+    },
+    enabled: !!userId,
+  });
+
+  const totalAttempts = attempts.length;
+  const totalPassed = attempts.filter((a: any) => a.passed).length;
+  const uniqueQuizzes = new Set(attempts.map((a: any) => a.quiz_id)).size;
+  const passRate = totalAttempts > 0 ? Math.round((totalPassed / totalAttempts) * 100) : 0;
+
+  if (!userId) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-muted-foreground text-sm">
+          This employee does not have a linked user account. Quiz history is only available for employees with a portal login.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card>
+          <CardContent className="py-4 text-center">
+            <p className="text-2xl font-bold text-foreground" data-testid="quiz-total-attempts">{totalAttempts}</p>
+            <p className="text-xs text-muted-foreground mt-1">Total Attempts</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4 text-center">
+            <p className="text-2xl font-bold text-green-600" data-testid="quiz-passed">{totalPassed}</p>
+            <p className="text-xs text-muted-foreground mt-1">Passed</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4 text-center">
+            <p className="text-2xl font-bold text-foreground" data-testid="quiz-unique">{uniqueQuizzes}</p>
+            <p className="text-xs text-muted-foreground mt-1">Unique Quizzes</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4 text-center">
+            <p className="text-2xl font-bold text-primary" data-testid="quiz-pass-rate">{passRate}%</p>
+            <p className="text-xs text-muted-foreground mt-1">Pass Rate</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-primary" />
+            Quiz Attempt History
+          </CardTitle>
+          <CardDescription>All quiz attempts — every result is permanently recorded</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : attempts.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              No quiz attempts recorded yet. This employee has not taken any quizzes.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {attempts.map((attempt: any, idx: number) => {
+                const pct = attempt.total_questions > 0
+                  ? Math.round((attempt.score / attempt.total_questions) * 100)
+                  : 0;
+                const levelLabel = LEVEL_LABELS[attempt.highest_level_passed] ?? "Unknown";
+                const takenAt = attempt.completed_at
+                  ? new Date(attempt.completed_at)
+                  : null;
+
+                return (
+                  <div
+                    key={attempt.id}
+                    className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
+                    data-testid={`quiz-attempt-row-${idx}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm text-foreground truncate">{attempt.sop_title}</span>
+                        {attempt.is_safety_critical && (
+                          <Badge variant="destructive" className="text-xs px-1.5 py-0">Safety Critical</Badge>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {attempt.quiz_title}
+                        {attempt.sop_category && <span className="ml-2 opacity-60">· {attempt.sop_category}</span>}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+                      <div className="text-center min-w-[54px]">
+                        <p className="text-sm font-semibold text-foreground" data-testid={`quiz-score-${idx}`}>
+                          {attempt.score}/{attempt.total_questions}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{pct}%</p>
+                      </div>
+
+                      <div className="text-center min-w-[80px]">
+                        <p className="text-xs font-medium text-muted-foreground">{levelLabel}</p>
+                        <p className="text-xs text-muted-foreground opacity-70">
+                          {attempt.final_score_label || "—"}
+                        </p>
+                      </div>
+
+                      <Badge
+                        variant={attempt.passed ? "default" : "destructive"}
+                        className={`text-xs px-2 min-w-[58px] justify-center ${attempt.passed ? "bg-green-600 hover:bg-green-700" : ""}`}
+                        data-testid={`quiz-pass-badge-${idx}`}
+                      >
+                        {attempt.passed ? "PASSED" : "NOT PASSED"}
+                      </Badge>
+
+                      <div className="text-right min-w-[110px]">
+                        {takenAt ? (
+                          <>
+                            <p className="text-xs text-foreground">{takenAt.toLocaleDateString()}</p>
+                            <p className="text-xs text-muted-foreground">{takenAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">—</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
