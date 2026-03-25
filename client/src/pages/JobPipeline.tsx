@@ -61,6 +61,9 @@ function SoldJobsBoard() {
   const [showAddTab, setShowAddTab] = useState(false);
   const [addTabName, setAddTabName] = useState("");
   
+  const { user } = useAuth();
+  const isAdmin = user?.role === "Admin" || user?.role === "Master Admin" || user?.role === "Manager";
+
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: ["/api/jobs"],
   });
@@ -398,9 +401,11 @@ function SoldJobsBoard() {
                                 
                                 <div>
                                   <h4 className="font-bold text-foreground leading-tight">{job.client}</h4>
-                                  <p className="text-lg font-heading text-primary mt-1">
-                                    ${(job.value || 0).toLocaleString()}
-                                  </p>
+                                  {isAdmin && (
+                                    <p className="text-lg font-heading text-primary mt-1">
+                                      ${(job.value || 0).toLocaleString()}
+                                    </p>
+                                  )}
                                 </div>
 
                                 <div className="flex items-center justify-between pt-2 border-t text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
@@ -413,6 +418,11 @@ function SoldJobsBoard() {
                                   {job.zone && (
                                     <div className="flex items-center gap-1">
                                       <MapPin className="w-3 h-3" /> {job.zone}
+                                    </div>
+                                  )}
+                                  {(job as any).totalHours && (
+                                    <div className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3" /> {(job as any).totalHours}h total
                                     </div>
                                   )}
                                 </div>
@@ -501,15 +511,17 @@ function SoldJobsBoard() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>{t("common.value")} ($)</Label>
-                  <Input
-                    type="number"
-                    value={editForm.value || ""}
-                    onChange={e => setEditForm({ ...editForm, value: parseInt(e.target.value) || 0 })}
-                    data-testid="input-job-value"
-                  />
-                </div>
+                {isAdmin && (
+                  <div className="space-y-2">
+                    <Label>Contract Value ($)</Label>
+                    <Input
+                      type="number"
+                      value={editForm.value || ""}
+                      onChange={e => setEditForm({ ...editForm, value: parseInt(e.target.value) || 0 })}
+                      data-testid="input-job-value"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -590,7 +602,7 @@ function SoldJobsBoard() {
                 <Label htmlFor="mandatoryDate" className="text-sm">Mark as mandatory completion date</Label>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Estimated Hours</Label>
                   <Input
@@ -598,6 +610,16 @@ function SoldJobsBoard() {
                     value={editForm.estimatedHours || ""}
                     onChange={e => setEditForm({ ...editForm, estimatedHours: parseInt(e.target.value) || undefined })}
                     placeholder="e.g. 8"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Total Hours Worked</Label>
+                  <Input
+                    type="number"
+                    value={(editForm as any).totalHours || ""}
+                    onChange={e => setEditForm({ ...editForm, totalHours: parseInt(e.target.value) || undefined } as any)}
+                    placeholder="e.g. 12"
+                    data-testid="input-job-total-hours"
                   />
                 </div>
                 <div className="space-y-2">
@@ -787,7 +809,7 @@ function EstimatesBoard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const isAdmin = user?.role === "Admin" || user?.role === "Master Admin";
+  const isAdmin = user?.role === "Admin" || user?.role === "Master Admin" || user?.role === "Manager";
   
   const [selectedEstimate, setSelectedEstimate] = useState<Estimate | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1059,7 +1081,7 @@ function EstimatesBoard() {
                                 <div>
                                   <h4 className="font-bold text-foreground leading-tight text-sm">{estimate.clientName}</h4>
                                   <p className="text-xs text-muted-foreground">{estimate.serviceType}</p>
-                                  {estimate.estimatedValue ? (
+                                  {isAdmin && estimate.estimatedValue ? (
                                     <p className="text-base font-heading text-primary mt-1">
                                       ${(estimate.estimatedValue || 0).toLocaleString()}
                                     </p>
@@ -1164,16 +1186,18 @@ function EstimatesBoard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>{t("jobs.estimatedValue")} ($)</Label>
-                <Input
-                  type="number"
-                  value={editForm.estimatedValue || ""}
-                  onChange={e => setEditForm({ ...editForm, estimatedValue: parseInt(e.target.value) || 0 })}
-                  data-testid="input-estimate-value"
-                />
-              </div>
+            <div className={`grid gap-4 ${isAdmin ? "grid-cols-2" : "grid-cols-1"}`}>
+              {isAdmin && (
+                <div className="space-y-2">
+                  <Label>Estimated Value ($)</Label>
+                  <Input
+                    type="number"
+                    value={editForm.estimatedValue || ""}
+                    onChange={e => setEditForm({ ...editForm, estimatedValue: parseInt(e.target.value) || 0 })}
+                    data-testid="input-estimate-value"
+                  />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Job Stage</Label>
                 <Select
