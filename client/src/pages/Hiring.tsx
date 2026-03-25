@@ -718,8 +718,8 @@ export default function Hiring() {
               data-testid="checkbox-send-offer-email"
             />
             <div>
-              <label htmlFor="send-offer-email" className="text-sm font-medium cursor-pointer">Send offer email to candidate</label>
-              <p className="text-xs text-muted-foreground">Email the acceptance link to {pendingOfferExtended?.candidate.name}</p>
+              <label htmlFor="send-offer-email" className="text-sm font-medium cursor-pointer">Send offer email &amp; SMS to candidate</label>
+              <p className="text-xs text-muted-foreground">Email the acceptance link and send an SMS to {pendingOfferExtended?.candidate.name}</p>
             </div>
           </div>
 
@@ -777,8 +777,8 @@ export default function Hiring() {
                   data-testid="checkbox-send-hire-email"
                 />
                 <div>
-                  <label htmlFor="send-hire-email" className="text-sm font-medium cursor-pointer">Send welcome email to employee</label>
-                  <p className="text-xs text-muted-foreground">Email login credentials to {pendingHire?.candidate.name}</p>
+                  <label htmlFor="send-hire-email" className="text-sm font-medium cursor-pointer">Send welcome email &amp; SMS to employee</label>
+                  <p className="text-xs text-muted-foreground">Email login credentials and send an SMS to {pendingHire?.candidate.name}</p>
                 </div>
               </div>
             </div>
@@ -973,8 +973,8 @@ export default function Hiring() {
                 data-testid="checkbox-stage-confirm-send"
               />
               <div>
-                <label htmlFor="stage-confirm-send" className="text-sm font-medium cursor-pointer">Send email notification to candidate</label>
-                <p className="text-xs text-muted-foreground">Uses the email template for this stage (if enabled)</p>
+                <label htmlFor="stage-confirm-send" className="text-sm font-medium cursor-pointer">Send email &amp; SMS to candidate</label>
+                <p className="text-xs text-muted-foreground">Sends the email template for this stage (if enabled) and an SMS</p>
               </div>
             </div>
           </div>

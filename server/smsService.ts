@@ -65,6 +65,38 @@ function normalizePhone(phone: string): string | null {
   return null;
 }
 
+export async function sendStageSms(
+  to: string,
+  candidateName: string,
+  stage: string,
+  position: string
+): Promise<boolean> {
+  const firstName = candidateName.split(" ")[0];
+  const pos = position || "the position";
+  const messages: Record<string, string> = {
+    "Application Received": `Hi ${firstName}, we received your application for the ${pos} position at Chapin Landscapes. We'll be in touch soon!`,
+    "Review & Rate": `Hi ${firstName}, your application for the ${pos} position at Chapin Landscapes is currently under review. We'll update you soon.`,
+    "Phone Screen": `Hi ${firstName}, we'd like to schedule a brief phone call with you regarding the ${pos} position at Chapin Landscapes. Please watch for our call!`,
+    "1st Interview": `Hi ${firstName}, thank you for interviewing with Chapin Landscapes for the ${pos} position! We're reviewing and will be in touch soon.`,
+    "2nd Interview": `Hi ${firstName}, we'd like to invite you for a second interview for the ${pos} position at Chapin Landscapes. We'll contact you with details.`,
+    "Offer Extended": `Hi ${firstName}, we're excited to extend an offer for the ${pos} position! Please check your email for the full offer details and acceptance link.`,
+    "Hired": `Hi ${firstName}, welcome to the Chapin Landscapes team! Check your email for your account credentials and onboarding information.`,
+    "Declined / Not a Fit": `Hi ${firstName}, thank you for your interest in Chapin Landscapes. After careful consideration, we've decided to move forward with other candidates at this time. We wish you the best!`,
+  };
+  const body = messages[stage] || `Hi ${firstName}, your application status for the ${pos} position at Chapin Landscapes has been updated. Please check your email for details.`;
+  return sendSms(to, body);
+}
+
+export async function sendHireSms(
+  to: string,
+  candidateName: string,
+  position: string
+): Promise<boolean> {
+  const firstName = candidateName.split(" ")[0];
+  const body = `Hi ${firstName}, welcome to the Chapin Landscapes team! Your account credentials and onboarding information have been sent to your email.`;
+  return sendSms(to, body);
+}
+
 export async function sendInterviewSms(
   to: string,
   candidateName: string,

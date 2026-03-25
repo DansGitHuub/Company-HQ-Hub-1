@@ -5,7 +5,7 @@ import { sendHiringStageEmail, sendHiringWelcomeEmail, sendNewHireAccountEmail, 
 import { getAppUrl, sendOfferAcceptanceEmail } from "./emailService";
 import { hashPassword } from "./auth";
 import { createZoomMeeting, isZoomConfigured } from "./zoomService";
-import { sendInterviewSms, isSmsConfigured } from "./smsService";
+import { sendInterviewSms, sendStageSms, sendHireSms, isSmsConfigured } from "./smsService";
 import { createCalendarEvent, refreshAccessToken, isTokenExpired } from "./googleOAuth";
 import { db } from "./db";
 import { users } from "@shared/schema";
@@ -189,6 +189,15 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
     }
   }
 
+  // Send SMS notification for all stages (if candidate has a phone)
+  if (candidate.phone && isSmsConfigured()) {
+    try {
+      await sendStageSms(candidate.phone, candidate.name, newStage, candidate.role || "");
+    } catch (err: any) {
+      console.error(`[hiring] Stage SMS failed for ${newStage}:`, err.message);
+    }
+  }
+
   // Send offer acceptance email when moving to Offer Extended
   if (newStage === "Offer Extended" && candidate.email) {
     try {
@@ -368,6 +377,13 @@ async function executeHireFlow(candidateId: string, startDate?: string, sendEmai
           emailSent = true;
         } catch (err: any) {
           console.error("[hiring] Welcome email failed:", err.message);
+        }
+      }
+      if (sendEmail && candidate.phone && isSmsConfigured()) {
+        try {
+          await sendHireSms(candidate.phone, candidate.name, candidate.role || "Team Member");
+        } catch (err: any) {
+          console.error("[hiring] Hire SMS failed:", err.message);
         }
       }
     } else {
