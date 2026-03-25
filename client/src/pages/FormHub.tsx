@@ -75,15 +75,15 @@ function FormList() {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6" data-testid="form-hub">
       <div>
-        <h1 className="text-2xl font-bold">{t("forms.title")}</h1>
-        <p className="text-muted-foreground mt-1">{t("forms.subtitle")}</p>
+        <h1 className="text-2xl font-bold">My Forms</h1>
+        <p className="text-muted-foreground mt-1">View and complete forms assigned to you.</p>
       </div>
 
       {pendingForms.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Badge variant="destructive">{pendingForms.length}</Badge>
-            {t("forms.actionRequired")}
+            Action Required
           </h2>
           {pendingForms.map((form: any) => (
             <Card
@@ -103,7 +103,7 @@ function FormList() {
                   </div>
                 </div>
                 <Badge variant={form.status === "draft" ? "outline" : "secondary"}>
-                  {form.status === "draft" ? t("forms.notStarted") : form.status}
+                  {form.status === "draft" ? "Not Started" : form.status}
                 </Badge>
               </CardContent>
             </Card>
@@ -113,7 +113,7 @@ function FormList() {
 
       {completedForms.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold">{t("forms.completedForms")}</h2>
+          <h2 className="text-lg font-semibold">Completed Forms</h2>
           {completedForms.map((form: any) => (
             <Card key={form.id} className="opacity-75" data-testid={`completed-form-${form.id}`}>
               <CardContent className="flex items-center justify-between p-4">
@@ -138,12 +138,12 @@ function FormList() {
       {pendingForms.length === 0 && completedForms.length === 0 && (
         <div className="text-center py-12">
           <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-          <p className="text-muted-foreground">{t("forms.noFormsAssigned")}</p>
+          <p className="text-muted-foreground">No forms have been assigned to you yet.</p>
         </div>
       )}
 
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold">{t("forms.allForms")}</h2>
+        <h2 className="text-lg font-semibold">All Forms</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {Object.entries(FORM_LABELS).map(([type, label]) => (
             <Card
@@ -215,7 +215,7 @@ function FormRenderer({ formType, submissionId }: { formType: string; submission
   return (
     <div className="max-w-4xl mx-auto p-6">
       <Button variant="ghost" onClick={() => navigate("/onboarding-forms")} className="mb-4" data-testid="button-back-to-forms">
-        <ArrowLeft className="h-4 w-4 mr-2" /> {t("common.backToForms")}
+        <ArrowLeft className="h-4 w-4 mr-2" /> Back to Forms
       </Button>
 
       <div className="mb-6">
@@ -227,8 +227,8 @@ function FormRenderer({ formType, submissionId }: { formType: string; submission
         <Card>
           <CardContent className="py-12 text-center">
             <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-            <p className="text-muted-foreground">{t("forms.notAvailable")}</p>
-            <p className="text-xs text-muted-foreground mt-1">{t("forms.formType")}: {formType}</p>
+            <p className="text-muted-foreground">This form is not available.</p>
+            <p className="text-xs text-muted-foreground mt-1">Form type: {formType}</p>
           </CardContent>
         </Card>
       ) : FormComponent ? (

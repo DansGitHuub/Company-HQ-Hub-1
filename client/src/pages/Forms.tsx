@@ -1069,8 +1069,8 @@ function FormsHome({
   const { t } = useTranslation();
   const topButton = {
     id: "build-new" as View,
-    label: t("forms.buildNewForm"),
-    description: t("forms.buildNewFormDesc"),
+    label: "Build New Form",
+    description: "Start from scratch or choose a template to create a custom form",
     icon: FilePlus2,
     color: "from-emerald-500 to-emerald-700",
     hoverColor: "from-emerald-600 to-emerald-800",
@@ -1084,13 +1084,13 @@ function FormsHome({
     color: string;
     hoverColor: string;
   }[] = [
-    { id: "form-library", label: t("forms.formLibrary"), description: t("forms.formLibraryDesc"), icon: Library, color: "from-blue-500 to-blue-700", hoverColor: "from-blue-600 to-blue-800" },
-    { id: "update-existing", label: t("forms.updateExisting"), description: t("forms.updateExistingDesc"), icon: RefreshCw, color: "from-violet-500 to-violet-700", hoverColor: "from-violet-600 to-violet-800" },
-    { id: "form-drafts", label: t("forms.formDrafts"), description: t("forms.formDraftsDesc"), icon: FileEdit, color: "from-amber-500 to-amber-700", hoverColor: "from-amber-600 to-amber-800" },
-    { id: "share-forms", label: t("forms.shareForms"), description: t("forms.shareFormsDesc"), icon: Share2, color: "from-cyan-500 to-cyan-700", hoverColor: "from-cyan-600 to-cyan-800" },
-    { id: "build-packet", label: t("forms.buildPacket"), description: t("forms.buildPacketDesc"), icon: Package, color: "from-rose-500 to-rose-700", hoverColor: "from-rose-600 to-rose-800" },
-    { id: "pdf-forms", label: t("forms.pdfForms"), description: t("forms.pdfFormsDesc"), icon: FileDown, color: "from-indigo-500 to-indigo-700", hoverColor: "from-indigo-600 to-indigo-800" },
-    { id: "discontinued", label: t("forms.discontinued"), description: t("forms.discontinuedDesc"), icon: XCircle, color: "from-slate-500 to-slate-700", hoverColor: "from-slate-600 to-slate-800" },
+    { id: "form-library", label: "Form Library", description: "Browse and manage all published forms", icon: Library, color: "from-blue-500 to-blue-700", hoverColor: "from-blue-600 to-blue-800" },
+    { id: "update-existing", label: "Update Existing", description: "Edit or revise a form that's already live", icon: RefreshCw, color: "from-violet-500 to-violet-700", hoverColor: "from-violet-600 to-violet-800" },
+    { id: "form-drafts", label: "Form Drafts", description: "Continue working on unfinished forms", icon: FileEdit, color: "from-amber-500 to-amber-700", hoverColor: "from-amber-600 to-amber-800" },
+    { id: "share-forms", label: "Share Forms", description: "Send forms to employees or customers", icon: Share2, color: "from-cyan-500 to-cyan-700", hoverColor: "from-cyan-600 to-cyan-800" },
+    { id: "build-packet", label: "Build a Packet", description: "Bundle multiple forms into one packet", icon: Package, color: "from-rose-500 to-rose-700", hoverColor: "from-rose-600 to-rose-800" },
+    { id: "pdf-forms", label: "PDF Forms", description: "Upload and manage fillable PDF forms", icon: FileDown, color: "from-indigo-500 to-indigo-700", hoverColor: "from-indigo-600 to-indigo-800" },
+    { id: "discontinued", label: "Discontinued", description: "View forms that are no longer in use", icon: XCircle, color: "from-slate-500 to-slate-700", hoverColor: "from-slate-600 to-slate-800" },
   ];
 
   return (
