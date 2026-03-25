@@ -456,12 +456,15 @@ function OverviewTab({ asset }: { asset: Equipment }) {
                 <InfoRow label="Category" value={asset.category} />
                 <InfoRow label="Year/Make/Model" value={[asset.year, asset.make, asset.model].filter(Boolean).join(" ")} />
                 <InfoRow label="VIN" value={asset.vin} />
-                <InfoRow label="Serial #" value={asset.serialNumber} />
+                <InfoRow label="Serial / ID #" value={asset.serialNumber} />
                 <InfoRow label="License Plate" value={asset.licensePlate} />
                 <InfoRow label="Location" value={asset.primaryLocation} />
                 <InfoRow label="Tracking" value={asset.trackingType} />
                 <InfoRow label="Current Hours" value={asset.currentHours?.toString() ?? asset.hours?.toString()} />
                 <InfoRow label="Mileage" value={asset.mileage?.toLocaleString()} />
+                {(asset.customFields as any[] | null)?.filter((f: any) => f.label || f.value).map((f: any, i: number) => (
+                  <InfoRow key={i} label={f.label || `Custom ${i + 1}`} value={f.value} />
+                ))}
               </>
             )}
           </CardContent>
@@ -1138,6 +1141,7 @@ function AddEquipmentWizard({ open, onClose }: { open: boolean; onClose: () => v
     primaryLocation: "",
     notes: "",
     autoAssignTemplates: true,
+    customFields: [] as { label: string; value: string }[],
   });
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
@@ -1203,7 +1207,7 @@ function AddEquipmentWizard({ open, onClose }: { open: boolean; onClose: () => v
       queryClient.invalidateQueries({ queryKey: ["/api/fleet/dashboard"] });
       onClose();
       setStep(1);
-      setForm({ type: "Equipment", name: "", nickname: "", category: "", make: "", model: "", year: "", serialNumber: "", vin: "", licensePlate: "", status: "Active", trackingType: "hours", currentHours: 0, hoursAtPurchase: 0, mileage: 0, purchaseDate: "", purchasePrice: "", purchasedFrom: "", conditionAtPurchase: "", primaryLocation: "", notes: "", autoAssignTemplates: true });
+      setForm({ type: "Equipment", name: "", nickname: "", category: "", make: "", model: "", year: "", serialNumber: "", vin: "", licensePlate: "", status: "Active", trackingType: "hours", currentHours: 0, hoursAtPurchase: 0, mileage: 0, purchaseDate: "", purchasePrice: "", purchasedFrom: "", conditionAtPurchase: "", primaryLocation: "", notes: "", autoAssignTemplates: true, customFields: [] });
       toast({ title: "Equipment added with maintenance schedules" });
     },
   });
@@ -1239,7 +1243,14 @@ function AddEquipmentWizard({ open, onClose }: { open: boolean; onClose: () => v
               <div><Label>Model</Label><Input value={form.model} onChange={e => setForm({...form, model: e.target.value})} /></div>
               <div><Label>Year</Label><Input value={form.year} onChange={e => setForm({...form, year: e.target.value})} /></div>
             </div>
-            <div><Label>Serial Number</Label><Input value={form.serialNumber} onChange={e => setForm({...form, serialNumber: e.target.value})} /></div>
+            <div>
+              <Label>Serial Number / VIN / ID #</Label>
+              <Input
+                value={form.serialNumber}
+                onChange={e => setForm({...form, serialNumber: e.target.value})}
+                placeholder="Serial no., VIN, or any ID number"
+              />
+            </div>
             {isVehicle && (
               <div>
                 <Label>VIN</Label>
@@ -1319,6 +1330,64 @@ function AddEquipmentWizard({ open, onClose }: { open: boolean; onClose: () => v
             {isVehicle && <div><Label>License Plate</Label><Input value={form.licensePlate} onChange={e => setForm({...form, licensePlate: e.target.value})} /></div>}
             <div><Label>Nickname</Label><Input value={form.nickname} onChange={e => setForm({...form, nickname: e.target.value})} /></div>
             <div><Label>Notes</Label><Textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows={2} /></div>
+
+            {/* Custom Info Fields */}
+            <div className="pt-2 border-t space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Custom Info Fields</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setForm({ ...form, customFields: [...(form.customFields || []), { label: "", value: "" }] })}
+                  data-testid="button-add-custom-field"
+                >
+                  <Plus className="h-3 w-3 mr-1" /> Add Field
+                </Button>
+              </div>
+              {(form.customFields || []).length === 0 && (
+                <p className="text-xs text-muted-foreground">No custom fields yet. Click "Add Field" to add a custom info box.</p>
+              )}
+              {(form.customFields || []).map((field: { label: string; value: string }, idx: number) => (
+                <div key={idx} className="flex gap-2 items-start">
+                  <div className="flex-1 space-y-1">
+                    <Input
+                      placeholder="Field title (e.g. Asset Tag)"
+                      value={field.label}
+                      onChange={e => {
+                        const updated = [...(form.customFields || [])];
+                        updated[idx] = { ...updated[idx], label: e.target.value };
+                        setForm({ ...form, customFields: updated });
+                      }}
+                      data-testid={`input-custom-field-label-${idx}`}
+                    />
+                    <Input
+                      placeholder="Value"
+                      value={field.value}
+                      onChange={e => {
+                        const updated = [...(form.customFields || [])];
+                        updated[idx] = { ...updated[idx], value: e.target.value };
+                        setForm({ ...form, customFields: updated });
+                      }}
+                      data-testid={`input-custom-field-value-${idx}`}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive hover:bg-destructive/10 mt-1"
+                    onClick={() => {
+                      const updated = (form.customFields || []).filter((_: any, i: number) => i !== idx);
+                      setForm({ ...form, customFields: updated });
+                    }}
+                    data-testid={`button-remove-custom-field-${idx}`}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -1333,7 +1402,10 @@ function AddEquipmentWizard({ open, onClose }: { open: boolean; onClose: () => v
               <InfoRow label="Tracking" value={form.trackingType} />
               <InfoRow label="Current" value={form.currentHours?.toString()} />
               {form.vin && <InfoRow label="VIN" value={form.vin} />}
-              {form.serialNumber && <InfoRow label="Serial #" value={form.serialNumber} />}
+              {form.serialNumber && <InfoRow label="Serial / ID #" value={form.serialNumber} />}
+              {(form.customFields || []).filter((f: any) => f.label || f.value).map((f: any, i: number) => (
+                <InfoRow key={i} label={f.label || `Custom ${i + 1}`} value={f.value} />
+              ))}
             </div>
             {selectedTemplateIds.length > 0 && (
               <p className="text-xs text-muted-foreground mt-2">{selectedTemplateIds.length} maintenance tasks will be auto-assigned.</p>

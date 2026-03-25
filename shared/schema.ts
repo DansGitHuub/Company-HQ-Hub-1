@@ -954,6 +954,7 @@ export const equipment = pgTable("equipment", {
   insuranceExpiry: timestamp("insurance_expiry"),
   warrantyExpiry: timestamp("warranty_expiry"),
   primaryPhotoUrl: text("primary_photo_url"),
+  customFields: jsonb("custom_fields").$type<{ label: string; value: string }[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
