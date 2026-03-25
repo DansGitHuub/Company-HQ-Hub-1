@@ -1247,7 +1247,7 @@ export default function JobPipeline() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-heading font-bold text-foreground">{t("jobs.title")}</h1>
-          <p className="text-muted-foreground">{t("jobs.pipelineSubtitle")}</p>
+          <p className="text-muted-foreground">Job Pipeline</p>
         </div>
       </div>
 
