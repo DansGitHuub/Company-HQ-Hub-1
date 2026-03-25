@@ -497,7 +497,7 @@ export default function SOPs() {
       <div className="space-y-6 max-w-4xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between">
           <Button variant="ghost" onClick={() => setSelectedSOP(null)} className="pl-0 gap-2 text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="w-4 h-4" /> {t("sops.backToLibrary")}
+            <ArrowLeft className="w-4 h-4" /> Back to SOP Library
           </Button>
           <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setEditingSOP(selectedSOP)} data-testid="button-edit-sop">
