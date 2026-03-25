@@ -707,7 +707,7 @@ const WIZARD_PAGES = [
   "Results",
 ] as const;
 
-export default function CalculatorPage() {
+export default function CalculatorPage({ onClose }: { onClose?: () => void } = {}) {
   const { t } = useTranslation();
   const [state, setState] = useState<WizardState>({ values: {} });
   const [pageIndex, setPageIndex] = useState(0);
@@ -1230,13 +1230,20 @@ export default function CalculatorPage() {
           </Button>
         )}
         {WIZARD_PAGES[pageIndex] === "Results" && (
-          <Button
-            variant="outline"
-            onClick={() => resetFrom("intent")}
-            data-testid="button-calc-new"
-          >
-            <RotateCcw className="h-4 w-4 mr-2" /> New Calculation
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              onClick={() => resetFrom("intent")}
+              data-testid="button-calc-new"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" /> New Calculation
+            </Button>
+            {onClose && (
+              <Button onClick={onClose} data-testid="button-calc-done">
+                Done
+              </Button>
+            )}
+          </>
         )}
       </div>
     </div>

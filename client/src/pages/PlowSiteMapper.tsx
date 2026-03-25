@@ -86,7 +86,7 @@ function useLoadImage(src: string | null) {
   return image;
 }
 
-export default function PlowSiteMapper() {
+export default function PlowSiteMapper({ onClose }: { onClose?: () => void } = {}) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();

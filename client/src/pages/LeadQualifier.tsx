@@ -162,7 +162,7 @@ function ScoreBar({ score, maxScore }: { score: number; maxScore: number }) {
   );
 }
 
-export default function LeadQualifier() {
+export default function LeadQualifier({ onClose }: { onClose?: () => void } = {}) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [view, setView] = useState<"qualifier" | "saved">("qualifier");
@@ -283,6 +283,11 @@ export default function LeadQualifier() {
           >
             <Users className="h-4 w-4 mr-2" /> {t("common.saved")} ({savedLeads.length})
           </Button>
+          {onClose && (
+            <Button variant="outline" onClick={onClose} data-testid="button-qualifier-done">
+              Done
+            </Button>
+          )}
         </div>
       </div>
 

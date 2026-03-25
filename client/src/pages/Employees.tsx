@@ -1050,20 +1050,27 @@ function DocumentsTab({ employee, onGoToTab }: { employee: any; onGoToTab?: (tab
 
       {/* Issue Corrective Action */}
       <Dialog open={correctiveActionOpen} onOpenChange={setCorrectiveActionOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl flex flex-col" style={{ maxHeight: "90vh" }}>
+          <DialogHeader className="shrink-0 pb-2">
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <ShieldAlert className="h-5 w-5" /> Issue Corrective Action Report
             </DialogTitle>
             <DialogDescription>For: {employeeName}</DialogDescription>
           </DialogHeader>
-          <CorrectiveActionForm
-            preSelectedEmployeeId={employeeId}
-            onComplete={() => {
-              setCorrectiveActionOpen(false);
-              queryClient.invalidateQueries({ queryKey: [`/api/employees/${employeeId}/corrective-actions`] });
-            }}
-          />
+          <div className="overflow-y-auto flex-1 pr-1">
+            <CorrectiveActionForm
+              preSelectedEmployeeId={employeeId}
+              onComplete={() => {
+                setCorrectiveActionOpen(false);
+                queryClient.invalidateQueries({ queryKey: [`/api/employees/${employeeId}/corrective-actions`] });
+              }}
+            />
+          </div>
+          <div className="shrink-0 pt-2 border-t">
+            <Button variant="outline" className="w-full" onClick={() => setCorrectiveActionOpen(false)} data-testid="button-cancel-corrective-action">
+              Cancel
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
