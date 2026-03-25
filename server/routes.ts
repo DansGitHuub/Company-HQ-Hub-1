@@ -39,7 +39,7 @@ import {
   activityLog
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod";
 import { autoClassifySOPTitle, getTaxonomy } from "@shared/sopClassification";
 
@@ -4715,6 +4715,56 @@ Generate detailed information for this landscaping material.`;
       res.json(allEstimates);
     } catch (err) {
       res.status(500).json({ message: "Error fetching estimates" });
+    }
+  });
+
+  // Follow-up reminders: returns due estimates and logs bell notifications (deduped per day)
+  app.get("/api/estimates/follow-up-reminders", requireAuth, async (req, res) => {
+    try {
+      const role = req.user?.role;
+      if (role !== "Admin" && role !== "Manager" && role !== "Master Admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const now = new Date();
+      const startOfToday = new Date(now);
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const allEstimates = await storage.getEstimates();
+      const dueEstimates = allEstimates.filter((e: any) =>
+        e.followUpDate &&
+        new Date(e.followUpDate) <= now &&
+        e.stage !== "Won" &&
+        e.stage !== "Lost"
+      );
+
+      // Log a bell notification for each due estimate, once per day
+      for (const estimate of dueEstimates) {
+        const existing = await db
+          .select()
+          .from(activityLog)
+          .where(
+            and(
+              eq(activityLog.eventType, "follow_up_reminder"),
+              sql`description LIKE ${'%' + estimate.id + '%'}`,
+              gte(activityLog.createdAt, startOfToday)
+            )
+          )
+          .limit(1);
+
+        if (existing.length === 0) {
+          await logActivity(
+            "follow_up_reminder",
+            `Follow-up due: ${estimate.clientName} — ${estimate.serviceType} [${estimate.id}]`,
+            "/jobs",
+            req.user?.id
+          );
+        }
+      }
+
+      res.json(dueEstimates);
+    } catch (err) {
+      console.error("Error fetching follow-up reminders:", err);
+      res.status(500).json({ message: "Error fetching reminders" });
     }
   });
 

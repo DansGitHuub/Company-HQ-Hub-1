@@ -15,7 +15,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import { 
   Plus, MapPin, Calendar, FileText, Upload, Trash2, 
   ExternalLink, Clock, AlertCircle, Layers, X, Edit2, Check,
-  DollarSign, ArrowRight, Mail, MailCheck, ArrowRightLeft
+  DollarSign, ArrowRight, Mail, MailCheck, ArrowRightLeft, Bell
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -808,6 +808,26 @@ function EstimatesBoard() {
     queryKey: ["/api/estimates"],
   });
 
+  // Fetch follow-up reminders on load (also logs bell notifications server-side)
+  const { data: dueFollowUps = [] } = useQuery<Estimate[]>({
+    queryKey: ["/api/estimates/follow-up-reminders"],
+    refetchOnWindowFocus: false,
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const getFollowUpStatus = (followUpDate: Date | string | null | undefined) => {
+    if (!followUpDate) return null;
+    const d = new Date(followUpDate);
+    d.setHours(0, 0, 0, 0);
+    if (d < today) return "overdue";
+    if (d.getTime() === today.getTime()) return "today";
+    return "upcoming";
+  };
+
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Estimate>) => {
       const res = await apiRequest("POST", "/api/estimates", data);
@@ -961,6 +981,32 @@ function EstimatesBoard() {
         </DialogContent>
       </Dialog>
 
+      {/* Follow-up reminders banner */}
+      {dueFollowUps.length > 0 && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 px-4 py-3 mb-4">
+          <Bell className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              {dueFollowUps.length} follow-up{dueFollowUps.length !== 1 ? "s" : ""} due
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {(dueFollowUps as any[]).map((e: any) => (
+                <li key={e.id} className="text-xs text-amber-700 dark:text-amber-400 truncate">
+                  • {e.clientName} — {e.serviceType}
+                  {e.followUpDate && (
+                    <span className="ml-1 font-medium">
+                      ({new Date(e.followUpDate) < new Date() && new Date(e.followUpDate).toDateString() !== new Date().toDateString()
+                        ? "overdue"
+                        : "today"})
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="flex-1 flex gap-4 overflow-x-auto pb-4">
           {ESTIMATE_STAGES.map((stage) => {
@@ -1026,6 +1072,23 @@ function EstimatesBoard() {
                                     <span className="truncate">{estimate.propertyAddress}</span>
                                   </div>
                                 )}
+
+                                {estimate.followUpDate && (() => {
+                                  const status = getFollowUpStatus(estimate.followUpDate);
+                                  const dateStr = new Date(estimate.followUpDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                                  return (
+                                    <div className={`flex items-center gap-1 text-[10px] pt-1 border-t font-medium ${
+                                      status === "overdue" ? "text-red-600 dark:text-red-400" :
+                                      status === "today" ? "text-amber-600 dark:text-amber-400" :
+                                      "text-muted-foreground"
+                                    }`}>
+                                      <Calendar className="w-3 h-3" />
+                                      <span>Follow-up: {dateStr}</span>
+                                      {status === "overdue" && <span className="ml-0.5">(overdue)</span>}
+                                      {status === "today" && <span className="ml-0.5">(today)</span>}
+                                    </div>
+                                  );
+                                })()}
 
                                 {estimate.stage === "Won" && isAdmin && (
                                   <Button
@@ -1209,7 +1272,7 @@ function EstimatesBoard() {
             </div>
 
             <div className="space-y-2">
-              <Label>{t("jobs.followUpDate")}</Label>
+              <Label>Follow Up Date</Label>
               <Input
                 type="date"
                 value={editForm.followUpDate ? new Date(editForm.followUpDate).toISOString().split('T')[0] : ""}
