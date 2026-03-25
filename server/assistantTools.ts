@@ -125,6 +125,35 @@ export const allToolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = 
   {
     type: "function",
     function: {
+      name: "getCalendarEvents",
+      description: "Get calendar events for the user. Use when the user asks about their schedule, calendar, appointments, or what is happening today or on a specific date.",
+      parameters: {
+        type: "object",
+        properties: {
+          date: { type: "string", description: "ISO date string (YYYY-MM-DD) to filter events for a specific day. Defaults to today if not provided." },
+          upcoming: { type: "boolean", description: "If true, return upcoming events from today forward (next 7 days)." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getJobs",
+      description: "Get jobs/pipeline records. Use when the user asks about jobs, projects, estimates, sold jobs, or scheduled work.",
+      parameters: {
+        type: "object",
+        properties: {
+          stage: { type: "string", description: "Filter by stage: Lead, Estimate, Sold, In Progress, Complete, Invoiced, Cancelled" },
+          scheduledToday: { type: "boolean", description: "If true, only return jobs scheduled for today." },
+          category: { type: "string", description: "Filter by category: Install, Maintenance, Project, Service" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "getDailyBriefing",
       description: "Get a structured daily briefing summary with overdue tasks, urgent equipment alerts, unread messages, and tasks due today. Use when the user asks 'what do I need to know today?' or 'give me a summary'.",
       parameters: { type: "object", properties: {} },
@@ -394,14 +423,14 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
         let sql = `SELECT t.id, t.task_id, t.title, t.status, t.priority, t.due_date,
                     creator.name as created_by_name, assignee.name as assigned_to_name
                     FROM tasks t
-                    LEFT JOIN users creator ON t.created_by = creator.id
-                    LEFT JOIN users assignee ON t.assigned_to = assignee.id
+                    LEFT JOIN users creator ON t.created_by_user_id = creator.id
+                    LEFT JOIN users assignee ON t.assigned_to_user_id = assignee.id
                     WHERE 1=1`;
         const params: any[] = [];
         let paramIdx = 1;
 
         if (toolArgs.assignedTo) {
-          sql += ` AND (assignee.name ILIKE $${paramIdx} OR t.assigned_to = $${paramIdx})`;
+          sql += ` AND (assignee.name ILIKE $${paramIdx} OR t.assigned_to_user_id = $${paramIdx})`;
           params.push(`%${toolArgs.assignedTo}%`);
           paramIdx++;
         }
@@ -434,22 +463,57 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
         return { result: { sops: res.rows, count: res.rows.length } };
       }
 
+      case "getCalendarEvents": {
+        let evtSql = `SELECT ce.id, ce.title, ce.description, ce.event_type, ce.start_datetime, ce.end_datetime, ce.all_day, ce.location,
+                      u.name as created_by_name
+                      FROM calendar_events ce
+                      LEFT JOIN users u ON ce.created_by = u.id
+                      WHERE (ce.created_by = $1 OR ce.assigned_to = $1 OR ce.is_company_event = true)`;
+        const evtParams: any[] = [user.id];
+
+        if (toolArgs.scheduledToday || (!toolArgs.date && !toolArgs.upcoming)) {
+          evtSql += ` AND ce.start_datetime::date = CURRENT_DATE`;
+        } else if (toolArgs.date) {
+          evtSql += ` AND ce.start_datetime::date = $2`;
+          evtParams.push(toolArgs.date);
+        } else if (toolArgs.upcoming) {
+          evtSql += ` AND ce.start_datetime >= NOW() AND ce.start_datetime <= NOW() + INTERVAL '7 days'`;
+        }
+
+        evtSql += ` ORDER BY ce.start_datetime ASC LIMIT 20`;
+        const evtRes = await pool.query(evtSql, evtParams);
+        return { result: { events: evtRes.rows, count: evtRes.rows.length, date: toolArgs.date || new Date().toISOString().split("T")[0] } };
+      }
+
+      case "getJobs": {
+        let jobSql = `SELECT id, client, type, category, stage, value, scheduled_date, completion_date, notes, zone FROM jobs WHERE 1=1`;
+        const jobParams: any[] = [];
+        let jobIdx = 1;
+
+        if (toolArgs.stage) { jobSql += ` AND stage = $${jobIdx++}`; jobParams.push(toolArgs.stage); }
+        if (toolArgs.category) { jobSql += ` AND category ILIKE $${jobIdx++}`; jobParams.push(toolArgs.category); }
+        if (toolArgs.scheduledToday) { jobSql += ` AND scheduled_date::date = CURRENT_DATE`; }
+
+        jobSql += ` ORDER BY scheduled_date ASC NULLS LAST, created_at DESC LIMIT 20`;
+        const jobRes = await pool.query(jobSql, jobParams);
+        return { result: { jobs: jobRes.rows, count: jobRes.rows.length } };
+      }
+
       case "getDailyBriefing": {
         const userId = user.id;
-        const [overdue, dueToday, p1Equip, unread, unack] = await Promise.all([
+        const [overdue, dueToday, p1Equip, unack] = await Promise.all([
           pool.query(
-            `SELECT t.task_id, t.title, t.priority, t.due_date FROM tasks t WHERE (t.assigned_to = $1 OR t.created_by = $1) AND t.status NOT IN ('completed','confirmed','cancelled') AND t.due_date < NOW() ORDER BY t.due_date LIMIT 10`,
+            `SELECT t.task_id, t.title, t.priority, t.due_date FROM tasks t WHERE (t.assigned_to_user_id = $1 OR t.created_by_user_id = $1) AND t.status NOT IN ('completed','confirmed','cancelled') AND t.due_date < NOW() ORDER BY t.due_date LIMIT 10`,
             [userId]
           ),
           pool.query(
-            `SELECT t.task_id, t.title, t.priority FROM tasks t WHERE (t.assigned_to = $1 OR t.created_by = $1) AND t.status NOT IN ('completed','confirmed','cancelled') AND t.due_date::date = CURRENT_DATE LIMIT 10`,
+            `SELECT t.task_id, t.title, t.priority FROM tasks t WHERE (t.assigned_to_user_id = $1 OR t.created_by_user_id = $1) AND t.status NOT IN ('completed','confirmed','cancelled') AND t.due_date::date = CURRENT_DATE LIMIT 10`,
             [userId]
           ),
           pool.query(
-            `SELECT e.name, e.asset_id, ms.name as schedule_name FROM maintenance_schedules ms JOIN equipment e ON ms.equipment_id = e.id WHERE ms.priority = 'p1_critical' AND ms.status = 'due' LIMIT 10`
+            `SELECT e.name, e.asset_id, ms.name as schedule_name FROM maintenance_schedules ms JOIN equipment e ON ms.equipment_id = e.id WHERE ms.is_active = true AND ms.next_due_date <= NOW() LIMIT 10`
           ),
-          pool.query(`SELECT COUNT(*) as count FROM tasks WHERE assigned_to = $1 AND status = 'assigned'`, [userId]),
-          pool.query(`SELECT COUNT(*) as count FROM tasks WHERE assigned_to = $1 AND status = 'assigned'`, [userId]),
+          pool.query(`SELECT COUNT(*) as count FROM tasks WHERE assigned_to_user_id = $1 AND status = 'assigned'`, [userId]),
         ]);
 
         return {
@@ -477,7 +541,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
 
         const newTaskId = crypto.randomUUID();
         await pool.query(
-          `INSERT INTO tasks (id, task_id, title, description, priority, status, created_by, assigned_to, due_date, type, requires_confirmation, created_at)
+          `INSERT INTO tasks (id, task_id, title, description, priority, status, created_by_user_id, assigned_to_user_id, due_date, type, requires_confirmation, created_at)
            VALUES ($1, $2, $3, $4, $5, 'assigned', $6, $7, $8, 'standard', false, NOW())`,
           [newTaskId, taskId, toolArgs.title, toolArgs.description || null, toolArgs.priority, user.id, toolArgs.assignedToUserId, toolArgs.dueDate ? new Date(toolArgs.dueDate) : null]
         );
@@ -491,7 +555,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
       }
 
       case "updateTaskStatus": {
-        const taskRes = await pool.query(`SELECT id, task_id, title, status, assigned_to, created_by FROM tasks WHERE id = $1 OR task_id = $1`, [toolArgs.taskId]);
+        const taskRes = await pool.query(`SELECT id, task_id, title, status, assigned_to_user_id, created_by_user_id FROM tasks WHERE id = $1 OR task_id = $1`, [toolArgs.taskId]);
         if (taskRes.rows.length === 0) return { result: null, error: "Task not found." };
 
         const task = taskRes.rows[0];

@@ -124,14 +124,26 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     setIsListening(false);
   }, []);
 
+  const ttsAudioCtxRef = useRef<AudioContext | null>(null);
+  const ttsSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
   const speakText = useCallback(async (text: string, voice?: string) => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
+    // Stop any current playback
+    if (ttsSourceRef.current) {
+      try { ttsSourceRef.current.stop(); } catch {}
+      ttsSourceRef.current = null;
     }
 
     setIsSpeaking(true);
     try {
+      // Reuse or create a single AudioContext (avoids per-call creation limits)
+      if (!ttsAudioCtxRef.current || ttsAudioCtxRef.current.state === "closed") {
+        const AC = window.AudioContext || (window as any).webkitAudioContext;
+        ttsAudioCtxRef.current = new AC();
+      }
+      const audioCtx = ttsAudioCtxRef.current;
+      if (audioCtx.state === "suspended") await audioCtx.resume();
+
       const res = await fetch("/api/ai/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -141,24 +153,20 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
       if (!res.ok) throw new Error("TTS failed");
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audioRef.current = audio;
+      const arrayBuffer = await res.arrayBuffer();
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-      audio.onended = () => {
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioCtx.destination);
+      ttsSourceRef.current = source;
+
+      source.onended = () => {
         setIsSpeaking(false);
-        URL.revokeObjectURL(url);
-        audioRef.current = null;
+        ttsSourceRef.current = null;
       };
 
-      audio.onerror = () => {
-        setIsSpeaking(false);
-        URL.revokeObjectURL(url);
-        audioRef.current = null;
-      };
-
-      await audio.play();
+      source.start(0);
     } catch (err) {
       console.error("[voice] TTS playback error:", err);
       setIsSpeaking(false);
@@ -166,6 +174,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const stopSpeaking = useCallback(() => {
+    if (ttsSourceRef.current) {
+      try { ttsSourceRef.current.stop(); } catch {}
+      ttsSourceRef.current = null;
+    }
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;

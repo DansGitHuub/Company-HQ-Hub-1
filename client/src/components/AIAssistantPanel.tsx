@@ -315,8 +315,8 @@ export default function AIAssistantPanel() {
 
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
         const SILENCE_THRESHOLD = 8;
-        const SILENCE_FRAMES_NEEDED = 20; // 20 × 100ms = 2s
-        const COUNTDOWN_START_FRAME = 10; // show countdown after 1s of silence
+        const SILENCE_FRAMES_NEEDED = 10; // 10 × 100ms = 1s
+        const COUNTDOWN_START_FRAME = 5; // show countdown after 0.5s of silence
         let silentFrames = 0;
 
         silenceIntervalRef.current = setInterval(() => {
