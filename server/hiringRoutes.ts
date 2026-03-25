@@ -133,9 +133,7 @@ async function notifyHRAndManagers(type: string, title: string, message: string,
   }
 }
 
-async function handleStageChange(candidateId: string, newStage: string, candidate: any, userId?: string) {
-  const template = await storage.getHiringEmailTemplate(newStage);
-
+async function handleStageChange(candidateId: string, newStage: string, candidate: any, userId?: string, sendCandidateNotification: boolean = true) {
   // Look up status URL from job application token
   let statusUrl: string | undefined;
   try {
@@ -145,6 +143,19 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
     }
   } catch {}
 
+  // Always notify HR/managers internally
+  await notifyHRAndManagers(
+    "hiring_stage_change",
+    `Applicant Moved: ${candidate.name}`,
+    `${candidate.name} has been moved to "${newStage}" for the ${candidate.role || "open"} position.`,
+    "/hiring",
+    { candidateId, newStage, candidateName: candidate.name, position: candidate.role }
+  );
+
+  if (!sendCandidateNotification) return;
+
+  // Send candidate email (stage template)
+  const template = await storage.getHiringEmailTemplate(newStage);
   if (template && template.isEnabled && candidate.email) {
     let subject = template.subject;
     let body = template.body;
@@ -159,7 +170,6 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
       subject = subject.replace(new RegExp(key.replace(/[{}]/g, "\\$&"), "g"), value);
       body = body.replace(new RegExp(key.replace(/[{}]/g, "\\$&"), "g"), value);
     }
-
     try {
       const sent = await sendHiringStageEmail(candidate.email, candidate.name, subject, body, statusUrl);
       if (sent) {
@@ -179,14 +189,7 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
     }
   }
 
-  await notifyHRAndManagers(
-    "hiring_stage_change",
-    `Applicant Moved: ${candidate.name}`,
-    `${candidate.name} has been moved to "${newStage}" for the ${candidate.role || "open"} position.`,
-    "/hiring",
-    { candidateId, newStage, candidateName: candidate.name, position: candidate.role }
-  );
-
+  // Send offer acceptance email when moving to Offer Extended
   if (newStage === "Offer Extended" && candidate.email) {
     try {
       const token = randomBytes(24).toString("hex");
@@ -215,18 +218,16 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
     }
   }
 
+  // Legacy hired path (via handleStageChange) — send welcome email
   if (newStage === "Hired") {
     const existingEmployees = await storage.getEmployees();
     const alreadyHired = existingEmployees.find((e: any) => e.candidateId === candidateId);
-
     if (!alreadyHired) {
       await createHiredDocuments(candidateId);
-
       const nameParts = candidate.name.split(" ");
       const firstName = nameParts[0] || "";
       const lastName = nameParts.slice(1).join(" ") || "";
       const startDate = new Date().toISOString().split("T")[0];
-
       const employee = await storage.createEmployee({
         candidateId,
         firstName,
@@ -240,17 +241,10 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
         jobTitle: candidate.role || undefined,
         startDate,
       });
-
       await createOnboardingChecklist(employee.id);
-
       if (candidate.email) {
         try {
-          await sendHiringWelcomeEmail(
-            candidate.email,
-            candidate.name,
-            candidate.role || "Team Member",
-            new Date(startDate).toLocaleDateString()
-          );
+          await sendHiringWelcomeEmail(candidate.email, candidate.name, candidate.role || "Team Member", new Date(startDate).toLocaleDateString());
         } catch (err: any) {
           console.error("Failed to send welcome/onboarding email:", err.message);
         }
@@ -259,7 +253,7 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
   }
 }
 
-async function executeHireFlow(candidateId: string, startDate?: string) {
+async function executeHireFlow(candidateId: string, startDate?: string, sendEmail: boolean = true) {
   const candidate = await storage.getCandidate(candidateId);
   if (!candidate) throw new Error("Candidate not found");
 
@@ -368,7 +362,7 @@ async function executeHireFlow(candidateId: string, startDate?: string) {
       await storage.updateCandidate(candidateId, { userId: newUser.id });
       await storage.updateEmployee(employee.id, { userId: newUser.id });
       accountCreated = true;
-      if (candidate.email) {
+      if (sendEmail && candidate.email) {
         try {
           await sendNewHireAccountEmail(candidate.email, candidate.name, username, tempPassword, candidate.role || "Team Member");
           emailSent = true;
@@ -489,13 +483,13 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
   // Stage change with notifications
   app.post("/api/candidates/:id/stage", requireAuth, requireHRAccess, async (req, res) => {
     try {
-      const { stage } = req.body;
+      const { stage, sendNotification = true } = req.body;
       const candidate = await storage.getCandidate(req.params.id);
       if (!candidate) return res.status(404).json({ message: "Candidate not found" });
 
       const updated = await storage.updateCandidate(req.params.id, { stage, updatedAt: new Date() });
 
-      await handleStageChange(req.params.id, stage, { ...candidate, stage }, (req as any).user?.id);
+      await handleStageChange(req.params.id, stage, { ...candidate, stage }, (req as any).user?.id, sendNotification !== false);
 
       res.json(updated);
     } catch (err: any) {
@@ -883,9 +877,9 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
   app.post("/api/candidates/:id/schedule-interview", requireAuth, requireHRAccess, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { date, time, duration = 30, type = "zoom", location = "", notes = "", interviewerName = "" } = req.body as {
+      const { date, time, duration = 30, type = "zoom", location = "", notes = "", interviewerName = "", sendNotification = true } = req.body as {
         date: string; time: string; duration?: number; type?: string;
-        location?: string; notes?: string; interviewerName?: string;
+        location?: string; notes?: string; interviewerName?: string; sendNotification?: boolean;
       };
 
       if (!date || !time) return res.status(400).json({ message: "Date and time are required" });
@@ -973,48 +967,49 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
 
       await storage.updateCandidate(id, updates);
 
-      // ── Send email to applicant ───────────────────────────────────────────
+      // ── Send email & SMS to applicant (if sendNotification is true) ──────
       let emailSent = false;
+      let smsSent = false;
       let interviewStatusUrl: string | undefined;
       try {
         const jobApp = await storage.getJobApplicationByCandidateId(id);
         if (jobApp?.token) interviewStatusUrl = `${getAppUrl()}/status/${jobApp.token}`;
       } catch {}
 
-      if (candidate.email) {
-        try {
-          const dateLabel = startDatetime.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-          if (type === "zoom" && zoomResult) {
-            await sendZoomInterviewEmail(candidate.email, candidate.name, candidate.role, dateLabel, time, zoomResult.joinUrl, zoomResult.passcode, interviewerName, notes, interviewStatusUrl);
-          } else {
-            await sendInPersonInterviewEmail(candidate.email, candidate.name, candidate.role, dateLabel, time, location, interviewerName, notes, interviewStatusUrl);
+      if (sendNotification !== false) {
+        if (candidate.email) {
+          try {
+            const dateLabel = startDatetime.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+            if (type === "zoom" && zoomResult) {
+              await sendZoomInterviewEmail(candidate.email, candidate.name, candidate.role, dateLabel, time, zoomResult.joinUrl, zoomResult.passcode, interviewerName, notes, interviewStatusUrl);
+            } else {
+              await sendInPersonInterviewEmail(candidate.email, candidate.name, candidate.role, dateLabel, time, location, interviewerName, notes, interviewStatusUrl);
+            }
+            emailSent = true;
+          } catch (emailErr: any) {
+            console.error("[hiring] Interview email failed:", emailErr.message);
           }
-          emailSent = true;
-        } catch (emailErr: any) {
-          console.error("[hiring] Interview email failed:", emailErr.message);
+        }
+
+        if (candidate.phone && isSmsConfigured()) {
+          try {
+            const dateLabel = startDatetime.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+            smsSent = await sendInterviewSms(
+              candidate.phone,
+              candidate.name,
+              dateLabel,
+              time,
+              type === "zoom" ? "zoom" : "in-person",
+              zoomResult?.joinUrl,
+              location
+            );
+          } catch (smsErr: any) {
+            console.error("[hiring] Interview SMS failed:", smsErr.message);
+          }
         }
       }
 
-      // ── Send SMS to applicant ─────────────────────────────────────────────
-      let smsSent = false;
-      if (candidate.phone && isSmsConfigured()) {
-        try {
-          const dateLabel = startDatetime.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-          smsSent = await sendInterviewSms(
-            candidate.phone,
-            candidate.name,
-            dateLabel,
-            time,
-            type === "zoom" ? "zoom" : "in-person",
-            zoomResult?.joinUrl,
-            location
-          );
-        } catch (smsErr: any) {
-          console.error("[hiring] Interview SMS failed:", smsErr.message);
-        }
-      }
-
-      // ── Notify HR / Managers ─────────────────────────────────────────────
+      // ── Always notify HR / Managers ───────────────────────────────────────
       const updatedCandidate = await storage.getCandidate(id);
       await notifyHRAndManagers(
         "hiring_stage_change",
@@ -1060,7 +1055,8 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
   // POST /api/candidates/:id/hire — full hire automation
   app.post("/api/candidates/:id/hire", requireAuth, requireHRAccess, async (req: any, res) => {
     try {
-      const result = await executeHireFlow(req.params.id, req.body.startDate);
+      const sendEmail = req.body.sendNotification !== false;
+      const result = await executeHireFlow(req.params.id, req.body.startDate, sendEmail);
       res.json(result);
     } catch (err: any) {
       console.error("[hiring] hire error:", err);

@@ -95,17 +95,22 @@ export default function Hiring() {
   const [hireStartDate, setHireStartDate] = useState("");
   const [hiring, setHiring] = useState(false);
   const [hireResult, setHireResult] = useState<any>(null);
+  const [pendingStageChange, setPendingStageChange] = useState<{ candidateId: string; candidate: Candidate; newStage: string } | null>(null);
+  const [stageConfirmSend, setStageConfirmSend] = useState(true);
+  const [sendInterviewEmail, setSendInterviewEmail] = useState(true);
+  const [sendOfferEmail, setSendOfferEmail] = useState(true);
+  const [sendHireEmail, setSendHireEmail] = useState(true);
 
   const { data: candidates = [] } = useQuery<Candidate[]>({
     queryKey: ["/api/candidates"],
   });
 
   const stageMutation = useMutation({
-    mutationFn: async ({ id, stage }: { id: string; stage: string }) => {
-      const res = await apiRequest("POST", `/api/candidates/${id}/stage`, { stage });
+    mutationFn: async ({ id, stage, sendNotification = true }: { id: string; stage: string; sendNotification?: boolean }) => {
+      const res = await apiRequest("POST", `/api/candidates/${id}/stage`, { stage, sendNotification });
       return res.json();
     },
-        onSuccess: () => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
       toast({ title: t("hiring.stageUpdated") });
     },
@@ -154,38 +159,48 @@ export default function Hiring() {
 
     if (newStage === "Interview Scheduled") {
       setPendingSchedule({ candidateId, candidate });
+      setSendInterviewEmail(true);
       setScheduleForm({ date: "", time: "", duration: 30, type: "zoom", location: "", notes: "", interviewerName: "" });
       return;
     }
 
     if (newStage === "Offer Extended") {
       setPendingOfferExtended({ candidateId, candidate });
+      setSendOfferEmail(true);
       setOfferForm({ pay: "", payType: "Hourly", startDate: "", employmentType: "Full-time", schedule: "", benefits: [], notes: "" });
       return;
     }
 
     if (newStage === "Hired") {
       setPendingHire({ candidateId, candidate });
+      setSendHireEmail(true);
       setHireStartDate("");
       setHireResult(null);
       return;
     }
 
-    stageMutation.mutate({ id: candidateId, stage: newStage });
+    // All other stages: show confirmation dialog before moving
+    setPendingStageChange({ candidateId, candidate, newStage });
+    setStageConfirmSend(true);
   }
 
   async function handleScheduleSubmit() {
     if (!pendingSchedule || !scheduleForm.date || !scheduleForm.time) return;
     setScheduling(true);
     try {
-      const res = await apiRequest("POST", `/api/candidates/${pendingSchedule.candidateId}/schedule-interview`, scheduleForm);
+      const res = await apiRequest("POST", `/api/candidates/${pendingSchedule.candidateId}/schedule-interview`, {
+        ...scheduleForm,
+        sendNotification: sendInterviewEmail,
+      });
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
       toast({
         title: "Interview Scheduled",
-        description: data.zoomMeeting
-          ? `Zoom meeting created. ${data.emailSent ? "Confirmation email sent." : "No applicant email on file."}`
-          : `Interview scheduled. ${data.emailSent ? "Confirmation email sent." : "No applicant email on file."}`,
+        description: sendInterviewEmail
+          ? (data.zoomMeeting
+              ? `Zoom meeting created. ${data.emailSent ? "Confirmation email sent." : "No applicant email on file."}`
+              : `Interview scheduled. ${data.emailSent ? "Confirmation email sent." : "No applicant email on file."}`)
+          : "Interview scheduled. No notification sent to candidate.",
       });
       setPendingSchedule(null);
     } catch (err: any) {
@@ -209,10 +224,15 @@ export default function Hiring() {
         offerBenefits: offerForm.benefits.length > 0 ? offerForm.benefits.join(",") : null,
         offerNotes: offerForm.notes || null,
       });
-      // Move stage — triggers token generation + email
-      await apiRequest("POST", `/api/candidates/${pendingOfferExtended.candidateId}/stage`, { stage: "Offer Extended" });
+      // Move stage — triggers token generation + email (if sendOfferEmail is true)
+      await apiRequest("POST", `/api/candidates/${pendingOfferExtended.candidateId}/stage`, { stage: "Offer Extended", sendNotification: sendOfferEmail });
       queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
-      toast({ title: "Offer Extended", description: `Offer details saved and acceptance link sent to ${pendingOfferExtended.candidate.name}.` });
+      toast({
+        title: "Offer Extended",
+        description: sendOfferEmail
+          ? `Offer details saved and acceptance link sent to ${pendingOfferExtended.candidate.name}.`
+          : `Offer details saved. No email sent to ${pendingOfferExtended.candidate.name}.`,
+      });
       setPendingOfferExtended(null);
       setOfferForm({ pay: "", payType: "Hourly", startDate: "", employmentType: "Full-time", schedule: "", benefits: [], notes: "" });
     } catch (err: any) {
@@ -226,7 +246,7 @@ export default function Hiring() {
     if (!pendingHire) return;
     setHiring(true);
     try {
-      const res = await apiRequest("POST", `/api/candidates/${pendingHire.candidateId}/hire`, { startDate: hireStartDate });
+      const res = await apiRequest("POST", `/api/candidates/${pendingHire.candidateId}/hire`, { startDate: hireStartDate, sendNotification: sendHireEmail });
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
       setHireResult(data);
@@ -690,6 +710,19 @@ export default function Hiring() {
             </div>
           </div>
 
+          <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30 mx-1 mb-1">
+            <Checkbox
+              id="send-offer-email"
+              checked={sendOfferEmail}
+              onCheckedChange={(v) => setSendOfferEmail(!!v)}
+              data-testid="checkbox-send-offer-email"
+            />
+            <div>
+              <label htmlFor="send-offer-email" className="text-sm font-medium cursor-pointer">Send offer email to candidate</label>
+              <p className="text-xs text-muted-foreground">Email the acceptance link to {pendingOfferExtended?.candidate.name}</p>
+            </div>
+          </div>
+
           <DialogFooter className="gap-2 pt-2 border-t">
             <Button variant="ghost" onClick={() => { setPendingOfferExtended(null); setOfferForm({ pay: "", payType: "Hourly", startDate: "", employmentType: "Full-time", schedule: "", benefits: [], notes: "" }); }} disabled={offerUploading}>
               Cancel
@@ -735,6 +768,18 @@ export default function Hiring() {
                   onChange={e => setHireStartDate(e.target.value)}
                   data-testid="input-hire-start-date"
                 />
+              </div>
+              <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+                <Checkbox
+                  id="send-hire-email"
+                  checked={sendHireEmail}
+                  onCheckedChange={(v) => setSendHireEmail(!!v)}
+                  data-testid="checkbox-send-hire-email"
+                />
+                <div>
+                  <label htmlFor="send-hire-email" className="text-sm font-medium cursor-pointer">Send welcome email to employee</label>
+                  <p className="text-xs text-muted-foreground">Email login credentials to {pendingHire?.candidate.name}</p>
+                </div>
               </div>
             </div>
           ) : (
@@ -878,6 +923,19 @@ export default function Hiring() {
             </div>
           </div>
 
+          <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30 mt-1">
+            <Checkbox
+              id="send-interview-email"
+              checked={sendInterviewEmail}
+              onCheckedChange={(v) => setSendInterviewEmail(!!v)}
+              data-testid="checkbox-send-interview-email"
+            />
+            <div>
+              <label htmlFor="send-interview-email" className="text-sm font-medium cursor-pointer">Send email &amp; SMS to candidate</label>
+              <p className="text-xs text-muted-foreground">Notify the applicant with interview details</p>
+            </div>
+          </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setPendingSchedule(null)} disabled={scheduling}>
               Cancel
@@ -892,6 +950,47 @@ export default function Hiring() {
               ) : (
                 <><Calendar className="h-4 w-4 mr-2" /> Schedule Interview</>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stage Move Confirmation Dialog */}
+      <Dialog open={!!pendingStageChange} onOpenChange={(open) => { if (!open) setPendingStageChange(null); }}>
+        <DialogContent className="max-w-sm" data-testid="dialog-stage-confirm">
+          <DialogHeader>
+            <DialogTitle>Move to {pendingStageChange?.newStage}?</DialogTitle>
+            <DialogDescription>
+              Moving <strong>{pendingStageChange?.candidate.name}</strong> to <strong>{pendingStageChange?.newStage}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+              <Checkbox
+                id="stage-confirm-send"
+                checked={stageConfirmSend}
+                onCheckedChange={(v) => setStageConfirmSend(!!v)}
+                data-testid="checkbox-stage-confirm-send"
+              />
+              <div>
+                <label htmlFor="stage-confirm-send" className="text-sm font-medium cursor-pointer">Send email notification to candidate</label>
+                <p className="text-xs text-muted-foreground">Uses the email template for this stage (if enabled)</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingStageChange(null)} data-testid="button-cancel-stage-confirm">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!pendingStageChange) return;
+                stageMutation.mutate({ id: pendingStageChange.candidateId, stage: pendingStageChange.newStage, sendNotification: stageConfirmSend });
+                setPendingStageChange(null);
+              }}
+              data-testid="button-confirm-stage-move"
+            >
+              Confirm Move
             </Button>
           </DialogFooter>
         </DialogContent>
