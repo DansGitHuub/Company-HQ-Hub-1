@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Plus, Phone, Mail, MapPin, FileText, User, Clock,
   ChevronLeft, Upload, CheckCircle2, Circle, AlertCircle, Users, ExternalLink, ClipboardList,
-  LogOut, ThumbsUp, ThumbsDown, ShieldAlert, Loader2, X, FileSignature, Send
+  LogOut, ThumbsUp, ThumbsDown, ShieldAlert, Loader2, X, FileSignature, Send, AlertTriangle
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +26,7 @@ import DocumentsPanel from "@/components/DocumentsPanel";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
 import CorrectiveActionForm from "@/components/forms/CorrectiveActionForm";
 import ResignationLetterForm from "@/components/forms/ResignationLetterForm";
+import OSHAIncidentForm from "@/components/forms/OSHAIncidentForm";
 
 function getInitials(name: string) {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
@@ -504,6 +505,8 @@ function DocumentsTab({ employee, onGoToTab }: { employee: any; onGoToTab?: (tab
   const [sendAgreementTemplateId, setSendAgreementTemplateId] = useState("");
   const [sendAgreementPayRate, setSendAgreementPayRate] = useState("");
   const [sendAgreementStartDate, setSendAgreementStartDate] = useState("");
+  const [oshaFormOpen, setOshaFormOpen] = useState(false);
+  const [viewOSHAOpen, setViewOSHAOpen] = useState<any>(null);
 
   const { data: docs = [] } = useQuery({
     queryKey: [`/api/employees/${employeeId}/documents`],
@@ -533,6 +536,19 @@ function DocumentsTab({ employee, onGoToTab }: { employee: any; onGoToTab?: (tab
     staleTime: 0,
     refetchOnMount: "always",
   });
+
+  const { data: allOnboardingForms = [], refetch: refetchOnboarding } = useQuery<any[]>({
+    queryKey: [`/api/onboarding-forms`, employeeId],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/onboarding-forms?employeeId=${employeeId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isHR,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+  const oshaReports = (allOnboardingForms as any[]).filter((f) => f.form_type === "osha_incident" || f.formType === "osha_incident");
 
   const reviewTORMutation = useMutation({
     mutationFn: async ({ id, status, reviewNotes }: { id: string; status: string; reviewNotes?: string }) => {
@@ -798,8 +814,86 @@ function DocumentsTab({ employee, onGoToTab }: { employee: any; onGoToTab?: (tab
               </div>
             </>
           )}
+
+          {/* OSHA 301 Incident Reports */}
+          {isHR && (
+            <>
+              <Separator />
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-orange-500" />
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">OSHA 301 Incident Reports</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => setOshaFormOpen(true)} data-testid="button-file-osha-report"
+                    className="text-orange-600 border-orange-200 hover:bg-orange-50">
+                    <Plus className="h-3 w-3 mr-1" /> File Report
+                  </Button>
+                </div>
+                {oshaReports.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No OSHA 301 incident reports on file.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {oshaReports.map((report: any) => {
+                      const data = report.submission_data || report.submissionData || {};
+                      return (
+                        <div key={report.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`osha-row-${report.id}`}>
+                          <div>
+                            <p className="text-sm font-medium">Incident: {data.dateOfInjury || "—"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {data.whatHappened ? data.whatHappened.slice(0, 60) + (data.whatHappened.length > 60 ? "…" : "") : ""}
+                            </p>
+                          </div>
+                          <Button size="sm" variant="ghost" onClick={() => setViewOSHAOpen(report)} data-testid={`view-osha-${report.id}`}>View</Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
+
+      {/* OSHA 301 File Report Dialog */}
+      <Dialog open={oshaFormOpen} onOpenChange={setOshaFormOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>File OSHA 301 Incident Report</DialogTitle>
+            <DialogDescription>Document a workplace injury or illness for {employeeName}. Employee information has been pre-filled.</DialogDescription>
+          </DialogHeader>
+          <OSHAIncidentForm
+            employeeId={employee.id}
+            preFillEmployee={{
+              firstName: employee.firstName,
+              lastName: employee.lastName,
+              startDate: employee.startDate,
+            }}
+            onComplete={() => {
+              setOshaFormOpen(false);
+              refetchOnboarding();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* OSHA View Dialog */}
+      {viewOSHAOpen && (
+        <Dialog open={!!viewOSHAOpen} onOpenChange={(o) => !o && setViewOSHAOpen(null)}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>OSHA 301 Incident Report</DialogTitle>
+              <DialogDescription>{employeeName} · Incident: {(viewOSHAOpen.submission_data || viewOSHAOpen.submissionData || {}).dateOfInjury || "—"}</DialogDescription>
+            </DialogHeader>
+            <OSHAIncidentForm
+              employeeId={employee.id}
+              submissionId={viewOSHAOpen.id}
+              readOnly
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Send Agreement Dialog */}
       <Dialog open={sendAgreementOpen} onOpenChange={setSendAgreementOpen}>

@@ -63,6 +63,13 @@ interface OSHAIncidentFormProps {
   employeeId: string;
   onComplete?: () => void;
   readOnly?: boolean;
+  preFillEmployee?: {
+    firstName?: string;
+    lastName?: string;
+    startDate?: string;
+    personalEmail?: string;
+    personalPhone?: string;
+  };
 }
 
 function SignaturePad({ value, onChange, testId }: { value: string; onChange: (dataUrl: string) => void; testId: string }) {
@@ -114,7 +121,7 @@ function SignaturePad({ value, onChange, testId }: { value: string; onChange: (d
   );
 }
 
-export default function OSHAIncidentForm({ submissionId, employeeId, onComplete, readOnly }: OSHAIncidentFormProps) {
+export default function OSHAIncidentForm({ submissionId, employeeId, onComplete, readOnly, preFillEmployee }: OSHAIncidentFormProps) {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<"employee"|"supervisor">("employee");
   const { data: existingData } = useQuery({ queryKey: ["/api/onboarding-forms", submissionId], enabled: !!submissionId });
@@ -138,6 +145,13 @@ export default function OSHAIncidentForm({ submissionId, employeeId, onComplete,
   });
 
   useEffect(() => { if (existingData && (existingData as any).submissionData) { const data = (existingData as any).submissionData; Object.keys(data).forEach((key) => form.setValue(key as any, data[key])); } }, [existingData, form]);
+
+  useEffect(() => {
+    if (!preFillEmployee || submissionId) return;
+    if (preFillEmployee.firstName) form.setValue("employeeFirstName", preFillEmployee.firstName);
+    if (preFillEmployee.lastName) form.setValue("employeeLastName", preFillEmployee.lastName);
+    if (preFillEmployee.startDate) form.setValue("employeeHireDate", preFillEmployee.startDate);
+  }, [preFillEmployee, submissionId]);
 
   const submitMutation = useMutation({
     mutationFn: async (values: OSHAFormValues) => {
