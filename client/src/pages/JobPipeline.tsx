@@ -1112,7 +1112,7 @@ function EstimatesBoard() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t("jobs.stage")}</Label>
+                <Label>Job Stage</Label>
                 <Select
                   value={editForm.stage || undefined}
                   onValueChange={v => setEditForm({ ...editForm, stage: v as EstimateStage })}
