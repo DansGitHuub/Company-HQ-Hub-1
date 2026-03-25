@@ -534,7 +534,7 @@ export default function SOPs() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => { setCopyingSopId(selectedSOP.id); setCopyDialogOpen(true); }}>
-                  <Copy className="w-4 h-4 mr-2" /> {t("sops.copyTo")}
+                  <Copy className="w-4 h-4 mr-2" /> Copy To
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setMovingSopId(selectedSOP.id); setMoveDialogOpen(true); }}>
                   <Move className="w-4 h-4 mr-2" /> {t("common.move")}
