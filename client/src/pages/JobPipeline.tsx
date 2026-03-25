@@ -1067,9 +1067,9 @@ function EstimatesBoard() {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isNewEstimate ? t("jobs.createNewEstimate") : t("jobs.editEstimate")}</DialogTitle>
+            <DialogTitle>{isNewEstimate ? "Create New Estimate" : "Edit Estimate"}</DialogTitle>
             <DialogDescription>
-              {isNewEstimate ? t("jobs.enterEstimateDetails") : t("jobs.updateEstimateInfo")}
+              {isNewEstimate ? "Estimate Details" : "Update the estimate information below."}
             </DialogDescription>
           </DialogHeader>
 
@@ -1134,7 +1134,7 @@ function EstimatesBoard() {
               <Textarea
                 value={editForm.description || ""}
                 onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                placeholder={t("jobs.estimateDescriptionPlaceholder")}
+                placeholder="Enter Job Description"
                 rows={3}
               />
             </div>
@@ -1222,7 +1222,7 @@ function EstimatesBoard() {
               <Textarea
                 value={editForm.notes || ""}
                 onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
-                placeholder={t("jobs.internalNotesPlaceholder")}
+                placeholder="Enter Internal Notes"
                 rows={3}
               />
             </div>
