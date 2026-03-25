@@ -12,14 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Search, Plus, Trash2, Edit, Package, ChevronRight, ChevronLeft, FolderPlus, Check, Sparkles, Loader2, FolderInput, CheckSquare } from "lucide-react";
+import { Search, Plus, Trash2, Edit, Package, ChevronRight, ChevronLeft, FolderPlus, Check, Sparkles, Loader2, FolderInput, CheckSquare, ImageIcon, RefreshCw } from "lucide-react";
+import { ImageReplacer } from "@/components/ImageReplacer";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { showErrorToast } from "@/lib/errorToast";
 import type { Material, MaterialCategory, CategoryField } from "@shared/schema";
 
-type WizardStep = "name" | "category" | "ai-fill" | "review" | "confirm";
+type WizardStep = "name" | "category" | "ai-fill" | "review" | "image-search" | "confirm";
 
 export default function Materials() {
   const { t } = useTranslation();
@@ -43,6 +44,11 @@ export default function Materials() {
   
   const [wizardStep, setWizardStep] = useState<WizardStep>("name");
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [imageSearchResults, setImageSearchResults] = useState<string[]>([]);
+  const [imageSearchSource, setImageSearchSource] = useState<"search" | "ai_suggested" | "none">("none");
+  const [imageSearchLoading, setImageSearchLoading] = useState(false);
+  const [imageSearchQuery, setImageSearchQuery] = useState("");
+  const [aiImageGenerating, setAiImageGenerating] = useState(false);
   const [wizardData, setWizardData] = useState({
     name: "",
     categoryId: "",
@@ -179,6 +185,18 @@ export default function Materials() {
     },
   });
 
+  const updateMaterialImageMutation = useMutation({
+    mutationFn: async ({ id, imageUrl }: { id: string; imageUrl: string }) => {
+      const res = await apiRequest("PATCH", `/api/materials/${id}/image`, { imageUrl });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      toast({ title: "Image updated" });
+    },
+    onError: (err: any) => showErrorToast(err, "Image update failed"),
+  });
+
   const bulkMoveMutation = useMutation({
     mutationFn: async ({ materialIds, targetCategoryId }: { materialIds: string[]; targetCategoryId: string }) => {
       const promises = materialIds.map(id => 
@@ -224,11 +242,15 @@ export default function Materials() {
       fieldValues: {},
     });
     setIsAiLoading(false);
+    setImageSearchResults([]);
+    setImageSearchSource("none");
+    setImageSearchLoading(false);
+    setImageSearchQuery("");
+    setAiImageGenerating(false);
   };
 
   const generateAiContent = async () => {
     if (!wizardData.name || !selectedCategory) return;
-    
     setIsAiLoading(true);
     try {
       const res = await apiRequest("POST", "/api/materials/ai-generate", {
@@ -236,7 +258,6 @@ export default function Materials() {
         category: selectedCategory.name,
       });
       const data = await res.json();
-      
       setWizardData(prev => ({
         ...prev,
         description: data.description || prev.description,
@@ -244,12 +265,53 @@ export default function Materials() {
         vendor: data.vendor || prev.vendor,
         fieldValues: { ...prev.fieldValues, ...data.fieldValues },
       }));
-      
       toast({ title: "AI filled material details" });
     } catch (err: any) {
       showErrorToast(err, "AI generation failed");
     } finally {
       setIsAiLoading(false);
+    }
+  };
+
+  const searchImagesForWizard = async (nameOverride?: string) => {
+    const name = nameOverride || wizardData.name;
+    if (!name) return;
+    setImageSearchLoading(true);
+    setImageSearchResults([]);
+    setImageSearchSource("none");
+    try {
+      const params = new URLSearchParams({ q: name });
+      if (selectedCategory?.name) params.set("category", selectedCategory.name);
+      const res = await apiRequest("GET", `/api/image-search?${params}`);
+      const data = await res.json();
+      setImageSearchResults(data.images || []);
+      setImageSearchSource(data.source || "none");
+      setImageSearchQuery(data.searchQuery || name);
+    } catch {
+      setImageSearchSource("none");
+    } finally {
+      setImageSearchLoading(false);
+    }
+  };
+
+  const generateAiImageForWizard = async () => {
+    if (!wizardData.name) return;
+    setAiImageGenerating(true);
+    try {
+      const res = await apiRequest("POST", "/api/materials/ai-image", {
+        name: wizardData.name,
+        materialType: selectedCategory?.name,
+        description: wizardData.description,
+      });
+      const data = await res.json();
+      if (data.imageUrl) {
+        setWizardData(prev => ({ ...prev, primaryImage: data.imageUrl }));
+        toast({ title: "AI image generated" });
+      }
+    } catch (err: any) {
+      showErrorToast(err, "Image generation failed");
+    } finally {
+      setAiImageGenerating(false);
     }
   };
 
@@ -259,29 +321,27 @@ export default function Materials() {
       case "category": return wizardData.categoryId !== "";
       case "ai-fill": return true;
       case "review": return true;
+      case "image-search": return true;
       case "confirm": return true;
       default: return false;
     }
   };
 
+  const WIZARD_STEPS: WizardStep[] = ["name", "category", "ai-fill", "review", "image-search", "confirm"];
+
   const nextStep = () => {
-    const steps: WizardStep[] = ["name", "category", "ai-fill", "review", "confirm"];
-    const currentIndex = steps.indexOf(wizardStep);
-    if (currentIndex < steps.length - 1) {
-      const next = steps[currentIndex + 1];
+    const currentIndex = WIZARD_STEPS.indexOf(wizardStep);
+    if (currentIndex < WIZARD_STEPS.length - 1) {
+      const next = WIZARD_STEPS[currentIndex + 1];
       setWizardStep(next);
-      if (next === "ai-fill") {
-        generateAiContent();
-      }
+      if (next === "ai-fill") generateAiContent();
+      if (next === "image-search") searchImagesForWizard();
     }
   };
 
   const prevStep = () => {
-    const steps: WizardStep[] = ["name", "category", "ai-fill", "review", "confirm"];
-    const currentIndex = steps.indexOf(wizardStep);
-    if (currentIndex > 0) {
-      setWizardStep(steps[currentIndex - 1]);
-    }
+    const currentIndex = WIZARD_STEPS.indexOf(wizardStep);
+    if (currentIndex > 0) setWizardStep(WIZARD_STEPS[currentIndex - 1]);
   };
 
   const getCategoryMaterialCount = (categoryId: string) => {
@@ -412,6 +472,7 @@ export default function Materials() {
               onEditMaterial={setShowEditMaterial}
               onBulkMove={() => setShowBulkMove(true)}
               onDeleteMaterial={(id) => deleteMaterialMutation.mutate(id)}
+              onReplaceImage={async (id, url) => { await updateMaterialImageMutation.mutateAsync({ id, imageUrl: url }); }}
               isAdmin={isAdmin}
             />
           </TabsContent>
@@ -434,6 +495,7 @@ export default function Materials() {
           onEditMaterial={() => {}}
           onBulkMove={() => {}}
           onDeleteMaterial={() => {}}
+          onReplaceImage={async () => {}}
           isAdmin={false}
         />
       )}
@@ -465,11 +527,12 @@ export default function Materials() {
               Add New Material
             </DialogTitle>
             <DialogDescription>
-              Step {["name", "category", "ai-fill", "review", "confirm"].indexOf(wizardStep) + 1} of 5: {
+              Step {WIZARD_STEPS.indexOf(wizardStep) + 1} of {WIZARD_STEPS.length}: {
                 wizardStep === "name" ? "Material Name" :
                 wizardStep === "category" ? "Select Category" :
                 wizardStep === "ai-fill" ? "AI Auto-Fill" :
                 wizardStep === "review" ? "Review & Edit" :
+                wizardStep === "image-search" ? "Choose Image" :
                 "Confirm & Save"
               }
             </DialogDescription>
@@ -614,12 +677,119 @@ export default function Materials() {
               </div>
             )}
 
+            {wizardStep === "image-search" && (
+              <div className="space-y-4">
+                {imageSearchLoading ? (
+                  <div className="flex flex-col items-center justify-center py-10">
+                    <Loader2 className="w-10 h-10 animate-spin text-primary mb-3" />
+                    <p className="text-sm font-medium">Searching for images...</p>
+                    <p className="text-xs text-muted-foreground mt-1">Looking up "{wizardData.name}"</p>
+                  </div>
+                ) : (
+                  <>
+                    {imageSearchResults.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium mb-2">
+                          {imageSearchSource === "search"
+                            ? "Select an image from the web:"
+                            : "One result found — confirm or try another:"}
+                        </p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {imageSearchResults.map((url, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setWizardData(prev => ({ ...prev, primaryImage: url }))}
+                              className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                                wizardData.primaryImage === url
+                                  ? "border-primary ring-2 ring-primary"
+                                  : "border-muted hover:border-primary/50"
+                              }`}
+                              data-testid={`image-option-${i}`}
+                            >
+                              <img src={url} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
+                              {wizardData.primaryImage === url && (
+                                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                  <Check className="w-6 h-6 text-primary drop-shadow" />
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {imageSearchResults.length === 0 && (
+                      <div className="flex flex-col items-center py-6 text-center">
+                        <ImageIcon className="w-10 h-10 text-muted-foreground mb-2" />
+                        <p className="text-sm font-medium">No images found online</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {imageSearchSource === "ai_suggested"
+                            ? "This looks like a commodity material — AI can generate a professional image."
+                            : "Try generating an AI image or upload one manually later."}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 pt-2 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => searchImagesForWizard()}
+                        disabled={imageSearchLoading}
+                        data-testid="button-retry-search"
+                      >
+                        <RefreshCw className="w-3 h-3 mr-1" /> Search Again
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={generateAiImageForWizard}
+                        disabled={aiImageGenerating}
+                        data-testid="button-generate-ai-image"
+                      >
+                        {aiImageGenerating ? (
+                          <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Generating...</>
+                        ) : (
+                          <><Sparkles className="w-3 h-3 mr-1" /> Generate with AI</>
+                        )}
+                      </Button>
+                      {wizardData.primaryImage && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setWizardData(prev => ({ ...prev, primaryImage: "" }))}
+                        >
+                          Skip Image
+                        </Button>
+                      )}
+                    </div>
+
+                    {wizardData.primaryImage && (
+                      <div className="flex items-center gap-3 p-2 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                        <img src={wizardData.primaryImage} alt="Selected" className="w-12 h-12 object-cover rounded" />
+                        <div>
+                          <p className="text-xs font-medium text-green-700 dark:text-green-400">Image selected</p>
+                          <p className="text-xs text-muted-foreground">Click Next to continue</p>
+                        </div>
+                        <Check className="w-4 h-4 text-green-600 ml-auto" />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
             {wizardStep === "confirm" && (
               <div className="space-y-4">
                 <Card className="p-4">
                   <div className="flex gap-4">
-                    <div className="w-16 h-16 bg-secondary rounded flex items-center justify-center">
-                      <Package className="w-8 h-8 text-muted-foreground" />
+                    <div className="w-16 h-16 bg-secondary rounded overflow-hidden flex items-center justify-center flex-shrink-0">
+                      {wizardData.primaryImage ? (
+                        <img src={wizardData.primaryImage} alt={wizardData.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Package className="w-8 h-8 text-muted-foreground" />
+                      )}
                     </div>
                     <div className="flex-1">
                       <h3 className="font-semibold text-lg">{wizardData.name}</h3>
@@ -701,14 +871,21 @@ export default function Materials() {
 
       <Dialog open={!!showMaterialDetail} onOpenChange={() => setShowMaterialDetail(null)}>
         <DialogContent className="max-w-lg">
-          {showMaterialDetail && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{showMaterialDetail.name}</DialogTitle>
-              </DialogHeader>
-              <MaterialDetailView material={showMaterialDetail} categories={categories} />
-            </>
-          )}
+          {showMaterialDetail && (() => {
+            const liveMaterial = materials.find(m => m.id === showMaterialDetail.id) || showMaterialDetail;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle>{liveMaterial.name}</DialogTitle>
+                </DialogHeader>
+                <MaterialDetailView
+                  material={liveMaterial}
+                  categories={categories}
+                  onReplaceImage={async (id, url) => { await updateMaterialImageMutation.mutateAsync({ id, imageUrl: url }); }}
+                />
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>
@@ -861,6 +1038,7 @@ function MaterialsGrid({
   onEditMaterial,
   onBulkMove,
   onDeleteMaterial,
+  onReplaceImage,
   isAdmin,
 }: {
   materials: Material[];
@@ -877,6 +1055,7 @@ function MaterialsGrid({
   onEditMaterial: (m: Material) => void;
   onBulkMove: () => void;
   onDeleteMaterial: (id: string) => void;
+  onReplaceImage: (id: string, url: string) => Promise<void>;
   isAdmin: boolean;
 }) {
   return (
@@ -932,17 +1111,19 @@ function MaterialsGrid({
             className={`overflow-hidden transition-shadow ${selectedMaterials.has(material.id) ? 'ring-2 ring-primary' : ''}`}
             data-testid={`card-material-${material.id}`}
           >
-            <div 
-              className="h-28 bg-secondary relative cursor-pointer"
-              onClick={() => onSelectMaterial(material)}
-            >
-              {material.primaryImage ? (
-                <img src={material.primaryImage} className="w-full h-full object-cover" alt={material.name} />
-              ) : (
+            <div className="h-28 bg-secondary relative">
+              <div className="absolute inset-0 cursor-pointer z-0" onClick={() => onSelectMaterial(material)} />
+              <ImageReplacer
+                currentImageUrl={material.primaryImage}
+                onReplace={async (url) => { await onReplaceImage(material.id, url); }}
+                className="w-full h-full relative z-10"
+                imgClassName="w-full h-full object-cover"
+                alt={material.name}
+              >
                 <div className="w-full h-full flex items-center justify-center">
                   <Package className="w-10 h-10 text-muted-foreground opacity-30" />
                 </div>
-              )}
+              </ImageReplacer>
               {isAdmin && (
                 <div 
                   className="absolute top-2 left-2"
@@ -1003,7 +1184,7 @@ function MaterialsGrid({
   );
 }
 
-function MaterialDetailView({ material, categories }: { material: Material; categories: MaterialCategory[] }) {
+function MaterialDetailView({ material, categories, onReplaceImage }: { material: Material; categories: MaterialCategory[]; onReplaceImage: (id: string, url: string) => Promise<void> }) {
   const { data: fieldValues = [] } = useQuery({
     queryKey: ["/api/materials", material.id, "field-values"],
     queryFn: getQueryFn({ on401: "throw" }),
@@ -1025,13 +1206,19 @@ function MaterialDetailView({ material, categories }: { material: Material; cate
   return (
     <div className="space-y-4">
       <div className="flex gap-4">
-        {material.primaryImage ? (
-          <img src={material.primaryImage} className="w-24 h-24 object-cover rounded" alt={material.name} />
-        ) : (
-          <div className="w-24 h-24 bg-secondary rounded flex items-center justify-center">
-            <Package className="w-10 h-10 text-muted-foreground opacity-30" />
-          </div>
-        )}
+        <div className="w-24 h-24 rounded overflow-hidden flex-shrink-0">
+          <ImageReplacer
+            currentImageUrl={material.primaryImage}
+            onReplace={async (url) => { await onReplaceImage(material.id, url); }}
+            className="w-full h-full"
+            imgClassName="w-full h-full object-cover"
+            alt={material.name}
+          >
+            <div className="w-full h-full bg-secondary flex items-center justify-center">
+              <Package className="w-10 h-10 text-muted-foreground opacity-30" />
+            </div>
+          </ImageReplacer>
+        </div>
         <div>
           <Badge variant={material.status === "Active" ? "default" : "secondary"}>
             {material.status}

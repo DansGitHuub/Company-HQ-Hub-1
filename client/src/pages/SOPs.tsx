@@ -274,6 +274,17 @@ export default function SOPs() {
     },
   });
 
+  const updateSopImageMutation = useMutation({
+    mutationFn: async ({ id, targetField, stepIndex, imageUrl }: { id: string; targetField?: string; stepIndex?: number; imageUrl: string }) => {
+      const res = await apiRequest("PATCH", `/api/sops/${id}/step-image`, { targetField, stepIndex, imageUrl });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sops"] });
+      toast({ title: "Image updated" });
+    },
+  });
+
   const createExampleMutation = useMutation({
     mutationFn: async (data: Partial<SopExample>) => {
       const res = await fetch("/api/sop-examples", {
@@ -561,6 +572,16 @@ export default function SOPs() {
                 companyName={companySettings?.companyName || undefined}
                 companyLogoUrl={companySettings?.logoUrl || undefined}
                 data={structuredData!}
+                onReplaceHeaderImage={
+                  (user?.role === "Admin" || user?.role === "Manager" || (user as any)?.isMasterAdmin)
+                    ? async (url) => { await updateSopImageMutation.mutateAsync({ id: selectedSOP.id, targetField: "headerImageUrl", imageUrl: url }); }
+                    : undefined
+                }
+                onReplaceStepImage={
+                  (user?.role === "Admin" || user?.role === "Manager" || (user as any)?.isMasterAdmin)
+                    ? async (stepIndex, url) => { await updateSopImageMutation.mutateAsync({ id: selectedSOP.id, stepIndex, imageUrl: url }); }
+                    : undefined
+                }
               />
             ) : (
               <CardContent className="p-8 prose prose-slate dark:prose-invert max-w-none">

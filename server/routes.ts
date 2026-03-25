@@ -14,6 +14,7 @@ import { registerCalendarRoutes } from "./calendarRoutes";
 import { registerSuggestionsRoutes } from "./suggestionsRoutes";
 import { registerTaskRoutes } from "./taskRoutes";
 import { registerAssistantRoutes } from "./assistantRoutes";
+import { searchProductImages } from "./imageSearchService";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail } from "./email";
 import { logActivity } from "./activityLogger";
 import { checkAndSendReminders } from "./maintenanceScheduler";
@@ -3781,6 +3782,88 @@ Generate detailed information for this landscaping material.`;
     } catch (err: any) {
       console.error("AI image generation error:", err);
       res.status(500).json({ message: "Image generation failed", error: err.message });
+    }
+  });
+
+  // Product image web search (DuckDuckGo + AI fallback)
+  app.get("/api/image-search", requireAuth, async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      const category = req.query.category as string | undefined;
+      if (!query) return res.status(400).json({ message: "Query required" });
+      const result = await searchProductImages(query, category);
+      if (result.needsReview && result.source === "none") {
+        try {
+          const allUsers = await storage.getAllUsers();
+          const admins = (allUsers as any[]).filter(
+            (u: any) => u.role === "Admin" || u.role === "Manager" || u.isMasterAdmin
+          );
+          for (const admin of admins) {
+            await storage.createStaffNotification({
+              userId: admin.id,
+              type: "image_needs_review",
+              title: "Material Image Needed",
+              message: `No image found for "${query}". Please add one manually in the Materials catalog.`,
+              link: "/materials",
+              isRead: false,
+            });
+          }
+        } catch {}
+      }
+      res.json(result);
+    } catch (err: any) {
+      console.error("[image-search]", err.message);
+      res.json({ images: [], source: "none", needsReview: true, searchQuery: req.query.q || "" });
+    }
+  });
+
+  // Update only the image for a material (admin/manager only)
+  app.patch("/api/materials/:id/image", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!["Admin", "Manager"].includes(user?.role) && !user?.isMasterAdmin) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const { imageUrl } = req.body;
+      if (!imageUrl) return res.status(400).json({ message: "imageUrl required" });
+      const updated = await storage.updateMaterial(req.params.id, { primaryImage: imageUrl });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Update a single step image within an SOP's structuredData (admin/manager only)
+  app.patch("/api/sops/:id/step-image", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!["Admin", "Manager"].includes(user?.role) && !user?.isMasterAdmin) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const { stepIndex, imageUrl, targetField } = req.body;
+      const sop = await storage.getSop(req.params.id);
+      if (!sop) return res.status(404).json({ message: "SOP not found" });
+
+      const structured: any =
+        typeof sop.structuredData === "string"
+          ? JSON.parse(sop.structuredData)
+          : sop.structuredData || {};
+
+      if (targetField === "headerImageUrl") {
+        structured.headerImageUrl = imageUrl;
+      } else if (typeof stepIndex === "number" && Array.isArray(structured.steps)) {
+        if (!structured.steps[stepIndex]) {
+          return res.status(400).json({ message: "Step not found" });
+        }
+        structured.steps[stepIndex].imageUrl = imageUrl;
+      } else {
+        return res.status(400).json({ message: "stepIndex or targetField required" });
+      }
+
+      const updated = await storage.updateSop(req.params.id, { structuredData: structured });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
     }
   });
 

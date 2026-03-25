@@ -1,4 +1,5 @@
 import { Shield, Wrench, Package, Clock, CheckCircle2, AlertTriangle, Info, Camera, ClipboardCheck, FileCheck, UserCheck, ThumbsUp, Target } from "lucide-react";
+import { ImageReplacer } from "@/components/ImageReplacer";
 
 export interface SOPStructuredData {
   outcome?: string;
@@ -37,6 +38,8 @@ interface SOPTemplateRendererProps {
   companyName?: string;
   companyLogoUrl?: string;
   data: SOPStructuredData;
+  onReplaceHeaderImage?: (url: string) => Promise<void>;
+  onReplaceStepImage?: (stepIndex: number, url: string) => Promise<void>;
 }
 
 const outcomeStyles: Record<string, { border: string; bg: string; badgeBg: string; badgeText: string; badgeBorder: string }> = {
@@ -74,7 +77,7 @@ function parseItemWithSpec(line: string): { name: string; spec: string } {
   return { name: line, spec: "" };
 }
 
-export default function SOPTemplateRenderer({ title, category, sopType, lastUpdated, companyName, companyLogoUrl, data }: SOPTemplateRendererProps) {
+export default function SOPTemplateRenderer({ title, category, sopType, lastUpdated, companyName, companyLogoUrl, data, onReplaceHeaderImage, onReplaceStepImage }: SOPTemplateRendererProps) {
   const ppeItems = parseList(data.ppe);
   const toolItems = parseList(data.tools);
   const materialItems = parseList(data.materials);
@@ -149,9 +152,23 @@ export default function SOPTemplateRenderer({ title, category, sopType, lastUpda
       </div>
 
       <div className="p-6 sm:p-8 space-y-6">
-        {data.headerImageUrl && (
+        {(data.headerImageUrl || onReplaceHeaderImage) && (
           <div className="text-center">
-            <img src={data.headerImageUrl} alt={title} className="max-w-full max-h-72 rounded-lg mx-auto border" />
+            {onReplaceHeaderImage ? (
+              <ImageReplacer
+                currentImageUrl={data.headerImageUrl}
+                onReplace={onReplaceHeaderImage}
+                className="inline-block max-w-full rounded-lg overflow-hidden border"
+                imgClassName="max-w-full max-h-72 object-contain"
+                alt={title}
+              >
+                <div className="flex items-center justify-center w-full h-32 bg-muted rounded-lg border border-dashed">
+                  <span className="text-sm text-muted-foreground">No header image — hover to add one</span>
+                </div>
+              </ImageReplacer>
+            ) : (
+              <img src={data.headerImageUrl} alt={title} className="max-w-full max-h-72 rounded-lg mx-auto border" />
+            )}
           </div>
         )}
 
@@ -297,9 +314,23 @@ export default function SOPTemplateRenderer({ title, category, sopType, lastUpda
 
                       <p className="text-gray-700 leading-7 mb-3">{step.instruction}</p>
 
-                      {step.imageUrl && (
+                      {(step.imageUrl || onReplaceStepImage) && (
                         <div className="my-3">
-                          <img src={step.imageUrl} alt={step.title} className="max-w-full max-h-48 rounded-md border" />
+                          {onReplaceStepImage ? (
+                            <ImageReplacer
+                              currentImageUrl={step.imageUrl}
+                              onReplace={async (url) => { await onReplaceStepImage(i, url); }}
+                              className="inline-block max-w-full rounded-md overflow-hidden border"
+                              imgClassName="max-w-full max-h-48 object-contain"
+                              alt={step.title}
+                            >
+                              <div className="flex items-center justify-center w-full h-20 bg-muted rounded-md border border-dashed">
+                                <span className="text-xs text-muted-foreground">No image — hover to add</span>
+                              </div>
+                            </ImageReplacer>
+                          ) : (
+                            <img src={step.imageUrl} alt={step.title} className="max-w-full max-h-48 rounded-md border" />
+                          )}
                         </div>
                       )}
 
