@@ -559,7 +559,7 @@ function SoldJobsBoard() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>{t("jobs.scheduledDate")}</Label>
+                  <Label>Scheduled Date</Label>
                   <Input
                     type="date"
                     value={editForm.scheduledDate ? new Date(editForm.scheduledDate).toISOString().split('T')[0] : ""}
@@ -569,7 +569,7 @@ function SoldJobsBoard() {
                 </div>
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
-                    {t("jobs.completionDate")}
+                    Completion Date
                     {editForm.isMandatoryDate && <AlertCircle className="w-4 h-4 text-destructive" />}
                   </Label>
                   <Input
@@ -587,55 +587,55 @@ function SoldJobsBoard() {
                   checked={editForm.isMandatoryDate || false}
                   onCheckedChange={(c) => setEditForm({ ...editForm, isMandatoryDate: c === true })}
                 />
-                <Label htmlFor="mandatoryDate" className="text-sm">{t("jobs.mandatoryCompletion")}</Label>
+                <Label htmlFor="mandatoryDate" className="text-sm">Mark as mandatory completion date</Label>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>{t("jobs.hoursToComplete")}</Label>
+                  <Label>Estimated Hours</Label>
                   <Input
                     type="number"
                     value={editForm.estimatedHours || ""}
                     onChange={e => setEditForm({ ...editForm, estimatedHours: parseInt(e.target.value) || undefined })}
-                    placeholder={t("jobs.hoursToComplete")}
+                    placeholder="e.g. 8"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("jobs.daysToComplete")}</Label>
+                  <Label>Estimated Days</Label>
                   <Input
                     type="number"
                     value={editForm.estimatedDays || ""}
                     onChange={e => setEditForm({ ...editForm, estimatedDays: parseInt(e.target.value) || undefined })}
-                    placeholder={t("jobs.daysToComplete")}
+                    placeholder="e.g. 3"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>{t("jobs.contactName")}</Label>
+                  <Label>Contact Name</Label>
                   <Input
                     value={editForm.contactName || ""}
                     onChange={e => setEditForm({ ...editForm, contactName: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("jobs.contactPhone")}</Label>
+                  <Label>Contact Phone</Label>
                   <Input
                     value={editForm.contactPhone || ""}
                     onChange={e => setEditForm({ ...editForm, contactPhone: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("jobs.additionalPhone")}</Label>
+                  <Label>Additional Phone</Label>
                   <Input
                     value={editForm.contactPhone2 || ""}
                     onChange={e => setEditForm({ ...editForm, contactPhone2: e.target.value })}
-                    placeholder={t("jobs.additionalPhone")}
+                    placeholder="Secondary number"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("jobs.contactEmail")}</Label>
+                  <Label>Contact Email</Label>
                   <Input
                     type="email"
                     value={editForm.contactEmail || ""}
@@ -645,20 +645,20 @@ function SoldJobsBoard() {
               </div>
 
               <div className="space-y-2">
-                <Label>{t("jobs.zone")}</Label>
+                <Label>Zone / Area</Label>
                 <Input
                   value={editForm.zone || ""}
                   onChange={e => setEditForm({ ...editForm, zone: e.target.value })}
-                  placeholder={t("jobs.zonePlaceholder")}
+                  placeholder="e.g. North, East Side, Zone 3"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>{t("common.notes")}</Label>
+                <Label>Notes</Label>
                 <Textarea
                   value={editForm.notes || ""}
                   onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
-                  placeholder={t("jobs.notesPlaceholder")}
+                  placeholder="Internal notes about this job..."
                   rows={4}
                   data-testid="input-job-notes"
                 />
@@ -702,7 +702,7 @@ function SoldJobsBoard() {
 
                 <div className="space-y-2">
                   {jobDocuments.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">{t("jobs.noDocuments")}</p>
+                    <p className="text-muted-foreground text-center py-8">No documents uploaded yet.</p>
                   ) : (
                     jobDocuments.map(doc => (
                       <Card key={doc.id} className="p-4">
