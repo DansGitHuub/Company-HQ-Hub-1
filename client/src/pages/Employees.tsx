@@ -417,7 +417,7 @@ function EmploymentTab({ employee, onUpdate }: { employee: any; onUpdate: (data:
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><Label>Job Title</Label><Input value={form.jobTitle} onChange={e => setForm({ ...form, jobTitle: e.target.value })} /></div>
-              <div><Label>Department</Label><Input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} /></div>
+              <div><Label>Division</Label><Input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} /></div>
               <div>
                 <Label>Employment Type</Label>
                 <Select value={form.employmentType} onValueChange={v => setForm({ ...form, employmentType: v })}>
@@ -452,7 +452,7 @@ function EmploymentTab({ employee, onUpdate }: { employee: any; onUpdate: (data:
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 text-sm">
             {employee.employeeNumber && <div><span className="text-muted-foreground">Employee ID:</span> {employee.employeeNumber}</div>}
             <div><span className="text-muted-foreground">Title:</span> {employee.jobTitle || "\u2014"}</div>
-            <div><span className="text-muted-foreground">Department:</span> {employee.department || "\u2014"}</div>
+            <div><span className="text-muted-foreground">Division:</span> {employee.department || "\u2014"}</div>
             <div><span className="text-muted-foreground">Type:</span> {employee.employmentType}</div>
             <div><span className="text-muted-foreground">Start:</span> {employee.startDate || "\u2014"}</div>
             {employee.endDate && <div><span className="text-muted-foreground">End:</span> {employee.endDate}</div>}
