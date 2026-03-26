@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
 import type { SopQuiz, UserQuizAttempt, Sop } from "@shared/schema";
+import { ViewQuizButton } from "@/components/QuizViewModal";
 
 type CatalogEntry = {
   sop: Sop;
@@ -467,14 +468,22 @@ export default function TestingKnowledge() {
                 </div>
               </div>
 
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={() => startAdaptiveQuiz(adaptiveQuiz.id)}
-                data-testid="button-start-adaptive"
-              >
-                {bestAttempt ? "Retake Quiz" : "Start Adaptive Quiz"}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  size="lg"
+                  onClick={() => startAdaptiveQuiz(adaptiveQuiz.id)}
+                  data-testid="button-start-adaptive"
+                >
+                  {bestAttempt ? "Retake Quiz" : "Start Adaptive Quiz"}
+                </Button>
+                <ViewQuizButton
+                  quizId={adaptiveQuiz.id}
+                  quizTitle={adaptiveQuiz.title}
+                  size="lg"
+                  variant="outline"
+                />
+              </div>
             </CardContent>
           </Card>
         ) : (
@@ -506,6 +515,7 @@ export default function TestingKnowledge() {
                           {best.passed ? "Passed" : `${best.score}/${best.totalQuestions}`}
                         </Badge>
                       )}
+                      <ViewQuizButton quizId={quiz.id} quizTitle={quiz.title} />
                       <Button size="sm" variant="outline" onClick={() => startAdaptiveQuiz(quiz.id)}>
                         Take
                       </Button>
@@ -669,6 +679,17 @@ function QuizCatalog({
                           className={`flex-1 h-1.5 rounded-full ${level <= (best.highestLevelPassed || 0) ? DIFFICULTY_COLORS[level].split(" ")[0] : "bg-muted"}`}
                         />
                       ))}
+                    </div>
+                  )}
+                  {quizToCheck && (
+                    <div className="mt-3 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
+                      <ViewQuizButton
+                        quizId={quizToCheck.id}
+                        quizTitle={entry.sop.title}
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                      />
                     </div>
                   )}
                 </CardContent>

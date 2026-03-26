@@ -24,6 +24,7 @@ import SOPBuilder, { type SOPBuilderData } from "@/components/SOPBuilder";
 import SOPTemplateRenderer, { generateSOPPrintHTML, type SOPStructuredData } from "@/components/SOPTemplateRenderer";
 import SOPAIEditor from "@/components/SOPAIEditor";
 import type { Sop, SopCategory, SopTemplate, SopExample, SopDraft, SopQuiz, CompanySettings } from "@shared/schema";
+import { ViewQuizButton } from "@/components/QuizViewModal";
 import { Clock, PlayCircle, Brain, Printer, Download, Mail, Eye, EyeOff, Bold, Italic, Underline, Heading2, Heading3, List, ToggleLeft, ToggleRight, SearchCheck } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -609,9 +610,16 @@ export default function SOPs() {
                       <div className="space-y-3">
                         <div className="grid grid-cols-3 gap-3">
                           {quizzes.map((quiz) => (
-                            <div key={quiz.id} className="p-3 border rounded-lg text-center" data-testid={`quiz-level-${quiz.skillLevel}`}>
-                              <Badge variant="outline" className="mb-2 capitalize">{quiz.skillLevel}</Badge>
+                            <div key={quiz.id} className="p-3 border rounded-lg text-center space-y-2" data-testid={`quiz-level-${quiz.skillLevel}`}>
+                              <Badge variant="outline" className="capitalize">{quiz.skillLevel}</Badge>
                               <p className="text-sm font-medium" data-testid={`text-quiz-count-${quiz.skillLevel}`}>{quiz.questionCount} questions</p>
+                              <ViewQuizButton
+                                quizId={quiz.id}
+                                quizTitle={`${selectedSOP.title} — ${quiz.skillLevel}`}
+                                variant="outline"
+                                size="sm"
+                                className="w-full"
+                              />
                             </div>
                           ))}
                         </div>
