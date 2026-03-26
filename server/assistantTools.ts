@@ -3,6 +3,7 @@ import { pool } from "./db";
 
 const TOOLS_REQUIRING_CONFIRMATION = [
   "createTask",
+  "sendInternalMessage",
   "createEquipment",
   "logEquipmentService",
   "updateEquipmentHours",
@@ -119,6 +120,36 @@ export const allToolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = 
           query: { type: "string", description: "Search query for SOP title or content" },
         },
         required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "sendInternalMessage",
+      description: "Compose and send an internal message to an employee. Use when the user asks to send, write, or draft a message to someone. Always confirm before sending.",
+      parameters: {
+        type: "object",
+        properties: {
+          recipientName: { type: "string", description: "The name of the person to send the message to (will be looked up)" },
+          recipientId: { type: "string", description: "The user ID of the recipient if already known" },
+          subject: { type: "string", description: "Subject line of the message" },
+          message: { type: "string", description: "The full message body" },
+        },
+        required: ["subject", "message"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getMessages",
+      description: "Get the current user's messages/inbox. Use when the user asks about their messages, inbox, or new notifications.",
+      parameters: {
+        type: "object",
+        properties: {
+          unreadOnly: { type: "boolean", description: "If true, only return unread/unanswered messages" },
+        },
       },
     },
   },
@@ -325,13 +356,17 @@ const RECORD_ROUTES: Record<string, (id: string) => string> = {
 
 function checkPermission(user: any, toolName: string): { allowed: boolean; reason?: string } {
   const role = user.role;
-  const readOnlyTools = ["searchGlobal", "searchEquipment", "searchTasks", "searchEmployees", "searchSOPs", "getDailyBriefing", "navigateTo", "openRecord", "lookupVIN"];
+  const readOnlyTools = [
+    "searchGlobal", "searchEquipment", "searchTasks", "searchEmployees", "searchSOPs",
+    "getDailyBriefing", "navigateTo", "openRecord", "lookupVIN",
+    "getMessages", "getCalendarEvents", "getJobs",
+  ];
   if (readOnlyTools.includes(toolName)) return { allowed: true };
 
   if (role === "Customer") return { allowed: false, reason: "This action is not available for customer accounts." };
 
   if (["createTask"].includes(toolName)) {
-    if (["Sales", "Customer"].includes(role)) return { allowed: false, reason: "Your role does not have permission to create tasks." };
+    if (role === "Customer") return { allowed: false, reason: "Customers cannot create tasks." };
     return { allowed: true };
   }
 
@@ -461,6 +496,55 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
           [query]
         );
         return { result: { sops: res.rows, count: res.rows.length } };
+      }
+
+      case "sendInternalMessage": {
+        // Resolve recipient
+        let recipientId = toolArgs.recipientId || null;
+        let recipientName = toolArgs.recipientName || null;
+
+        if (!recipientId && recipientName) {
+          const recipientRes = await pool.query(
+            `SELECT id, name, role FROM users WHERE name ILIKE $1 AND role != 'Customer' LIMIT 1`,
+            [`%${recipientName}%`]
+          );
+          if (recipientRes.rows.length === 0) {
+            return { result: null, error: `Could not find an employee named "${recipientName}". Use searchEmployees to find the correct name.` };
+          }
+          recipientId = recipientRes.rows[0].id;
+          recipientName = recipientRes.rows[0].name;
+        } else if (recipientId) {
+          const recipientRes = await pool.query(`SELECT id, name, role FROM users WHERE id = $1`, [recipientId]);
+          if (recipientRes.rows.length === 0) return { result: null, error: "Recipient not found." };
+          recipientName = recipientRes.rows[0].name;
+        }
+
+        if (!recipientId) return { result: null, error: "A recipient is required to send a message. Please specify who to send it to." };
+
+        const msgId = crypto.randomUUID();
+        await pool.query(
+          `INSERT INTO customer_messages (id, customer_id, target_employee_id, subject, message, status, created_at)
+           VALUES ($1, $2, $3, $4, $5, 'unread', NOW())`,
+          [msgId, user.id, recipientId, toolArgs.subject, toolArgs.message]
+        );
+
+        return { result: { success: true, sentTo: recipientName, subject: toolArgs.subject, messagePreview: toolArgs.message.slice(0, 100) } };
+      }
+
+      case "getMessages": {
+        let msgSql = `SELECT cm.id, cm.subject, cm.message, cm.status, cm.created_at, cm.admin_reply, cm.replied_at,
+                      sender.name as sender_name, target.name as target_name
+                      FROM customer_messages cm
+                      LEFT JOIN users sender ON cm.customer_id = sender.id
+                      LEFT JOIN users target ON cm.target_employee_id = target.id
+                      WHERE (cm.customer_id = $1 OR cm.target_employee_id = $1)`;
+        if (toolArgs.unreadOnly) {
+          msgSql += ` AND cm.status = 'unread'`;
+        }
+        msgSql += ` ORDER BY cm.created_at DESC LIMIT 15`;
+
+        const msgRes = await pool.query(msgSql, [user.id]);
+        return { result: { messages: msgRes.rows, count: msgRes.rows.length } };
       }
 
       case "getCalendarEvents": {
@@ -658,12 +742,17 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
 function checkTaskAssignment(creatorRole: string, assigneeRole: string): { allowed: boolean; reason?: string } {
   if (["Admin", "Master Admin"].includes(creatorRole)) return { allowed: true };
   if (creatorRole === "Manager") {
-    if (["Crew Lead", "Crew", "New Hire"].includes(assigneeRole)) return { allowed: true };
-    return { allowed: false, reason: `As a Manager, you can only assign tasks to Crew Lead, Crew, or New Hire roles, not ${assigneeRole}.` };
+    if (["Crew Lead", "Crew", "New Hire", "HR", "Sales"].includes(assigneeRole)) return { allowed: true };
+    return { allowed: false, reason: `As a Manager, you can assign tasks to Crew Lead, Crew, New Hire, HR, or Sales roles.` };
+  }
+  if (["HR", "Sales"].includes(creatorRole)) {
+    // HR and Sales can assign tasks to themselves or other HR/Sales; not to crew
+    if (["HR", "Sales"].includes(assigneeRole) || assigneeRole === creatorRole) return { allowed: true };
+    return { allowed: false, reason: `As ${creatorRole}, you can create tasks for yourself or other HR/Sales team members.` };
   }
   if (creatorRole === "Crew Lead") {
-    if (assigneeRole === "Crew") return { allowed: true };
-    return { allowed: false, reason: `As a Crew Lead, you can only assign tasks to Crew members.` };
+    if (["Crew", "New Hire"].includes(assigneeRole)) return { allowed: true };
+    return { allowed: false, reason: `As a Crew Lead, you can only assign tasks to Crew members or New Hires.` };
   }
   return { allowed: false, reason: `Your role (${creatorRole}) does not have permission to assign tasks to others.` };
 }
