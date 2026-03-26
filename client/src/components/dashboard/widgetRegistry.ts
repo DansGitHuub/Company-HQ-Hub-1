@@ -51,7 +51,7 @@ export const WIDGET_DEFINITIONS: WidgetDefinition[] = [
   {
     type: "todos",
     label: "Tasks",
-    description: "Your to-do items and deadlines",
+    description: "Live task board — click to open full Kanban view",
     icon: CheckSquare,
     roles: ["Admin", "Manager", "Crew"],
     defaultSize: "medium",

@@ -1,7 +1,14 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Mail,
   CheckSquare,
@@ -26,6 +33,15 @@ import {
   FileText,
   Sparkles,
   GraduationCap,
+  Maximize2,
+  ExternalLink,
+  Play,
+  Bell,
+  Eye,
+  Pause,
+  CheckCircle2,
+  User,
+  ListChecks,
 } from "lucide-react";
 import type { WidgetSize } from "./widgetRegistry";
 
@@ -88,49 +104,225 @@ export function MessagesWidget({ size }: WidgetProps) {
   );
 }
 
-export function TodosWidget({ size }: WidgetProps) {
-  const { data: todos = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/todos"],
-  });
+const PRIORITY_COLORS: Record<string, string> = {
+  p1_urgent: "bg-red-500",
+  p2_high: "bg-orange-500",
+  p3_normal: "bg-yellow-500",
+  p4_low: "bg-green-500",
+};
 
-  const pending = todos.filter((t: any) => !t.completed);
-  const overdue = pending.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date());
-  const display = pending.slice(0, size === "small" ? 4 : size === "medium" ? 6 : 10);
+const PRIORITY_LABELS: Record<string, string> = {
+  p1_urgent: "Urgent",
+  p2_high: "High",
+  p3_normal: "Normal",
+  p4_low: "Low",
+};
+
+const KANBAN_COLUMNS = [
+  { id: "assigned",    label: "Assigned",    icon: Bell,         color: "border-blue-400",   bg: "bg-blue-50 dark:bg-blue-950/30" },
+  { id: "acknowledged",label: "Acknowledged",icon: Eye,          color: "border-indigo-400",  bg: "bg-indigo-50 dark:bg-indigo-950/30" },
+  { id: "in_progress", label: "In Progress", icon: Play,         color: "border-yellow-400",  bg: "bg-yellow-50 dark:bg-yellow-950/30" },
+  { id: "on_hold",     label: "On Hold",     icon: Pause,        color: "border-gray-400",    bg: "bg-gray-50 dark:bg-gray-800/30" },
+  { id: "completed",   label: "Completed",   icon: CheckCircle2, color: "border-green-400",   bg: "bg-green-50 dark:bg-green-950/30" },
+];
+
+function TaskCard({ task }: { task: any }) {
+  const isOverdue = task.dueDate && task.status !== "completed" && task.status !== "cancelled"
+    && new Date(task.dueDate) < new Date();
 
   return (
-    <WidgetShell loading={isLoading} href="/todos">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-xs text-muted-foreground">{pending.length} pending</span>
-        {overdue.length > 0 && (
-          <Badge variant="destructive" className="text-xs">{overdue.length} overdue</Badge>
+    <div
+      className="bg-card border rounded-lg p-3 space-y-1.5 shadow-sm hover:shadow-md transition-shadow cursor-default"
+      data-testid={`mirror-task-card-${task.id}`}
+    >
+      <p className="text-sm font-medium leading-snug line-clamp-2">{task.title}</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {task.priority && (
+          <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold text-white ${PRIORITY_COLORS[task.priority] || "bg-gray-400"}`}>
+            {PRIORITY_LABELS[task.priority] || task.priority}
+          </span>
+        )}
+        {task.dueDate && (
+          <span className={`flex items-center gap-0.5 text-[10px] ${isOverdue ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
+            <Clock className="h-2.5 w-2.5" />
+            {isOverdue ? "Overdue" : new Date(task.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+          </span>
         )}
       </div>
-      {display.length === 0 ? (
-        <p className="text-sm text-muted-foreground">All caught up!</p>
-      ) : (
-        <div className="space-y-1.5">
-          {display.map((todo: any) => {
-            const isOverdue = todo.dueDate && new Date(todo.dueDate) < new Date();
+      {task.assigneeName && (
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <User className="h-2.5 w-2.5" />
+          <span className="truncate">{task.assigneeName}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TasksBoardPanel() {
+  const { data: myTasks = [], isLoading: loadingMy } = useQuery<any[]>({ queryKey: ["/api/tasks/my"] });
+  const { data: assignedTasks = [], isLoading: loadingAssigned } = useQuery<any[]>({ queryKey: ["/api/tasks/assigned"] });
+
+  const allTasks = React.useMemo(() => {
+    const seen = new Set<string>();
+    return [...myTasks, ...assignedTasks].filter(t => {
+      if (seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+  }, [myTasks, assignedTasks]);
+
+  const isLoading = loadingMy || loadingAssigned;
+
+  const overdueTasks = allTasks.filter(t =>
+    t.dueDate && !["completed", "cancelled"].includes(t.status) && new Date(t.dueDate) < new Date()
+  );
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col gap-3 p-4 overflow-hidden">
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-sm text-muted-foreground">{allTasks.length} total tasks</span>
+        {overdueTasks.length > 0 && (
+          <Badge variant="destructive" className="text-xs gap-1">
+            <AlertTriangle className="h-3 w-3" /> {overdueTasks.length} overdue
+          </Badge>
+        )}
+        <div className="ml-auto">
+          <Link href="/todo">
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7" data-testid="open-full-tasks-page">
+              <ExternalLink className="h-3 w-3" /> Open Full Tasks Page
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-x-auto overflow-y-hidden">
+        <div className="flex gap-3 h-full" style={{ minWidth: `${KANBAN_COLUMNS.length * 220}px` }}>
+          {KANBAN_COLUMNS.map(col => {
+            const colTasks = allTasks.filter(t => t.status === col.id);
+            const Icon = col.icon;
             return (
-              <div key={todo.id} className="flex items-start gap-2 text-sm">
-                <CheckSquare className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${isOverdue ? "text-destructive" : "text-muted-foreground"}`} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs">{todo.title}</p>
-                  {todo.dueDate && (
-                    <p className={`text-[10px] ${isOverdue ? "text-destructive" : "text-muted-foreground"}`}>
-                      Due {new Date(todo.dueDate).toLocaleDateString()}
-                    </p>
+              <div key={col.id} className={`flex flex-col rounded-xl border-t-2 ${col.color} ${col.bg} flex-1 min-w-[200px] overflow-hidden`}>
+                <div className="px-3 pt-3 pb-2 flex items-center gap-2">
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{col.label}</span>
+                  <Badge variant="secondary" className="ml-auto text-[10px] h-4 min-w-[18px] flex items-center justify-center px-1">
+                    {colTasks.length}
+                  </Badge>
+                </div>
+                <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-2">
+                  {colTasks.length === 0 ? (
+                    <p className="text-[11px] text-muted-foreground text-center py-4 italic">No tasks</p>
+                  ) : (
+                    colTasks.map(task => <TaskCard key={task.id} task={task} />)
                   )}
                 </div>
-                {todo.priority && (
-                  <Badge variant="outline" className="text-[10px] shrink-0 px-1">{todo.priority}</Badge>
-                )}
               </div>
             );
           })}
         </div>
-      )}
-    </WidgetShell>
+      </div>
+    </div>
+  );
+}
+
+export function TodosWidget({ size }: WidgetProps) {
+  const [boardOpen, setBoardOpen] = useState(false);
+
+  const { data: myTasks = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/tasks/my"] });
+
+  const now = new Date();
+  const active    = myTasks.filter((t: any) => !["completed", "cancelled"].includes(t.status));
+  const inProgress = myTasks.filter((t: any) => t.status === "in_progress");
+  const overdue    = myTasks.filter((t: any) => t.dueDate && !["completed", "cancelled"].includes(t.status) && new Date(t.dueDate) < now);
+  const dueToday   = myTasks.filter((t: any) => {
+    if (!t.dueDate || ["completed", "cancelled"].includes(t.status)) return false;
+    const d = new Date(t.dueDate);
+    return d.toDateString() === now.toDateString();
+  });
+
+  const previewTasks = active.slice(0, size === "small" ? 3 : size === "medium" ? 5 : 8);
+
+  return (
+    <>
+      <div className="h-full flex flex-col gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground font-medium">{active.length} active</span>
+          {inProgress.length > 0 && (
+            <Badge className="text-[10px] gap-0.5 px-1.5 h-4 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20" variant="outline">
+              <Play className="h-2.5 w-2.5" /> {inProgress.length} in progress
+            </Badge>
+          )}
+          {overdue.length > 0 && (
+            <Badge variant="destructive" className="text-[10px] gap-0.5 px-1.5 h-4">
+              <AlertTriangle className="h-2.5 w-2.5" /> {overdue.length} overdue
+            </Badge>
+          )}
+          {dueToday.length > 0 && overdue.length === 0 && (
+            <Badge className="text-[10px] gap-0.5 px-1.5 h-4 bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20" variant="outline">
+              <Clock className="h-2.5 w-2.5" /> {dueToday.length} due today
+            </Badge>
+          )}
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center flex-1">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : previewTasks.length === 0 ? (
+          <p className="text-sm text-muted-foreground flex-1 flex items-center">All caught up!</p>
+        ) : (
+          <div className="flex-1 space-y-1 min-h-0 overflow-hidden">
+            {previewTasks.map((task: any) => {
+              const isTaskOverdue = task.dueDate && new Date(task.dueDate) < now;
+              return (
+                <div key={task.id} className="flex items-center gap-2 text-xs py-0.5">
+                  {task.status === "in_progress"
+                    ? <Play className="h-3 w-3 text-yellow-500 shrink-0" />
+                    : <CheckSquare className={`h-3 w-3 shrink-0 ${isTaskOverdue ? "text-destructive" : "text-muted-foreground"}`} />
+                  }
+                  <span className={`truncate flex-1 ${isTaskOverdue ? "text-destructive" : ""}`}>{task.title}</span>
+                  {task.priority && (
+                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${PRIORITY_COLORS[task.priority] || "bg-gray-400"}`} title={PRIORITY_LABELS[task.priority]} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <button
+          onClick={() => setBoardOpen(true)}
+          className="flex items-center justify-center gap-1.5 w-full mt-1 pt-2 border-t text-xs text-primary hover:text-primary/80 transition-colors font-medium"
+          data-testid="open-tasks-board"
+        >
+          <Maximize2 className="h-3 w-3" /> Open Task Board
+        </button>
+      </div>
+
+      <Dialog open={boardOpen} onOpenChange={setBoardOpen}>
+        <DialogContent
+          className="max-w-[97vw] w-[97vw] h-[93vh] max-h-[93vh] p-0 flex flex-col gap-0 overflow-hidden"
+          data-testid="tasks-board-dialog"
+        >
+          <DialogHeader className="px-5 py-3 border-b shrink-0 flex-row items-center gap-3">
+            <ListChecks className="h-5 w-5 text-primary shrink-0" />
+            <DialogTitle className="text-base font-semibold">Task Board</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <TasksBoardPanel />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
