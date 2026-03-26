@@ -1685,10 +1685,10 @@ Respond with valid JSON matching this exact structure:
     }
   ],
   "imagePrompts": {
-    "header": "Detailed image prompt for the SOP header/overview image showing the main topic in a landscaping context",
+    "header": "Documentary-style field photo prompt for the SOP header: describe a real landscaping crew performing this task outdoors in natural daylight — include specific tools, materials, crew attire (work gear/PPE), setting, and what action is happening. Photorealistic, no illustrations.",
     "steps": [
-      "Detailed image prompt for step 1 showing a landscape crew performing the action described",
-      "Detailed image prompt for step 2..."
+      "Documentary-style field photo prompt for step 1: real crew member(s) on a job site actively performing this specific step — include tools in use, body position, materials, outdoor setting, natural light. Photorealistic, no illustrations.",
+      "Same format for step 2..."
     ]
   }
 }`
@@ -1732,7 +1732,7 @@ Generate comprehensive content with 5-8 detailed steps and image prompts for eve
 
           async function generateAndUploadImage(prompt: string, label: string): Promise<string | null> {
             try {
-              const fullPrompt = `Landscaping/outdoor work context: ${prompt}. Professional, clear, educational illustration style, high quality.`;
+              const fullPrompt = `Documentary-style field photograph: ${prompt}. Shot on a real landscaping job site, natural daylight, crew members in work gear actually performing the task, candid and authentic, photorealistic DSLR photography, sharp focus, no illustrations, no cartoons, no graphics.`;
               const imageApiRes = await fetch(`${baseURL}/images/generations`, {
                 method: "POST",
                 headers: {
@@ -2318,7 +2318,7 @@ Focus on accuracy. Include the most critical maintenance tasks that prevent brea
       (async () => {
         try {
           const stylePrompts: Record<string, string> = {
-            photoreal: "photorealistic, high quality photography, professional, detailed",
+            photoreal: "documentary-style field photograph, crew members in work gear on a real job site, natural daylight, candid and authentic, photorealistic DSLR photography, sharp focus, no illustrations, no cartoons",
             diagram: "technical diagram, clean lines, labeled, professional schematic",
             illustration: "simple illustration, clean, educational, clear colors",
             icon: "flat icon style, minimal, simple shapes, bold colors",
