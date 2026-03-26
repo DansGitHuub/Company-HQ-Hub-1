@@ -16,6 +16,7 @@ import {
   Hammer,
   ClipboardList,
   Sparkles,
+  StickyNote,
   type LucideIcon,
 } from "lucide-react";
 
@@ -193,13 +194,22 @@ export const WIDGET_DEFINITIONS: WidgetDefinition[] = [
     defaultSize: "medium",
     sizes: ["small", "medium", "large"],
   },
+  {
+    type: "notes",
+    label: "Quick Notes",
+    description: "Personal notepad with reminders — voice or type to add notes",
+    icon: StickyNote,
+    roles: ["Admin", "Manager", "Crew", "HR", "Sales", "New Hire"],
+    defaultSize: "medium",
+    sizes: ["small", "medium", "large"],
+  },
 ];
 
 export function getDefaultWidgets(role: string): WidgetConfig[] {
   const defaults: Record<string, string[]> = {
-    Admin: ["messages", "todos", "pipeline", "estimates", "calendar", "equipment", "marketing", "employees"],
-    Manager: ["messages", "todos", "pipeline", "estimates", "calendar", "equipment", "employees"],
-    Crew: ["todos", "calendar", "messages", "pipeline", "equipment", "sops"],
+    Admin:   ["notes", "messages", "todos", "pipeline", "estimates", "calendar", "equipment", "marketing", "employees"],
+    Manager: ["notes", "messages", "todos", "pipeline", "estimates", "calendar", "equipment", "employees"],
+    Crew:    ["notes", "todos", "calendar", "messages", "equipment", "sops"],
   };
 
   const types = defaults[role] || defaults.Crew;

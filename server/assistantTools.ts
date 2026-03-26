@@ -8,6 +8,7 @@ const TOOLS_REQUIRING_CONFIRMATION = [
   "logEquipmentService",
   "updateEquipmentHours",
   "submitRepairRequest",
+  "createNote",
 ];
 
 const STATUS_REQUIRING_CONFIRMATION = ["completed", "cancelled"];
@@ -313,6 +314,40 @@ export const allToolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = 
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "createNote",
+      description: "Create a quick note in the user's personal notepad on the dashboard. Can include a reminder time. Use when the user asks you to 'take a note', 'remind me', 'write this down', 'save this', or similar. Always confirm before saving.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Short title or subject for the note" },
+          body: { type: "string", description: "The full note content" },
+          reminderAt: { type: "string", description: "Optional ISO 8601 datetime string if the user wants a reminder (e.g. '2025-06-15T09:00:00')" },
+          color: { type: "string", enum: ["default", "yellow", "green", "blue", "purple", "red", "orange", "teal"], description: "Optional note color" },
+          tags: { type: "array", items: { type: "string" }, description: "Optional tags or categories" },
+          isPinned: { type: "boolean", description: "Whether to pin the note to the top" },
+        },
+        required: ["body"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getNotes",
+      description: "Search or list the user's personal notes. Use when the user asks 'what notes do I have', 'find my note about X', 'show my reminders', etc.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Optional search term to filter notes by title, body, or tag" },
+          pinned: { type: "boolean", description: "If true, only return pinned notes" },
+        },
+        required: [],
+      },
+    },
+  },
 ];
 
 const MODULE_ROUTES: Record<string, string> = {
@@ -359,7 +394,7 @@ function checkPermission(user: any, toolName: string): { allowed: boolean; reaso
   const readOnlyTools = [
     "searchGlobal", "searchEquipment", "searchTasks", "searchEmployees", "searchSOPs",
     "getDailyBriefing", "navigateTo", "openRecord", "lookupVIN",
-    "getMessages", "getCalendarEvents", "getJobs",
+    "getMessages", "getCalendarEvents", "getJobs", "getNotes",
   ];
   if (readOnlyTools.includes(toolName)) return { allowed: true };
 
@@ -728,6 +763,51 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
         );
 
         return { result: { success: true, assetName: equip.name, assetId: equip.asset_id, severity: toolArgs.severity, requestId: reqId } };
+      }
+
+      case "createNote": {
+        const noteId = crypto.randomUUID();
+        await pool.query(
+          `INSERT INTO notes (id, user_id, title, body, color, is_pinned, tags, reminder_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+          [noteId, user.id, toolArgs.title || null, toolArgs.body, toolArgs.color || "default",
+           toolArgs.isPinned || false, toolArgs.tags || [], toolArgs.reminderAt || null]
+        );
+        return {
+          result: {
+            success: true,
+            message: `Note saved${toolArgs.title ? ` — "${toolArgs.title}"` : ""}${toolArgs.reminderAt ? ` with reminder set for ${new Date(toolArgs.reminderAt).toLocaleString()}` : ""}. You can find it on your dashboard notepad.`,
+            noteId,
+          },
+        };
+      }
+
+      case "getNotes": {
+        let query = `SELECT * FROM notes WHERE user_id = $1 AND is_archived = FALSE ORDER BY is_pinned DESC, updated_at DESC LIMIT 15`;
+        const params: any[] = [user.id];
+
+        if (toolArgs.pinned) {
+          query = `SELECT * FROM notes WHERE user_id = $1 AND is_pinned = TRUE AND is_archived = FALSE ORDER BY updated_at DESC LIMIT 10`;
+        } else if (toolArgs.query) {
+          query = `SELECT * FROM notes WHERE user_id = $1 AND is_archived = FALSE AND (title ILIKE $2 OR body ILIKE $2) ORDER BY is_pinned DESC, updated_at DESC LIMIT 10`;
+          params.push(`%${toolArgs.query}%`);
+        }
+
+        const { rows } = await pool.query(query, params);
+        if (rows.length === 0) return { result: { notes: [], message: "No notes found." } };
+
+        const noteList = rows.map((n: any) => ({
+          id: n.id,
+          title: n.title || "(no title)",
+          body: n.body ? n.body.slice(0, 150) + (n.body.length > 150 ? "…" : "") : "",
+          color: n.color,
+          isPinned: n.is_pinned,
+          tags: n.tags,
+          reminderAt: n.reminder_at,
+          updatedAt: n.updated_at,
+        }));
+
+        return { result: { notes: noteList, count: rows.length } };
       }
 
       default:

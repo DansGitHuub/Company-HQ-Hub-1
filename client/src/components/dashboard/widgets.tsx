@@ -1,8 +1,10 @@
-import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useState, useRef, useCallback, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +44,19 @@ import {
   CheckCircle2,
   User,
   ListChecks,
+  StickyNote,
+  Pin,
+  PinOff,
+  Archive,
+  Trash2,
+  Plus,
+  Search,
+  Tag,
+  ChevronLeft,
+  Save,
+  AlarmClock,
+  Palette,
+  X,
 } from "lucide-react";
 import type { WidgetSize } from "./widgetRegistry";
 
@@ -883,6 +898,454 @@ export function SOPPipelineWidget({ size }: WidgetProps) {
   );
 }
 
+// ─── Notes Widget ─────────────────────────────────────────────────────────────
+
+type Note = {
+  id: string; userId: string; title: string | null; body: string | null;
+  color: string; isPinned: boolean; isArchived: boolean; tags: string[];
+  reminderAt: string | null; reminderSent: boolean; createdAt: string; updatedAt: string;
+};
+
+const NOTE_COLORS: Record<string, { bg: string; border: string; label: string }> = {
+  default: { bg: "bg-card",             border: "border-border",       label: "Default"  },
+  yellow:  { bg: "bg-yellow-50 dark:bg-yellow-950/40",  border: "border-yellow-300 dark:border-yellow-700",  label: "Yellow"   },
+  green:   { bg: "bg-green-50 dark:bg-green-950/40",    border: "border-green-300 dark:border-green-700",    label: "Green"    },
+  blue:    { bg: "bg-blue-50 dark:bg-blue-950/40",      border: "border-blue-300 dark:border-blue-700",      label: "Blue"     },
+  purple:  { bg: "bg-purple-50 dark:bg-purple-950/40",  border: "border-purple-300 dark:border-purple-700",  label: "Purple"   },
+  red:     { bg: "bg-red-50 dark:bg-red-950/40",        border: "border-red-300 dark:border-red-700",        label: "Red"      },
+  orange:  { bg: "bg-orange-50 dark:bg-orange-950/40",  border: "border-orange-300 dark:border-orange-700",  label: "Orange"   },
+  teal:    { bg: "bg-teal-50 dark:bg-teal-950/40",      border: "border-teal-300 dark:border-teal-700",      label: "Teal"     },
+};
+
+const COLOR_SWATCHES: Record<string, string> = {
+  default: "bg-card border-2 border-border",
+  yellow:  "bg-yellow-400",
+  green:   "bg-green-500",
+  blue:    "bg-blue-500",
+  purple:  "bg-purple-500",
+  red:     "bg-red-500",
+  orange:  "bg-orange-400",
+  teal:    "bg-teal-500",
+};
+
+function formatReminderDate(dt: string | null): string {
+  if (!dt) return "";
+  const d = new Date(dt);
+  const now = new Date();
+  const diff = d.getTime() - now.getTime();
+  if (diff < 0) return "Past reminder";
+  if (diff < 60 * 60 * 1000) return `In ${Math.round(diff / 60000)}m`;
+  if (diff < 24 * 60 * 60 * 1000) return `In ${Math.round(diff / 3600000)}h`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function toLocalDatetimeInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function NoteEditor({ note, onSave, onDelete, onBack }: {
+  note: Partial<Note> | null;
+  onSave: (data: Partial<Note>) => void;
+  onDelete: () => void;
+  onBack: () => void;
+}) {
+  const [title, setTitle]     = useState(note?.title || "");
+  const [body, setBody]       = useState(note?.body || "");
+  const [color, setColor]     = useState(note?.color || "default");
+  const [isPinned, setIsPinned] = useState(note?.isPinned || false);
+  const [tags, setTags]       = useState<string[]>(note?.tags || []);
+  const [tagInput, setTagInput] = useState("");
+  const [reminderAt, setReminderAt] = useState(toLocalDatetimeInput(note?.reminderAt || null));
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => { bodyRef.current?.focus(); }, []);
+
+  const handleSave = () => {
+    onSave({ title: title || null, body, color, isPinned, tags,
+      reminderAt: reminderAt ? new Date(reminderAt).toISOString() : null });
+  };
+
+  const addTag = () => {
+    const t = tagInput.trim().toLowerCase();
+    if (t && !tags.includes(t)) setTags([...tags, t]);
+    setTagInput("");
+  };
+
+  const removeTag = (t: string) => setTags(tags.filter(x => x !== t));
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
+        <button onClick={onBack} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" data-testid="note-back">
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <div className="flex gap-1 ml-1">
+          {Object.entries(COLOR_SWATCHES).map(([key, cls]) => (
+            <button key={key} onClick={() => setColor(key)}
+              className={`h-5 w-5 rounded-full ${cls} transition-all ${color === key ? "ring-2 ring-offset-1 ring-foreground scale-110" : "hover:scale-105"}`}
+              title={NOTE_COLORS[key]?.label} data-testid={`color-swatch-${key}`} />
+          ))}
+        </div>
+        <div className="ml-auto flex items-center gap-1">
+          <button onClick={() => setIsPinned(!isPinned)}
+            className={`p-1.5 rounded hover:bg-muted transition-colors ${isPinned ? "text-primary" : "text-muted-foreground"}`}
+            title={isPinned ? "Unpin" : "Pin"} data-testid="note-pin-toggle">
+            {isPinned ? <Pin className="h-3.5 w-3.5" /> : <PinOff className="h-3.5 w-3.5" />}
+          </button>
+          {note?.id && (
+            <button onClick={onDelete}
+              className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+              title="Delete note" data-testid="note-delete">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <Button size="sm" className="h-7 gap-1 text-xs" onClick={handleSave} data-testid="note-save">
+            <Save className="h-3 w-3" /> Save
+          </Button>
+        </div>
+      </div>
+
+      <div className={`flex-1 overflow-y-auto p-4 space-y-3 ${NOTE_COLORS[color]?.bg || ""}`}>
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") bodyRef.current?.focus(); }}
+          placeholder="Title"
+          className="w-full bg-transparent text-lg font-semibold border-none outline-none placeholder:text-muted-foreground/60"
+          data-testid="note-title-input"
+        />
+        <Textarea
+          ref={bodyRef}
+          value={body}
+          onChange={e => setBody(e.target.value)}
+          placeholder="Write your note…"
+          className="w-full min-h-[200px] bg-transparent border-none outline-none resize-none text-sm placeholder:text-muted-foreground/60 p-0 focus-visible:ring-0 shadow-none"
+          data-testid="note-body-input"
+        />
+
+        <div className="border-t pt-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <AlarmClock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <input
+              type="datetime-local"
+              value={reminderAt}
+              onChange={e => setReminderAt(e.target.value)}
+              className="text-xs bg-transparent border border-border rounded px-2 py-1 flex-1 text-foreground"
+              data-testid="note-reminder-input"
+            />
+            {reminderAt && (
+              <button onClick={() => setReminderAt("")} className="text-muted-foreground hover:text-foreground">
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <div className="flex flex-wrap gap-1 flex-1">
+              {tags.map(t => (
+                <span key={t} className="inline-flex items-center gap-0.5 text-[10px] bg-muted px-1.5 py-0.5 rounded-full">
+                  {t}
+                  <button onClick={() => removeTag(t)} className="hover:text-destructive"><X className="h-2.5 w-2.5" /></button>
+                </span>
+              ))}
+              <input
+                value={tagInput}
+                onChange={e => setTagInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(); } }}
+                placeholder="Add tag…"
+                className="text-xs bg-transparent border-none outline-none placeholder:text-muted-foreground/50 min-w-[60px] flex-1"
+                data-testid="note-tag-input"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NoteCard({ note, onClick, onPin, onArchive, onDelete }: {
+  note: Note;
+  onClick: () => void;
+  onPin: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const colors = NOTE_COLORS[note.color] || NOTE_COLORS.default;
+  const isPast = note.reminderAt && new Date(note.reminderAt) < new Date();
+
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className={`relative rounded-xl border p-3 cursor-pointer transition-all hover:shadow-md group ${colors.bg} ${colors.border}`}
+      data-testid={`note-card-${note.id}`}
+    >
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <div className="flex-1 min-w-0">
+          {note.title && <p className="text-sm font-semibold truncate">{note.title}</p>}
+          {note.body && (
+            <p className={`text-xs text-muted-foreground line-clamp-3 mt-0.5 ${!note.title ? "font-medium text-foreground/80" : ""}`}>
+              {note.body}
+            </p>
+          )}
+        </div>
+        {note.isPinned && <Pin className="h-3 w-3 text-primary shrink-0 mt-0.5" />}
+      </div>
+
+      {(note.tags.length > 0 || note.reminderAt) && (
+        <div className="flex flex-wrap items-center gap-1 mt-2">
+          {note.reminderAt && (
+            <span className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${isPast ? "bg-destructive/10 text-destructive" : "bg-blue-500/10 text-blue-600 dark:text-blue-400"}`}>
+              <AlarmClock className="h-2.5 w-2.5" /> {formatReminderDate(note.reminderAt)}
+            </span>
+          )}
+          {note.tags.slice(0, 3).map(t => (
+            <span key={t} className="text-[10px] bg-muted/80 text-muted-foreground px-1.5 py-0.5 rounded-full">{t}</span>
+          ))}
+        </div>
+      )}
+
+      {hovered && (
+        <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-background/90 backdrop-blur-sm rounded-lg shadow px-1 py-0.5 border"
+          onClick={e => e.stopPropagation()}>
+          <button onClick={onPin} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors" title={note.isPinned ? "Unpin" : "Pin"}>
+            {note.isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
+          </button>
+          <button onClick={onArchive} className="p-1 rounded hover:bg-muted text-muted-foreground transition-colors" title="Archive">
+            <Archive className="h-3 w-3" />
+          </button>
+          <button onClick={onDelete} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-colors" title="Delete">
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NotesPanel() {
+  const queryClient = useQueryClient();
+  const [search, setSearch]   = useState("");
+  const [filter, setFilter]   = useState<"all" | "pinned" | "reminders" | "archived">("all");
+  const [editing, setEditing] = useState<Note | null | "new">(null);
+
+  const qKey = ["/api/notes", filter, search];
+  const { data: notes = [], isLoading } = useQuery<Note[]>({
+    queryKey: qKey,
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (search) params.set("q", search);
+      if (filter === "pinned") params.set("pinned", "true");
+      if (filter === "archived") params.set("archived", "true");
+      const res = await fetch(`/api/notes?${params}`, { credentials: "include" });
+      return res.json();
+    },
+  });
+
+  const displayNotes = filter === "reminders"
+    ? notes.filter((n: Note) => !!n.reminderAt && !n.isArchived)
+    : notes;
+
+  const createMutation = useMutation({
+    mutationFn: async (data: Partial<Note>) => {
+      const res = await fetch("/api/notes", { method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      return res.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/notes"] }); setEditing(null); },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Note> }) => {
+      const res = await fetch(`/api/notes/${id}`, { method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      return res.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/notes"] }); setEditing(null); },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await fetch(`/api/notes/${id}`, { method: "DELETE", credentials: "include" });
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/notes"] }); setEditing(null); },
+  });
+
+  const handleSave = (data: Partial<Note>) => {
+    if (editing === "new") { createMutation.mutate(data); }
+    else if (editing) { updateMutation.mutate({ id: editing.id, data }); }
+  };
+
+  const FILTERS = [
+    { id: "all",       label: "All"       },
+    { id: "pinned",    label: "Pinned"    },
+    { id: "reminders", label: "Reminders" },
+    { id: "archived",  label: "Archived"  },
+  ] as const;
+
+  if (editing !== null) {
+    return (
+      <NoteEditor
+        note={editing === "new" ? null : editing}
+        onSave={handleSave}
+        onDelete={() => editing !== "new" && deleteMutation.mutate(editing.id)}
+        onBack={() => setEditing(null)}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-4 py-3 border-b shrink-0 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search notes…"
+              className="w-full pl-8 pr-3 py-1.5 text-sm bg-muted/50 border border-border rounded-lg outline-none focus:ring-1 focus:ring-primary"
+              data-testid="notes-search"
+            />
+          </div>
+          <Button size="sm" className="h-8 gap-1.5 shrink-0" onClick={() => setEditing("new")} data-testid="new-note-button">
+            <Plus className="h-3.5 w-3.5" /> New Note
+          </Button>
+        </div>
+        <div className="flex gap-1">
+          {FILTERS.map(f => (
+            <button key={f.id} onClick={() => setFilter(f.id)}
+              className={`text-xs px-3 py-1 rounded-full transition-colors ${filter === f.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+              data-testid={`filter-${f.id}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-32">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : displayNotes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2">
+            <StickyNote className="h-8 w-8 opacity-30" />
+            <p className="text-sm">{search ? "No notes match your search" : filter === "archived" ? "No archived notes" : "No notes yet — create your first!"}</p>
+          </div>
+        ) : (
+          <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-3 space-y-3">
+            {displayNotes.map((note: Note) => (
+              <div key={note.id} className="break-inside-avoid mb-3">
+                <NoteCard
+                  note={note}
+                  onClick={() => setEditing(note)}
+                  onPin={() => updateMutation.mutate({ id: note.id, data: { isPinned: !note.isPinned } })}
+                  onArchive={() => updateMutation.mutate({ id: note.id, data: { isArchived: true } })}
+                  onDelete={() => { if (confirm("Delete this note?")) deleteMutation.mutate(note.id); }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function NotesWidget({ size }: WidgetProps) {
+  const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: notes = [], isLoading } = useQuery<Note[]>({
+    queryKey: ["/api/notes", "all", ""],
+    queryFn: async () => {
+      const res = await fetch("/api/notes", { credentials: "include" });
+      return res.json();
+    },
+  });
+
+  const pinned    = notes.filter((n: Note) => n.isPinned && !n.isArchived);
+  const recent    = notes.filter((n: Note) => !n.isPinned && !n.isArchived);
+  const reminders = notes.filter((n: Note) => n.reminderAt && !n.reminderSent && !n.isArchived);
+  const previewNotes = [...pinned, ...recent].slice(0, size === "small" ? 2 : size === "medium" ? 3 : 5);
+
+  return (
+    <>
+      <div className="h-full flex flex-col gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground font-medium">{notes.filter((n: Note) => !n.isArchived).length} notes</span>
+          {pinned.length > 0 && (
+            <Badge variant="outline" className="text-[10px] gap-0.5 px-1.5 h-4">
+              <Pin className="h-2.5 w-2.5" /> {pinned.length} pinned
+            </Badge>
+          )}
+          {reminders.length > 0 && (
+            <Badge className="text-[10px] gap-0.5 px-1.5 h-4 bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20" variant="outline">
+              <AlarmClock className="h-2.5 w-2.5" /> {reminders.length} reminder{reminders.length > 1 ? "s" : ""}
+            </Badge>
+          )}
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center flex-1">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : previewNotes.length === 0 ? (
+          <button onClick={() => setOpen(true)} className="flex-1 flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground transition-colors group">
+            <StickyNote className="h-6 w-6 opacity-40 group-hover:opacity-60" />
+            <p className="text-xs">Tap to add your first note</p>
+          </button>
+        ) : (
+          <div className="flex-1 space-y-1.5 min-h-0 overflow-hidden">
+            {previewNotes.map((note: Note) => {
+              const colors = NOTE_COLORS[note.color] || NOTE_COLORS.default;
+              return (
+                <button key={note.id} onClick={() => setOpen(true)}
+                  className={`w-full text-left rounded-lg border px-2.5 py-1.5 ${colors.bg} ${colors.border} hover:shadow-sm transition-shadow`}
+                  data-testid={`notepad-preview-${note.id}`}>
+                  <div className="flex items-center gap-1.5">
+                    {note.isPinned && <Pin className="h-2.5 w-2.5 text-primary shrink-0" />}
+                    <p className="text-xs font-medium truncate flex-1">{note.title || note.body?.slice(0, 40) || "Empty note"}</p>
+                    {note.reminderAt && <AlarmClock className="h-2.5 w-2.5 text-blue-500 shrink-0" />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <button
+          onClick={() => setOpen(true)}
+          className="flex items-center justify-center gap-1.5 w-full mt-1 pt-2 border-t text-xs text-primary hover:text-primary/80 transition-colors font-medium"
+          data-testid="open-notepad"
+        >
+          <Maximize2 className="h-3 w-3" /> Open Notepad
+        </button>
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-[97vw] w-[97vw] h-[93vh] max-h-[93vh] p-0 flex flex-col gap-0 overflow-hidden" data-testid="notepad-dialog">
+          <DialogHeader className="px-5 py-3 border-b shrink-0 flex-row items-center gap-3">
+            <StickyNote className="h-5 w-5 text-primary shrink-0" />
+            <DialogTitle className="text-base font-semibold">My Notepad</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <NotesPanel />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>> = {
   messages: MessagesWidget,
   todos: TodosWidget,
@@ -901,4 +1364,5 @@ export const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>>
   help: HelpWidget,
   devtracker: DevTrackerWidget,
   soppipeline: SOPPipelineWidget,
+  notes: NotesWidget,
 };

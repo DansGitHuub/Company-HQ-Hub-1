@@ -7,6 +7,7 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerHiringRoutes } from "./hiringRoutes";
 import { registerEmployeeFormsRoutes } from "./employeeFormsRoutes";
+import { registerNotesRoutes, migrateNotesTable, runNoteReminderScheduler } from "./notesRoutes";
 import { registerAgreementRoutes } from "./agreementRoutes";
 import { registerCustomerHubRoutes } from "./customerHubRoutes";
 import { registerEquipmentRoutes } from "./equipmentRoutes";
@@ -9543,6 +9544,11 @@ Provide accurate information based on publicly available documentation.`;
   registerObjectStorageRoutes(app, requireAuth);
   registerChatRoutes(app);
   registerAssistantRoutes(app);
+
+  await migrateNotesTable();
+  registerNotesRoutes(app);
+  setInterval(runNoteReminderScheduler, 60 * 1000);
+  console.log("[notes-scheduler] Note reminder scheduler started (checking every minute)");
 
   // PDF Field Placer — build fillable PDF from field placer tool
   const fieldPlacerUpload = (await import("multer")).default({

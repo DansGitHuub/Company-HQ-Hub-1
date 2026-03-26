@@ -2811,3 +2811,26 @@ export const employeeAgreements = pgTable("employee_agreements", {
 export const insertEmployeeAgreementSchema = createInsertSchema(employeeAgreements).omit({ id: true, createdAt: true, sentAt: true, signedAt: true });
 export type InsertEmployeeAgreement = z.infer<typeof insertEmployeeAgreementSchema>;
 export type EmployeeAgreement = typeof employeeAgreements.$inferSelect;
+
+// ─── Quick Notes / Notepad ───────────────────────────────────────────────────
+export const noteColorEnum = ["default", "yellow", "green", "blue", "purple", "red", "orange", "teal"] as const;
+export type NoteColor = typeof noteColorEnum[number];
+
+export const notes = pgTable("notes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "cascade" }).notNull(),
+  title: text("title"),
+  body: text("body"),
+  color: text("color").default("default"),
+  isPinned: boolean("is_pinned").default(false),
+  isArchived: boolean("is_archived").default(false),
+  tags: text("tags").array().default([]),
+  reminderAt: timestamp("reminder_at"),
+  reminderSent: boolean("reminder_sent").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertNoteSchema = createInsertSchema(notes).omit({ id: true, createdAt: true, updatedAt: true, reminderSent: true });
+export type InsertNote = z.infer<typeof insertNoteSchema>;
+export type Note = typeof notes.$inferSelect;
