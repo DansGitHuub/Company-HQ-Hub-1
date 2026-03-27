@@ -40,6 +40,7 @@ The frontend is built with React and TypeScript, using React Query for server st
 - **User Tools**: Customizable User Profiles, Interactive Calendar, Document Sharing, Document Management, and Onboarding Forms System.
 - **Customer Hub**: Customer-facing portal with dashboard, job details, document access, care library, and messaging.
 - **Internationalization (i18n)**: Full English/Spanish language support with user preference stored in the database.
+- **Daily Crew Worksheet**: Full field reporting tool in the WORK nav section (`/daily-worksheet`). Supports draft saving and submit-with-email workflow. 7 sections: Job Information (weather conditions, customer, date, address, estimate#), Team Members & Time Log (foreman + 5 crew, auto-computed hours from arrival/departure times), Work Description (6 items: description, man hours, material, quantity), Punch List (5 items), Chemical Application Log (5 fixed chemicals with qty/location/vendor/cost), Equipment Log (4 fixed units), and Notes & Signature. On submission, emails a formatted HTML report to all Admin/Manager users. DB table: `daily_worksheets`. Backend routes: `server/dailyWorksheetRoutes.ts`.
 
 ## External Dependencies
 

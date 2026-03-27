@@ -2834,3 +2834,49 @@ export const notes = pgTable("notes", {
 export const insertNoteSchema = createInsertSchema(notes).omit({ id: true, createdAt: true, updatedAt: true, reminderSent: true });
 export type InsertNote = z.infer<typeof insertNoteSchema>;
 export type Note = typeof notes.$inferSelect;
+
+// ─── Daily Crew Worksheets ────────────────────────────────────────────────────
+export const dailyWorksheets = pgTable("daily_worksheets", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  submittedBy: varchar("submitted_by", { length: 36 }).references(() => users.id),
+  status: varchar("status", { length: 20 }).notNull().default("draft"), // draft | submitted
+
+  // Conditions
+  weatherConditions: text("weather_conditions").array().default([]),
+
+  // Job Info
+  customerName: text("customer_name").notNull().default(""),
+  date: varchar("date", { length: 20 }).notNull().default(""),
+  dayOfWeek: varchar("day_of_week", { length: 15 }),
+  addressLine1: text("address_line_1"),
+  addressLine2: text("address_line_2"),
+  estimateNumber: varchar("estimate_number", { length: 50 }),
+  contactPhone: varchar("contact_phone", { length: 20 }),
+
+  // Foreman
+  foremanName: text("foreman_name"),
+  foremanArrivalTime: varchar("foreman_arrival_time", { length: 15 }),
+  foremanDepartureTime: varchar("foreman_departure_time", { length: 15 }),
+  foremanTotalHours: varchar("foreman_total_hours", { length: 10 }),
+  foremanNotes: text("foreman_notes"),
+
+  // Dynamic arrays (JSON)
+  teamMembers: jsonb("team_members").notNull().default([]),
+  workItems: jsonb("work_items").notNull().default([]),
+  punchItems: jsonb("punch_items").notNull().default([]),
+  chemicalLog: jsonb("chemical_log").notNull().default({}),
+  equipmentLog: jsonb("equipment_log").notNull().default({}),
+
+  // Notes & Signature
+  additionalNotes: text("additional_notes"),
+  signatureName: text("signature_name"),
+  dateSigned: varchar("date_signed", { length: 20 }),
+
+  submittedAt: timestamp("submitted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDailyWorksheetSchema = createInsertSchema(dailyWorksheets).omit({ id: true, createdAt: true, updatedAt: true, submittedAt: true });
+export type InsertDailyWorksheet = z.infer<typeof insertDailyWorksheetSchema>;
+export type DailyWorksheet = typeof dailyWorksheets.$inferSelect;

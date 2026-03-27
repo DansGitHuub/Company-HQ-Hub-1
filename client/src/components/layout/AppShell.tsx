@@ -29,6 +29,7 @@ import {
   Truck,
   Info,
   ClipboardCheck,
+  ClipboardList,
   CheckSquare,
   Snowflake,
   BellRing,
@@ -343,6 +344,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     hiring: { icon: Users, label: t("nav.hiring"), href: "/hiring" },
     employees: { icon: User, label: t("nav.employees"), href: "/employees" },
     jobs: { icon: LayoutDashboard, label: t("nav.work"), href: "/jobs" },
+    daily_worksheet: { icon: ClipboardList, label: "Daily Worksheet", href: "/daily-worksheet" },
     education: { icon: GraduationCap, label: t("nav.resourceLibrary"), href: "/education" },
     help: { icon: LifeBuoy, label: t("nav.help"), href: "/help" },
     hq: { icon: Building2, label: t("nav.companyHQ"), href: "/hq" },
@@ -365,7 +367,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarSections: NavSection[] = [
     { label: "", items: ["dashboard"] },
-    { label: "WORK", items: ["jobs", "todos", "equipment"] },
+    { label: "WORK", items: ["jobs", "todos", "daily_worksheet", "equipment"] },
     { label: "PEOPLE", items: ["employees", "education", "hiring"] },
     { label: "COMPANY", items: ["inbox", "sops", "testing", "hq"] },
     { label: "ADMIN", items: ["admin", "tools", "forms"] },

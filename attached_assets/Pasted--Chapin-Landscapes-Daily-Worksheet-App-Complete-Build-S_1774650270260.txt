@@ -1,0 +1,641 @@
+# Chapin Landscapes — Daily Worksheet App: Complete Build Spec
+**Prepared for the Replit developer.**
+This document contains everything needed to build the Daily Worksheet feature: form structure, field definitions, validation rules, AI voice assistant behavior, and PDF export mapping. No other files are required to understand the spec — the PDF template (`Daily_Worksheet_Fillable.pdf`) is only needed at export time.
+
+---
+
+## 1. Overview & How This Form Works
+
+The Daily Crew Worksheet is filled out once per day by the crew foreman, either by tapping through fields in the app or by talking to the AI voice assistant. Here is how the system should behave:
+
+- **Validation lives in the app.** The PDF template has field flags set, but the real enforcement is in your UI. Block form submission if required fields are empty. Show inline errors next to each missing field.
+- **The PDF is export-only.** When the user taps "Export" or "Print," the app fills the PDF template programmatically and either downloads it or opens a print dialog. The PDF is not the primary UI.
+- **The AI assistant fills fields conversationally.** Users will say things like "the customer is Smith Residence" or "we arrived at 7:30." The AI maps those phrases to the correct field. Voice prompts for every field are listed in the schema below.
+- **Required fields must be confirmed at the start of every session** before the user fills anything else. See the Session Start Flow in Section 5.
+
+---
+
+## 2. Required vs. Optional Fields
+
+| Field | Required | Notes |
+|---|---|---|
+| Customer Name | **YES** | Block submission if empty. Highlight with error. |
+| Date | **YES** | Block submission if empty. Default to today. |
+| All other fields | No | Variable day to day. Never block submission for these. |
+
+**Validation rule:** When the user taps Submit, check `customer_name` and `date`. If either is empty, show an inline error message directly under that field: *"This field is required before submitting."* Do not use a modal alert. Do not clear or reset other fields.
+
+---
+
+## 3. Form Schema
+
+Every section, field, type, and voice prompt is defined here. Use `id` values as your internal data keys. Use `label` values for UI display. The `voice_prompts` arrays are the phrases your AI assistant should recognize as referring to each field.
+
+```json
+{
+  "form": {
+    "id": "daily_worksheet",
+    "title": "Chapin Landscapes – Daily Crew Worksheet",
+    "version": "1.0",
+    "submit_label": "Submit Worksheet",
+    "export_label": "Export to PDF"
+  },
+
+  "sections": [
+
+    {
+      "id": "job_info",
+      "title": "Job Information",
+      "fields": [
+        {
+          "id": "customer_name",
+          "label": "Customer Name",
+          "type": "text",
+          "required": true,
+          "placeholder": "e.g., Smith Residence",
+          "voice_prompts": [
+            "customer name", "customer", "client name", "client",
+            "job name", "who is the customer"
+          ],
+          "validation": {
+            "min_length": 2,
+            "error_message": "Customer name is required before submitting."
+          }
+        },
+        {
+          "id": "date",
+          "label": "Date",
+          "type": "date",
+          "required": true,
+          "placeholder": "MM/DD/YYYY",
+          "default": "today",
+          "voice_prompts": [
+            "date", "today's date", "what date", "job date", "work date"
+          ],
+          "validation": {
+            "format": "MM/DD/YYYY",
+            "error_message": "Date is required before submitting."
+          }
+        },
+        {
+          "id": "day_of_week",
+          "label": "Day of Week",
+          "type": "select",
+          "required": false,
+          "default": "auto",
+          "note": "Auto-populate from the Date field. User should not need to set this manually.",
+          "options": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+          "voice_prompts": ["day of week", "what day", "day"]
+        },
+        {
+          "id": "address_line_1",
+          "label": "Address Line 1",
+          "type": "text",
+          "required": false,
+          "placeholder": "Street address of job site",
+          "voice_prompts": [
+            "address", "job address", "site address",
+            "street address", "address line one"
+          ]
+        },
+        {
+          "id": "address_line_2",
+          "label": "Address Line 2 / City, State, Zip",
+          "type": "text",
+          "required": false,
+          "placeholder": "City, State ZIP",
+          "voice_prompts": [
+            "city", "address line two", "city state zip", "zip code"
+          ]
+        },
+        {
+          "id": "estimate_number",
+          "label": "Estimate Number",
+          "type": "text",
+          "required": false,
+          "placeholder": "e.g., EST-2024-047",
+          "voice_prompts": [
+            "estimate number", "estimate", "job number", "estimate id"
+          ]
+        },
+        {
+          "id": "contact_phone",
+          "label": "Contact Phone",
+          "type": "tel",
+          "required": false,
+          "placeholder": "Customer phone number",
+          "voice_prompts": [
+            "phone number", "contact", "phone", "customer phone"
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "team_time",
+      "title": "Team Members & Time Log",
+      "note": "Render the Foreman as a fixed first row (not deletable). Render Team Members 1–5 as dynamic rows the user can add or remove.",
+      "fields": [
+        {
+          "id": "foreman_name",
+          "label": "Foreman Name",
+          "type": "text",
+          "required": false,
+          "placeholder": "Lead crew member",
+          "voice_prompts": [
+            "foreman", "foreman name", "lead", "crew lead", "supervisor"
+          ]
+        },
+        {
+          "id": "foreman_arrival_time",
+          "label": "Foreman Arrival Time",
+          "type": "time",
+          "required": false,
+          "placeholder": "e.g., 7:30 AM",
+          "voice_prompts": [
+            "foreman arrived", "foreman arrival",
+            "foreman arrival time", "lead arrived at"
+          ]
+        },
+        {
+          "id": "foreman_departure_time",
+          "label": "Foreman Departure Time",
+          "type": "time",
+          "required": false,
+          "placeholder": "e.g., 4:00 PM",
+          "voice_prompts": [
+            "foreman left", "foreman departure",
+            "foreman departure time", "lead departed at", "foreman done"
+          ]
+        },
+        {
+          "id": "foreman_total_hours",
+          "label": "Foreman Total Hours",
+          "type": "number",
+          "required": false,
+          "step": 0.25,
+          "computed_from": ["foreman_arrival_time", "foreman_departure_time"],
+          "note": "Auto-calculate. User can override manually.",
+          "voice_prompts": ["foreman hours", "foreman total hours", "lead hours"]
+        },
+        {
+          "id": "foreman_notes",
+          "label": "Foreman Notes",
+          "type": "text",
+          "required": false,
+          "voice_prompts": ["foreman notes", "lead notes", "foreman comment"]
+        }
+      ],
+      "repeating_group": {
+        "id": "team_member",
+        "label": "Team Member",
+        "min": 0,
+        "max": 5,
+        "instance_label": "Team Member {n}",
+        "add_button_label": "Add Team Member",
+        "fields": [
+          {
+            "id": "name",
+            "label": "Name",
+            "type": "text",
+            "required": false,
+            "placeholder": "Team member name",
+            "voice_prompts": [
+              "team member {n} name", "member {n}",
+              "crew member {n}", "add team member", "add crew member"
+            ]
+          },
+          {
+            "id": "arrival_time",
+            "label": "Arrival Time",
+            "type": "time",
+            "required": false,
+            "voice_prompts": [
+              "team member {n} arrived",
+              "team member {n} arrival",
+              "{name} arrived at"
+            ]
+          },
+          {
+            "id": "departure_time",
+            "label": "Departure Time",
+            "type": "time",
+            "required": false,
+            "voice_prompts": [
+              "team member {n} left", "team member {n} departure",
+              "{name} left at", "{name} departed"
+            ]
+          },
+          {
+            "id": "total_hours",
+            "label": "Total Hours",
+            "type": "number",
+            "required": false,
+            "step": 0.25,
+            "computed_from": ["arrival_time", "departure_time"],
+            "note": "Auto-calculate. User can override.",
+            "voice_prompts": [
+              "team member {n} hours", "{name} hours", "{name} worked"
+            ]
+          },
+          {
+            "id": "notes",
+            "label": "Notes",
+            "type": "text",
+            "required": false,
+            "voice_prompts": ["team member {n} notes", "{name} notes"]
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "work_description",
+      "title": "Work Description & Man Hours",
+      "note": "Render as dynamic rows. User adds items one at a time. Max 6.",
+      "repeating_group": {
+        "id": "work_item",
+        "label": "Work Item",
+        "min": 0,
+        "max": 6,
+        "instance_label": "Item {n}",
+        "add_button_label": "Add Work Item",
+        "fields": [
+          {
+            "id": "description",
+            "label": "Description of Work",
+            "type": "text",
+            "required": false,
+            "placeholder": "What was done",
+            "voice_prompts": [
+              "work item {n}", "item {n} description",
+              "work description {n}", "what was done for item {n}",
+              "add work item", "add task", "description of work"
+            ]
+          },
+          {
+            "id": "man_hours",
+            "label": "Man Hours",
+            "type": "number",
+            "required": false,
+            "step": 0.25,
+            "placeholder": "0.0",
+            "voice_prompts": [
+              "man hours for item {n}", "hours for item {n}",
+              "item {n} hours", "how many hours for item {n}"
+            ]
+          },
+          {
+            "id": "material",
+            "label": "Materials Used",
+            "type": "text",
+            "required": false,
+            "placeholder": "Material name",
+            "voice_prompts": [
+              "material for item {n}", "materials used for item {n}",
+              "item {n} material", "what material for item {n}"
+            ]
+          },
+          {
+            "id": "quantity",
+            "label": "Quantity",
+            "type": "text",
+            "required": false,
+            "placeholder": "e.g., 3 bags, 10 ft",
+            "voice_prompts": [
+              "quantity for item {n}", "how much material for item {n}",
+              "item {n} quantity", "amount for item {n}"
+            ]
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "punch_list",
+      "title": "Things to Fix / Change / Add",
+      "note": "Punch list. Visible to office staff when the record is submitted. Render as dynamic rows, max 5.",
+      "repeating_group": {
+        "id": "punch_item",
+        "label": "Punch List Item",
+        "min": 0,
+        "max": 5,
+        "instance_label": "Item {n}",
+        "add_button_label": "Add Punch List Item",
+        "fields": [
+          {
+            "id": "description",
+            "label": "Item Description",
+            "type": "text",
+            "required": false,
+            "placeholder": "What needs to be fixed, changed, or added",
+            "voice_prompts": [
+              "punch list item {n}", "fix item {n}",
+              "thing to fix {n}", "add to punch list",
+              "needs to be fixed", "change item {n}", "add item to fix"
+            ]
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "chemical_log",
+      "title": "Chemical Application Log (EPA Required)",
+      "note": "Render as a fixed table — these 5 rows are always shown with the chemical names pre-filled. The user only fills the quantity, location, vendor, and amount columns. Leave blank if a chemical was not used.",
+      "repeating_group": {
+        "id": "chemical_entry",
+        "label": "Chemical",
+        "fixed_rows": true,
+        "instances": [
+          { "n": 1, "chemical_name": "Dimension 62719-542",      "epa_reg": "62719-542" },
+          { "n": 2, "chemical_name": "Brush Master 2217-774",    "epa_reg": "2217-774" },
+          { "n": 3, "chemical_name": "Cross Check 279315610404", "epa_reg": "279315610404" },
+          { "n": 4, "chemical_name": "Three Way 10404-43",       "epa_reg": "10404-43" },
+          { "n": 5, "chemical_name": "Round-Up Quik Pro",        "epa_reg": "524-475" }
+        ],
+        "fields": [
+          {
+            "id": "quantity_gallons",
+            "label": "Qty / Gallons",
+            "type": "number",
+            "required": false,
+            "step": 0.1,
+            "placeholder": "0.0",
+            "voice_prompts": [
+              "{chemical_name} quantity", "{chemical_name} gallons",
+              "how much {chemical_name}", "{chemical_name} amount used"
+            ]
+          },
+          {
+            "id": "location_of_spray",
+            "label": "Location of Spray",
+            "type": "text",
+            "required": false,
+            "placeholder": "Where was it applied",
+            "voice_prompts": [
+              "{chemical_name} location",
+              "where was {chemical_name} applied",
+              "{chemical_name} spray location",
+              "location for {chemical_name}"
+            ]
+          },
+          {
+            "id": "vendor",
+            "label": "Receipt / Vendor",
+            "type": "text",
+            "required": false,
+            "placeholder": "Vendor name or receipt number",
+            "voice_prompts": [
+              "{chemical_name} vendor", "{chemical_name} receipt",
+              "where did we get {chemical_name}"
+            ]
+          },
+          {
+            "id": "amount_dollars",
+            "label": "Amount ($)",
+            "type": "currency",
+            "required": false,
+            "placeholder": "0.00",
+            "voice_prompts": [
+              "{chemical_name} cost", "{chemical_name} price",
+              "how much did {chemical_name} cost",
+              "{chemical_name} dollar amount"
+            ]
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "equipment_log",
+      "title": "Equipment Log",
+      "note": "Fixed rows, always shown. User fills purpose and hours only.",
+      "repeating_group": {
+        "id": "equipment_entry",
+        "label": "Equipment",
+        "fixed_rows": true,
+        "instances": [
+          { "n": 1, "equipment_name": "Skid Steer" },
+          { "n": 2, "equipment_name": "Excavator" },
+          { "n": 3, "equipment_name": "MT-50" },
+          { "n": 4, "equipment_name": "Other Equipment" }
+        ],
+        "fields": [
+          {
+            "id": "purpose",
+            "label": "Used For / Purpose",
+            "type": "text",
+            "required": false,
+            "placeholder": "What was it used for",
+            "voice_prompts": [
+              "{equipment_name} used for", "{equipment_name} purpose",
+              "what was the {equipment_name} used for", "{equipment_name} task"
+            ]
+          },
+          {
+            "id": "hours",
+            "label": "Hours",
+            "type": "number",
+            "required": false,
+            "step": 0.25,
+            "placeholder": "0.0",
+            "voice_prompts": [
+              "{equipment_name} hours",
+              "how long was the {equipment_name} used",
+              "{equipment_name} run time",
+              "hours on the {equipment_name}"
+            ]
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "notes_signature",
+      "title": "Additional Notes & Signature",
+      "fields": [
+        {
+          "id": "additional_notes",
+          "label": "Additional Notes",
+          "type": "textarea",
+          "required": false,
+          "placeholder": "Any other notes, observations, or comments about today's work",
+          "voice_prompts": [
+            "notes", "additional notes", "general notes",
+            "comments", "add a note", "other notes"
+          ]
+        },
+        {
+          "id": "date_signed",
+          "label": "Date Signed",
+          "type": "date",
+          "required": false,
+          "default": "today",
+          "voice_prompts": ["date signed", "sign date", "signature date"]
+        }
+      ]
+    }
+
+  ]
+}
+```
+
+---
+
+## 4. Computed Fields (Auto-Calculate — No User Input Required)
+
+| Field | Computed From | Logic |
+|---|---|---|
+| `day_of_week` | `date` | `new Date(date).toLocaleDateString('en-US', {weekday: 'long'})` |
+| `foreman_total_hours` | `foreman_arrival_time` + `foreman_departure_time` | Departure minus arrival in decimal hours. Example: 7:30 AM → 4:00 PM = 8.5 hours |
+| `team_member_{n}_total_hours` | `team_member_{n}_arrival_time` + `team_member_{n}_departure_time` | Same logic as foreman |
+
+Allow the user to manually override any computed field if needed.
+
+---
+
+## 5. AI Voice Assistant — Behavior & Session Flow
+
+### Session Start Flow
+Run this sequence at the beginning of every new worksheet session before letting the user fill other fields freely:
+
+1. Auto-fill today's date. Confirm with user: *"I've set today's date to [date]. Does that look right?"*
+2. Ask: *"Who is the customer for today's job?"* → maps to `customer_name`
+3. Ask: *"What's the job site address?"* → maps to `address_line_1` (user can say "skip" to move on)
+4. Ask: *"Who's on the crew today?"* → fill `foreman_name` and `team_member_{n}_name` in order
+5. After that, let the user drive via voice or by tapping through fields freely.
+
+### Ambiguous Voice Command Rules
+
+| If the user says... | Do this |
+|---|---|
+| "set customer" or "the customer is" | → `customer_name` |
+| "we arrived at [time]" with no name | Apply to foreman by default. Then ask: *"Just you, or the whole crew?"* |
+| "add a task" or "we did" | Create the next available `work_item` row |
+| A chemical name partially (e.g., "Dimension" or "Roundup") | Fuzzy-match to the closest pre-loaded chemical in the chemical log |
+| "add to punch list" or "needs to be fixed" | Append to the next available `punch_item` |
+| "we used the skid steer" or "skid steer was running" | Map to `equipment_log` → Skid Steer row |
+| Time in any format (7:30 AM, 07:30, 7:30) | Normalize to HH:MM AM/PM before storing |
+
+### Token Substitution
+In the voice prompt arrays, `{n}` means the instance number (1, 2, 3…), `{name}` means the team member's actual name once it has been set, and `{chemical_name}` / `{equipment_name}` means the pre-loaded label for that row. Resolve these tokens at runtime so the AI can match "John arrived at 8" to Team Member 2's arrival time if John is Member 2.
+
+---
+
+## 6. PDF Export — Field Mapping
+
+When the user taps Export or Print, fill `Daily_Worksheet_Fillable.pdf` using the mapping below. The left column is your app's internal field ID. The right column is the exact AcroForm field name in the PDF. These must match exactly (case-sensitive).
+
+| App Field ID | PDF Field Name |
+|---|---|
+| `customer_name` | `Customer Name` |
+| `date` | `Date` |
+| `address_line_1` | `Address Line 1` |
+| `address_line_2` | `Address Line 2` |
+| `estimate_number` | `Estimate Number` |
+| `contact_phone` | `Contact Phone` |
+| `foreman_name` | `Foreman Name` |
+| `foreman_arrival_time` | `Foreman Arrival Time` |
+| `foreman_departure_time` | `Foreman Departure Time` |
+| `foreman_total_hours` | `Foreman Total Hours` |
+| `foreman_notes` | `Foreman Notes` |
+| `team_member_1_name` | `Team Member 1 Name` |
+| `team_member_1_arrival_time` | `Team Member 1 Arrival Time` |
+| `team_member_1_departure_time` | `Team Member 1 Departure Time` |
+| `team_member_1_total_hours` | `Team Member 1 Total Hours` |
+| `team_member_1_notes` | `Team Member 1 Notes` |
+| `team_member_2_name` | `Team Member 2 Name` |
+| `team_member_2_arrival_time` | `Team Member 2 Arrival Time` |
+| `team_member_2_departure_time` | `Team Member 2 Departure Time` |
+| `team_member_2_total_hours` | `Team Member 2 Total Hours` |
+| `team_member_2_notes` | `Team Member 2 Notes` |
+| `team_member_3_name` | `Team Member 3 Name` |
+| `team_member_3_arrival_time` | `Team Member 3 Arrival Time` |
+| `team_member_3_departure_time` | `Team Member 3 Departure Time` |
+| `team_member_3_total_hours` | `Team Member 3 Total Hours` |
+| `team_member_3_notes` | `Team Member 3 Notes` |
+| `team_member_4_name` | `Team Member 4 Name` |
+| `team_member_4_arrival_time` | `Team Member 4 Arrival Time` |
+| `team_member_4_departure_time` | `Team Member 4 Departure Time` |
+| `team_member_4_total_hours` | `Team Member 4 Total Hours` |
+| `team_member_4_notes` | `Team Member 4 Notes` |
+| `team_member_5_name` | `Team Member 5 Name` |
+| `team_member_5_arrival_time` | `Team Member 5 Arrival Time` |
+| `team_member_5_departure_time` | `Team Member 5 Departure Time` |
+| `team_member_5_total_hours` | `Team Member 5 Total Hours` |
+| `team_member_5_notes` | `Team Member 5 Notes` |
+| `work_item_1_description` | `Work Description 1` |
+| `work_item_1_man_hours` | `Man Hours 1` |
+| `work_item_1_material` | `Material 1` |
+| `work_item_1_quantity` | `Quantity 1` |
+| `work_item_2_description` | `Work Description 2` |
+| `work_item_2_man_hours` | `Man Hours 2` |
+| `work_item_2_material` | `Material 2` |
+| `work_item_2_quantity` | `Quantity 2` |
+| `work_item_3_description` | `Work Description 3` |
+| `work_item_3_man_hours` | `Man Hours 3` |
+| `work_item_3_material` | `Material 3` |
+| `work_item_3_quantity` | `Quantity 3` |
+| `work_item_4_description` | `Work Description 4` |
+| `work_item_4_man_hours` | `Man Hours 4` |
+| `work_item_4_material` | `Material 4` |
+| `work_item_4_quantity` | `Quantity 4` |
+| `work_item_5_description` | `Work Description 5` |
+| `work_item_5_man_hours` | `Man Hours 5` |
+| `work_item_5_material` | `Material 5` |
+| `work_item_5_quantity` | `Quantity 5` |
+| `work_item_6_description` | `Work Description 6` |
+| `work_item_6_man_hours` | `Man Hours 6` |
+| `work_item_6_material` | `Material 6` |
+| `work_item_6_quantity` | `Quantity 6` |
+| `punch_item_1` | `Punch List Item 1` |
+| `punch_item_2` | `Punch List Item 2` |
+| `punch_item_3` | `Punch List Item 3` |
+| `punch_item_4` | `Punch List Item 4` |
+| `punch_item_5` | `Punch List Item 5` |
+| `additional_notes` | `Additional Notes` |
+| `date_signed` | `Date Signed` |
+| `dimension_quantity` | `Dimension 62719-542 Quantity` |
+| `dimension_location` | `Dimension 62719-542 Location` |
+| `dimension_vendor` | `Dimension 62719-542 Vendor` |
+| `dimension_amount` | `Dimension 62719-542 Amount` |
+| `brush_master_quantity` | `Brush Master 2217-774 Quantity` |
+| `brush_master_location` | `Brush Master 2217-774 Location` |
+| `brush_master_vendor` | `Brush Master 2217-774 Vendor` |
+| `brush_master_amount` | `Brush Master 2217-774 Amount` |
+| `cross_check_quantity` | `Cross Check 279315610404 Quantity` |
+| `cross_check_location` | `Cross Check 279315610404 Location` |
+| `cross_check_vendor` | `Cross Check 279315610404 Vendor` |
+| `cross_check_amount` | `Cross Check 279315610404 Amount` |
+| `three_way_quantity` | `Three Way 10404-43 Quantity` |
+| `three_way_location` | `Three Way 10404-43 Location` |
+| `three_way_vendor` | `Three Way 10404-43 Vendor` |
+| `three_way_amount` | `Three Way 10404-43 Amount` |
+| `roundup_quantity` | `Round-Up Quik Pro Quantity` |
+| `roundup_location` | `Round-Up Quik Pro Location` |
+| `roundup_vendor` | `Round-Up Quik Pro Vendor` |
+| `roundup_amount` | `Round-Up Quik Pro Amount` |
+| `skid_steer_purpose` | `Skid Steer Purpose` |
+| `skid_steer_hours` | `Skid Steer Hours` |
+| `excavator_purpose` | `Excavator Purpose` |
+| `excavator_hours` | `Excavator Hours` |
+| `mt50_purpose` | `MT-50 Purpose` |
+| `mt50_hours` | `MT-50 Hours` |
+| `other_equipment_purpose` | `Other Equipment Purpose` |
+| `other_equipment_hours` | `Other Equipment Hours` |
+
+The PDF contains 102 AcroForm fields total. Day-of-week is handled via 7 individual checkbox fields (`Day Mon`, `Day Tue`, etc.) — check the one matching the computed `day_of_week` value when exporting.
+
+---
+
+## 7. Files Included
+
+| File | Purpose |
+|---|---|
+| `Replit_Build_Spec_Daily_Worksheet.md` | This file. Complete build spec. Give to your Replit developer. |
+| `Daily_Worksheet_Fillable.pdf` | PDF template for export/print only. 102 AcroForm fields pre-built. Required fields (Customer Name, Date) have orange borders and are flagged in the PDF, but app-side validation is the enforcer. |
+
+---
+
+*Chapin Landscapes — Daily Worksheet Spec v1.0*

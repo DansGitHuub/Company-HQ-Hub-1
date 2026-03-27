@@ -34,6 +34,7 @@ import EquipmentTracker from "@/pages/EquipmentTracker";
 import SearchPage from "@/pages/Search";
 import TodoList from "@/pages/TodoList";
 
+import DailyWorksheet from "@/pages/DailyWorksheet";
 import PlowSiteMapper from "@/pages/PlowSiteMapper";
 import ProcessAuditor from "@/pages/ProcessAuditor";
 import IntegrationWizard from "@/pages/IntegrationWizard";
@@ -124,6 +125,7 @@ function AppRoutes() {
         <Route path="/equipment" component={EquipmentTracker} />
         <Route path="/search" component={SearchPage} />
         <Route path="/todos" component={TodoList} />
+        <Route path="/daily-worksheet" component={DailyWorksheet} />
         <Route path="/tools/plow-mapper" component={PlowSiteMapper} />
         <Route path="/tools/process-auditor" component={ProcessAuditor} />
         <Route path="/tools/integration-wizard" component={IntegrationWizard} />

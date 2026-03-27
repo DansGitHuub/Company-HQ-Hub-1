@@ -8,6 +8,7 @@ import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerHiringRoutes } from "./hiringRoutes";
 import { registerEmployeeFormsRoutes } from "./employeeFormsRoutes";
 import { registerNotesRoutes, migrateNotesTable, runNoteReminderScheduler } from "./notesRoutes";
+import { registerDailyWorksheetRoutes } from "./dailyWorksheetRoutes";
 import { registerAgreementRoutes } from "./agreementRoutes";
 import { registerCustomerHubRoutes } from "./customerHubRoutes";
 import { registerEquipmentRoutes } from "./equipmentRoutes";
@@ -9547,6 +9548,7 @@ Provide accurate information based on publicly available documentation.`;
 
   await migrateNotesTable();
   registerNotesRoutes(app);
+  registerDailyWorksheetRoutes(app, requireAuth);
   setInterval(runNoteReminderScheduler, 60 * 1000);
   console.log("[notes-scheduler] Note reminder scheduler started (checking every minute)");
 
