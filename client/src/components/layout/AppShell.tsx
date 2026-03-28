@@ -120,6 +120,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       description: "Track all projects from lead to completion with customizable tabs.",
       tips: ["Use tabs for job types", "Upload permits and contracts", "Track with Google Maps"]
     },
+    daily_worksheet: {
+      title: "Daily Worksheet",
+      description: "Field reporting tool for daily crew activity, materials, chemicals, and equipment used on the job.",
+      tips: ["Save drafts and submit when complete", "Email report sent to all admins/managers on submit", "Tracks chemicals, equipment, and crew hours"]
+    },
     education: {
       title: t("nav.resourceLibrary"),
       description: "Resource library with care guides, instructions, and documents for customers.",
