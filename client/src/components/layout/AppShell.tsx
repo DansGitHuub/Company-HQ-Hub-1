@@ -485,17 +485,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 const showTodoBadge = item.id === "todos" && todoActiveStatus?.isActive && todoActiveStatus.unreadCount > 0;
                 return (
                   <div key={item.id} className="flex items-center group w-full">
-                    <Link href={item.href} className="flex-1 min-w-0 block">
+                    <Link href={item.href} className="flex-1 min-w-0 block" style={{ height: 36, overflow: 'hidden' }}>
                       <div
                         className={cn(
-                          "flex items-center gap-3 rounded-lg font-semibold transition-all cursor-pointer overflow-hidden",
+                          "flex items-center gap-3 rounded-lg font-semibold transition-all cursor-pointer",
                           "border border-white/5 shadow-sm",
                           "bg-gradient-to-b from-white/[0.08] to-transparent",
-                          "h-9 px-4 text-[13px] leading-[16px]",
+                          "px-4 text-[13px]",
                           isActive
                             ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] border-sidebar-primary/50"
                             : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] hover:border-white/10"
                         )}
+                        style={{ height: 36, overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 12 }}
                         onClick={() => {
                           if (location === item.href) {
                             window.dispatchEvent(new CustomEvent("forms-nav-reset"));
@@ -503,7 +504,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                           setIsMobileOpen(false);
                         }}
                       >
-                        <div className="relative shrink-0">
+                        <div className="relative" style={{ flexShrink: 0 }}>
                           <item.icon className="h-4 w-4" />
                           {showTodoBadge && (
                             <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
@@ -511,7 +512,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                             </span>
                           )}
                         </div>
-                        <span className="truncate">{item.label}</span>
+                        <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0 }}>{item.label}</span>
                       </div>
                     </Link>
                     {helpContent && (
@@ -555,18 +556,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Link href={item.href} className="flex-1 min-w-0 block">
                 <div
                   className={cn(
-                    "flex items-center gap-3 rounded-lg font-semibold transition-all cursor-pointer overflow-hidden",
+                    "flex items-center gap-3 rounded-lg font-semibold transition-all cursor-pointer",
                     "border border-white/5 shadow-sm",
                     "bg-gradient-to-b from-white/[0.08] to-transparent",
-                    "h-9 px-4 text-[13px] leading-[16px]",
+                    "px-4 text-[13px]",
                     isActive
                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_2px_4px_rgba(0,0,0,0.3)] border-sidebar-primary/50"
                       : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_2px_4px_rgba(0,0,0,0.2)] hover:border-white/10"
                   )}
+                  style={{ height: 36, overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 12 }}
                   onClick={() => setIsMobileOpen(false)}
                 >
-                  <item.icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
+                  <item.icon className="h-4 w-4" style={{ flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0 }}>{item.label}</span>
                 </div>
               </Link>
             </div>
