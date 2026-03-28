@@ -488,7 +488,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <Link href={item.href} className="flex-1 min-w-0 block">
                       <div
                         className={cn(
-                          "flex items-center gap-3 rounded-lg font-semibold transition-all cursor-pointer",
+                          "flex items-center gap-3 rounded-lg font-semibold transition-all cursor-pointer overflow-hidden",
                           "border border-white/5 shadow-sm",
                           "bg-gradient-to-b from-white/[0.08] to-transparent",
                           "h-9 px-4 text-[13px] leading-[16px]",
@@ -503,7 +503,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                           setIsMobileOpen(false);
                         }}
                       >
-                        <div className="relative">
+                        <div className="relative shrink-0">
                           <item.icon className="h-4 w-4" />
                           {showTodoBadge && (
                             <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
@@ -511,7 +511,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                             </span>
                           )}
                         </div>
-                        {item.label}
+                        <span className="truncate">{item.label}</span>
                       </div>
                     </Link>
                     {helpContent && (
@@ -555,7 +555,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Link href={item.href} className="flex-1 min-w-0 block">
                 <div
                   className={cn(
-                    "flex items-center gap-3 rounded-lg font-semibold transition-all cursor-pointer",
+                    "flex items-center gap-3 rounded-lg font-semibold transition-all cursor-pointer overflow-hidden",
                     "border border-white/5 shadow-sm",
                     "bg-gradient-to-b from-white/[0.08] to-transparent",
                     "h-9 px-4 text-[13px] leading-[16px]",
@@ -565,8 +565,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   )}
                   onClick={() => setIsMobileOpen(false)}
                 >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{item.label}</span>
                 </div>
               </Link>
             </div>
