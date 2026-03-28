@@ -520,7 +520,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0 }}>{item.label}</span>
                       </div>
                     </Link>
-                    {helpContent && (
+                    {helpContent ? (
                       <Popover>
                         <PopoverTrigger asChild>
                           <button 
@@ -548,6 +548,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                           </div>
                         </PopoverContent>
                       </Popover>
+                    ) : (
+                      <div style={{ width: 22, height: 22, flexShrink: 0 }} aria-hidden="true" />
                     )}
                   </div>
                 );
