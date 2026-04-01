@@ -28,6 +28,107 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  app.post("/api/customers", requireAuth, async (req, res) => {
+    const { first_name, last_name, company_name, billing_address, billing_city,
+            billing_state, billing_zip, source, notes, phones = [], emails = [] } = req.body;
+
+    if (!first_name?.trim() || !last_name?.trim()) {
+      return res.status(400).json({ message: "First name and last name are required" });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query(
+        `INSERT INTO customers
+           (first_name, last_name, company_name, billing_address, billing_city,
+            billing_state, billing_zip, source, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        [first_name.trim(), last_name.trim(), company_name || null,
+         billing_address || null, billing_city || null, billing_state || null,
+         billing_zip || null, source || null, notes || null]
+      );
+      const customerId = result.rows[0].id;
+      for (const p of phones) {
+        if (p.phone?.trim()) {
+          await client.query(
+            `INSERT INTO customer_phones (customer_id, phone, phone_type, is_primary) VALUES ($1,$2,$3,$4)`,
+            [customerId, p.phone.trim(), p.phone_type || null, !!p.is_primary]
+          );
+        }
+      }
+      for (const e of emails) {
+        if (e.email?.trim()) {
+          await client.query(
+            `INSERT INTO customer_emails (customer_id, email, email_type, is_primary) VALUES ($1,$2,$3,$4)`,
+            [customerId, e.email.trim(), e.email_type || null, !!e.is_primary]
+          );
+        }
+      }
+      await client.query("COMMIT");
+      return res.status(201).json(result.rows[0]);
+    } catch (err: any) {
+      await client.query("ROLLBACK");
+      return res.status(500).json({ message: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  app.put("/api/customers/:id", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const { first_name, last_name, company_name, billing_address, billing_city,
+            billing_state, billing_zip, source, notes, phones = [], emails = [] } = req.body;
+
+    if (!first_name?.trim() || !last_name?.trim()) {
+      return res.status(400).json({ message: "First name and last name are required" });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query(
+        `UPDATE customers
+         SET first_name=$1, last_name=$2, company_name=$3, billing_address=$4,
+             billing_city=$5, billing_state=$6, billing_zip=$7, source=$8,
+             notes=$9, updated_at=now()
+         WHERE id=$10 RETURNING *`,
+        [first_name.trim(), last_name.trim(), company_name || null,
+         billing_address || null, billing_city || null, billing_state || null,
+         billing_zip || null, source || null, notes || null, id]
+      );
+      if (result.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Customer not found" });
+      }
+      await client.query(`DELETE FROM customer_phones WHERE customer_id=$1`, [id]);
+      await client.query(`DELETE FROM customer_emails WHERE customer_id=$1`, [id]);
+      for (const p of phones) {
+        if (p.phone?.trim()) {
+          await client.query(
+            `INSERT INTO customer_phones (customer_id, phone, phone_type, is_primary) VALUES ($1,$2,$3,$4)`,
+            [id, p.phone.trim(), p.phone_type || null, !!p.is_primary]
+          );
+        }
+      }
+      for (const e of emails) {
+        if (e.email?.trim()) {
+          await client.query(
+            `INSERT INTO customer_emails (customer_id, email, email_type, is_primary) VALUES ($1,$2,$3,$4)`,
+            [id, e.email.trim(), e.email_type || null, !!e.is_primary]
+          );
+        }
+      }
+      await client.query("COMMIT");
+      return res.json(result.rows[0]);
+    } catch (err: any) {
+      await client.query("ROLLBACK");
+      return res.status(500).json({ message: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
   app.get("/api/customers/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
