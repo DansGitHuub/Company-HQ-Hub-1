@@ -22,6 +22,7 @@ import { runEstimatesMigration } from "./estimatesMigration";
 import { runLanguageMigration } from "./languageMigration";
 import { runActivityLogMigration } from "./activityLogMigration";
 import { seedHiringEmailTemplates, startApplicationTokenScheduler } from "./applicationTokenScheduler";
+import { importRouter } from "./importRoute";
 
 const app = express();
 const httpServer = createServer(app);
@@ -42,6 +43,7 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+app.use(importRouter);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
