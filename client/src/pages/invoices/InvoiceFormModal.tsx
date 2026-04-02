@@ -26,6 +26,7 @@ interface InvoiceFormData {
   notes: string;
   terms: string;
   customer_message: string;
+  customer_response: string;
   line_items: LineItem[];
 }
 
@@ -68,6 +69,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
     notes: "",
     terms: "Payment due within 30 days.",
     customer_message: "",
+    customer_response: "",
     line_items: [EMPTY_ITEM()],
     ...initialData,
   });
@@ -83,6 +85,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
       notes: "",
       terms: "Payment due within 30 days.",
       customer_message: "",
+      customer_response: "",
       line_items: [EMPTY_ITEM()],
       ...initialData,
     });
@@ -301,11 +304,19 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
                 rows={3} placeholder="Payment due within 30 days." data-testid="textarea-terms" />
             </div>
           </div>
-          <div className="space-y-1">
-            <Label>Customer Message <span className="text-muted-foreground/60 text-xs">(visible to customer)</span></Label>
-            <Textarea value={form.customer_message} onChange={(e) => set("customer_message", e.target.value)}
-              rows={2} placeholder="Thank you for your business! We appreciate the opportunity to work with you."
-              data-testid="textarea-customer-message" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Customer Message <span className="text-muted-foreground/60 text-xs">(sent to customer)</span></Label>
+              <Textarea value={form.customer_message} onChange={(e) => set("customer_message", e.target.value)}
+                rows={2} placeholder="Thank you for your business! We appreciate the opportunity to work with you."
+                data-testid="textarea-customer-message" />
+            </div>
+            <div className="space-y-1">
+              <Label>Customer Response <span className="text-muted-foreground/60 text-xs">(their reply)</span></Label>
+              <Textarea value={form.customer_response} onChange={(e) => set("customer_response", e.target.value)}
+                rows={2} placeholder="Record customer's phone/email response…"
+                data-testid="textarea-customer-response" />
+            </div>
           </div>
         </div>
 

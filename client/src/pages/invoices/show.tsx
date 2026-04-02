@@ -38,7 +38,7 @@ interface InvoiceDetail {
   issued_date: string; due_date: string | null;
   subtotal: string; tax_rate: string; tax_amount: string; discount_amount: string;
   total: string; amount_paid: string; balance_due: string;
-  notes: string | null; terms: string | null; customer_message: string | null;
+  notes: string | null; terms: string | null; customer_message: string | null; customer_response: string | null;
   cust_first: string | null; cust_last: string | null; cust_company: string | null;
   job_title: string | null; job_client: string | null; job_address: string | null;
   created_at: string; updated_at: string;
@@ -443,10 +443,27 @@ export default function InvoiceDetailPage() {
               {invoice.customer_message && (
                 <Card className="border-primary/30 bg-primary/5">
                   <CardHeader className="pb-2 pt-4">
-                    <CardTitle className="text-sm text-primary">Customer Message</CardTitle>
+                    <CardTitle className="text-sm text-primary">Message to Customer</CardTitle>
                   </CardHeader>
                   <CardContent className="pb-4">
                     <p className="text-sm whitespace-pre-wrap">{invoice.customer_message}</p>
+                  </CardContent>
+                </Card>
+              )}
+              {invoice.customer_response && (
+                <Card className="border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20">
+                  <CardHeader className="pb-2 pt-4">
+                    <CardTitle className="text-sm text-amber-700 dark:text-amber-400">
+                      Customer Response
+                      {["accepted","declined","changes_requested"].includes(invoice.status) && (
+                        <span className="ml-2 font-normal text-xs">
+                          — <span className="capitalize">{invoice.status.replace("_", " ")}</span>
+                        </span>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pb-4">
+                    <p className="text-sm whitespace-pre-wrap">{invoice.customer_response}</p>
                   </CardContent>
                 </Card>
               )}
@@ -489,6 +506,7 @@ export default function InvoiceDetailPage() {
             notes: invoice.notes ?? "",
             terms: invoice.terms ?? "",
             customer_message: invoice.customer_message ?? "",
+            customer_response: invoice.customer_response ?? "",
             line_items: invoice.line_items.map((li) => ({
               description: li.description,
               quantity: String(li.quantity),
