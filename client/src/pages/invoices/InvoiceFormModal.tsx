@@ -19,7 +19,7 @@ interface LineItem { description: string; quantity: string; unit_price: string; 
 interface InvoiceFormData {
   customer_id: string;
   job_id: string;
-  issue_date: string;
+  issued_date: string;
   due_date: string;
   tax_rate: string;
   notes: string;
@@ -57,7 +57,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
   const [form, setForm] = useState<InvoiceFormData>({
     customer_id: lockedCustomerId ?? "",
     job_id: lockedJobId ?? "",
-    issue_date: today,
+    issued_date: today,
     due_date: "",
     tax_rate: "0",
     notes: "",
@@ -70,7 +70,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
     if (open) setForm({
       customer_id: lockedCustomerId ?? "",
       job_id: lockedJobId ?? "",
-      issue_date: today,
+      issued_date: today,
       due_date: "",
       tax_rate: "0",
       notes: "",
@@ -187,7 +187,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label>Issue Date</Label>
-              <Input type="date" value={form.issue_date} onChange={(e) => set("issue_date", e.target.value)}
+              <Input type="date" value={form.issued_date} onChange={(e) => set("issued_date", e.target.value)}
                 data-testid="input-issue-date" />
             </div>
             <div className="space-y-1">

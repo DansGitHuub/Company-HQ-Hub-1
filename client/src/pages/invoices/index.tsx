@@ -16,7 +16,7 @@ import { InvoiceFormModal } from "./InvoiceFormModal";
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface InvoiceRow {
   id: string; invoice_number: string; status: string;
-  issue_date: string; due_date: string | null;
+  issued_date: string; due_date: string | null;
   total: string; amount_paid: string; balance_due: string;
   customer_id: string | null;
   cust_first: string | null; cust_last: string | null; cust_company: string | null;
@@ -190,7 +190,7 @@ export default function InvoicesPage() {
                       {inv.job_title || inv.job_client || "—"}
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                      {fmtDate(inv.issue_date)}
+                      {fmtDate(inv.issued_date)}
                     </TableCell>
                     <TableCell className={`hidden md:table-cell text-sm ${
                       inv.status === "overdue" ? "text-red-600 font-medium" : "text-muted-foreground"

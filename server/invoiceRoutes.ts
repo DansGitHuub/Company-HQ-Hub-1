@@ -44,7 +44,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
     try {
       let q = `
         SELECT
-          i.id, i.invoice_number, i.status, i.issue_date, i.due_date,
+          i.id, i.invoice_number, i.status, i.issued_date, i.due_date,
           i.subtotal, i.tax_rate, i.tax_amount, i.total,
           i.amount_paid, i.balance_due, i.customer_id, i.job_id, i.created_at,
           c.first_name AS cust_first, c.last_name AS cust_last, c.company_name AS cust_company,
@@ -63,8 +63,8 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
       }
       if (customer_id) { params.push(customer_id); q += ` AND i.customer_id = $${params.length}`; }
       if (job_id)      { params.push(job_id);       q += ` AND i.job_id = $${params.length}`; }
-      if (date_from)   { params.push(date_from);    q += ` AND i.issue_date >= $${params.length}`; }
-      if (date_to)     { params.push(date_to);      q += ` AND i.issue_date <= $${params.length}`; }
+      if (date_from)   { params.push(date_from);    q += ` AND i.issued_date >= $${params.length}`; }
+      if (date_to)     { params.push(date_to);      q += ` AND i.issued_date <= $${params.length}`; }
       if (search) {
         params.push(`%${search}%`);
         const idx = params.length;
@@ -115,7 +115,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   // ── CREATE ────────────────────────────────────────────────────────────────────
   app.post("/api/invoices", requireAuth, async (req, res) => {
     const {
-      customer_id, job_id, issue_date, due_date,
+      customer_id, job_id, issued_date, due_date,
       tax_rate = 0, notes, terms, line_items = [],
     } = req.body;
 
@@ -123,12 +123,12 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
       const invoice_number = await generateInvoiceNumber();
 
       const { rows } = await pool.query(`
-        INSERT INTO invoices (invoice_number, customer_id, job_id, issue_date, due_date, tax_rate, notes, terms)
+        INSERT INTO invoices (invoice_number, customer_id, job_id, issued_date, due_date, tax_rate, notes, terms)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
       `, [
         invoice_number,
         customer_id || null, job_id || null,
-        issue_date || new Date().toISOString().split("T")[0],
+        issued_date || new Date().toISOString().split("T")[0],
         due_date || null, tax_rate, notes || null, terms || null,
       ]);
 
@@ -158,7 +158,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   // ── UPDATE ────────────────────────────────────────────────────────────────────
   app.put("/api/invoices/:id", requireAuth, async (req, res) => {
     const {
-      customer_id, job_id, status, issue_date, due_date,
+      customer_id, job_id, status, issued_date, due_date,
       tax_rate, notes, terms, line_items,
     } = req.body;
 
@@ -168,7 +168,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
           customer_id = COALESCE($1, customer_id),
           job_id      = COALESCE($2, job_id),
           status      = COALESCE($3, status),
-          issue_date  = COALESCE($4, issue_date),
+          issued_date = COALESCE($4, issued_date),
           due_date    = $5,
           tax_rate    = COALESCE($6, tax_rate),
           notes       = $7,
@@ -177,7 +177,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
         WHERE id = $9
       `, [
         customer_id || null, job_id || null, status || null,
-        issue_date || null, due_date ?? null,
+        issued_date || null, due_date ?? null,
         tax_rate ?? null, notes ?? null, terms ?? null,
         req.params.id,
       ]);

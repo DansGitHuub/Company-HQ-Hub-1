@@ -35,7 +35,7 @@ interface Payment {
 interface InvoiceDetail {
   id: string; invoice_number: string; status: string;
   customer_id: string | null; job_id: string | null;
-  issue_date: string; due_date: string | null;
+  issued_date: string; due_date: string | null;
   subtotal: string; tax_rate: string; tax_amount: string;
   total: string; amount_paid: string; balance_due: string;
   notes: string | null; terms: string | null;
@@ -225,7 +225,7 @@ export default function InvoiceDetailPage() {
               <InfoRow icon={Briefcase} label="Job"
                 value={invoice.job_title || invoice.job_client}
                 href={invoice.job_id ? `/jobs/${invoice.job_id}` : undefined} />
-              <InfoRow icon={Calendar} label="Issued" value={fmtDate(invoice.issue_date)} />
+              <InfoRow icon={Calendar} label="Issued" value={fmtDate(invoice.issued_date)} />
               <InfoRow icon={Calendar} label="Due"
                 value={<span className={balanceDue > 0 && invoice.status === "overdue" ? "text-red-600 font-semibold" : ""}>
                   {fmtDate(invoice.due_date)}
@@ -458,7 +458,7 @@ export default function InvoiceDetailPage() {
             id: invoice.id,
             customer_id: invoice.customer_id ?? "",
             job_id: invoice.job_id ?? "",
-            issue_date: invoice.issue_date?.split("T")[0] ?? "",
+            issued_date: invoice.issued_date?.split("T")[0] ?? "",
             due_date: invoice.due_date?.split("T")[0] ?? "",
             tax_rate: invoice.tax_rate ?? "0",
             notes: invoice.notes ?? "",
