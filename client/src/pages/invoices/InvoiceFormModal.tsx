@@ -25,6 +25,7 @@ interface InvoiceFormData {
   discount_amount: string;
   notes: string;
   terms: string;
+  customer_message: string;
   line_items: LineItem[];
 }
 
@@ -66,6 +67,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
     discount_amount: "0",
     notes: "",
     terms: "Payment due within 30 days.",
+    customer_message: "",
     line_items: [EMPTY_ITEM()],
     ...initialData,
   });
@@ -80,6 +82,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
       discount_amount: "0",
       notes: "",
       terms: "Payment due within 30 days.",
+      customer_message: "",
       line_items: [EMPTY_ITEM()],
       ...initialData,
     });
@@ -285,18 +288,24 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
             </div>
           </div>
 
-          {/* Notes + Terms */}
+          {/* Notes + Terms + Customer Message */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label>Notes <span className="text-muted-foreground/60 text-xs">(visible to customer)</span></Label>
+              <Label>Internal Notes <span className="text-muted-foreground/60 text-xs">(not shown to customer)</span></Label>
               <Textarea value={form.notes} onChange={(e) => set("notes", e.target.value)}
-                rows={3} placeholder="Thank you for your business…" data-testid="textarea-notes" />
+                rows={3} placeholder="Internal notes for your team…" data-testid="textarea-notes" />
             </div>
             <div className="space-y-1">
               <Label>Terms</Label>
               <Textarea value={form.terms} onChange={(e) => set("terms", e.target.value)}
                 rows={3} placeholder="Payment due within 30 days." data-testid="textarea-terms" />
             </div>
+          </div>
+          <div className="space-y-1">
+            <Label>Customer Message <span className="text-muted-foreground/60 text-xs">(visible to customer)</span></Label>
+            <Textarea value={form.customer_message} onChange={(e) => set("customer_message", e.target.value)}
+              rows={2} placeholder="Thank you for your business! We appreciate the opportunity to work with you."
+              data-testid="textarea-customer-message" />
           </div>
         </div>
 

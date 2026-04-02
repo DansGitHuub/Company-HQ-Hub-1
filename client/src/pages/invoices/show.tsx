@@ -38,7 +38,7 @@ interface InvoiceDetail {
   issued_date: string; due_date: string | null;
   subtotal: string; tax_rate: string; tax_amount: string; discount_amount: string;
   total: string; amount_paid: string; balance_due: string;
-  notes: string | null; terms: string | null;
+  notes: string | null; terms: string | null; customer_message: string | null;
   cust_first: string | null; cust_last: string | null; cust_company: string | null;
   job_title: string | null; job_client: string | null; job_address: string | null;
   created_at: string; updated_at: string;
@@ -439,23 +439,35 @@ export default function InvoiceDetailPage() {
 
           {/* Notes & Terms */}
           <TabsContent value="notes">
-            <div className="grid grid-cols-2 gap-4">
-              <Card>
-                <CardHeader className="pb-2 pt-4"><CardTitle className="text-sm">Notes</CardTitle></CardHeader>
-                <CardContent className="pb-4">
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {invoice.notes || <span className="italic">No notes.</span>}
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2 pt-4"><CardTitle className="text-sm">Terms</CardTitle></CardHeader>
-                <CardContent className="pb-4">
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {invoice.terms || <span className="italic">No terms.</span>}
-                  </p>
-                </CardContent>
-              </Card>
+            <div className="space-y-4">
+              {invoice.customer_message && (
+                <Card className="border-primary/30 bg-primary/5">
+                  <CardHeader className="pb-2 pt-4">
+                    <CardTitle className="text-sm text-primary">Customer Message</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pb-4">
+                    <p className="text-sm whitespace-pre-wrap">{invoice.customer_message}</p>
+                  </CardContent>
+                </Card>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader className="pb-2 pt-4"><CardTitle className="text-sm">Internal Notes</CardTitle></CardHeader>
+                  <CardContent className="pb-4">
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {invoice.notes || <span className="italic">No internal notes.</span>}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2 pt-4"><CardTitle className="text-sm">Terms</CardTitle></CardHeader>
+                  <CardContent className="pb-4">
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {invoice.terms || <span className="italic">No terms.</span>}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
@@ -476,6 +488,7 @@ export default function InvoiceDetailPage() {
             discount_amount: String(parseFloat(invoice.discount_amount ?? "0")),
             notes: invoice.notes ?? "",
             terms: invoice.terms ?? "",
+            customer_message: invoice.customer_message ?? "",
             line_items: invoice.line_items.map((li) => ({
               description: li.description,
               quantity: String(li.quantity),
