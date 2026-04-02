@@ -23,6 +23,7 @@ import { runLanguageMigration } from "./languageMigration";
 import { runActivityLogMigration } from "./activityLogMigration";
 import { seedHiringEmailTemplates, startApplicationTokenScheduler } from "./applicationTokenScheduler";
 import { runCustomerDataMigration } from "./customerDataMigration";
+import { runTimeTrackingMigration } from "./timeTrackingMigration";
 
 const app = express();
 const httpServer = createServer(app);
@@ -95,6 +96,7 @@ app.use((req, res, next) => {
   await runEstimatesMigration();
   await runLanguageMigration();
   await runActivityLogMigration();
+  await runTimeTrackingMigration();
   await registerRoutes(httpServer, app);
   
   await seedUsers();

@@ -17,6 +17,7 @@ import { registerCalendarRoutes } from "./calendarRoutes";
 import { registerSuggestionsRoutes } from "./suggestionsRoutes";
 import { registerTaskRoutes } from "./taskRoutes";
 import { registerAssistantRoutes } from "./assistantRoutes";
+import { registerTimeRoutes } from "./timeRoutes";
 import { searchProductImages } from "./imageSearchService";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail } from "./email";
 import { logActivity } from "./activityLogger";
@@ -9551,6 +9552,7 @@ Provide accurate information based on publicly available documentation.`;
   registerNotesRoutes(app);
   registerDailyWorksheetRoutes(app, requireAuth);
   registerCustomerRoutes(app, requireAuth);
+  registerTimeRoutes(app, requireAuth);
   setInterval(runNoteReminderScheduler, 60 * 1000);
   console.log("[notes-scheduler] Note reminder scheduler started (checking every minute)");
 

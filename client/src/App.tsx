@@ -35,6 +35,7 @@ import SearchPage from "@/pages/Search";
 import TodoList from "@/pages/TodoList";
 
 import DailyWorksheet from "@/pages/DailyWorksheet";
+import TimeTracking from "@/pages/time/index";
 import CustomerList from "@/pages/customers/index";
 import CustomerDetail from "@/pages/customers/show";
 import PlowSiteMapper from "@/pages/PlowSiteMapper";
@@ -128,6 +129,7 @@ function AppRoutes() {
         <Route path="/search" component={SearchPage} />
         <Route path="/todos" component={TodoList} />
         <Route path="/daily-worksheet" component={DailyWorksheet} />
+        <Route path="/time" component={TimeTracking} />
         <Route path="/customers" component={CustomerList} />
         <Route path="/customers/:id" component={CustomerDetail} />
         <Route path="/tools/plow-mapper" component={PlowSiteMapper} />

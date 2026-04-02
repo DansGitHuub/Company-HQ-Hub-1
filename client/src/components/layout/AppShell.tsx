@@ -7,6 +7,7 @@ import type { CompanySettings } from "@shared/schema";
 import AIAssistantPanel from "@/components/AIAssistantPanel";
 import UpdatesPopup from "@/components/UpdatesPopup";
 import GlobalMicButton from "@/components/GlobalMicButton";
+import TimeClock from "@/components/TimeClock";
 import CalendarPage from "@/pages/Calendar";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
@@ -38,7 +39,8 @@ import {
   X,
   LifeBuoy,
   Languages,
-  Contact
+  Contact,
+  Timer
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -352,6 +354,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     jobs: { icon: LayoutDashboard, label: t("nav.work"), href: "/jobs" },
     customers: { icon: Contact, label: t("nav.customers"), href: "/customers" },
     daily_worksheet: { icon: ClipboardList, label: "Daily Worksheet", href: "/daily-worksheet" },
+    time_tracking: { icon: Timer, label: "Time Tracking", href: "/time" },
     education: { icon: GraduationCap, label: t("nav.resourceLibrary"), href: "/education" },
     help: { icon: LifeBuoy, label: t("nav.help"), href: "/help" },
     hq: { icon: Building2, label: t("nav.companyHQ"), href: "/hq" },
@@ -374,7 +377,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarSections: NavSection[] = [
     { label: "", items: ["dashboard"] },
-    { label: "WORK", items: ["jobs", "customers", "todos", "daily_worksheet", "equipment"] },
+    { label: "WORK", items: ["jobs", "customers", "todos", "daily_worksheet", "time_tracking", "equipment"] },
     { label: "PEOPLE", items: ["employees", "education", "hiring"] },
     { label: "COMPANY", items: ["inbox", "sops", "testing", "hq"] },
     { label: "ADMIN", items: ["admin", "tools", "forms"] },
@@ -764,7 +767,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-1.5 lg:gap-2">
             <GlobalMicButton />
-            
+            <TimeClock />
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
