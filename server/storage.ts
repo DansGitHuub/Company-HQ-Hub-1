@@ -200,9 +200,6 @@ export interface IStorage {
   updateCandidateDocument(id: string, updates: Partial<CandidateDocument>): Promise<CandidateDocument | undefined>;
   deleteCandidateDocument(id: string): Promise<boolean>;
   
-  getCampaigns(): Promise<Campaign[]>;
-  createCampaign(campaign: InsertCampaign): Promise<Campaign>;
-  
   getJobs(): Promise<Job[]>;
   getJobsByCategory(category: string): Promise<Job[]>;
   getJob(id: string): Promise<Job | undefined>;
