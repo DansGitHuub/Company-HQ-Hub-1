@@ -22,6 +22,7 @@ interface InvoiceFormData {
   issued_date: string;
   due_date: string;
   tax_rate: string;
+  discount_amount: string;
   notes: string;
   terms: string;
   line_items: LineItem[];
@@ -38,14 +39,16 @@ interface Props {
   onSuccess?: (inv: any) => void;
 }
 
-function calcTotal(items: LineItem[], taxRate: string) {
+function calcTotal(items: LineItem[], taxRate: string, discountAmount: string) {
   const subtotal = items.reduce((s, i) => {
     const q = parseFloat(i.quantity || "0");
     const p = parseFloat(i.unit_price || "0");
     return s + (isNaN(q) || isNaN(p) ? 0 : q * p);
   }, 0);
-  const tax = subtotal * (parseFloat(taxRate || "0") / 100);
-  return { subtotal, tax, total: subtotal + tax };
+  const discount = parseFloat(discountAmount || "0") || 0;
+  const taxable = Math.max(0, subtotal - discount);
+  const tax = taxable * (parseFloat(taxRate || "0") / 100);
+  return { subtotal, discount, tax, total: taxable + tax };
 }
 
 export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustomerId, lockedJobId, onSuccess }: Props) {
@@ -60,6 +63,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
     issued_date: today,
     due_date: "",
     tax_rate: "0",
+    discount_amount: "0",
     notes: "",
     terms: "Payment due within 30 days.",
     line_items: [EMPTY_ITEM()],
@@ -73,6 +77,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
       issued_date: today,
       due_date: "",
       tax_rate: "0",
+      discount_amount: "0",
       notes: "",
       terms: "Payment due within 30 days.",
       line_items: [EMPTY_ITEM()],
@@ -111,7 +116,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
     ...f, line_items: f.line_items.filter((_, i) => i !== idx),
   }));
 
-  const { subtotal, tax, total } = calcTotal(form.line_items, form.tax_rate);
+  const { subtotal, discount, tax, total } = calcTotal(form.line_items, form.tax_rate, form.discount_amount);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -120,6 +125,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
         customer_id: lockedCustomerId || form.customer_id || null,
         job_id: lockedJobId || form.job_id || null,
         tax_rate: parseFloat(form.tax_rate || "0") / 100,
+        discount_amount: parseFloat(form.discount_amount || "0"),
         line_items: form.line_items
           .filter((li) => li.description.trim())
           .map((li) => ({
@@ -184,7 +190,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
           </div>
 
           {/* Dates */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <div className="space-y-1">
               <Label>Issue Date</Label>
               <Input type="date" value={form.issued_date} onChange={(e) => set("issued_date", e.target.value)}
@@ -200,6 +206,12 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
               <Input type="number" min="0" max="100" step="0.1" value={form.tax_rate}
                 onChange={(e) => set("tax_rate", e.target.value)}
                 placeholder="0" data-testid="input-tax-rate" />
+            </div>
+            <div className="space-y-1">
+              <Label>Discount ($)</Label>
+              <Input type="number" min="0" step="0.01" value={form.discount_amount}
+                onChange={(e) => set("discount_amount", e.target.value)}
+                placeholder="0.00" data-testid="input-discount" />
             </div>
           </div>
 
@@ -253,6 +265,12 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>${subtotal.toFixed(2)}</span>
                 </div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-sm text-emerald-600">
+                    <span>Discount</span>
+                    <span>−${discount.toFixed(2)}</span>
+                  </div>
+                )}
                 {parseFloat(form.tax_rate) > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Tax ({form.tax_rate}%)</span>

@@ -36,7 +36,7 @@ interface InvoiceDetail {
   id: string; invoice_number: string; status: string;
   customer_id: string | null; job_id: string | null;
   issued_date: string; due_date: string | null;
-  subtotal: string; tax_rate: string; tax_amount: string;
+  subtotal: string; tax_rate: string; tax_amount: string; discount_amount: string;
   total: string; amount_paid: string; balance_due: string;
   notes: string | null; terms: string | null;
   cust_first: string | null; cust_last: string | null; cust_company: string | null;
@@ -240,6 +240,12 @@ export default function InvoiceDetailPage() {
                 <span className="text-muted-foreground">Subtotal</span>
                 <span>{fmtMoney(invoice.subtotal)}</span>
               </div>
+              {parseFloat(invoice.discount_amount) > 0 && (
+                <div className="flex justify-between text-sm text-emerald-600">
+                  <span>Discount</span>
+                  <span>−{fmtMoney(invoice.discount_amount)}</span>
+                </div>
+              )}
               {parseFloat(invoice.tax_rate) > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Tax ({(parseFloat(invoice.tax_rate) * 100).toFixed(2)}%)</span>
@@ -308,6 +314,12 @@ export default function InvoiceDetailPage() {
                       <span className="text-muted-foreground">Subtotal</span>
                       <span>{fmtMoney(invoice.subtotal)}</span>
                     </div>
+                    {parseFloat(invoice.discount_amount) > 0 && (
+                      <div className="flex justify-between text-emerald-600">
+                        <span>Discount</span>
+                        <span>−{fmtMoney(invoice.discount_amount)}</span>
+                      </div>
+                    )}
                     {parseFloat(invoice.tax_rate) > 0 && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Tax ({(parseFloat(invoice.tax_rate) * 100).toFixed(2)}%)</span>
@@ -461,6 +473,7 @@ export default function InvoiceDetailPage() {
             issued_date: invoice.issued_date?.split("T")[0] ?? "",
             due_date: invoice.due_date?.split("T")[0] ?? "",
             tax_rate: String(parseFloat(invoice.tax_rate ?? "0") * 100),
+            discount_amount: String(parseFloat(invoice.discount_amount ?? "0")),
             notes: invoice.notes ?? "",
             terms: invoice.terms ?? "",
             line_items: invoice.line_items.map((li) => ({

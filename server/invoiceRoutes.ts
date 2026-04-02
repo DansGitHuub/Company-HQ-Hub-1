@@ -14,11 +14,11 @@ async function syncInvoiceTotals(invoiceId: string) {
   await pool.query(`
     UPDATE invoices SET
       subtotal    = COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0),
-      tax_amount  = ROUND(COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0) * tax_rate, 2),
-      total       = ROUND(COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0)
+      tax_amount  = ROUND((COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0) - discount_amount) * tax_rate, 2),
+      total       = ROUND((COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0) - discount_amount)
                     * (1 + tax_rate), 2),
       amount_paid = COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=$1), 0),
-      balance_due = ROUND(COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0)
+      balance_due = ROUND((COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0) - discount_amount)
                     * (1 + tax_rate), 2)
                     - COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=$1), 0),
       updated_at  = NOW()
@@ -116,20 +116,20 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   app.post("/api/invoices", requireAuth, async (req, res) => {
     const {
       customer_id, job_id, issued_date, due_date,
-      tax_rate = 0, notes, terms, line_items = [],
+      tax_rate = 0, discount_amount = 0, notes, terms, line_items = [],
     } = req.body;
 
     try {
       const invoice_number = await generateInvoiceNumber();
 
       const { rows } = await pool.query(`
-        INSERT INTO invoices (invoice_number, customer_id, job_id, issued_date, due_date, tax_rate, notes, terms)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
+        INSERT INTO invoices (invoice_number, customer_id, job_id, issued_date, due_date, tax_rate, discount_amount, notes, terms)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *
       `, [
         invoice_number,
         customer_id || null, job_id || null,
         issued_date || new Date().toISOString().split("T")[0],
-        due_date || null, tax_rate, notes || null, terms || null,
+        due_date || null, tax_rate, discount_amount || 0, notes || null, terms || null,
       ]);
 
       const invoice = rows[0];
@@ -159,26 +159,27 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   app.put("/api/invoices/:id", requireAuth, async (req, res) => {
     const {
       customer_id, job_id, status, issued_date, due_date,
-      tax_rate, notes, terms, line_items,
+      tax_rate, discount_amount, notes, terms, line_items,
     } = req.body;
 
     try {
       await pool.query(`
         UPDATE invoices SET
-          customer_id = COALESCE($1, customer_id),
-          job_id      = COALESCE($2, job_id),
-          status      = COALESCE($3, status),
-          issued_date = COALESCE($4, issued_date),
-          due_date    = $5,
-          tax_rate    = COALESCE($6, tax_rate),
-          notes       = $7,
-          terms       = $8,
-          updated_at  = NOW()
-        WHERE id = $9
+          customer_id     = COALESCE($1, customer_id),
+          job_id          = COALESCE($2, job_id),
+          status          = COALESCE($3, status),
+          issued_date     = COALESCE($4, issued_date),
+          due_date        = $5,
+          tax_rate        = COALESCE($6, tax_rate),
+          discount_amount = COALESCE($7, discount_amount),
+          notes           = $8,
+          terms           = $9,
+          updated_at      = NOW()
+        WHERE id = $10
       `, [
         customer_id || null, job_id || null, status || null,
         issued_date || null, due_date ?? null,
-        tax_rate ?? null, notes ?? null, terms ?? null,
+        tax_rate ?? null, discount_amount ?? null, notes ?? null, terms ?? null,
         req.params.id,
       ]);
 
