@@ -95,7 +95,6 @@ app.use((req, res, next) => {
   await runEstimatesMigration();
   await runLanguageMigration();
   await runActivityLogMigration();
-  await runCustomerDataMigration();
   await registerRoutes(httpServer, app);
   
   await seedUsers();
@@ -140,6 +139,9 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      runCustomerDataMigration().catch((err) =>
+        console.error("[customer-data] Background seed error:", err.message)
+      );
       startMaintenanceScheduler();
       startTaskScheduler();
       startSopPipelineScheduler();

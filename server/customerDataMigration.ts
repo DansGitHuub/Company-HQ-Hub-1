@@ -2,6 +2,39 @@ import { pool } from "./db";
 import fs from "fs";
 import path from "path";
 
+const BATCH = 100;
+
+function buildInsert(
+  table: string,
+  cols: string[],
+  rows: any[][],
+): { text: string; values: any[] } {
+  const colList = cols.join(", ");
+  const placeholders = rows
+    .map((_, ri) =>
+      `(${cols.map((_, ci) => `$${ri * cols.length + ci + 1}`).join(", ")})`
+    )
+    .join(", ");
+  const values = rows.flat();
+  return {
+    text: `INSERT INTO ${table} (${colList}) VALUES ${placeholders} ON CONFLICT (id) DO NOTHING`,
+    values,
+  };
+}
+
+async function batchInsert(
+  client: any,
+  table: string,
+  cols: string[],
+  rows: any[][],
+) {
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const chunk = rows.slice(i, i + BATCH);
+    const q = buildInsert(table, cols, chunk);
+    await client.query(q.text, q.values);
+  }
+}
+
 export async function runCustomerDataMigration() {
   try {
     const countResult = await pool.query("SELECT COUNT(*) AS cnt FROM customers");
@@ -20,7 +53,7 @@ export async function runCustomerDataMigration() {
       return;
     }
 
-    console.log("[customer-data] Customers table is empty — seeding from JSON files...");
+    console.log("[customer-data] Seeding customer data in background...");
 
     const customers  = JSON.parse(fs.readFileSync(path.join(base, "customers_data.json"),       "utf-8")) as any[];
     const phones     = JSON.parse(fs.readFileSync(path.join(base, "customer_phones_data.json"), "utf-8")) as any[];
@@ -31,49 +64,25 @@ export async function runCustomerDataMigration() {
     try {
       await client.query("BEGIN");
 
-      for (const c of customers) {
-        await client.query(
-          `INSERT INTO customers
-             (id, first_name, last_name, company_name, billing_address, billing_city,
-              billing_state, billing_zip, source, notes, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-           ON CONFLICT (id) DO NOTHING`,
-          [c.id, c.first_name, c.last_name, c.company_name,
-           c.billing_address, c.billing_city, c.billing_state, c.billing_zip,
-           c.source, c.notes, c.created_at, c.updated_at]
-        );
-      }
+      await batchInsert(client, "customers",
+        ["id","first_name","last_name","company_name","billing_address","billing_city","billing_state","billing_zip","source","notes","created_at","updated_at"],
+        customers.map(c => [c.id,c.first_name,c.last_name,c.company_name,c.billing_address,c.billing_city,c.billing_state,c.billing_zip,c.source,c.notes,c.created_at,c.updated_at])
+      );
 
-      for (const p of phones) {
-        await client.query(
-          `INSERT INTO customer_phones
-             (id, customer_id, phone, phone_type, is_primary, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6)
-           ON CONFLICT (id) DO NOTHING`,
-          [p.id, p.customer_id, p.phone, p.phone_type, p.is_primary, p.created_at]
-        );
-      }
+      await batchInsert(client, "customer_phones",
+        ["id","customer_id","phone","phone_type","is_primary","created_at"],
+        phones.map(p => [p.id,p.customer_id,p.phone,p.phone_type,p.is_primary,p.created_at])
+      );
 
-      for (const e of emails) {
-        await client.query(
-          `INSERT INTO customer_emails
-             (id, customer_id, email, email_type, is_primary, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6)
-           ON CONFLICT (id) DO NOTHING`,
-          [e.id, e.customer_id, e.email, e.email_type, e.is_primary, e.created_at]
-        );
-      }
+      await batchInsert(client, "customer_emails",
+        ["id","customer_id","email","email_type","is_primary","created_at"],
+        emails.map(e => [e.id,e.customer_id,e.email,e.email_type,e.is_primary,e.created_at])
+      );
 
-      for (const p of properties) {
-        await client.query(
-          `INSERT INTO properties
-             (id, customer_id, address, city, state, zip, property_type, notes, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-           ON CONFLICT (id) DO NOTHING`,
-          [p.id, p.customer_id, p.address, p.city, p.state, p.zip,
-           p.property_type, p.notes, p.created_at, p.updated_at]
-        );
-      }
+      await batchInsert(client, "properties",
+        ["id","customer_id","address","city","state","zip","property_type","notes","created_at","updated_at"],
+        properties.map(p => [p.id,p.customer_id,p.address,p.city,p.state,p.zip,p.property_type,p.notes,p.created_at,p.updated_at])
+      );
 
       await client.query("COMMIT");
       const after = await pool.query("SELECT COUNT(*) AS cnt FROM customers");
