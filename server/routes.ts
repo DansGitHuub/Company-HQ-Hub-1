@@ -18,6 +18,7 @@ import { registerSuggestionsRoutes } from "./suggestionsRoutes";
 import { registerTaskRoutes } from "./taskRoutes";
 import { registerAssistantRoutes } from "./assistantRoutes";
 import { registerTimeRoutes } from "./timeRoutes";
+import { registerJobRoutes } from "./jobRoutes";
 import { searchProductImages } from "./imageSearchService";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail } from "./email";
 import { logActivity } from "./activityLogger";
@@ -57,6 +58,9 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   setupAuth(app);
+
+  // Jobs module routes (registered first so they take precedence over legacy simple routes)
+  registerJobRoutes(app, requireAuth);
 
   // Global search endpoint - searches everything based on user role
   app.get("/api/search", requireAuth, async (req, res) => {

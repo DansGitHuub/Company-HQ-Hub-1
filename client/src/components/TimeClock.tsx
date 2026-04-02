@@ -98,12 +98,13 @@ export default function TimeClock() {
     refetchInterval: 30_000,
   });
 
-  // Jobs for selector
+  // Jobs for selector — only show scheduled or in-progress jobs
   const { data: jobs = [] } = useQuery<Job[]>({
-    queryKey: ["/api/jobs"],
+    queryKey: ["/api/jobs", "active"],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/jobs");
-      return res.json();
+      const res = await apiRequest("GET", "/api/jobs?status=scheduled,in_progress");
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
     },
     enabled: open && !activeEntry,
   });

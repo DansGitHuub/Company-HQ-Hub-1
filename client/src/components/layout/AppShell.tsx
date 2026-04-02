@@ -40,7 +40,8 @@ import {
   LifeBuoy,
   Languages,
   Contact,
-  Timer
+  Timer,
+  Briefcase
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -351,7 +352,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     todos: { icon: CheckSquare, label: t("nav.tasks"), href: "/todos" },
     hiring: { icon: Users, label: t("nav.hiring"), href: "/hiring" },
     employees: { icon: User, label: t("nav.employees"), href: "/employees" },
-    jobs: { icon: LayoutDashboard, label: t("nav.work"), href: "/jobs" },
+    jobs: { icon: Briefcase, label: "Jobs", href: "/jobs" },
     customers: { icon: Contact, label: t("nav.customers"), href: "/customers" },
     daily_worksheet: { icon: ClipboardList, label: "Daily Worksheet", href: "/daily-worksheet" },
     time_tracking: { icon: Timer, label: "Time Tracking", href: "/time" },

@@ -27,6 +27,8 @@ import Employees from "@/pages/Employees";
 import FormHub from "@/pages/FormHub";
 import HQOverview from "@/pages/HQOverview";
 import JobPipeline from "@/pages/JobPipeline";
+import JobList from "@/pages/jobs/index";
+import JobDetail from "@/pages/jobs/show";
 import Help from "@/pages/Help";
 import Profile from "@/pages/Profile";
 import AdminSetup from "@/pages/AdminSetup";
@@ -122,7 +124,9 @@ function AppRoutes() {
         <Route path="/employee" component={EmployeePortal} />
         <Route path="/employee-portal" component={EmployeePortal} />
         <Route path="/hq" component={HQOverview} />
-        <Route path="/jobs" component={JobPipeline} />
+        <Route path="/jobs" component={JobList} />
+        <Route path="/jobs/:id" component={JobDetail} />
+        <Route path="/pipeline" component={JobPipeline} />
         <Route path="/help" component={Help} />
         <Route path="/admin-setup" component={AdminSetup} />
         <Route path="/equipment" component={EquipmentTracker} />
