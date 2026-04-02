@@ -40,6 +40,7 @@ interface InvoiceDetail {
   total: string; amount_paid: string; balance_due: string;
   notes: string | null; terms: string | null; customer_message: string | null;
   customer_response: string | null; customer_response_at: string | null; customer_response_note: string | null;
+  sent_at: string | null;
   cust_first: string | null; cust_last: string | null; cust_company: string | null;
   job_title: string | null; job_client: string | null; job_address: string | null;
   created_at: string; updated_at: string;
@@ -227,6 +228,9 @@ export default function InvoiceDetailPage() {
                 value={invoice.job_title || invoice.job_client}
                 href={invoice.job_id ? `/jobs/${invoice.job_id}` : undefined} />
               <InfoRow icon={Calendar} label="Issued" value={fmtDate(invoice.issued_date)} />
+              {invoice.sent_at && (
+                <InfoRow icon={Calendar} label="Sent" value={fmtDate(invoice.sent_at)} />
+              )}
               <InfoRow icon={Calendar} label="Due"
                 value={<span className={balanceDue > 0 && invoice.status === "overdue" ? "text-red-600 font-semibold" : ""}>
                   {fmtDate(invoice.due_date)}
