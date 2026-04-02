@@ -38,7 +38,8 @@ interface InvoiceDetail {
   issued_date: string; due_date: string | null;
   subtotal: string; tax_rate: string; tax_amount: string; discount_amount: string;
   total: string; amount_paid: string; balance_due: string;
-  notes: string | null; terms: string | null; customer_message: string | null; customer_response: string | null;
+  notes: string | null; terms: string | null; customer_message: string | null;
+  customer_response: string | null; customer_response_at: string | null;
   cust_first: string | null; cust_last: string | null; cust_company: string | null;
   job_title: string | null; job_client: string | null; job_address: string | null;
   created_at: string; updated_at: string;
@@ -453,11 +454,18 @@ export default function InvoiceDetailPage() {
               {invoice.customer_response && (
                 <Card className="border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20">
                   <CardHeader className="pb-2 pt-4">
-                    <CardTitle className="text-sm text-amber-700 dark:text-amber-400">
-                      Customer Response
-                      {["accepted","declined","changes_requested"].includes(invoice.status) && (
-                        <span className="ml-2 font-normal text-xs">
-                          — <span className="capitalize">{invoice.status.replace("_", " ")}</span>
+                    <CardTitle className="text-sm text-amber-700 dark:text-amber-400 flex items-center justify-between">
+                      <span>
+                        Customer Response
+                        {["accepted","declined","changes_requested"].includes(invoice.status) && (
+                          <span className="ml-2 font-normal text-xs">
+                            — <span className="capitalize">{invoice.status.replace(/_/g, " ")}</span>
+                          </span>
+                        )}
+                      </span>
+                      {invoice.customer_response_at && (
+                        <span className="text-xs font-normal text-amber-600/70 dark:text-amber-400/60">
+                          {fmtDate(invoice.customer_response_at)}
                         </span>
                       )}
                     </CardTitle>
