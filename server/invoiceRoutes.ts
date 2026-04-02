@@ -116,21 +116,22 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   app.post("/api/invoices", requireAuth, async (req, res) => {
     const {
       customer_id, job_id, issued_date, due_date,
-      tax_rate = 0, discount_amount = 0, notes, terms, customer_message, customer_response, customer_response_at, line_items = [],
+      tax_rate = 0, discount_amount = 0, notes, terms, customer_message, customer_response, customer_response_at, customer_response_note, line_items = [],
     } = req.body;
 
     try {
       const invoice_number = await generateInvoiceNumber();
 
       const { rows } = await pool.query(`
-        INSERT INTO invoices (invoice_number, customer_id, job_id, issued_date, due_date, tax_rate, discount_amount, notes, terms, customer_message, customer_response, customer_response_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *
+        INSERT INTO invoices (invoice_number, customer_id, job_id, issued_date, due_date, tax_rate, discount_amount, notes, terms, customer_message, customer_response, customer_response_at, customer_response_note)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *
       `, [
         invoice_number,
         customer_id || null, job_id || null,
         issued_date || new Date().toISOString().split("T")[0],
         due_date || null, tax_rate, discount_amount || 0, notes || null, terms || null,
         customer_message || null, customer_response || null, customer_response_at || null,
+        customer_response_note || null,
       ]);
 
       const invoice = rows[0];
@@ -160,7 +161,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   app.put("/api/invoices/:id", requireAuth, async (req, res) => {
     const {
       customer_id, job_id, status, issued_date, due_date,
-      tax_rate, discount_amount, notes, terms, customer_message, customer_response, customer_response_at, line_items,
+      tax_rate, discount_amount, notes, terms, customer_message, customer_response, customer_response_at, customer_response_note, line_items,
     } = req.body;
 
     try {
@@ -175,16 +176,18 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
           discount_amount  = COALESCE($7, discount_amount),
           notes            = $8,
           terms            = $9,
-          customer_message     = $10,
-          customer_response    = $11,
-          customer_response_at = $12,
-          updated_at           = NOW()
-        WHERE id = $13
+          customer_message       = $10,
+          customer_response      = $11,
+          customer_response_at   = $12,
+          customer_response_note = $13,
+          updated_at             = NOW()
+        WHERE id = $14
       `, [
         customer_id || null, job_id || null, status || null,
         issued_date || null, due_date ?? null,
         tax_rate ?? null, discount_amount ?? null, notes ?? null, terms ?? null,
-        customer_message ?? null, customer_response ?? null, customer_response_at ?? null, req.params.id,
+        customer_message ?? null, customer_response ?? null, customer_response_at ?? null,
+        customer_response_note ?? null, req.params.id,
       ]);
 
       // Replace line items if provided

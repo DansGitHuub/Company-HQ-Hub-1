@@ -39,7 +39,7 @@ interface InvoiceDetail {
   subtotal: string; tax_rate: string; tax_amount: string; discount_amount: string;
   total: string; amount_paid: string; balance_due: string;
   notes: string | null; terms: string | null; customer_message: string | null;
-  customer_response: string | null; customer_response_at: string | null;
+  customer_response: string | null; customer_response_at: string | null; customer_response_note: string | null;
   cust_first: string | null; cust_last: string | null; cust_company: string | null;
   job_title: string | null; job_client: string | null; job_address: string | null;
   created_at: string; updated_at: string;
@@ -470,8 +470,13 @@ export default function InvoiceDetailPage() {
                       )}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="pb-4">
+                  <CardContent className="pb-4 space-y-2">
                     <p className="text-sm whitespace-pre-wrap">{invoice.customer_response}</p>
+                    {invoice.customer_response_note && (
+                      <p className="text-xs text-muted-foreground border-t pt-2 mt-2 whitespace-pre-wrap">
+                        <span className="font-medium">Note:</span> {invoice.customer_response_note}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               )}
@@ -515,6 +520,7 @@ export default function InvoiceDetailPage() {
             terms: invoice.terms ?? "",
             customer_message: invoice.customer_message ?? "",
             customer_response: invoice.customer_response ?? "",
+            customer_response_note: invoice.customer_response_note ?? "",
             line_items: invoice.line_items.map((li) => ({
               description: li.description,
               quantity: String(li.quantity),

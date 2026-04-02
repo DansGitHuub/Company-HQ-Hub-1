@@ -22,9 +22,10 @@ export async function runInvoicesMigration() {
         balance_due    DECIMAL(10,2)  DEFAULT 0,
         notes          TEXT,
         terms          TEXT,
-        customer_message     TEXT,
-        customer_response    TEXT,
-        customer_response_at TIMESTAMPTZ,
+        customer_message       TEXT,
+        customer_response      TEXT,
+        customer_response_at   TIMESTAMPTZ,
+        customer_response_note TEXT,
         created_at     TIMESTAMPTZ    DEFAULT NOW(),
         updated_at     TIMESTAMPTZ    DEFAULT NOW()
       );

@@ -27,6 +27,7 @@ interface InvoiceFormData {
   terms: string;
   customer_message: string;
   customer_response: string;
+  customer_response_note: string;
   line_items: LineItem[];
 }
 
@@ -70,6 +71,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
     terms: "Payment due within 30 days.",
     customer_message: "",
     customer_response: "",
+    customer_response_note: "",
     line_items: [EMPTY_ITEM()],
     ...initialData,
   });
@@ -86,6 +88,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
       terms: "Payment due within 30 days.",
       customer_message: "",
       customer_response: "",
+      customer_response_note: "",
       line_items: [EMPTY_ITEM()],
       ...initialData,
     });
@@ -317,6 +320,12 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
                 rows={2} placeholder="Record customer's phone/email response…"
                 data-testid="textarea-customer-response" />
             </div>
+          </div>
+          <div className="space-y-1">
+            <Label>Response Note <span className="text-muted-foreground/60 text-xs">(internal follow-up)</span></Label>
+            <Textarea value={form.customer_response_note} onChange={(e) => set("customer_response_note", e.target.value)}
+              rows={2} placeholder="e.g. Called back twice, prefers email, follow up Friday…"
+              data-testid="textarea-customer-response-note" />
           </div>
         </div>
 
