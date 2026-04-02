@@ -162,7 +162,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
     const {
       customer_id, job_id, status, issued_date, due_date,
       tax_rate, discount_amount, notes, terms, customer_message, customer_response,
-      customer_response_at, customer_response_note, sent_at, line_items,
+      customer_response_at, customer_response_note, sent_at, viewed_at, paid_at, line_items,
     } = req.body;
 
     try {
@@ -186,14 +186,25 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
             WHEN $3 = 'sent' AND sent_at IS NULL THEN NOW()
             ELSE sent_at
           END,
+          viewed_at = CASE
+            WHEN $15 IS NOT NULL THEN $15::TIMESTAMPTZ
+            WHEN $3 = 'viewed' AND viewed_at IS NULL THEN NOW()
+            ELSE viewed_at
+          END,
+          paid_at = CASE
+            WHEN $16 IS NOT NULL THEN $16::TIMESTAMPTZ
+            WHEN $3 = 'paid' AND paid_at IS NULL THEN NOW()
+            ELSE paid_at
+          END,
           updated_at = NOW()
-        WHERE id = $15
+        WHERE id = $17
       `, [
         customer_id || null, job_id || null, status || null,
         issued_date || null, due_date ?? null,
         tax_rate ?? null, discount_amount ?? null, notes ?? null, terms ?? null,
         customer_message ?? null, customer_response ?? null, customer_response_at ?? null,
-        customer_response_note ?? null, sent_at ?? null, req.params.id,
+        customer_response_note ?? null, sent_at ?? null, viewed_at ?? null, paid_at ?? null,
+        req.params.id,
       ]);
 
       // Replace line items if provided

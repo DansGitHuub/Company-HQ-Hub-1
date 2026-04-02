@@ -27,6 +27,8 @@ export async function runInvoicesMigration() {
         customer_response_at   TIMESTAMPTZ,
         customer_response_note TEXT,
         sent_at                TIMESTAMPTZ,
+        viewed_at              TIMESTAMPTZ,
+        paid_at                TIMESTAMPTZ,
         created_at     TIMESTAMPTZ    DEFAULT NOW(),
         updated_at     TIMESTAMPTZ    DEFAULT NOW()
       );
