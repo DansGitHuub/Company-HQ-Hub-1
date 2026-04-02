@@ -1137,15 +1137,6 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  async getCampaigns(): Promise<Campaign[]> {
-    return db.select().from(campaigns);
-  }
-
-  async createCampaign(campaign: InsertCampaign): Promise<Campaign> {
-    const [newCampaign] = await db.insert(campaigns).values(campaign).returning();
-    return newCampaign;
-  }
-
   async getJobs(): Promise<Job[]> {
     return db.select().from(jobs);
   }
