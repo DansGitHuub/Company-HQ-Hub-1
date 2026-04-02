@@ -3,7 +3,7 @@ import { pool } from "../db";
 export async function runInvoicesMigration() {
   try {
     await pool.query(`
-      CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1000;
+      CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1;
 
       CREATE TABLE IF NOT EXISTS invoices (
         id             VARCHAR(36)    PRIMARY KEY DEFAULT gen_random_uuid()::text,

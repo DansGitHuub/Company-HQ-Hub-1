@@ -4,9 +4,8 @@ import { pool } from "./db";
 const PAYMENT_METHODS = ["cash", "check", "card", "ach", "zelle", "other"];
 
 async function generateInvoiceNumber(): Promise<string> {
-  const year = new Date().getFullYear();
   const { rows } = await pool.query(`SELECT NEXTVAL('invoice_number_seq') AS n`);
-  return `INV-${year}-${String(rows[0].n).padStart(4, "0")}`;
+  return `INV-${String(rows[0].n).padStart(4, "0")}`;
 }
 
 /** Recalculate totals for an invoice from its line items + payments */
