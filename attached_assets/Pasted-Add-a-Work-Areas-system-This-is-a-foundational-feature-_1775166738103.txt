@@ -1,0 +1,62 @@
+Add a Work Areas system. This is a foundational feature — every job has named scopes of work (like "Mowing", "Mulching", "Build Patio") and crews clock into a specific work area, not just a job.
+
+**DATABASE — create server/migrations/workAreas.ts:**
+
+Table 1: work_area_types (the company-managed list)
+- id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text
+- name VARCHAR(100) NOT NULL
+- division VARCHAR(50) — e.g. Maintenance, Install, Snow, General
+- is_active BOOLEAN DEFAULT true
+- sort_order INTEGER DEFAULT 0
+- created_at TIMESTAMPTZ DEFAULT NOW()
+
+Seed these defaults on first run (check if table is empty):
+Maintenance division: Mowing, Trimming, Edging, Mulching, Fertilization, Aeration, Leaf Cleanup, Spring Cleanup, Fall Cleanup, Pruning, Weeding, Irrigation Check
+Install division: Planting, Paver Patio, Retaining Wall, Grading, Drainage, Irrigation Install, Lighting Install, Sod Install, Seeding, Tree Installation
+Snow division: Snow Plowing, Salting, Sidewalk Clearing, Snow Hauling
+General: Consultation, Site Visit, Shop Time, Drive Time, Meeting, Training
+
+Table 2: job_work_areas (work areas assigned to a specific job)
+- id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text
+- job_id VARCHAR(36) REFERENCES jobs(id) ON DELETE CASCADE
+- work_area_type_id VARCHAR(36) REFERENCES work_area_types(id)
+- name VARCHAR(100) NOT NULL — copied from work_area_type name at creation
+- estimated_hours DECIMAL(6,2)
+- actual_hours DECIMAL(6,2) DEFAULT 0 — computed from time_entries
+- status VARCHAR(20) DEFAULT 'pending' — pending, in_progress, completed
+- sort_order INTEGER DEFAULT 0
+- notes TEXT
+
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS job_work_area_id VARCHAR(36) REFERENCES job_work_areas(id) ON DELETE SET NULL;
+ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS work_area_name VARCHAR(100); -- denormalized for display
+
+Import and run this migration in server/index.ts.
+
+**SERVER ROUTES — add to server/timeRoutes.ts or create server/workAreaRoutes.ts:**
+- GET /api/work-area-types — list all active types, ordered by division then sort_order
+- POST /api/work-area-types — create new type (admin only)
+- PUT /api/work-area-types/:id — update name, division, sort_order, is_active
+- GET /api/jobs/:id/work-areas — list work areas for a job
+- POST /api/jobs/:id/work-areas — add a work area to a job (body: { work_area_type_id, estimated_hours })
+- PUT /api/job-work-areas/:id — update estimated_hours, status, notes
+- DELETE /api/job-work-areas/:id — remove from job
+Register routes in server/index.ts.
+
+**UPDATE CLOCK-IN (client/src/components/TimeClock.tsx):**
+The Clock In dropdown currently has Entry Type and Job selectors. Change it to:
+1. Job selector (fetch /api/jobs?status=scheduled,in_progress) — required
+2. Work Area selector — once a job is selected, fetch /api/jobs/:id/work-areas and show the list. If the job has no work areas yet, fall back to showing all work_area_types grouped by division.
+3. Remove the old "Entry Type" dropdown — the work area name IS the entry type now. But keep these as special non-job options: Drive Time, Shop Time, Meeting, Break (these should always show in the dropdown even without a job selected, fetched from work_area_types where division = 'General')
+
+When clocking in, POST /api/time/clock-in with: { job_id, job_work_area_id (if from a job work area), work_area_name (the name to display) }
+Save work_area_name to the time_entries record so it shows on the time tracking page.
+
+**UPDATE TIME TRACKING PAGE (client/src/pages/time/index.tsx):**
+Replace the "Type" column with "Work Area" showing work_area_name from the time entry.
+
+**UPDATE JOB DETAIL PAGE (client/src/pages/jobs/show.tsx):**
+Add a Work Areas section to the left column (below the existing fields). Shows a list of this job's work areas with:
+- Name, estimated hours, actual hours (computed), status badge (pending/in_progress/completed)
+- "Add Work Area" button that opens a small modal: pick from work_area_types dropdown (grouped by division) + estimated hours
+- Each row has a delete button
+This replaces the empty space currently in the left column.

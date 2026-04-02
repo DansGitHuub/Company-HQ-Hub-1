@@ -21,6 +21,7 @@ interface TimeEntry {
   clock_out: string | null;
   duration_minutes: number | null;
   entry_type: string;
+  work_area_name: string | null;
   notes: string | null;
 }
 
@@ -201,7 +202,7 @@ export default function TimeTrackingPage() {
                   <TableHead>Clock In</TableHead>
                   <TableHead>Clock Out</TableHead>
                   <TableHead>Duration</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead>Work Area</TableHead>
                   <TableHead>Job</TableHead>
                   <TableHead>Notes</TableHead>
                 </TableRow>
@@ -227,8 +228,8 @@ export default function TimeTrackingPage() {
                         : <RunningTimer clockIn={entry.clock_in} />}
                     </TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[entry.entry_type] ?? "bg-muted text-muted-foreground"}`}>
-                        {TYPE_LABELS[entry.entry_type] ?? entry.entry_type}
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                        {entry.work_area_name || TYPE_LABELS[entry.entry_type] || entry.entry_type}
                       </span>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">

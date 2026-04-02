@@ -14,7 +14,13 @@ import {
 import {
   ChevronLeft, Pencil, User, MapPin, Calendar, Clock,
   DollarSign, Briefcase, Timer, ChevronDown, Loader2, FileText,
+  Plus, Trash2, HardHat,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -195,6 +201,11 @@ export default function JobDetailPage() {
   const [crewNotes, setCrewNotes] = useState<string | null>(null);
   const [savingNotes, setSavingNotes] = useState(false);
 
+  // Work Areas modal state
+  const [showAddArea, setShowAddArea] = useState(false);
+  const [addAreaTypeId, setAddAreaTypeId] = useState("");
+  const [addAreaHours, setAddAreaHours] = useState("");
+
   const { data: job, isLoading, error } = useQuery<JobDetail>({
     queryKey: ["/api/jobs", id],
     queryFn: async () => {
@@ -204,6 +215,57 @@ export default function JobDetailPage() {
       setCrewNotes(data.crew_notes ?? data.notes ?? "");
       return data;
     },
+  });
+
+  // Work area types (for the add dialog)
+  const { data: workAreaTypes = [] } = useQuery<Array<{ id: string; name: string; division: string | null }>>({
+    queryKey: ["/api/work-area-types"],
+    queryFn: async () => {
+      const res = await fetch("/api/work-area-types", { credentials: "include" });
+      return res.json();
+    },
+    enabled: showAddArea,
+  });
+
+  // Job work areas
+  const { data: jobWorkAreas = [], refetch: refetchAreas } = useQuery<Array<{
+    id: string; name: string; estimated_hours: string | null; actual_hours_computed: string; status: string;
+  }>>({
+    queryKey: ["/api/jobs", id, "work-areas"],
+    queryFn: async () => {
+      const res = await fetch(`/api/jobs/${id}/work-areas`, { credentials: "include" });
+      return res.json();
+    },
+    enabled: !!id,
+  });
+
+  const addAreaMutation = useMutation({
+    mutationFn: async () => {
+      if (!addAreaTypeId) throw new Error("Please select a work area type");
+      const res = await apiRequest("POST", `/api/jobs/${id}/work-areas`, {
+        work_area_type_id: addAreaTypeId,
+        estimated_hours: addAreaHours ? parseFloat(addAreaHours) : undefined,
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchAreas();
+      setShowAddArea(false);
+      setAddAreaTypeId("");
+      setAddAreaHours("");
+      toast({ title: "Work area added" });
+    },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
+  const deleteAreaMutation = useMutation({
+    mutationFn: async (areaId: string) => {
+      const res = await apiRequest("DELETE", `/api/job-work-areas/${areaId}`);
+      if (!res.ok) throw new Error("Failed to delete");
+    },
+    onSuccess: () => { refetchAreas(); toast({ title: "Work area removed" }); },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
 
   const statusMutation = useMutation({
@@ -339,6 +401,67 @@ export default function JobDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Work Areas */}
+          <Card>
+            <CardHeader className="pb-2 pt-4 px-4 flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2">
+                <HardHat className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm">Work Areas</CardTitle>
+              </div>
+              {isAdminOrManager && (
+                <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                  onClick={() => setShowAddArea(true)} data-testid="button-add-work-area">
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              {jobWorkAreas.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  No work areas yet. Add scopes of work for this job.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {jobWorkAreas.map((area) => {
+                    const estH = area.estimated_hours ? parseFloat(area.estimated_hours) : null;
+                    const actH = parseFloat(area.actual_hours_computed ?? "0");
+                    const statusCls =
+                      area.status === "completed"   ? "bg-green-100 text-green-700" :
+                      area.status === "in_progress" ? "bg-blue-100 text-blue-700" :
+                                                       "bg-gray-100 text-gray-600";
+                    return (
+                      <div key={area.id} className="flex items-center justify-between gap-2 py-1.5 border-b last:border-b-0"
+                        data-testid={`row-work-area-${area.id}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{area.name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${statusCls}`}>
+                              {area.status.replace("_", " ")}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {actH.toFixed(1)}h{estH ? ` / ${estH}h est.` : ""}
+                            </span>
+                          </div>
+                        </div>
+                        {isAdminOrManager && (
+                          <button
+                            onClick={() => deleteAreaMutation.mutate(area.id)}
+                            disabled={deleteAreaMutation.isPending}
+                            className="text-muted-foreground hover:text-red-500 transition-colors flex-shrink-0"
+                            title="Remove work area"
+                            data-testid={`button-delete-area-${area.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* ── Right Column ─────────────────────────────────────────────────── */}
@@ -544,6 +667,60 @@ export default function JobDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Add Work Area Dialog */}
+      <Dialog open={showAddArea} onOpenChange={(o) => { if (!o) { setShowAddArea(false); setAddAreaTypeId(""); setAddAreaHours(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add Work Area</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <div className="space-y-1">
+              <Label className="text-xs">Work Area Type</Label>
+              <select
+                value={addAreaTypeId}
+                onChange={(e) => setAddAreaTypeId(e.target.value)}
+                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                data-testid="select-add-area-type"
+              >
+                <option value="">Select type…</option>
+                {Object.entries(
+                  workAreaTypes.reduce<Record<string, typeof workAreaTypes>>((acc, t) => {
+                    const div = t.division ?? "Other";
+                    (acc[div] = acc[div] ?? []).push(t);
+                    return acc;
+                  }, {})
+                ).map(([div, types]) => (
+                  <optgroup key={div} label={div}>
+                    {types.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Estimated Hours <span className="text-muted-foreground">(optional)</span></Label>
+              <Input
+                type="number"
+                step="0.5"
+                min="0"
+                placeholder="e.g. 2.5"
+                value={addAreaHours}
+                onChange={(e) => setAddAreaHours(e.target.value)}
+                data-testid="input-area-hours"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddArea(false)}>Cancel</Button>
+            <Button onClick={() => addAreaMutation.mutate()} disabled={addAreaMutation.isPending || !addAreaTypeId}>
+              {addAreaMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              Add Work Area
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Modal */}
       {showEdit && job && (

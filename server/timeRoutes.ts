@@ -6,7 +6,10 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
   // ── Clock In ────────────────────────────────────────────────────────────────
   app.post("/api/time/clock-in", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
-    const { job_id, entry_type = "billable" } = req.body;
+    const { job_id, entry_type, job_work_area_id, work_area_name } = req.body;
+
+    // Derive entry_type: use provided value, or fallback to "billable" when a job is given
+    const resolvedEntryType = entry_type || (job_id ? "billable" : "shop_time");
 
     try {
       // Check if already clocked in
@@ -19,9 +22,9 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
       }
 
       const result = await pool.query(
-        `INSERT INTO time_entries (user_id, job_id, entry_type, clock_in)
-         VALUES ($1, $2, $3, NOW()) RETURNING *`,
-        [userId, job_id || null, entry_type]
+        `INSERT INTO time_entries (user_id, job_id, entry_type, clock_in, job_work_area_id, work_area_name)
+         VALUES ($1, $2, $3, NOW(), $4, $5) RETURNING *`,
+        [userId, job_id || null, resolvedEntryType, job_work_area_id || null, work_area_name || null]
       );
       return res.status(201).json(result.rows[0]);
     } catch (err: any) {

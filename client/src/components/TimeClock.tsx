@@ -15,18 +15,21 @@ interface TimeEntry {
   clock_in: string;
   clock_out: string | null;
   entry_type: string;
+  work_area_name: string | null;
 }
 
-interface Job { id: string; client: string; type: string; }
+interface Job { id: string; client: string; title: string | null; }
 
-const ENTRY_TYPES = [
-  { value: "billable",     label: "Billable Job" },
-  { value: "non_billable", label: "Non-Billable" },
-  { value: "drive_time",   label: "Drive Time" },
-  { value: "break",        label: "Break" },
-  { value: "shop_time",    label: "Shop Time" },
-  { value: "meeting",      label: "Meeting" },
-];
+interface WorkAreaType {
+  id: string; name: string; division: string | null; sort_order: number;
+}
+
+interface JobWorkArea {
+  id: string; name: string; estimated_hours: string | null; status: string;
+}
+
+// ── General (non-job) options always shown ────────────────────────────────────
+const GENERAL_OPTIONS = ["Drive Time", "Shop Time", "Meeting", "Break"];
 
 // ── Elapsed time hook ─────────────────────────────────────────────────────────
 function useElapsed(clockIn: string | null) {
@@ -72,7 +75,7 @@ function useGpsPinger(activeEntry: TimeEntry | null) {
   useEffect(() => {
     if (pingRef.current) { clearInterval(pingRef.current); pingRef.current = null; }
     if (activeEntry) {
-      sendPing(activeEntry.id);                    // immediate first ping
+      sendPing(activeEntry.id);
       pingRef.current = setInterval(() => sendPing(activeEntry.id), 60_000);
     }
     return () => { if (pingRef.current) clearInterval(pingRef.current); };
@@ -84,8 +87,8 @@ export default function TimeClock() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [entryType, setEntryType] = useState("billable");
   const [selectedJob, setSelectedJob] = useState("");
+  const [selectedWorkArea, setSelectedWorkArea] = useState("");
 
   // Active entry
   const { data: activeEntry = null } = useQuery<TimeEntry | null>({
@@ -98,7 +101,7 @@ export default function TimeClock() {
     refetchInterval: 30_000,
   });
 
-  // Jobs for selector — only show scheduled or in-progress jobs
+  // Jobs — only scheduled or in-progress
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: ["/api/jobs", "active"],
     queryFn: async () => {
@@ -109,15 +112,84 @@ export default function TimeClock() {
     enabled: open && !activeEntry,
   });
 
+  // Work areas for the selected job
+  const { data: jobWorkAreas = [] } = useQuery<JobWorkArea[]>({
+    queryKey: ["/api/jobs", selectedJob, "work-areas"],
+    queryFn: async () => {
+      const res = await fetch(`/api/jobs/${selectedJob}/work-areas`, { credentials: "include" });
+      return res.json();
+    },
+    enabled: open && !!selectedJob,
+  });
+
+  // All work area types (for fallback when no job selected or job has no areas)
+  const { data: allTypes = [] } = useQuery<WorkAreaType[]>({
+    queryKey: ["/api/work-area-types"],
+    queryFn: async () => {
+      const res = await fetch("/api/work-area-types", { credentials: "include" });
+      return res.json();
+    },
+    enabled: open && !activeEntry,
+  });
+
   const elapsed = useElapsed(activeEntry?.clock_in ?? null);
   useGpsPinger(activeEntry);
+
+  // Reset work area when job changes
+  useEffect(() => { setSelectedWorkArea(""); }, [selectedJob]);
+
+  // Build the work area options shown in the dropdown
+  // Format: encoded string "job:ID:NAME" or "type:NAME" or "general:NAME"
+  function buildWorkAreaOptions(): Array<{ value: string; label: string; group: string }> {
+    const opts: Array<{ value: string; label: string; group: string }> = [];
+
+    // General options always available
+    const generalTypes = allTypes.filter((t) => t.division === "General" && GENERAL_OPTIONS.includes(t.name));
+    // Also include any general options not in DB yet
+    GENERAL_OPTIONS.forEach((name) => {
+      const match = generalTypes.find((t) => t.name === name);
+      opts.push({ value: `general:${match?.id ?? ""}:${name}`, label: name, group: "General" });
+    });
+
+    if (selectedJob) {
+      if (jobWorkAreas.length > 0) {
+        // Show job's specific work areas
+        jobWorkAreas.forEach((jwa) => {
+          opts.push({ value: `job:${jwa.id}:${jwa.name}`, label: jwa.name, group: "Job Work Areas" });
+        });
+      } else {
+        // No work areas on this job — show all types grouped by division (excluding General already shown)
+        const grouped = allTypes.filter((t) => t.division !== "General");
+        const divisions = [...new Set(grouped.map((t) => t.division ?? "Other"))];
+        divisions.forEach((div) => {
+          grouped.filter((t) => (t.division ?? "Other") === div).forEach((t) => {
+            opts.push({ value: `type:${t.id}:${t.name}`, label: t.name, group: div });
+          });
+        });
+      }
+    }
+
+    return opts;
+  }
+
+  function parseWorkAreaValue(val: string) {
+    const [kind, id, ...rest] = val.split(":");
+    const name = rest.join(":");
+    if (kind === "job") return { job_work_area_id: id, work_area_name: name };
+    return { job_work_area_id: undefined, work_area_name: name };
+  }
+
+  const workAreaOptions = buildWorkAreaOptions();
 
   // Clock in
   const clockInMutation = useMutation({
     mutationFn: async () => {
+      if (!selectedWorkArea) throw new Error("Please select a work area.");
+      const { job_work_area_id, work_area_name } = parseWorkAreaValue(selectedWorkArea);
       const res = await apiRequest("POST", "/api/time/clock-in", {
-        entry_type: entryType,
         job_id: selectedJob || undefined,
+        job_work_area_id: job_work_area_id || undefined,
+        work_area_name,
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       return res.json();
@@ -127,6 +199,8 @@ export default function TimeClock() {
       queryClient.invalidateQueries({ queryKey: ["/api/time/entries"] });
       toast({ title: "Clocked in" });
       setOpen(false);
+      setSelectedJob("");
+      setSelectedWorkArea("");
     },
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
@@ -150,14 +224,15 @@ export default function TimeClock() {
 
   // ── Clocked In State ──
   if (activeEntry) {
+    const displayLabel = activeEntry.work_area_name || activeEntry.job_name;
     return (
       <div className="flex items-center gap-1.5" data-testid="timeclock-active">
         <div className="flex items-center gap-1.5 bg-green-500/15 border border-green-500/30 text-green-600 dark:text-green-400 rounded-full px-3 py-1.5 text-xs font-semibold">
           <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
           {elapsed}
-          {activeEntry.job_name && (
+          {displayLabel && (
             <span className="hidden sm:inline text-green-600/70 dark:text-green-400/70 font-normal">
-              · {activeEntry.job_name}
+              · {displayLabel}
             </span>
           )}
         </div>
@@ -175,6 +250,12 @@ export default function TimeClock() {
   }
 
   // ── Clocked Out State ──
+  // Group work area options by group label
+  const optionGroups = workAreaOptions.reduce<Record<string, typeof workAreaOptions>>((acc, o) => {
+    (acc[o.group] = acc[o.group] ?? []).push(o);
+    return acc;
+  }, {});
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -187,49 +268,52 @@ export default function TimeClock() {
           <ChevronDown className="h-3 w-3" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-3" align="end" data-testid="popover-clock-in">
+      <PopoverContent className="w-72 p-3" align="end" data-testid="popover-clock-in">
         <div className="space-y-3">
           <p className="text-sm font-semibold">Clock In</p>
 
-          {/* Entry Type */}
+          {/* Job selector */}
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground font-medium">Entry Type</label>
+            <label className="text-xs text-muted-foreground font-medium">
+              Job <span className="text-muted-foreground/60">(optional)</span>
+            </label>
             <select
-              value={entryType}
-              onChange={(e) => setEntryType(e.target.value)}
+              value={selectedJob}
+              onChange={(e) => setSelectedJob(e.target.value)}
               className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              data-testid="select-entry-type"
+              data-testid="select-job"
             >
-              {ENTRY_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
+              <option value="">No specific job</option>
+              {jobs.slice(0, 50).map((j) => (
+                <option key={j.id} value={j.id}>{j.title || j.client}</option>
               ))}
             </select>
           </div>
 
-          {/* Job (optional) */}
-          {(entryType === "billable" || entryType === "non_billable") && (
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground font-medium">
-                Job <span className="text-muted-foreground/60">(optional)</span>
-              </label>
-              <select
-                value={selectedJob}
-                onChange={(e) => setSelectedJob(e.target.value)}
-                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                data-testid="select-job"
-              >
-                <option value="">No specific job</option>
-                {jobs.slice(0, 50).map((j) => (
-                  <option key={j.id} value={j.id}>{j.client}</option>
-                ))}
-              </select>
-            </div>
-          )}
+          {/* Work Area selector */}
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground font-medium">Work Area *</label>
+            <select
+              value={selectedWorkArea}
+              onChange={(e) => setSelectedWorkArea(e.target.value)}
+              className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              data-testid="select-work-area"
+            >
+              <option value="">Select work area…</option>
+              {Object.entries(optionGroups).map(([group, opts]) => (
+                <optgroup key={group} label={group}>
+                  {opts.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
 
           <Button
             className="w-full bg-green-600 hover:bg-green-700 text-white h-9"
             onClick={() => clockInMutation.mutate()}
-            disabled={clockInMutation.isPending}
+            disabled={clockInMutation.isPending || !selectedWorkArea}
             data-testid="button-clock-in-confirm"
           >
             {clockInMutation.isPending ? "Clocking in…" : "Clock In"}
