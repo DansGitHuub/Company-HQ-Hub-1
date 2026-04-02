@@ -1,0 +1,38 @@
+Next task: Add GPS tracking and Time Tracking to the app. This requires both database tables and UI.
+
+DATABASE - Add these two migrations:
+
+1. Table: time_entries
+   - id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+   - user_id UUID REFERENCES users(id) ON DELETE CASCADE
+   - job_id UUID REFERENCES jobs(id) ON DELETE SET NULL (nullable)
+   - clock_in TIMESTAMPTZ NOT NULL
+   - clock_out TIMESTAMPTZ (nullable - null means currently clocked in)
+   - duration_minutes INTEGER (computed on clock_out)
+   - entry_type VARCHAR(20) NOT NULL DEFAULT 'billable' -- values: 'billable', 'non_billable', 'drive_time', 'break', 'shop_time', 'meeting'
+   - notes TEXT
+   - created_at TIMESTAMPTZ DEFAULT NOW()
+
+2. Table: gps_pings
+   - id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+   - user_id UUID REFERENCES users(id) ON DELETE CASCADE
+   - time_entry_id UUID REFERENCES time_entries(id) ON DELETE CASCADE (nullable)
+   - lat DOUBLE PRECISION NOT NULL
+   - lng DOUBLE PRECISION NOT NULL
+   - accuracy REAL
+   - recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+API ENDPOINTS:
+- POST /api/time/clock-in  { job_id?, entry_type } -> creates time_entry, returns it
+- POST /api/time/clock-out { time_entry_id, notes? } -> sets clock_out, computes duration
+- GET  /api/time/active -> returns the current open time_entry for the logged-in user (if any)
+- GET  /api/time/entries?user_id=&date= -> list entries
+- POST /api/gps/ping { lat, lng, accuracy, time_entry_id? } -> saves a GPS ping
+
+UI - Add a "Time Clock" widget that appears as a floating bar at the bottom of every page (or in the top header area). It should:
+- Show current clock status: if clocked in, show green "● Clocked In — 1h 23m" with a stop button
+- If clocked out, show a "Clock In" button that opens a small dropdown: select entry type (Billable Job, Non-Billable, Drive Time, Break, Shop Time, Meeting), optionally select a job, then Clock In
+- When clocked in, ping GPS every 60 seconds using browser navigator.geolocation and POST to /api/gps/ping
+- Keep it simple and unobtrusive - fits into the existing header bar
+
+Also add a Time Tracking page at /time that shows a table of today's entries for the current user with clock in/out times, duration, type, and job name.
