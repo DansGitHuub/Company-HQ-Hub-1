@@ -10,7 +10,7 @@ export async function runInvoicesMigration() {
         invoice_number VARCHAR(50)    UNIQUE NOT NULL,
         customer_id    UUID           REFERENCES customers(id) ON DELETE SET NULL,
         job_id         VARCHAR(36)    REFERENCES jobs(id) ON DELETE SET NULL,
-        status         VARCHAR(20)    NOT NULL DEFAULT 'draft',
+        status         VARCHAR(30)    NOT NULL DEFAULT 'draft',
         issued_date    DATE           NOT NULL DEFAULT CURRENT_DATE,
         due_date       DATE,
         subtotal       DECIMAL(10,2)  NOT NULL DEFAULT 0,
