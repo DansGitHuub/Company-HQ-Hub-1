@@ -827,12 +827,12 @@ function EstimatesBoard() {
   }, [alwaysNotifyIds]);
 
   const { data: allEstimates = [] } = useQuery<Estimate[]>({
-    queryKey: ["/api/estimates"],
+    queryKey: ["/api/pipeline-estimates"],
   });
 
   // Fetch follow-up reminders on load (also logs bell notifications server-side)
   const { data: dueFollowUps = [] } = useQuery<Estimate[]>({
-    queryKey: ["/api/estimates/follow-up-reminders"],
+    queryKey: ["/api/pipeline-estimates/follow-up-reminders"],
     refetchOnWindowFocus: false,
   });
 
@@ -852,11 +852,11 @@ function EstimatesBoard() {
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Estimate>) => {
-      const res = await apiRequest("POST", "/api/estimates", data);
+      const res = await apiRequest("POST", "/api/pipeline-estimates", data);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pipeline-estimates"] });
       toast({ title: t("jobs.estimateCreated") });
       setIsModalOpen(false);
     },
@@ -864,11 +864,11 @@ function EstimatesBoard() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      const res = await apiRequest("PATCH", `/api/estimates/${id}`, data);
+      const res = await apiRequest("PATCH", `/api/pipeline-estimates/${id}`, data);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pipeline-estimates"] });
       toast({ title: t("jobs.estimateUpdated") });
       setIsModalOpen(false);
     },
@@ -876,10 +876,10 @@ function EstimatesBoard() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/estimates/${id}`);
+      await apiRequest("DELETE", `/api/pipeline-estimates/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pipeline-estimates"] });
       toast({ title: t("jobs.estimateDeleted") });
       setIsModalOpen(false);
     },
@@ -887,11 +887,11 @@ function EstimatesBoard() {
 
   const convertMutation = useMutation({
     mutationFn: async ({ id, category }: { id: string; category: string }) => {
-      const res = await apiRequest("POST", `/api/estimates/${id}/convert-to-job`, { category });
+      const res = await apiRequest("POST", `/api/pipeline-estimates/${id}/convert-to-job`, { category });
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pipeline-estimates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
       toast({ title: t("jobs.convertedToJob") });
       setShowConvertDialog(false);

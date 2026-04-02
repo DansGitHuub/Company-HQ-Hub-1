@@ -18,7 +18,7 @@ import {
 import {
   ChevronLeft, Phone, Mail, MapPin, Building2, FileText, Star,
   Loader2, Pencil, Plus, Trash2, CheckCircle2, XCircle,
-  Briefcase, DollarSign, CalendarDays, Clock, Home, LayoutGrid,
+  Briefcase, DollarSign, CalendarDays, Clock, Home, LayoutGrid, Calculator,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -101,6 +101,77 @@ function CustomerInvoicesTab({ customerId }: { customerId: string }) {
                   <TableCell className={`text-right text-sm font-medium pr-6 ${parseFloat(inv.balance_due) > 0 ? "text-red-600" : "text-green-600"}`}>
                     {fmtMoney(inv.balance_due)}
                   </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Customer Estimates Tab ────────────────────────────────────────────────────
+function CustomerEstimatesTab({ customerId }: { customerId: string }) {
+  const [, nav] = useLocation();
+  const fmtMoney = (v: any) => `$${parseFloat(v ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+  const fmtDate = (d: string | null) => { if (!d) return "—"; try { return format(parseISO(d), "MMM d, yyyy"); } catch { return d; } };
+
+  const EST_STATUS_CLS: Record<string, string> = {
+    draft: "bg-gray-100 text-gray-700", sent: "bg-blue-100 text-blue-700",
+    viewed: "bg-sky-100 text-sky-700", approved: "bg-emerald-100 text-emerald-700",
+    declined: "bg-red-100 text-red-700", converted: "bg-purple-100 text-purple-700",
+  };
+
+  const { data: estimates = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/estimates", "customer", customerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/estimates?customer_id=${customerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  if (isLoading) return <div className="py-12 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3 pt-4 flex flex-row items-center justify-between">
+        <CardTitle className="text-sm">Estimates</CardTitle>
+        <Button size="sm" variant="outline" onClick={() => nav("/estimates")} className="text-xs h-7 px-2">
+          <Plus className="h-3.5 w-3.5 mr-1" /> New Estimate
+        </Button>
+      </CardHeader>
+      <CardContent className="pb-4 px-0">
+        {estimates.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">
+            <Calculator className="h-8 w-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No estimates yet.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-6">Estimate #</TableHead>
+                <TableHead>Title</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Issued</TableHead>
+                <TableHead className="text-right pr-6">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {estimates.map((est: any) => (
+                <TableRow key={est.id} className="cursor-pointer hover:bg-muted/40"
+                  onClick={() => nav(`/estimates/${est.id}`)} data-testid={`row-estimate-${est.id}`}>
+                  <TableCell className="pl-6 font-mono text-sm font-medium">{est.estimate_number ?? "—"}</TableCell>
+                  <TableCell className="text-sm">{est.title}</TableCell>
+                  <TableCell>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${EST_STATUS_CLS[est.status] ?? "bg-gray-100 text-gray-600"}`}>
+                      {est.status}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-sm">{fmtDate(est.issued_date)}</TableCell>
+                  <TableCell className="text-right text-sm font-semibold pr-6">{fmtMoney(est.total)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -529,6 +600,9 @@ export default function CustomerDetailPage() {
                   <Badge variant="secondary" className="ml-1 h-4 min-w-4 text-xs px-1">{jobs.length}</Badge>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="estimates" className="flex items-center gap-1.5 text-xs" data-testid="tab-estimates">
+                <Calculator className="h-3.5 w-3.5" /> Estimates
+              </TabsTrigger>
               <TabsTrigger value="invoices" className="flex items-center gap-1.5 text-xs" data-testid="tab-invoices">
                 <FileText className="h-3.5 w-3.5" /> Invoices
               </TabsTrigger>
@@ -733,6 +807,11 @@ export default function CustomerDetailPage() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* ── Estimates ── */}
+            <TabsContent value="estimates" className="mt-4">
+              <CustomerEstimatesTab customerId={customer.id} />
             </TabsContent>
 
             {/* ── Invoices ── */}

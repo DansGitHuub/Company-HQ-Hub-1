@@ -4,13 +4,16 @@ export async function runNewEstimatesMigration() {
   // Sequence for estimate numbers
   await pool.query(`CREATE SEQUENCE IF NOT EXISTS sales_estimate_seq START 1`);
 
-  // Main estimates table (named sales_estimates to avoid conflict with legacy pipeline table)
+  // Main estimates table
+  // customer_id/property_id → UUID  (customers.id and properties.id are uuid)
+  // salesperson_id           → VARCHAR(36) (users.id is character varying(36))
+  // converted_job_id         → VARCHAR(36) (jobs.id is character varying(36))
   await pool.query(`
     CREATE TABLE IF NOT EXISTS sales_estimates (
-      id                    VARCHAR(36)    PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      id                    UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
       estimate_number       VARCHAR(50)    UNIQUE,
-      customer_id           VARCHAR(36)    REFERENCES customers(id) ON DELETE SET NULL,
-      property_id           VARCHAR(36)    REFERENCES properties(id) ON DELETE SET NULL,
+      customer_id           UUID           REFERENCES customers(id) ON DELETE SET NULL,
+      property_id           UUID           REFERENCES properties(id) ON DELETE SET NULL,
       estimate_type         VARCHAR(50)    NOT NULL DEFAULT 'project',
       template_name         VARCHAR(100),
       title                 VARCHAR(200)   NOT NULL DEFAULT 'New Estimate',
@@ -40,11 +43,11 @@ export async function runNewEstimatesMigration() {
     );
   `);
 
-  // Work areas within an estimate (grouped line items)
+  // Work areas within an estimate
   await pool.query(`
     CREATE TABLE IF NOT EXISTS estimate_work_areas (
-      id                 VARCHAR(36)   PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      estimate_id        VARCHAR(36)   NOT NULL REFERENCES sales_estimates(id) ON DELETE CASCADE,
+      id                 UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+      estimate_id        UUID          NOT NULL REFERENCES sales_estimates(id) ON DELETE CASCADE,
       name               VARCHAR(100)  NOT NULL,
       work_area_type_id  VARCHAR(36)   REFERENCES work_area_types(id) ON DELETE SET NULL,
       sort_order         INTEGER       NOT NULL DEFAULT 0
@@ -54,31 +57,31 @@ export async function runNewEstimatesMigration() {
   // Line items within each work area
   await pool.query(`
     CREATE TABLE IF NOT EXISTS estimate_line_items (
-      id                   VARCHAR(36)    PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      estimate_work_area_id VARCHAR(36)   NOT NULL REFERENCES estimate_work_areas(id) ON DELETE CASCADE,
-      item_type            VARCHAR(20)    NOT NULL DEFAULT 'service',
-      description          TEXT           NOT NULL,
-      quantity             DECIMAL(10,2)  NOT NULL DEFAULT 1,
-      unit                 VARCHAR(30),
-      unit_price           DECIMAL(10,2)  NOT NULL DEFAULT 0,
-      amount               DECIMAL(10,2)  NOT NULL DEFAULT 0,
-      sort_order           INTEGER        NOT NULL DEFAULT 0,
-      is_optional          BOOLEAN        NOT NULL DEFAULT false
+      id                    UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+      estimate_work_area_id UUID           NOT NULL REFERENCES estimate_work_areas(id) ON DELETE CASCADE,
+      item_type             VARCHAR(20)    NOT NULL DEFAULT 'service',
+      description           TEXT           NOT NULL,
+      quantity              DECIMAL(10,2)  NOT NULL DEFAULT 1,
+      unit                  VARCHAR(30),
+      unit_price            DECIMAL(10,2)  NOT NULL DEFAULT 0,
+      amount                DECIMAL(10,2)  NOT NULL DEFAULT 0,
+      sort_order            INTEGER        NOT NULL DEFAULT 0,
+      is_optional           BOOLEAN        NOT NULL DEFAULT false
     );
   `);
 
   // Reusable estimate templates
   await pool.query(`
     CREATE TABLE IF NOT EXISTS estimate_templates (
-      id                     VARCHAR(36)   PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      name                   VARCHAR(100)  NOT NULL,
-      estimate_type          VARCHAR(50)   NOT NULL,
-      description            TEXT,
-      default_work_areas     JSONB,
-      default_terms          TEXT,
+      id                       UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+      name                     VARCHAR(100)  NOT NULL,
+      estimate_type            VARCHAR(50)   NOT NULL,
+      description              TEXT,
+      default_work_areas       JSONB,
+      default_terms            TEXT,
       default_customer_message TEXT,
-      is_active              BOOLEAN       NOT NULL DEFAULT true,
-      created_at             TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+      is_active                BOOLEAN       NOT NULL DEFAULT true,
+      created_at               TIMESTAMPTZ   NOT NULL DEFAULT NOW()
     );
   `);
 
@@ -86,20 +89,20 @@ export async function runNewEstimatesMigration() {
   const { rows } = await pool.query(`SELECT COUNT(*) FROM estimate_templates`);
   if (parseInt(rows[0].count) === 0) {
     const maintenanceAreas = JSON.stringify([
-      { name: "Mowing",        line_items: [{ item_type: "service", description: "Lawn mowing", quantity: 1, unit: "visit", unit_price: 0 }] },
-      { name: "Trimming",      line_items: [{ item_type: "service", description: "Trimming and edging", quantity: 1, unit: "visit", unit_price: 0 }] },
-      { name: "Edging",        line_items: [{ item_type: "service", description: "Bed edging", quantity: 1, unit: "lf", unit_price: 0 }] },
-      { name: "Fertilization", line_items: [{ item_type: "material", description: "Fertilizer application", quantity: 1, unit: "application", unit_price: 0 }] },
+      { name: "Mowing",        line_items: [{ item_type: "service",  description: "Lawn mowing",               quantity: 1, unit: "visit",       unit_price: 0 }] },
+      { name: "Trimming",      line_items: [{ item_type: "service",  description: "Trimming and edging",       quantity: 1, unit: "visit",       unit_price: 0 }] },
+      { name: "Edging",        line_items: [{ item_type: "service",  description: "Bed edging",                quantity: 1, unit: "lf",          unit_price: 0 }] },
+      { name: "Fertilization", line_items: [{ item_type: "material", description: "Fertilizer application",   quantity: 1, unit: "application", unit_price: 0 }] },
     ]);
     const projectAreas = JSON.stringify([
-      { name: "Site Prep / Grading", line_items: [{ item_type: "labor", description: "Site preparation and grading", quantity: 1, unit: "hr", unit_price: 0 }] },
-      { name: "Planting",            line_items: [{ item_type: "material", description: "Plant material", quantity: 1, unit: "each", unit_price: 0 }] },
-      { name: "Mulching",            line_items: [{ item_type: "material", description: "Mulch installation", quantity: 1, unit: "yard", unit_price: 0 }] },
+      { name: "Site Prep / Grading", line_items: [{ item_type: "labor",    description: "Site preparation and grading", quantity: 1, unit: "hr",   unit_price: 0 }] },
+      { name: "Planting",            line_items: [{ item_type: "material", description: "Plant material",               quantity: 1, unit: "each", unit_price: 0 }] },
+      { name: "Mulching",            line_items: [{ item_type: "material", description: "Mulch installation",           quantity: 1, unit: "yard", unit_price: 0 }] },
     ]);
     const snowAreas = JSON.stringify([
-      { name: "Snow Plowing",     line_items: [{ item_type: "service", description: "Per push plowing", quantity: 1, unit: "push", unit_price: 0 }] },
-      { name: "Salting",          line_items: [{ item_type: "material", description: "Salt/deicer application", quantity: 1, unit: "application", unit_price: 0 }] },
-      { name: "Sidewalk Clearing", line_items: [{ item_type: "service", description: "Sidewalk hand clearing", quantity: 1, unit: "hr", unit_price: 0 }] },
+      { name: "Snow Plowing",      line_items: [{ item_type: "service",  description: "Per push plowing",          quantity: 1, unit: "push",        unit_price: 0 }] },
+      { name: "Salting",           line_items: [{ item_type: "material", description: "Salt/deicer application",   quantity: 1, unit: "application", unit_price: 0 }] },
+      { name: "Sidewalk Clearing", line_items: [{ item_type: "service",  description: "Sidewalk hand clearing",    quantity: 1, unit: "hr",          unit_price: 0 }] },
     ]);
 
     await pool.query(

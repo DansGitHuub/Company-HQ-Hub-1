@@ -31,6 +31,8 @@ import JobList from "@/pages/jobs/index";
 import JobDetail from "@/pages/jobs/show";
 import InvoiceList from "@/pages/invoices/index";
 import InvoiceDetail from "@/pages/invoices/show";
+import EstimateList from "@/pages/estimates/index";
+import EstimateDetail from "@/pages/estimates/show";
 import Help from "@/pages/Help";
 import Profile from "@/pages/Profile";
 import AdminSetup from "@/pages/AdminSetup";
@@ -130,6 +132,8 @@ function AppRoutes() {
         <Route path="/jobs/:id" component={JobDetail} />
         <Route path="/invoices" component={InvoiceList} />
         <Route path="/invoices/:id" component={InvoiceDetail} />
+        <Route path="/estimates" component={EstimateList} />
+        <Route path="/estimates/:id" component={EstimateDetail} />
         <Route path="/pipeline" component={JobPipeline} />
         <Route path="/help" component={Help} />
         <Route path="/admin-setup" component={AdminSetup} />

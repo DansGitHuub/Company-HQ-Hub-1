@@ -19,6 +19,7 @@ import { registerTaskRoutes } from "./taskRoutes";
 import { registerAssistantRoutes } from "./assistantRoutes";
 import { registerTimeRoutes } from "./timeRoutes";
 import { registerWorkAreaRoutes } from "./workAreaRoutes";
+import { registerEstimateRoutes } from "./estimateRoutes";
 import { registerJobRoutes } from "./jobRoutes";
 import { registerInvoiceRoutes } from "./invoiceRoutes";
 import { searchProductImages } from "./imageSearchService";
@@ -9561,6 +9562,7 @@ Provide accurate information based on publicly available documentation.`;
   registerCustomerRoutes(app, requireAuth);
   registerTimeRoutes(app, requireAuth);
   registerWorkAreaRoutes(app, requireAuth, requireRole);
+  registerEstimateRoutes(app);
   setInterval(runNoteReminderScheduler, 60 * 1000);
   console.log("[notes-scheduler] Note reminder scheduler started (checking every minute)");
 

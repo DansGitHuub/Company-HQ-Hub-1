@@ -375,7 +375,7 @@ export function PipelineWidget({ size }: WidgetProps) {
 
 export function EstimatesWidget({ size }: WidgetProps) {
   const { data: estimates = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/estimates"],
+    queryKey: ["/api/pipeline-estimates"],
   });
 
   const stages = ["New Lead", "Contact Made", "Site Visit", "Proposal Sent", "Follow Up", "Won", "Lost"];
