@@ -29,6 +29,8 @@ import HQOverview from "@/pages/HQOverview";
 import JobPipeline from "@/pages/JobPipeline";
 import JobList from "@/pages/jobs/index";
 import JobDetail from "@/pages/jobs/show";
+import InvoiceList from "@/pages/invoices/index";
+import InvoiceDetail from "@/pages/invoices/show";
 import Help from "@/pages/Help";
 import Profile from "@/pages/Profile";
 import AdminSetup from "@/pages/AdminSetup";
@@ -126,6 +128,8 @@ function AppRoutes() {
         <Route path="/hq" component={HQOverview} />
         <Route path="/jobs" component={JobList} />
         <Route path="/jobs/:id" component={JobDetail} />
+        <Route path="/invoices" component={InvoiceList} />
+        <Route path="/invoices/:id" component={InvoiceDetail} />
         <Route path="/pipeline" component={JobPipeline} />
         <Route path="/help" component={Help} />
         <Route path="/admin-setup" component={AdminSetup} />
