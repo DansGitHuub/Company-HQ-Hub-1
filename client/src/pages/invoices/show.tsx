@@ -47,13 +47,14 @@ interface InvoiceDetail {
 }
 
 const INVOICE_STATUSES = [
-  { value: "draft",   label: "Draft" },
-  { value: "sent",    label: "Sent" },
-  { value: "viewed",  label: "Viewed" },
-  { value: "partial", label: "Partial" },
-  { value: "paid",    label: "Paid" },
-  { value: "overdue", label: "Overdue" },
-  { value: "void",    label: "Void" },
+  { value: "draft",             label: "Draft" },
+  { value: "sent",              label: "Sent" },
+  { value: "viewed",            label: "Viewed" },
+  { value: "accepted",          label: "Accepted" },
+  { value: "declined",          label: "Declined" },
+  { value: "changes_requested", label: "Changes Requested" },
+  { value: "paid",              label: "Paid" },
+  { value: "void",              label: "Void" },
 ];
 
 const PAYMENT_METHODS = ["cash","check","card","ach","zelle","other"];

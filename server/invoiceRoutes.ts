@@ -25,23 +25,13 @@ async function syncInvoiceTotals(invoiceId: string) {
     WHERE id = $1
   `, [invoiceId]);
 
-  // Auto-mark as paid if balance_due <= 0 and already sent/partial
+  // Auto-mark as paid if balance_due <= 0 and invoice was accepted/sent/viewed
   await pool.query(`
     UPDATE invoices
     SET status = 'paid', updated_at = NOW()
     WHERE id = $1
       AND balance_due <= 0
-      AND status IN ('sent','partial','viewed','overdue')
-  `, [invoiceId]);
-
-  // Mark partial if some paid but not all
-  await pool.query(`
-    UPDATE invoices
-    SET status = 'partial', updated_at = NOW()
-    WHERE id = $1
-      AND balance_due > 0
-      AND amount_paid > 0
-      AND status IN ('sent','viewed')
+      AND status IN ('accepted','sent','viewed')
   `, [invoiceId]);
 }
 

@@ -25,13 +25,14 @@ interface InvoiceRow {
 
 // ── Status ────────────────────────────────────────────────────────────────────
 export const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft:   { label: "Draft",   cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
-  sent:    { label: "Sent",    cls: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
-  viewed:  { label: "Viewed",  cls: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300" },
-  partial: { label: "Partial", cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" },
-  paid:    { label: "Paid",    cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
-  overdue: { label: "Overdue", cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
-  void:    { label: "Void",    cls: "bg-muted text-muted-foreground" },
+  draft:             { label: "Draft",             cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
+  sent:              { label: "Sent",              cls: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
+  viewed:            { label: "Viewed",            cls: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300" },
+  accepted:          { label: "Accepted",          cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300" },
+  declined:          { label: "Declined",          cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
+  changes_requested: { label: "Changes Requested", cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" },
+  paid:              { label: "Paid",              cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
+  void:              { label: "Void",              cls: "bg-muted text-muted-foreground" },
 };
 
 export function StatusBadge({ status }: { status: string }) {
@@ -60,11 +61,13 @@ function fmtDate(d: string | null) {
 }
 
 const TABS = [
-  { value: "all",     label: "All" },
-  { value: "draft",   label: "Draft" },
-  { value: "sent",    label: "Sent" },
-  { value: "overdue", label: "Overdue" },
-  { value: "paid",    label: "Paid" },
+  { value: "all",               label: "All" },
+  { value: "draft",             label: "Draft" },
+  { value: "sent",              label: "Sent" },
+  { value: "accepted",          label: "Accepted" },
+  { value: "changes_requested", label: "Changes Requested" },
+  { value: "declined",          label: "Declined" },
+  { value: "paid",              label: "Paid" },
 ];
 
 // ── Main ──────────────────────────────────────────────────────────────────────
