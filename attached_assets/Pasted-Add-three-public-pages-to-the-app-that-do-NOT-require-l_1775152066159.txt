@@ -1,0 +1,41 @@
+Add three public pages to the app that do NOT require login — they must be accessible to anyone without authentication. These are needed for Twilio SMS compliance.
+
+1. GET /privacy — Privacy Policy page
+2. GET /terms — Terms of Service page  
+3. GET /sms-consent — SMS Opt-In Consent Form page
+
+All three should be served as server-side HTML routes (Express res.send with full HTML) so they work even before the React app loads. Style them cleanly with inline CSS — white background, Chapin Landscapes green (#2d5016) header bar with company name, readable body font, max-width 800px centered.
+
+PRIVACY POLICY page content:
+- Effective date, company name (Chapin Landscapes), contact email (dan@chapinlandscapes.com)
+- What data we collect: name, address, phone, email, service history
+- How we use it: scheduling, invoicing, SMS/email communications, improving service
+- SMS messaging: we collect phone numbers to send appointment reminders, estimates, job updates, and invoices. Standard message and data rates may apply. Message frequency varies.
+- We do NOT sell customer data to third parties
+- Data security section
+- How to contact us to request data deletion
+- Links to /terms and /sms-consent
+
+TERMS OF SERVICE page content:
+- Service description: Chapin Landscapes provides landscaping, maintenance, and related services
+- Scheduling and cancellation policy
+- Payment terms
+- SMS communications: by providing your phone number you may receive transactional texts. Reply STOP to unsubscribe at any time. Reply HELP for assistance.
+- Limitation of liability
+- Governing law (Ohio)
+- Contact info
+- Links to /privacy
+
+SMS CONSENT page content:
+- Heading: "SMS Message Opt-In"
+- Clear description: "By submitting this form, you agree to receive text messages from Chapin Landscapes including appointment reminders, estimate notifications, job updates, and invoice alerts."
+- A simple HTML form with fields: First Name, Last Name, Phone Number, Email
+- An UNCHECKED checkbox (required) with label: "I agree to receive SMS text messages from Chapin Landscapes. Message and data rates may apply. Reply STOP at any time to unsubscribe. Reply HELP for help."
+- A second UNCHECKED checkbox (optional) with label: "I also agree to receive occasional promotional messages about seasonal services and special offers."
+- Submit button
+- Below form: "Message frequency varies. To opt out at any time, reply STOP to any message. For help, reply HELP or contact us at dan@chapinlandscapes.com"
+- Links to /privacy and /terms
+- The form POST should save to a sms_opt_ins table: id, first_name, last_name, phone, email, promotional_consent (boolean), opted_in_at (timestamptz). Create this table in the migration.
+- On successful submit, show a thank-you message on the same page.
+
+Register all three routes in server/index.ts BEFORE the catch-all React route so they are not intercepted by the frontend router.

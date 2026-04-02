@@ -26,6 +26,8 @@ import { runCustomerDataMigration } from "./customerDataMigration";
 import { runTimeTrackingMigration } from "./timeTrackingMigration";
 import { runJobsMigration } from "./jobsMigration";
 import { runInvoicesMigration } from "./migrations/invoices";
+import { runSmsOptInsMigration } from "./migrations/smsOptIns";
+import { registerPublicPages } from "./publicPages";
 
 const app = express();
 const httpServer = createServer(app);
@@ -101,6 +103,11 @@ app.use((req, res, next) => {
   await runTimeTrackingMigration();
   await runJobsMigration();
   await runInvoicesMigration();
+  await runSmsOptInsMigration();
+
+  // Public pages must be registered BEFORE registerRoutes (which sets up the React catch-all)
+  registerPublicPages(app);
+
   await registerRoutes(httpServer, app);
   
   await seedUsers();
