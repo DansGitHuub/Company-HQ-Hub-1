@@ -1,0 +1,137 @@
+Build the Estimates module. This is the core pre-sale workflow: you build a proposal, send it to the customer, they approve it, it auto-creates a Job and a down payment Invoice.
+
+**DATABASE — create server/migrations/estimates.ts:**
+
+Table: estimates
+- id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text
+- estimate_number VARCHAR(50) UNIQUE NOT NULL — auto-generate as "EST-0001", "EST-0002" etc
+- customer_id VARCHAR(36) REFERENCES customers(id) ON DELETE SET NULL
+- property_id VARCHAR(36) REFERENCES properties(id) ON DELETE SET NULL
+- estimate_type VARCHAR(50) NOT NULL DEFAULT 'project' — values: project, maintenance_contract, snow_contract, service_ticket (extensible)
+- template_name VARCHAR(100) — which template was used to start this
+- title VARCHAR(200) NOT NULL DEFAULT 'New Estimate'
+- status VARCHAR(30) NOT NULL DEFAULT 'draft'
+  -- draft, sent, viewed, accepted, declined, changes_requested, expired, converted
+- salesperson_id VARCHAR(36) REFERENCES users(id) ON DELETE SET NULL
+- valid_until DATE
+- issued_date DATE DEFAULT CURRENT_DATE
+- subtotal DECIMAL(10,2) DEFAULT 0
+- tax_rate DECIMAL(5,4) DEFAULT 0
+- tax_amount DECIMAL(10,2) DEFAULT 0
+- discount_amount DECIMAL(10,2) DEFAULT 0
+- total DECIMAL(10,2) DEFAULT 0
+- down_payment_percent DECIMAL(5,2) DEFAULT 0 — e.g. 50.00 for 50%
+- down_payment_amount DECIMAL(10,2) DEFAULT 0
+- notes TEXT — internal notes
+- customer_message TEXT — message shown to customer on proposal
+- terms TEXT
+- customer_response TEXT — accepted/declined/changes_requested
+- customer_response_at TIMESTAMPTZ
+- customer_response_note TEXT — customer's message when requesting changes
+- sent_at TIMESTAMPTZ
+- viewed_at TIMESTAMPTZ
+- converted_at TIMESTAMPTZ
+- converted_job_id VARCHAR(36) REFERENCES jobs(id) ON DELETE SET NULL
+- created_at TIMESTAMPTZ DEFAULT NOW()
+- updated_at TIMESTAMPTZ DEFAULT NOW()
+
+Table: estimate_work_areas (the line items grouped by work area)
+- id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text
+- estimate_id VARCHAR(36) REFERENCES estimates(id) ON DELETE CASCADE
+- name VARCHAR(100) NOT NULL — e.g. "Paver Patio", "Mowing"
+- work_area_type_id VARCHAR(36) REFERENCES work_area_types(id) ON DELETE SET NULL
+- sort_order INTEGER DEFAULT 0
+
+Table: estimate_line_items (items within each work area)
+- id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text
+- estimate_work_area_id VARCHAR(36) REFERENCES estimate_work_areas(id) ON DELETE CASCADE
+- item_type VARCHAR(20) DEFAULT 'service' — service, labor, material, subcontractor, equipment
+- description TEXT NOT NULL
+- quantity DECIMAL(10,2) DEFAULT 1
+- unit VARCHAR(30) — hr, sq ft, each, lb, yard, etc.
+- unit_price DECIMAL(10,2) DEFAULT 0
+- amount DECIMAL(10,2) DEFAULT 0 — quantity * unit_price
+- sort_order INTEGER DEFAULT 0
+- is_optional BOOLEAN DEFAULT false — for either/or line items
+
+Table: estimate_templates
+- id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text
+- name VARCHAR(100) NOT NULL
+- estimate_type VARCHAR(50) NOT NULL
+- description TEXT
+- default_work_areas JSONB — array of {name, work_area_type_id, line_items:[]}
+- default_terms TEXT
+- default_customer_message TEXT
+- is_active BOOLEAN DEFAULT true
+- created_at TIMESTAMPTZ DEFAULT NOW()
+
+Seed 3 starter templates:
+1. "Maintenance Contract" (type: maintenance_contract) — work areas: Mowing, Trimming, Edging, Fertilization
+2. "Landscape Project" (type: project) — work areas: Site Prep/Grading, Planting, Mulching
+3. "Snow & Ice Contract" (type: snow_contract) — work areas: Snow Plowing, Salting, Sidewalk Clearing
+
+**SERVER ROUTES — create server/estimateRoutes.ts:**
+- GET /api/estimates — list with customer name, status, total. Filters: status, customer_id, salesperson_id, estimate_type, date_from, date_to, search
+- GET /api/estimates/:id — full estimate with work areas, line items, customer info, property
+- POST /api/estimates — create estimate + work areas + line items, compute totals
+- PUT /api/estimates/:id — update, replace work areas and line items, recompute totals
+- DELETE /api/estimates/:id — soft delete (set status = 'expired')
+- PATCH /api/estimates/:id/send — status='sent', sent_at=NOW()
+- PATCH /api/estimates/:id/response — customer responds: {response: 'accepted'|'declined'|'changes_requested', note?}
+  When accepted: set status='accepted', then automatically:
+  1. Create a Job from the estimate (title=estimate.title, customer_id, property_id, status='scheduled', price=estimate.total)
+  2. Create work areas on the job from estimate_work_areas
+  3. If down_payment_percent > 0: create an Invoice (status='sent', total=down_payment_amount, notes='Down payment for ' + estimate.title)
+  4. Set converted_at, converted_job_id
+  5. Return the new job_id and invoice_id
+- PATCH /api/estimates/:id/convert — manually mark as accepted/converted (same logic as accepted response)
+- GET /api/estimate-templates — list all active templates
+Register in server/index.ts
+
+**ESTIMATES LIST PAGE — client/src/pages/estimates/index.tsx at /estimates:**
+- Header: "Estimates" + "New Estimate" button
+- Summary cards: Total Sent (count), Total Value (sum of totals where sent/accepted), Accepted this month, Pending Response
+- Filter tabs: All / Draft / Sent / Accepted / Changes Requested / Declined
+- Filter bar: search, estimate type dropdown, date range, salesperson filter
+- Table: Estimate #, Title, Customer, Type badge, Issued, Valid Until, Total, Status badge, Actions (Send, Convert)
+- Status colors: draft=gray, sent=blue, viewed=cyan, accepted=green, changes_requested=orange, declined=red, converted=purple
+- Row click → /estimates/:id
+
+**ESTIMATE DETAIL PAGE — client/src/pages/estimates/show.tsx at /estimates/:id:**
+Two-column layout:
+Left column:
+- Status badge (large, clickable dropdown to change status)
+- Customer name (linked to /customers/:id)
+- Property address
+- Estimate type badge
+- Salesperson
+- Issued / Valid Until dates
+- Down Payment % and amount
+- Total
+- "Edit Estimate" button
+- "Send to Customer" button (when draft)
+- "Convert to Job" button (when accepted)
+- If status is changes_requested: show customer's note in an orange callout box with "Revise & Resend" button
+
+Right column with tabs:
+- Proposal: Shows the full estimate formatted like a real proposal document. Work areas as sections, line items under each. Subtotal/tax/discount/total at bottom. Customer message at top.
+- Work Areas: editable list of work areas and their line items with add/edit/delete
+- Notes: internal notes (not shown to customer)
+- Activity: timeline of status changes with timestamps
+
+Customer Response section (shown when status is sent or viewed):
+Three buttons: Accept / Decline / Request Changes — with a note field for Request Changes. This simulates what the customer will eventually do in the customer portal.
+
+**ESTIMATE FORM MODAL — client/src/pages/estimates/EstimateFormModal.tsx:**
+Step 1 — Setup: Customer (searchable), Property (filtered by customer), Estimate Type dropdown, Template selector (filtered by type — shows template cards with descriptions), Title, Salesperson, Valid Until date, Down Payment %, Customer Message, Terms
+Step 2 — Work Areas & Line Items: Shows work areas from the template pre-populated. Each work area is a collapsible section. Within each: list of line items (type, description, qty, unit, unit price, amount). Can add/remove work areas. Can add/remove/edit line items within each area. Running total shown at bottom.
+On submit: creates the estimate with all nested data.
+
+**NAVIGATION:**
+- Add "Estimates" to sidebar under SALES between Jobs and Customers (order: Jobs, Estimates, Customers, Invoices)
+- Add /estimates and /estimates/:id to App.tsx
+
+**CUSTOMER DETAIL PAGE:**
+The existing Invoices tab should now also show a section for Estimates linked to that customer — show estimate number, title, type, status, total, with a link to the estimate detail.
+
+Keep all UI consistent with existing patterns, green color scheme, shadcn/ui components.

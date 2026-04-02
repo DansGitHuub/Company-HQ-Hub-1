@@ -4717,7 +4717,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.get("/api/estimates", requireAuth, async (req, res) => {
+  app.get("/api/pipeline-estimates", requireAuth, async (req, res) => {
     try {
       if (req.user?.role !== "Admin" && req.user?.role !== "Manager" && req.user?.role !== "Master Admin") {
         return res.status(403).json({ message: "Not authorized" });
@@ -4730,7 +4730,7 @@ Generate detailed information for this landscaping material.`;
   });
 
   // Follow-up reminders: returns due estimates and logs bell notifications (deduped per day)
-  app.get("/api/estimates/follow-up-reminders", requireAuth, async (req, res) => {
+  app.get("/api/pipeline-estimates/follow-up-reminders", requireAuth, async (req, res) => {
     try {
       const role = req.user?.role;
       if (role !== "Admin" && role !== "Manager" && role !== "Master Admin") {
@@ -4779,7 +4779,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.post("/api/estimates", requireAuth, async (req, res) => {
+  app.post("/api/pipeline-estimates", requireAuth, async (req, res) => {
     try {
       if (req.user?.role !== "Admin" && req.user?.role !== "Manager" && req.user?.role !== "Master Admin") {
         return res.status(403).json({ message: "Not authorized" });
@@ -4792,7 +4792,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.patch("/api/estimates/:id", requireAuth, async (req, res) => {
+  app.patch("/api/pipeline-estimates/:id", requireAuth, async (req, res) => {
     try {
       if (req.user?.role !== "Admin" && req.user?.role !== "Manager" && req.user?.role !== "Master Admin") {
         return res.status(403).json({ message: "Not authorized" });
@@ -4839,7 +4839,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.delete("/api/estimates/:id", requireAuth, async (req, res) => {
+  app.delete("/api/pipeline-estimates/:id", requireAuth, async (req, res) => {
     try {
       if (req.user?.role !== "Admin" && req.user?.role !== "Master Admin") {
         return res.status(403).json({ message: "Not authorized" });
@@ -4851,7 +4851,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.post("/api/estimates/:id/convert-to-job", requireAuth, async (req, res) => {
+  app.post("/api/pipeline-estimates/:id/convert-to-job", requireAuth, async (req, res) => {
     try {
       if (req.user?.role !== "Admin" && req.user?.role !== "Master Admin") {
         return res.status(403).json({ message: "Not authorized" });
