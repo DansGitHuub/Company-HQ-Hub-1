@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import {
   ChevronLeft, Pencil, User, MapPin, Calendar, Clock,
-  DollarSign, Briefcase, Timer, ChevronDown, Loader2,
+  DollarSign, Briefcase, Timer, ChevronDown, Loader2, FileText,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -93,6 +93,92 @@ function InfoRow({ icon: Icon, label, value, href }: { icon: any; label: string;
           : <p className="text-sm font-medium">{value}</p>}
       </div>
     </div>
+  );
+}
+
+// ── Invoice helpers ───────────────────────────────────────────────────────────
+const INV_STATUS_CLS: Record<string, string> = {
+  draft: "bg-gray-100 text-gray-600",
+  sent: "bg-blue-100 text-blue-700",
+  viewed: "bg-indigo-100 text-indigo-700",
+  accepted: "bg-green-100 text-green-700",
+  declined: "bg-red-100 text-red-700",
+  changes_requested: "bg-amber-100 text-amber-700",
+  paid: "bg-emerald-100 text-emerald-700",
+  void: "bg-gray-100 text-gray-400 line-through",
+};
+
+interface InvoiceSummary {
+  id: string; invoice_number: string; status: string;
+  issued_date: string; due_date: string | null;
+  total: string; balance_due: string;
+}
+
+function JobInvoicesTab({ jobId }: { jobId: string }) {
+  const [, nav] = useLocation();
+  const { data: invoices = [], isLoading } = useQuery<InvoiceSummary[]>({
+    queryKey: ["/api/invoices", "job", jobId],
+    queryFn: async () => {
+      const res = await fetch(`/api/invoices?job_id=${jobId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load invoices");
+      return res.json();
+    },
+  });
+
+  const fmtMoney = (v: any) => `$${parseFloat(v ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+  const fmtDate = (d: string | null) => { if (!d) return "—"; try { return format(parseISO(d), "MMM d, yyyy"); } catch { return d; } };
+
+  if (isLoading) return <div className="py-12 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3 pt-4 flex flex-row items-center justify-between">
+        <CardTitle className="text-sm">Invoices</CardTitle>
+        <Button size="sm" variant="outline" onClick={() => nav("/invoices")} className="text-xs h-7 px-2">
+          <FileText className="h-3.5 w-3.5 mr-1" /> All Invoices
+        </Button>
+      </CardHeader>
+      <CardContent className="pb-4 px-0">
+        {invoices.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">
+            <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No invoices linked to this job yet.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-6">Invoice #</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Issued</TableHead>
+                <TableHead>Due</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right pr-6">Balance</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invoices.map((inv) => (
+                <TableRow key={inv.id} className="cursor-pointer hover:bg-muted/40"
+                  onClick={() => nav(`/invoices/${inv.id}`)} data-testid={`row-invoice-${inv.id}`}>
+                  <TableCell className="pl-6 font-mono text-sm font-medium">{inv.invoice_number}</TableCell>
+                  <TableCell>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${INV_STATUS_CLS[inv.status] ?? "bg-gray-100 text-gray-600"}`}>
+                      {inv.status.replace(/_/g, " ")}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-sm">{fmtDate(inv.issued_date)}</TableCell>
+                  <TableCell className="text-sm">{fmtDate(inv.due_date)}</TableCell>
+                  <TableCell className="text-right text-sm">{fmtMoney(inv.total)}</TableCell>
+                  <TableCell className={`text-right text-sm font-medium pr-6 ${parseFloat(inv.balance_due) > 0 ? "text-red-600" : "text-green-600"}`}>
+                    {fmtMoney(inv.balance_due)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -261,6 +347,7 @@ export default function JobDetailPage() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="time">Time Entries</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
+            <TabsTrigger value="invoices">Invoices</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
 
@@ -408,6 +495,11 @@ export default function JobDetailPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Invoices Tab */}
+          <TabsContent value="invoices">
+            <JobInvoicesTab jobId={job.id} />
           </TabsContent>
 
           {/* Activity Tab */}

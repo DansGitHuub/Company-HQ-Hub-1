@@ -18,7 +18,12 @@ import {
 import {
   ChevronLeft, ChevronDown, Pencil, User, Briefcase,
   Calendar, DollarSign, Loader2, Trash2, Plus, CreditCard,
+  Send, CheckCircle2, XCircle, MessageSquare, BadgeDollarSign,
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import { format, parseISO } from "date-fns";
 import { StatusBadge, STATUS_MAP } from "./index";
 import { InvoiceFormModal } from "./InvoiceFormModal";
@@ -97,6 +102,8 @@ export default function InvoiceDetailPage() {
 
   const [showEdit, setShowEdit] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [responseDialog, setResponseDialog] = useState<{ type: "declined" | "changes_requested" } | null>(null);
+  const [responseText, setResponseText] = useState("");
   const [payForm, setPayForm] = useState({
     amount: "", payment_method: "cash", payment_date: new Date().toISOString().split("T")[0],
     reference_number: "", notes: "",
@@ -158,6 +165,53 @@ export default function InvoiceDetailPage() {
     },
   });
 
+  const sendMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/invoices/${id}/send`, {});
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/invoices", id] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices"] });
+      toast({ title: "Invoice marked as sent" });
+    },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
+  const paidMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/invoices/${id}/paid`, {});
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/invoices", id] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices"] });
+      toast({ title: "Invoice marked as paid" });
+    },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
+  const responseMutation = useMutation({
+    mutationFn: async ({ type, text }: { type: string; text: string }) => {
+      const res = await apiRequest("PATCH", `/api/invoices/${id}/response`, {
+        status: type, customer_response: text || null,
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["/api/invoices", id] });
+      qc.invalidateQueries({ queryKey: ["/api/invoices"] });
+      const labels: Record<string, string> = { accepted: "Accepted", declined: "Declined", changes_requested: "Changes requested" };
+      toast({ title: labels[vars.type] ?? "Response recorded" });
+      setResponseDialog(null);
+      setResponseText("");
+    },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
   if (isLoading) {
     return <div className="p-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
@@ -183,9 +237,25 @@ export default function InvoiceDetailPage() {
           <h1 className="text-xl font-bold font-mono">{invoice.invoice_number}</h1>
         </div>
         {isAdminOrManager && (
-          <Button variant="outline" size="sm" onClick={() => setShowEdit(true)} data-testid="button-edit">
-            <Pencil className="h-4 w-4 mr-1.5" /> Edit Invoice
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {invoice.status === "draft" && (
+              <Button size="sm" onClick={() => sendMutation.mutate()} disabled={sendMutation.isPending}
+                data-testid="button-send-invoice">
+                {sendMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Send className="h-4 w-4 mr-1.5" />}
+                Send Invoice
+              </Button>
+            )}
+            {["sent","viewed","accepted"].includes(invoice.status) && parseFloat(invoice.balance_due ?? "0") > 0 && (
+              <Button size="sm" variant="outline" onClick={() => paidMutation.mutate()} disabled={paidMutation.isPending}
+                className="border-green-400 text-green-700 hover:bg-green-50" data-testid="button-mark-paid">
+                {paidMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <BadgeDollarSign className="h-4 w-4 mr-1.5" />}
+                Mark Paid
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setShowEdit(true)} data-testid="button-edit">
+              <Pencil className="h-4 w-4 mr-1.5" /> Edit Invoice
+            </Button>
+          </div>
         )}
       </div>
 
@@ -220,7 +290,31 @@ export default function InvoiceDetailPage() {
                 )}
               </div>
 
-              <Separator className="mb-3" />
+              {/* Customer response actions — shown when invoice is sent/viewed */}
+              {isAdminOrManager && ["sent","viewed"].includes(invoice.status) && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-muted-foreground font-medium">Record Customer Response</p>
+                  <div className="flex flex-col gap-1.5">
+                    <Button size="sm" variant="outline" className="justify-start border-green-400 text-green-700 hover:bg-green-50"
+                      onClick={() => responseMutation.mutate({ type: "accepted", text: "" })}
+                      disabled={responseMutation.isPending} data-testid="button-accept">
+                      <CheckCircle2 className="h-4 w-4 mr-2" /> Accepted
+                    </Button>
+                    <Button size="sm" variant="outline" className="justify-start border-red-300 text-red-600 hover:bg-red-50"
+                      onClick={() => { setResponseDialog({ type: "declined" }); setResponseText(""); }}
+                      data-testid="button-decline">
+                      <XCircle className="h-4 w-4 mr-2" /> Declined
+                    </Button>
+                    <Button size="sm" variant="outline" className="justify-start"
+                      onClick={() => { setResponseDialog({ type: "changes_requested" }); setResponseText(""); }}
+                      data-testid="button-request-changes">
+                      <MessageSquare className="h-4 w-4 mr-2" /> Changes Requested
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <Separator className="mb-3 mt-3" />
 
               <InfoRow icon={User} label="Customer" value={custName}
                 href={invoice.customer_id ? `/customers/${invoice.customer_id}` : undefined} />
@@ -512,6 +606,42 @@ export default function InvoiceDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Customer Response Dialog */}
+      <Dialog open={!!responseDialog} onOpenChange={(o) => { if (!o) { setResponseDialog(null); setResponseText(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {responseDialog?.type === "declined" ? "Record Decline" : "Record Change Request"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              {responseDialog?.type === "declined"
+                ? "Optionally record the reason the customer declined."
+                : "Optionally record what changes the customer is requesting."}
+            </p>
+            <Textarea
+              placeholder="Customer's message (optional)…"
+              value={responseText}
+              onChange={(e) => setResponseText(e.target.value)}
+              rows={4}
+              data-testid="textarea-response-text"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResponseDialog(null); setResponseText(""); }}>Cancel</Button>
+            <Button
+              onClick={() => responseDialog && responseMutation.mutate({ type: responseDialog.type, text: responseText })}
+              disabled={responseMutation.isPending}
+              variant={responseDialog?.type === "declined" ? "destructive" : "default"}
+            >
+              {responseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              {responseDialog?.type === "declined" ? "Mark Declined" : "Mark Changes Requested"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Modal */}
       {showEdit && invoice && (

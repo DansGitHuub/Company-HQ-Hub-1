@@ -304,6 +304,61 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── SEND ──────────────────────────────────────────────────────────────────────
+  app.patch("/api/invoices/:id/send", requireAuth, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`
+        UPDATE invoices
+        SET status='sent', sent_at=COALESCE(sent_at, NOW()), updated_at=NOW()
+        WHERE id=$1 RETURNING *
+      `, [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ message: "Not found" });
+      return res.json(rows[0]);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── CUSTOMER RESPONSE (accept / decline / changes_requested) ──────────────────
+  app.patch("/api/invoices/:id/response", requireAuth, async (req, res) => {
+    const { status, customer_response, customer_response_note } = req.body;
+    const VALID = ["accepted", "declined", "changes_requested"];
+    if (!status || !VALID.includes(status)) {
+      return res.status(400).json({ message: `status must be one of: ${VALID.join(", ")}` });
+    }
+    try {
+      const { rows } = await pool.query(`
+        UPDATE invoices SET
+          status                 = $1,
+          customer_response      = $2,
+          customer_response_at   = NOW(),
+          customer_response_note = $3,
+          paid_at = CASE WHEN $1 = 'paid' AND paid_at IS NULL THEN NOW() ELSE paid_at END,
+          updated_at             = NOW()
+        WHERE id = $4 RETURNING *
+      `, [status, customer_response || null, customer_response_note || null, req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ message: "Not found" });
+      return res.json(rows[0]);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── MARK PAID ─────────────────────────────────────────────────────────────────
+  app.patch("/api/invoices/:id/paid", requireAuth, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`
+        UPDATE invoices
+        SET status='paid', paid_at=COALESCE(paid_at, NOW()), updated_at=NOW()
+        WHERE id=$1 RETURNING *
+      `, [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ message: "Not found" });
+      return res.json(rows[0]);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── PAYMENT METHODS LIST ──────────────────────────────────────────────────────
   app.get("/api/invoices/meta/payment-methods", requireAuth, (_req, res) => {
     return res.json(PAYMENT_METHODS);
