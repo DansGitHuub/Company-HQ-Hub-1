@@ -14,12 +14,12 @@ async function syncInvoiceTotals(invoiceId: string) {
   await pool.query(`
     UPDATE invoices SET
       subtotal    = COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0),
-      tax_amount  = ROUND(COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0) * tax_rate / 100, 2),
+      tax_amount  = ROUND(COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0) * tax_rate, 2),
       total       = ROUND(COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0)
-                    * (1 + tax_rate / 100), 2),
+                    * (1 + tax_rate), 2),
       amount_paid = COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=$1), 0),
       balance_due = ROUND(COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0)
-                    * (1 + tax_rate / 100), 2)
+                    * (1 + tax_rate), 2)
                     - COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=$1), 0),
       updated_at  = NOW()
     WHERE id = $1

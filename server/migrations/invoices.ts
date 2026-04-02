@@ -14,7 +14,7 @@ export async function runInvoicesMigration() {
         issued_date    DATE           NOT NULL DEFAULT CURRENT_DATE,
         due_date       DATE,
         subtotal       DECIMAL(10,2)  NOT NULL DEFAULT 0,
-        tax_rate       DECIMAL(5,2)   DEFAULT 0,
+        tax_rate       DECIMAL(5,4)   DEFAULT 0,
         tax_amount     DECIMAL(10,2)  DEFAULT 0,
         total          DECIMAL(10,2)  NOT NULL DEFAULT 0,
         amount_paid    DECIMAL(10,2)  DEFAULT 0,

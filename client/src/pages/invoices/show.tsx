@@ -242,7 +242,7 @@ export default function InvoiceDetailPage() {
               </div>
               {parseFloat(invoice.tax_rate) > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tax ({invoice.tax_rate}%)</span>
+                  <span className="text-muted-foreground">Tax ({(parseFloat(invoice.tax_rate) * 100).toFixed(2)}%)</span>
                   <span>{fmtMoney(invoice.tax_amount)}</span>
                 </div>
               )}
@@ -310,7 +310,7 @@ export default function InvoiceDetailPage() {
                     </div>
                     {parseFloat(invoice.tax_rate) > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tax ({invoice.tax_rate}%)</span>
+                        <span className="text-muted-foreground">Tax ({(parseFloat(invoice.tax_rate) * 100).toFixed(2)}%)</span>
                         <span>{fmtMoney(invoice.tax_amount)}</span>
                       </div>
                     )}
@@ -460,7 +460,7 @@ export default function InvoiceDetailPage() {
             job_id: invoice.job_id ?? "",
             issued_date: invoice.issued_date?.split("T")[0] ?? "",
             due_date: invoice.due_date?.split("T")[0] ?? "",
-            tax_rate: invoice.tax_rate ?? "0",
+            tax_rate: String(parseFloat(invoice.tax_rate ?? "0") * 100),
             notes: invoice.notes ?? "",
             terms: invoice.terms ?? "",
             line_items: invoice.line_items.map((li) => ({

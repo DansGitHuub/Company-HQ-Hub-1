@@ -119,7 +119,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
         ...form,
         customer_id: lockedCustomerId || form.customer_id || null,
         job_id: lockedJobId || form.job_id || null,
-        tax_rate: parseFloat(form.tax_rate || "0"),
+        tax_rate: parseFloat(form.tax_rate || "0") / 100,
         line_items: form.line_items
           .filter((li) => li.description.trim())
           .map((li) => ({
