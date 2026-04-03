@@ -1,0 +1,42 @@
+Please build a Reports module at /reports. This is the Data Center for the business — landscape company owners live in these numbers.
+
+**Page structure**: A /reports page with sidebar tab navigation (left side tabs, similar to the Settings page layout) containing these 4 report sections:
+
+---
+
+## 1. Revenue Report
+- Filters at top: Date Range (this month / last month / this quarter / last quarter / this year / custom), Division (All / Maintenance / Install / Snow / General), Salesperson (All + list of users)
+- Summary cards row: Total Revenue, # of Jobs, Avg Job Value, % vs Prior Period
+- Bar chart: Revenue by Month (12 months rolling)
+- Breakdown table: columns = Division | Jobs | Revenue | % of Total — one row per division
+
+## 2. Job Costing Report  
+- Filters: Date Range, Division, Status (All / In Progress / Completed)
+- Summary cards: Total Estimated, Total Actual Cost, Gross Profit, Gross Margin %
+- Table: Job Name | Customer | Division | Est. Revenue | Est. Hours | Actual Hours | Variance | Status
+- Pull data from the jobs table (title, customer_id, division, status, estimated_cost, actual_cost fields — use whatever columns exist)
+
+## 3. Invoice Aging Report
+- As-of date picker (default today)
+- Summary cards: Total Outstanding, Current (0-30), 31-60 Days, 61-90 Days, 90+ Days
+- Table: Invoice # | Customer | Invoice Date | Due Date | Amount | Days Outstanding | Status
+- Color-code rows: green = current, yellow = 31-60, orange = 61-90, red = 90+
+- Pull from invoices table
+
+## 4. Crew Hours Report
+- Filters: Date Range, Employee (All + list), Division (All + list)
+- Summary cards: Total Hours, Regular Hours, Overtime Hours (>40/week), Avg Hours/Employee
+- Bar chart: Hours by Week (last 12 weeks)
+- Table: Employee Name | Role | Regular Hrs | OT Hrs | Total Hrs | Jobs Worked
+
+---
+
+**Tech notes**:
+- Use Recharts for charts (already installed)
+- Create GET API endpoints in server/ for each report: /api/reports/revenue, /api/reports/job-costing, /api/reports/invoice-aging, /api/reports/crew-hours
+- Each endpoint should aggregate real data from the database using pool.query()
+- If a table/column doesn't exist yet, return realistic mock/placeholder data so the UI still renders
+- Use the same card/table styling as the rest of the app (shadcn/ui Card, Table components)
+- Admin/Manager roles can see all data; regular users see only their own data
+- Add the route in App.tsx: <Route path="/reports" component={ReportsPage} />
+- Make sure the existing /reports sidebar link works

@@ -25,6 +25,7 @@ import { registerMyDayRoutes } from "./myDayRoutes";
 import { registerSettingsRoutes } from "./settingsRoutes";
 import { registerJobRoutes } from "./jobRoutes";
 import { registerInvoiceRoutes } from "./invoiceRoutes";
+import { registerReportRoutes } from "./reportRoutes";
 import { searchProductImages } from "./imageSearchService";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail } from "./email";
 import { logActivity } from "./activityLogger";
@@ -68,6 +69,7 @@ export async function registerRoutes(
   // Jobs + Invoices module routes (registered first to take precedence over legacy simple routes)
   registerJobRoutes(app, requireAuth);
   registerInvoiceRoutes(app, requireAuth);
+  registerReportRoutes(app, requireAuth);
 
   // Global search endpoint - searches everything based on user role
   app.get("/api/search", requireAuth, async (req, res) => {
