@@ -21,6 +21,7 @@ import { registerTimeRoutes } from "./timeRoutes";
 import { registerWorkAreaRoutes } from "./workAreaRoutes";
 import { registerEstimateRoutes } from "./estimateRoutes";
 import { registerSchedulingRoutes } from "./schedulingRoutes";
+import { registerMyDayRoutes } from "./myDayRoutes";
 import { registerJobRoutes } from "./jobRoutes";
 import { registerInvoiceRoutes } from "./invoiceRoutes";
 import { searchProductImages } from "./imageSearchService";
@@ -9565,6 +9566,7 @@ Provide accurate information based on publicly available documentation.`;
   registerWorkAreaRoutes(app, requireAuth, requireRole);
   registerEstimateRoutes(app);
   registerSchedulingRoutes(app);
+  registerMyDayRoutes(app);
   setInterval(runNoteReminderScheduler, 60 * 1000);
   console.log("[notes-scheduler] Note reminder scheduler started (checking every minute)");
 

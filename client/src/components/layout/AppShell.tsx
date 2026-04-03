@@ -42,7 +42,8 @@ import {
   Contact,
   Timer,
   Briefcase,
-  Calculator
+  Calculator,
+  Sun
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -355,6 +356,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     employees: { icon: User, label: t("nav.employees"), href: "/employees" },
     jobs: { icon: Briefcase, label: "Jobs", href: "/jobs" },
     scheduling: { icon: CalendarCheck, label: "Scheduling", href: "/scheduling" },
+    my_day: { icon: Sun, label: "My Day", href: "/my-day" },
     estimates: { icon: Calculator, label: "Estimates", href: "/estimates" },
     invoices: { icon: FileText, label: "Invoices", href: "/invoices" },
     customers: { icon: Contact, label: t("nav.customers"), href: "/customers" },
@@ -382,7 +384,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarSections: NavSection[] = [
     { label: "", items: ["dashboard"] },
-    { label: "WORK", items: ["jobs", "scheduling", "estimates", "invoices", "customers", "todos", "daily_worksheet", "time_tracking", "equipment"] },
+    { label: "WORK", items: ["jobs", "scheduling", "my_day", "estimates", "invoices", "customers", "todos", "daily_worksheet", "time_tracking", "equipment"] },
     { label: "PEOPLE", items: ["employees", "education", "hiring"] },
     { label: "COMPANY", items: ["inbox", "sops", "testing", "hq"] },
     { label: "ADMIN", items: ["admin", "tools", "forms"] },

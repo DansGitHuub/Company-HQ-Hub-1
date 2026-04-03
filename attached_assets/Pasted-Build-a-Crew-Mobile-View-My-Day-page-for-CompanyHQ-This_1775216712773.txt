@@ -1,0 +1,84 @@
+Build a Crew Mobile View "My Day" page for CompanyHQ. This is what crew members see on their phone — today's assigned jobs, tap to clock in by Work Area, and their own time log. Follow the existing code patterns exactly.
+
+## 1. PAGE ROUTE: /my-day
+
+Add this route in client/src/App.tsx:
+import MyDayPage from './pages/my-day/index';
+<Route path="/my-day" component={MyDayPage} />
+
+## 2. SIDEBAR LINK
+
+In the sidebar nav, add a "My Day" link with a Sun or Smartphone icon from lucide-react.
+Place it right after "Scheduling" in the sidebar. Visible to all roles.
+
+## 3. API ROUTES — add to server/index.ts or a new myDayRoutes.ts
+
+GET /api/my-day
+Returns today's jobs assigned to the logged-in employee.
+Use the session user's employee_id. If not available, fall back to all today's scheduled jobs.
+Query:
+SELECT j.*, c.name as customer_name, c.address as customer_address,
+  COALESCE(json_agg(json_build_object('id', jwa.id, 'name', jwa.name, 'status', jwa.status, 'estimated_hours', jwa.estimated_hours)) FILTER (WHERE jwa.id IS NOT NULL), '[]') as work_areas
+FROM jobs j
+LEFT JOIN customers c ON j.customer_id = c.id
+LEFT JOIN job_assignments ja ON ja.job_id = j.id AND ja.scheduled_date = j.scheduled_date
+LEFT JOIN job_work_areas jwa ON jwa.job_id = j.id
+WHERE (ja.employee_id = $1 OR $1 IS NULL) AND j.scheduled_date = CURRENT_DATE AND j.status != 'cancelled'
+GROUP BY j.id, c.name, c.address ORDER BY j.scheduled_start
+
+GET /api/my-day/time-entries
+Returns today's time entries for the logged-in employee.
+SELECT te.*, j.title as job_title, j.job_number
+FROM time_entries te LEFT JOIN jobs j ON te.job_id = j.id
+WHERE te.employee_id = $1 AND DATE(te.clock_in) = CURRENT_DATE
+ORDER BY te.clock_in DESC
+
+Check if POST /api/time-entries and PATCH /api/time-entries/:id/clock-out already exist in server/timeRoutes.ts or similar. Only add them if they are missing. They need: body { job_id, job_work_area_id, work_area_name, employee_id, clock_in }.
+
+## 4. THE PAGE — client/src/pages/my-day/index.tsx
+
+Create a mobile-first page (max-w-lg mx-auto). All components must have large tap targets (min h-11).
+
+HEADER:
+- "Good morning/afternoon/evening, [first name]" based on hour of day
+- Today's date formatted: "Friday, April 3"
+- If currently clocked in: show a green sticky banner "● Working: [Work Area] · [Job Title] · [elapsed time]" with a Clock Out button
+
+TODAY'S JOBS:
+- Section heading with job count
+- Each job is a Card with:
+  - Left colored border (division colors: Maintenance=#22c55e, Install=#3b82f6, Snow=#94a3b8, General=#f59e0b)
+  - Job title (font-semibold)
+  - Customer name + address (text-sm text-gray-500) with MapPin icon
+  - Scheduled time with Clock icon
+  - Work Area chips: each job_work_area shown as a pill button. Tapping opens a confirmation dialog: "Clock into [Work Area] at [Job]?" with Confirm/Cancel
+  - Always show "Drive Time", "Shop Time", "Break" chips at the bottom of each card
+  - If already clocked in: tapping a different area shows "Clock out of [current] and clock into [new]?" confirm dialog
+
+CLOCK IN logic:
+- POST /api/time-entries to clock in
+- If there's an open entry (no clock_out), auto-clock-out first (PATCH /api/time-entries/:id/clock-out), then clock in to new
+- After success: invalidate /api/my-day/time-entries query, show "Clocked in!" toast
+
+CLOCK OUT:
+- PATCH /api/time-entries/:id/clock-out on the active entry
+- Show "Clocked out!" toast
+
+MY TIME LOG section:
+- Show today's time entries as a list
+- Each entry: Work area name, job title, clock-in time, clock-out time (or green "Active" badge), duration
+- Format duration as "2h 15m" 
+- If no entries: "No time logged today yet" empty state
+
+ACTIVE ENTRY TRACKING:
+- "Active entry" = time_entry with no clock_out
+- Store active entry ID in state
+- Poll: useQuery with refetchInterval: 30000
+
+STYLING: 
+- Clean white cards with subtle shadows
+- Green accent color throughout (matching Chapin brand)
+- Mobile-first, large text, generous padding
+- Use existing shadcn/ui: Card, CardContent, Badge, Button, Dialog
+
+Use TanStack Query (useQuery/useMutation), pool.query() in routes, existing component patterns from estimates/index.tsx and jobs/index.tsx.
