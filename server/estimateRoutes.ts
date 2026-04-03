@@ -63,15 +63,66 @@ async function getEstimateFull(id: string) {
 
 export function registerEstimateRoutes(app: Express) {
   // ------ Templates ------
+  // ?all=true returns inactive templates too (settings page)
   app.get("/api/estimate-templates", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     try {
+      const showAll = req.query.all === "true";
       const { rows } = await pool.query(
-        `SELECT * FROM estimate_templates WHERE is_active = true ORDER BY name`
+        showAll
+          ? `SELECT * FROM estimate_templates ORDER BY name`
+          : `SELECT * FROM estimate_templates WHERE is_active = true ORDER BY name`
       );
       res.json(rows);
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Error fetching templates" });
+    }
+  });
+
+  app.post("/api/estimate-templates", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+    const { name, estimate_type, default_customer_message, default_terms, is_active = true } = req.body;
+    if (!name) return res.status(400).json({ message: "name is required" });
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO estimate_templates (name, estimate_type, default_customer_message, default_terms, is_active)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [name, estimate_type || null, default_customer_message || null, default_terms || null, is_active]
+      );
+      res.status(201).json(rows[0]);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Error creating template" });
+    }
+  });
+
+  app.put("/api/estimate-templates/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+    const { name, estimate_type, default_customer_message, default_terms, is_active } = req.body;
+    try {
+      const { rows } = await pool.query(
+        `UPDATE estimate_templates SET
+           name                    = COALESCE($1, name),
+           estimate_type           = COALESCE($2, estimate_type),
+           default_customer_message = COALESCE($3, default_customer_message),
+           default_terms           = COALESCE($4, default_terms),
+           is_active               = COALESCE($5, is_active)
+         WHERE id = $6 RETURNING *`,
+        [name ?? null, estimate_type ?? null, default_customer_message ?? null, default_terms ?? null, is_active ?? null, req.params.id]
+      );
+      if (rows.length === 0) return res.status(404).json({ message: "Template not found" });
+      res.json(rows[0]);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Error updating template" });
+    }
+  });
+
+  app.delete("/api/estimate-templates/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+    try {
+      await pool.query(`DELETE FROM estimate_templates WHERE id = $1`, [req.params.id]);
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Error deleting template" });
     }
   });
 

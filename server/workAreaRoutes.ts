@@ -4,10 +4,14 @@ import { pool } from "./db";
 export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRole: any) {
 
   // ── GET /api/work-area-types ─────────────────────────────────────────────
+  // ?all=true returns inactive items too (used by settings page)
   app.get("/api/work-area-types", requireAuth, async (req, res) => {
     try {
+      const showAll = req.query.all === "true";
       const { rows } = await pool.query(
-        `SELECT * FROM work_area_types WHERE is_active = true ORDER BY division, sort_order, name`
+        showAll
+          ? `SELECT * FROM work_area_types ORDER BY division, sort_order, name`
+          : `SELECT * FROM work_area_types WHERE is_active = true ORDER BY division, sort_order, name`
       );
       return res.json(rows);
     } catch (err: any) {
@@ -45,6 +49,23 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
       );
       if (rows.length === 0) return res.status(404).json({ message: "Not found" });
       return res.json(rows[0]);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── DELETE /api/work-area-types/:id ──────────────────────────────────────
+  app.delete("/api/work-area-types/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const inUse = await pool.query(
+        `SELECT 1 FROM job_work_areas WHERE work_area_type_id = $1 LIMIT 1`,
+        [req.params.id]
+      );
+      if (inUse.rows.length > 0) {
+        return res.status(409).json({ message: "Cannot delete — this type is in use by one or more jobs." });
+      }
+      await pool.query(`DELETE FROM work_area_types WHERE id = $1`, [req.params.id]);
+      return res.json({ success: true });
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
     }

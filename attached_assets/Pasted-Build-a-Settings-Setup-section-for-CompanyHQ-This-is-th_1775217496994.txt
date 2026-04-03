@@ -1,0 +1,168 @@
+Build a Settings/Setup section for CompanyHQ. This is the admin area for managing app-wide configuration. Follow existing code patterns exactly.
+
+## 1. ROUTE: /settings
+
+Add to client/src/App.tsx:
+import SettingsPage from './pages/settings/index';
+<Route path="/settings" component={SettingsPage} />
+<Route path="/settings/:tab" component={SettingsPage} />
+
+## 2. SIDEBAR LINK
+
+Add "Settings" link with Settings/Cog icon from lucide-react at the BOTTOM of the sidebar, below all other nav items. Only visible to admin and manager roles.
+
+## 3. THE PAGE — client/src/pages/settings/index.tsx
+
+Create a settings page with tabbed navigation. Tabs: Work Areas | Divisions | Estimate Templates | Company Info
+
+Use the URL param :tab to track active tab (e.g. /settings/work-areas, /settings/divisions, etc.)
+
+---
+
+### TAB 1: Work Areas (/settings/work-areas)
+
+Manages the work_area_types table (id, name, division, is_active, sort_order).
+
+Display a table with columns: Name, Division, Active (toggle), Sort Order, Actions (Edit/Delete).
+Group rows by division with a sticky group header.
+"+ Add Work Area" button opens an inline form or modal:
+  - Name (text input)
+  - Division (select: Maintenance | Install | Snow | General)
+  - Active (checkbox, default true)
+  - Sort Order (number)
+  - Save / Cancel
+
+Edit: click pencil icon → inline edit row or same modal pre-filled.
+Delete: click trash icon → confirm dialog "Delete [name]? This cannot be undone."
+Toggle Active: click toggle directly in table row.
+
+API routes needed:
+GET /api/work-area-types — already exists, use it
+POST /api/work-area-types — create new (check if exists, add if missing): { name, division, is_active, sort_order }
+PUT /api/work-area-types/:id — update: { name, division, is_active, sort_order }
+DELETE /api/work-area-types/:id — delete (only if not in use by any job_work_areas)
+
+---
+
+### TAB 2: Divisions (/settings/divisions)
+
+Manage the divisions used throughout the app (for color-coding jobs, estimates, scheduling).
+
+For now this can be a STATIC editable list stored in a new app_settings table or just hardcoded as a display with color swatches. Show:
+- Maintenance · #22c55e (green swatch)
+- Install · #3b82f6 (blue swatch)
+- Snow · #94a3b8 (slate swatch)
+- General · #f59e0b (amber swatch)
+
+Each row: color swatch, name, hex color input. Allow admin to change the hex color.
+Store in a new app_settings table:
+CREATE TABLE IF NOT EXISTS app_settings (
+  key VARCHAR(100) PRIMARY KEY,
+  value TEXT,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+Seed with: division_colors = '{"Maintenance":"#22c55e","Install":"#3b82f6","Snow":"#94a3b8","General":"#f59e0b"}'
+
+API: GET /api/settings/:key and PUT /api/settings/:key (value in body)
+
+---
+
+### TAB 3: Estimate Templates (/settings/estimate-templates)
+
+Manages the estimate_templates table (id, name, type, default_terms, default_message, is_active).
+
+Display a table: Name, Type, Active.
+"+ New Template" opens a modal:
+  - Template Name
+  - Type (Maintenance Contract | Landscape Project | Snow & Ice Contract | Custom)
+  - Default Customer Message (textarea)
+  - Default Terms (textarea)
+  - Active (checkbox)
+  - Save / Cancel
+
+Edit and Delete same pattern as Work Areas tab.
+
+API routes (check if they exist, add if missing):
+GET /api/estimate-templates — already exists
+POST /api/estimate-templates — create
+PUT /api/estimate-templates/:id — update
+DELETE /api/estimate-templates/:id — soft delete (set is_active=false) or hard delete
+
+---
+
+### TAB 4: Company Info (/settings/company)
+
+Simple form to edit company-wide settings stored in app_settings table:
+- Company Name
+- Company Phone
+- Company Email
+- Company Address
+- Company Website
+- Default Tax Rate (%)
+- Default Payment Terms (e.g. "Net 30")
+
+Save button: PUT /api/settings/company_info with all fields as JSON value.
+
+---
+
+## 4. MIGRATIONS — server/migrations/appSettings.ts
+
+Create this migration:
+
+export async function runAppSettingsMigration() {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key VARCHAR(100) PRIMARY KEY,
+        value TEXT,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    // Seed division colors
+    await client.query(`
+      INSERT INTO app_settings (key, value) VALUES ('division_colors', '{"Maintenance":"#22c55e","Install":"#3b82f6","Snow":"#94a3b8","General":"#f59e0b"}')
+      ON CONFLICT (key) DO NOTHING
+    `);
+    // Seed company info placeholder
+    await client.query(`
+      INSERT INTO app_settings (key, value) VALUES ('company_info', '{"name":"Chapin Landscapes","phone":"","email":"","address":"","website":"","tax_rate":"0","payment_terms":"Net 30"}')
+      ON CONFLICT (key) DO NOTHING
+    `);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+Register this in server/migrations/index.ts following the same pattern as other migrations.
+
+## 5. SETTINGS API ROUTES — server/settingsRoutes.ts
+
+Create and mount at app.use('/api', settingsRoutes):
+
+GET /api/settings/:key — returns { key, value } from app_settings
+PUT /api/settings/:key — updates value, returns updated record
+
+Also ensure these work-area-type routes exist (check workAreaRoutes.ts first):
+POST /api/work-area-types
+PUT /api/work-area-types/:id
+DELETE /api/work-area-types/:id
+
+And these estimate-template routes (check estimateRoutes.ts first):
+POST /api/estimate-templates
+PUT /api/estimate-templates/:id
+DELETE /api/estimate-templates/:id
+
+## IMPORTANT NOTES:
+- Admin-only tabs: all settings tabs should require admin or manager role
+- Follow exact same import/query patterns as other pages
+- Use TanStack Query (useQuery/useMutation) for all data
+- Use shadcn/ui: Tabs, TabsContent, TabsList, TabsTrigger, Table, Dialog, Input, Select, Switch, Button, Badge
+- The work_area_types table already has 30 seeded entries — just display and edit them
+- The estimate_templates table already has 3 seeded entries
+- Keep the UI clean and consistent with the rest of the app

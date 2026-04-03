@@ -1,0 +1,40 @@
+Build a Settings/Setup admin page at /settings with 4 tabs for CompanyHQ. Follow exact same patterns as estimates/index.tsx and jobs/index.tsx.
+
+ROUTE: Add to App.tsx: <Route path="/settings" component={SettingsPage} /> and <Route path="/settings/:tab" component={SettingsPage} />
+
+SIDEBAR: Add "Settings" link with Cog icon at bottom of sidebar, visible to admin/manager only.
+
+MIGRATION - server/migrations/appSettings.ts:
+Create app_settings table (key VARCHAR PRIMARY KEY, value TEXT, updated_at TIMESTAMP).
+Seed: key='division_colors' value='{"Maintenance":"#22c55e","Install":"#3b82f6","Snow":"#94a3b8","General":"#f59e0b"}'
+Seed: key='company_info' value='{"name":"Chapin Landscapes","phone":"","email":"","address":"","website":"","tax_rate":"0","payment_terms":"Net 30"}'
+Register in server/migrations/index.ts.
+
+SETTINGS ROUTES - server/settingsRoutes.ts:
+GET /api/settings/:key — returns {key, value} from app_settings
+PUT /api/settings/:key — updates value field
+Mount: app.use('/api', settingsRoutes)
+
+TAB 1 - Work Areas (/settings/work-areas):
+Table of work_area_types (name, division, is_active toggle, sort_order, edit/delete actions).
+Grouped by division with headers.
+Add/Edit modal: name input, division select (Maintenance|Install|Snow|General), active checkbox, sort order number.
+Delete shows confirm dialog.
+Check workAreaRoutes.ts — add POST/PUT/DELETE /api/work-area-types/:id if missing.
+
+TAB 2 - Divisions (/settings/divisions):
+Display 4 divisions with colored dot swatches. Let admin edit the hex color for each.
+Load from GET /api/settings/division_colors, save with PUT /api/settings/division_colors.
+
+TAB 3 - Estimate Templates (/settings/estimate-templates):
+Table of estimate_templates (name, type, active).
+Add/Edit modal: template name, type select, default customer message textarea, default terms textarea, active checkbox.
+Check estimateRoutes.ts — add POST/PUT/DELETE /api/estimate-templates if missing.
+
+TAB 4 - Company Info (/settings/company):
+Form fields: Company Name, Phone, Email, Address, Website, Default Tax Rate (%), Default Payment Terms.
+Load from GET /api/settings/company_info, save with PUT /api/settings/company_info.
+Save button at bottom.
+
+Use shadcn/ui: Tabs, TabsList, TabsTrigger, TabsContent, Table, Dialog, Input, Select, Switch, Button, Badge.
+Use TanStack Query useQuery/useMutation. Use pool.query() in routes. Admin/manager role check on all settings endpoints.

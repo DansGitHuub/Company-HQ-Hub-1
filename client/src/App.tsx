@@ -35,6 +35,7 @@ import EstimateList from "@/pages/estimates/index";
 import EstimateDetail from "@/pages/estimates/show";
 import SchedulingCalendar from "@/pages/scheduling/index";
 import MyDayPage from "@/pages/my-day/index";
+import SettingsPage from "@/pages/settings/index";
 import Help from "@/pages/Help";
 import Profile from "@/pages/Profile";
 import AdminSetup from "@/pages/AdminSetup";
@@ -138,6 +139,7 @@ function AppRoutes() {
         <Route path="/estimates/:id" component={EstimateDetail} />
         <Route path="/scheduling" component={SchedulingCalendar} />
         <Route path="/my-day" component={MyDayPage} />
+        <Route path="/settings/:tab?" component={SettingsPage} />
         <Route path="/pipeline" component={JobPipeline} />
         <Route path="/help" component={Help} />
         <Route path="/admin-setup" component={AdminSetup} />

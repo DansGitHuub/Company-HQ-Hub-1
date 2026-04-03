@@ -43,7 +43,8 @@ import {
   Timer,
   Briefcase,
   Calculator,
-  Sun
+  Sun,
+  Cog
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -594,6 +595,28 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           );
         })}
       </div>
+
+      {["Admin", "Master Admin", "Manager"].includes(effectiveRole || "") && (
+        <div className="px-2 pb-1 pt-2">
+          <Link href="/settings" onClick={() => setIsMobileOpen(false)}>
+            <div
+              data-testid="nav-settings"
+              className={cn(
+                "flex items-center gap-3 rounded-lg font-semibold transition-all cursor-pointer",
+                "border border-white/5 shadow-sm px-4 text-[13px]",
+                "bg-gradient-to-b from-white/[0.08] to-transparent",
+                location.startsWith("/settings")
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] border-sidebar-primary/50"
+                  : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:border-white/10"
+              )}
+              style={{ height: 36, display: "flex", alignItems: "center" }}
+            >
+              <Cog className="h-4 w-4 shrink-0" />
+              <span>Settings</span>
+            </div>
+          </Link>
+        </div>
+      )}
 
       <div className="mt-auto p-4 border-t-2 border-primary/20 bg-gradient-to-t from-primary/5 to-transparent">
         {isMobileSheet ? (
