@@ -1,0 +1,109 @@
+Build a Scheduling/Dispatch Calendar page for CompanyHQ. This is a core feature for a landscaping company to schedule jobs and assign crews. Follow the existing code patterns exactly.
+
+---
+
+## 1. DATABASE MIGRATION — server/migrations/scheduling.ts
+
+Create this file:
+
+```typescript
+import { pool } from '../db';
+
+export async function runSchedulingMigration() {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`
+      ALTER TABLE jobs
+        ADD COLUMN IF NOT EXISTS scheduled_date DATE,
+        ADD COLUMN IF NOT EXISTS scheduled_start TIME,
+        ADD COLUMN IF NOT EXISTS scheduled_end TIME,
+        ADD COLUMN IF NOT EXISTS division VARCHAR(50) DEFAULT 'Maintenance',
+        ADD COLUMN IF NOT EXISTS color VARCHAR(20) DEFAULT '#22c55e'
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS job_assignments (
+        id SERIAL PRIMARY KEY,
+        job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+        employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+        scheduled_date DATE NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(job_id, employee_id, scheduled_date)
+      )
+    `);
+    await client.query('COMMIT');
+    console.log('Scheduling migration complete');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+```
+
+## 2. REGISTER MIGRATION — server/migrations/index.ts
+
+Import and call runSchedulingMigration following the same pattern as the other migrations.
+
+## 3. SCHEDULING ROUTES — server/schedulingRoutes.ts
+
+Create this file with these routes:
+
+GET /api/calendar?start=YYYY-MM-DD&end=YYYY-MM-DD — returns scheduled jobs in date range with assigned_crew array (JOIN job_assignments + employees)
+GET /api/calendar/unscheduled — returns jobs where scheduled_date IS NULL and status IN ('active','approved','sold','pending')
+PATCH /api/jobs/:id/schedule — body: { scheduled_date, scheduled_start, scheduled_end, division, color, employee_ids[] } — updates jobs table and replaces job_assignments rows
+PATCH /api/jobs/:id/unschedule — sets scheduled_date/start/end to NULL, deletes job_assignments
+
+Use pool.query() pattern (no ORM). Export default router.
+
+## 4. REGISTER ROUTES — server/index.ts
+
+Import schedulingRoutes and add: app.use('/api', schedulingRoutes)
+
+## 5. CALENDAR PAGE — client/src/pages/calendar/index.tsx
+
+Create a full-featured dispatch calendar page with:
+
+LAYOUT:
+- Left panel (w-64): "Unscheduled Jobs" list — draggable job cards, color-coded by division, showing job title + customer name + address + status badge
+- Right main area: calendar header + day column headers + scrollable time grid
+
+CALENDAR HEADER:
+- Prev/Next week buttons (ChevronLeft/ChevronRight)
+- "Today" button 
+- Current week range label (e.g. "Apr 6 – Apr 12, 2026")
+- Division legend: Maintenance=green, Install=blue, Snow=slate, General=amber (colored dots)
+- Week / Day view toggle buttons
+
+DAY HEADERS: Mon–Sun with date number, today highlighted in green, job count per day
+
+TIME GRID: 6am–7pm (14 hours), 1-hour rows, 64px tall each. Each cell = drop target. Scheduled jobs appear as colored cards showing title + customer + assigned crew first names.
+
+DRAG & DROP: Use native HTML5 drag events (draggable, onDragStart, onDragOver, onDrop). No external DnD library.
+
+SCHEDULE MODAL: When a job is dropped onto a time slot, show a modal to confirm date/time and pick crew members (checkboxes from /api/employees list). "Confirm Schedule" button calls PATCH /api/jobs/:id/schedule.
+
+REMOVE FROM CALENDAR: Hover X button on scheduled job card calls PATCH /api/jobs/:id/unschedule.
+
+Division colors: Maintenance=#22c55e, Install=#3b82f6, Snow=#94a3b8, General=#f59e0b
+
+Use date-fns for date math: startOfWeek, addDays, addWeeks, subWeeks, format, isSameDay
+Use TanStack Query (useQuery/useMutation) for all API calls.
+Use existing shadcn/ui components: Button, Badge.
+Layout must use h-screen overflow-hidden so the time grid scrolls within fixed height.
+
+## 6. ADD ROUTE — client/src/App.tsx
+
+Add: <Route path="/calendar" component={CalendarPage} />
+Import: import CalendarPage from './pages/calendar/index'
+
+## 7. SIDEBAR LINK
+
+In the sidebar/layout nav, add a Calendar link with Calendar icon from lucide-react, placed AFTER Jobs and BEFORE Time Tracking.
+
+## 8. CHECK date-fns
+
+If date-fns is not in package.json, run: npm install date-fns
+
+IMPORTANT: Follow exact same patterns as estimates/index.tsx, jobs/index.tsx. Use pool.query() not ORM. No external DnD library — use HTML5 drag events only.
