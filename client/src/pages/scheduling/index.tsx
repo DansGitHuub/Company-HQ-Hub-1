@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ChevronLeft, ChevronRight, CalendarCheck, X, Users, Briefcase } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, CalendarCheck, X, Users, Briefcase, RotateCcw } from "lucide-react";
 import {
   format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday,
   parseISO, parse,
@@ -37,6 +37,22 @@ interface UnscheduledJob {
 interface Employee { id: string; first_name: string; last_name: string; position?: string; }
 
 interface PendingDrop { jobId: string; date: string; hour: number; }
+
+interface UndoPreviousState {
+  was_scheduled: boolean;
+  scheduled_date: string | null;
+  scheduled_start_time: string | null;
+  scheduled_end_time: string | null;
+  division: string | null;
+  color: string | null;
+  employee_ids: string[];
+}
+interface UndoAction {
+  jobId: string;
+  jobTitle: string;
+  previousState: UndoPreviousState;
+  timestamp: number;
+}
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const HOURS = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]; // 6am – 7pm
@@ -127,10 +143,22 @@ export default function SchedulingCalendar() {
       });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/calendar"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/unscheduled"] });
       toast({ title: "Job scheduled!" });
+      // Record undo action from captured previous state
+      if (previousStateRef.current) {
+        const job = calJobs.find(j => j.id === variables.jobId)
+          ?? unscheduled.find(j => j.id === variables.jobId);
+        setUndoAction({
+          jobId:         variables.jobId,
+          jobTitle:      job?.title ?? "Job",
+          previousState: previousStateRef.current,
+          timestamp:     Date.now(),
+        });
+        previousStateRef.current = null;
+      }
       setPendingDrop(null);
     },
     onError: () => toast({ title: "Error scheduling job", variant: "destructive" }),
@@ -148,6 +176,39 @@ export default function SchedulingCalendar() {
     onError: () => toast({ title: "Error removing job", variant: "destructive" }),
   });
 
+  // ── Undo mutation ─────────────────────────────────────────────────────────────
+  const undoMutation = useMutation({
+    mutationFn: async ({ jobId, previousState }: { jobId: string; previousState: UndoPreviousState }) => {
+      if (previousState.was_scheduled) {
+        await apiRequest("PATCH", `/api/scheduling/jobs/${jobId}/schedule`, {
+          scheduled_date:  previousState.scheduled_date,
+          scheduled_start: previousState.scheduled_start_time,
+          scheduled_end:   previousState.scheduled_end_time,
+          division:        previousState.division ?? "General",
+          color:           previousState.color ?? "#f59e0b",
+          employee_ids:    previousState.employee_ids,
+        });
+      } else {
+        await apiRequest("PATCH", `/api/scheduling/jobs/${jobId}/unschedule`, {});
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/unscheduled"] });
+      toast({ title: "Action undone" });
+      // Clear the undo button
+      if (undoIntervalRef.current) clearInterval(undoIntervalRef.current);
+      setUndoAction(null);
+      setUndoSecondsLeft(0);
+    },
+    onError: () => toast({ title: "Undo failed", variant: "destructive" }),
+  });
+
+  function handleUndo() {
+    if (!undoAction) return;
+    undoMutation.mutate({ jobId: undoAction.jobId, previousState: undoAction.previousState });
+  }
+
   // ── Drag & Drop state ─────────────────────────────────────────────────────────
   const draggingId = useRef<string | null>(null);
 
@@ -158,6 +219,31 @@ export default function SchedulingCalendar() {
   const [modalDivision,  setModalDivision]  = useState("Maintenance");
   const [modalColor,     setModalColor]     = useState("#22c55e");
   const [selectedEmpIds, setSelectedEmpIds] = useState<string[]>([]);
+
+  // ── Undo state ────────────────────────────────────────────────────────────────
+  const UNDO_DURATION = 300; // seconds (5 minutes)
+  const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const [undoSecondsLeft, setUndoSecondsLeft] = useState(0);
+  const previousStateRef = useRef<UndoPreviousState | null>(null);
+  const undoIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Countdown ticker – decrements every second, clears when it hits 0
+  useEffect(() => {
+    if (!undoAction) return;
+    setUndoSecondsLeft(UNDO_DURATION);
+    if (undoIntervalRef.current) clearInterval(undoIntervalRef.current);
+    undoIntervalRef.current = setInterval(() => {
+      setUndoSecondsLeft(s => {
+        if (s <= 1) {
+          clearInterval(undoIntervalRef.current!);
+          setUndoAction(null);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => { if (undoIntervalRef.current) clearInterval(undoIntervalRef.current); };
+  }, [undoAction?.timestamp]); // re-run only when a new action is recorded
 
   const handleDragStart = useCallback((e: React.DragEvent, jobId: string) => {
     draggingId.current = jobId;
@@ -179,6 +265,25 @@ export default function SchedulingCalendar() {
     const existingJob = calJobs.find(j => j.id === jobId) || null;
     const unschJob    = unscheduled.find(j => j.id === jobId) || null;
     const job         = existingJob ?? unschJob;
+
+    // Capture previous state for potential undo
+    if (existingJob) {
+      previousStateRef.current = {
+        was_scheduled:       true,
+        scheduled_date:      existingJob.scheduled_date,
+        scheduled_start_time: existingJob.scheduled_start_time,
+        scheduled_end_time:   existingJob.scheduled_end_time,
+        division:            existingJob.division,
+        color:               existingJob.color,
+        employee_ids:        existingJob.assigned_crew.map(c => c.id),
+      };
+    } else {
+      previousStateRef.current = {
+        was_scheduled: false,
+        scheduled_date: null, scheduled_start_time: null,
+        scheduled_end_time: null, division: null, color: null, employee_ids: [],
+      };
+    }
 
     const defaultDiv   = job?.division ?? "Maintenance";
     const defaultColor = job?.color    ?? getDivisionColor(defaultDiv);
@@ -443,6 +548,40 @@ export default function SchedulingCalendar() {
           )}
         </div>
       </div>
+
+      {/* ── Floating Undo Button (appears for 5 min after a scheduling action) ── */}
+      {undoAction && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 shadow-lg"
+          data-testid="undo-container"
+        >
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleUndo}
+            disabled={undoMutation.isPending}
+            data-testid="btn-undo-schedule"
+            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium shadow-md"
+          >
+            {undoMutation.isPending
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <RotateCcw className="h-4 w-4" />}
+            <span>
+              Undo "{undoAction.jobTitle}" (
+              {String(Math.floor(undoSecondsLeft / 60)).padStart(1, "0")}:{String(undoSecondsLeft % 60).padStart(2, "0")}
+              )
+            </span>
+          </Button>
+          <button
+            onClick={() => { setUndoAction(null); if (undoIntervalRef.current) clearInterval(undoIntervalRef.current); }}
+            className="flex items-center justify-center w-6 h-6 rounded-full bg-background border hover:bg-muted transition-colors"
+            data-testid="btn-dismiss-undo"
+            title="Dismiss"
+          >
+            <X className="h-3 w-3 text-muted-foreground" />
+          </button>
+        </div>
+      )}
 
       {/* ── Schedule Modal ── */}
       <Dialog open={!!pendingDrop} onOpenChange={open => !open && setPendingDrop(null)}>
