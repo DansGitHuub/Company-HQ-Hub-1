@@ -44,7 +44,9 @@ import {
   Briefcase,
   Calculator,
   Sun,
-  Cog
+  Cog,
+  CalendarClock,
+  BarChart2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -363,6 +365,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     customers: { icon: Contact, label: t("nav.customers"), href: "/customers" },
     daily_worksheet: { icon: ClipboardList, label: "Daily Worksheet", href: "/daily-worksheet" },
     time_tracking: { icon: Timer, label: "Time Tracking", href: "/time" },
+    consultations: { icon: CalendarClock, label: "Consultations", href: "/consultations" },
+    reports: { icon: BarChart2, label: "Reports", href: "/reports" },
+    settings_nav: { icon: Settings, label: t("nav.settings"), href: "/settings" },
     education: { icon: GraduationCap, label: t("nav.resourceLibrary"), href: "/education" },
     help: { icon: LifeBuoy, label: t("nav.help"), href: "/help" },
     hq: { icon: Building2, label: t("nav.companyHQ"), href: "/hq" },
@@ -385,7 +390,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarSections: NavSection[] = [
     { label: "", items: ["dashboard"] },
-    { label: "WORK", items: ["jobs", "scheduling", "my_day", "estimates", "invoices", "customers", "todos", "daily_worksheet", "time_tracking", "equipment"] },
+    { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "scheduling", "my_day", "time_tracking", "invoices", "reports", "settings_nav"] },
     { label: "PEOPLE", items: ["employees", "education", "hiring"] },
     { label: "COMPANY", items: ["inbox", "sops", "testing", "hq"] },
     { label: "ADMIN", items: ["admin", "tools", "forms"] },
