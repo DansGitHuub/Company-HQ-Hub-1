@@ -27,10 +27,10 @@ async function getEstimateFull(id: string) {
   const { rows: est } = await pool.query(
     `SELECT e.*,
             c.first_name || ' ' || c.last_name AS customer_name,
-            c.email AS customer_email,
-            c.phone AS customer_phone,
+            (SELECT email FROM customer_contacts WHERE customer_id = e.customer_id ORDER BY id LIMIT 1) AS customer_email,
+            (SELECT phone FROM customer_contacts WHERE customer_id = e.customer_id ORDER BY id LIMIT 1) AS customer_phone,
             p.address AS property_address,
-            u.first_name || ' ' || u.last_name AS salesperson_name
+            u.name AS salesperson_name
      FROM sales_estimates e
      LEFT JOIN customers c ON c.id = e.customer_id
      LEFT JOIN properties p ON p.id = e.property_id
@@ -134,7 +134,7 @@ export function registerEstimateRoutes(app: Express) {
         SELECT e.*,
                c.first_name || ' ' || c.last_name AS customer_name,
                p.address AS property_address,
-               u.first_name || ' ' || u.last_name AS salesperson_name
+               u.name AS salesperson_name
         FROM sales_estimates e
         LEFT JOIN customers c ON c.id = e.customer_id
         LEFT JOIN properties p ON p.id = e.property_id
