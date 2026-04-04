@@ -389,7 +389,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                 <SelectContent>
                   <SelectItem value="_none">— None —</SelectItem>
                   {staff.map((u: any) => (
-                    <SelectItem key={u.id} value={u.id}>{u.first_name} {u.last_name}</SelectItem>
+                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
