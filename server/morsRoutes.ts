@@ -396,7 +396,16 @@ function calculateSummary(budget: any, employees: any[], materials: any[], equip
   const total_billable_hours = total_labor_hours - total_unbillable_hours;
 
   const avg_wage       = total_billable_hours > 0 ? total_direct_labor / total_billable_hours : 0;
-  const unbillable_pct = total_labor_hours > 0 ? (total_unbillable_hours / total_labor_hours) * 100 : 0;
+  // Stored as raw fraction (0–1); multiply by 100 in the UI for display
+  const unbillable_pct = total_labor_hours > 0 ? total_unbillable_hours / total_labor_hours : 0;
+
+  // ── Display-only labor rate (blended average across ALL employees × unbillable hrs) ──
+  const sum_all_comp  = empDetails.reduce((s, e) => s + e.total_compensation, 0);
+  const sum_all_hours = empDetails.reduce((s, e) => s + parseFloat(e.total_hours_per_year || 0), 0);
+  const display_unbillable_cost = sum_all_hours > 0 ? (sum_all_comp / sum_all_hours) * total_unbillable_hours : 0;
+  const display_total_overhead  = display_unbillable_cost + equipment_overhead_total + additional_overhead;
+  const display_breakeven_rate  = total_billable_hours > 0 ? (total_direct_labor + display_total_overhead) / total_billable_hours : 0;
+  const display_labor_rate      = (1 - margin) > 0 ? display_breakeven_rate / (1 - margin) : 0;
 
   // Equipment
   const equipOwnedDetails = equipOwned.map(e => {
@@ -444,6 +453,7 @@ function calculateSummary(budget: any, employees: any[], materials: any[], equip
     total_costs, required_revenue, net_profit,
     net_margin_pct: parseFloat(budget.target_margin_percent),
     breakeven_rate, labor_rate, overhead_markup_on_labor_pct,
+    display_labor_rate, display_breakeven_rate,
   };
 }
 
@@ -474,7 +484,7 @@ async function loadBudgetData(budgetId: string | number) {
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
-export async function registerMorsRoutes(app: Express, requireAuth: any) {
+export async function registerMorsRoutes(app: Express, requireAuth: any, requireAdmin: any) {
   await migrate();
 
   // Seed 2026 budget if none exists
@@ -488,7 +498,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
   }
 
   // ── GET /api/mors/budgets ──────────────────────────────────────────────────
-  app.get("/api/mors/budgets", requireAuth, async (req, res) => {
+  app.get("/api/mors/budgets", requireAdmin, async (req, res) => {
     try {
       const { rows } = await pool.query("SELECT * FROM mors_budgets ORDER BY year DESC, name");
       res.json(rows);
@@ -496,7 +506,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
   });
 
   // ── POST /api/mors/budgets ─────────────────────────────────────────────────
-  app.post("/api/mors/budgets", requireAuth, async (req, res) => {
+  app.post("/api/mors/budgets", requireAdmin, async (req, res) => {
     const { name, year, status, target_margin_percent, work_season_start, work_season_end, working_days_per_week, production_days } = req.body;
     try {
       const { rows: [b] } = await pool.query(
@@ -509,7 +519,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
   });
 
   // ── GET /api/mors/budgets/:id ──────────────────────────────────────────────
-  app.get("/api/mors/budgets/:id", requireAuth, async (req, res) => {
+  app.get("/api/mors/budgets/:id", requireAdmin, async (req, res) => {
     try {
       const data = await loadBudgetData(req.params.id);
       if (!data.budget) return res.status(404).json({ error: "Budget not found" });
@@ -518,7 +528,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
   });
 
   // ── PUT /api/mors/budgets/:id ──────────────────────────────────────────────
-  app.put("/api/mors/budgets/:id", requireAuth, async (req, res) => {
+  app.put("/api/mors/budgets/:id", requireAdmin, async (req, res) => {
     const { name, year, status, target_margin_percent, work_season_start, work_season_end, working_days_per_week, production_days, material_markup_percent, equipment_markup_percent, subcontractor_markup_percent } = req.body;
     try {
       const { rows: [b] } = await pool.query(
@@ -533,7 +543,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
   });
 
   // ── DELETE /api/mors/budgets/:id ──────────────────────────────────────────
-  app.delete("/api/mors/budgets/:id", requireAuth, async (req, res) => {
+  app.delete("/api/mors/budgets/:id", requireAdmin, async (req, res) => {
     try {
       await pool.query("DELETE FROM mors_budgets WHERE id=$1", [req.params.id]);
       res.status(204).end();
@@ -541,7 +551,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
   });
 
   // ── GET /api/mors/budgets/:id/summary ─────────────────────────────────────
-  app.get("/api/mors/budgets/:id/summary", requireAuth, async (req, res) => {
+  app.get("/api/mors/budgets/:id/summary", requireAdmin, async (req, res) => {
     try {
       const { budget, employees, materials, equipOwned, equipLeased, subs, overheadItems } = await loadBudgetData(req.params.id);
       if (!budget) return res.status(404).json({ error: "Not found" });
@@ -551,7 +561,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Employees ──────────────────────────────────────────────────────────────
-  app.post("/api/mors/budgets/:id/employees", requireAuth, async (req, res) => {
+  app.post("/api/mors/budgets/:id/employees", requireAdmin, async (req, res) => {
     const bid = req.params.id;
     const { role, name, employee_type, hourly_wage, annual_salary, total_hours_per_year, unbillable_hours_per_year, overtime_hours, overtime_multiplier, bonuses, is_overhead_staff } = req.body;
     try {
@@ -564,7 +574,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.put("/api/mors/budgets/:id/employees/:eid", requireAuth, async (req, res) => {
+  app.put("/api/mors/budgets/:id/employees/:eid", requireAdmin, async (req, res) => {
     const { role, name, employee_type, hourly_wage, annual_salary, total_hours_per_year, unbillable_hours_per_year, overtime_hours, overtime_multiplier, bonuses, is_overhead_staff } = req.body;
     try {
       const { rows: [e] } = await pool.query(
@@ -577,7 +587,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.delete("/api/mors/budgets/:id/employees/:eid", requireAuth, async (req, res) => {
+  app.delete("/api/mors/budgets/:id/employees/:eid", requireAdmin, async (req, res) => {
     try {
       await pool.query("DELETE FROM mors_labor_employees WHERE id=$1 AND budget_id=$2", [req.params.eid, req.params.id]);
       res.status(204).end();
@@ -586,7 +596,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
 
   // ── Materials ──────────────────────────────────────────────────────────────
   const simpleCrud = (table: string, idField: string) => {
-    app.post(`/api/mors/budgets/:id/${idField}`, requireAuth, async (req, res) => {
+    app.post(`/api/mors/budgets/:id/${idField}`, requireAdmin, async (req, res) => {
       const cols = Object.keys(req.body).filter(k => k !== "id" && k !== "budget_id");
       const vals = cols.map(k => req.body[k]);
       try {
@@ -598,7 +608,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
       } catch (e: any) { res.status(500).json({ error: e.message }); }
     });
 
-    app.put(`/api/mors/budgets/:id/${idField}/:itemId`, requireAuth, async (req, res) => {
+    app.put(`/api/mors/budgets/:id/${idField}/:itemId`, requireAdmin, async (req, res) => {
       const cols = Object.keys(req.body).filter(k => k !== "id" && k !== "budget_id");
       const vals = cols.map(k => req.body[k]);
       try {
@@ -611,7 +621,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
       } catch (e: any) { res.status(500).json({ error: e.message }); }
     });
 
-    app.delete(`/api/mors/budgets/:id/${idField}/:itemId`, requireAuth, async (req, res) => {
+    app.delete(`/api/mors/budgets/:id/${idField}/:itemId`, requireAdmin, async (req, res) => {
       try {
         await pool.query(`DELETE FROM ${table} WHERE id=$1 AND budget_id=$2`, [req.params.itemId, req.params.id]);
         res.status(204).end();
@@ -627,7 +637,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
   simpleCrud("mors_sales_targets",      "sales-targets");
 
   // ── Overhead categories ─────────────────────────────────────────────────────
-  app.post("/api/mors/budgets/:id/overhead-categories", requireAuth, async (req, res) => {
+  app.post("/api/mors/budgets/:id/overhead-categories", requireAdmin, async (req, res) => {
     try {
       const { rows: [r] } = await pool.query(
         "INSERT INTO mors_overhead_categories (budget_id,name,sort_order) VALUES ($1,$2,$3) RETURNING *",
@@ -637,7 +647,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.put("/api/mors/budgets/:id/overhead-categories/:catId", requireAuth, async (req, res) => {
+  app.put("/api/mors/budgets/:id/overhead-categories/:catId", requireAdmin, async (req, res) => {
     try {
       const { rows: [r] } = await pool.query(
         "UPDATE mors_overhead_categories SET name=$1 WHERE id=$2 AND budget_id=$3 RETURNING *",
@@ -648,7 +658,7 @@ export async function registerMorsRoutes(app: Express, requireAuth: any) {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  app.delete("/api/mors/budgets/:id/overhead-categories/:catId", requireAuth, async (req, res) => {
+  app.delete("/api/mors/budgets/:id/overhead-categories/:catId", requireAdmin, async (req, res) => {
     try {
       await pool.query("DELETE FROM mors_overhead_categories WHERE id=$1 AND budget_id=$2", [req.params.catId, req.params.id]);
       res.status(204).end();

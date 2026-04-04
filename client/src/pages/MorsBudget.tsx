@@ -1,5 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -45,7 +47,8 @@ interface Summary {
   additional_overhead: number; total_overhead: number;
   total_materials: number; total_subcontractors: number; total_cogs: number;
   total_costs: number; required_revenue: number; net_profit: number; net_margin_pct: number;
-  breakeven_rate: number; labor_rate: number; overhead_markup_on_labor_pct: number;
+  breakeven_rate: number; labor_rate: number; display_labor_rate: number; display_breakeven_rate: number;
+  overhead_markup_on_labor_pct: number;
   employee_details: (Employee & { total_compensation: number; unbillable_cost: number; direct_labor_cost: number })[];
   equipment_owned_details: any[]; equipment_leased_details: any[];
 }
@@ -193,14 +196,14 @@ function OverviewTab({ summary, budget }: { summary: Summary | undefined; budget
     { label: "Total Billable Hours", formula: "Field staff total hours − unbillable hours", value: num(summary.total_billable_hours) + " hrs" },
     { label: "Average Wage",        formula: "Direct labor ÷ billable hours",               value: $2(summary.avg_wage) + " / hr" },
     { label: "Total Direct Labor",  formula: "All field staff compensation (billable portion)", value: $(summary.total_direct_labor) },
-    { label: "Unbillable Labor",    formula: "Field staff compensation × unbillable %",     value: $(summary.total_unbillable_labor) + ` (${pct(summary.unbillable_pct)})` },
+    { label: "Unbillable Labor",    formula: "Field staff compensation × unbillable %",     value: $(summary.total_unbillable_labor) + ` (${pct(summary.unbillable_pct * 100)})` },
     { label: "Equipment Overhead",  formula: "All owned + leased equipment annual costs",   value: $(summary.equipment_overhead_total) },
     { label: "Additional Overhead", formula: "All overhead line items + overhead staff cost", value: $(summary.additional_overhead) },
     { label: "Total Overhead",      formula: "Unbillable labor + equipment + additional",   value: $(summary.total_overhead), bold: true },
     { label: "Total COGS",          formula: "Direct labor + materials + subcontractors",   value: $(summary.total_cogs) },
     { label: "Required Revenue",    formula: `(COGS + overhead) ÷ (1 − ${summary.net_margin_pct}%)`, value: $(summary.required_revenue), bold: true },
     { label: "Breakeven Rate",      formula: "(Direct labor + overhead) ÷ billable hours",  value: $2(summary.breakeven_rate) + " / hr" },
-    { label: "Labor Rate",          formula: `Breakeven rate ÷ (1 − ${summary.net_margin_pct}%)`, value: $2(summary.labor_rate) + " / hr", bold: true },
+    { label: "Labor Rate (actual)", formula: `Breakeven rate ÷ (1 − ${summary.net_margin_pct}%)`, value: $2(summary.labor_rate) + " / hr", bold: true },
     { label: "Overhead Markup",     formula: "Total overhead ÷ direct labor × 100",         value: pct(summary.overhead_markup_on_labor_pct) },
   ];
 
@@ -218,8 +221,8 @@ function OverviewTab({ summary, budget }: { summary: Summary | undefined; budget
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: "Average Wage",     value: $2(summary.avg_wage) + " /hr",     icon: Users },
-          { label: "Breakeven Rate",   value: $2(summary.breakeven_rate) + " /hr", icon: TrendingUp },
-          { label: "Labor Rate",       value: $2(summary.labor_rate) + " /hr",   icon: DollarSign },
+          { label: "Breakeven Rate",   value: $2(summary.display_breakeven_rate) + " /hr", icon: TrendingUp },
+          { label: "Labor Rate",       value: $2(summary.display_labor_rate) + " /hr",   icon: DollarSign },
           { label: "Overhead Markup",  value: pct(summary.overhead_markup_on_labor_pct), icon: Building2 },
         ].map(card => (
           <Card key={card.label}>
@@ -263,7 +266,7 @@ function OverviewTab({ summary, budget }: { summary: Summary | undefined; budget
               ["Days / Week",       budget.working_days_per_week + " days"],
               ["Total Labor Hrs",   num(summary.total_labor_hours) + " hrs"],
               ["Billable Hrs",      num(summary.total_billable_hours) + " hrs"],
-              ["Unbillable Hrs",    `${num(summary.total_unbillable_hours)} hrs (${pct(summary.unbillable_pct)})`],
+              ["Unbillable Hrs",    `${num(summary.total_unbillable_hours)} hrs (${pct(summary.unbillable_pct * 100)})`],
             ].map(([k, v]) => (
               <div key={k as string} className="flex justify-between">
                 <span className="text-muted-foreground">{k}</span>
@@ -352,7 +355,7 @@ function LaborTab({ budgetId, data, summary }: { budgetId: number; data: any; su
         <SummaryCard label="Unbillable Labor"  value={$(unbillTotal)} sub="non-billable overhead" color="text-amber-600" />
         <SummaryCard label="Overhead Staff"   value={$(ohTotal)} sub="salaries" />
         <SummaryCard label="Billable Hours"   value={num(billHrs) + " hrs"} sub="chargeable hours" />
-        <SummaryCard label="Unbillable Hours" value={num(unbillHrs) + " hrs"} sub={pct(summary?.unbillable_pct)} />
+        <SummaryCard label="Unbillable Hours" value={num(unbillHrs) + " hrs"} sub={pct((summary?.unbillable_pct ?? 0) * 100)} />
       </div>
 
       {/* Sub-tab selector */}
@@ -802,19 +805,31 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
 export default function MorsBudget() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const [, nav] = useLocation();
   const [budgetId, setBudgetId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+
+  // Admin-only guard
+  useEffect(() => {
+    if (user && user.role !== "Admin" && !(user as any).isMasterAdmin) {
+      nav("/");
+      toast({ title: "Access denied", description: "MORS Budget is for Admins only.", variant: "destructive" });
+    }
+  }, [user]);
 
   // Load budget list
   const { data: budgets = [] } = useQuery<Budget[]>({
     queryKey: ["/api/mors/budgets"],
-    onSuccess: (list: Budget[]) => {
-      if (!budgetId && list.length > 0) {
-        const active = list.find(b => b.status === "active") ?? list[0];
-        setBudgetId(active.id);
-      }
-    },
-  } as any);
+  });
+
+  // Auto-select active or first budget
+  useEffect(() => {
+    if (!budgetId && budgets.length > 0) {
+      const active = budgets.find((b: Budget) => b.status === "active") ?? budgets[0];
+      setBudgetId(active.id);
+    }
+  }, [budgets, budgetId]);
 
   // Load full budget data
   const { data: budgetData, isLoading: dataLoading } = useQuery<any>({
@@ -866,7 +881,7 @@ export default function MorsBudget() {
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Labor Rate</span>
-              <span className="font-semibold">{$2(summary.labor_rate)}/hr</span>
+              <span className="font-semibold">{$2(summary.display_labor_rate)}/hr</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Net Profit</span>

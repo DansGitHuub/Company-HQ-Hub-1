@@ -31,6 +31,8 @@ interface WorkAreaDraft {
   _key: string;
   name: string;
   work_area_type_id: string;
+  category: string;
+  area_description: string;
   line_items: LineItem[];
   collapsed: boolean;
 }
@@ -71,7 +73,7 @@ function defaultLineItem(): LineItem {
 }
 
 function defaultArea(name = ""): WorkAreaDraft {
-  return { _key: key(), name, work_area_type_id: "", line_items: [defaultLineItem()], collapsed: false };
+  return { _key: key(), name, work_area_type_id: "", category: "", area_description: "", line_items: [defaultLineItem()], collapsed: false };
 }
 
 function lineAmount(item: LineItem) {
@@ -108,6 +110,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
   const [taxRate, setTaxRate] = useState(parseFloat(existing?.tax_rate ?? "0") * 100);
   const [discountAmount, setDiscountAmount] = useState(parseFloat(existing?.discount_amount ?? "0"));
   const [downPaymentPct, setDownPaymentPct] = useState(parseFloat(existing?.down_payment_percent ?? "0"));
+  const [presentationStyle, setPresentationStyle] = useState<"simple" | "booklet">(existing?.presentation_style ?? "simple");
 
   // Work areas
   const [areas, setAreas] = useState<WorkAreaDraft[]>(() => {
@@ -116,6 +119,8 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
         _key: key(),
         name: a.name,
         work_area_type_id: a.work_area_type_id ?? "",
+        category: a.category ?? "",
+        area_description: a.area_description ?? "",
         collapsed: false,
         line_items: (a.line_items ?? []).map((li: any) => ({
           _key: key(),
@@ -257,12 +262,15 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
       issued_date: issuedDate,
       valid_until: validUntil || null,
       notes, customer_message, terms,
+      presentation_style: presentationStyle,
       subtotal, tax_rate: taxRate / 100, tax_amount: taxAmount,
       discount_amount: discountAmount, total,
       down_payment_percent: downPaymentPct, down_payment_amount: downPaymentAmount,
       work_areas: areas.map(a => ({
         name: a.name,
         work_area_type_id: a.work_area_type_id || null,
+        category: a.category || null,
+        area_description: a.area_description || null,
         line_items: a.line_items.map(li => ({
           item_type: li.item_type,
           description: li.description,
@@ -408,6 +416,28 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
               placeholder="Brief message shown at the top of the estimate for the customer..." />
           </div>
 
+          {/* ── Presentation Style ── */}
+          <div>
+            <Label className="text-xs">Presentation Style</Label>
+            <div className="flex gap-2 mt-1">
+              {(["simple", "booklet"] as const).map(style => (
+                <button
+                  key={style}
+                  type="button"
+                  onClick={() => setPresentationStyle(style)}
+                  data-testid={`btn-style-${style}`}
+                  className={`flex-1 py-1.5 text-sm rounded border font-medium transition-colors ${
+                    presentationStyle === style
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground border-muted hover:border-primary/50"
+                  }`}
+                >
+                  {style === "simple" ? "Simple (1-page summary)" : "Booklet (detailed proposal)"}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <Separator />
 
           {/* ── Work Areas ── */}
@@ -445,6 +475,32 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                     {/* Line items */}
                     {!area.collapsed && (
                       <div className="p-3 space-y-2">
+                        {/* Category + Description row */}
+                        <div className="grid grid-cols-[1fr_1fr] gap-2 mb-2">
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Category</Label>
+                            <Select value={area.category || ""} onValueChange={v => updateArea(area._key, { category: v })}>
+                              <SelectTrigger className="h-7 text-xs mt-0.5" data-testid={`select-category-${aIdx}`}>
+                                <SelectValue placeholder="Select category..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {["Landscaping", "Hardscaping", "Irrigation", "Lawn Care", "Tree Service", "Snow Removal", "Lighting", "Drainage", "Cleanup", "Other"].map(c => (
+                                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Area Description</Label>
+                            <Input
+                              value={area.area_description}
+                              onChange={e => updateArea(area._key, { area_description: e.target.value })}
+                              className="h-7 text-xs mt-0.5"
+                              placeholder="Brief description of this area..."
+                              data-testid={`input-area-desc-${aIdx}`}
+                            />
+                          </div>
+                        </div>
                         {/* Column headers */}
                         <div className="grid grid-cols-[90px_1fr_60px_70px_80px_70px_28px] gap-1 text-[10px] text-muted-foreground font-medium px-1">
                           <span>Type</span>

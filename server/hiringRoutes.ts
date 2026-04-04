@@ -550,7 +550,13 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
     }
   });
 
-  app.get("/api/employees", requireAuth, requireHRAccess, async (req, res) => {
+  // Admin-only: list all employees
+  app.get("/api/employees", requireAuth, requireHRAccess, async (req: any, res) => {
+    const role = req.user?.role;
+    const isMasterAdmin = req.user?.isMasterAdmin;
+    if (!["Admin"].includes(role) && !isMasterAdmin) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
     try {
       const emps = await storage.getEmployees();
       res.json(emps);
@@ -559,10 +565,16 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
     }
   });
 
-  app.get("/api/employees/:id", requireAuth, requireHRAccess, async (req, res) => {
+  // Admin OR own employee record
+  app.get("/api/employees/:id", requireAuth, async (req: any, res) => {
     try {
+      const role = req.user?.role;
+      const isMasterAdmin = req.user?.isMasterAdmin;
       const emp = await storage.getEmployee(req.params.id);
       if (!emp) return res.status(404).json({ message: "Employee not found" });
+      const isAdmin = ["Admin", "Manager"].includes(role) || isMasterAdmin;
+      const isOwn = emp.user_id === req.user?.id;
+      if (!isAdmin && !isOwn) return res.status(403).json({ message: "Access denied" });
       res.json(emp);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -579,10 +591,17 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
     }
   });
 
-  app.patch("/api/employees/:id", requireAuth, requireHRAccess, async (req, res) => {
+  // Admin OR own employee record
+  app.patch("/api/employees/:id", requireAuth, async (req: any, res) => {
     try {
+      const role = req.user?.role;
+      const isMasterAdmin = req.user?.isMasterAdmin;
+      const emp = await storage.getEmployee(req.params.id);
+      if (!emp) return res.status(404).json({ message: "Employee not found" });
+      const isAdmin = ["Admin", "Manager"].includes(role) || isMasterAdmin;
+      const isOwn = emp.user_id === req.user?.id;
+      if (!isAdmin && !isOwn) return res.status(403).json({ message: "Access denied" });
       const updated = await storage.updateEmployee(req.params.id, req.body);
-      if (!updated) return res.status(404).json({ message: "Employee not found" });
       res.json(updated);
     } catch (err: any) {
       res.status(500).json({ message: err.message });

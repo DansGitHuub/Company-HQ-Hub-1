@@ -176,6 +176,7 @@ export function registerEstimateRoutes(app: Express) {
         subtotal = 0, tax_rate = 0, tax_amount = 0, discount_amount = 0,
         total = 0, down_payment_percent = 0, down_payment_amount = 0,
         notes, customer_message, terms,
+        presentation_style = "simple",
         work_areas = [],
       } = req.body;
 
@@ -186,21 +187,23 @@ export function registerEstimateRoutes(app: Express) {
            (estimate_number, customer_id, property_id, estimate_type, template_name,
             title, status, salesperson_id, valid_until, issued_date,
             subtotal, tax_rate, tax_amount, discount_amount, total,
-            down_payment_percent, down_payment_amount, notes, customer_message, terms)
-         VALUES ($1,$2,$3,$4,$5,$6,'draft',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+            down_payment_percent, down_payment_amount, notes, customer_message, terms,
+            presentation_style)
+         VALUES ($1,$2,$3,$4,$5,$6,'draft',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
          RETURNING id`,
         [estNum, customer_id || null, property_id || null, estimate_type, template_name || null,
          title, salesperson_id || null, valid_until || null, issued_date || new Date().toISOString().slice(0, 10),
          subtotal, tax_rate, tax_amount, discount_amount, total,
-         down_payment_percent, down_payment_amount, notes || null, customer_message || null, terms || null]
+         down_payment_percent, down_payment_amount, notes || null, customer_message || null, terms || null,
+         presentation_style || "simple"]
       );
       const estimateId = rows[0].id;
 
       for (let aIdx = 0; aIdx < work_areas.length; aIdx++) {
         const area = work_areas[aIdx];
         const { rows: ar } = await client.query(
-          `INSERT INTO estimate_work_areas (estimate_id, name, work_area_type_id, sort_order) VALUES ($1,$2,$3,$4) RETURNING id`,
-          [estimateId, area.name, area.work_area_type_id || null, aIdx]
+          `INSERT INTO estimate_work_areas (estimate_id, name, work_area_type_id, sort_order, category, area_description, photo_url) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+          [estimateId, area.name, area.work_area_type_id || null, aIdx, area.category || null, area.area_description || null, area.photo_url || null]
         );
         const areaId = ar[0].id;
         for (let iIdx = 0; iIdx < (area.line_items || []).length; iIdx++) {
@@ -237,6 +240,7 @@ export function registerEstimateRoutes(app: Express) {
         subtotal, tax_rate, tax_amount, discount_amount, total,
         down_payment_percent, down_payment_amount,
         notes, customer_message, terms,
+        presentation_style,
         work_areas,
       } = req.body;
 
@@ -246,14 +250,15 @@ export function registerEstimateRoutes(app: Express) {
            title=$5, salesperson_id=$6, valid_until=$7, issued_date=$8,
            subtotal=$9, tax_rate=$10, tax_amount=$11, discount_amount=$12, total=$13,
            down_payment_percent=$14, down_payment_amount=$15,
-           notes=$16, customer_message=$17, terms=$18, updated_at=NOW()
+           notes=$16, customer_message=$17, terms=$18, updated_at=NOW(),
+           presentation_style=COALESCE($20, presentation_style)
          WHERE id=$19`,
         [customer_id || null, property_id || null, estimate_type, template_name || null,
          title, salesperson_id || null, valid_until || null, issued_date,
          subtotal, tax_rate, tax_amount, discount_amount, total,
          down_payment_percent, down_payment_amount,
          notes || null, customer_message || null, terms || null,
-         req.params.id]
+         req.params.id, presentation_style || null]
       );
 
       if (work_areas !== undefined) {
@@ -262,8 +267,8 @@ export function registerEstimateRoutes(app: Express) {
         for (let aIdx = 0; aIdx < work_areas.length; aIdx++) {
           const area = work_areas[aIdx];
           const { rows: ar } = await client.query(
-            `INSERT INTO estimate_work_areas (estimate_id, name, work_area_type_id, sort_order) VALUES ($1,$2,$3,$4) RETURNING id`,
-            [req.params.id, area.name, area.work_area_type_id || null, aIdx]
+            `INSERT INTO estimate_work_areas (estimate_id, name, work_area_type_id, sort_order, category, area_description, photo_url) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+            [req.params.id, area.name, area.work_area_type_id || null, aIdx, area.category || null, area.area_description || null, area.photo_url || null]
           );
           const areaId = ar[0].id;
           for (let iIdx = 0; iIdx < (area.line_items || []).length; iIdx++) {

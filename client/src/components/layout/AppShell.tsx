@@ -358,6 +358,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     todos: { icon: CheckSquare, label: t("nav.tasks"), href: "/todos" },
     hiring: { icon: Users, label: t("nav.hiring"), href: "/hiring" },
     employees: { icon: User, label: t("nav.employees"), href: "/employees" },
+    my_profile: { icon: User, label: "My Profile", href: "/employees/me" },
     jobs: { icon: Briefcase, label: "Jobs", href: "/jobs" },
     scheduling: { icon: CalendarCheck, label: "Scheduling", href: "/scheduling" },
     my_day: { icon: Sun, label: "My Day", href: "/my-day" },
@@ -399,21 +400,38 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {
+    const isAdmin = role === "Admin" || (user as any)?.isMasterAdmin;
     if (role === "Crew" || role === "New Hire") {
       return sidebarSections
         .filter(s => s.label !== "ADMIN")
-        .map(s => ({ ...s, items: s.items.filter(i => i !== "hiring") }));
+        .map(s => ({
+          ...s,
+          items: s.items
+            .filter(i => i !== "hiring" && i !== "mors_budget")
+            .map(i => i === "employees" ? "my_profile" : i),
+        }));
     }
     if (role === "Crew Lead") {
       return sidebarSections
         .filter(s => s.label !== "ADMIN")
-        .map(s => ({ ...s, items: s.items.filter(i => i !== "hiring") }));
+        .map(s => ({
+          ...s,
+          items: s.items
+            .filter(i => i !== "hiring" && i !== "mors_budget")
+            .map(i => i === "employees" ? "my_profile" : i),
+        }));
     }
     if (role === "Manager" || role === "HR" || role === "Sales") {
       return sidebarSections
         .filter(s => s.label !== "ADMIN")
-        .map(s => ({ ...s, items: s.items.filter(i => i !== "hiring") }));
+        .map(s => ({
+          ...s,
+          items: s.items
+            .filter(i => i !== "hiring" && (!isAdmin && i === "mors_budget" ? false : true))
+            .map(i => i === "employees" ? "my_profile" : i),
+        }));
     }
+    // Admin / Master Admin: full access
     return sidebarSections;
   };
 

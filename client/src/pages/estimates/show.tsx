@@ -16,7 +16,7 @@ import { EstimateFormModal } from "./EstimateFormModal";
 import { EstimateStatusBadge, ESTIMATE_TYPE_LABELS } from "./index";
 import {
   Calculator, ArrowLeft, Edit2, Send, CheckCircle2, XCircle,
-  Briefcase, Building2, User, Calendar, Trash2, RefreshCw, Loader2
+  Briefcase, Building2, User, Calendar, Trash2, RefreshCw, Loader2, Eye
 } from "lucide-react";
 import { format, parseISO, isAfter } from "date-fns";
 import { Link } from "wouter";
@@ -28,6 +28,7 @@ interface LineItemDetail {
 }
 interface WorkAreaDetail {
   id: string; name: string; sort_order: number;
+  category: string | null; area_description: string | null;
   line_items: LineItemDetail[];
 }
 interface EstimateDetail {
@@ -40,6 +41,7 @@ interface EstimateDetail {
   discount_amount: string; total: string;
   down_payment_percent: string; down_payment_amount: string;
   notes: string | null; customer_message: string | null; terms: string | null;
+  presentation_style: string | null;
   customer_response: string | null; customer_response_at: string | null;
   customer_response_note: string | null;
   sent_at: string | null; viewed_at: string | null;
@@ -188,6 +190,9 @@ export default function EstimateDetail() {
               {convertMutation.isPending ? "Converting…" : "Convert to Job"}
             </Button>
           )}
+          <Button size="sm" variant="outline" onClick={() => nav(`/estimates/${id}/preview`)} data-testid="btn-preview-estimate">
+            <Eye className="h-3.5 w-3.5 mr-1.5" /> Preview / PDF
+          </Button>
           {canEdit && estimate.status !== "converted" && (
             <Button size="sm" variant="outline" onClick={() => setShowEdit(true)} data-testid="btn-edit-estimate">
               <Edit2 className="h-3.5 w-3.5 mr-1.5" /> Edit

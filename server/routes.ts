@@ -75,7 +75,7 @@ export async function registerRoutes(
   registerReportRoutes(app, requireAuth);
   await registerConsultationRoutes(app, requireAuth);
   await registerQuickBooksRoutes(app, requireAuth);
-  await registerMorsRoutes(app, requireAuth);
+  await registerMorsRoutes(app, requireAuth, requireAdmin);
 
   // Global search endpoint - searches everything based on user role
   app.get("/api/search", requireAuth, async (req, res) => {

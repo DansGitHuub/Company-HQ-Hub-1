@@ -33,6 +33,7 @@ import InvoiceList from "@/pages/invoices/index";
 import InvoiceDetail from "@/pages/invoices/show";
 import EstimateList from "@/pages/estimates/index";
 import EstimateDetail from "@/pages/estimates/show";
+import EstimatePreview from "@/pages/estimates/EstimatePreview";
 import SchedulingCalendar from "@/pages/scheduling/index";
 import MyDayPage from "@/pages/my-day/index";
 import Help from "@/pages/Help";
@@ -138,6 +139,7 @@ function AppRoutes() {
         <Route path="/invoices" component={InvoiceList} />
         <Route path="/invoices/:id" component={InvoiceDetail} />
         <Route path="/estimates" component={EstimateList} />
+        <Route path="/estimates/:id/preview" component={EstimatePreview} />
         <Route path="/estimates/:id" component={EstimateDetail} />
         <Route path="/scheduling" component={SchedulingCalendar} />
         <Route path="/my-day" component={MyDayPage} />

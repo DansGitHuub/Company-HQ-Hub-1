@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import { pool } from "./db";
 
 export async function runEstimatesMigration() {
   await db.execute(sql`
@@ -27,5 +28,20 @@ export async function runEstimatesMigration() {
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `);
-  console.log("[Migration] estimates table ready");
+
+  // Add presentation_style column to sales_estimates if not exists
+  await pool.query(`
+    ALTER TABLE sales_estimates
+      ADD COLUMN IF NOT EXISTS presentation_style VARCHAR(50) DEFAULT 'simple'
+  `);
+
+  // Add category, area_description, photo_url columns to estimate_work_areas if not exists
+  await pool.query(`
+    ALTER TABLE estimate_work_areas
+      ADD COLUMN IF NOT EXISTS category VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS area_description TEXT,
+      ADD COLUMN IF NOT EXISTS photo_url TEXT
+  `);
+
+  console.log("[Migration] estimates table ready + sales_estimates + estimate_work_areas columns added");
 }
