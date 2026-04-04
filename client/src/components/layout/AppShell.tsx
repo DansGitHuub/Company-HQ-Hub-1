@@ -47,6 +47,7 @@ import {
   Cog,
   CalendarClock,
   BarChart2,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -367,6 +368,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     time_tracking: { icon: Timer, label: "Time Tracking", href: "/time" },
     consultations: { icon: CalendarClock, label: "Consultations", href: "/consultations" },
     reports: { icon: BarChart2, label: "Reports", href: "/reports" },
+    mors_budget: { icon: TrendingUp, label: "MORS Budget", href: "/mors-budget" },
     settings_nav: { icon: Settings, label: t("nav.settings"), href: "/settings" },
     education: { icon: GraduationCap, label: t("nav.resourceLibrary"), href: "/education" },
     help: { icon: LifeBuoy, label: t("nav.help"), href: "/help" },
@@ -390,7 +392,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarSections: NavSection[] = [
     { label: "", items: ["dashboard"] },
-    { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "scheduling", "my_day", "time_tracking", "invoices", "reports", "settings_nav"] },
+    { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "scheduling", "my_day", "time_tracking", "invoices", "reports", "mors_budget", "settings_nav"] },
     { label: "PEOPLE", items: ["employees", "education", "hiring"] },
     { label: "COMPANY", items: ["inbox", "sops", "testing", "hq"] },
     { label: "ADMIN", items: ["admin", "tools", "forms"] },

@@ -46,6 +46,7 @@ import DailyWorksheet from "@/pages/DailyWorksheet";
 import TimeTracking from "@/pages/time/index";
 import ReportsPage from "@/pages/Reports";
 import ConsultationsPage from "@/pages/Consultations";
+import MorsBudget from "@/pages/MorsBudget";
 import CustomerList from "@/pages/customers/index";
 import CustomerDetail from "@/pages/customers/show";
 import PlowSiteMapper from "@/pages/PlowSiteMapper";
@@ -150,6 +151,7 @@ function AppRoutes() {
         <Route path="/time" component={TimeTracking} />
         <Route path="/reports" component={ReportsPage} />
         <Route path="/consultations" component={ConsultationsPage} />
+        <Route path="/mors-budget" component={MorsBudget} />
         <Route path="/customers" component={CustomerList} />
         <Route path="/customers/:id" component={CustomerDetail} />
         <Route path="/tools/plow-mapper" component={PlowSiteMapper} />
