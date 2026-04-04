@@ -22,6 +22,7 @@ import { runEstimatesMigration } from "./estimatesMigration";
 import { runLanguageMigration } from "./languageMigration";
 import { runActivityLogMigration } from "./activityLogMigration";
 import { seedHiringEmailTemplates, startApplicationTokenScheduler } from "./applicationTokenScheduler";
+import { startQuickBooksScheduler } from "./quickbooksScheduler";
 import { runCustomerDataMigration } from "./customerDataMigration";
 import { runTimeTrackingMigration } from "./timeTrackingMigration";
 import { runJobsMigration } from "./jobsMigration";
@@ -168,6 +169,7 @@ app.use((req, res, next) => {
       startSopPipelineScheduler();
       startProcessAuditScheduler();
       startApplicationTokenScheduler();
+      startQuickBooksScheduler();
     },
   );
 })();
