@@ -1,0 +1,164 @@
+import { Express } from "express";
+import { pool } from "./db";
+import { getTokens, runFullSync } from "./quickbooksSync";
+
+async function migrate() {
+  // Core token store (single row per realm)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS quickbooks_tokens (
+      id           SERIAL PRIMARY KEY,
+      realm_id     VARCHAR(50) NOT NULL UNIQUE,
+      access_token TEXT NOT NULL,
+      refresh_token TEXT NOT NULL,
+      token_expiry TIMESTAMPTZ NOT NULL,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  // Sync activity log
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS quickbooks_sync_log (
+      id             SERIAL PRIMARY KEY,
+      entity_type    VARCHAR(50) NOT NULL,
+      direction      VARCHAR(20) NOT NULL,
+      records_synced INT NOT NULL DEFAULT 0,
+      errors         TEXT,
+      status         VARCHAR(20) NOT NULL DEFAULT 'running',
+      started_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      completed_at   TIMESTAMPTZ
+    )
+  `);
+
+  // QB columns on customers
+  await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS qb_customer_id VARCHAR(50)`);
+  await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS qb_synced_at  TIMESTAMPTZ`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_customers_qb_id ON customers(qb_customer_id)`);
+
+  // QB columns on invoices
+  await pool.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS qb_invoice_id VARCHAR(50)`);
+  await pool.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS qb_synced_at  TIMESTAMPTZ`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_invoices_qb_id ON invoices(qb_invoice_id)`);
+
+  console.log("[migration] quickbooks tables ready");
+}
+
+export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
+  await migrate();
+
+  // ── GET /api/quickbooks/auth — start OAuth flow ────────────────────────────
+  app.get("/api/quickbooks/auth", requireAuth, async (req, res) => {
+    try {
+      const { default: OAuthClient } = await import("intuit-oauth");
+      const client = new OAuthClient({
+        clientId: process.env.QUICKBOOKS_CLIENT_ID!,
+        clientSecret: process.env.QUICKBOOKS_CLIENT_SECRET!,
+        environment: "production",
+        redirectUri: "https://companyhq.app/api/auth/quickbooks/callback",
+      });
+      const authUri = client.authorizeUri({
+        scope: [OAuthClient.scopes.Accounting, OAuthClient.scopes.OpenId],
+        state: "qb-connect",
+      });
+      res.redirect(authUri);
+    } catch (err: any) {
+      console.error("[QB auth]", err.message);
+      res.redirect("/settings?qb=error");
+    }
+  });
+
+  // ── GET /api/auth/quickbooks/callback — OAuth callback ────────────────────
+  app.get("/api/auth/quickbooks/callback", async (req, res) => {
+    try {
+      const { default: OAuthClient } = await import("intuit-oauth");
+      const client = new OAuthClient({
+        clientId: process.env.QUICKBOOKS_CLIENT_ID!,
+        clientSecret: process.env.QUICKBOOKS_CLIENT_SECRET!,
+        environment: "production",
+        redirectUri: "https://companyhq.app/api/auth/quickbooks/callback",
+      });
+
+      const fullUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+      const tokenResponse = await client.createToken(fullUrl);
+      const token = tokenResponse.getJson();
+      const realmId = (req.query.realmId as string) || token.realmId;
+
+      if (!realmId || !token.access_token) {
+        throw new Error("Missing realmId or access_token in callback");
+      }
+
+      const expiry = new Date(Date.now() + (token.expires_in ?? 3600) * 1000);
+
+      await pool.query(
+        `INSERT INTO quickbooks_tokens (realm_id, access_token, refresh_token, token_expiry)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (realm_id) DO UPDATE
+           SET access_token=$2, refresh_token=$3, token_expiry=$4, updated_at=NOW()`,
+        [realmId, token.access_token, token.refresh_token, expiry]
+      );
+
+      console.log(`[QB] Connected realm ${realmId}`);
+      res.redirect("/settings?qb=connected&tab=quickbooks");
+    } catch (err: any) {
+      console.error("[QB callback]", err.message);
+      res.redirect("/settings?qb=error&tab=quickbooks");
+    }
+  });
+
+  // ── GET /api/quickbooks/status ─────────────────────────────────────────────
+  app.get("/api/quickbooks/status", requireAuth, async (req, res) => {
+    try {
+      const tok = await getTokens();
+      if (!tok) return res.json({ connected: false });
+
+      // Latest sync entry
+      const { rows: logs } = await pool.query(
+        `SELECT * FROM quickbooks_sync_log
+         WHERE status IN ('success','partial')
+         ORDER BY completed_at DESC NULLS LAST LIMIT 1`
+      );
+
+      res.json({
+        connected: true,
+        realm_id: tok.realm_id,
+        token_expiry: tok.token_expiry,
+        last_sync: logs[0]?.completed_at ?? null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/quickbooks/disconnect ───────────────────────────────────────
+  app.post("/api/quickbooks/disconnect", requireAuth, async (req, res) => {
+    try {
+      await pool.query("DELETE FROM quickbooks_tokens");
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/quickbooks/sync ──────────────────────────────────────────────
+  app.post("/api/quickbooks/sync", requireAuth, async (req, res) => {
+    try {
+      const results = await runFullSync();
+      res.json({ ok: true, results });
+    } catch (err: any) {
+      console.error("[QB sync]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/quickbooks/sync/logs ─────────────────────────────────────────
+  app.get("/api/quickbooks/sync/logs", requireAuth, async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT * FROM quickbooks_sync_log ORDER BY started_at DESC LIMIT 50`
+      );
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

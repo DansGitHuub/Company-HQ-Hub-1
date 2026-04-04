@@ -26,19 +26,29 @@ import {
 import {
   User, Bell, BellOff, Globe, Palette, Shield, Save, Loader2, Lock, Eye, EyeOff, Check,
   Settings as SettingsIcon, Mail, Monitor, Sun, Moon, Layers, Tag, FileText, Building2,
-  Plus, Pencil, Trash2,
+  Plus, Pencil, Trash2, Link2, Link2Off, RefreshCw, CheckCircle, XCircle, AlertCircle,
+  ArrowLeftRight,
 } from "lucide-react";
 import { themes, getTheme, applyTheme, type ThemeId } from "@/lib/themes";
 
-type SettingsSection = "profile" | "notifications" | "language" | "appearance" | "admin" | "work-areas" | "divisions" | "estimate-templates" | "company";
+type SettingsSection = "profile" | "notifications" | "language" | "appearance" | "admin" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks";
 
 export default function Settings() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [activeSection, setActiveSection] = useState<SettingsSection>("profile");
   const isAdmin = user?.role === "Admin" || user?.role === "Master Admin";
   const isAdminOrManager = isAdmin || user?.role === "Manager";
+
+  // Handle ?tab=quickbooks from OAuth callback
+  const urlParams = new URLSearchParams(window.location.search);
+  const tabParam = urlParams.get("tab") as SettingsSection | null;
+  const qbParam  = urlParams.get("qb");
+  const [activeSection, setActiveSection] = useState<SettingsSection>(
+    tabParam && ["quickbooks","company","work-areas","divisions","estimate-templates"].includes(tabParam)
+      ? tabParam
+      : "profile"
+  );
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["/api/profile"],
@@ -56,6 +66,7 @@ export default function Settings() {
       { id: "estimate-templates" as const, label: "Estimate Templates", icon: FileText },
       { id: "company" as const, label: "Company Info", icon: Building2 },
     ] : []),
+    ...(isAdmin ? [{ id: "quickbooks" as const, label: "QuickBooks", icon: ArrowLeftRight }] : []),
   ];
 
   if (isLoading) {
@@ -106,6 +117,7 @@ export default function Settings() {
           {activeSection === "divisions" && isAdminOrManager && <DivisionsSection />}
           {activeSection === "estimate-templates" && isAdminOrManager && <EstimateTemplatesSection />}
           {activeSection === "company" && isAdminOrManager && <CompanyInfoSection />}
+          {activeSection === "quickbooks" && isAdmin && <QuickBooksSection qbParam={qbParam} />}
         </div>
       </div>
     </div>
@@ -973,5 +985,250 @@ function CompanyInfoSection() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  QuickBooks Section
+// ═══════════════════════════════════════════════════════════════════════════════
+function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    if (qbParam === "connected") toast({ title: "QuickBooks connected successfully!" });
+    if (qbParam === "error") toast({ title: "QuickBooks connection failed", description: "Please try again.", variant: "destructive" });
+  }, [qbParam]);
+
+  const { data: status, isLoading: statusLoading } = useQuery<any>({
+    queryKey: ["/api/quickbooks/status"],
+    refetchInterval: 30000,
+  });
+
+  const { data: logs = [], isLoading: logsLoading } = useQuery<any[]>({
+    queryKey: ["/api/quickbooks/sync/logs"],
+    enabled: status?.connected === true,
+  });
+
+  const disconnectMut = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/quickbooks/disconnect"),
+    onSuccess: () => {
+      toast({ title: "QuickBooks disconnected" });
+      qc.invalidateQueries({ queryKey: ["/api/quickbooks/status"] });
+      qc.invalidateQueries({ queryKey: ["/api/quickbooks/sync/logs"] });
+    },
+    onError: () => toast({ title: "Disconnect failed", variant: "destructive" }),
+  });
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<any>(null);
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await apiRequest("POST", "/api/quickbooks/sync");
+      const data = await res.json();
+      setSyncResult(data);
+      qc.invalidateQueries({ queryKey: ["/api/quickbooks/status"] });
+      qc.invalidateQueries({ queryKey: ["/api/quickbooks/sync/logs"] });
+      toast({ title: "Sync complete" });
+    } catch (e: any) {
+      toast({ title: "Sync failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  function fmtDate(d: string | null) {
+    if (!d) return "Never";
+    return new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+
+  function logStatusBadge(s: string) {
+    if (s === "success") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700"><CheckCircle className="h-3 w-3" />Success</span>;
+    if (s === "partial") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700"><AlertCircle className="h-3 w-3" />Partial</span>;
+    if (s === "error")   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-600"><XCircle className="h-3 w-3" />Error</span>;
+    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700"><RefreshCw className="h-3 w-3 animate-spin" />Running</span>;
+  }
+
+  return (
+    <div className="space-y-5" data-testid="quickbooks-section">
+      {/* Connection Card */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ArrowLeftRight className="h-5 w-5 text-[#2CA01C]" />
+            QuickBooks Online
+          </CardTitle>
+          <CardDescription>
+            Bidirectional sync of customers, invoices, and payments with QuickBooks Online.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {statusLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> Checking connection…
+            </div>
+          ) : status?.connected ? (
+            <div className="space-y-4">
+              {/* Connected state */}
+              <div className="flex items-center gap-3 p-4 rounded-lg border bg-green-50 dark:bg-green-950/20">
+                <div className="p-2 rounded-full bg-green-100 text-green-700">
+                  <Link2 className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-sm text-green-700">Connected to QuickBooks Online</p>
+                  <p className="text-xs text-muted-foreground">
+                    Realm: {status.realm_id} · Last sync: {fmtDate(status.last_sync)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={handleSync}
+                  disabled={syncing}
+                  data-testid="btn-qb-sync"
+                >
+                  {syncing
+                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing…</>
+                    : <><RefreshCw className="h-4 w-4 mr-2" />Sync Now</>}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => disconnectMut.mutate()}
+                  disabled={disconnectMut.isPending}
+                  data-testid="btn-qb-disconnect"
+                >
+                  <Link2Off className="h-4 w-4 mr-2" />
+                  Disconnect
+                </Button>
+              </div>
+
+              {/* Sync result summary */}
+              {syncResult?.results && (
+                <div className="grid grid-cols-3 gap-3 pt-1">
+                  {Object.entries(syncResult.results).map(([entity, r]: [string, any]) => (
+                    <div key={entity} className="p-3 rounded-lg border bg-muted/30 text-center">
+                      <p className="text-xs font-medium capitalize text-muted-foreground">{entity}</p>
+                      <p className="text-xl font-bold mt-1">{r.synced}</p>
+                      <p className="text-[10px] text-muted-foreground">synced</p>
+                      {r.errors?.length > 0 && (
+                        <p className="text-[10px] text-destructive mt-0.5">{r.errors.length} error{r.errors.length !== 1 ? "s" : ""}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30">
+                <div className="p-2 rounded-full bg-muted text-muted-foreground">
+                  <Link2Off className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Not connected</p>
+                  <p className="text-xs text-muted-foreground">Connect to sync customers, invoices, and payments with QuickBooks Online.</p>
+                </div>
+              </div>
+              <Button
+                onClick={() => { window.location.href = "/api/quickbooks/auth"; }}
+                className="bg-[#2CA01C] hover:bg-[#238016] text-white"
+                data-testid="btn-qb-connect"
+              >
+                <Link2 className="h-4 w-4 mr-2" />
+                Connect to QuickBooks
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Sync Capabilities */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">What Gets Synced</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { name: "Customers", push: "New local customers → QB", pull: "New QB customers → local", icon: "👤" },
+              { name: "Invoices",  push: "Sent invoices → QB",       pull: "QB invoice statuses → local", icon: "📄" },
+              { name: "Payments",  push: "—",                         pull: "QB payments mark invoices paid", icon: "💳" },
+            ].map(item => (
+              <div key={item.name} className="p-3 rounded-lg border space-y-2">
+                <div className="flex items-center gap-2 font-medium text-sm">
+                  <span>{item.icon}</span> {item.name}
+                </div>
+                <div className="text-xs space-y-1">
+                  <div className="flex items-start gap-1.5 text-muted-foreground">
+                    <span className="text-green-600 font-bold mt-0.5">↑</span> {item.push}
+                  </div>
+                  <div className="flex items-start gap-1.5 text-muted-foreground">
+                    <span className="text-blue-600 font-bold mt-0.5">↓</span> {item.pull}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sync Log */}
+      {status?.connected && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Sync History</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {logsLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : logs.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">No sync history yet. Run your first sync above.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table data-testid="qb-sync-log-table">
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead>Entity</TableHead>
+                      <TableHead>Direction</TableHead>
+                      <TableHead>Records</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Started</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Errors</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {logs.map((log: any) => {
+                      const duration = log.completed_at
+                        ? `${Math.round((new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 1000)}s`
+                        : "—";
+                      return (
+                        <TableRow key={log.id} data-testid={`qb-log-row-${log.id}`}>
+                          <TableCell className="capitalize text-sm font-medium">{log.entity_type}</TableCell>
+                          <TableCell className="text-sm capitalize text-muted-foreground">{log.direction}</TableCell>
+                          <TableCell className="text-sm font-mono">{log.records_synced}</TableCell>
+                          <TableCell>{logStatusBadge(log.status)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{fmtDate(log.started_at)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{duration}</TableCell>
+                          <TableCell className="text-xs text-destructive max-w-[200px] truncate" title={log.errors ?? ""}>
+                            {log.errors ?? "—"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }

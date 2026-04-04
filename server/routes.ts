@@ -27,6 +27,7 @@ import { registerJobRoutes } from "./jobRoutes";
 import { registerInvoiceRoutes } from "./invoiceRoutes";
 import { registerReportRoutes } from "./reportRoutes";
 import { registerConsultationRoutes } from "./consultationRoutes";
+import { registerQuickBooksRoutes } from "./quickbooksRoutes";
 import { searchProductImages } from "./imageSearchService";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail } from "./email";
 import { logActivity } from "./activityLogger";
@@ -72,6 +73,7 @@ export async function registerRoutes(
   registerInvoiceRoutes(app, requireAuth);
   registerReportRoutes(app, requireAuth);
   await registerConsultationRoutes(app, requireAuth);
+  await registerQuickBooksRoutes(app, requireAuth);
 
   // Global search endpoint - searches everything based on user role
   app.get("/api/search", requireAuth, async (req, res) => {
