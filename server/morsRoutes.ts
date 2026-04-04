@@ -399,14 +399,6 @@ function calculateSummary(budget: any, employees: any[], materials: any[], equip
   // Stored as raw fraction (0–1); multiply by 100 in the UI for display
   const unbillable_pct = total_labor_hours > 0 ? total_unbillable_hours / total_labor_hours : 0;
 
-  // ── Display-only labor rate (blended average across ALL employees × unbillable hrs) ──
-  const sum_all_comp  = empDetails.reduce((s, e) => s + e.total_compensation, 0);
-  const sum_all_hours = empDetails.reduce((s, e) => s + parseFloat(e.total_hours_per_year || 0), 0);
-  const display_unbillable_cost = sum_all_hours > 0 ? (sum_all_comp / sum_all_hours) * total_unbillable_hours : 0;
-  const display_total_overhead  = display_unbillable_cost + equipment_overhead_total + additional_overhead;
-  const display_breakeven_rate  = total_billable_hours > 0 ? (total_direct_labor + display_total_overhead) / total_billable_hours : 0;
-  const display_labor_rate      = (1 - margin) > 0 ? display_breakeven_rate / (1 - margin) : 0;
-
   // Equipment
   const equipOwnedDetails = equipOwned.map(e => {
     const annual_cost_to_own = (parseFloat(e.replacement_cost) - parseFloat(e.sell_price || 0)) / parseFloat(e.useful_life_years || 1);
@@ -426,6 +418,15 @@ function calculateSummary(budget: any, employees: any[], materials: any[], equip
   // Overhead
   const overhead_items_total   = overheadItems.reduce((s, i) => s + parseFloat(i.annual_cost || 0), 0);
   const additional_overhead    = overhead_items_total + total_overhead_staff_cost;
+
+  // ── Display-only labor rate (blended average across ALL employees × unbillable hrs) ──
+  // NOTE: must come AFTER equipment_overhead_total and additional_overhead are defined
+  const sum_all_comp  = empDetails.reduce((s, e) => s + e.total_compensation, 0);
+  const sum_all_hours = empDetails.reduce((s, e) => s + parseFloat(e.total_hours_per_year || 0), 0);
+  const display_unbillable_cost = sum_all_hours > 0 ? (sum_all_comp / sum_all_hours) * total_unbillable_hours : 0;
+  const display_total_overhead  = display_unbillable_cost + equipment_overhead_total + additional_overhead;
+  const display_breakeven_rate  = total_billable_hours > 0 ? (total_direct_labor + display_total_overhead) / total_billable_hours : 0;
+  const display_labor_rate      = (1 - margin) > 0 ? display_breakeven_rate / (1 - margin) : 0;
   const total_overhead         = total_unbillable_labor + equipment_overhead_total + additional_overhead;
 
   // COGS
