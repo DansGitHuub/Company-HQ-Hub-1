@@ -261,7 +261,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
       salesperson_id: salespersonId || null,
       issued_date: issuedDate,
       valid_until: validUntil || null,
-      notes, customer_message, terms,
+      notes, customer_message: customerMessage, terms,
       presentation_style: presentationStyle,
       subtotal, tax_rate: taxRate / 100, tax_amount: taxAmount,
       discount_amount: discountAmount, total,
