@@ -20,6 +20,7 @@ The frontend is built using React and TypeScript, leveraging React Query for ser
 - **SOP Management**: Centralized SOPs with AI-powered quiz generation, adaptive quizzes, an AI-powered SOP Pipeline for content generation and scheduling, and an AI Editor for content and image rewriting with version history.
 - **Employee Quiz History Tracking**: Records all quiz attempts with detailed results for administrative review and HR decisions.
 - **Inventory Management**: Comprehensive materials catalog with an AI-powered creation wizard.
+- **Materials Catalog Module**: Full catalog management for Labor, Equipment, Materials, and Subcontracting items. Features auto-generated item numbers (ITEM-000001 format), class/category/tag filtering, cost and taxable tracking, SKU support, CSV bulk import, and soft-delete (retire) workflow. Tables: catalog_items, catalog_tags, catalog_item_tags. Routes: GET/POST/PUT/DELETE /api/catalog, /api/catalog/categories, /api/catalog/tags, /api/catalog/import. Frontend at /catalog and /catalog/import.
 - **Hiring & HR Module**: Full hiring pipeline with a Kanban board, applicant tracking, employee records, HR email templates, public application forms, interview scheduling (Zoom integration), offer letter management, and digital signature for acceptance. Includes an applicant status portal.
 - **Marketing Campaigns**: Database-backed campaign management with CRUD operations, dashboard, and performance visualization.
 - **Work Pipeline**: Manages "Sold Jobs" and "Estimates" via Kanban boards.

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, boolean, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, timestamp, integer, jsonb, serial, numeric, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -2880,3 +2880,44 @@ export const dailyWorksheets = pgTable("daily_worksheets", {
 export const insertDailyWorksheetSchema = createInsertSchema(dailyWorksheets).omit({ id: true, createdAt: true, updatedAt: true, submittedAt: true });
 export type InsertDailyWorksheet = z.infer<typeof insertDailyWorksheetSchema>;
 export type DailyWorksheet = typeof dailyWorksheets.$inferSelect;
+
+// ─── Materials Catalog ────────────────────────────────────────────────────────
+export const CATALOG_CLASSES = ["Labor", "Equipment", "Materials", "Subcontracting"] as const;
+export type CatalogClass = typeof CATALOG_CLASSES[number];
+
+export const catalogItems = pgTable("catalog_items", {
+  id: serial("id").primaryKey(),
+  itemNumber: varchar("item_number", { length: 20 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  class: varchar("class", { length: 50 }),
+  category: varchar("category", { length: 100 }),
+  units: varchar("units", { length: 50 }),
+  cost: numeric("cost", { precision: 10, scale: 2 }).default("0"),
+  taxable: boolean("taxable").default(false),
+  description: text("description"),
+  sku: varchar("sku", { length: 100 }),
+  otherOptions: text("other_options"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCatalogItemSchema = createInsertSchema(catalogItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCatalogItem = z.infer<typeof insertCatalogItemSchema>;
+export type CatalogItem = typeof catalogItems.$inferSelect;
+
+export const catalogTags = pgTable("catalog_tags", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+});
+
+export const insertCatalogTagSchema = createInsertSchema(catalogTags).omit({ id: true });
+export type InsertCatalogTag = z.infer<typeof insertCatalogTagSchema>;
+export type CatalogTag = typeof catalogTags.$inferSelect;
+
+export const catalogItemTags = pgTable("catalog_item_tags", {
+  itemId: integer("item_id").notNull().references(() => catalogItems.id, { onDelete: "cascade" }),
+  tagId: integer("tag_id").notNull().references(() => catalogTags.id, { onDelete: "cascade" }),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.itemId, t.tagId] }),
+}));

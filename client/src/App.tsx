@@ -66,6 +66,8 @@ import OfferAcceptancePage from "@/pages/OfferAcceptancePage";
 import AgreementSigningPage from "@/pages/AgreementSigningPage";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import NotFound from "@/pages/not-found";
+import CatalogPage from "@/pages/catalog/index";
+import CatalogImport from "@/pages/catalog/CatalogImport";
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
@@ -166,6 +168,8 @@ function AppRoutes() {
         <Route path="/calendar" component={CalendarPage} />
         <Route path="/testing" component={TestingKnowledge} />
         <Route path="/settings" component={SettingsPage} />
+        <Route path="/catalog/import" component={CatalogImport} />
+        <Route path="/catalog" component={CatalogPage} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>
