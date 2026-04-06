@@ -35,6 +35,13 @@ export async function runEstimatesMigration() {
       ADD COLUMN IF NOT EXISTS presentation_style VARCHAR(50) DEFAULT 'simple'
   `);
 
+  // Add portal columns to sales_estimates
+  await pool.query(`
+    ALTER TABLE sales_estimates
+      ADD COLUMN IF NOT EXISTS portal_token TEXT UNIQUE,
+      ADD COLUMN IF NOT EXISTS signature_data TEXT
+  `);
+
   // Add category, area_description, photo_url columns to estimate_work_areas if not exists
   await pool.query(`
     ALTER TABLE estimate_work_areas

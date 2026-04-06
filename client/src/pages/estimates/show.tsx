@@ -6,17 +6,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { EstimateFormModal } from "./EstimateFormModal";
 import { EstimateStatusBadge, ESTIMATE_TYPE_LABELS } from "./index";
 import {
   Calculator, ArrowLeft, Edit2, Send, CheckCircle2, XCircle,
-  Briefcase, Building2, User, Calendar, Trash2, RefreshCw, Loader2, Eye
+  Briefcase, Building2, User, Calendar, Trash2, RefreshCw, Loader2, Eye, Globe, Copy, Check
 } from "lucide-react";
 import { format, parseISO, isAfter } from "date-fns";
 import { Link } from "wouter";
@@ -46,6 +48,7 @@ interface EstimateDetail {
   customer_response_note: string | null;
   sent_at: string | null; viewed_at: string | null;
   converted_at: string | null; converted_job_id: string | null;
+  portal_token: string | null;
   created_at: string; updated_at: string;
   work_areas: WorkAreaDetail[];
 }
@@ -80,6 +83,9 @@ export default function EstimateDetail() {
 
   const [showEdit, setShowEdit] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPortalDialog, setShowPortalDialog] = useState(false);
+  const [portalUrl, setPortalUrl] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const { data: estimate, isLoading, error } = useQuery<EstimateDetail>({
     queryKey: ["/api/estimates", id],
@@ -129,6 +135,23 @@ export default function EstimateDetail() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/estimates"] }); nav("/estimates"); },
     onError:   () => toast({ title: "Error deleting", variant: "destructive" }),
   });
+
+  const sendToPortalMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/estimates/${id}/send-to-portal`, {}).then(r => r.json()),
+    onSuccess: (data: { portal_url: string }) => {
+      setPortalUrl(data.portal_url);
+      setShowPortalDialog(true);
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+    },
+    onError: () => toast({ title: "Error generating portal link", variant: "destructive" }),
+  });
+
+  function copyPortalUrl() {
+    navigator.clipboard.writeText(portalUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   if (isLoading) {
     return (
@@ -188,6 +211,23 @@ export default function EstimateDetail() {
             <Button size="sm" variant="outline" onClick={() => convertMutation.mutate()} disabled={convertMutation.isPending} data-testid="btn-convert-job">
               <Briefcase className="h-3.5 w-3.5 mr-1.5" />
               {convertMutation.isPending ? "Converting…" : "Convert to Job"}
+            </Button>
+          )}
+          {canEdit && estimate.status !== "converted" && (
+            <Button size="sm"
+              className="bg-green-600 hover:bg-green-700 text-white border-0"
+              onClick={() => {
+                if (estimate.portal_token) {
+                  setPortalUrl(`https://companyhq.app/portal/${estimate.portal_token}`);
+                  setShowPortalDialog(true);
+                } else {
+                  sendToPortalMutation.mutate();
+                }
+              }}
+              disabled={sendToPortalMutation.isPending}
+              data-testid="btn-send-to-portal">
+              <Globe className="h-3.5 w-3.5 mr-1.5" />
+              {sendToPortalMutation.isPending ? "Generating…" : estimate.portal_token ? "Portal Link" : "Send to Portal"}
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={() => nav(`/estimates/${id}/preview`)} data-testid="btn-preview-estimate">
@@ -495,6 +535,39 @@ export default function EstimateDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Portal URL dialog */}
+      <Dialog open={showPortalDialog} onOpenChange={setShowPortalDialog}>
+        <DialogContent className="max-w-md" data-testid="dialog-portal-url">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5 text-green-600" />
+              Customer Portal Link
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Share this link with the customer so they can review and respond to the estimate online.
+            </p>
+            <div className="flex gap-2">
+              <Input
+                readOnly
+                value={portalUrl}
+                className="font-mono text-xs"
+                onClick={e => (e.target as HTMLInputElement).select()}
+                data-testid="input-portal-url"
+              />
+              <Button size="sm" variant="outline" onClick={copyPortalUrl} data-testid="btn-copy-portal-url">
+                {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </div>
+            {copied && <p className="text-xs text-green-600 font-medium">Copied to clipboard!</p>}
+            <p className="text-xs text-muted-foreground">
+              The estimate status will update to <strong>Viewed</strong> when the customer opens the link, and to <strong>Approved</strong> or <strong>Declined</strong> when they respond.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

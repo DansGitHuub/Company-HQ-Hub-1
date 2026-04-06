@@ -373,4 +373,120 @@ export function registerEstimateRoutes(app: Express) {
       res.status(500).json({ message: "Error deleting estimate" });
     }
   });
+
+  // ------ Customer Portal ------
+
+  // POST /api/estimates/:id/send-to-portal — generate portal token and mark sent
+  app.post("/api/estimates/:id/send-to-portal", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { rows: existing } = await pool.query(
+        `SELECT portal_token FROM sales_estimates WHERE id=$1`, [id]
+      );
+      if (!existing.length) return res.status(404).json({ message: "Estimate not found" });
+
+      // Reuse token if already generated, otherwise create new
+      let token = existing[0].portal_token;
+      if (!token) {
+        const { randomUUID } = await import("crypto");
+        token = randomUUID();
+        await pool.query(
+          `UPDATE sales_estimates SET portal_token=$1, status='sent', sent_at=COALESCE(sent_at, NOW()), updated_at=NOW() WHERE id=$2`,
+          [token, id]
+        );
+      }
+
+      const portalUrl = `https://companyhq.app/portal/${token}`;
+      res.json({ portal_token: token, portal_url: portalUrl });
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ message: "Error generating portal link" });
+    }
+  });
+
+  // GET /api/portal/:token — public, returns estimate + work areas, marks viewed_at on first load
+  app.get("/api/portal/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { rows } = await pool.query(
+        `SELECT e.*,
+                c.first_name || ' ' || c.last_name AS customer_name,
+                (SELECT email FROM customer_contacts WHERE customer_id = e.customer_id ORDER BY id LIMIT 1) AS customer_email,
+                p.address AS property_address,
+                u.name AS salesperson_name
+         FROM sales_estimates e
+         LEFT JOIN customers c ON c.id = e.customer_id
+         LEFT JOIN properties p ON p.id = e.property_id
+         LEFT JOIN users u ON u.id = e.salesperson_id
+         WHERE e.portal_token=$1`,
+        [token]
+      );
+      if (!rows.length) return res.status(404).json({ message: "Portal link not found or expired" });
+
+      const estimate = rows[0];
+
+      // Mark viewed on first load
+      if (!estimate.viewed_at) {
+        await pool.query(
+          `UPDATE sales_estimates SET viewed_at=NOW(), status=CASE WHEN status='sent' THEN 'viewed' ELSE status END, updated_at=NOW() WHERE portal_token=$1`,
+          [token]
+        );
+        estimate.viewed_at = new Date().toISOString();
+        if (estimate.status === "sent") estimate.status = "viewed";
+      }
+
+      // Attach work areas
+      const { rows: areas } = await pool.query(
+        `SELECT wa.*, wat.name AS type_name
+         FROM estimate_work_areas wa
+         LEFT JOIN work_area_types wat ON wat.id = wa.work_area_type_id
+         WHERE wa.estimate_id=$1 ORDER BY wa.sort_order, wa.id`,
+        [estimate.id]
+      );
+      for (const area of areas) {
+        const { rows: items } = await pool.query(
+          `SELECT * FROM estimate_line_items WHERE estimate_work_area_id=$1 ORDER BY sort_order, id`,
+          [area.id]
+        );
+        area.line_items = items;
+      }
+      estimate.work_areas = areas;
+
+      res.json(estimate);
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ message: "Error loading portal" });
+    }
+  });
+
+  // POST /api/portal/:token/respond — public, customer approves/declines with optional signature
+  app.post("/api/portal/:token/respond", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { action, note, signature_data } = req.body;
+
+      if (!["approved", "declined"].includes(action)) {
+        return res.status(400).json({ message: "action must be 'approved' or 'declined'" });
+      }
+
+      const { rows } = await pool.query(
+        `SELECT id, status FROM sales_estimates WHERE portal_token=$1`, [token]
+      );
+      if (!rows.length) return res.status(404).json({ message: "Portal link not found" });
+
+      const status = action === "approved" ? "approved" : "declined";
+      await pool.query(
+        `UPDATE sales_estimates
+         SET status=$1, customer_response=$2, customer_response_at=NOW(),
+             customer_response_note=$3, signature_data=$4, updated_at=NOW()
+         WHERE portal_token=$5`,
+        [status, action, note || null, signature_data || null, token]
+      );
+
+      res.json({ success: true, status });
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ message: "Error saving response" });
+    }
+  });
 }
