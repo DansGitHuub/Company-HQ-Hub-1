@@ -43,18 +43,33 @@ async function migrate() {
   console.log("[migration] quickbooks tables ready");
 }
 
+// Resolve credentials — accept either the short name (QB_CLIENT_ID) or the
+// legacy long name (QUICKBOOKS_CLIENT_ID), so both dev and prod configs work.
+function qbClientId()     { return process.env.QB_CLIENT_ID     || process.env.QUICKBOOKS_CLIENT_ID     || ""; }
+function qbClientSecret() { return process.env.QB_CLIENT_SECRET || process.env.QUICKBOOKS_CLIENT_SECRET || ""; }
+const QB_REDIRECT_URI = "https://companyhq.app/api/auth/quickbooks/callback";
+
 export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
   await migrate();
 
+  // ── GET /api/quickbooks/config — check if credentials are configured ───────
+  app.get("/api/quickbooks/config", requireAuth, (_req, res) => {
+    res.json({ configured: !!(qbClientId() && qbClientSecret()) });
+  });
+
   // ── GET /api/quickbooks/auth — start OAuth flow ────────────────────────────
   app.get("/api/quickbooks/auth", requireAuth, async (req, res) => {
+    if (!qbClientId() || !qbClientSecret()) {
+      console.error("[QB auth] QB_CLIENT_ID / QB_CLIENT_SECRET not set");
+      return res.redirect("/settings?qb=not-configured&tab=quickbooks");
+    }
     try {
       const { default: OAuthClient } = await import("intuit-oauth");
       const client = new OAuthClient({
-        clientId: process.env.QUICKBOOKS_CLIENT_ID!,
-        clientSecret: process.env.QUICKBOOKS_CLIENT_SECRET!,
+        clientId: qbClientId(),
+        clientSecret: qbClientSecret(),
         environment: "production",
-        redirectUri: "https://companyhq.app/api/auth/quickbooks/callback",
+        redirectUri: QB_REDIRECT_URI,
       });
       const authUri = client.authorizeUri({
         scope: [OAuthClient.scopes.Accounting, OAuthClient.scopes.OpenId],
@@ -63,19 +78,22 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
       res.redirect(authUri);
     } catch (err: any) {
       console.error("[QB auth]", err.message);
-      res.redirect("/settings?qb=error");
+      res.redirect("/settings?qb=error&tab=quickbooks");
     }
   });
 
   // ── GET /api/auth/quickbooks/callback — OAuth callback ────────────────────
   app.get("/api/auth/quickbooks/callback", async (req, res) => {
+    if (!qbClientId() || !qbClientSecret()) {
+      return res.redirect("/settings?qb=not-configured&tab=quickbooks");
+    }
     try {
       const { default: OAuthClient } = await import("intuit-oauth");
       const client = new OAuthClient({
-        clientId: process.env.QUICKBOOKS_CLIENT_ID!,
-        clientSecret: process.env.QUICKBOOKS_CLIENT_SECRET!,
+        clientId: qbClientId(),
+        clientSecret: qbClientSecret(),
         environment: "production",
-        redirectUri: "https://companyhq.app/api/auth/quickbooks/callback",
+        redirectUri: QB_REDIRECT_URI,
       });
 
       const fullUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;

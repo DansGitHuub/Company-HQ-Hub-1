@@ -98,11 +98,6 @@ export default function EstimateDetail() {
   const [depositDraft, setDepositDraft] = useState<number | "">("");
   const [savingTC, setSavingTC] = useState(false);
 
-  const { data: defaultTC } = useQuery<{ id: string; content: string; title: string } | null>({
-    queryKey: ["/api/settings/terms/active/install"],
-    queryFn: () => fetch("/api/settings/terms/active/install", { credentials: "include" }).then(r => r.json()),
-  });
-
   const { data: estimate, isLoading, error } = useQuery<EstimateDetail>({
     queryKey: ["/api/estimates", id],
     queryFn: async () => {
@@ -111,6 +106,19 @@ export default function EstimateDetail() {
       return res.json();
     },
     enabled: !!id,
+  });
+
+  // Map estimate type to the correct T&C type slug
+  const tcType = (() => {
+    const t = estimate?.estimate_type ?? "";
+    if (t === "maintenance_contract") return "maintenance";
+    if (t === "snow_contract") return "snow";
+    return "install";
+  })();
+
+  const { data: defaultTC } = useQuery<{ id: string; content: string; title: string } | null>({
+    queryKey: ["/api/settings/terms/active", tcType],
+    queryFn: () => fetch(`/api/settings/terms/active/${tcType}`, { credentials: "include" }).then(r => r.json()),
   });
 
   const canEdit   = ["Admin", "Manager", "Master Admin"].includes(user?.role ?? "");

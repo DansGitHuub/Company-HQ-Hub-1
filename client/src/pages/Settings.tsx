@@ -1085,11 +1085,18 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
   useEffect(() => {
     if (qbParam === "connected") toast({ title: "QuickBooks connected successfully!" });
     if (qbParam === "error") toast({ title: "QuickBooks connection failed", description: "Please try again.", variant: "destructive" });
+    if (qbParam === "not-configured") toast({ title: "QuickBooks not configured", description: "QB_CLIENT_ID and QB_CLIENT_SECRET must be set in environment variables.", variant: "destructive" });
   }, [qbParam]);
+
+  const { data: qbConfig } = useQuery<{ configured: boolean }>({
+    queryKey: ["/api/quickbooks/config"],
+    queryFn: () => apiRequest("GET", "/api/quickbooks/config").then(r => r.json()),
+  });
 
   const { data: status, isLoading: statusLoading } = useQuery<any>({
     queryKey: ["/api/quickbooks/status"],
     refetchInterval: 30000,
+    enabled: qbConfig?.configured === true,
   });
 
   const { data: logs = [], isLoading: logsLoading } = useQuery<any[]>({
@@ -1153,7 +1160,23 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {statusLoading ? (
+          {qbConfig?.configured === false ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 rounded-lg border bg-amber-50 dark:bg-amber-950/20">
+                <div className="p-2 rounded-full bg-amber-100 text-amber-700">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm text-amber-700">QuickBooks credentials not configured</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Set <code className="bg-muted px-1 rounded text-xs">QB_CLIENT_ID</code> and{" "}
+                    <code className="bg-muted px-1 rounded text-xs">QB_CLIENT_SECRET</code> environment variables,
+                    then restart the server to enable QuickBooks integration.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : statusLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground text-sm">
               <Loader2 className="h-4 w-4 animate-spin" /> Checking connection…
             </div>
