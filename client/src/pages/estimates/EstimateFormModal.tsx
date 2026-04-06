@@ -167,14 +167,22 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
     enabled: !!customerId,
   });
 
-  // Auto-select the only property when a customer has exactly one (new estimates only)
+  // Auto-populate property when customer's properties load (new estimates only)
   useEffect(() => {
-    if (!isEdit && properties.length === 1 && !propertyId) {
-      const p = properties[0];
-      setPropertyId(p.id);
-      setPropertySearch([p.address, p.city, p.state].filter(Boolean).join(", "));
+    if (isEdit || propertiesLoading || properties.length === 0 || propertyId) return;
+    const first = properties[0];
+    const label = [first.address, first.city, first.state].filter(Boolean).join(", ");
+    if (properties.length === 1) {
+      // Only one option — silently auto-select, no dropdown needed
+      setPropertyId(first.id);
+      setPropertySearch(label);
+    } else {
+      // Multiple options — pre-select the first but open dropdown so user can review/change
+      setPropertyId(first.id);
+      setPropertySearch(label);
+      setShowPropertyDrop(true);
     }
-  }, [properties, isEdit]);
+  }, [properties, propertiesLoading, isEdit]);
 
   // Filter properties client-side based on what user has typed
   // Only filter when there is a typed query AND no property has been confirmed yet
