@@ -220,6 +220,50 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ─── PROPERTY LIST ───────────────────────────────────────────────────────────
+  // GET /api/properties?customer_id=&search=
+  app.get("/api/properties", requireAuth, async (req, res) => {
+    try {
+      const customerId = (req.query.customer_id as string | undefined)?.trim() ?? "";
+      const search     = (req.query.search     as string | undefined)?.trim() ?? "";
+
+      const params: any[] = [];
+      const conditions: string[] = [];
+
+      if (customerId) {
+        params.push(customerId);
+        conditions.push(`p.customer_id = $${params.length}`);
+      }
+
+      if (search) {
+        params.push(`%${search}%`);
+        const n = params.length;
+        conditions.push(`(
+          p.address ILIKE $${n}
+          OR p.city  ILIKE $${n}
+          OR p.zip   ILIKE $${n}
+          OR (p.address || ' ' || COALESCE(p.city,'')) ILIKE $${n}
+        )`);
+      }
+
+      const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      const { rows } = await pool.query(`
+        SELECT p.*, c.first_name, c.last_name, c.company_name
+        FROM properties p
+        LEFT JOIN customers c ON c.id = p.customer_id
+        ${where}
+        ORDER BY p.address ASC
+        LIMIT 50
+      `, params);
+
+      return res.json(rows);
+    } catch (err: any) {
+      console.error("[properties] GET /api/properties error:", err.message);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ─── PROPERTY CRUD ───────────────────────────────────────────────────────────
   app.post("/api/customers/:id/properties", requireAuth, async (req, res) => {
     const { id } = req.params;
