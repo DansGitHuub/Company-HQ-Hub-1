@@ -190,7 +190,8 @@ export default function PublicApplicationForm() {
   }, []);
 
   // Required field progress
-  const missingFields = REQUIRED_FIELDS.filter(f => !(data[f.key] || "").trim());
+  const missingFields   = REQUIRED_FIELDS.filter(f => !(data[f.key] || "").trim());
+  const filledRequired  = REQUIRED_FIELDS.filter(f =>  (data[f.key] || "").trim());
   const remaining = missingFields.length;
   const allFilled = remaining === 0;
 
