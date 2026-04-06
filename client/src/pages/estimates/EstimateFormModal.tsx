@@ -45,7 +45,7 @@ interface Template {
 }
 
 interface CustomerRow { id: string; first_name: string; last_name: string; company_name: string; email: string; }
-interface PropertyRow { id: string; address: string; }
+interface PropertyRow { id: string; address: string; city?: string; state?: string; zip?: string; }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -99,6 +99,8 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
   const [customerSearch, setCustomerSearch] = useState(existing?.customer_name ?? "");
   const [showCustomerDrop, setShowCustomerDrop] = useState(false);
   const [propertyId, setPropertyId] = useState(existing?.property_id ?? "");
+  const [propertySearch, setPropertySearch] = useState(existing?.property_address ?? "");
+  const [showPropertyDrop, setShowPropertyDrop] = useState(false);
   const [estimateType, setEstimateType] = useState(existing?.estimate_type ?? "project");
   const [title, setTitle] = useState(existing?.title ?? "New Estimate");
   const [salespersonId, setSalespersonId] = useState(existing?.salesperson_id ?? "");
@@ -164,6 +166,18 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
     },
     enabled: !!customerId,
   });
+
+  // Filter properties client-side based on what user has typed
+  const filteredProperties = propertySearch.trim()
+    ? properties.filter(p => {
+        const q = propertySearch.toLowerCase();
+        return (
+          p.address?.toLowerCase().includes(q) ||
+          p.city?.toLowerCase().includes(q) ||
+          p.zip?.toLowerCase().includes(q)
+        );
+      })
+    : properties;
 
   // Template auto-fill
   function applyTemplate(tpl: Template) {
@@ -344,6 +358,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                         setCustomerSearch(`${c.first_name} ${c.last_name}${c.company_name ? ` (${c.company_name})` : ""}`);
                         setShowCustomerDrop(false);
                         setPropertyId("");
+                        setPropertySearch("");
                       }}
                     >
                       {c.first_name} {c.last_name}
@@ -354,18 +369,49 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
               )}
             </div>
 
-            <div>
+            <div className="relative">
               <Label className="text-xs">Property</Label>
-              <Select value={propertyId} onValueChange={setPropertyId} disabled={!customerId}>
-                <SelectTrigger className="mt-1" data-testid="select-property">
-                  <SelectValue placeholder={customerId ? "Select property" : "Select customer first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {properties.map((p: PropertyRow) => (
-                    <SelectItem key={p.id} value={p.id}>{p.address}</SelectItem>
+              <Input
+                value={propertySearch}
+                onChange={e => {
+                  setPropertySearch(e.target.value);
+                  setShowPropertyDrop(true);
+                  if (!e.target.value) setPropertyId("");
+                }}
+                onFocus={() => { if (customerId) setShowPropertyDrop(true); }}
+                onBlur={() => setTimeout(() => setShowPropertyDrop(false), 150)}
+                placeholder={customerId ? "Search or select property…" : "Select customer first"}
+                disabled={!customerId}
+                className="mt-1"
+                data-testid="input-property-search"
+              />
+              {showPropertyDrop && customerId && filteredProperties.length > 0 && (
+                <div className="absolute z-50 w-full bg-popover border rounded-md shadow-md mt-1 max-h-44 overflow-y-auto">
+                  {filteredProperties.map((p: PropertyRow) => (
+                    <button
+                      key={p.id}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                      onClick={() => {
+                        setPropertyId(p.id);
+                        setPropertySearch([p.address, p.city, p.state].filter(Boolean).join(", "));
+                        setShowPropertyDrop(false);
+                      }}
+                    >
+                      <span className="font-medium">{p.address}</span>
+                      {(p.city || p.zip) && (
+                        <span className="text-muted-foreground ml-1 text-xs">
+                          {[p.city, p.zip].filter(Boolean).join(" ")}
+                        </span>
+                      )}
+                    </button>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
+              {showPropertyDrop && customerId && properties.length === 0 && (
+                <div className="absolute z-50 w-full bg-popover border rounded-md shadow-md mt-1 px-3 py-2 text-sm text-muted-foreground">
+                  No properties on file for this customer.
+                </div>
+              )}
             </div>
 
             <div>
