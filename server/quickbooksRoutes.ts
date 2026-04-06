@@ -1,6 +1,7 @@
-import { Express } from "express";
+import express, { Express } from "express";
+import crypto from "crypto";
 import { pool } from "./db";
-import { getTokens, runFullSync } from "./quickbooksSync";
+import { getTokens, runFullSync, syncCustomersPublic, syncInvoicesPublic, syncPaymentsPublic } from "./quickbooksSync";
 
 async function migrate() {
   // Core token store (single row per realm)
@@ -154,6 +155,73 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/quickbooks/webhook ──────────────────────────────────────────
+  // Public endpoint — no auth guard. QuickBooks sends events here.
+  // Raw body is captured globally via the verify option on express.json()
+  // in index.ts, so req.rawBody is always available.
+  app.post("/api/quickbooks/webhook", (req, res) => {
+    const secret = process.env.QUICKBOOKS_WEBHOOK_TOKEN;
+    const signature = req.headers["intuit-signature"] as string | undefined;
+
+    if (!secret || !signature) {
+      console.warn("[QB webhook] Missing secret or intuit-signature header — rejecting");
+      return res.status(401).end();
+    }
+
+    const rawBody = req.rawBody as Buffer | undefined;
+    if (!rawBody || !rawBody.length) {
+      console.warn("[QB webhook] Empty raw body — rejecting");
+      return res.status(401).end();
+    }
+
+    const expected = crypto
+      .createHmac("sha256", secret)
+      .update(rawBody)
+      .digest("base64");
+
+    if (signature !== expected) {
+      console.warn("[QB webhook] Signature mismatch — rejecting");
+      return res.status(401).end();
+    }
+
+    // Signature valid — return 200 immediately, sync in background
+    res.status(200).end();
+
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody.toString("utf8"));
+    } catch {
+      console.error("[QB webhook] Could not parse payload JSON");
+      return;
+    }
+
+    const eventNotifications: any[] = payload?.eventNotifications ?? [];
+    const entityTypes = new Set<string>();
+
+    for (const notification of eventNotifications) {
+      const entities: any[] = notification?.dataChangeEvent?.entities ?? [];
+      for (const entity of entities) {
+        if (entity?.name) {
+          entityTypes.add(entity.name);
+          console.log(`[QB webhook] Event: ${entity.name} id=${entity.id} op=${entity.operation}`);
+        }
+      }
+    }
+
+    if (entityTypes.has("Customer")) {
+      console.log("[QB webhook] Firing syncCustomers (fire-and-forget)");
+      syncCustomersPublic().catch(e => console.error("[QB webhook] syncCustomers error:", e.message));
+    }
+    if (entityTypes.has("Invoice")) {
+      console.log("[QB webhook] Firing syncInvoices (fire-and-forget)");
+      syncInvoicesPublic().catch(e => console.error("[QB webhook] syncInvoices error:", e.message));
+    }
+    if (entityTypes.has("Payment")) {
+      console.log("[QB webhook] Firing syncPayments (fire-and-forget)");
+      syncPaymentsPublic().catch(e => console.error("[QB webhook] syncPayments error:", e.message));
     }
   });
 

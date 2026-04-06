@@ -406,3 +406,19 @@ export async function runFullSync() {
   results.payments  = await syncPayments(tok);
   return results;
 }
+
+// ── Public per-entity sync wrappers (used by webhook) ────────────────────────
+export async function syncCustomersPublic() {
+  const tok = await getValidToken();
+  return syncCustomers(tok);
+}
+
+export async function syncInvoicesPublic() {
+  const tok = await getValidToken();
+  return syncInvoices(tok);
+}
+
+export async function syncPaymentsPublic() {
+  const tok = await getValidToken();
+  return syncPayments(tok);
+}
