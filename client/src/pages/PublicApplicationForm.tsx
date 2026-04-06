@@ -189,7 +189,7 @@ export default function PublicApplicationForm() {
     });
   }, []);
 
-  // Required field progress
+  // Required field progress — filledRequired declared here (fixes "not defined" crash)
   const missingFields   = REQUIRED_FIELDS.filter(f => !(data[f.key] || "").trim());
   const filledRequired  = REQUIRED_FIELDS.filter(f =>  (data[f.key] || "").trim());
   const remaining = missingFields.length;
