@@ -412,6 +412,11 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                   No properties on file for this customer.
                 </div>
               )}
+              {showPropertyDrop && customerId && properties.length > 0 && filteredProperties.length === 0 && (
+                <div className="absolute z-50 w-full bg-popover border rounded-md shadow-md mt-1 px-3 py-2 text-sm text-muted-foreground">
+                  No properties match "<span className="font-medium">{propertySearch}</span>"
+                </div>
+              )}
             </div>
 
             <div>
