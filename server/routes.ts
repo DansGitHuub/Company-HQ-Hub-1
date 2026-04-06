@@ -3979,6 +3979,115 @@ Generate detailed information for this landscaping material.`;
     res.json(template);
   });
 
+  // ── Materials CSV Export ──────────────────────────────────────────────────
+  app.get("/api/materials/export", requireAuth, async (req, res) => {
+    try {
+      const allMaterials = await storage.getMaterials();
+      const headers = ["sku", "name", "category", "class", "unit", "cost", "markup", "taxable", "description"];
+      const escape = (v: any) => {
+        const s = v == null ? "" : String(v);
+        if (s.includes(",") || s.includes('"') || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
+        return s;
+      };
+      const rows = [
+        headers.join(","),
+        ...allMaterials.map(m => [
+          m.sku,
+          m.name,
+          m.category,
+          (m as any).class,
+          m.unit || m.unitOfMeasure,
+          (m as any).cost ?? "",
+          (m as any).markup ?? "",
+          (m as any).taxable ? "TRUE" : "FALSE",
+          m.description,
+        ].map(escape).join(","))
+      ];
+      const csv = rows.join("\r\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", 'attachment; filename="materials-export.csv"');
+      res.send(csv);
+    } catch (err: any) {
+      res.status(500).json({ message: "Error exporting materials" });
+    }
+  });
+
+  // ── Materials CSV Import (upsert by SKU) ──────────────────────────────────
+  app.post("/api/materials/import", requireAuth, async (req, res) => {
+    try {
+      const multerImport = (await import("multer")).default;
+      const csvParse = (await import("csv-parse/sync")).parse;
+      const upload = multerImport({ storage: multerImport.memoryStorage() }).single("file");
+
+      await new Promise<void>((resolve, reject) => upload(req as any, res as any, (err: any) => err ? reject(err) : resolve()));
+      const file = (req as any).file;
+      if (!file) return res.status(400).json({ message: "No file uploaded" });
+
+      const text = file.buffer.toString("utf-8");
+      const records: Record<string, string>[] = csvParse(text, { columns: true, skip_empty_lines: true, trim: true });
+
+      const results = { imported: 0, updated: 0, skipped: 0, errors: [] as string[] };
+      const { db: _db } = await import("./db");
+      const { pool: _pool } = await import("./db");
+
+      for (const row of records) {
+        try {
+          const name = row["name"] || row["Name"];
+          if (!name) { results.skipped++; continue; }
+
+          const rawCost = (row["cost"] || row["Cost"] || "").replace(/[$,]/g, "");
+          const rawMarkup = (row["markup"] || row["Markup"] || "").replace(/[$,%]/g, "");
+          const rawTaxable = (row["taxable"] || row["Taxable"] || "").toUpperCase();
+          const taxable = rawTaxable === "TRUE" || rawTaxable === "YES" || rawTaxable === "1";
+          const sku = row["sku"] || row["SKU"] || null;
+
+          if (sku) {
+            // Upsert by SKU
+            const { rows: existing } = await _pool.query(`SELECT id FROM materials WHERE sku=$1`, [sku]);
+            if (existing.length > 0) {
+              await _pool.query(
+                `UPDATE materials SET name=$1, category=$2, class=$3, unit=$4, cost=$5, markup=$6, taxable=$7, description=$8, updated_at=NOW() WHERE sku=$9`,
+                [name,
+                 row["category"] || row["Category"] || null,
+                 row["class"] || row["Class"] || null,
+                 row["unit"] || row["Unit"] || null,
+                 rawCost ? parseFloat(rawCost) : null,
+                 rawMarkup ? parseFloat(rawMarkup) : null,
+                 taxable,
+                 row["description"] || row["Description"] || null,
+                 sku]
+              );
+              results.updated++;
+              continue;
+            }
+          }
+
+          // Insert
+          await _pool.query(
+            `INSERT INTO materials (id, name, category, sku, class, unit, unit_of_measure, cost, markup, taxable, description, status, created_at, updated_at)
+             VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $5, $6, $7, $8, $9, 'Active', NOW(), NOW())`,
+            [name,
+             row["category"] || row["Category"] || null,
+             sku,
+             row["class"] || row["Class"] || null,
+             row["unit"] || row["Unit"] || null,
+             rawCost ? parseFloat(rawCost) : null,
+             rawMarkup ? parseFloat(rawMarkup) : null,
+             taxable,
+             row["description"] || row["Description"] || null]
+          );
+          results.imported++;
+        } catch (rowErr: any) {
+          results.errors.push(`Row "${row["name"] || row["Name"] || "?"}": ${rowErr.message}`);
+          results.skipped++;
+        }
+      }
+      res.json(results);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/candidates", requireAuth, async (req, res) => {
     try {
       const candidates = await storage.getCandidates();

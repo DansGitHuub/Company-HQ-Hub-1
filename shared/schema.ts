@@ -225,6 +225,11 @@ export const materials = pgTable("materials", {
   crewNotes: text("crew_notes"),
   customerNotes: text("customer_notes"),
   aiGenerated: boolean("ai_generated").default(false),
+  // Catalog fields
+  class: varchar("class", { length: 50 }),
+  cost: numeric("cost", { precision: 10, scale: 2 }),
+  markup: numeric("markup", { precision: 5, scale: 2 }),
+  taxable: boolean("taxable").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

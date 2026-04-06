@@ -7,10 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, ArrowLeft, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 
-const EXPECTED_COLUMNS = ["Class", "Name", "Description", "Categories", "SKU", "Units", "Cost", "Taxable", "Tags"];
+const EXPECTED_COLUMNS = ["sku", "name", "category", "class", "unit", "cost", "markup", "taxable", "description"];
 
 type PreviewRow = Record<string, string>;
-type ImportResult = { imported: number; skipped: number; errors: string[] };
+type ImportResult = { imported: number; updated: number; skipped: number; errors: string[] };
 
 export default function CatalogImport() {
   const [, navigate] = useLocation();
@@ -61,7 +61,7 @@ export default function CatalogImport() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const resp = await fetch("/api/catalog/import", {
+      const resp = await fetch("/api/materials/import", {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -69,7 +69,7 @@ export default function CatalogImport() {
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.message || "Import failed");
       setResult(data);
-      toast({ title: `Imported ${data.imported} items${data.skipped ? `, skipped ${data.skipped}` : ""}` });
+      toast({ title: `Imported ${data.imported} new, updated ${data.updated}${data.skipped ? `, skipped ${data.skipped}` : ""}` });
     } catch (err: any) {
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     } finally {
