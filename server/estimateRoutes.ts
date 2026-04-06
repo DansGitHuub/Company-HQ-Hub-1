@@ -459,29 +459,114 @@ export function registerEstimateRoutes(app: Express) {
     }
   });
 
+  // PATCH /api/estimates/:id/terms — update T&C override + deposit percentage
+  app.patch("/api/estimates/:id/terms", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+    try {
+      const { terms_and_conditions_override, deposit_percentage } = req.body;
+      await pool.query(
+        `UPDATE sales_estimates
+         SET terms_and_conditions_override=$1, deposit_percentage=COALESCE($2, deposit_percentage), updated_at=NOW()
+         WHERE id=$3`,
+        [terms_and_conditions_override ?? null, deposit_percentage ?? null, req.params.id]
+      );
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // POST /api/portal/:token/respond — public, customer approves/declines with optional signature
   app.post("/api/portal/:token/respond", async (req, res) => {
     try {
       const { token } = req.params;
-      const { action, note, signature_data } = req.body;
+      const { action, note, signature_data, initials } = req.body;
 
       if (!["approved", "declined"].includes(action)) {
         return res.status(400).json({ message: "action must be 'approved' or 'declined'" });
       }
 
       const { rows } = await pool.query(
-        `SELECT id, status FROM sales_estimates WHERE portal_token=$1`, [token]
+        `SELECT e.*, c.first_name || ' ' || c.last_name AS customer_name
+         FROM sales_estimates e
+         LEFT JOIN customers c ON c.id = e.customer_id
+         WHERE e.portal_token=$1`,
+        [token]
       );
       if (!rows.length) return res.status(404).json({ message: "Portal link not found" });
 
+      const estimate = rows[0];
       const status = action === "approved" ? "approved" : "declined";
+
       await pool.query(
         `UPDATE sales_estimates
          SET status=$1, customer_response=$2, customer_response_at=NOW(),
-             customer_response_note=$3, signature_data=$4, updated_at=NOW()
-         WHERE portal_token=$5`,
-        [status, action, note || null, signature_data || null, token]
+             customer_response_note=$3, signature_data=$4, initials=$5,
+             approved_at=CASE WHEN $2='approved' THEN NOW() ELSE approved_at END,
+             updated_at=NOW()
+         WHERE portal_token=$6`,
+        [status, action, note || null, signature_data || null, initials || null, token]
       );
+
+      if (action === "approved") {
+        // ── Notify admin/assigned salesperson ──────────────────────────────
+        const estimateNum = estimate.estimate_number || estimate.id.slice(0, 8).toUpperCase();
+        const estimateTitle = estimate.title || "Untitled Estimate";
+        const customerName = estimate.customer_name || "Customer";
+        const notifMsg = `Customer ${customerName} approved estimate #${estimateNum} - ${estimateTitle}`;
+        const notifLink = `/estimates/${estimate.id}`;
+
+        // Notify salesperson if assigned, otherwise all admins
+        const recipientRows = await (async () => {
+          if (estimate.salesperson_id) {
+            const { rows: r } = await pool.query(
+              `SELECT id FROM users WHERE id=$1`, [estimate.salesperson_id]
+            );
+            return r;
+          }
+          const { rows: r } = await pool.query(
+            `SELECT id FROM users WHERE role IN ('Admin','Master Admin')`
+          );
+          return r;
+        })();
+
+        for (const recipient of recipientRows) {
+          await pool.query(
+            `INSERT INTO staff_notifications (user_id, type, title, message, link)
+             VALUES ($1, 'estimate_approved', 'Estimate Approved', $2, $3)`,
+            [recipient.id, notifMsg, notifLink]
+          );
+        }
+
+        // ── Auto-create down payment invoice ──────────────────────────────
+        const depositPct = estimate.deposit_percentage ?? 50;
+        const total = parseFloat(estimate.total ?? "0");
+        const depositAmount = (total * depositPct) / 100;
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 7);
+        const dueDateStr = dueDate.toISOString().split("T")[0];
+
+        // Generate invoice number
+        const { rows: seqRows } = await pool.query(
+          `SELECT nextval('invoice_number_seq') AS n`
+        );
+        const invoiceNumber = `INV-${String(seqRows[0].n).padStart(4, "0")}`;
+
+        await pool.query(
+          `INSERT INTO invoices
+             (id, invoice_number, customer_id, estimate_id, invoice_type, status, issued_date, due_date,
+              subtotal, total, balance_due, notes)
+           VALUES (gen_random_uuid()::text, $1, $2::uuid, $3::text, 'down_payment', 'pending',
+                   CURRENT_DATE, $4, $5, $5, $5, $6)`,
+          [
+            invoiceNumber,
+            estimate.customer_id || null,
+            estimate.id,
+            dueDateStr,
+            depositAmount.toFixed(2),
+            `${depositPct}% Deposit - ${estimateTitle}`,
+          ]
+        );
+      }
 
       res.json({ success: true, status });
     } catch (err: any) {

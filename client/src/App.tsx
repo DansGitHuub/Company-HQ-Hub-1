@@ -68,6 +68,7 @@ import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import NotFound from "@/pages/not-found";
 import CatalogPage from "@/pages/catalog/index";
 import CatalogImport from "@/pages/catalog/CatalogImport";
+import CustomerPortal from "@/pages/CustomerPortal";
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
@@ -94,6 +95,10 @@ function AppRoutes() {
 
   if (window.location.pathname === "/privacy") {
     return <PrivacyPolicy />;
+  }
+
+  if (window.location.pathname.startsWith("/portal/")) {
+    return <CustomerPortal />;
   }
 
   if (isLoading) {

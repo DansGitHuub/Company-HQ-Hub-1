@@ -31,7 +31,92 @@ import {
 } from "lucide-react";
 import { themes, getTheme, applyTheme, type ThemeId } from "@/lib/themes";
 
-type SettingsSection = "profile" | "notifications" | "language" | "appearance" | "admin" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks";
+type SettingsSection = "profile" | "notifications" | "language" | "appearance" | "admin" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks" | "terms";
+
+function TermsSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<"install" | "maintenance" | "snow">("install");
+  const [editContent, setEditContent] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const { data: termsList = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/settings/terms"],
+    queryFn: () => apiRequest("GET", "/api/settings/terms").then(r => r.json()),
+  });
+
+  const activeRecord = termsList.find(t => t.type === activeTab);
+  const content = editContent[activeTab] ?? activeRecord?.content ?? "";
+
+  async function handleSave() {
+    if (!activeRecord) return;
+    setSaving(activeTab);
+    try {
+      await apiRequest("PUT", `/api/settings/terms/${activeRecord.id}`, { content });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/terms"] });
+      toast({ title: "Terms & Conditions saved" });
+    } catch {
+      toast({ title: "Failed to save", variant: "destructive" });
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  if (isLoading) return <div className="py-8 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin inline mr-2" />Loading…</div>;
+
+  const tabs: { key: "install" | "maintenance" | "snow"; label: string }[] = [
+    { key: "install", label: "Install" },
+    { key: "maintenance", label: "Maintenance" },
+    { key: "snow", label: "Snow Removal" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">Terms &amp; Conditions</h2>
+        <p className="text-sm text-muted-foreground mt-1">Manage the legal terms that appear on customer proposals and the portal acceptance page.</p>
+      </div>
+
+      <div className="flex gap-2 border-b pb-2">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === tab.key ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+            data-testid={`tc-tab-${tab.key}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">{activeRecord?.title ?? "Terms & Conditions"}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Textarea
+            value={content}
+            onChange={e => setEditContent(prev => ({ ...prev, [activeTab]: e.target.value }))}
+            className="min-h-[420px] font-mono text-xs"
+            placeholder="Enter terms and conditions text…"
+            data-testid={`tc-textarea-${activeTab}`}
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={saving === activeTab}
+              data-testid="btn-save-terms"
+            >
+              {saving === activeTab ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />Save Terms</>}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export default function Settings() {
   const { t, i18n } = useTranslation();
@@ -45,7 +130,7 @@ export default function Settings() {
   const tabParam = urlParams.get("tab") as SettingsSection | null;
   const qbParam  = urlParams.get("qb");
   const [activeSection, setActiveSection] = useState<SettingsSection>(
-    tabParam && ["quickbooks","company","work-areas","divisions","estimate-templates"].includes(tabParam)
+    tabParam && ["quickbooks","company","work-areas","divisions","estimate-templates","terms"].includes(tabParam)
       ? tabParam
       : "profile"
   );
@@ -67,6 +152,7 @@ export default function Settings() {
       { id: "company" as const, label: "Company Info", icon: Building2 },
     ] : []),
     ...(isAdmin ? [{ id: "quickbooks" as const, label: "QuickBooks", icon: ArrowLeftRight }] : []),
+    ...(isAdmin ? [{ id: "terms" as const, label: "Terms & Conditions", icon: FileText }] : []),
   ];
 
   if (isLoading) {
@@ -118,6 +204,7 @@ export default function Settings() {
           {activeSection === "estimate-templates" && isAdminOrManager && <EstimateTemplatesSection />}
           {activeSection === "company" && isAdminOrManager && <CompanyInfoSection />}
           {activeSection === "quickbooks" && isAdmin && <QuickBooksSection qbParam={qbParam} />}
+          {activeSection === "terms" && isAdmin && <TermsSection />}
         </div>
       </div>
     </div>

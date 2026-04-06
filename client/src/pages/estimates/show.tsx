@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useRoute, useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +19,8 @@ import { EstimateFormModal } from "./EstimateFormModal";
 import { EstimateStatusBadge, ESTIMATE_TYPE_LABELS } from "./index";
 import {
   Calculator, ArrowLeft, Edit2, Send, CheckCircle2, XCircle,
-  Briefcase, Building2, User, Calendar, Trash2, RefreshCw, Loader2, Eye, Globe, Copy, Check
+  Briefcase, Building2, User, Calendar, Trash2, RefreshCw, Loader2, Eye, Globe, Copy, Check,
+  ChevronDown, ChevronRight, Pencil, RotateCcw
 } from "lucide-react";
 import { format, parseISO, isAfter } from "date-fns";
 import { Link } from "wouter";
@@ -43,6 +45,9 @@ interface EstimateDetail {
   discount_amount: string; total: string;
   down_payment_percent: string; down_payment_amount: string;
   notes: string | null; customer_message: string | null; terms: string | null;
+  terms_and_conditions_override: string | null;
+  deposit_percentage: number | null;
+  initials: string | null;
   presentation_style: string | null;
   customer_response: string | null; customer_response_at: string | null;
   customer_response_note: string | null;
@@ -81,11 +86,22 @@ export default function EstimateDetail() {
   const { toast } = useToast();
   const id = params?.id ?? "";
 
+  const qc = useQueryClient();
   const [showEdit, setShowEdit] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPortalDialog, setShowPortalDialog] = useState(false);
   const [portalUrl, setPortalUrl] = useState("");
   const [copied, setCopied] = useState(false);
+  const [tcExpanded, setTcExpanded] = useState(false);
+  const [tcEditing, setTcEditing] = useState(false);
+  const [tcDraft, setTcDraft] = useState("");
+  const [depositDraft, setDepositDraft] = useState<number | "">("");
+  const [savingTC, setSavingTC] = useState(false);
+
+  const { data: defaultTC } = useQuery<{ id: string; content: string; title: string } | null>({
+    queryKey: ["/api/settings/terms/active/install"],
+    queryFn: () => fetch("/api/settings/terms/active/install", { credentials: "include" }).then(r => r.json()),
+  });
 
   const { data: estimate, isLoading, error } = useQuery<EstimateDetail>({
     queryKey: ["/api/estimates", id],
@@ -368,17 +384,107 @@ export default function EstimateDetail() {
             </Card>
           )}
 
-          {/* Terms */}
-          {estimate.terms && (
-            <Card>
-              <CardHeader className="pb-2 pt-4 px-5">
-                <CardTitle className="text-sm">Terms &amp; Conditions</CardTitle>
-              </CardHeader>
-              <CardContent className="px-5 pb-5">
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{estimate.terms}</p>
-              </CardContent>
-            </Card>
-          )}
+          {/* Terms & Conditions (enhanced) */}
+          {(() => {
+            const tcContent = estimate.terms_and_conditions_override || defaultTC?.content || estimate.terms;
+            const hasOverride = !!estimate.terms_and_conditions_override;
+            const depositPct = estimate.deposit_percentage ?? 50;
+
+            async function saveTC() {
+              setSavingTC(true);
+              try {
+                await apiRequest("PATCH", `/api/estimates/${id}/terms`, {
+                  terms_and_conditions_override: tcDraft || null,
+                  deposit_percentage: typeof depositDraft === "number" ? depositDraft : undefined,
+                });
+                qc.invalidateQueries({ queryKey: ["/api/estimates", id] });
+                toast({ title: "Terms updated" });
+                setTcEditing(false);
+              } catch { toast({ title: "Failed to save terms", variant: "destructive" }); }
+              finally { setSavingTC(false); }
+            }
+
+            async function resetTC() {
+              setSavingTC(true);
+              try {
+                await apiRequest("PATCH", `/api/estimates/${id}/terms`, { terms_and_conditions_override: null });
+                qc.invalidateQueries({ queryKey: ["/api/estimates", id] });
+                toast({ title: "Terms reset to default" });
+                setTcEditing(false);
+              } catch { toast({ title: "Failed to reset", variant: "destructive" }); }
+              finally { setSavingTC(false); }
+            }
+
+            return (
+              <Card data-testid="card-terms">
+                <CardHeader
+                  className="pb-2 pt-4 px-5 cursor-pointer flex flex-row items-center justify-between"
+                  onClick={() => setTcExpanded(v => !v)}
+                >
+                  <div className="flex items-center gap-2">
+                    {tcExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                    <CardTitle className="text-sm">Terms &amp; Conditions</CardTitle>
+                    {hasOverride && <Badge variant="outline" className="text-xs">Custom</Badge>}
+                  </div>
+                  {canEdit && tcExpanded && !tcEditing && (
+                    <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
+                      {hasOverride && (
+                        <Button size="sm" variant="ghost" onClick={resetTC} disabled={savingTC} className="text-xs h-7 px-2" data-testid="btn-reset-terms">
+                          <RotateCcw className="h-3 w-3 mr-1" />Reset to Default
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => { setTcDraft(estimate.terms_and_conditions_override || defaultTC?.content || ""); setDepositDraft(depositPct); setTcEditing(true); }} className="text-xs h-7 px-2" data-testid="btn-edit-terms">
+                        <Pencil className="h-3 w-3 mr-1" />Edit Terms
+                      </Button>
+                    </div>
+                  )}
+                </CardHeader>
+                {tcExpanded && (
+                  <CardContent className="px-5 pb-5 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground">Deposit %</span>
+                      {tcEditing ? (
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={depositDraft}
+                          onChange={e => setDepositDraft(e.target.value === "" ? "" : Number(e.target.value))}
+                          className="w-20 h-7 text-xs"
+                          data-testid="input-deposit-pct"
+                        />
+                      ) : (
+                        <span className="text-sm font-semibold">{depositPct}%</span>
+                      )}
+                    </div>
+                    {tcEditing ? (
+                      <>
+                        <Textarea
+                          value={tcDraft}
+                          onChange={e => setTcDraft(e.target.value)}
+                          className="min-h-[280px] font-mono text-xs"
+                          data-testid="textarea-tc-edit"
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <Button size="sm" variant="outline" onClick={() => setTcEditing(false)}>Cancel</Button>
+                          <Button size="sm" onClick={saveTC} disabled={savingTC} data-testid="btn-save-terms">
+                            {savingTC ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground whitespace-pre-wrap max-h-64 overflow-y-auto leading-relaxed">
+                        {tcContent || <span className="italic">No terms configured. Go to Settings → Terms &amp; Conditions to add them.</span>}
+                      </p>
+                    )}
+                    {estimate.initials && (
+                      <p className="text-xs text-muted-foreground pt-1 border-t">Customer initials: <strong>{estimate.initials}</strong></p>
+                    )}
+                  </CardContent>
+                )}
+              </Card>
+            );
+          })()}
 
           {/* Notes */}
           {estimate.notes && (

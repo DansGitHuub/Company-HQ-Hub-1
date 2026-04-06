@@ -1,0 +1,77 @@
+Build the full T&C + Customer Acceptance flow for Project/Install estimates. Here is the complete spec:
+
+## 1. T&C MANAGEMENT (DB + Admin Settings)
+
+Create a new DB table terms_and_conditions: id, type (TEXT: 'install' | 'maintenance' | 'snow'), title (TEXT), content (TEXT), is_active (BOOLEAN default true), created_at, updated_at
+
+Seed it with the Install T&C (type='install', title='Install Project Terms & Conditions').
+
+Add a Settings page at /settings/terms (linked from the existing Settings nav) that lets admin:
+- View all T&C types (Install, Maintenance, Snow tabs)
+- Edit the content of each in a large textarea
+- Save changes (PUT /api/settings/terms/:id)
+
+API routes: GET /api/settings/terms, PUT /api/settings/terms/:id (admin only)
+
+## 2. AUTO-POPULATE T&C ON ESTIMATES
+
+Add column terms_and_conditions_override TEXT to sales_estimates.
+
+On the estimate detail page, add a collapsible "Terms & Conditions" section at the bottom that shows:
+- The T&C text (from override if set, otherwise from the active install T&C for that job type)
+- "Edit Terms" button opens a textarea to customize for this estimate
+- "Reset to Default" clears the override
+
+## 3. CUSTOMER PORTAL - T&C + INITIALS + SIGNATURE + ACCEPT
+
+Update the customer portal (GET /api/portal/:token) to include full acceptance flow:
+
+Section order:
+1. Chapin Landscapes logo + estimate header
+2. Scope/line items summary
+3. Terms & Conditions - scrollable box, customer must scroll to bottom before initials activates
+4. Initials field - text input "Type your initials to confirm you have read and agree to the Terms & Conditions above" - required
+5. Signature pad - canvas-based (no external library, plain canvas draw)
+6. Accept button - green, full width "Accept & Approve Proposal" - disabled until initials filled AND signature drawn
+7. Decline button - secondary "Decline Proposal"
+
+On Accept: POST /api/portal/:token/respond with { action: 'approved', initials, signature_data (base64 canvas), note: '' }
+Show confirmation: "Thank you [customer name]! Your approval has been confirmed."
+
+On Decline: Show textarea "Why are you declining? (optional)" then POST with { action: 'declined', note }
+
+## 4. APPROVAL NOTIFICATION
+
+When approved:
+- Update estimate status to 'approved', set approved_at = NOW()
+- Create notifications table if not exists: id, user_id, message, estimate_id, read BOOLEAN default false, created_at
+- Insert notification for assigned user (or all admins): "Customer [name] approved estimate #[number] - [title]"
+- Bell icon in top nav shows unread count badge and lists notifications on click
+
+## 5. AUTO DOWN PAYMENT INVOICE
+
+When estimate is approved:
+- Auto-create invoice: estimate_id, customer_id, type='down_payment', amount = total * 0.5, status='pending', due_date = NOW() + 7 days, description = "50% Deposit - [estimate name]"
+- Store deposit_percentage column on sales_estimates (default 50) so it's configurable per estimate
+- Invoice appears in Invoices section linked to the estimate
+
+## INSTALL T&C CONTENT (seed this exact text):
+
+SCOPE: Chapin Landscapes (the Contractor) shall furnish all materials, tools, equipment, and labor necessary to execute the installation in the applicable drawing(s) and defined on the accompanying proposal/scope of work. Any substantial change to the scope of this work must be in writing and approved by both parties.
+WORKMANSHIP: All operations shall be completed in a substantial and workmanlike manner. Drawings and details are to serve as a guide.
+REVISION: This proposal is subject to revision unless accepted within 30 days, as the availability of many materials is not constant. This proposal is based on the current price of labor and materials and may be adjusted after 30 days to account for any unanticipated price increases and or material availability.
+BILLING AND COLLECTION: The Contractor's invoices are due upon receipt unless stated otherwise. The Contractor shall charge the Customer a minimum fee of $50 for any check returned for insufficient funds. Late payments will be subject to a finance charge at the periodic rate of two percent (2%) per month (which is an annual rate of 24%). In addition, late payment shall constitute a breach of this Agreement and entitle the Contractor to immediately terminate this Agreement. No payments shall be made to any employee of the Contractor other than through official invoices. If any collection service, legal action or other proceeding is necessary to collect past due amounts, the Customer agrees to be responsible for all fees associated with the collection of the delinquent amount, including but not limited to court costs and reasonable legal fees.
+CONCEALED CONTINGENCIES: This proposal is subject to extra charges for concealed contingencies, including but not limited to rock, debris, poor drainage, sub-surface soil conditions, sprinkler systems, utilities, hidden piping, etc. not readily apparent when estimating. The Contractor is not responsible for costs caused by damage to pre-existing or unknown conditions. The site shall be received in a finished grade that is properly drained and in a clean, workable condition unless otherwise stated.
+GUARANTEE: The Contractor guarantees quality of workmanship and installation methods for one year from installation date, but does not guarantee plants, trees, products, materials, or finishes beyond any warranty provided by the supplier or manufacturer. The Contractor is not responsible for labor, delivery, or installation costs associated with manufacturer defects. This Guarantee does not cover normal reactions such as fine cracks in concrete, checking or warping of wood, settling, erosion, color variation in natural stone, or rust on non-galvanized metal. All seeding and sodding areas are guaranteed to show satisfactory growth within 60 days, with no bare spots larger than one square foot. This Guarantee is only valid if payment is received in full.
+MAINTENANCE: The Customer shall begin maintenance of plants, seeding, and turf immediately after installation. Failure to provide adequate maintenance shall void the Guarantee.
+MATERIALS: The Contractor shall supply all materials as specified but shall have the right to substitute materials of equal or higher value when necessary. The Customer is responsible for preventing theft of materials after placement on site.
+CHANGES: Substantial alterations to the approved contract must be in writing and will be charged at the Contractor's normal selling price.
+UNAVOIDABLE INTERRUPTIONS: The Contractor shall not be held responsible for any loss, damage, or delay caused by weather, strikes, or other causes beyond the Contractor's control.
+PROPERTY LINES: The Customer is responsible for the location of all property lines and corners.
+DAMAGE: The Contractor will contact Ohio Utility Protection Service to mark all known utility lines. The Customer is responsible for marking private lines including invisible fences, gas and water lines, electric, cable, and other underground objects. The Contractor will not assume responsibility for damages to unmarked objects.
+OPPORTUNITY TO REPAIR: The Contractor shall have no liability unless the Customer gives notice within three business days and affords a reasonable opportunity to repair. The Contractor will not be liable for indirect or consequential damage. The Customer shall not withhold payment due to the Contractor for any damage.
+PERMITS: All necessary zoning, building, and construction permits shall be paid for by the Customer.
+LIMITATION OF LIABILITY: The Contractor's liability shall not exceed the compensation paid under this Agreement. The Contractor shall not be liable for lost profits, indirect damages, or damage resulting from lack of proper maintenance or causes beyond the Contractor's control.
+ARBITRATION: Any controversy arising out of this Contract shall be settled by binding arbitration in accordance with the construction industry's arbitration rules of the American Arbitration Association, Greater Cleveland area. All arbitration costs shall be the responsibility of the losing party.
+
+Build all 5 parts and publish when done.
