@@ -11,6 +11,36 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   // ─── LIST ────────────────────────────────────────────────────────────────────
   app.get("/api/customers", requireAuth, async (req, res) => {
     try {
+      const search = (req.query.search as string | undefined)?.trim() ?? "";
+      // Only apply a row limit when a search term is provided (to keep autocomplete fast).
+      // Without a search param the full list is returned so the customers page works.
+      const limitRequested = req.query.limit ? parseInt(req.query.limit as string, 10) : null;
+      const limit = search
+        ? Math.min(limitRequested ?? 20, 50)
+        : null; // no limit for full list
+
+      const params: any[] = [];
+      let whereClause = "";
+
+      if (search) {
+        params.push(`%${search}%`);
+        whereClause = `
+          WHERE (
+            c.first_name ILIKE $1
+            OR c.last_name  ILIKE $1
+            OR c.company_name ILIKE $1
+            OR (c.first_name || ' ' || c.last_name) ILIKE $1
+            OR ce.email ILIKE $1
+            OR cp.phone ILIKE $1
+          )`;
+      }
+
+      let limitClause = "";
+      if (limit !== null) {
+        params.push(limit);
+        limitClause = `LIMIT $${params.length}`;
+      }
+
       const result = await pool.query(`
         SELECT
           c.id, c.first_name, c.last_name, c.company_name, c.source,
@@ -20,8 +50,11 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
         FROM customers c
         LEFT JOIN customer_phones cp ON cp.customer_id = c.id AND cp.is_primary = true
         LEFT JOIN customer_emails ce ON ce.customer_id = c.id AND ce.is_primary = true
-        ORDER BY c.created_at DESC
-      `);
+        ${whereClause}
+        ORDER BY c.last_name ASC, c.first_name ASC
+        ${limitClause}
+      `, params);
+
       return res.json(result.rows);
     } catch (err: any) {
       console.error("[customers] GET /api/customers error:", err.message);
