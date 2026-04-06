@@ -606,3 +606,36 @@ export async function sendHiredNotificationEmail(
     </div>
   `);
 }
+
+export async function sendApplicationLinkEmail(toEmail: string, applyUrl: string): Promise<boolean> {
+  return sendEmail(toEmail, "You're invited to apply — Chapin Landscapes", `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+      <div style="background-color: #166534; padding: 24px 30px;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Chapin Landscapes</h1>
+        <p style="color: #bbf7d0; margin: 6px 0 0 0; font-size: 14px;">Job Application Invitation</p>
+      </div>
+      <div style="padding: 30px;">
+        <p style="color: #374151; font-size: 16px; margin: 0 0 16px 0;">Hi there,</p>
+        <p style="color: #374151; line-height: 1.6; margin: 0 0 20px 0;">
+          You've been invited to apply for a position at <strong>Chapin Landscapes</strong>.
+          Click the button below to fill out your application — it saves automatically as you go.
+        </p>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${escapeHtml(applyUrl)}" style="background-color: #166534; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 15px; display: inline-block;">
+            Start My Application
+          </a>
+        </div>
+        <p style="color: #6b7280; font-size: 13px; line-height: 1.5; margin: 20px 0 0 0;">
+          Or copy this link into your browser:<br/>
+          <a href="${escapeHtml(applyUrl)}" style="color: #166534; word-break: break-all;">${escapeHtml(applyUrl)}</a>
+        </p>
+        <p style="color: #9ca3af; font-size: 12px; margin: 16px 0 0 0;">
+          This link is unique to you — please don't share it. It will expire after 30 days.
+        </p>
+      </div>
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
+        <p style="margin: 0;">Chapin Landscapes · design, build, maintain · 440.724.8006 · chapinlandscapes.com</p>
+      </div>
+    </div>
+  `);
+}

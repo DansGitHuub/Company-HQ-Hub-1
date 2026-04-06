@@ -1003,6 +1003,12 @@ function ApplicationLinksPanel() {
   const [expiryDays, setExpiryDays] = useState<14 | 30>(30);
   const [generating, setGenerating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [emailOpenId, setEmailOpenId] = useState<string | null>(null);
+  const [emailInputs, setEmailInputs] = useState<Record<string, string>>({});
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+  const [emailErrors, setEmailErrors] = useState<Record<string, string>>({});
+  const { toast } = useToast();
 
   const { data: links = [], refetch } = useQuery<any[]>({
     queryKey: ["/api/apply"],
@@ -1038,6 +1044,35 @@ function ApplicationLinksPanel() {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     });
+  };
+
+  const handleSendEmail = async (linkId: string) => {
+    const email = (emailInputs[linkId] || "").trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailErrors(prev => ({ ...prev, [linkId]: "Please enter a valid email address." }));
+      return;
+    }
+    setEmailErrors(prev => ({ ...prev, [linkId]: "" }));
+    setSendingId(linkId);
+    try {
+      const r = await fetch(`/api/apply/${linkId}/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || "Failed to send");
+      setSentIds(prev => new Set([...prev, linkId]));
+      setEmailOpenId(null);
+      setEmailInputs(prev => ({ ...prev, [linkId]: "" }));
+      toast({ title: "Email sent!", description: `Application link sent to ${email}` });
+      setTimeout(() => setSentIds(prev => { const s = new Set(prev); s.delete(linkId); return s; }), 3000);
+    } catch (err: any) {
+      setEmailErrors(prev => ({ ...prev, [linkId]: err.message || "Failed to send email." }));
+    } finally {
+      setSendingId(null);
+    }
   };
 
   return (
@@ -1128,7 +1163,63 @@ function ApplicationLinksPanel() {
                           <><Copy className="h-3.5 w-3.5" /> Copy Link</>
                         )}
                       </button>
+                      <button
+                        data-testid={`button-send-email-${link.id}`}
+                        onClick={() => setEmailOpenId(emailOpenId === link.id ? null : link.id)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors whitespace-nowrap ${
+                          sentIds.has(link.id)
+                            ? "border-green-300 text-green-700 bg-green-50"
+                            : emailOpenId === link.id
+                            ? "border-blue-300 text-blue-700 bg-blue-50"
+                            : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        {sentIds.has(link.id) ? (
+                          <><CheckCircle2 className="h-3.5 w-3.5" /> Sent!</>
+                        ) : (
+                          <><Mail className="h-3.5 w-3.5" /> Send via Email</>
+                        )}
+                      </button>
                     </div>
+                    {/* Inline email form */}
+                    {emailOpenId === link.id && (
+                      <div className="pt-2 border-t border-gray-100">
+                        <p className="text-xs text-gray-500 mb-2">Enter the applicant's email to send them this link directly.</p>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="email"
+                            data-testid={`input-applicant-email-${link.id}`}
+                            value={emailInputs[link.id] || ""}
+                            onChange={e => setEmailInputs(prev => ({ ...prev, [link.id]: e.target.value }))}
+                            onKeyDown={e => { if (e.key === "Enter") handleSendEmail(link.id); }}
+                            placeholder="applicant@email.com"
+                            className="flex-1 text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent"
+                          />
+                          <button
+                            data-testid={`button-confirm-send-email-${link.id}`}
+                            onClick={() => handleSendEmail(link.id)}
+                            disabled={sendingId === link.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-700 hover:bg-green-800 text-white text-xs font-semibold transition-colors disabled:opacity-60 whitespace-nowrap"
+                          >
+                            {sendingId === link.id ? (
+                              <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending…</>
+                            ) : (
+                              <><Send className="h-3.5 w-3.5" /> Send</>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => { setEmailOpenId(null); setEmailErrors(prev => ({ ...prev, [link.id]: "" })); }}
+                            className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                            data-testid={`button-cancel-email-${link.id}`}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        {emailErrors[link.id] && (
+                          <p className="text-xs text-red-500 mt-1">{emailErrors[link.id]}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}

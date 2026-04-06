@@ -31,7 +31,7 @@ import { registerQuickBooksRoutes } from "./quickbooksRoutes";
 import { registerMorsRoutes } from "./morsRoutes";
 import { registerCatalogRoutes } from "./catalogRoutes";
 import { searchProductImages } from "./imageSearchService";
-import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail } from "./email";
+import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail, sendApplicationLinkEmail } from "./email";
 import { logActivity } from "./activityLogger";
 import { checkAndSendReminders } from "./maintenanceScheduler";
 import OpenAI from "openai";
@@ -10101,6 +10101,36 @@ Provide accurate information based on publicly available documentation.`;
       const apps = await storage.getJobApplications();
       return res.json(apps);
     } catch (err) {
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // ADMIN: Email an application link to a prospective applicant
+  app.post("/api/apply/:id/send-email", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { email } = req.body as { email?: string };
+
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ message: "A valid email address is required." });
+      }
+
+      const application = await storage.getJobApplicationById(id);
+      if (!application) {
+        return res.status(404).json({ message: "Application link not found." });
+      }
+
+      const { getAppUrl } = await import("./emailService");
+      const applyUrl = `${getAppUrl()}/apply/${application.token}`;
+      const sent = await sendApplicationLinkEmail(email, applyUrl);
+
+      if (!sent) {
+        return res.status(500).json({ message: "Failed to send email. Check email service configuration." });
+      }
+
+      return res.json({ success: true, message: `Application link sent to ${email}` });
+    } catch (err: any) {
+      console.error("[apply] send-email error:", err.message);
       return res.status(500).json({ message: "Server error" });
     }
   });
