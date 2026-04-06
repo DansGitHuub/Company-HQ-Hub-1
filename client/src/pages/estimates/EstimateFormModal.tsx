@@ -156,52 +156,55 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
     enabled: customerSearch.length >= 2 && showCustomerDrop,
   });
 
-  // Properties for selected customer
-  const { data: properties = [], isLoading: propertiesLoading } = useQuery<PropertyRow[]>({
+  // ── Load ALL properties for this customer (used for auto-populate & browsing) ──
+  const { data: allProperties = [], isLoading: propertiesLoading } = useQuery<PropertyRow[]>({
     queryKey: ["/api/properties", customerId],
     queryFn: async () => {
       if (!customerId) return [];
-      const res = await fetch(`/api/properties?customer_id=${customerId}`, { credentials: "include" });
+      const res = await fetch(`/api/properties?customer_id=${encodeURIComponent(customerId)}`, { credentials: "include" });
       return res.json();
     },
     enabled: !!customerId,
   });
 
-  // Auto-populate when properties first arrive (new estimates only)
-  const propertiesLoadedRef = React.useRef<string>(""); // tracks which customerId we've auto-populated for
+  // ── Live API search — fires when user is typing and no property is confirmed ──
+  const isTypingSearch = !propertyId && propertySearch.trim().length > 0;
+  const { data: searchResults = [], isLoading: searchLoading } = useQuery<PropertyRow[]>({
+    queryKey: ["/api/properties/search", customerId, propertySearch.trim()],
+    queryFn: async () => {
+      if (!customerId || !propertySearch.trim()) return [];
+      const params = new URLSearchParams({ customer_id: customerId, search: propertySearch.trim() });
+      const res = await fetch(`/api/properties?${params}`, { credentials: "include" });
+      return res.json();
+    },
+    enabled: !!customerId && isTypingSearch,
+  });
+
+  // What to show in the dropdown and whether we're loading
+  const displayProperties = isTypingSearch ? searchResults : allProperties;
+  const displayLoading    = isTypingSearch ? searchLoading  : propertiesLoading;
+
+  // ── Auto-populate when properties first arrive (new estimates only) ──────────
+  const autoPopRef = React.useRef<string>(""); // which customerId was already auto-populated
   useEffect(() => {
     if (isEdit) return;
-    if (propertiesLoading || properties.length === 0) return;
-    if (propertiesLoadedRef.current === customerId) return; // already ran for this customer
-    propertiesLoadedRef.current = customerId;
+    if (propertiesLoading || allProperties.length === 0) return;
+    if (autoPopRef.current === customerId) return; // already did this customer
+    autoPopRef.current = customerId;
 
-    const first = properties[0];
+    const first = allProperties[0];
     const label = [first.address, first.city, first.state].filter(Boolean).join(", ");
     setPropertyId(first.id);
     setPropertySearch(label);
-    if (properties.length > 1) {
-      // Multiple properties: open the dropdown so user can review and pick
-      setShowPropertyDrop(true);
+    if (allProperties.length > 1) {
+      setShowPropertyDrop(true); // open so user can see all and pick
     }
-    // 1 property: silently auto-filled, no dropdown needed
-  }, [properties, propertiesLoading, customerId, isEdit]);
+  }, [allProperties, propertiesLoading, customerId, isEdit]);
 
-  // Reset the ref when customer changes so the next customer triggers auto-populate again
+  // Reset ref when customer changes so next customer triggers auto-populate
   useEffect(() => {
-    propertiesLoadedRef.current = "";
+    autoPopRef.current = "";
   }, [customerId]);
-
-  // Always filter by whatever is in the input — simple, no short-circuit
-  const filteredProperties = propertySearch.trim()
-    ? properties.filter(p => {
-        const q = propertySearch.toLowerCase();
-        return (
-          p.address?.toLowerCase().includes(q) ||
-          p.city?.toLowerCase().includes(q) ||
-          p.zip?.toLowerCase().includes(q)
-        );
-      })
-    : properties;
 
   // Template auto-fill
   function applyTemplate(tpl: Template) {
@@ -411,20 +414,18 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
               />
               {showPropertyDrop && customerId && (
                 <div className="absolute z-50 w-full bg-popover border rounded-md shadow-md mt-1 max-h-44 overflow-y-auto">
-                  {propertiesLoading ? (
+                  {displayLoading ? (
                     <div className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Loading properties…
+                      <Loader2 className="h-3 w-3 animate-spin" /> Loading…
                     </div>
-                  ) : properties.length === 0 ? (
+                  ) : displayProperties.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No properties on file for this customer.
-                    </div>
-                  ) : filteredProperties.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No properties match "<span className="font-medium">{propertySearch}</span>"
+                      {isTypingSearch
+                        ? `No properties match "${propertySearch}"`
+                        : "No properties on file for this customer."}
                     </div>
                   ) : (
-                    filteredProperties.map((p: PropertyRow) => (
+                    displayProperties.map((p: PropertyRow) => (
                       <button
                         key={p.id}
                         className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
