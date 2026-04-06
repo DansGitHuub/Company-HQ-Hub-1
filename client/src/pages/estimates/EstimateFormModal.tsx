@@ -167,29 +167,34 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
     enabled: !!customerId,
   });
 
-  // Auto-populate property when customer's properties load (new estimates only)
+  // Auto-populate when properties first arrive (new estimates only)
+  const propertiesLoadedRef = React.useRef<string>(""); // tracks which customerId we've auto-populated for
   useEffect(() => {
-    if (isEdit || propertiesLoading || properties.length === 0 || propertyId) return;
+    if (isEdit) return;
+    if (propertiesLoading || properties.length === 0) return;
+    if (propertiesLoadedRef.current === customerId) return; // already ran for this customer
+    propertiesLoadedRef.current = customerId;
+
     const first = properties[0];
     const label = [first.address, first.city, first.state].filter(Boolean).join(", ");
-    if (properties.length === 1) {
-      // Only one option — silently auto-select, no dropdown needed
-      setPropertyId(first.id);
-      setPropertySearch(label);
-    } else {
-      // Multiple options — pre-select the first but open dropdown so user can review/change
-      setPropertyId(first.id);
-      setPropertySearch(label);
+    setPropertyId(first.id);
+    setPropertySearch(label);
+    if (properties.length > 1) {
+      // Multiple properties: open the dropdown so user can review and pick
       setShowPropertyDrop(true);
     }
-  }, [properties, propertiesLoading, isEdit]);
+    // 1 property: silently auto-filled, no dropdown needed
+  }, [properties, propertiesLoading, customerId, isEdit]);
 
-  // Filter properties client-side based on what user has typed
-  // Only filter when there is a typed query AND no property has been confirmed yet
-  const filterQuery = propertyId ? "" : propertySearch.trim();
-  const filteredProperties = filterQuery
+  // Reset the ref when customer changes so the next customer triggers auto-populate again
+  useEffect(() => {
+    propertiesLoadedRef.current = "";
+  }, [customerId]);
+
+  // Always filter by whatever is in the input — simple, no short-circuit
+  const filteredProperties = propertySearch.trim()
     ? properties.filter(p => {
-        const q = filterQuery.toLowerCase();
+        const q = propertySearch.toLowerCase();
         return (
           p.address?.toLowerCase().includes(q) ||
           p.city?.toLowerCase().includes(q) ||
@@ -397,7 +402,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                   setPropertyId(""); // clear selection so filter re-activates while typing
                   setShowPropertyDrop(true);
                 }}
-                onFocus={() => { if (customerId) setShowPropertyDrop(true); }}
+                onFocus={e => { if (customerId) { setShowPropertyDrop(true); e.target.select(); } }}
                 onBlur={() => setTimeout(() => setShowPropertyDrop(false), 150)}
                 placeholder={customerId ? "Search or select property…" : "Select customer first"}
                 disabled={!customerId}
