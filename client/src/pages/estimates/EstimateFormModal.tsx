@@ -157,7 +157,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
   });
 
   // Properties for selected customer
-  const { data: properties = [] } = useQuery<PropertyRow[]>({
+  const { data: properties = [], isLoading: propertiesLoading } = useQuery<PropertyRow[]>({
     queryKey: ["/api/properties", customerId],
     queryFn: async () => {
       if (!customerId) return [];
@@ -167,10 +167,21 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
     enabled: !!customerId,
   });
 
+  // Auto-select the only property when a customer has exactly one (new estimates only)
+  useEffect(() => {
+    if (!isEdit && properties.length === 1 && !propertyId) {
+      const p = properties[0];
+      setPropertyId(p.id);
+      setPropertySearch([p.address, p.city, p.state].filter(Boolean).join(", "));
+    }
+  }, [properties, isEdit]);
+
   // Filter properties client-side based on what user has typed
-  const filteredProperties = propertySearch.trim()
+  // Only filter when there is a typed query AND no property has been confirmed yet
+  const filterQuery = propertyId ? "" : propertySearch.trim();
+  const filteredProperties = filterQuery
     ? properties.filter(p => {
-        const q = propertySearch.toLowerCase();
+        const q = filterQuery.toLowerCase();
         return (
           p.address?.toLowerCase().includes(q) ||
           p.city?.toLowerCase().includes(q) ||
@@ -375,8 +386,8 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                 value={propertySearch}
                 onChange={e => {
                   setPropertySearch(e.target.value);
+                  setPropertyId(""); // clear selection so filter re-activates while typing
                   setShowPropertyDrop(true);
-                  if (!e.target.value) setPropertyId("");
                 }}
                 onFocus={() => { if (customerId) setShowPropertyDrop(true); }}
                 onBlur={() => setTimeout(() => setShowPropertyDrop(false), 150)}
@@ -385,36 +396,40 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                 className="mt-1"
                 data-testid="input-property-search"
               />
-              {showPropertyDrop && customerId && filteredProperties.length > 0 && (
+              {showPropertyDrop && customerId && (
                 <div className="absolute z-50 w-full bg-popover border rounded-md shadow-md mt-1 max-h-44 overflow-y-auto">
-                  {filteredProperties.map((p: PropertyRow) => (
-                    <button
-                      key={p.id}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
-                      onClick={() => {
-                        setPropertyId(p.id);
-                        setPropertySearch([p.address, p.city, p.state].filter(Boolean).join(", "));
-                        setShowPropertyDrop(false);
-                      }}
-                    >
-                      <span className="font-medium">{p.address}</span>
-                      {(p.city || p.zip) && (
-                        <span className="text-muted-foreground ml-1 text-xs">
-                          {[p.city, p.zip].filter(Boolean).join(" ")}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {showPropertyDrop && customerId && properties.length === 0 && (
-                <div className="absolute z-50 w-full bg-popover border rounded-md shadow-md mt-1 px-3 py-2 text-sm text-muted-foreground">
-                  No properties on file for this customer.
-                </div>
-              )}
-              {showPropertyDrop && customerId && properties.length > 0 && filteredProperties.length === 0 && (
-                <div className="absolute z-50 w-full bg-popover border rounded-md shadow-md mt-1 px-3 py-2 text-sm text-muted-foreground">
-                  No properties match "<span className="font-medium">{propertySearch}</span>"
+                  {propertiesLoading ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Loading properties…
+                    </div>
+                  ) : properties.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      No properties on file for this customer.
+                    </div>
+                  ) : filteredProperties.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      No properties match "<span className="font-medium">{propertySearch}</span>"
+                    </div>
+                  ) : (
+                    filteredProperties.map((p: PropertyRow) => (
+                      <button
+                        key={p.id}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                        onClick={() => {
+                          setPropertyId(p.id);
+                          setPropertySearch([p.address, p.city, p.state].filter(Boolean).join(", "));
+                          setShowPropertyDrop(false);
+                        }}
+                      >
+                        <span className="font-medium">{p.address}</span>
+                        {(p.city || p.zip) && (
+                          <span className="text-muted-foreground ml-1 text-xs">
+                            {[p.city, p.zip].filter(Boolean).join(" ")}
+                          </span>
+                        )}
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
             </div>
