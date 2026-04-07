@@ -247,13 +247,13 @@ async function syncInvoices(tok: any) {
         .map((i: any) => [i.DocNumber, i])
     );
 
-    // ── PUSH: Local invoices without qb_invoice_id ────────────────────────────
+    // ── PUSH: Local invoices with status='sent' not yet in QB ─────────────────
     const { rows: localInvoices } = await pool.query(`
       SELECT inv.*, c.qb_customer_id
       FROM invoices inv
       LEFT JOIN customers c ON c.id = inv.customer_id
       WHERE inv.qb_invoice_id IS NULL
-        AND inv.status NOT IN ('draft','cancelled')
+        AND inv.status = 'sent'
       LIMIT 200
     `);
 
@@ -305,6 +305,28 @@ async function syncInvoices(tok: any) {
             [newId, li.id]
           );
           synced++;
+
+          // Send the invoice via QB so the customer receives a payment-link email
+          try {
+            const sendUrl = `${QB_BASE_URL}/${tok.realm_id}/invoice/${newId}/send?${QB_MINOR_VER}`;
+            const sendRes = await fetch(sendUrl, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${tok.access_token}`,
+                Accept: "application/json",
+                "Content-Type": "application/octet-stream",
+              },
+              body: "",
+            });
+            if (!sendRes.ok) {
+              const txt = await sendRes.text();
+              errs.push(`send invoice ${li.invoice_number} (QB id ${newId}): ${sendRes.status} ${txt}`);
+            } else {
+              console.log(`[QB sync] Invoice ${li.invoice_number} created and sent via QB (id ${newId})`);
+            }
+          } catch (sendErr: any) {
+            errs.push(`send invoice ${li.invoice_number}: ${sendErr.message}`);
+          }
         }
       } catch (e: any) {
         errs.push(`push invoice ${li.invoice_number}: ${e.message}`);
