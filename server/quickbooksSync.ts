@@ -174,12 +174,54 @@ async function syncCustomers(tok: any) {
             };
           }
 
-          const created = await qbPost(tok, "customer", qbBody);
-          const newId = created?.Customer?.Id;
-          if (newId) {
+          // Use raw fetch so we can inspect the response body before throwing
+          const createUrl = `${QB_BASE_URL}/${tok.realm_id}/customer?${QB_MINOR_VER}`;
+          const createRes = await fetch(createUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${tok.access_token}`,
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(qbBody),
+          });
+
+          let qbId: string | null = null;
+
+          if (createRes.ok) {
+            const created = await createRes.json();
+            qbId = created?.Customer?.Id ?? null;
+          } else {
+            const errBody = await createRes.json().catch(() => ({}));
+            const faultCode = errBody?.Fault?.Error?.[0]?.code;
+
+            if (String(faultCode) === "6240") {
+              // Duplicate name — look up the existing QB customer by DisplayName
+              console.log(`[QB sync] Duplicate customer '${displayName}' — querying QB to link by name`);
+              try {
+                const safeDisplayName = displayName.replace(/'/g, "\\'");
+                const lookupData = await qbQuery(
+                  tok,
+                  `SELECT * FROM Customer WHERE DisplayName = '${safeDisplayName}'`
+                );
+                const existing = lookupData?.QueryResponse?.Customer?.[0];
+                if (existing?.Id) {
+                  qbId = existing.Id;
+                } else {
+                  errs.push(`push customer '${displayName}': duplicate in QB but name lookup returned nothing`);
+                }
+              } catch (lookupErr: any) {
+                errs.push(`push customer '${displayName}': duplicate lookup failed — ${lookupErr.message}`);
+              }
+            } else {
+              throw new Error(`QB POST customer: ${createRes.status} ${JSON.stringify(errBody)}`);
+            }
+          }
+
+          if (qbId) {
             await pool.query(
               "UPDATE customers SET qb_customer_id=$1, qb_synced_at=NOW() WHERE id=$2",
-              [newId, lc.id]
+              [qbId, lc.id]
             );
             synced++;
           }
