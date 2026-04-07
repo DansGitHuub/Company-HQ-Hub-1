@@ -281,6 +281,16 @@ async function syncInvoices(tok: any) {
   const errs: string[] = [];
 
   try {
+    // Look up a valid QB Service item to use as the line ItemRef
+    let qbServiceItemId = "1";
+    try {
+      const itemData = await qbQuery(tok, "SELECT * FROM Item WHERE Type = 'Service' MAXRESULTS 1");
+      const firstItem = itemData?.QueryResponse?.Item?.[0];
+      if (firstItem?.Id) qbServiceItemId = firstItem.Id;
+    } catch (itemErr: any) {
+      console.warn("[QB sync] Could not fetch service item — falling back to id '1':", itemErr.message);
+    }
+
     const data = await qbQuery(tok, "SELECT * FROM Invoice MAXRESULTS 500");
     const qbInvoices: any[] = data?.QueryResponse?.Invoice ?? [];
     const qbByDocNum = new Map(
@@ -327,7 +337,7 @@ async function syncInvoices(tok: any) {
               Amount: parseFloat(li.subtotal ?? li.total ?? 0),
               DetailType: "SalesItemLineDetail",
               SalesItemLineDetail: {
-                ItemRef: { value: "1", name: "Services" },
+                ItemRef: { value: qbServiceItemId },
                 UnitPrice: parseFloat(li.subtotal ?? li.total ?? 0),
                 Qty: 1,
               },
