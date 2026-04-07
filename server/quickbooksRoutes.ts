@@ -1,7 +1,14 @@
+// Production QB credentials active
 import express, { Express } from "express";
 import crypto from "crypto";
 import { pool } from "./db";
-import { getTokens, runFullSync, syncCustomersPublic, syncInvoicesPublic, syncPaymentsPublic } from "./quickbooksSync";
+import {
+  getTokens,
+  runFullSync,
+  syncCustomersPublic,
+  syncInvoicesPublic,
+  syncPaymentsPublic,
+} from "./quickbooksSync";
 
 async function migrate() {
   // Core token store (single row per realm)
@@ -32,22 +39,40 @@ async function migrate() {
   `);
 
   // QB columns on customers
-  await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS qb_customer_id VARCHAR(50)`);
-  await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS qb_synced_at  TIMESTAMPTZ`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_customers_qb_id ON customers(qb_customer_id)`);
+  await pool.query(
+    `ALTER TABLE customers ADD COLUMN IF NOT EXISTS qb_customer_id VARCHAR(50)`,
+  );
+  await pool.query(
+    `ALTER TABLE customers ADD COLUMN IF NOT EXISTS qb_synced_at  TIMESTAMPTZ`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_customers_qb_id ON customers(qb_customer_id)`,
+  );
 
   // QB columns on invoices
-  await pool.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS qb_invoice_id VARCHAR(50)`);
-  await pool.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS qb_synced_at  TIMESTAMPTZ`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_invoices_qb_id ON invoices(qb_invoice_id)`);
+  await pool.query(
+    `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS qb_invoice_id VARCHAR(50)`,
+  );
+  await pool.query(
+    `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS qb_synced_at  TIMESTAMPTZ`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_invoices_qb_id ON invoices(qb_invoice_id)`,
+  );
 
   console.log("[migration] quickbooks tables ready");
 }
 
 // Resolve credentials — accept either the short name (QB_CLIENT_ID) or the
 // legacy long name (QUICKBOOKS_CLIENT_ID), so both dev and prod configs work.
-function qbClientId()     { return process.env.QB_CLIENT_ID     || process.env.QUICKBOOKS_CLIENT_ID     || ""; }
-function qbClientSecret() { return process.env.QB_CLIENT_SECRET || process.env.QUICKBOOKS_CLIENT_SECRET || ""; }
+function qbClientId() {
+  return process.env.QB_CLIENT_ID || process.env.QUICKBOOKS_CLIENT_ID || "";
+}
+function qbClientSecret() {
+  return (
+    process.env.QB_CLIENT_SECRET || process.env.QUICKBOOKS_CLIENT_SECRET || ""
+  );
+}
 const QB_REDIRECT_URI = "https://companyhq.app/api/auth/quickbooks/callback";
 
 export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
@@ -113,7 +138,7 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (realm_id) DO UPDATE
            SET access_token=$2, refresh_token=$3, token_expiry=$4, updated_at=NOW()`,
-        [realmId, token.access_token, token.refresh_token, expiry]
+        [realmId, token.access_token, token.refresh_token, expiry],
       );
 
       console.log(`[QB] Connected realm ${realmId}`);
@@ -134,7 +159,7 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
       const { rows: logs } = await pool.query(
         `SELECT * FROM quickbooks_sync_log
          WHERE status IN ('success','partial')
-         ORDER BY completed_at DESC NULLS LAST LIMIT 1`
+         ORDER BY completed_at DESC NULLS LAST LIMIT 1`,
       );
 
       res.json({
@@ -167,7 +192,9 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
     const signature = req.headers["intuit-signature"] as string | undefined;
 
     if (!secret || !signature) {
-      console.warn("[QB webhook] Missing secret or intuit-signature header — rejecting");
+      console.warn(
+        "[QB webhook] Missing secret or intuit-signature header — rejecting",
+      );
       return res.status(401).end();
     }
 
@@ -206,22 +233,30 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
       for (const entity of entities) {
         if (entity?.name) {
           entityTypes.add(entity.name);
-          console.log(`[QB webhook] Event: ${entity.name} id=${entity.id} op=${entity.operation}`);
+          console.log(
+            `[QB webhook] Event: ${entity.name} id=${entity.id} op=${entity.operation}`,
+          );
         }
       }
     }
 
     if (entityTypes.has("Customer")) {
       console.log("[QB webhook] Firing syncCustomers (fire-and-forget)");
-      syncCustomersPublic().catch(e => console.error("[QB webhook] syncCustomers error:", e.message));
+      syncCustomersPublic().catch((e) =>
+        console.error("[QB webhook] syncCustomers error:", e.message),
+      );
     }
     if (entityTypes.has("Invoice")) {
       console.log("[QB webhook] Firing syncInvoices (fire-and-forget)");
-      syncInvoicesPublic().catch(e => console.error("[QB webhook] syncInvoices error:", e.message));
+      syncInvoicesPublic().catch((e) =>
+        console.error("[QB webhook] syncInvoices error:", e.message),
+      );
     }
     if (entityTypes.has("Payment")) {
       console.log("[QB webhook] Firing syncPayments (fire-and-forget)");
-      syncPaymentsPublic().catch(e => console.error("[QB webhook] syncPayments error:", e.message));
+      syncPaymentsPublic().catch((e) =>
+        console.error("[QB webhook] syncPayments error:", e.message),
+      );
     }
   });
 
@@ -240,7 +275,7 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
   app.get("/api/quickbooks/sync/logs", requireAuth, async (req, res) => {
     try {
       const { rows } = await pool.query(
-        `SELECT * FROM quickbooks_sync_log ORDER BY started_at DESC LIMIT 50`
+        `SELECT * FROM quickbooks_sync_log ORDER BY started_at DESC LIMIT 50`,
       );
       res.json(rows);
     } catch (err: any) {
