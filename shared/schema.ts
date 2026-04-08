@@ -2626,7 +2626,30 @@ export const estimates = pgTable("estimates", {
   followUpDate: timestamp("follow_up_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  issueDate: timestamp("issue_date").defaultNow(),
+  sentDate: timestamp("sent_date"),
+  validUntil: timestamp("valid_until"),
 });
+
+export const estimateItems = pgTable("estimate_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  estimateId: varchar("estimate_id", { length: 36 }).notNull().references(() => estimates.id),
+  materialId: varchar("material_id", { length: 36 }),
+  description: text("description").notNull(),
+  quantity: numeric("quantity", { precision: 10, scale: 2 }).default("1"),
+  unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).default("0"),
+  total: numeric("total", { precision: 10, scale: 2 }).default("0"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEstimateItemSchema = createInsertSchema(estimateItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertEstimateItem = z.infer<typeof insertEstimateItemSchema>;
+export type EstimateItem = typeof estimateItems.$inferSelect;
 
 export const insertEstimateSchema = createInsertSchema(estimates).omit({
   id: true,

@@ -50,5 +50,28 @@ export async function runEstimatesMigration() {
       ADD COLUMN IF NOT EXISTS photo_url TEXT
   `);
 
-  console.log("[Migration] estimates table ready + sales_estimates + estimate_work_areas columns added");
+  // Add new date columns to estimates table
+  await pool.query(`
+    ALTER TABLE estimates
+      ADD COLUMN IF NOT EXISTS issue_date TIMESTAMP DEFAULT NOW(),
+      ADD COLUMN IF NOT EXISTS sent_date TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS valid_until TIMESTAMP
+  `);
+
+  // Create estimate_items table if not exists
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS estimate_items (
+      id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+      estimate_id VARCHAR(36) NOT NULL REFERENCES estimates(id) ON DELETE CASCADE,
+      material_id VARCHAR(36),
+      description TEXT NOT NULL,
+      quantity NUMERIC(10,2) DEFAULT 1,
+      unit_price NUMERIC(10,2) DEFAULT 0,
+      total NUMERIC(10,2) DEFAULT 0,
+      sort_order INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  console.log("[Migration] estimates table ready + sales_estimates + estimate_work_areas columns added + estimate date fields + estimate_items table");
 }

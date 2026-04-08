@@ -4908,7 +4908,10 @@ Generate detailed information for this landscaping material.`;
       if (req.user?.role !== "Admin" && req.user?.role !== "Manager" && req.user?.role !== "Master Admin") {
         return res.status(403).json({ message: "Not authorized" });
       }
-      const estimate = await storage.createEstimate(req.body);
+      const issueDate = new Date();
+      const validUntil = new Date(issueDate);
+      validUntil.setDate(validUntil.getDate() + 45);
+      const estimate = await storage.createEstimate({ ...req.body, issueDate, validUntil });
       logActivity("estimate_created", `New estimate created for ${estimate.clientName}`, "/jobs", req.user?.id);
       res.status(201).json(estimate);
     } catch (err) {
@@ -5006,6 +5009,98 @@ Generate detailed information for this landscaping material.`;
       res.json({ job, estimate });
     } catch (err) {
       res.status(500).json({ message: "Error converting estimate to job" });
+    }
+  });
+
+  // Send estimate to customer (sets sentDate + emails customer)
+  app.post("/api/pipeline-estimates/:id/send", requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== "Admin" && req.user?.role !== "Manager" && req.user?.role !== "Master Admin") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const estimate = await storage.getEstimate(req.params.id);
+      if (!estimate) return res.status(404).json({ message: "Estimate not found" });
+
+      const sentDate = new Date();
+      const updated = await storage.updateEstimate(req.params.id, { sentDate });
+
+      // Email customer if contactEmail exists
+      if (estimate.contactEmail) {
+        try {
+          await sendCustomerNotificationEmail(
+            estimate.contactEmail,
+            estimate.clientName,
+            `Your Estimate for ${estimate.serviceType}`,
+            `Your estimate for ${estimate.serviceType} has been sent and is ready for your review. The estimate is valid for 45 days. Please contact us if you have any questions.`,
+            "View Estimate",
+            "/customer"
+          );
+        } catch (emailErr) {
+          console.error("Error sending estimate email:", emailErr);
+        }
+      }
+
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Error sending estimate" });
+    }
+  });
+
+  // Get estimate items
+  app.get("/api/pipeline-estimates/:id/items", requireAuth, async (req, res) => {
+    try {
+      const { db: dbConn } = await import("./db");
+      const { estimateItems } = await import("../shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const items = await dbConn.select().from(estimateItems).where(eq(estimateItems.estimateId, req.params.id)).orderBy(estimateItems.sortOrder);
+      res.json(items);
+    } catch (err) {
+      console.error("Error fetching estimate items:", err);
+      res.status(500).json({ message: "Error fetching estimate items" });
+    }
+  });
+
+  // Create estimate item
+  app.post("/api/pipeline-estimates/:id/items", requireAuth, async (req, res) => {
+    try {
+      const { db: dbConn } = await import("./db");
+      const { estimateItems } = await import("../shared/schema");
+      const item = await dbConn.insert(estimateItems).values({
+        ...req.body,
+        estimateId: req.params.id,
+      }).returning();
+      res.status(201).json(item[0]);
+    } catch (err) {
+      console.error("Error creating estimate item:", err);
+      res.status(500).json({ message: "Error creating estimate item" });
+    }
+  });
+
+  // Update estimate item
+  app.patch("/api/pipeline-estimates/:id/items/:itemId", requireAuth, async (req, res) => {
+    try {
+      const { db: dbConn } = await import("./db");
+      const { estimateItems } = await import("../shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const item = await dbConn.update(estimateItems).set(req.body).where(eq(estimateItems.id, req.params.itemId)).returning();
+      res.json(item[0]);
+    } catch (err) {
+      console.error("Error updating estimate item:", err);
+      res.status(500).json({ message: "Error updating estimate item" });
+    }
+  });
+
+  // Delete estimate item
+  app.delete("/api/pipeline-estimates/:id/items/:itemId", requireAuth, async (req, res) => {
+    try {
+      const { db: dbConn } = await import("./db");
+      const { estimateItems } = await import("../shared/schema");
+      const { eq } = await import("drizzle-orm");
+      await dbConn.delete(estimateItems).where(eq(estimateItems.id, req.params.itemId));
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting estimate item:", err);
+      res.status(500).json({ message: "Error deleting estimate item" });
     }
   });
 

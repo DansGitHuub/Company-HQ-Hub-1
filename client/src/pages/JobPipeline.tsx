@@ -922,6 +922,17 @@ function EstimatesBoard() {
     setPendingStageChange(null);
   };
 
+  const sendEstimateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/pipeline-estimates/${id}/send`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pipeline-estimates"] });
+      toast({ title: "Estimate sent to customer" });
+    },
+  });
+
   const openEstimateModal = (estimate: Estimate) => {
     setSelectedEstimate(estimate);
     setEditForm(estimate);
@@ -1315,7 +1326,32 @@ function EstimatesBoard() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 mt-6">
+          {!isNewEstimate && (
+          <div className="border rounded-lg p-4 mt-4 space-y-3">
+            <h3 className="font-semibold text-sm">Estimate Details</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Issue Date</Label>
+                <p className="text-sm">{selectedEstimate?.issueDate ? new Date(selectedEstimate.issueDate).toLocaleDateString() : selectedEstimate?.createdAt ? new Date(selectedEstimate.createdAt).toLocaleDateString() : "—"}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Valid Until</Label>
+                <Input
+                  type="date"
+                  value={editForm.validUntil ? new Date(editForm.validUntil as string).toISOString().split("T")[0] : ""}
+                  onChange={e => setEditForm({ ...editForm, validUntil: e.target.value ? new Date(e.target.value) : undefined })}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Sent Date</Label>
+                <p className="text-sm">{(selectedEstimate as any)?.sentDate ? new Date((selectedEstimate as any).sentDate).toLocaleDateString() : <span className="text-muted-foreground">Not sent</span>}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 mt-6">
             {!isNewEstimate && isAdmin && (
               <Button
                 variant="destructive"
@@ -1330,6 +1366,16 @@ function EstimatesBoard() {
               </Button>
             )}
             <div className="flex-1" />
+            {!isNewEstimate && selectedEstimate && (
+              <Button
+                variant="outline"
+                onClick={() => sendEstimateMutation.mutate(selectedEstimate.id)}
+                disabled={sendEstimateMutation.isPending}
+                className="border-green-500 text-green-700 hover:bg-green-50"
+              >
+                {sendEstimateMutation.isPending ? "Sending..." : "Send Estimate"}
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>
               {t("common.cancel")}
             </Button>
