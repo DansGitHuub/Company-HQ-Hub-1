@@ -283,4 +283,29 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // -- POST /api/quickbooks/sync/items -----------------------------------------
+  app.post("/api/quickbooks/sync/items", requireAuth, async (req, res) => {
+    try {
+      const result = await syncItemsPublic();
+      res.json({ ok: true, result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // -- GET /api/quickbooks/items ------------------------------------------------
+  app.get("/api/quickbooks/items", requireAuth, async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT qb_item_id, name, full_name, type, description, unit_price,
+                income_account_name, parent_name, active
+         FROM qb_items ORDER BY full_name ASC`
+      );
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
 }
