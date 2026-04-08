@@ -336,6 +336,7 @@ async function syncInvoices(tok: any) {
             {
               Amount: parseFloat(li.subtotal ?? li.total ?? 0),
               DetailType: "SalesItemLineDetail",
+          Taxable: li.taxable ?? true,
               SalesItemLineDetail: {
                 ItemRef: { value: qbServiceItemId },
                 UnitPrice: parseFloat(li.subtotal ?? li.total ?? 0),

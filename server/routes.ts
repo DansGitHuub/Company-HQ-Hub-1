@@ -3607,7 +3607,7 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
   app.patch("/api/materials/:id", requireAuth, async (req, res) => {
     try {
       const id = req.params.id as string;
-      const { name, categoryId, status, description, vendor, unitOfMeasure, primaryImage, galleryImages, tags } = req.body;
+      const { name, categoryId, status, description, vendor, unitOfMeasure, primaryImage, galleryImages, tags , taxable} = req.body;
       
       const updates: any = {};
       if (name !== undefined) updates.name = name;
@@ -3619,6 +3619,7 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
       if (primaryImage !== undefined) updates.primaryImage = primaryImage;
       if (galleryImages !== undefined) updates.galleryImages = galleryImages;
       if (tags !== undefined) updates.tags = tags;
+      if (taxable !== undefined) updates.taxable = taxable;
       
       const material = await storage.updateMaterial(id, updates);
       if (!material) {

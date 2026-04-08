@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,14 @@ export default function CatalogPage() {
     queryKey: ["/api/materials"],
     queryFn: () => apiRequest("GET", "/api/materials").then(r => r.json()),
   });
+const queryClient = useQueryClient();
+const toggleTaxableMut = useMutation({
+  mutationFn: async ({ id, taxable }: { id: number; taxable: boolean }) => {
+    const res = await apiRequest("PATCH", `/api/materials/${id}`, { taxable });
+    return res.json();
+  },
+  onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/materials"] }),
+});
 
   // Derive unique categories from the data
   const categories = useMemo(() => {
@@ -200,7 +208,7 @@ export default function CatalogPage() {
                     {item.markup != null ? `${parseFloat(item.markup as string).toFixed(1)}%` : "—"}
                   </td>
                   <td className="px-4 py-3 text-center" data-testid={`text-taxable-${item.id}`}>
-                    {item.taxable ? "✓" : ""}
+                    <Switch checked={item.taxable ?? false} onCheckedChange={(checked) => toggleTaxableMut.mutate({ id: item.id, taxable: checked })} />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
