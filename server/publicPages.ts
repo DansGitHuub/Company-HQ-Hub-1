@@ -168,15 +168,9 @@ function smsConsentBody(success = false): string {
     <input type="email" id="email" name="email" placeholder="jane@example.com" />
 
     <div class="checkbox-row" style="margin-top:24px;">
-      <input type="checkbox" id="sms_consent" name="sms_consent" value="1" required />
-      <span><label for="sms_consent">I agree to receive SMS text messages from Chapin Landscapes, including appointment reminders, estimate notifications, job updates, and invoice alerts. Message and data rates may apply. Reply STOP at any time to unsubscribe. Reply HELP for help. <strong>(Required)</strong></label></span>
+      <input type="checkbox" id="sms_consent" name="sms_consent" value="1" />
+      <span><label for="sms_consent">I agree to receive SMS text messages from Chapin Landscapes, including appointment reminders, estimate notifications, job updates, and invoice alerts. Message and data rates may apply. Reply STOP at any time to unsubscribe. Reply HELP for help.</label></span>
     </div>
-
-    <div class="checkbox-row">
-      <input type="checkbox" id="promo_consent" name="promo_consent" value="1" />
-      <span><label for="promo_consent">I also agree to receive occasional promotional messages about seasonal services and special offers. <em>(Optional)</em></label></span>
-    </div>
-
     <button type="submit">Submit &amp; Opt In</button>
 
     <p class="fine-print">
