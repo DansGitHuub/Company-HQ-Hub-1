@@ -53,7 +53,7 @@ function useElapsed(clockIn: string | null) {
 }
 
 // ── GPS Pinger ────────────────────────────────────────────────────────────────
-function useGpsPinger(activeEntry: TimeEntry | null) {
+function useGpsPinger(activeEntry: TimeEntry | null, setGpsLost: (v: boolean) => void) {
   const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const sendPing = useCallback((entryId: string) => {
@@ -148,7 +148,7 @@ export default function TimeClock() {
   });
 
   const elapsed = useElapsed(activeEntry?.clock_in ?? null);
-  useGpsPinger(activeEntry);
+  useGpsPinger(activeEntry, setGpsLost);
 
   // Reset work area when job changes
   useEffect(() => { setSelectedWorkArea(""); }, [selectedJob]);
