@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { themes, getTheme, applyTheme, type ThemeId } from "@/lib/themes";
 
-type SettingsSection = "profile" | "notifications" | "language" | "appearance" | "admin" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks" | "terms";
+type SettingsSection = "profile" | "notifications" | "language" | "appearance" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks" | "terms";
 
 function TermsSection() {
   const { toast } = useToast();
@@ -144,7 +144,6 @@ export default function Settings() {
     { id: "notifications" as const, label: "Notifications", icon: Bell },
     { id: "language" as const, label: "Language & Display", icon: Globe },
     { id: "appearance" as const, label: "Appearance", icon: Palette },
-    ...(isAdmin ? [{ id: "admin" as const, label: "Admin Settings", icon: Shield }] : []),
     ...(isAdminOrManager ? [
       { id: "work-areas" as const, label: "Work Areas", icon: Layers },
       { id: "divisions" as const, label: "Divisions", icon: Tag },
@@ -198,7 +197,7 @@ export default function Settings() {
           {activeSection === "notifications" && <NotificationsSection profile={profile} />}
           {activeSection === "language" && <LanguageSection profile={profile} />}
           {activeSection === "appearance" && <AppearanceSection />}
-          {activeSection === "admin" && isAdmin && <AdminSection />}
+
           {activeSection === "work-areas" && isAdminOrManager && <WorkAreasSection />}
           {activeSection === "divisions" && isAdminOrManager && <DivisionsSection />}
           {activeSection === "estimate-templates" && isAdminOrManager && <EstimateTemplatesSection />}
@@ -519,28 +518,6 @@ function AppearanceSection() {
   );
 }
 
-function AdminSection() {
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" /> Admin Settings</CardTitle>
-          <CardDescription>Administrative configuration options</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-4 rounded-lg border bg-muted/30 text-center">
-            <Shield className="h-10 w-10 mx-auto mb-2 text-muted-foreground opacity-50" />
-            <p className="font-medium text-sm">Admin settings are managed from the Admin Panel</p>
-            <p className="text-xs text-muted-foreground mt-1">Company branding, user management, and system configuration are available in the Admin Panel.</p>
-            <a href="/admin" className="text-xs text-primary hover:underline mt-2 inline-block" data-testid="link-admin-panel">
-              Go to Admin Panel →
-            </a>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DIVISIONS_LIST = ["Maintenance", "Install", "Snow", "General"] as const;
