@@ -381,7 +381,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     admin: { icon: Shield, label: t("nav.adminPanel"), href: "/admin" },
     catalog: { icon: BookMarked, label: "Materials Catalog", href: "/catalog" },
     tools: { icon: Snowflake, label: t("nav.tools"), href: "/tools" },
-    plow_mapper: { icon: Snowflake, label: t("nav.plowMapper"), href: "/tools/plow-mapper" },
+    tasks: { icon: ClipboardList, label: "Tasks", href: "/tasks" },
+  plow_mapper: { icon: Snowflake, label: t("nav.plowMapper"), href: "/tools/plow-mapper" },
   };
 
   type NavSection = { label: string; items: string[] };
@@ -395,7 +396,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarSections: NavSection[] = [
     { label: "", items: ["dashboard"] },
-    { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "scheduling", "my_day", "time_tracking", "invoices", "reports", "mors_budget", "settings_nav"] },
+    { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "tasks", "equipment", "scheduling", "my_day", "time_tracking", "invoices", "reports", "mors_budget", "settings_nav"] },
     { label: "PEOPLE", items: ["employees", "education", "hiring"] },
     { label: "COMPANY", items: ["inbox", "sops", "testing", "hq"] },
     { label: "ADMIN", items: ["admin", "catalog", "tools", "forms"] },

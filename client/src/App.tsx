@@ -40,6 +40,7 @@ import Help from "@/pages/Help";
 import Profile from "@/pages/Profile";
 import AdminSetup from "@/pages/AdminSetup";
 import EquipmentTracker from "@/pages/EquipmentTracker";
+import Tasks from "@/pages/Tasks";
 import SearchPage from "@/pages/Search";
 import TodoList from "@/pages/TodoList";
 
@@ -175,6 +176,7 @@ function AppRoutes() {
         <Route path="/settings" component={SettingsPage} />
         <Route path="/catalog/import" component={CatalogImport} />
         <Route path="/catalog" component={CatalogPage} />
+        <Route path="/tasks" component={Tasks} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>

@@ -74,11 +74,24 @@ function useGpsPinger(activeEntry: TimeEntry | null) {
 
   useEffect(() => {
     if (pingRef.current) { clearInterval(pingRef.current); pingRef.current = null; }
+    let watchId: number | null = null;
     if (activeEntry) {
       sendPing(activeEntry.id);
       pingRef.current = setInterval(() => sendPing(activeEntry.id), 60_000);
+      if (navigator.geolocation) {
+        watchId = navigator.geolocation.watchPosition(
+          () => { setGpsLost(false); },
+          () => { setGpsLost(true); },
+          { enableHighAccuracy: false, timeout: 30000 }
+        );
+      }
+    } else {
+      setGpsLost(false);
     }
-    return () => { if (pingRef.current) clearInterval(pingRef.current); };
+    return () => {
+      if (pingRef.current) clearInterval(pingRef.current);
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    };
   }, [activeEntry?.id]);
 }
 
@@ -89,6 +102,8 @@ export default function TimeClock() {
   const [open, setOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState("");
   const [selectedWorkArea, setSelectedWorkArea] = useState("");
+  const [gpsChecking, setGpsChecking] = useState(false);
+  const [gpsLost, setGpsLost] = useState(false);
 
   // Active entry
   const { data: activeEntry = null } = useQuery<TimeEntry | null>({
@@ -182,6 +197,13 @@ export default function TimeClock() {
   const workAreaOptions = buildWorkAreaOptions();
 
   // Clock in
+  // Alert when GPS is lost while clocked in
+  useEffect(() => {
+    if (gpsLost && activeEntry) {
+      toast({ title: "GPS signal lost", description: "Location has been disabled. GPS is required while clocked in — please re-enable it.", variant: "destructive" });
+    }
+  }, [gpsLost]);
+
   const clockInMutation = useMutation({
     mutationFn: async () => {
       if (!selectedWorkArea) throw new Error("Please select a work area.");
@@ -204,6 +226,25 @@ export default function TimeClock() {
     },
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
+
+  const handleClockIn = () => {
+    if (!navigator.geolocation) {
+      toast({ title: "GPS required", description: "This device does not support location. GPS is required to clock in.", variant: "destructive" });
+      return;
+    }
+    setGpsChecking(true);
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        setGpsChecking(false);
+        clockInMutation.mutate();
+      },
+      () => {
+        setGpsChecking(false);
+        toast({ title: "GPS required", description: "Location access was denied. Please enable GPS for this app and try again.", variant: "destructive" });
+      },
+      { enableHighAccuracy: false, timeout: 10000 }
+    );
+  };
 
   // Clock out
   const clockOutMutation = useMutation({
@@ -312,11 +353,11 @@ export default function TimeClock() {
 
           <Button
             className="w-full bg-green-600 hover:bg-green-700 text-white h-9"
-            onClick={() => clockInMutation.mutate()}
-            disabled={clockInMutation.isPending || !selectedWorkArea}
+            onClick={handleClockIn}
+            disabled={clockInMutation.isPending || gpsChecking || !selectedWorkArea}
             data-testid="button-clock-in-confirm"
           >
-            {clockInMutation.isPending ? "Clocking in…" : "Clock In"}
+            {gpsChecking ? "Getting GPS…" : clockInMutation.isPending ? "Clocking in…" : "Clock In"}
           </Button>
         </div>
       </PopoverContent>

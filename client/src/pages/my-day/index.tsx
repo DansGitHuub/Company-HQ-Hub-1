@@ -136,6 +136,7 @@ export default function MyDayPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<PendingClockIn | null>(null);
+  const [gpsChecking, setGpsChecking] = useState(false);
 
   // ── Data ───────────────────────────────────────────────────────────────────
   const { data: user } = useQuery<any>({
@@ -198,6 +199,26 @@ export default function MyDayPage() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
+
+  const handleMyDayClockIn = () => {
+    if (!pending) return;
+    if (!navigator.geolocation) {
+      toast({ title: "GPS required", description: "This device does not support location. GPS is required to clock in.", variant: "destructive" });
+      return;
+    }
+    setGpsChecking(true);
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        setGpsChecking(false);
+        clockInMutation.mutate(pending);
+      },
+      () => {
+        setGpsChecking(false);
+        toast({ title: "GPS required", description: "Location access was denied. Please enable GPS for this app and try again.", variant: "destructive" });
+      },
+      { enableHighAccuracy: false, timeout: 10000 }
+    );
+  };
 
   const firstName = user?.firstName || user?.username || "there";
 
@@ -333,11 +354,11 @@ export default function MyDayPage() {
             </Button>
             <Button
               className="bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => pending && clockInMutation.mutate(pending)}
-              disabled={clockInMutation.isPending}
+              onClick={handleMyDayClockIn}
+              disabled={clockInMutation.isPending || gpsChecking}
               data-testid="clock-in-confirm"
             >
-              {clockInMutation.isPending ? "Clocking in…" : "Confirm"}
+              {gpsChecking ? "Getting GPS…" : clockInMutation.isPending ? "Clocking in…" : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>
