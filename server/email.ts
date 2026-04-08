@@ -639,3 +639,89 @@ export async function sendApplicationLinkEmail(toEmail: string, applyUrl: string
     </div>
   `);
 }
+
+export async function sendEstimateEmail(
+  toEmail: string,
+  customerName: string,
+  estimate: {
+    serviceType: string;
+    propertyAddress?: string;
+    city?: string;
+    state?: string;
+    estimatedValue?: number;
+    validUntil?: Date | string | null;
+  },
+  items: Array<{ description: string; total: string | number }>,
+) {
+  const appUrl = getAppUrl();
+  const fmt = (n: string | number) =>
+    Number(n).toLocaleString("en-US", { style: "currency", currency: "USD" });
+
+  const validStr = estimate.validUntil
+    ? new Date(estimate.validUntil).toLocaleDateString("en-US", {
+        month: "long", day: "numeric", year: "numeric",
+      })
+    : null;
+
+  const addressParts = [estimate.propertyAddress, estimate.city, estimate.state]
+    .filter(Boolean)
+    .join(", ");
+
+  const workAreaRows = items.length > 0
+    ? items.map(item => `
+        <tr>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #374151;">${escapeHtml(item.description)}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #374151; text-align: right; white-space: nowrap;">${escapeHtml(fmt(item.total))}</td>
+        </tr>`).join("")
+    : `<tr><td colspan="2" style="padding: 10px 12px; color: #6b7280; text-align: center;">No work areas listed</td></tr>`;
+
+  const totalRow = estimate.estimatedValue != null
+    ? `<tr style="background-color: #f9fafb;">
+        <td style="padding: 12px; font-weight: bold; color: #111827;">Total</td>
+        <td style="padding: 12px; font-weight: bold; color: #111827; text-align: right;">${escapeHtml(fmt(estimate.estimatedValue))}</td>
+      </tr>`
+    : "";
+
+  const subject = `Your Estimate from Chapin Landscapes — ${escapeHtml(estimate.serviceType)}`;
+
+  return sendEmail(toEmail, subject, `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #F7F3EC;">
+      <div style="background-color: #1E3A2F; padding: 20px; text-align: center;">
+        <h1 style="color: #C9A84C; margin: 0; font-size: 20px;">Chapin Landscapes</h1>
+      </div>
+      <div style="padding: 30px;">
+        <p style="color: #4b5563; font-size: 15px;">Hi ${escapeHtml(customerName)},</p>
+        <p style="color: #374151; line-height: 1.6;">
+          Your estimate for <strong>${escapeHtml(estimate.serviceType)}</strong> is ready for your review.
+          ${validStr ? `This estimate is valid until <strong>${escapeHtml(validStr)}</strong>.` : ""}
+        </p>
+        ${addressParts ? `<p style="color: #6b7280; font-size: 13px; margin-top: -8px;">Property: ${escapeHtml(addressParts)}</p>` : ""}
+
+        <!-- Pricing summary — work area totals only -->
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 8px;">
+          <thead>
+            <tr style="background-color: #1E3A2F;">
+              <th style="padding: 10px 12px; text-align: left; color: #C9A84C; font-weight: 600;">Work Area</th>
+              <th style="padding: 10px 12px; text-align: right; color: #C9A84C; font-weight: 600;">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${workAreaRows}
+          </tbody>
+          ${totalRow ? `<tfoot>${totalRow}</tfoot>` : ""}
+        </table>
+
+        <p style="color: #6b7280; font-size: 12px; margin-top: 4px;">
+          Questions? Reply to this email or call us at 40.724.8006.
+        </p>
+
+        <div style="text-align: center; margin-top: 28px;">
+          <a href="${appUrl}/customer" style="display: inline-block; background-color: #1E3A2F; color: #C9A84C; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Estimate</a>
+        </div>
+      </div>
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
+        <p style="margin: 0;">Chapin Landscapes · design, build, maintain · 40.724.8006 · chapinlandscapes.com</p>
+      </div>
+    </div>
+  `);
+}

@@ -5024,16 +5024,30 @@ Generate detailed information for this landscaping material.`;
       const sentDate = new Date();
       const updated = await storage.updateEstimate(req.params.id, { sentDate });
 
-      // Email customer if contactEmail exists
+            // Email customer with work-area pricing summary (no material/labor detail)
       if (estimate.contactEmail) {
         try {
-          await sendCustomerNotificationEmail(
+          const { db: dbConn } = await import("./db");
+          const { estimateItems } = await import("../shared/schema");
+          const { eq } = await import("drizzle-orm");
+          const items = await dbConn
+            .select({ description: estimateItems.description, total: estimateItems.total })
+            .from(estimateItems)
+            .where(eq(estimateItems.estimateId, req.params.id))
+            .orderBy(estimateItems.sortOrder);
+
+          await sendEstimateEmail(
             estimate.contactEmail,
             estimate.clientName,
-            `Your Estimate for ${estimate.serviceType}`,
-            `Your estimate for ${estimate.serviceType} has been sent and is ready for your review. The estimate is valid for 45 days. Please contact us if you have any questions.`,
-            "View Estimate",
-            "/customer"
+            {
+              serviceType: estimate.serviceType,
+              propertyAddress: estimate.propertyAddress ?? undefined,
+              city: estimate.city ?? undefined,
+              state: estimate.state ?? undefined,
+              estimatedValue: estimate.estimatedValue ?? undefined,
+              validUntil: estimate.validUntil,
+            },
+            items.map(i => ({ description: i.description, total: i.total ?? "0" }))
           );
         } catch (emailErr) {
           console.error("Error sending estimate email:", emailErr);
