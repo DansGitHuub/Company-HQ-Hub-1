@@ -1,0 +1,23 @@
+                                          Table "public.catalog_items"
+    Column     |            Type             | Collation | Nullable |                  Default                  
+---------------+-----------------------------+-----------+----------+-------------------------------------------
+ id            | integer                     |           | not null | nextval('catalog_items_id_seq'::regclass)
+ item_number   | character varying(20)       |           | not null | 
+ name          | character varying(255)      |           | not null | 
+ class         | character varying(50)       |           |          | 
+ category      | character varying(100)      |           |          | 
+ units         | character varying(50)       |           |          | 
+ cost          | numeric(10,2)               |           |          | '0'::numeric
+ taxable       | boolean                     |           |          | false
+ description   | text                        |           |          | 
+ sku           | character varying(100)      |           |          | 
+ other_options | text                        |           |          | 
+ is_active     | boolean                     |           |          | true
+ created_at    | timestamp without time zone |           |          | now()
+ updated_at    | timestamp without time zone |           |          | now()
+Indexes:
+    "catalog_items_pkey" PRIMARY KEY, btree (id)
+    "catalog_items_item_number_key" UNIQUE CONSTRAINT, btree (item_number)
+Referenced by:
+    TABLE "catalog_item_tags" CONSTRAINT "catalog_item_tags_item_id_fkey" FOREIGN KEY (item_id) REFERENCES catalog_items(id) ON DELETE CASCADE
+

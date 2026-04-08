@@ -471,10 +471,77 @@ async function syncPayments(tok: any) {
   return { synced, errors: errs };
 }
 
+// -- Items sync (QB -> local) -------------------------------------------------
+async function syncItemsFromQB(tok: any) {
+  const logId = await startLog("qb_items", "pull");
+  let synced = 0;
+  const errs: string[] = [];
+
+  try {
+    const data = await qbQuery(tok, "SELECT * FROM Item MAXRESULTS 1000");
+    const items: any[] = data?.QueryResponse?.Item ?? [];
+
+    for (const item of items) {
+      try {
+        await pool.query(
+          `INSERT INTO qb_items (
+            qb_item_id, name, full_name, type, description,
+            unit_price, income_account_ref, income_account_name,
+            expense_account_ref, expense_account_name,
+            parent_ref, parent_name, active, synced_at, raw_data
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),$14)
+          ON CONFLICT (qb_item_id) DO UPDATE SET
+            name               = EXCLUDED.name,
+            full_name          = EXCLUDED.full_name,
+            type               = EXCLUDED.type,
+            description        = EXCLUDED.description,
+            unit_price         = EXCLUDED.unit_price,
+            income_account_ref  = EXCLUDED.income_account_ref,
+            income_account_name = EXCLUDED.income_account_name,
+            expense_account_ref  = EXCLUDED.expense_account_ref,
+            expense_account_name = EXCLUDED.expense_account_name,
+            parent_ref         = EXCLUDED.parent_ref,
+            parent_name        = EXCLUDED.parent_name,
+            active             = EXCLUDED.active,
+            synced_at          = NOW(),
+            raw_data           = EXCLUDED.raw_data`,
+          [
+            item.Id,
+            item.Name,
+            item.FullyQualifiedName ?? item.Name,
+            item.Type ?? null,
+            item.Description ?? null,
+            item.UnitPrice ?? null,
+            item.IncomeAccountRef?.value ?? null,
+            item.IncomeAccountRef?.name ?? null,
+            item.ExpenseAccountRef?.value ?? null,
+            item.ExpenseAccountRef?.name ?? null,
+            item.ParentRef?.value ?? null,
+            item.ParentRef?.name ?? null,
+            item.Active !== false,
+            JSON.stringify(item),
+          ]
+        );
+        synced++;
+      } catch (itemErr: any) {
+        errs.push(`Item ${item.Id} (${item.Name}): ${itemErr.message}`);
+      }
+    }
+
+    await finishLog(logId, synced, errs.length ? "partial" : "success", errs.length ? errs.join("; ") : undefined);
+  } catch (e: any) {
+    await finishLog(logId, synced, "error", e.message);
+    throw e;
+  }
+
+  return { synced, errors: errs };
+}
+
 // ── Master sync entry ─────────────────────────────────────────────────────────
 export async function runFullSync() {
   const tok = await getValidToken();
-  const results = { customers: { synced: 0, errors: [] as string[] }, invoices: { synced: 0, errors: [] as string[] }, payments: { synced: 0, errors: [] as string[] } };
+  const results = { items: { synced: 0, errors: [] as string[] }, customers: { synced: 0, errors: [] as string[] }, invoices: { synced: 0, errors: [] as string[] }, payments: { synced: 0, errors: [] as string[] } };
+  results.items     = await syncItemsFromQB(tok);
   results.customers = await syncCustomers(tok);
   results.invoices  = await syncInvoices(tok);
   results.payments  = await syncPayments(tok);
@@ -495,4 +562,9 @@ export async function syncInvoicesPublic() {
 export async function syncPaymentsPublic() {
   const tok = await getValidToken();
   return syncPayments(tok);
+}
+
+export async function syncItemsPublic() {
+  const tok = await getValidToken();
+  return syncItemsFromQB(tok);
 }

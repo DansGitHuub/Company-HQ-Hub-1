@@ -8,6 +8,7 @@ import {
   syncCustomersPublic,
   syncInvoicesPublic,
   syncPaymentsPublic,
+  syncItemsPublic,
 } from "./quickbooksSync";
 
 async function migrate() {
