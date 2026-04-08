@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { EstimateFormModal } from "./EstimateFormModal";
@@ -20,7 +21,7 @@ import { EstimateStatusBadge, ESTIMATE_TYPE_LABELS } from "./index";
 import {
   Calculator, ArrowLeft, Edit2, Send, CheckCircle2, XCircle,
   Briefcase, Building2, User, Calendar, Trash2, RefreshCw, Loader2, Eye, Globe, Copy, Check,
-  ChevronDown, ChevronRight, Pencil, RotateCcw
+  ChevronDown, ChevronRight, Pencil, RotateCcw, Upload
 } from "lucide-react";
 import { format, parseISO, isAfter } from "date-fns";
 import { Link } from "wouter";
@@ -56,6 +57,13 @@ interface EstimateDetail {
   portal_token: string | null;
   created_at: string; updated_at: string;
   work_areas: WorkAreaDetail[];
+  signedAt: string | null;
+  signatureType: string | null;
+  signatureData: string | null;
+  signerName: string | null;
+  signerInitials: string | null;
+  signerIp: string | null;
+  signedDocumentUrl: string | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -97,6 +105,9 @@ export default function EstimateDetail() {
   const [tcDraft, setTcDraft] = useState("");
   const [depositDraft, setDepositDraft] = useState<number | "">("");
   const [savingTC, setSavingTC] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadFileUrl, setUploadFileUrl] = useState("");
+  const [uploadSignerName, setUploadSignerName] = useState("");
 
   const { data: estimate, isLoading, error } = useQuery<EstimateDetail>({
     queryKey: ["/api/estimates", id],
@@ -169,6 +180,25 @@ export default function EstimateDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
     },
     onError: () => toast({ title: "Error generating portal link", variant: "destructive" }),
+  });
+
+  const uploadSignedMutation = useMutation({
+    mutationFn: async (payload: { fileUrl: string; signerName: string }) => {
+      const res = await apiRequest("POST", `/api/estimates/${id}/upload-signed`, payload);
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message ?? "Failed"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      setShowUploadDialog(false);
+      setUploadFileUrl("");
+      setUploadSignerName("");
+      toast({ title: "Signed copy recorded", description: "Physical signature has been saved." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    },
   });
 
   function copyPortalUrl() {
@@ -604,7 +634,61 @@ export default function EstimateDetail() {
             </Card>
           )}
 
-          {/* Activity */}
+          {/* Signature record */}
+        <Card className={estimate.signedAt ? "border-emerald-300" : ""}>
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground font-medium">Signature</p>
+              {!estimate.signedAt && (
+                <Button size="sm" variant="outline"
+                  onClick={() => setShowUploadDialog(true)}
+                  className="text-xs h-7 gap-1" data-testid="btn-upload-signed">
+                  <Upload className="h-3 w-3" />Upload Signed Copy
+                </Button>
+              )}
+            </div>
+            {estimate.signedAt ? (
+              <div className="space-y-1">
+                <div className="flex items-center gap-1 text-emerald-600">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span className="text-xs font-medium">Signed</span>
+                  {estimate.signatureType && (
+                    <span className="text-xs text-muted-foreground ml-1">
+                      ({estimate.signatureType === "uploaded" ? "physical copy" : "electronic"})
+                    </span>
+                  )}
+                </div>
+                {estimate.signerName && (
+                  <p className="text-xs text-muted-foreground">
+                    By: <span className="font-medium">{estimate.signerName}</span>
+                    {estimate.signerInitials && (
+                      <span className="ml-1 text-muted-foreground">({estimate.signerInitials})</span>
+                    )}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">{fmtDateTime(estimate.signedAt)}</p>
+                {estimate.signerIp && (
+                  <p className="text-xs text-muted-foreground">IP: {estimate.signerIp}</p>
+                )}
+                {estimate.signedDocumentUrl && (
+                  <a href={estimate.signedDocumentUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-blue-600 underline block">
+                    View signed document
+                  </a>
+                )}
+                <Button size="sm" variant="ghost"
+                  onClick={() => setShowUploadDialog(true)}
+                  className="text-xs h-6 px-2 text-muted-foreground mt-1">
+                  Replace signed copy
+                </Button>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">No signature recorded yet.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Activity */}
           <Card>
             <CardContent className="p-4 space-y-1">
               <p className="text-xs text-muted-foreground">Created</p>
@@ -615,6 +699,49 @@ export default function EstimateDetail() {
           </Card>
         </div>
       </div>
+
+      {/* Upload signed copy dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="max-w-md" data-testid="dialog-upload-signed">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />Record Physical Signed Copy
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Record a scanned or photographed signed document for this estimate.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="upload-signer-name">Signer Name</Label>
+              <Input id="upload-signer-name" placeholder="Customer's full name"
+                value={uploadSignerName}
+                onChange={(e) => setUploadSignerName(e.target.value)}
+                data-testid="input-upload-signer-name" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="upload-file-url">Document URL</Label>
+              <Input id="upload-file-url" placeholder="https://..."
+                value={uploadFileUrl}
+                onChange={(e) => setUploadFileUrl(e.target.value)}
+                data-testid="input-upload-file-url" />
+              <p className="text-xs text-muted-foreground">
+                Paste the URL of the uploaded scan (e.g. from Google Drive, Dropbox, etc.)
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>Cancel</Button>
+            <Button
+              disabled={!uploadSignerName.trim() || !uploadFileUrl.trim() || uploadSignedMutation.isPending}
+              onClick={() => uploadSignedMutation.mutate({ fileUrl: uploadFileUrl.trim(), signerName: uploadSignerName.trim() })}
+              data-testid="btn-confirm-upload-signed">
+              {uploadSignedMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Save Signed Copy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit modal */}
       {showEdit && (
