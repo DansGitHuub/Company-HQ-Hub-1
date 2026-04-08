@@ -308,4 +308,46 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // -- GET /api/quickbooks/catalog-mapping -----------------------------------------
+  // Returns all active materials with their current QB item mapping
+  app.get("/api/quickbooks/catalog-mapping", requireAuth, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`
+        SELECT
+          m.id,
+          m.name,
+          m.sku,
+          m.class,
+          m.status,
+          m.qb_item_id,
+          qi.full_name AS qb_item_name,
+          qi.type AS qb_item_type
+        FROM materials m
+        LEFT JOIN qb_items qi ON qi.qb_item_id = m.qb_item_id
+        WHERE m.status != 'Deleted'
+        ORDER BY m.class NULLS LAST, m.name ASC
+      `);
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // -- PATCH /api/quickbooks/catalog-mapping/:id ------------------------------------
+  // Updates the QB item mapping for a single material
+  app.patch("/api/quickbooks/catalog-mapping/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { qb_item_id } = req.body;
+      await pool.query(
+        `UPDATE materials SET qb_item_id = $1, updated_at = NOW() WHERE id = $2`,
+        [qb_item_id || null, id]
+      );
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+
 }

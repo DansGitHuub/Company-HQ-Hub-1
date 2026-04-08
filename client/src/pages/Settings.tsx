@@ -1076,6 +1076,88 @@ function CompanyInfoSection() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// QB Catalog Mapping sub-component
+function QBCatalogMappingCard() {
+  const qc = useQueryClient();
+  const { data: materials = [], isLoading: loadingMaterials } = useQuery<any[]>({
+    queryKey: ["/api/quickbooks/catalog-mapping"],
+    queryFn: () => apiRequest("GET", "/api/quickbooks/catalog-mapping").then(r => r.json()),
+  });
+  const { data: qbItems = [] } = useQuery<any[]>({
+    queryKey: ["/api/quickbooks/items"],
+    queryFn: () => apiRequest("GET", "/api/quickbooks/items").then(r => r.json()),
+  });
+  const { toast } = useToast();
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const handleMap = async (materialId: string, qbItemId: string) => {
+    setSaving(materialId);
+    try {
+      await apiRequest("PATCH", `/api/quickbooks/catalog-mapping/${materialId}`, {
+        qb_item_id: qbItemId === "__none__" ? null : qbItemId,
+      });
+      qc.invalidateQueries({ queryKey: ["/api/quickbooks/catalog-mapping"] });
+    } catch (e) {
+      toast({ title: "Save failed", variant: "destructive" });
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const classes = Array.from(new Set(materials.map((m: any) => m.class || "Uncategorized"))).sort();
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <h3 className="font-semibold text-base mb-1">Cost Code Mapping</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Link each catalog item to a QuickBooks cost code so invoices post to the right account.
+        </p>
+        {loadingMaterials ? (
+          <div className="text-sm text-muted-foreground">Loading catalog items…</div>
+        ) : (
+          <div className="space-y-6">
+            {classes.map(cls => {
+              const items = materials.filter((m: any) => (m.class || "Uncategorized") === cls);
+              return (
+                <div key={cls}>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{cls}</div>
+                  <div className="rounded-md border divide-y">
+                    {items.map((m: any) => (
+                      <div key={m.id} className="flex items-center justify-between px-3 py-2 gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium truncate">{m.name}</div>
+                          {m.sku && <div className="text-xs text-muted-foreground">{m.sku}</div>}
+                        </div>
+                        <div className="w-56 shrink-0">
+                          <select
+                            className="w-full text-sm border rounded px-2 py-1 bg-background"
+                            value={m.qb_item_id || "__none__"}
+                            disabled={saving === m.id}
+                            onChange={e => handleMap(m.id, e.target.value)}
+                          >
+                            <option value="__none__">— Not mapped —</option>
+                            {qbItems.filter((qi: any) => qi.active).map((qi: any) => (
+                              <option key={qi.qb_item_id} value={qi.qb_item_id}>
+                                {qi.full_name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 //  QuickBooks Section
 // ═══════════════════════════════════════════════════════════════════════════════
 function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
@@ -1339,6 +1421,7 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
           </CardContent>
         </Card>
       )}
+      {status?.connected && <QBCatalogMappingCard />}
     </div>
   );
 }

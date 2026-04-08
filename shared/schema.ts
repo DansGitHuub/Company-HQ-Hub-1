@@ -232,6 +232,7 @@ export const materials = pgTable("materials", {
   taxable: boolean("taxable").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  qbItemId: varchar("qb_item_id", { length: 50 }),
 });
 
 export const insertMaterialSchema = createInsertSchema(materials).omit({
