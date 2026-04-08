@@ -157,6 +157,7 @@ function AppRoutes() {
         <Route path="/equipment" component={EquipmentTracker} />
         <Route path="/search" component={SearchPage} />
         <Route path="/todos" component={TodoList} />
+        <Route path="/tasks" component={Tasks} />
         <Route path="/daily-worksheet" component={DailyWorksheet} />
         <Route path="/time" component={TimeTracking} />
         <Route path="/reports" component={ReportsPage} />
@@ -176,7 +177,6 @@ function AppRoutes() {
         <Route path="/settings" component={SettingsPage} />
         <Route path="/catalog/import" component={CatalogImport} />
         <Route path="/catalog" component={CatalogPage} />
-        <Route path="/tasks" component={Tasks} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>
