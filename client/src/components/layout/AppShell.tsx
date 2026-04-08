@@ -357,7 +357,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     materials: { icon: Hammer, label: t("nav.materials"), href: "/materials" },
     equipment: { icon: Truck, label: t("nav.equipment"), href: "/equipment" },
     todos: { icon: CheckSquare, label: t("nav.tasks"), href: "/todos" },
-    tasks: { icon: ClipboardList, label: "Task Board", href: "/tasks" },
     hiring: { icon: Users, label: t("nav.hiring"), href: "/hiring" },
     employees: { icon: User, label: t("nav.employees"), href: "/employees" },
     my_profile: { icon: User, label: "My Profile", href: "/employees/me" },
@@ -396,7 +395,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarSections: NavSection[] = [
     { label: "", items: ["dashboard"] },
-    { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "todos", "tasks", "daily_worksheet", "equipment", "scheduling", "my_day", "time_tracking", "invoices", "reports", "mors_budget", "settings_nav"] },
+    { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "todos", "daily_worksheet", "equipment", "scheduling", "my_day", "time_tracking", "invoices", "reports", "mors_budget", "settings_nav"] },
     { label: "PEOPLE", items: ["employees", "education", "hiring"] },
     { label: "COMPANY", items: ["inbox", "sops", "testing", "hq"] },
     { label: "ADMIN", items: ["admin", "catalog", "tools", "forms"] },
