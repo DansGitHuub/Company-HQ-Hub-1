@@ -2629,6 +2629,14 @@ export const estimates = pgTable("estimates", {
   issueDate: timestamp("issue_date").defaultNow(),
   sentDate: timestamp("sent_date"),
   validUntil: timestamp("valid_until"),
+  // Signature fields
+  signatureData: text("signature_data"),
+  signatureType: text("signature_type"),
+  signerName: text("signer_name"),
+  signerInitials: text("signer_initials"),
+  signerIp: text("signer_ip"),
+  signedAt: timestamp("signed_at"),
+  signedDocumentUrl: text("signed_document_url"),
 });
 
 export const estimateItems = pgTable("estimate_items", {

@@ -5060,6 +5060,116 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
+  // Sign estimate (public - customer signs from email link)
+  app.post("/api/estimates/:id/sign", async (req, res) => {
+    try {
+      const { db: dbConn } = await import("./db");
+      const { estimates } = await import("../shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const estimateId = req.params.id;
+      const { signatureData, signatureType, signerName, signerInitials } = req.body;
+
+      if (!signerName || !signerInitials) {
+        return res.status(400).json({ message: "Name and initials are required" });
+      }
+      if (!signatureData && signatureType !== "typed") {
+        return res.status(400).json({ message: "Signature is required" });
+      }
+
+      // Get the IP address
+      const signerIp =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+        req.socket?.remoteAddress ||
+        req.ip ||
+        "unknown";
+
+      const [existing] = await dbConn
+        .select({ id: estimates.id, signedAt: estimates.signedAt, contactEmail: estimates.contactEmail, clientName: estimates.clientName, stage: estimates.stage })
+        .from(estimates)
+        .where(eq(estimates.id, estimateId));
+
+      if (!existing) {
+        return res.status(404).json({ message: "Estimate not found" });
+      }
+
+      // Save signature data
+      const now = new Date();
+      const [updated] = await dbConn
+        .update(estimates)
+        .set({
+          signatureData: signatureData || null,
+          signatureType: signatureType || "typed",
+          signerName,
+          signerInitials,
+          signerIp,
+          signedAt: now,
+          stage: existing.stage === "estimate" || existing.stage === "sent" ? "approved" : existing.stage,
+          updatedAt: now,
+        })
+        .where(eq(estimates.id, estimateId))
+        .returning();
+
+      // Send confirmation email to customer
+      if (existing.contactEmail) {
+        try {
+          const { sendEstimateSignedEmail } = await import("./email");
+          await sendEstimateSignedEmail(
+            existing.contactEmail,
+            existing.clientName,
+            estimateId,
+            signerName,
+            signerInitials,
+            signerIp,
+            now,
+          );
+        } catch (emailErr) {
+          console.error("Error sending signed confirmation email:", emailErr);
+        }
+      }
+
+      res.json({ success: true, estimate: updated });
+    } catch (err) {
+      console.error("Error saving signature:", err);
+      res.status(500).json({ message: "Error saving signature" });
+    }
+  });
+
+  // Upload physical signed copy (admin only)
+  app.post("/api/estimates/:id/upload-signed", requireAuth, async (req, res) => {
+    try {
+      const { db: dbConn } = await import("./db");
+      const { estimates } = await import("../shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const estimateId = req.params.id;
+      const { fileUrl, signerName } = req.body;
+
+      if (!fileUrl) {
+        return res.status(400).json({ message: "File URL is required" });
+      }
+
+      const now = new Date();
+      const [updated] = await dbConn
+        .update(estimates)
+        .set({
+          signedDocumentUrl: fileUrl,
+          signatureType: "uploaded",
+          signerName: signerName || "Physical signature",
+          signedAt: now,
+          stage: "approved",
+          updatedAt: now,
+        })
+        .where(eq(estimates.id, estimateId))
+        .returning();
+
+      res.json({ success: true, estimate: updated });
+    } catch (err) {
+      console.error("Error uploading signed copy:", err);
+      res.status(500).json({ message: "Error uploading signed copy" });
+    }
+  });
+
   // Get estimate items
   app.get("/api/pipeline-estimates/:id/items", requireAuth, async (req, res) => {
     try {

@@ -725,3 +725,110 @@ export async function sendEstimateEmail(
     </div>
   `);
 }
+
+export async function sendEstimateSignedEmail(
+  toEmail: string,
+  customerName: string,
+  estimateId: string,
+  signerName: string,
+  signerInitials: string,
+  signerIp: string,
+  signedAt: Date,
+) {
+  const appUrl = getAppUrl();
+  const estimateUrl = `${appUrl}/estimates/${estimateId}/preview`;
+  const timestamp = signedAt.toLocaleString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+
+  await sendEmail({
+    to: toEmail,
+    subject: "Your Estimate Has Been Signed – Thank You!",
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+      <body style="margin:0;padding:0;background:#F7F3EC;font-family:Georgia,'Times New Roman',serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#F7F3EC;padding:32px 0;">
+          <tr><td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+              <!-- Header -->
+              <tr>
+                <td style="background:#1E3A2F;padding:28px 40px;text-align:center;">
+                  <h1 style="margin:0;color:#C9A84C;font-size:22px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;">Chapin Landscapes</h1>
+                  <p style="margin:4px 0 0;color:#a0b8a8;font-size:13px;">Professional Landscape Services</p>
+                </td>
+              </tr>
+              <!-- Body -->
+              <tr>
+                <td style="padding:36px 40px;">
+                  <h2 style="color:#1E3A2F;font-size:20px;margin:0 0 16px;">Thank You, ${escapeHtml(customerName)}!</h2>
+                  <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                    We've received your signed estimate. We're excited to work with you and will be in touch shortly to schedule your project.
+                  </p>
+
+                  <!-- Signature confirmation box -->
+                  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f7f2;border:1px solid #e0d8c8;border-radius:6px;margin:0 0 24px;">
+                    <tr>
+                      <td style="padding:20px 24px;">
+                        <p style="margin:0 0 12px;color:#1E3A2F;font-size:14px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Signature Confirmation</p>
+                        <table width="100%" cellpadding="4" cellspacing="0">
+                          <tr>
+                            <td style="color:#888;font-size:13px;width:140px;">Signed By:</td>
+                            <td style="color:#333;font-size:13px;font-weight:600;">${escapeHtml(signerName)}</td>
+                          </tr>
+                          <tr>
+                            <td style="color:#888;font-size:13px;">Initials:</td>
+                            <td style="color:#333;font-size:13px;font-weight:600;">${escapeHtml(signerInitials)}</td>
+                          </tr>
+                          <tr>
+                            <td style="color:#888;font-size:13px;">Date &amp; Time:</td>
+                            <td style="color:#333;font-size:13px;">${escapeHtml(timestamp)}</td>
+                          </tr>
+                          <tr>
+                            <td style="color:#888;font-size:13px;">IP Address:</td>
+                            <td style="color:#333;font-size:13px;font-family:monospace;">${escapeHtml(signerIp)}</td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <p style="color:#666;font-size:14px;line-height:1.5;margin:0 0 24px;">
+                    You can view your signed estimate at any time by clicking the button below. Please keep this email for your records.
+                  </p>
+
+                  <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+                    <tr>
+                      <td style="background:#1E3A2F;border-radius:6px;padding:14px 28px;">
+                        <a href="${estimateUrl}" style="color:#C9A84C;text-decoration:none;font-size:15px;font-weight:bold;font-family:Arial,sans-serif;letter-spacing:0.3px;">View Your Signed Estimate</a>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <p style="color:#888;font-size:13px;line-height:1.5;margin:0;border-top:1px solid #eee;padding-top:20px;">
+                    Questions? Reply to this email or call us. We look forward to transforming your outdoor space.
+                  </p>
+                </td>
+              </tr>
+              <!-- Footer -->
+              <tr>
+                <td style="background:#1E3A2F;padding:20px 40px;text-align:center;">
+                  <p style="margin:0;color:#a0b8a8;font-size:12px;">Chapin Landscapes · Professional Landscape Services</p>
+                  <p style="margin:6px 0 0;color:#7a9a8a;font-size:11px;">This is a legally binding electronic signature record.</p>
+                </td>
+              </tr>
+            </table>
+          </td></tr>
+        </table>
+      </body>
+      </html>
+    `,
+  });
+}
