@@ -179,12 +179,20 @@ export default function DailyWorksheet() {
 
   // ── Save notes ───────────────────────────────────────────────────────────────
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [notesSaved, setNotesSaved] = useState(false);
+
+  const flashSaved = () => {
+    setNotesSaved(true);
+    setTimeout(() => setNotesSaved(false), 2000);
+  };
+
   const saveNotes = async () => {
     if (!ws) return;
     setIsSavingNotes(true);
     try {
       await apiRequest("PATCH", `/api/worksheets/${ws.id}`, { notes });
       qc.invalidateQueries({ queryKey: ["/api/worksheets/today"] });
+      flashSaved();
     } finally {
       setIsSavingNotes(false);
     }
@@ -199,6 +207,7 @@ export default function DailyWorksheet() {
       try {
         setIsSavingNotes(true);
         await apiRequest("PATCH", `/api/worksheets/${wsIdRef.current}`, { notes });
+        flashSaved();
       } catch { /* silent */ } finally {
         setIsSavingNotes(false);
       }
@@ -640,9 +649,19 @@ export default function DailyWorksheet() {
             data-testid="textarea-notes"
           />
           {!isSubmitted && (
-            <Button size="sm" variant="outline" onClick={saveNotes} disabled={isSavingNotes} className="mt-2 h-7 text-xs" data-testid="btn-save-notes">
-              {isSavingNotes ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />} Save Notes
-            </Button>
+            <div className="flex items-center gap-3 mt-2">
+              <Button size="sm" variant="outline" onClick={saveNotes} disabled={isSavingNotes} className="h-7 text-xs" data-testid="btn-save-notes">
+                {isSavingNotes ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />} Save Notes
+              </Button>
+              {notesSaved && (
+                <span className="text-xs text-green-600 font-medium flex items-center gap-1" data-testid="text-notes-saved">
+                  <span>✓</span> Saved
+                </span>
+              )}
+              {isSavingNotes && !notesSaved && (
+                <span className="text-xs text-gray-400">Saving…</span>
+              )}
+            </div>
           )}
         </Section>
       </div>
