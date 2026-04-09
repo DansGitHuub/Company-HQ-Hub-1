@@ -3016,6 +3016,7 @@ export const worksheets = pgTable("worksheets", {
   date: date("date").notNull().default(sql`CURRENT_DATE`),
   notes: text("notes"),
   status: text("status").notNull().default("draft"),
+  signatureUrl: text("signature_url"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({

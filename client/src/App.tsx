@@ -45,6 +45,7 @@ import SearchPage from "@/pages/Search";
 import TodoList from "@/pages/TodoList";
 
 import DailyWorksheet from "@/pages/DailyWorksheet";
+import ClockOutReviewPage from "@/pages/ClockOutReviewPage";
 import TimeTracking from "@/pages/time/index";
 import ReportsPage from "@/pages/Reports";
 import ConsultationsPage from "@/pages/Consultations";
@@ -159,6 +160,7 @@ function AppRoutes() {
         <Route path="/todos" component={TodoList} />
         <Route path="/tasks" component={Tasks} />
         <Route path="/daily-worksheet" component={DailyWorksheet} />
+        <Route path="/clock-out-review" component={ClockOutReviewPage} />
         <Route path="/time" component={TimeTracking} />
         <Route path="/reports" component={ReportsPage} />
         <Route path="/consultations" component={ConsultationsPage} />
