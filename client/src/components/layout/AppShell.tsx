@@ -69,6 +69,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import WorksheetWidget from "@/components/WorksheetWidget";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation, effectiveRole, previewRole } = useAuth();
@@ -883,6 +884,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </SheetContent>
         </Sheet>
       </div>
+      <WorksheetWidget />
     </div>
   );
 }
