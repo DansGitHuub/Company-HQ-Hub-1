@@ -673,59 +673,45 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         ) : (
-          /* Desktop: DropdownMenu as normal */
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                className="w-full flex items-center justify-between px-2 h-12 hover:bg-white/10 text-sidebar-foreground"
-                data-testid="button-user-menu"
+          /* Desktop: direct navigation — no dropdown */
+          <div className="w-full flex items-center gap-2">
+            <Link href="/profile" className="flex-1 min-w-0">
+              <div
+                className="flex items-center gap-3 px-3 py-2 rounded-lg border border-white/20 hover:bg-white/10 text-sidebar-foreground transition-colors cursor-pointer"
+                data-testid="button-user-profile"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Avatar className="h-8 w-8 border border-white/20">
-                    <AvatarFallback className="bg-primary/20 text-xs font-bold">
-                      {user?.name?.split(" ").map((n: string) => n[0]).join("") || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="text-left min-w-0">
-                    <p className="text-sm font-bold truncate leading-none mb-1">
-                      {user?.name || user?.username}
-                    </p>
-                    <p className="text-[10px] font-medium opacity-60 uppercase tracking-wider truncate">
-                      {previewRole || effectiveRole || user?.role}
-                    </p>
-                  </div>
+                <Avatar className="h-8 w-8 border border-white/20 shrink-0">
+                  <AvatarFallback className="bg-primary/20 text-xs font-bold">
+                    {user?.name?.split(" ").map((n: string) => n[0]).join("") || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="text-left min-w-0">
+                  <p className="text-sm font-bold truncate leading-none mb-1">
+                    {user?.name || user?.username}
+                  </p>
+                  <p className="text-[10px] font-medium opacity-60 uppercase tracking-wider truncate">
+                    {previewRole || effectiveRole || user?.role}
+                  </p>
                 </div>
-                <Settings className="h-8 w-8 opacity-40 shrink-0" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 mb-2">
-              <DropdownMenuLabel>{t("nav.myAccount")}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <Link href="/profile">
-                <DropdownMenuItem className="cursor-pointer" data-testid="link-profile">
-                  <User className="mr-2 h-4 w-4" />
-                  <span>{t("nav.myProfile")}</span>
-                </DropdownMenuItem>
-              </Link>
-              <Link href="/settings">
-                <DropdownMenuItem className="cursor-pointer" data-testid="link-settings">
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>{t("nav.settings")}</span>
-                </DropdownMenuItem>
-              </Link>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                className="text-destructive cursor-pointer" 
-                onClick={() => logoutMutation.mutate()}
-                disabled={logoutMutation.isPending}
-                data-testid="button-logout"
+              </div>
+            </Link>
+            <Link href="/settings">
+              <button
+                className="p-1 rounded-lg hover:bg-white/10 text-sidebar-foreground transition-colors shrink-0"
+                data-testid="link-settings"
               >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>{t("nav.logOut")}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <Settings className="h-8 w-8 opacity-40 shrink-0" />
+              </button>
+            </Link>
+            <button
+              className="p-1 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors shrink-0"
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+              data-testid="button-logout"
+            >
+              <LogOut className="h-8 w-8 shrink-0" />
+            </button>
+          </div>
         )}
       </div>
     </div>
