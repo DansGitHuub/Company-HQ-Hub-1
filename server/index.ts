@@ -34,6 +34,7 @@ import { runSchedulingMigration } from "./migrations/scheduling";
 import { runAppSettingsMigration } from "./migrations/appSettings";
 import { runMaterialsCatalogColumnsMigration } from "./migrations/materialsCatalogColumns";
 import { runTermsAndConditionsMigration } from "./migrations/termsAndConditions";
+import { runWorksheetTablesMigration } from "./migrations/worksheetTables";
 import { registerPublicPages } from "./publicPages";
 
 const app = express();
@@ -117,6 +118,7 @@ app.use((req, res, next) => {
   await runAppSettingsMigration();
   await runMaterialsCatalogColumnsMigration();
   await runTermsAndConditionsMigration();
+  await runWorksheetTablesMigration();
 
   // Public pages must be registered BEFORE registerRoutes (which sets up the React catch-all)
   registerPublicPages(app);
