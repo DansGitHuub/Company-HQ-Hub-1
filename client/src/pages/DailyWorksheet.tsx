@@ -166,10 +166,14 @@ export default function DailyWorksheet() {
   // ── Notes state (local, saved on blur or submit) ─────────────────────────────
   const [notes, setNotes] = useState("");
   const notesInitialized = useRef(false);
+  const notesDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wsIdRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
     if (ws && !notesInitialized.current) {
       setNotes(ws.notes ?? "");
       notesInitialized.current = true;
+      wsIdRef.current = ws.id;
     }
   }, [ws]);
 
@@ -185,6 +189,23 @@ export default function DailyWorksheet() {
       setIsSavingNotes(false);
     }
   };
+
+  // ── Debounced 1s auto-save for notes ─────────────────────────────────────────
+  useEffect(() => {
+    if (!notesInitialized.current || !wsIdRef.current) return;
+    if (notesDebounce.current) clearTimeout(notesDebounce.current);
+    notesDebounce.current = setTimeout(async () => {
+      if (!wsIdRef.current) return;
+      try {
+        setIsSavingNotes(true);
+        await apiRequest("PATCH", `/api/worksheets/${wsIdRef.current}`, { notes });
+      } catch { /* silent */ } finally {
+        setIsSavingNotes(false);
+      }
+    }, 1000);
+    return () => { if (notesDebounce.current) clearTimeout(notesDebounce.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes]);
 
   // ── Submit worksheet ─────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -613,7 +634,6 @@ export default function DailyWorksheet() {
             placeholder="Add any notes about today's work…"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            onBlur={saveNotes}
             rows={4}
             disabled={isSubmitted}
             className="text-sm resize-none"
