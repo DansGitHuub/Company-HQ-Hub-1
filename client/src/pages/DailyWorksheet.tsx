@@ -601,21 +601,25 @@ export default function DailyWorksheet() {
         </Section>
 
         {/* Section 3 — Team Members */}
-        <Section icon={Users} title="Crew on Site" count={ws.teamMembers.length} color="#059669">
-          {ws.teamMembers.length > 0 && (
-            <div className="mb-3 flex flex-wrap gap-2">
-              {ws.teamMembers.map((m) => (
-                <div key={m.id} className="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-800 text-sm px-3 py-1.5 rounded-full" data-testid={`member-chip-${m.id}`}>
-                  <span className="font-medium">{m.user_name || m.username}</span>
-                  {!isSubmitted && (
-                    <button onClick={() => removeTeamMember(m.id)} className="ml-1 text-green-500 hover:text-red-500 transition-colors" data-testid={`btn-remove-member-${m.id}`}>
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-              ))}
+        <Section icon={Users} title="Crew on Site" count={ws.teamMembers.length + 1} color="#059669">
+          <div className="mb-3 flex flex-wrap gap-2">
+            {/* Logged-in user — always shown, no remove button */}
+            <div className="flex items-center gap-1.5 bg-green-100 border border-green-300 text-green-900 text-sm px-3 py-1.5 rounded-full" data-testid="member-chip-self">
+              <span className="font-medium">{user?.name || user?.username}</span>
+              <span className="text-xs text-green-600 font-normal">(You)</span>
             </div>
-          )}
+            {/* Other crew members */}
+            {ws.teamMembers.map((m) => (
+              <div key={m.id} className="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-800 text-sm px-3 py-1.5 rounded-full" data-testid={`member-chip-${m.id}`}>
+                <span className="font-medium">{m.user_name || m.username}</span>
+                {!isSubmitted && (
+                  <button onClick={() => removeTeamMember(m.id)} className="ml-1 text-green-500 hover:text-red-500 transition-colors" data-testid={`btn-remove-member-${m.id}`}>
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
 
           {!isSubmitted && availableUsers.length > 0 && (
             <div className="flex gap-2">
