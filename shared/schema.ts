@@ -3008,6 +3008,62 @@ export const insertTimeCardSchema = createInsertSchema(timeCards).omit({ id: tru
 export type InsertTimeCard = z.infer<typeof insertTimeCardSchema>;
 export type TimeCard = typeof timeCards.$inferSelect;
 
+// ─── Phase-3 Worksheets ───────────────────────────────────────────────────────
+export const worksheets = pgTable("worksheets", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
+  date: date("date").notNull().default(sql`CURRENT_DATE`),
+  notes: text("notes"),
+  status: text("status").notNull().default("draft"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  userDateUniq: unique("worksheets_user_date_uidx").on(t.userId, t.date),
+}));
+export const insertWorksheetSchema = createInsertSchema(worksheets).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWorksheet = z.infer<typeof insertWorksheetSchema>;
+export type Worksheet = typeof worksheets.$inferSelect;
+
+export const worksheetMaterials = pgTable("worksheet_materials", {
+  id: serial("id").primaryKey(),
+  worksheetId: varchar("worksheet_id", { length: 36 }).notNull().references(() => worksheets.id, { onDelete: "cascade" }),
+  materialName: text("material_name"),
+  quantity: numeric("quantity"),
+  unit: text("unit"),
+  unitCost: numeric("unit_cost"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertWorksheetMaterialSchema = createInsertSchema(worksheetMaterials).omit({ id: true, createdAt: true });
+export type InsertWorksheetMaterial = z.infer<typeof insertWorksheetMaterialSchema>;
+export type WorksheetMaterial = typeof worksheetMaterials.$inferSelect;
+
+export const worksheetExpenses = pgTable("worksheet_expenses", {
+  id: serial("id").primaryKey(),
+  worksheetId: varchar("worksheet_id", { length: 36 }).notNull().references(() => worksheets.id, { onDelete: "cascade" }),
+  description: text("description"),
+  amount: numeric("amount"),
+  category: text("category"),
+  receiptUrl: text("receipt_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertWorksheetExpenseSchema = createInsertSchema(worksheetExpenses).omit({ id: true, createdAt: true });
+export type InsertWorksheetExpense = z.infer<typeof insertWorksheetExpenseSchema>;
+export type WorksheetExpense = typeof worksheetExpenses.$inferSelect;
+
+export const worksheetTeamMembers = pgTable("worksheet_team_members", {
+  id: serial("id").primaryKey(),
+  worksheetId: varchar("worksheet_id", { length: 36 }).notNull().references(() => worksheets.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  wsUserUniq: unique("worksheet_team_members_ws_user_uidx").on(t.worksheetId, t.userId),
+}));
+export const insertWorksheetTeamMemberSchema = createInsertSchema(worksheetTeamMembers).omit({ id: true, createdAt: true });
+export type InsertWorksheetTeamMember = z.infer<typeof insertWorksheetTeamMemberSchema>;
+export type WorksheetTeamMember = typeof worksheetTeamMembers.$inferSelect;
+
 // ─── Materials Catalog ────────────────────────────────────────────────────────
 export const CATALOG_CLASSES = ["Labor", "Equipment", "Materials", "Subcontracting"] as const;
 export type CatalogClass = typeof CATALOG_CLASSES[number];
