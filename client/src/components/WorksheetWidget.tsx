@@ -5,10 +5,10 @@ import { useLocation } from "wouter";
 
 interface ActiveTimeEntry {
   id: number;
-  jobId: number | null;
-  jobName: string | null;
-  clockIn: string;
-  entryType: string;
+  job_id: string | null;
+  job_name: string | null;
+  clock_in: string;
+  entry_type: string;
 }
 
 function formatElapsed(seconds: number): string {
@@ -38,15 +38,15 @@ export default function WorksheetWidget() {
   });
 
   useEffect(() => {
-    if (!activeEntry?.clockIn) { setElapsed(0); return; }
+    if (!activeEntry?.clock_in) { setElapsed(0); return; }
     const update = () => {
-      const diff = Math.floor((Date.now() - new Date(activeEntry.clockIn).getTime()) / 1000);
+      const diff = Math.floor((Date.now() - new Date(activeEntry.clock_in).getTime()) / 1000);
       setElapsed(diff);
     };
     update();
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
-  }, [activeEntry?.clockIn]);
+  }, [activeEntry?.clock_in]);
 
   useEffect(() => {
     localStorage.setItem("worksheetWidgetMinimized", String(minimized));
@@ -78,7 +78,7 @@ export default function WorksheetWidget() {
       <div className="bg-white px-4 py-3 space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Job</span>
-          <span className="font-medium text-gray-800 truncate max-w-[180px]">{activeEntry.jobName || "No job selected"}</span>
+          <span className="font-medium text-gray-800 truncate max-w-[180px]">{activeEntry.job_name || "No job selected"}</span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Time</span>
