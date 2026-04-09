@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ClipboardList, Plus, Trash2, Send, Save, Loader2, PackageOpen,
   Receipt, Users, StickyNote, Clock, Briefcase, ChevronDown, ChevronRight,
+  ImagePlus, X,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -265,9 +266,16 @@ export default function DailyWorksheet() {
 
   // ─── Expenses form state ──────────────────────────────────────────────────────
   const EXPENSE_CATEGORIES = ["Fuel", "Materials", "Equipment Rental", "Dump Fee", "Food", "Other"];
+  const receiptInputRef = useRef<HTMLInputElement>(null);
   const [expForm, setExpForm] = useState({ description: "", amount: "", category: "", receipt_url: "" });
   const [addingExp, setAddingExp] = useState(false);
   const [showExpForm, setShowExpForm] = useState(false);
+
+  const handleReceiptFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => setExpForm((f) => ({ ...f, receipt_url: e.target?.result as string }));
+    reader.readAsDataURL(file);
+  };
 
   const addExpense = async () => {
     if (!ws || !expForm.description) return;
@@ -515,11 +523,43 @@ export default function DailyWorksheet() {
                     {EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
+
+                {/* Receipt upload */}
+                <input
+                  ref={receiptInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  data-testid="input-receipt-file"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleReceiptFile(f); }}
+                />
+                {expForm.receipt_url ? (
+                  <div className="relative w-24 h-20 rounded-md overflow-hidden border border-purple-200">
+                    <img src={expForm.receipt_url} alt="Receipt" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { setExpForm((f) => ({ ...f, receipt_url: "" })); if (receiptInputRef.current) receiptInputRef.current.value = ""; }}
+                      className="absolute top-0.5 right-0.5 bg-black/50 text-white rounded-full p-0.5 hover:bg-black/70"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => receiptInputRef.current?.click()}
+                    className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 py-1"
+                    data-testid="btn-upload-receipt"
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" /> Attach receipt photo
+                  </button>
+                )}
+
                 <div className="flex gap-2 pt-1">
                   <Button size="sm" onClick={addExpense} disabled={!expForm.description || addingExp} className="h-7 text-xs bg-purple-600 hover:bg-purple-700" data-testid="btn-add-expense">
                     {addingExp ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3 mr-1" />} Add
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowExpForm(false)} className="h-7 text-xs">Cancel</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setShowExpForm(false); setExpForm({ description: "", amount: "", category: "", receipt_url: "" }); if (receiptInputRef.current) receiptInputRef.current.value = ""; }} className="h-7 text-xs">Cancel</Button>
                 </div>
               </div>
             ) : (
