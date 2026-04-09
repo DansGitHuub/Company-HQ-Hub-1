@@ -81,6 +81,21 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
       if (result.rows.length === 0) {
         return res.status(404).json({ message: "Active time entry not found" });
       }
+    // Update time_card and worksheet_session on clock-out
+    try {
+      const tcResult = await pool.query(
+        `UPDATE time_cards SET clock_out_time = NOW(), total_minutes = ROUND(EXTRACT(EPOCH FROM (NOW() - clock_in_time))/60) WHERE employee_id = $1 AND clock_out_time IS NULL RETURNING session_id`,
+        [userId]
+      );
+      if (tcResult.rows.length > 0 && tcResult.rows[0].session_id) {
+        await pool.query(
+          `UPDATE worksheet_sessions SET status = 'pending_review', updated_at = NOW() WHERE id = $1`,
+          [tcResult.rows[0].session_id]
+        );
+      }
+    } catch (wsErr: any) {
+      console.error('Failed to update time_card/worksheet_session on clock-out:', wsErr.message);
+    }
       return res.json(result.rows[0]);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
