@@ -371,7 +371,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     consultations: { icon: CalendarClock, label: "Consultations", href: "/consultations" },
     reports: { icon: BarChart2, label: "Reports", href: "/reports" },
     mors_budget: { icon: TrendingUp, label: "MORS Budget", href: "/mors-budget" },
-    settings_nav: { icon: Settings, label: t("nav.settings"), href: "/settings" },
     education: { icon: GraduationCap, label: t("nav.resourceLibrary"), href: "/education" },
     help: { icon: LifeBuoy, label: t("nav.help"), href: "/help" },
     hq: { icon: Building2, label: t("nav.companyHQ"), href: "/hq" },
@@ -395,7 +394,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarSections: NavSection[] = [
     { label: "", items: ["dashboard"] },
-    { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "todos", "daily_worksheet", "my_day", "time_tracking", "invoices", "reports", "mors_budget", "settings_nav", "scheduling", "equipment"] },
+    { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "todos", "daily_worksheet", "my_day", "time_tracking", "invoices", "reports", "mors_budget", "scheduling", "equipment"] },
     { label: "PEOPLE", items: ["employees", "education", "hiring"] },
     { label: "COMPANY", items: ["inbox", "sops", "testing", "hq"] },
     { label: "ADMIN", items: ["admin", "catalog", "tools", "forms"] },
@@ -623,27 +622,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         })}
       </div>
 
-      {["Admin", "Master Admin", "Manager"].includes(effectiveRole || "") && (
-        <div className="px-2 pb-1 pt-2">
-          <Link href="/settings" onClick={() => setIsMobileOpen(false)}>
-            <div
-              data-testid="nav-settings"
-              className={cn(
-                "flex items-center gap-3 rounded-lg font-semibold transition-all cursor-pointer",
-                "border border-white/5 shadow-sm px-4 text-[13px]",
-                "bg-gradient-to-b from-white/[0.08] to-transparent",
-                location.startsWith("/settings")
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] border-sidebar-primary/50"
-                  : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground hover:border-white/10"
-              )}
-              style={{ height: 36, display: "flex", alignItems: "center" }}
-            >
-              <Cog className="h-4 w-4 shrink-0" />
-              <span>Settings</span>
-            </div>
-          </Link>
-        </div>
-      )}
 
       <div className="mt-auto p-4 border-t-2 border-primary/20 bg-gradient-to-t from-primary/5 to-transparent">
         {isMobileSheet ? (
@@ -718,7 +696,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     </p>
                   </div>
                 </div>
-                <Settings className="h-4 w-4 opacity-40 shrink-0" />
+                <Settings className="h-8 w-8 opacity-40 shrink-0" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 mb-2">
