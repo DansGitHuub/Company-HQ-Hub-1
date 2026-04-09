@@ -55,6 +55,7 @@ interface ActiveEntry {
   id: number;
   job_id: string | null;
   job_name: string | null;
+  work_area_name: string | null;
   clock_in: string;
   entry_type: string;
 }
@@ -354,20 +355,32 @@ export default function DailyWorksheet() {
           <h1 className="text-2xl font-bold">{formatDate(ws.date)}</h1>
 
           {activeEntry ? (
-            <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
-              {activeEntry.job_name && (
-                <div className="flex items-center gap-1.5 opacity-90">
-                  <Briefcase className="h-3.5 w-3.5" />
-                  <span className="font-medium">{activeEntry.job_name}</span>
+            <div className="mt-3 space-y-1.5">
+              {(activeEntry.job_name || activeEntry.work_area_name) && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm opacity-90">
+                  {activeEntry.job_name && (
+                    <div className="flex items-center gap-1.5">
+                      <Briefcase className="h-3.5 w-3.5" />
+                      <span className="font-semibold">{activeEntry.job_name}</span>
+                    </div>
+                  )}
+                  {activeEntry.work_area_name && (
+                    <div className="flex items-center gap-1 opacity-80">
+                      <span className="text-white/50">·</span>
+                      <span>{activeEntry.work_area_name}</span>
+                    </div>
+                  )}
                 </div>
               )}
-              <div className="flex items-center gap-1.5 opacity-90">
-                <Clock className="h-3.5 w-3.5" />
-                <span className="font-mono font-bold text-base">{formatElapsed(elapsed)}</span>
-              </div>
-              <div className="flex items-center gap-1.5 opacity-75 text-xs">
-                <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                Clocked In
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-1.5 opacity-90">
+                  <Clock className="h-3.5 w-3.5" />
+                  <span className="font-mono font-bold text-base">{formatElapsed(elapsed)}</span>
+                </div>
+                <div className="flex items-center gap-1.5 opacity-75 text-xs">
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                  Clocked In
+                </div>
               </div>
             </div>
           ) : (
