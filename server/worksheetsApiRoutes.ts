@@ -60,6 +60,111 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── GET /api/worksheets/export ────────────────────────────────────────────────
+  app.get("/api/worksheets/export", requireAuth, async (req, res) => {
+    try {
+      const statusParam = (req.query.status as string) || "approved,submitted";
+      const statuses = statusParam.split(",").map((s) => s.trim()).filter(Boolean);
+      const dateFrom = req.query.dateFrom as string | undefined;
+      const dateTo   = req.query.dateTo   as string | undefined;
+
+      const params: any[] = [statuses];
+      let dateFilter = "";
+      if (dateFrom) { params.push(dateFrom); dateFilter += ` AND w.date >= $${params.length}`; }
+      if (dateTo)   { params.push(dateTo);   dateFilter += ` AND w.date <= $${params.length}`; }
+
+      const result = await pool.query(
+        `SELECT
+           w.date,
+           COALESCE(u.name, u.username) AS employee,
+           j.client                      AS job_area,
+           tc.clock_in_time,
+           tc.clock_out_time,
+           tc.total_minutes,
+           COALESCE(mat.total, 0)        AS materials_total,
+           COALESCE(exp.total, 0)        AS expenses_total,
+           w.notes
+         FROM worksheets w
+         LEFT JOIN users u ON u.id = w.user_id
+         LEFT JOIN jobs  j ON j.id = w.job_id
+         LEFT JOIN LATERAL (
+           SELECT clock_in_time, clock_out_time, total_minutes
+           FROM time_cards
+           WHERE employee_id = w.user_id AND date = w.date
+           ORDER BY clock_in_time ASC LIMIT 1
+         ) tc ON true
+         LEFT JOIN (
+           SELECT worksheet_id, SUM(COALESCE(quantity,0) * COALESCE(unit_cost,0)) AS total
+           FROM worksheet_materials GROUP BY worksheet_id
+         ) mat ON mat.worksheet_id = w.id
+         LEFT JOIN (
+           SELECT worksheet_id, SUM(COALESCE(amount,0)) AS total
+           FROM worksheet_expenses GROUP BY worksheet_id
+         ) exp ON exp.worksheet_id = w.id
+         WHERE w.status = ANY($1)
+         ${dateFilter}
+         ORDER BY w.date DESC, u.name ASC`,
+        params
+      );
+
+      // ── Build CSV ──────────────────────────────────────────────────────────
+      const escape = (v: any): string => {
+        if (v === null || v === undefined) return "";
+        const s = String(v);
+        if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+      };
+
+      const fmtTime = (ts: Date | null | undefined) => {
+        if (!ts) return "";
+        return new Date(ts).toLocaleTimeString("en-US", {
+          hour: "2-digit", minute: "2-digit", hour12: true,
+        });
+      };
+
+      const fmtMoney = (v: any) => {
+        const n = parseFloat(v);
+        return isNaN(n) ? "0.00" : n.toFixed(2);
+      };
+
+      const fmtHours = (mins: number | null) => {
+        if (mins === null || mins === undefined) return "";
+        return (mins / 60).toFixed(2);
+      };
+
+      const headers = [
+        "Date", "Employee", "Job/Area",
+        "Clock-In", "Clock-Out", "Hours",
+        "Materials Total", "Expenses Total", "Notes",
+      ].join(",");
+
+      const rows = result.rows.map((r) =>
+        [
+          escape(r.date),
+          escape(r.employee),
+          escape(r.job_area),
+          escape(fmtTime(r.clock_in_time)),
+          escape(fmtTime(r.clock_out_time)),
+          escape(fmtHours(r.total_minutes)),
+          escape(fmtMoney(r.materials_total)),
+          escape(fmtMoney(r.expenses_total)),
+          escape(r.notes),
+        ].join(",")
+      );
+
+      const csv = [headers, ...rows].join("\r\n");
+      const today = new Date().toISOString().slice(0, 10);
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="worksheets-${today}.csv"`);
+      return res.send(csv);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── GET /api/worksheets/today ─────────────────────────────────────────────────
   app.get("/api/worksheets/today", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;

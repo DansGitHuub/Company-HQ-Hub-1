@@ -1,12 +1,14 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Loader2, ClipboardList } from "lucide-react";
+import { Loader2, ClipboardList, Download } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -48,6 +50,7 @@ function fmtDate(dateStr: string) {
 
 export default function WorksheetReviewList() {
   const [, navigate] = useLocation();
+  const [exporting, setExporting] = useState(false);
 
   const { data: worksheets = [], isLoading, error } = useQuery<WorksheetSummary[]>({
     queryKey: ["/api/worksheets"],
@@ -58,19 +61,56 @@ export default function WorksheetReviewList() {
   const others    = worksheets.filter((w) => w.status !== "submitted");
   const sorted    = [...submitted, ...others];
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch("/api/worksheets/export?status=approved,submitted", {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      const today = new Date().toISOString().slice(0, 10);
+      a.download = `worksheets-${today}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <ClipboardList className="h-5 w-5 text-primary" />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <ClipboardList className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Worksheet Review</h1>
+            <p className="text-sm text-muted-foreground">
+              Review and approve submitted daily worksheets from field staff.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Worksheet Review</h1>
-          <p className="text-sm text-muted-foreground">
-            Review and approve submitted daily worksheets from field staff.
-          </p>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="button-export-csv"
+          onClick={handleExport}
+          disabled={exporting}
+          className="gap-2 shrink-0"
+        >
+          {exporting
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <Download className="h-4 w-4" />}
+          Export CSV
+        </Button>
       </div>
 
       {/* Summary counts */}
