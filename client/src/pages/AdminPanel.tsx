@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import SignaturePad from "@/components/forms/SignaturePad";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -107,6 +108,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
   isMasterAdmin: boolean;
   t: any;
 }) {
+  const [, navigate] = useLocation();
   const groups = [
     {
       label: "People & HR",
@@ -146,6 +148,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
       items: [
         { value: "process-auditor", label: "Process Auditor", icon: ClipboardCheck },
         { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle },
+        { value: "worksheet-review", label: "Worksheet Review", icon: FileText, href: "/worksheet-review" },
       ],
     },
     {
@@ -167,11 +170,18 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
           </p>
           {group.items.map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.value;
+            const isActive = (item as any).href ? false : activeTab === item.value;
+            const handleClick = () => {
+              if ((item as any).href) {
+                navigate((item as any).href);
+              } else {
+                setActiveTab(item.value);
+              }
+            };
             return (
               <button
                 key={item.value}
-                onClick={() => setActiveTab(item.value)}
+                onClick={handleClick}
                 data-testid={`admin-nav-${item.value}`}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
                   isActive
@@ -181,9 +191,9 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className="truncate">{item.label}</span>
-                {item.badge && (
+                {(item as any).badge && (
                   <Badge variant="destructive" className="ml-auto h-5 min-w-[20px] px-1 text-xs shrink-0">
-                    {item.badge}
+                    {(item as any).badge}
                   </Badge>
                 )}
               </button>

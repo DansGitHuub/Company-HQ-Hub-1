@@ -25,6 +25,41 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
     };
   }
 
+  // ── GET /api/worksheets (admin list) ─────────────────────────────────────────
+  app.get("/api/worksheets", requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT
+           w.id,
+           w.date,
+           w.status,
+           w.user_id,
+           u.name  AS employee_name,
+           u.username AS employee_username,
+           j.client AS job_name,
+           COALESCE(mat.total, 0) AS materials_total,
+           COALESCE(exp.total, 0) AS expenses_total
+         FROM worksheets w
+         LEFT JOIN users u ON u.id = w.user_id
+         LEFT JOIN jobs  j ON j.id = w.job_id
+         LEFT JOIN (
+           SELECT worksheet_id, SUM(quantity * unit_cost) AS total
+           FROM worksheet_materials
+           GROUP BY worksheet_id
+         ) mat ON mat.worksheet_id = w.id
+         LEFT JOIN (
+           SELECT worksheet_id, SUM(amount) AS total
+           FROM worksheet_expenses
+           GROUP BY worksheet_id
+         ) exp ON exp.worksheet_id = w.id
+         ORDER BY w.date DESC, w.created_at DESC`
+      );
+      return res.json(result.rows);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── GET /api/worksheets/today ─────────────────────────────────────────────────
   app.get("/api/worksheets/today", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
