@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, boolean, timestamp, integer, jsonb, serial, numeric, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, timestamp, integer, jsonb, serial, numeric, primaryKey, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -2912,11 +2912,101 @@ export const dailyWorksheets = pgTable("daily_worksheets", {
   submittedAt: timestamp("submitted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+
+  // Link to structured worksheet session
+  worksheetSessionId: integer("worksheet_session_id"),
 });
 
 export const insertDailyWorksheetSchema = createInsertSchema(dailyWorksheets).omit({ id: true, createdAt: true, updatedAt: true, submittedAt: true });
 export type InsertDailyWorksheet = z.infer<typeof insertDailyWorksheetSchema>;
 export type DailyWorksheet = typeof dailyWorksheets.$inferSelect;
+
+// ── Worksheet Sessions ────────────────────────────────────────────────────────
+export const worksheetSessions = pgTable("worksheet_sessions", {
+  id: serial("id").primaryKey(),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+  employeeId: varchar("employee_id", { length: 36 }).notNull().references(() => users.id),
+  date: date("date").notNull(),
+  status: text("status").notNull().default("active"), // active | pending_review | submitted | approved | archived
+  isDuplicate: boolean("is_duplicate").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  submittedAt: timestamp("submitted_at"),
+});
+
+export const insertWorksheetSessionSchema = createInsertSchema(worksheetSessions).omit({ id: true, createdAt: true, updatedAt: true, submittedAt: true });
+export type InsertWorksheetSession = z.infer<typeof insertWorksheetSessionSchema>;
+export type WorksheetSession = typeof worksheetSessions.$inferSelect;
+
+// ── Worksheet Time Entries ────────────────────────────────────────────────────
+export const worksheetTimeEntries = pgTable("worksheet_time_entries", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull().references(() => worksheetSessions.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+  workAreaId: varchar("work_area_id", { length: 36 }), // no FK — table may not exist
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time"),
+  durationMinutes: integer("duration_minutes"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWorksheetTimeEntrySchema = createInsertSchema(worksheetTimeEntries).omit({ id: true, createdAt: true });
+export type InsertWorksheetTimeEntry = z.infer<typeof insertWorksheetTimeEntrySchema>;
+export type WorksheetTimeEntry = typeof worksheetTimeEntries.$inferSelect;
+
+// ── Worksheet Materials Used ──────────────────────────────────────────────────
+export const worksheetMaterialsUsed = pgTable("worksheet_materials_used", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull().references(() => worksheetSessions.id),
+  materialId: varchar("material_id", { length: 36 }).references(() => materials.id),
+  miscName: text("misc_name"),
+  quantity: numeric("quantity").notNull(),
+  unit: text("unit"),
+  notes: text("notes"),
+  receiptPhotos: text("receipt_photos").array().default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWorksheetMaterialsUsedSchema = createInsertSchema(worksheetMaterialsUsed).omit({ id: true, createdAt: true });
+export type InsertWorksheetMaterialsUsed = z.infer<typeof insertWorksheetMaterialsUsedSchema>;
+export type WorksheetMaterialsUsed = typeof worksheetMaterialsUsed.$inferSelect;
+
+// ── Worksheet Photos ──────────────────────────────────────────────────────────
+export const worksheetPhotos = pgTable("worksheet_photos", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull().references(() => worksheetSessions.id),
+  photoUrl: text("photo_url").notNull(),
+  photoType: text("photo_type").notNull(), // receipt | work | before | after
+  caption: text("caption"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWorksheetPhotoSchema = createInsertSchema(worksheetPhotos).omit({ id: true, createdAt: true });
+export type InsertWorksheetPhoto = z.infer<typeof insertWorksheetPhotoSchema>;
+export type WorksheetPhoto = typeof worksheetPhotos.$inferSelect;
+
+// ── Time Cards ────────────────────────────────────────────────────────────────
+export const timeCards = pgTable("time_cards", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => worksheetSessions.id),
+  employeeId: varchar("employee_id", { length: 36 }).notNull().references(() => users.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+  date: date("date").notNull(),
+  clockInTime: timestamp("clock_in_time").notNull(),
+  clockOutTime: timestamp("clock_out_time"),
+  totalMinutes: integer("total_minutes"),
+  status: text("status").notNull().default("draft"), // draft | submitted | approved
+  signatureName: text("signature_name"),
+  signedAt: timestamp("signed_at"),
+  submittedAt: timestamp("submitted_at"),
+  qboExportedAt: timestamp("qbo_exported_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTimeCardSchema = createInsertSchema(timeCards).omit({ id: true, createdAt: true });
+export type InsertTimeCard = z.infer<typeof insertTimeCardSchema>;
+export type TimeCard = typeof timeCards.$inferSelect;
 
 // ─── Materials Catalog ────────────────────────────────────────────────────────
 export const CATALOG_CLASSES = ["Labor", "Equipment", "Materials", "Subcontracting"] as const;
