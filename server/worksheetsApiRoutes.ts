@@ -185,4 +185,46 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
       return res.status(500).json({ message: err.message });
     }
   });
+
+  // ── GET /api/materials/catalog?q= ────────────────────────────────────────────
+  // Searches both the materials inventory and catalog_items tables.
+  // Returns: [{ id, name, unit, unit_cost, source }]
+  app.get("/api/materials/catalog", requireAuth, async (req, res) => {
+    const q = ((req.query.q as string) || "").trim();
+    const pattern = `%${q}%`;
+    try {
+      const [fromMaterials, fromCatalog] = await Promise.all([
+        pool.query(
+          `SELECT id::text, name, NULL AS unit, NULL AS unit_cost, 'inventory' AS source
+           FROM materials
+           WHERE ($1 = '' OR name ILIKE $2) AND status = 'Active'
+           ORDER BY name LIMIT 25`,
+          [q, pattern]
+        ),
+        pool.query(
+          `SELECT id::text, name, units AS unit, cost AS unit_cost, 'catalog' AS source
+           FROM catalog_items
+           WHERE ($1 = '' OR name ILIKE $2)
+           ORDER BY name LIMIT 25`,
+          [q, pattern]
+        ),
+      ]);
+
+      // Merge, dedupe by lowercase name, catalog takes priority
+      const seen = new Set<string>();
+      const results: any[] = [];
+      for (const row of [...fromCatalog.rows, ...fromMaterials.rows]) {
+        const key = row.name.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          results.push(row);
+        }
+      }
+      results.sort((a, b) => a.name.localeCompare(b.name));
+
+      return res.json(results.slice(0, 30));
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
 }

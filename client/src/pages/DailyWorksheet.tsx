@@ -204,6 +204,28 @@ export default function DailyWorksheet() {
   const [addingMat, setAddingMat] = useState(false);
   const [showMatForm, setShowMatForm] = useState(false);
 
+  // Catalog autocomplete
+  const [catalogSuggestions, setCatalogSuggestions] = useState<{ id: string; name: string; unit: string | null; unit_cost: string | null }[]>([]);
+  const [showCatalogDrop, setShowCatalogDrop] = useState(false);
+  const catalogDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (catalogDebounce.current) clearTimeout(catalogDebounce.current);
+    const q = matForm.material_name.trim();
+    if (q.length < 2) { setCatalogSuggestions([]); setShowCatalogDrop(false); return; }
+    catalogDebounce.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/materials/catalog?q=${encodeURIComponent(q)}`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setCatalogSuggestions(data);
+          setShowCatalogDrop(data.length > 0);
+        }
+      } catch { /* silent */ }
+    }, 280);
+    return () => { if (catalogDebounce.current) clearTimeout(catalogDebounce.current); };
+  }, [matForm.material_name]);
+
   const addMaterial = async () => {
     if (!ws || !matForm.material_name) return;
     setAddingMat(true);
@@ -388,13 +410,41 @@ export default function DailyWorksheet() {
             showMatForm ? (
               <div className="space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
                 <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    placeholder="Material name *"
-                    value={matForm.material_name}
-                    onChange={(e) => setMatForm((f) => ({ ...f, material_name: e.target.value }))}
-                    className="h-8 text-sm col-span-2"
-                    data-testid="input-material-name"
-                  />
+                  <div className="col-span-2 relative">
+                    <Input
+                      placeholder="Material name *"
+                      value={matForm.material_name}
+                      onChange={(e) => setMatForm((f) => ({ ...f, material_name: e.target.value }))}
+                      onBlur={() => setTimeout(() => setShowCatalogDrop(false), 150)}
+                      className="h-8 text-sm"
+                      data-testid="input-material-name"
+                    />
+                    {showCatalogDrop && (
+                      <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {catalogSuggestions.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex justify-between items-center gap-2"
+                            onMouseDown={() => {
+                              setMatForm((f) => ({
+                                ...f,
+                                material_name: s.name,
+                                unit: s.unit ?? f.unit,
+                                unit_cost: s.unit_cost ?? f.unit_cost,
+                              }));
+                              setShowCatalogDrop(false);
+                            }}
+                          >
+                            <span className="font-medium text-gray-800">{s.name}</span>
+                            <span className="text-xs text-gray-400 shrink-0">
+                              {s.unit ? s.unit : ""}{s.unit_cost ? ` · $${parseFloat(s.unit_cost).toFixed(2)}` : ""}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <Input placeholder="Qty" value={matForm.quantity} onChange={(e) => setMatForm((f) => ({ ...f, quantity: e.target.value }))} className="h-8 text-sm" data-testid="input-material-qty" />
                   <Input placeholder="Unit (bag, gal…)" value={matForm.unit} onChange={(e) => setMatForm((f) => ({ ...f, unit: e.target.value }))} className="h-8 text-sm" data-testid="input-material-unit" />
                   <Input placeholder="Unit cost ($)" value={matForm.unit_cost} onChange={(e) => setMatForm((f) => ({ ...f, unit_cost: e.target.value }))} className="h-8 text-sm" data-testid="input-material-cost" />
