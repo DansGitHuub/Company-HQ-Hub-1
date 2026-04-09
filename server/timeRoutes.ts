@@ -11,24 +11,51 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
     // Derive entry_type: use provided value, or fallback to "billable" when a job is given
     const resolvedEntryType = entry_type || (job_id ? "billable" : "shop_time");
 
+    const client = await pool.connect();
     try {
+      await client.query("BEGIN");
+
       // Check if already clocked in
-      const active = await pool.query(
+      const active = await client.query(
         `SELECT id FROM time_entries WHERE user_id=$1 AND clock_out IS NULL LIMIT 1`,
         [userId]
       );
       if (active.rows.length > 0) {
+        await client.query("ROLLBACK");
         return res.status(400).json({ message: "Already clocked in. Please clock out first." });
       }
 
-      const result = await pool.query(
+      // Insert the time entry
+      const entryResult = await client.query(
         `INSERT INTO time_entries (user_id, job_id, entry_type, clock_in, job_work_area_id, work_area_name)
          VALUES ($1, $2, $3, NOW(), $4, $5) RETURNING *`,
         [userId, job_id || null, resolvedEntryType, job_work_area_id || null, work_area_name || null]
       );
-      return res.status(201).json(result.rows[0]);
+      const timeEntry = entryResult.rows[0];
+
+      // If a job is associated, create a worksheet session and time card
+      if (job_id) {
+        const sessionResult = await client.query(
+          `INSERT INTO worksheet_sessions (job_id, employee_id, date, status, created_at, updated_at)
+           VALUES ($1, $2, CURRENT_DATE, 'active', NOW(), NOW()) RETURNING id`,
+          [job_id, userId]
+        );
+        const sessionId = sessionResult.rows[0].id;
+
+        await client.query(
+          `INSERT INTO time_cards (session_id, employee_id, job_id, date, clock_in_time, status, created_at)
+           VALUES ($1, $2, $3, CURRENT_DATE, NOW(), 'draft', NOW())`,
+          [sessionId, userId, job_id]
+        );
+      }
+
+      await client.query("COMMIT");
+      return res.status(201).json(timeEntry);
     } catch (err: any) {
+      await client.query("ROLLBACK");
       return res.status(500).json({ message: err.message });
+    } finally {
+      client.release();
     }
   });
 
