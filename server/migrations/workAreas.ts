@@ -63,7 +63,8 @@ export async function runWorkAreasMigration() {
       actual_hours       DECIMAL(6,2)   NOT NULL DEFAULT 0,
       status             VARCHAR(20)    NOT NULL DEFAULT 'pending',
       sort_order         INTEGER        NOT NULL DEFAULT 0,
-      notes              TEXT
+      notes              TEXT,
+      is_active          BOOLEAN        NOT NULL DEFAULT true
     );
   `);
 

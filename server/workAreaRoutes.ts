@@ -24,6 +24,10 @@ const patchWorkAreaSchema = z.object({
 
 export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRole: any) {
 
+  // ── Migrate: is_active column on job_work_areas (fire-and-forget) ─────────
+  pool.query(`ALTER TABLE job_work_areas ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true`)
+    .catch((err: any) => console.error("[workAreaRoutes] is_active migration:", err.message));
+
   // ── GET /api/work-area-types ─────────────────────────────────────────────
   // ?all=true returns inactive items too (used by settings page)
   app.get("/api/work-area-types", requireAuth, async (req, res) => {
@@ -93,24 +97,35 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
   });
 
   // ── GET /api/jobs/:id/work-areas ─────────────────────────────────────────
-  // ?active=true  → exclude completed areas
+  // Soft-deleted rows (is_active=false) are always excluded.
+  // ?active=true        → also exclude completed areas
   // ?status=pending,active  → comma-separated status filter
+  // ?includeDeleted=true    → admin only: include soft-deleted rows
   app.get("/api/jobs/:id/work-areas", requireAuth, async (req, res) => {
     try {
-      const { active, status } = req.query as Record<string, string | undefined>;
+      const { active, status, includeDeleted } = req.query as Record<string, string | undefined>;
+      const userRole: string = (req.user as any)?.role ?? "";
 
-      let statusFilter = "";
       const params: any[] = [req.params.id];
+      const extraClauses: string[] = [];
 
+      // Soft-delete visibility
+      if (!(includeDeleted === "true" && userRole === "Admin")) {
+        extraClauses.push(`jwa.is_active = true`);
+      }
+
+      // Status filter
       if (active === "true") {
-        statusFilter = `AND jwa.status != 'completed'`;
+        extraClauses.push(`jwa.status != 'completed'`);
       } else if (status) {
         const statuses = status.split(",").map((s) => s.trim()).filter(Boolean);
         if (statuses.length > 0) {
           params.push(statuses);
-          statusFilter = `AND jwa.status = ANY($2::text[])`;
+          extraClauses.push(`jwa.status = ANY($${params.length}::text[])`);
         }
       }
+
+      const whereExtra = extraClauses.length ? "AND " + extraClauses.join(" AND ") : "";
 
       const { rows } = await pool.query(
         `SELECT jwa.*,
@@ -121,7 +136,7 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
                 ) AS actual_hours_computed
          FROM job_work_areas jwa
          WHERE jwa.job_id = $1
-         ${statusFilter}
+         ${whereExtra}
          ORDER BY
            CASE jwa.status
              WHEN 'active'    THEN 0
@@ -245,6 +260,27 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
       );
 
       return res.json(rows[0]);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── DELETE /api/jobs/:jobId/work-areas/:id ───────────────────────────────
+  // Admin only. Soft-deletes the work area (sets is_active = false).
+  // The work area is hidden from all field-worker views immediately.
+  app.delete("/api/jobs/:jobId/work-areas/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `UPDATE job_work_areas
+         SET is_active = false
+         WHERE id = $1 AND job_id = $2
+         RETURNING *`,
+        [req.params.id, req.params.jobId]
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ message: "Work area not found on this job" });
+      }
+      return res.json({ success: true, deactivated: rows[0] });
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
     }

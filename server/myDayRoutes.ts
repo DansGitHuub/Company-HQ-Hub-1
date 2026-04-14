@@ -39,7 +39,7 @@ export function registerMyDayRoutes(app: Express) {
          LEFT JOIN job_assignments ja
            ON ja.job_id = j.id
            AND ja.scheduled_date = j.scheduled_date::date
-         LEFT JOIN job_work_areas jwa ON jwa.job_id = j.id
+         LEFT JOIN job_work_areas jwa ON jwa.job_id = j.id AND jwa.is_active = true
          WHERE j.scheduled_date::date = CURRENT_DATE
            AND j.status NOT IN ('cancelled', 'completed', 'invoiced')
            AND ($1::text IS NULL OR ja.employee_id = $1)
@@ -67,7 +67,7 @@ export function registerMyDayRoutes(app: Express) {
            FROM jobs j
            LEFT JOIN customers c ON c.id = j.customer_id
            LEFT JOIN properties p ON p.id = j.property_id
-           LEFT JOIN job_work_areas jwa ON jwa.job_id = j.id
+           LEFT JOIN job_work_areas jwa ON jwa.job_id = j.id AND jwa.is_active = true
            WHERE j.scheduled_date::date = CURRENT_DATE
              AND j.status NOT IN ('cancelled', 'completed', 'invoiced')
            GROUP BY j.id, c.first_name, c.last_name, c.company_name, p.address
