@@ -2,6 +2,8 @@ import { Express } from "express";
 import { z } from "zod";
 import { pool } from "./db";
 
+const VALID_STATUSES = ["pending", "active", "on_hold", "completed"] as const;
+
 const createWorkAreaSchema = z.object({
   work_area_type_id: z.string().optional().nullable(),
   name:              z.string().min(1).optional(),
@@ -11,6 +13,14 @@ const createWorkAreaSchema = z.object({
 }).refine((d) => d.work_area_type_id || d.name, {
   message: "work_area_type_id or name is required",
 });
+
+const patchWorkAreaSchema = z.object({
+  name:            z.string().min(1).optional(),
+  estimated_hours: z.number().positive().optional().nullable(),
+  sort_order:      z.number().int().optional(),
+  notes:           z.string().optional().nullable(),
+  status:          z.enum(VALID_STATUSES).optional(),
+}).strict();
 
 export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRole: any) {
 
@@ -183,7 +193,64 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
     }
   });
 
-  // ── PUT /api/job-work-areas/:id ──────────────────────────────────────────
+  // ── PATCH /api/jobs/:jobId/work-areas/:id ────────────────────────────────
+  // Admin only. Any subset of: name, estimated_hours, sort_order, notes, status
+  // Valid status values: pending | active | on_hold | completed
+  app.patch("/api/jobs/:jobId/work-areas/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    const parsed = patchWorkAreaSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Invalid body" });
+    }
+
+    const data = parsed.data;
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ message: "No fields provided to update" });
+    }
+
+    try {
+      // Confirm the work area belongs to the specified job
+      const check = await pool.query(
+        `SELECT id FROM job_work_areas WHERE id = $1 AND job_id = $2`,
+        [req.params.id, req.params.jobId]
+      );
+      if (check.rows.length === 0) {
+        return res.status(404).json({ message: "Work area not found on this job" });
+      }
+
+      // Build dynamic SET clause — only touch fields that were sent
+      const setClauses: string[] = [];
+      const values: any[] = [];
+      let idx = 1;
+
+      const fieldMap: Record<string, string> = {
+        name:            "name",
+        estimated_hours: "estimated_hours",
+        sort_order:      "sort_order",
+        notes:           "notes",
+        status:          "status",
+      };
+
+      for (const [key, col] of Object.entries(fieldMap)) {
+        if (key in data) {
+          setClauses.push(`${col} = $${idx}`);
+          values.push((data as any)[key] ?? null);
+          idx++;
+        }
+      }
+
+      values.push(req.params.id);
+      const { rows } = await pool.query(
+        `UPDATE job_work_areas SET ${setClauses.join(", ")} WHERE id = $${idx} RETURNING *`,
+        values
+      );
+
+      return res.json(rows[0]);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── PUT /api/job-work-areas/:id ── legacy alias (auth only, no admin gate)
   app.put("/api/job-work-areas/:id", requireAuth, async (req, res) => {
     const { estimated_hours, status, notes } = req.body;
     try {
