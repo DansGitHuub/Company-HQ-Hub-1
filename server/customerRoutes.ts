@@ -90,6 +90,20 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
         .status(400)
         .json({ message: "First name and last name are required" });
 
+    // Prevent duplicate customers with the same name
+    const dupCheck = await pool.query(
+      `SELECT id, first_name, last_name, company_name FROM customers
+       WHERE LOWER(first_name) = LOWER($1) AND LOWER(last_name) = LOWER($2)
+       LIMIT 1`,
+      [first_name.trim(), last_name.trim()]
+    );
+    if (dupCheck.rows.length > 0) {
+      return res.status(409).json({
+        message: `A customer named ${first_name.trim()} ${last_name.trim()} already exists`,
+        existing: dupCheck.rows[0],
+      });
+    }
+
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
