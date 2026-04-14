@@ -1,5 +1,16 @@
 import { Express } from "express";
+import { z } from "zod";
 import { pool } from "./db";
+
+const createWorkAreaSchema = z.object({
+  work_area_type_id: z.string().optional().nullable(),
+  name:              z.string().min(1).optional(),
+  estimated_hours:   z.number().positive().optional().nullable(),
+  sort_order:        z.number().int().default(0),
+  notes:             z.string().optional().nullable(),
+}).refine((d) => d.work_area_type_id || d.name, {
+  message: "work_area_type_id or name is required",
+});
 
 export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRole: any) {
 
@@ -117,25 +128,54 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
     }
   });
 
-  // ── POST /api/jobs/:id/work-areas ────────────────────────────────────────
-  app.post("/api/jobs/:id/work-areas", requireAuth, async (req, res) => {
-    const { work_area_type_id, estimated_hours, name: customName } = req.body;
-    if (!work_area_type_id && !customName) {
-      return res.status(400).json({ message: "work_area_type_id or name is required" });
+  // ── POST /api/jobs/:jobId/work-areas ─────────────────────────────────────
+  // Admin only. Accepts:
+  //   work_area_type_id – pulls name from the type catalog
+  //   name              – custom name (required if no type id)
+  //   estimated_hours   – optional
+  //   sort_order        – optional, default 0
+  //   notes             – optional
+  app.post("/api/jobs/:jobId/work-areas", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    const parsed = createWorkAreaSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Invalid body" });
     }
+
+    const { work_area_type_id, name: customName, estimated_hours, sort_order, notes } = parsed.data;
+
     try {
-      let areaName = customName;
+      // Validate job exists
+      const jobCheck = await pool.query(`SELECT id FROM jobs WHERE id = $1`, [req.params.jobId]);
+      if (jobCheck.rows.length === 0) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      // Resolve display name from catalog if not provided directly
+      let areaName = customName ?? null;
       if (work_area_type_id && !areaName) {
         const { rows: typeRows } = await pool.query(
-          `SELECT name FROM work_area_types WHERE id = $1`, [work_area_type_id]
+          `SELECT name FROM work_area_types WHERE id = $1`,
+          [work_area_type_id]
         );
-        if (typeRows.length === 0) return res.status(404).json({ message: "Work area type not found" });
+        if (typeRows.length === 0) {
+          return res.status(404).json({ message: "Work area type not found" });
+        }
         areaName = typeRows[0].name;
       }
+
       const { rows } = await pool.query(
-        `INSERT INTO job_work_areas (job_id, work_area_type_id, name, estimated_hours)
-         VALUES ($1, $2, $3, $4) RETURNING *`,
-        [req.params.id, work_area_type_id || null, areaName, estimated_hours || null]
+        `INSERT INTO job_work_areas
+           (job_id, work_area_type_id, name, estimated_hours, sort_order, notes)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [
+          req.params.jobId,
+          work_area_type_id ?? null,
+          areaName,
+          estimated_hours ?? null,
+          sort_order,
+          notes ?? null,
+        ]
       );
       return res.status(201).json(rows[0]);
     } catch (err: any) {
