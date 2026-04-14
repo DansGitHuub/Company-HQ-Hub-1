@@ -176,6 +176,143 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── My Hours helpers ────────────────────────────────────────────────────────
+
+  function computePayPeriod(): { start: Date; end: Date } {
+    const now = new Date();
+    const dow = now.getDay(); // 0=Sun … 6=Sat
+    const daysSinceSat = dow === 6 ? 0 : dow + 1;
+    const periodEndDate = new Date(now);
+    periodEndDate.setDate(now.getDate() - daysSinceSat);
+    periodEndDate.setHours(23, 59, 59, 999);
+    const periodStartDate = new Date(periodEndDate);
+    periodStartDate.setDate(periodEndDate.getDate() - 13);
+    periodStartDate.setHours(0, 0, 0, 0);
+    return { start: periodStartDate, end: periodEndDate };
+  }
+
+  function computeSummary(rows: any[]) {
+    const byDay: Record<string, number> = {};
+    for (const r of rows) {
+      if (!r.clock_out || !r.duration_minutes) continue;
+      const day = new Date(r.clock_in).toISOString().split("T")[0];
+      byDay[day] = (byDay[day] || 0) + Number(r.duration_minutes);
+    }
+    let regularMinutes = 0;
+    let overtimeMinutes = 0;
+    for (const mins of Object.values(byDay)) {
+      regularMinutes += Math.min(mins, 480);
+      overtimeMinutes += Math.max(0, mins - 480);
+    }
+    const totalMinutes = regularMinutes + overtimeMinutes;
+    return {
+      totalMinutes,
+      totalHours: Math.round((totalMinutes / 60) * 100) / 100,
+      regularHours: Math.round((regularMinutes / 60) * 100) / 100,
+      overtimeHours: Math.round((overtimeMinutes / 60) * 100) / 100,
+      daysWorked: Object.keys(byDay).length,
+    };
+  }
+
+  // ── GET /api/time/my-hours ───────────────────────────────────────────────────
+  app.get("/api/time/my-hours", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const { startDate, endDate, page = "1", limit = "50" } = req.query as Record<string, string>;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ message: "startDate and endDate are required" });
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+    const offset = (pageNum - 1) * limitNum;
+
+    try {
+      const entryQ = `
+        SELECT
+          te.id, te.clock_in, te.clock_out, te.duration_minutes,
+          te.job_id, COALESCE(j.title, j.client, 'Unknown Job') AS job_title,
+          te.job_work_area_id AS work_area_id, te.work_area_name,
+          te.entry_type, te.status, te.notes
+        FROM time_entries te
+        LEFT JOIN jobs j ON j.id = te.job_id
+        WHERE te.user_id = $1
+          AND te.clock_in >= $2::timestamptz
+          AND te.clock_in <= $3::timestamptz
+        ORDER BY te.clock_in DESC
+        LIMIT $4 OFFSET $5
+      `;
+      const countQ = `
+        SELECT COUNT(*) FROM time_entries
+        WHERE user_id = $1
+          AND clock_in >= $2::timestamptz
+          AND clock_in <= $3::timestamptz
+      `;
+      const summaryQ = `
+        SELECT clock_in, clock_out, duration_minutes
+        FROM time_entries
+        WHERE user_id = $1
+          AND clock_in >= $2::timestamptz
+          AND clock_in <= $3::timestamptz
+      `;
+
+      const [entryRes, countRes, summaryRes] = await Promise.all([
+        pool.query(entryQ, [userId, startDate, endDate + "T23:59:59", limitNum, offset]),
+        pool.query(countQ, [userId, startDate, endDate + "T23:59:59"]),
+        pool.query(summaryQ, [userId, startDate, endDate + "T23:59:59"]),
+      ]);
+
+      const totalCount = parseInt(countRes.rows[0].count, 10);
+      const summary = computeSummary(summaryRes.rows);
+
+      return res.json({
+        entries: entryRes.rows,
+        summary,
+        page: pageNum,
+        totalPages: Math.ceil(totalCount / limitNum),
+        totalCount,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── GET /api/time/my-hours/pay-period ────────────────────────────────────────
+  app.get("/api/time/my-hours/pay-period", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const { start, end } = computePayPeriod();
+    const startStr = start.toISOString().split("T")[0];
+    const endStr = end.toISOString().split("T")[0];
+
+    try {
+      const result = await pool.query(
+        `SELECT
+           te.id, te.clock_in, te.clock_out, te.duration_minutes,
+           te.job_id, COALESCE(j.title, j.client, 'Unknown Job') AS job_title,
+           te.job_work_area_id AS work_area_id, te.work_area_name,
+           te.entry_type, te.status, te.notes
+         FROM time_entries te
+         LEFT JOIN jobs j ON j.id = te.job_id
+         WHERE te.user_id = $1
+           AND te.clock_in >= $2::timestamptz
+           AND te.clock_in <= $3::timestamptz
+         ORDER BY te.clock_in DESC`,
+        [userId, start.toISOString(), end.toISOString()]
+      );
+
+      const summary = computeSummary(result.rows);
+
+      return res.json({
+        entries: result.rows,
+        summary,
+        payPeriodStart: startStr,
+        payPeriodEnd: endStr,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── GPS Ping ────────────────────────────────────────────────────────────────
   app.post("/api/gps/ping", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
