@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { clockIn, clockOut, getActiveSession } from "@/lib/timeApi";
+import OfflineBanner from "@/components/OfflineBanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -153,8 +155,9 @@ export default function MyDayPage() {
     refetchInterval: 30_000,
   });
 
-  const { data: activeEntry } = useQuery<TimeEntry | null>({
+  const { data: activeEntry } = useQuery<any | null>({
     queryKey: ["/api/time/active"],
+    queryFn: () => getActiveSession(),
     refetchInterval: 30_000,
   });
 
@@ -165,17 +168,23 @@ export default function MyDayPage() {
     mutationFn: async (p: PendingClockIn) => {
       // Auto-clock-out if active
       if (activeEntry) {
-        await apiRequest("POST", "/api/time/clock-out", { time_entry_id: activeEntry.id });
+        const coPayload = activeEntry.isOffline
+          ? { local_clock_in_id: activeEntry.localId }
+          : { time_entry_id: activeEntry.id };
+        await clockOut(coPayload);
       }
-      return apiRequest("POST", "/api/time/clock-in", {
+      const result = await clockIn({
         job_id: p.jobId || undefined,
         job_work_area_id: p.workAreaId || undefined,
         work_area_name: p.workAreaName,
         entry_type: p.entryType,
       });
+      if (!result.success) throw new Error(result.error ?? "Clock-in failed");
+      return result;
     },
-    onSuccess: () => {
-      toast({ title: "Clocked in!", description: `Now working on ${pending?.workAreaName}` });
+    onSuccess: (result: any) => {
+      const offlineMsg = result?.offline ? " (saved offline)" : "";
+      toast({ title: `Clocked in${offlineMsg}!`, description: `Now working on ${pending?.workAreaName}` });
       setPending(null);
       queryClient.invalidateQueries({ queryKey: ["/api/time/active"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-day/time-entries"] });
@@ -188,10 +197,16 @@ export default function MyDayPage() {
   const clockOutMutation = useMutation({
     mutationFn: async () => {
       if (!activeEntry) return;
-      return apiRequest("POST", "/api/time/clock-out", { time_entry_id: activeEntry.id });
+      const payload = activeEntry.isOffline
+        ? { local_clock_in_id: activeEntry.localId }
+        : { time_entry_id: activeEntry.id };
+      const result = await clockOut(payload);
+      if (!result.success) throw new Error(result.error ?? "Clock-out failed");
+      return result;
     },
-    onSuccess: () => {
-      toast({ title: "Clocked out!" });
+    onSuccess: (result: any) => {
+      const offlineMsg = result?.offline ? " (saved offline)" : "";
+      toast({ title: `Clocked out${offlineMsg}!` });
       queryClient.invalidateQueries({ queryKey: ["/api/time/active"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-day/time-entries"] });
     },
@@ -225,6 +240,8 @@ export default function MyDayPage() {
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="max-w-lg mx-auto px-4 pb-12 pt-4 space-y-6">
+      <OfflineBanner />
+
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div>
         <h1 data-testid="my-day-greeting" className="text-2xl font-bold text-gray-900">
@@ -245,6 +262,14 @@ export default function MyDayPage() {
               {activeEntry.work_area_name || activeEntry.entry_type}
               {activeEntry.job_title && (
                 <span className="text-green-600 font-normal">· {activeEntry.job_title}</span>
+              )}
+              {activeEntry.isOffline && (
+                <Badge
+                  data-testid="badge-offline-entry"
+                  className="text-[10px] px-1.5 py-0 bg-yellow-100 text-yellow-800 border border-yellow-300"
+                >
+                  ⚡ Offline
+                </Badge>
               )}
             </p>
             <p className="text-green-600 text-xs mt-0.5">{elapsed}</p>

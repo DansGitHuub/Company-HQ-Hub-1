@@ -3,10 +3,20 @@ import { pool } from "./db";
 
 export function registerTimeRoutes(app: Express, requireAuth: any) {
 
+  // ── Migrate: add local_id column for offline idempotency (fire-and-forget) ──
+  pool.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS local_id TEXT`)
+    .then(() =>
+      pool.query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS time_entries_local_id_uidx
+         ON time_entries (user_id, local_id) WHERE local_id IS NOT NULL`
+      )
+    )
+    .catch((err) => console.error("[timeRoutes] local_id migration:", err.message));
+
   // ── Clock In ────────────────────────────────────────────────────────────────
   app.post("/api/time/clock-in", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
-    const { job_id, entry_type, job_work_area_id, work_area_name } = req.body;
+    const { job_id, entry_type, job_work_area_id, work_area_name, localId } = req.body;
 
     // Derive entry_type: use provided value, or fallback to "billable" when a job is given
     const resolvedEntryType = entry_type || (job_id ? "billable" : "shop_time");
@@ -14,6 +24,18 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+
+      // Idempotency: if localId provided, return existing entry rather than duplicating
+      if (localId) {
+        const existing = await client.query(
+          `SELECT * FROM time_entries WHERE user_id=$1 AND local_id=$2 LIMIT 1`,
+          [userId, localId]
+        );
+        if (existing.rows.length > 0) {
+          await client.query("COMMIT");
+          return res.status(200).json(existing.rows[0]);
+        }
+      }
 
       // Check if already clocked in
       const active = await client.query(
@@ -27,9 +49,9 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
 
       // Insert the time entry
       const entryResult = await client.query(
-        `INSERT INTO time_entries (user_id, job_id, entry_type, clock_in, job_work_area_id, work_area_name)
-         VALUES ($1, $2, $3, NOW(), $4, $5) RETURNING *`,
-        [userId, job_id || null, resolvedEntryType, job_work_area_id || null, work_area_name || null]
+        `INSERT INTO time_entries (user_id, job_id, entry_type, clock_in, job_work_area_id, work_area_name, local_id)
+         VALUES ($1, $2, $3, NOW(), $4, $5, $6) RETURNING *`,
+        [userId, job_id || null, resolvedEntryType, job_work_area_id || null, work_area_name || null, localId || null]
       );
       const timeEntry = entryResult.rows[0];
 

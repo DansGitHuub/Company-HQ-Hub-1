@@ -11,6 +11,7 @@ import {
 import { Clock, Briefcase, Timer, ChevronLeft, ChevronRight } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import TimeClock from "@/components/TimeClock";
+import OfflineBanner from "@/components/OfflineBanner";
 
 interface TimeEntry {
   id: string;
@@ -87,6 +88,7 @@ export default function TimeTrackingPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <OfflineBanner />
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
