@@ -23,6 +23,8 @@ import {
   Wrench,
   LogOut as ClockOutIcon,
   CheckCircle2,
+  Loader2,
+  ChevronRight,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -67,6 +69,13 @@ interface PendingClockIn {
   workAreaId: string | null;
   workAreaName: string;
   entryType: string;
+}
+
+interface PickerJob {
+  jobId: string;
+  jobTitle: string;
+  preSelectedId: string | null;
+  preSelectedName: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -139,6 +148,7 @@ export default function MyDayPage() {
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<PendingClockIn | null>(null);
   const [gpsChecking, setGpsChecking] = useState(false);
+  const [pickerJob, setPickerJob] = useState<PickerJob | null>(null);
 
   // ── Data ───────────────────────────────────────────────────────────────────
   const { data: user } = useQuery<any>({
@@ -235,6 +245,26 @@ export default function MyDayPage() {
     );
   };
 
+  const handlePickerConfirm = (p: PendingClockIn) => {
+    setPickerJob(null);
+    if (!navigator.geolocation) {
+      toast({ title: "GPS required", description: "This device does not support location. GPS is required to clock in.", variant: "destructive" });
+      return;
+    }
+    setGpsChecking(true);
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        setGpsChecking(false);
+        clockInMutation.mutate(p);
+      },
+      () => {
+        setGpsChecking(false);
+        toast({ title: "GPS required", description: "Location access was denied. Please enable GPS for this app and try again.", variant: "destructive" });
+      },
+      { enableHighAccuracy: false, timeout: 10000 }
+    );
+  };
+
   const firstName = user?.firstName || user?.username || "there";
 
   // ─── Render ──────────────────────────────────────────────────────────────
@@ -315,6 +345,7 @@ export default function MyDayPage() {
                 job={job}
                 activeEntry={activeEntry ?? null}
                 onChipTap={(p) => setPending(p)}
+                onPickerOpen={(picker) => setPickerJob(picker)}
               />
             ))}
           </div>
@@ -344,7 +375,17 @@ export default function MyDayPage() {
         )}
       </section>
 
-      {/* ── Clock-In Confirmation Dialog ───────────────────────────────── */}
+      {/* ── Work Area Picker Dialog ─────────────────────────────────────── */}
+      {pickerJob && (
+        <WorkAreaPickerDialog
+          pickerJob={pickerJob}
+          activeEntry={activeEntry ?? null}
+          onClose={() => setPickerJob(null)}
+          onConfirm={handlePickerConfirm}
+        />
+      )}
+
+      {/* ── Clock-In Confirmation Dialog (quick chips only) ─────────────── */}
       <Dialog open={!!pending} onOpenChange={(o) => { if (!o) setPending(null); }}>
         <DialogContent className="max-w-sm mx-auto">
           <DialogHeader>
@@ -392,15 +433,146 @@ export default function MyDayPage() {
   );
 }
 
+// ─── Work Area Picker Dialog ──────────────────────────────────────────────────
+function WorkAreaPickerDialog({
+  pickerJob,
+  activeEntry,
+  onClose,
+  onConfirm,
+}: {
+  pickerJob: PickerJob;
+  activeEntry: TimeEntry | null;
+  onClose: () => void;
+  onConfirm: (p: PendingClockIn) => void;
+}) {
+  const { data: areas = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/jobs", pickerJob.jobId, "work-areas"],
+    queryFn: () =>
+      apiRequest("GET", `/api/jobs/${pickerJob.jobId}/work-areas?active=true`)
+        .then((r) => r.json()),
+    staleTime: 30_000,
+  });
+
+  const openAreas = areas.filter((wa: any) => wa.is_active !== false && wa.status !== "completed");
+
+  const initialId = pickerJob.preSelectedId ?? (openAreas[0]?.id ?? "__general__");
+  const [selectedId, setSelectedId] = useState<string>(initialId);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setSelectedId(pickerJob.preSelectedId ?? (openAreas[0]?.id ?? "__general__"));
+    }
+  }, [isLoading, pickerJob.preSelectedId]);
+
+  function getSelectedName(): string {
+    if (selectedId === "__general__") return "General";
+    const found = openAreas.find((wa: any) => wa.id === selectedId);
+    return found?.name ?? "General";
+  }
+
+  function handleConfirm() {
+    const workAreaId = selectedId === "__general__" ? null : selectedId;
+    const workAreaName = getSelectedName();
+    onConfirm({
+      jobId: pickerJob.jobId,
+      jobTitle: pickerJob.jobTitle,
+      workAreaId,
+      workAreaName,
+      entryType: "billable",
+    });
+  }
+
+  const allOptions = [
+    ...openAreas.map((wa: any) => ({ id: wa.id, name: wa.name, hours: wa.estimated_hours })),
+    { id: "__general__", name: "General", hours: null },
+  ];
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-sm mx-auto">
+        <DialogHeader>
+          <DialogTitle>Select Work Area</DialogTitle>
+        </DialogHeader>
+
+        {activeEntry && (
+          <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            Will clock out of{" "}
+            <span className="font-semibold">
+              {activeEntry.work_area_name || activeEntry.entry_type}
+            </span>{" "}
+            first.
+          </div>
+        )}
+
+        <p className="text-xs text-gray-500 -mt-1">
+          {pickerJob.jobTitle}
+        </p>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5">
+            {allOptions.map((opt) => {
+              const isChosen = selectedId === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  data-testid={`picker-area-${opt.id}`}
+                  onClick={() => setSelectedId(opt.id)}
+                  className={[
+                    "w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-colors",
+                    isChosen
+                      ? "bg-green-600 border-green-600 text-white"
+                      : "bg-white border-gray-200 text-gray-800 hover:border-green-300 hover:bg-green-50",
+                  ].join(" ")}
+                >
+                  <span className="font-medium text-sm">
+                    {opt.name}
+                    {opt.hours ? (
+                      <span className={["ml-1.5 text-xs font-normal", isChosen ? "text-green-100" : "text-gray-400"].join(" ")}>
+                        {opt.hours}h est.
+                      </span>
+                    ) : null}
+                  </span>
+                  {isChosen && <CheckCircle2 className="w-4 h-4 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 pt-1">
+          <Button variant="outline" onClick={onClose} data-testid="picker-cancel">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirm}
+            disabled={isLoading}
+            data-testid="picker-confirm"
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            {activeEntry ? "Switch Area" : "Clock In"}
+            <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Job Card ─────────────────────────────────────────────────────────────────
 function JobCard({
   job,
   activeEntry,
   onChipTap,
+  onPickerOpen,
 }: {
   job: MyDayJob;
   activeEntry: TimeEntry | null;
   onChipTap: (p: PendingClockIn) => void;
+  onPickerOpen: (picker: PickerJob) => void;
 }) {
   const borderColor = divisionColor(job.division);
   const timeLabel =
@@ -409,13 +581,22 @@ function JobCard({
       : null;
 
   function handleChip(workAreaId: string | null, workAreaName: string, entryType: string) {
-    onChipTap({
-      jobId: job.id,
-      jobTitle: job.title || job.client || "Job",
-      workAreaId,
-      workAreaName,
-      entryType,
-    });
+    if (entryType === "billable") {
+      onPickerOpen({
+        jobId: job.id,
+        jobTitle: job.title || job.client || "Job",
+        preSelectedId: workAreaId,
+        preSelectedName: workAreaName,
+      });
+    } else {
+      onChipTap({
+        jobId: job.id,
+        jobTitle: job.title || job.client || "Job",
+        workAreaId,
+        workAreaName,
+        entryType,
+      });
+    }
   }
 
   return (
@@ -514,6 +695,26 @@ function JobCard({
             })()}
           </div>
         )}
+
+        {/* Clock In button — always present, opens work area picker */}
+        <div className="flex justify-end">
+          <button
+            data-testid={`clock-in-job-${job.id}`}
+            onClick={() =>
+              onPickerOpen({
+                jobId: job.id,
+                jobTitle: job.title || job.client || "Job",
+                preSelectedId: null,
+                preSelectedName: null,
+              })
+            }
+            className="flex items-center gap-1 text-sm font-medium text-green-700 hover:text-green-800 active:text-green-900 transition-colors"
+          >
+            <Clock className="w-3.5 h-3.5" />
+            Clock In
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
         {/* Quick chips: Drive Time / Shop Time / Break */}
         <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-100">
