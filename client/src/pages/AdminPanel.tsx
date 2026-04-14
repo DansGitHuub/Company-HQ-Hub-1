@@ -65,7 +65,8 @@ import {
   ClipboardCheck,
   Puzzle,
   Mail,
-  FileSignature
+  FileSignature,
+  Layers
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
@@ -149,6 +150,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "process-auditor", label: "Process Auditor", icon: ClipboardCheck },
         { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle },
         { value: "worksheet-review", label: "Worksheet Review", icon: FileText, href: "/worksheet-review" },
+        { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
       ],
     },
     {
@@ -324,6 +326,7 @@ export default function AdminPanel() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("users");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [resetPasswordUser, setResetPasswordUser] = useState<SafeUser | null>(null);
@@ -624,7 +627,10 @@ export default function AdminPanel() {
 
       {/* Mobile section picker — visible only on small screens */}
       <div className="block md:hidden">
-        <Select value={activeTab} onValueChange={setActiveTab}>
+        <Select value={activeTab} onValueChange={(v) => {
+          if (v === "work-areas") { navigate("/admin/work-areas"); return; }
+          setActiveTab(v);
+        }}>
           <SelectTrigger className="w-full" data-testid="admin-mobile-nav">
             <SelectValue placeholder="Select section…" />
           </SelectTrigger>
@@ -658,6 +664,7 @@ export default function AdminPanel() {
               <SelectLabel>Operations</SelectLabel>
               <SelectItem value="process-auditor">Process Auditor</SelectItem>
               <SelectItem value="integration-wizard">Integration Wizard</SelectItem>
+              <SelectItem value="work-areas">Work Areas</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>System</SelectLabel>

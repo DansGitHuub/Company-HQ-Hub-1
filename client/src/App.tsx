@@ -48,6 +48,7 @@ import DailyWorksheet from "@/pages/DailyWorksheet";
 import ClockOutReviewPage from "@/pages/ClockOutReviewPage";
 import WorksheetReviewList from "@/pages/WorksheetReviewList";
 import WorksheetReviewDetail from "@/pages/WorksheetReviewDetail";
+import WorkAreasPage from "@/pages/admin/WorkAreasPage";
 import TimeTracking from "@/pages/time/index";
 import ReportsPage from "@/pages/Reports";
 import ConsultationsPage from "@/pages/Consultations";
@@ -165,6 +166,7 @@ function AppRoutes() {
         <Route path="/clock-out-review" component={ClockOutReviewPage} />
         <Route path="/worksheet-review/:id" component={WorksheetReviewDetail} />
         <Route path="/worksheet-review" component={WorksheetReviewList} />
+        <Route path="/admin/work-areas" component={WorkAreasPage} />
         <Route path="/time" component={TimeTracking} />
         <Route path="/reports" component={ReportsPage} />
         <Route path="/consultations" component={ConsultationsPage} />
