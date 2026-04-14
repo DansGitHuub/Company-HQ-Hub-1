@@ -49,6 +49,9 @@ The frontend is built using React and TypeScript, leveraging React Query for ser
 - **Internationalization (i18n)**: Full English/Spanish language support with user preference stored in the database.
 - **Daily Crew Worksheet**: Field reporting tool.
 - **Time Tracking & GPS**: Comprehensive clock in/out system with various entry types, optional job linking, live elapsed timer, and GPS pinging.
+- **My Hours Portal**: Employee self-service view of their own time entries by pay period or custom date range, with overtime summaries.
+- **QuickBooks Time Export** (`/admin/qbo-export`): Admin tool to review completed time entries, map employees to QB Employee records, and bulk-export time activities to QuickBooks Online.
+- **Time Entry Archive** (`/admin/archive`): Admin tool to safely archive old completed time entries into `time_entries_archive` table, keeping the active table fast. Includes preview, 409 guard for active clock-ins, archive history log, and filterable browse view.
 
 ## External Dependencies
 

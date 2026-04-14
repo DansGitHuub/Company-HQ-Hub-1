@@ -51,6 +51,7 @@ import WorksheetReviewList from "@/pages/WorksheetReviewList";
 import WorksheetReviewDetail from "@/pages/WorksheetReviewDetail";
 import WorkAreasPage from "@/pages/admin/WorkAreasPage";
 import QBOExportPage from "@/pages/admin/QBOExportPage";
+import ArchivePage from "@/pages/admin/ArchivePage";
 import TimeTracking from "@/pages/time/index";
 import ReportsPage from "@/pages/Reports";
 import ConsultationsPage from "@/pages/Consultations";
@@ -171,6 +172,7 @@ function AppRoutes() {
         <Route path="/worksheet-review" component={WorksheetReviewList} />
         <Route path="/admin/work-areas" component={WorkAreasPage} />
         <Route path="/admin/qbo-export" component={QBOExportPage} />
+        <Route path="/admin/archive" component={ArchivePage} />
         <Route path="/time" component={TimeTracking} />
         <Route path="/reports" component={ReportsPage} />
         <Route path="/consultations" component={ConsultationsPage} />

@@ -66,7 +66,8 @@ import {
   Puzzle,
   Mail,
   FileSignature,
-  Layers
+  Layers,
+  Archive
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
@@ -152,6 +153,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "worksheet-review", label: "Worksheet Review", icon: FileText, href: "/worksheet-review" },
         { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
         { value: "qbo-export", label: "QB Export", icon: Upload, href: "/admin/qbo-export" },
+        { value: "archive", label: "Archive", icon: Archive, href: "/admin/archive" },
       ],
     },
     {
@@ -631,6 +633,7 @@ export default function AdminPanel() {
         <Select value={activeTab} onValueChange={(v) => {
           if (v === "work-areas") { navigate("/admin/work-areas"); return; }
           if (v === "qbo-export") { navigate("/admin/qbo-export"); return; }
+          if (v === "archive") { navigate("/admin/archive"); return; }
           setActiveTab(v);
         }}>
           <SelectTrigger className="w-full" data-testid="admin-mobile-nav">
@@ -668,6 +671,7 @@ export default function AdminPanel() {
               <SelectItem value="integration-wizard">Integration Wizard</SelectItem>
               <SelectItem value="work-areas">Work Areas</SelectItem>
               <SelectItem value="qbo-export">QB Export</SelectItem>
+              <SelectItem value="archive">Archive</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>System</SelectLabel>
