@@ -151,6 +151,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle },
         { value: "worksheet-review", label: "Worksheet Review", icon: FileText, href: "/worksheet-review" },
         { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
+        { value: "qbo-export", label: "QB Export", icon: Upload, href: "/admin/qbo-export" },
       ],
     },
     {
@@ -629,6 +630,7 @@ export default function AdminPanel() {
       <div className="block md:hidden">
         <Select value={activeTab} onValueChange={(v) => {
           if (v === "work-areas") { navigate("/admin/work-areas"); return; }
+          if (v === "qbo-export") { navigate("/admin/qbo-export"); return; }
           setActiveTab(v);
         }}>
           <SelectTrigger className="w-full" data-testid="admin-mobile-nav">
@@ -665,6 +667,7 @@ export default function AdminPanel() {
               <SelectItem value="process-auditor">Process Auditor</SelectItem>
               <SelectItem value="integration-wizard">Integration Wizard</SelectItem>
               <SelectItem value="work-areas">Work Areas</SelectItem>
+              <SelectItem value="qbo-export">QB Export</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>System</SelectLabel>

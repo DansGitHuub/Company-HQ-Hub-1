@@ -538,6 +538,111 @@ async function syncItemsFromQB(tok: any) {
   return { synced, errors: errs };
 }
 
+// ── Time Activity export ───────────────────────────────────────────────────────
+export async function exportTimeEntriesToQBO(entryIds: number[]): Promise<{
+  exported: number;
+  failed: number;
+  errors: string[];
+}> {
+  if (!entryIds.length) return { exported: 0, failed: 0, errors: [] };
+
+  let tok: any;
+  try {
+    tok = await getValidToken();
+  } catch (e: any) {
+    throw new Error("QuickBooks not connected");
+  }
+
+  // Look up a service item to use as ItemRef (same pattern as invoices)
+  let serviceItemId = "1";
+  try {
+    const itemData = await qbQuery(tok, "SELECT * FROM Item WHERE Type = 'Service' MAXRESULTS 1");
+    const firstItem = itemData?.QueryResponse?.Item?.[0];
+    if (firstItem?.Id) serviceItemId = firstItem.Id;
+  } catch (e: any) {
+    console.warn("[QB time export] Could not fetch service item:", e.message);
+  }
+
+  // Fetch entries with user + job info — skip already exported
+  const { rows: entries } = await pool.query(
+    `SELECT
+       te.id, te.clock_in, te.clock_out, te.duration_minutes,
+       te.work_area_name, te.entry_type, te.notes,
+       te.qbo_exported_at,
+       u.id AS user_id, u.qbo_employee_id,
+       COALESCE(j.title, j.client) AS job_title,
+       c.qb_customer_id
+     FROM time_entries te
+     JOIN users u ON u.id = te.user_id
+     LEFT JOIN jobs j ON j.id = te.job_id
+     LEFT JOIN customers c ON c.id = j.customer_id
+     WHERE te.id = ANY($1::int[])
+       AND te.clock_out IS NOT NULL
+       AND te.qbo_exported_at IS NULL`,
+    [entryIds]
+  );
+
+  let exported = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const entry of entries) {
+    if (!entry.qbo_employee_id) {
+      await pool.query(
+        `UPDATE time_entries SET qbo_export_error=$1 WHERE id=$2`,
+        [`Employee not mapped to a QB Employee (user ${entry.user_id})`, entry.id]
+      );
+      failed++;
+      errors.push(`Entry ${entry.id}: employee not mapped to QB`);
+      continue;
+    }
+
+    const totalMins = Number(entry.duration_minutes ?? 0);
+    const hours = Math.floor(totalMins / 60);
+    const minutes = totalMins % 60;
+    const txnDate = new Date(entry.clock_in).toISOString().split("T")[0];
+    const description = [entry.job_title, entry.work_area_name]
+      .filter(Boolean)
+      .join(" — ") || entry.entry_type || "Time Entry";
+
+    const payload: any = {
+      TxnDate: txnDate,
+      NameOf: "Employee",
+      EmployeeRef: { value: entry.qbo_employee_id },
+      ItemRef: { value: serviceItemId },
+      Hours: hours,
+      Minutes: minutes,
+      Description: description,
+      BillableStatus: entry.entry_type === "billable" ? "Billable" : "NotBillable",
+    };
+    if (entry.qb_customer_id) {
+      payload.CustomerRef = { value: entry.qb_customer_id };
+    }
+
+    try {
+      const result = await qbPost(tok, "timeactivity", payload);
+      const activityId = result?.TimeActivity?.Id ?? null;
+      await pool.query(
+        `UPDATE time_entries
+         SET qbo_exported_at=NOW(), qbo_time_activity_id=$1, qbo_export_error=NULL
+         WHERE id=$2`,
+        [activityId, entry.id]
+      );
+      exported++;
+    } catch (e: any) {
+      const errMsg = e.message ?? "Unknown error";
+      await pool.query(
+        `UPDATE time_entries SET qbo_export_error=$1 WHERE id=$2`,
+        [errMsg.slice(0, 500), entry.id]
+      );
+      failed++;
+      errors.push(`Entry ${entry.id}: ${errMsg}`);
+    }
+  }
+
+  return { exported, failed, errors };
+}
+
 // ── Master sync entry ─────────────────────────────────────────────────────────
 export async function runFullSync() {
   const tok = await getValidToken();

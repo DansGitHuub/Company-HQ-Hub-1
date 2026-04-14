@@ -9,6 +9,7 @@ import {
   syncInvoicesPublic,
   syncPaymentsPublic,
   syncItemsPublic,
+  exportTimeEntriesToQBO,
 } from "./quickbooksSync";
 
 async function migrate() {
@@ -60,6 +61,14 @@ async function migrate() {
   await pool.query(
     `CREATE INDEX IF NOT EXISTS idx_invoices_qb_id ON invoices(qb_invoice_id)`,
   );
+
+  // QB time-export columns on time_entries
+  await pool.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS qbo_exported_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS qbo_time_activity_id TEXT`);
+  await pool.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS qbo_export_error TEXT`);
+
+  // QB employee mapping on users
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS qbo_employee_id TEXT`);
 
   console.log("[migration] quickbooks tables ready");
 }
@@ -349,5 +358,171 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── GET /api/quickbooks/export-time/entries ───────────────────────────────
+  // Returns paginated completed time entries for the QB export review screen
+  app.get("/api/quickbooks/export-time/entries", requireAuth, async (req, res) => {
+    try {
+      const {
+        dateFrom, dateTo,
+        userId,
+        status, // "pending" | "exported" | "error" | "all"
+        page = "1",
+        limit = "50",
+      } = req.query as Record<string, string>;
+
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+      const offset = (pageNum - 1) * limitNum;
+
+      const params: any[] = [];
+      const conditions: string[] = ["te.clock_out IS NOT NULL"];
+
+      if (dateFrom) { params.push(dateFrom); conditions.push(`te.clock_in >= $${params.length}::timestamptz`); }
+      if (dateTo)   { params.push(dateTo + "T23:59:59"); conditions.push(`te.clock_in <= $${params.length}::timestamptz`); }
+      if (userId)   { params.push(userId); conditions.push(`te.user_id = $${params.length}`); }
+
+      if (status === "pending")  conditions.push("te.qbo_exported_at IS NULL AND (te.qbo_export_error IS NULL OR te.qbo_export_error = '')");
+      if (status === "exported") conditions.push("te.qbo_exported_at IS NOT NULL");
+      if (status === "error")    conditions.push("te.qbo_export_error IS NOT NULL AND te.qbo_export_error != '' AND te.qbo_exported_at IS NULL");
+
+      const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      const q = `
+        SELECT
+          te.id, te.clock_in, te.clock_out, te.duration_minutes,
+          te.entry_type, te.work_area_name,
+          te.qbo_exported_at, te.qbo_time_activity_id, te.qbo_export_error,
+          u.id AS user_id,
+          COALESCE(u.first_name || ' ' || u.last_name, u.username) AS employee_name,
+          COALESCE(j.title, j.client) AS job_title,
+          j.id AS job_id
+        FROM time_entries te
+        JOIN users u ON u.id = te.user_id
+        LEFT JOIN jobs j ON j.id = te.job_id
+        ${where}
+        ORDER BY te.clock_in DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `;
+      const countQ = `
+        SELECT COUNT(*) FROM time_entries te
+        JOIN users u ON u.id = te.user_id
+        LEFT JOIN jobs j ON j.id = te.job_id
+        ${where}
+      `;
+
+      const [entryRes, countRes] = await Promise.all([
+        pool.query(q, [...params, limitNum, offset]),
+        pool.query(countQ, params),
+      ]);
+
+      const totalCount = parseInt(countRes.rows[0].count, 10);
+      res.json({
+        entries: entryRes.rows,
+        page: pageNum,
+        totalPages: Math.ceil(totalCount / limitNum),
+        totalCount,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/quickbooks/export-time ──────────────────────────────────────
+  app.post("/api/quickbooks/export-time", requireAuth, async (req, res) => {
+    try {
+      const { entryIds } = req.body;
+      if (!Array.isArray(entryIds) || entryIds.length === 0) {
+        return res.status(400).json({ error: "entryIds array is required" });
+      }
+      const result = await exportTimeEntriesToQBO(entryIds.map(Number));
+      res.json(result);
+    } catch (err: any) {
+      const status = err.message === "QuickBooks not connected" ? 503 : 500;
+      res.status(status).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/quickbooks/employees ─────────────────────────────────────────
+  // Returns QB Employee list + our local users with their mapping
+  app.get("/api/quickbooks/employees", requireAuth, async (req, res) => {
+    try {
+      // Local users
+      const { rows: localUsers } = await pool.query(
+        `SELECT id, username, first_name, last_name, email, role, qbo_employee_id
+         FROM users WHERE role NOT IN ('Customer') ORDER BY first_name, last_name, username`
+      );
+
+      // QB Employees (best-effort — return empty if not connected)
+      let qbEmployees: any[] = [];
+      try {
+        const tok = await getTokens();
+        if (tok) {
+          const { default: OAuthClient } = await import("intuit-oauth");
+          const client = new OAuthClient({
+            clientId: process.env.QB_CLIENT_ID || process.env.QUICKBOOKS_CLIENT_ID || "",
+            clientSecret: process.env.QB_CLIENT_SECRET || process.env.QUICKBOOKS_CLIENT_SECRET || "",
+            environment: "production",
+            redirectUri: QB_REDIRECT_URI,
+          });
+          client.setToken({ access_token: tok.access_token, refresh_token: tok.refresh_token, realmId: tok.realm_id });
+          const isExpired = new Date(tok.token_expiry) <= new Date(Date.now() + 60000);
+          const validTok = isExpired ? (await client.refresh()).getJson() : tok;
+          const qbAccessToken = isExpired ? validTok.access_token : tok.access_token;
+
+          const empUrl = `https://quickbooks.api.intuit.com/v3/company/${tok.realm_id}/query?query=${encodeURIComponent("SELECT * FROM Employee WHERE Active = true MAXRESULTS 200")}&minorversion=65`;
+          const empRes = await fetch(empUrl, {
+            headers: { Authorization: `Bearer ${qbAccessToken}`, Accept: "application/json" },
+          });
+          if (empRes.ok) {
+            const data = await empRes.json();
+            qbEmployees = data?.QueryResponse?.Employee ?? [];
+          }
+        }
+      } catch (qbErr: any) {
+        console.warn("[QB employees] Could not fetch QB employees:", qbErr.message);
+      }
+
+      // Count pending (not exported, not error) entries per user
+      const { rows: pendingCounts } = await pool.query(
+        `SELECT user_id, COUNT(*)::int AS pending_count
+         FROM time_entries
+         WHERE clock_out IS NOT NULL AND qbo_exported_at IS NULL
+           AND (qbo_export_error IS NULL OR qbo_export_error = '')
+         GROUP BY user_id`
+      );
+      const pendingByUser = new Map(pendingCounts.map((r: any) => [r.user_id, r.pending_count]));
+
+      res.json({
+        localUsers: localUsers.map((u: any) => ({
+          ...u,
+          pendingCount: pendingByUser.get(u.id) ?? 0,
+        })),
+        qbEmployees: qbEmployees.map((e: any) => ({
+          id: e.Id,
+          displayName: e.DisplayName,
+          givenName: e.GivenName ?? "",
+          familyName: e.FamilyName ?? "",
+          active: e.Active !== false,
+        })),
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PATCH /api/quickbooks/employees/:userId ───────────────────────────────
+  app.patch("/api/quickbooks/employees/:userId", requireAuth, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { qboEmployeeId } = req.body;
+      await pool.query(
+        `UPDATE users SET qbo_employee_id = $1 WHERE id = $2`,
+        [qboEmployeeId || null, userId]
+      );
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
 }
