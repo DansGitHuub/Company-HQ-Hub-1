@@ -460,28 +460,58 @@ function JobCard({
 
         {/* Work area chips */}
         {job.work_areas.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {job.work_areas.map((wa) => {
-              const isActive =
-                activeEntry?.job_work_area_id === wa.id && !activeEntry?.clock_out;
+          <div className="space-y-2">
+            {/* Active / pending areas — tappable to clock in */}
+            {(() => {
+              const openAreas = job.work_areas.filter((wa) => wa.status !== "completed");
+              const doneAreas = job.work_areas.filter((wa) => wa.status === "completed");
               return (
-                <button
-                  key={wa.id}
-                  data-testid={`work-area-chip-${wa.id}`}
-                  onClick={() => handleChip(wa.id, wa.name, "billable")}
-                  className={[
-                    "px-3 py-1.5 rounded-full text-sm font-medium min-h-[36px] transition-colors",
-                    isActive
-                      ? "bg-green-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-green-50 hover:text-green-700 active:bg-green-100",
-                  ].join(" ")}
-                >
-                  {isActive && <CheckCircle2 className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />}
-                  {wa.name}
-                  {wa.estimated_hours ? ` (${wa.estimated_hours}h)` : ""}
-                </button>
+                <>
+                  {openAreas.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {openAreas.map((wa) => {
+                        const isActive =
+                          activeEntry?.job_work_area_id === wa.id && !activeEntry?.clock_out;
+                        return (
+                          <button
+                            key={wa.id}
+                            data-testid={`work-area-chip-${wa.id}`}
+                            onClick={() => handleChip(wa.id, wa.name, "billable")}
+                            className={[
+                              "px-3 py-1.5 rounded-full text-sm font-medium min-h-[36px] transition-colors",
+                              isActive
+                                ? "bg-green-600 text-white"
+                                : "bg-gray-100 text-gray-700 hover:bg-green-50 hover:text-green-700 active:bg-green-100",
+                            ].join(" ")}
+                          >
+                            {isActive && <CheckCircle2 className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />}
+                            {wa.name}
+                            {wa.estimated_hours ? ` (${wa.estimated_hours}h)` : ""}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Completed areas — non-clickable, greyed with checkmark */}
+                  {doneAreas.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {doneAreas.map((wa) => (
+                        <span
+                          key={wa.id}
+                          data-testid={`work-area-done-${wa.id}`}
+                          title="Completed"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-gray-50 text-gray-400 border border-gray-200 line-through cursor-default"
+                        >
+                          <CheckCircle2 className="inline w-3 h-3 text-gray-400 no-underline" style={{ textDecoration: "none" }} />
+                          <span>{wa.name}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
               );
-            })}
+            })()}
           </div>
         )}
 

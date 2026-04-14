@@ -29,12 +29,7 @@ export function registerMyDayRoutes(app: Express) {
            COALESCE(p.address, j.address) AS customer_address,
            COALESCE(
              json_agg(
-               DISTINCT jsonb_build_object(
-                 'id',              jwa.id,
-                 'name',            jwa.name,
-                 'status',          jwa.status,
-                 'estimated_hours', jwa.estimated_hours
-               )
+               jwa ORDER BY jwa.sort_order, jwa.name
              ) FILTER (WHERE jwa.id IS NOT NULL),
              '[]'::json
            ) AS work_areas
@@ -66,10 +61,7 @@ export function registerMyDayRoutes(app: Express) {
              COALESCE(p.address, j.address) AS customer_address,
              COALESCE(
                json_agg(
-                 DISTINCT jsonb_build_object(
-                   'id', jwa.id, 'name', jwa.name,
-                   'status', jwa.status, 'estimated_hours', jwa.estimated_hours
-                 )
+                 jwa ORDER BY jwa.sort_order, jwa.name
                ) FILTER (WHERE jwa.id IS NOT NULL), '[]'::json
              ) AS work_areas
            FROM jobs j

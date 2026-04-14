@@ -72,8 +72,25 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
   });
 
   // ── GET /api/jobs/:id/work-areas ─────────────────────────────────────────
+  // ?active=true  → exclude completed areas
+  // ?status=pending,active  → comma-separated status filter
   app.get("/api/jobs/:id/work-areas", requireAuth, async (req, res) => {
     try {
+      const { active, status } = req.query as Record<string, string | undefined>;
+
+      let statusFilter = "";
+      const params: any[] = [req.params.id];
+
+      if (active === "true") {
+        statusFilter = `AND jwa.status != 'completed'`;
+      } else if (status) {
+        const statuses = status.split(",").map((s) => s.trim()).filter(Boolean);
+        if (statuses.length > 0) {
+          params.push(statuses);
+          statusFilter = `AND jwa.status = ANY($2::text[])`;
+        }
+      }
+
       const { rows } = await pool.query(
         `SELECT jwa.*,
                 COALESCE(
@@ -83,8 +100,16 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
                 ) AS actual_hours_computed
          FROM job_work_areas jwa
          WHERE jwa.job_id = $1
-         ORDER BY jwa.sort_order, jwa.name`,
-        [req.params.id]
+         ${statusFilter}
+         ORDER BY
+           CASE jwa.status
+             WHEN 'active'    THEN 0
+             WHEN 'pending'   THEN 1
+             WHEN 'completed' THEN 2
+             ELSE 3
+           END,
+           jwa.sort_order, jwa.name`,
+        params
       );
       return res.json(rows);
     } catch (err: any) {
