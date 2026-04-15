@@ -397,7 +397,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarSections: NavSection[] = [
     { label: "", items: ["dashboard"] },
-    { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "todos", "daily_worksheet", "my_day", "my_hours", "time_tracking", "invoices", "reports", "mors_budget", "scheduling", "equipment"] },
+    { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "todos", "daily_worksheet", "my_day", "my_hours", "time_tracking", "invoices", "reports", "mors_budget", "scheduling", "equipment", "materials"] },
     { label: "PEOPLE", items: ["employees", "education", "hiring"] },
     { label: "COMPANY", items: ["inbox", "sops", "testing", "hq"] },
     { label: "ADMIN", items: ["admin", "catalog", "tools", "forms"] },
