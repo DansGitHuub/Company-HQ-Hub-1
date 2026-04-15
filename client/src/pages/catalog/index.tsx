@@ -9,17 +9,31 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Upload, Download } from "lucide-react";
-import type { Material } from "@shared/schema";
+import { Search, Upload, Download, Plus } from "lucide-react";
 
-// Material augmented with the new catalog columns
-type MaterialRow = Material & { class?: string | null; cost?: string | null; markup?: string | null; taxable?: boolean | null };
+type Tag = { id: number; name: string };
+
+type CatalogRow = {
+  id: number;
+  itemNumber: string;
+  name: string;
+  class: string | null;
+  category: string | null;
+  units: string | null;
+  cost: string | null;
+  taxable: boolean | null;
+  description: string | null;
+  sku: string | null;
+  isActive: boolean | null;
+  tags: Tag[];
+};
 
 const CLASS_TABS = ["All", "Labor", "Equipment", "Materials", "Subcontracting"];
 
 export default function CatalogPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
   const [classTab, setClassTab] = useState("All");
@@ -27,20 +41,26 @@ export default function CatalogPage() {
   const [showInactive, setShowInactive] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  const { data: items = [], isLoading } = useQuery<MaterialRow[]>({
-    queryKey: ["/api/materials"],
-    queryFn: () => apiRequest("GET", "/api/materials").then(r => r.json()),
+  const { data: items = [], isLoading } = useQuery<CatalogRow[]>({
+    queryKey: ["/api/catalog"],
+    queryFn: () => apiRequest("GET", "/api/catalog?active_only=false").then(r => r.json()),
   });
-const queryClient = useQueryClient();
-const toggleTaxableMut = useMutation({
-  mutationFn: async ({ id, taxable }: { id: number; taxable: boolean }) => {
-    const res = await apiRequest("PATCH", `/api/materials/${id}`, { taxable });
-    return res.json();
-  },
-  onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/materials"] }),
-});
 
-  // Derive unique categories from the data
+  const toggleTaxableMut = useMutation({
+    mutationFn: async ({ id, taxable }: { id: number; taxable: boolean }) => {
+      const item = items.find(i => i.id === id);
+      if (!item) throw new Error("Item not found");
+      const res = await apiRequest("PUT", `/api/catalog/${id}`, {
+        ...item,
+        taxable,
+        tags: item.tags.map(t => t.name),
+      });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/catalog"] }),
+    onError: () => toast({ title: "Update failed", variant: "destructive" }),
+  });
+
   const categories = useMemo(() => {
     const cats = new Set<string>();
     items.forEach(m => { if (m.category) cats.add(m.category); });
@@ -49,7 +69,7 @@ const toggleTaxableMut = useMutation({
 
   const filtered = useMemo(() => {
     return items.filter(item => {
-      if (!showInactive && item.status !== "Active") return false;
+      if (!showInactive && !item.isActive) return false;
       if (classTab !== "All" && (item.class ?? "") !== classTab) return false;
       if (categoryFilter !== "all" && item.category !== categoryFilter) return false;
       if (search) {
@@ -58,7 +78,8 @@ const toggleTaxableMut = useMutation({
           item.name?.toLowerCase().includes(q) ||
           item.sku?.toLowerCase().includes(q) ||
           item.description?.toLowerCase().includes(q) ||
-          item.category?.toLowerCase().includes(q)
+          item.category?.toLowerCase().includes(q) ||
+          item.itemNumber?.toLowerCase().includes(q)
         );
       }
       return true;
@@ -68,13 +89,26 @@ const toggleTaxableMut = useMutation({
   async function handleExport() {
     setExporting(true);
     try {
-      const resp = await fetch("/api/materials/export", { credentials: "include" });
-      if (!resp.ok) throw new Error("Export failed");
-      const blob = await resp.blob();
+      const rows = [
+        ["Item #", "Name", "Class", "Category", "Units", "Cost", "Taxable", "SKU", "Tags", "Active"].join(","),
+        ...filtered.map(item => [
+          item.itemNumber,
+          `"${(item.name ?? "").replace(/"/g, '""')}"`,
+          item.class ?? "",
+          item.category ?? "",
+          item.units ?? "",
+          item.cost ?? "",
+          item.taxable ? "TRUE" : "FALSE",
+          item.sku ?? "",
+          `"${item.tags.map(t => t.name).join("; ")}"`,
+          item.isActive ? "TRUE" : "FALSE",
+        ].join(","))
+      ].join("\n");
+      const blob = new Blob([rows], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "materials-export.csv";
+      a.download = "catalog-export.csv";
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -84,11 +118,9 @@ const toggleTaxableMut = useMutation({
     }
   }
 
-  function fmtCost(m: MaterialRow) {
-    const c = m.cost != null ? parseFloat(m.cost as string) : null;
-    if (c != null && !isNaN(c)) return `$${c.toFixed(2)}`;
-    if (m.price != null) return `$${m.price.toFixed(2)}`;
-    return "—";
+  function fmtCost(item: CatalogRow) {
+    const c = item.cost != null ? parseFloat(item.cost) : NaN;
+    return !isNaN(c) ? `$${c.toFixed(2)}` : "—";
   }
 
   return (
@@ -96,7 +128,7 @@ const toggleTaxableMut = useMutation({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Materials Catalog</h1>
+          <h1 className="text-2xl font-bold">Item Catalog</h1>
           <p className="text-muted-foreground text-sm mt-1">
             {items.length} items total · showing {filtered.length}
           </p>
@@ -126,7 +158,7 @@ const toggleTaxableMut = useMutation({
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search name, SKU, description…"
+              placeholder="Search name, SKU, item #…"
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="pl-9"
@@ -156,35 +188,44 @@ const toggleTaxableMut = useMutation({
         <table className="w-full text-sm">
           <thead className="bg-muted/40 border-b">
             <tr>
-              <th className="text-left px-4 py-3 font-medium">SKU</th>
+              <th className="text-left px-4 py-3 font-medium">Item #</th>
               <th className="text-left px-4 py-3 font-medium">Name</th>
               <th className="text-left px-4 py-3 font-medium">Class</th>
               <th className="text-left px-4 py-3 font-medium">Category</th>
-              <th className="text-left px-4 py-3 font-medium">Unit</th>
+              <th className="text-left px-4 py-3 font-medium">Units</th>
               <th className="text-right px-4 py-3 font-medium">Cost</th>
-              <th className="text-right px-4 py-3 font-medium">Markup</th>
               <th className="text-center px-4 py-3 font-medium">Tax</th>
               <th className="text-left px-4 py-3 font-medium">Tags</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">No items match your filters</td></tr>
+              <tr>
+                <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                  {items.length === 0
+                    ? "No catalog items yet. Import a CSV to get started."
+                    : "No items match your filters"}
+                </td>
+              </tr>
             ) : (
               filtered.map(item => (
                 <tr
                   key={item.id}
-                  className={`border-b hover:bg-muted/20 transition-colors ${item.status !== "Active" ? "opacity-50" : ""}`}
-                  data-testid={`row-material-${item.id}`}
+                  className={`border-b hover:bg-muted/30 transition-colors cursor-pointer ${!item.isActive ? "opacity-50" : ""}`}
+                  onClick={e => {
+                    if ((e.target as HTMLElement).closest('[role="switch"]')) return;
+                    navigate(`/catalog/${item.id}`);
+                  }}
+                  data-testid={`row-catalog-${item.id}`}
                 >
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground" data-testid={`text-sku-${item.id}`}>
-                    {item.sku ?? "—"}
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground" data-testid={`text-itemnum-${item.id}`}>
+                    {item.itemNumber}
                   </td>
                   <td className="px-4 py-3 font-medium" data-testid={`text-name-${item.id}`}>
                     {item.name}
-                    {item.status !== "Active" && (
+                    {!item.isActive && (
                       <Badge variant="outline" className="ml-2 text-xs">Inactive</Badge>
                     )}
                   </td>
@@ -198,28 +239,28 @@ const toggleTaxableMut = useMutation({
                   <td className="px-4 py-3 text-muted-foreground" data-testid={`text-category-${item.id}`}>
                     {item.category ?? "—"}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground" data-testid={`text-unit-${item.id}`}>
-                    {item.unit || item.unitOfMeasure || "—"}
+                  <td className="px-4 py-3 text-muted-foreground" data-testid={`text-units-${item.id}`}>
+                    {item.units || "—"}
                   </td>
                   <td className="px-4 py-3 text-right font-mono" data-testid={`text-cost-${item.id}`}>
                     {fmtCost(item)}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono text-muted-foreground" data-testid={`text-markup-${item.id}`}>
-                    {item.markup != null ? `${parseFloat(item.markup as string).toFixed(1)}%` : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-center" data-testid={`text-taxable-${item.id}`}>
-                    <Switch checked={item.taxable ?? false} onCheckedChange={(checked) => toggleTaxableMut.mutate({ id: item.id, taxable: checked })} />
+                  <td className="px-4 py-3 text-center" data-testid={`text-taxable-${item.id}`} onClick={e => e.stopPropagation()}>
+                    <Switch
+                      checked={item.taxable ?? false}
+                      onCheckedChange={checked => toggleTaxableMut.mutate({ id: item.id, taxable: checked })}
+                    />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
-                      {(item.tags ?? []).slice(0, 4).map((t, i) => (
+                      {item.tags.slice(0, 4).map((t, i) => (
                         <Badge key={i} variant="outline" className="text-xs">
-                          {t}
+                          {t.name}
                         </Badge>
                       ))}
-                      {(item.tags ?? []).length > 4 && (
+                      {item.tags.length > 4 && (
                         <Badge variant="outline" className="text-xs text-muted-foreground">
-                          +{(item.tags ?? []).length - 4}
+                          +{item.tags.length - 4}
                         </Badge>
                       )}
                     </div>
@@ -232,7 +273,7 @@ const toggleTaxableMut = useMutation({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        {filtered.length} of {items.length} items · Export CSV to edit in Excel, then Import CSV to update
+        {filtered.length} of {items.length} items · Click a row to view or edit · Export CSV to edit in bulk, then Import CSV to update
       </p>
     </div>
   );

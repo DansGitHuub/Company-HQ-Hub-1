@@ -77,6 +77,7 @@ import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import NotFound from "@/pages/not-found";
 import CatalogPage from "@/pages/catalog/index";
 import CatalogImport from "@/pages/catalog/CatalogImport";
+import CatalogDetail from "@/pages/catalog/CatalogDetail";
 import CustomerPortal from "@/pages/CustomerPortal";
 
 function AppRoutes() {
@@ -192,6 +193,7 @@ function AppRoutes() {
         <Route path="/testing" component={TestingKnowledge} />
         <Route path="/settings" component={SettingsPage} />
         <Route path="/catalog/import" component={CatalogImport} />
+        <Route path="/catalog/:id" component={CatalogDetail} />
         <Route path="/catalog" component={CatalogPage} />
         <Route component={NotFound} />
       </Switch>
