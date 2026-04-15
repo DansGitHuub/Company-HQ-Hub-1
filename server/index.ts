@@ -33,6 +33,7 @@ import { runNewEstimatesMigration } from "./migrations/newEstimates";
 import { runSchedulingMigration } from "./migrations/scheduling";
 import { runAppSettingsMigration } from "./migrations/appSettings";
 import { runMaterialsCatalogColumnsMigration } from "./migrations/materialsCatalogColumns";
+import { runCatalogExtendedMigration } from "./migrations/catalogExtended";
 import { runTermsAndConditionsMigration } from "./migrations/termsAndConditions";
 import { runWorksheetTablesMigration } from "./migrations/worksheetTables";
 import { runWorksheetPhase3Migration } from "./migrations/worksheetPhase3";
@@ -118,6 +119,7 @@ app.use((req, res, next) => {
   await runSchedulingMigration();
   await runAppSettingsMigration();
   await runMaterialsCatalogColumnsMigration();
+  await runCatalogExtendedMigration();
   await runTermsAndConditionsMigration();
   await runWorksheetTablesMigration();
   await runWorksheetPhase3Migration();

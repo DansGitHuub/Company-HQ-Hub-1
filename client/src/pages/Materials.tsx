@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Search, Plus, Trash2, Edit, Package, ChevronRight, ChevronLeft, FolderPlus, Check, Sparkles, Loader2, FolderInput, CheckSquare, ImageIcon, RefreshCw } from "lucide-react";
+import { Search, Plus, Trash2, Edit, Package, ChevronRight, ChevronLeft, FolderPlus, Check, Sparkles, Loader2, FolderInput, CheckSquare, ImageIcon, RefreshCw, Archive } from "lucide-react";
 import { ImageReplacer } from "@/components/ImageReplacer";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
@@ -31,6 +31,7 @@ export default function Materials() {
   
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [classFilter, setClassFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<string>("materials");
   
   const [showAddWizard, setShowAddWizard] = useState(false);
@@ -58,6 +59,9 @@ export default function Materials() {
     unitOfMeasure: "",
     primaryImage: "",
     fieldValues: {} as Record<string, string>,
+    class: "",
+    cost: "",
+    taxable: false,
   });
 
   const { data: categories = [] } = useQuery<MaterialCategory[]>({
@@ -89,9 +93,10 @@ export default function Materials() {
         m.name.toLowerCase().includes(search.toLowerCase()) ||
         (m.vendor && m.vendor.toLowerCase().includes(search.toLowerCase()));
       const matchesCategory = categoryFilter === "all" || m.categoryId === categoryFilter;
-      return matchesSearch && matchesCategory;
+      const matchesClass = classFilter === "all" || (m as any).class === classFilter;
+      return matchesSearch && matchesCategory && matchesClass;
     }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [materials, search, categoryFilter]);
+  }, [materials, search, categoryFilter, classFilter]);
 
   const createCategoryMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -149,6 +154,9 @@ export default function Materials() {
         vendor: data.vendor,
         unitOfMeasure: data.unitOfMeasure,
         primaryImage: data.primaryImage || null,
+        class: data.class || undefined,
+        cost: data.cost ? parseFloat(data.cost) : undefined,
+        taxable: data.taxable,
       });
       const material = await res.json();
       
@@ -464,6 +472,8 @@ export default function Materials() {
               setSearch={setSearch}
               categoryFilter={categoryFilter}
               setCategoryFilter={setCategoryFilter}
+              classFilter={classFilter}
+              setClassFilter={setClassFilter}
               selectedMaterials={selectedMaterials}
               toggleSelection={toggleMaterialSelection}
               selectAll={selectAllVisible}
@@ -487,6 +497,8 @@ export default function Materials() {
           setSearch={setSearch}
           categoryFilter={categoryFilter}
           setCategoryFilter={setCategoryFilter}
+          classFilter={classFilter}
+          setClassFilter={setClassFilter}
           selectedMaterials={selectedMaterials}
           toggleSelection={toggleMaterialSelection}
           selectAll={selectAllVisible}
@@ -607,6 +619,47 @@ export default function Materials() {
                     className="mt-1"
                     data-testid="input-description"
                   />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Class</Label>
+                    <Select
+                      value={wizardData.class}
+                      onValueChange={(v) => setWizardData(prev => ({ ...prev, class: v }))}
+                    >
+                      <SelectTrigger className="mt-1" data-testid="input-class">
+                        <SelectValue placeholder="Select class..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Labor">Labor</SelectItem>
+                        <SelectItem value="Equipment">Equipment</SelectItem>
+                        <SelectItem value="Materials">Materials</SelectItem>
+                        <SelectItem value="Subcontracting">Subcontracting</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Cost (per unit)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={wizardData.cost}
+                      onChange={(e) => setWizardData(prev => ({ ...prev, cost: e.target.value }))}
+                      placeholder="0.00"
+                      className="mt-1"
+                      data-testid="input-cost"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="wizard-taxable"
+                    checked={wizardData.taxable}
+                    onCheckedChange={(v) => setWizardData(prev => ({ ...prev, taxable: !!v }))}
+                    data-testid="checkbox-taxable"
+                  />
+                  <Label htmlFor="wizard-taxable">Taxable item</Label>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -921,10 +974,17 @@ function CategoryForm({ initial, onSubmit, isPending }: {
   );
 }
 
+const CLASS_BADGE_COLORS: Record<string, string> = {
+  Labor: "bg-blue-100 text-blue-800 border-blue-200",
+  Equipment: "bg-purple-100 text-purple-800 border-purple-200",
+  Materials: "bg-green-100 text-green-800 border-green-200",
+  Subcontracting: "bg-orange-100 text-orange-800 border-orange-200",
+};
+
 function EditMaterialForm({ material, categories, onSave, isPending }: {
   material: Material;
   categories: MaterialCategory[];
-  onSave: (updates: Partial<Material>) => void;
+  onSave: (updates: Partial<Material> & { class?: string; cost?: number | null; taxable?: boolean; retired?: boolean }) => void;
   isPending: boolean;
 }) {
   const [name, setName] = useState(material.name);
@@ -933,12 +993,44 @@ function EditMaterialForm({ material, categories, onSave, isPending }: {
   const [vendor, setVendor] = useState(material.vendor || "");
   const [unitOfMeasure, setUnitOfMeasure] = useState(material.unitOfMeasure || "");
   const [status, setStatus] = useState(material.status);
+  const [cls, setCls] = useState((material as any).class || "");
+  const [cost, setCost] = useState(String((material as any).cost ?? ""));
+  const [taxable, setTaxable] = useState(!!(material as any).taxable);
+  const [retired, setRetired] = useState(!!(material as any).retired);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
       <div>
         <Label>Name</Label>
         <Input value={name} onChange={(e) => setName(e.target.value)} data-testid="edit-material-name" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <Label>Class</Label>
+          <Select value={cls} onValueChange={setCls}>
+            <SelectTrigger data-testid="edit-material-class">
+              <SelectValue placeholder="Select class..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Labor">Labor</SelectItem>
+              <SelectItem value="Equipment">Equipment</SelectItem>
+              <SelectItem value="Materials">Materials</SelectItem>
+              <SelectItem value="Subcontracting">Subcontracting</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Cost (per unit)</Label>
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={cost}
+            onChange={(e) => setCost(e.target.value)}
+            placeholder="0.00"
+            data-testid="edit-material-cost"
+          />
+        </div>
       </div>
       <div>
         <Label>Category</Label>
@@ -979,9 +1071,35 @@ function EditMaterialForm({ material, categories, onSave, isPending }: {
           </SelectContent>
         </Select>
       </div>
+      <div className="flex gap-6">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="edit-taxable"
+            checked={taxable}
+            onCheckedChange={(v) => setTaxable(!!v)}
+            data-testid="edit-material-taxable"
+          />
+          <Label htmlFor="edit-taxable">Taxable</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="edit-retired"
+            checked={retired}
+            onCheckedChange={(v) => setRetired(!!v)}
+            data-testid="edit-material-retired"
+          />
+          <Label htmlFor="edit-retired">Retired</Label>
+        </div>
+      </div>
       <DialogFooter>
         <Button 
-          onClick={() => onSave({ name, categoryId, description, vendor, unitOfMeasure, status })} 
+          onClick={() => onSave({
+            name, categoryId, description, vendor, unitOfMeasure, status,
+            class: cls || undefined,
+            cost: cost ? parseFloat(cost) : null,
+            taxable,
+            retired,
+          } as any)} 
           disabled={!name.trim() || isPending}
           data-testid="button-save-material"
         >
@@ -1023,6 +1141,14 @@ function BulkMoveForm({ categories, onMove, isPending }: {
   );
 }
 
+const CLASS_FILTER_OPTIONS = [
+  { value: "all", label: "All Classes" },
+  { value: "Labor", label: "Labor" },
+  { value: "Equipment", label: "Equipment" },
+  { value: "Materials", label: "Materials" },
+  { value: "Subcontracting", label: "Subcontracting" },
+];
+
 function MaterialsGrid({
   materials,
   categories,
@@ -1030,6 +1156,8 @@ function MaterialsGrid({
   setSearch,
   categoryFilter,
   setCategoryFilter,
+  classFilter,
+  setClassFilter,
   selectedMaterials,
   toggleSelection,
   selectAll,
@@ -1047,6 +1175,8 @@ function MaterialsGrid({
   setSearch: (s: string) => void;
   categoryFilter: string;
   setCategoryFilter: (s: string) => void;
+  classFilter: string;
+  setClassFilter: (s: string) => void;
   selectedMaterials: Set<string>;
   toggleSelection: (id: string) => void;
   selectAll: () => void;
@@ -1064,7 +1194,7 @@ function MaterialsGrid({
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search materials..." 
+            placeholder="Search items..." 
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -1072,13 +1202,23 @@ function MaterialsGrid({
           />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[200px]" data-testid="select-filter-category">
+          <SelectTrigger className="w-[180px]" data-testid="select-filter-category">
             <SelectValue placeholder="All Categories" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             {categories.map(cat => (
               <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={classFilter} onValueChange={setClassFilter}>
+          <SelectTrigger className="w-[160px]" data-testid="select-filter-class">
+            <SelectValue placeholder="All Classes" />
+          </SelectTrigger>
+          <SelectContent>
+            {CLASS_FILTER_OPTIONS.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -1137,9 +1277,26 @@ function MaterialsGrid({
               <h3 className="font-semibold truncate cursor-pointer" onClick={() => onSelectMaterial(material)}>
                 {material.name}
               </h3>
-              <p className="text-sm text-muted-foreground truncate">
+              <p className="text-xs text-muted-foreground truncate">
                 {categories.find(c => c.id === material.categoryId)?.name || "Uncategorized"}
               </p>
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {(material as any).class && (
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${CLASS_BADGE_COLORS[(material as any).class] || "bg-gray-100 text-gray-700 border-gray-200"}`}>
+                    {(material as any).class}
+                  </span>
+                )}
+                {(material as any).cost != null && (material as any).cost !== "" && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
+                    ${parseFloat((material as any).cost).toFixed(2)}
+                  </span>
+                )}
+                {(material as any).retired && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                    <Archive className="w-2.5 h-2.5" /> Retired
+                  </span>
+                )}
+              </div>
               {isAdmin && (
                 <div className="flex gap-1 mt-2">
                   <Button variant="ghost" size="sm" onClick={() => onEditMaterial(material)}>

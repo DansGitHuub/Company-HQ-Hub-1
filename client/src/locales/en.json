@@ -3,7 +3,7 @@
     "myWorkspace": "My Workspace",
     "sopLibrary": "SOP Library",
     "quizzes": "Quizzes",
-    "materials": "Materials",
+    "materials": "Item Catalog",
     "equipment": "Equipment",
     "tasks": "Tasks",
     "hiring": "Hiring",
@@ -798,7 +798,18 @@
     "aiFilled": "AI filled material details",
     "aiGenerationFailed": "AI generation failed",
     "moveMaterials": "Move Materials",
-    "moving": "Moving..."
+    "moving": "Moving...",
+    "catalogTitle": "Item Catalog",
+    "manageDesc": "Manage your item catalog and categories",
+    "browseDesc": "Browse available items",
+    "addWithAI": "Add with AI",
+    "materialsTab": "Items",
+    "categoriesTab": "Categories",
+    "categoriesTitle": "Categories",
+    "deleteCategoryTitle": "Delete \"{{name}}\"?",
+    "deleteCategoryWithMaterials": "This will also delete {{count}} items in this category.",
+    "noCategories": "No categories yet",
+    "itemCount": "{{count}} items"
   },
   "messages": {
     "title": "Messages",

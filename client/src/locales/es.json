@@ -3,7 +3,7 @@
     "myWorkspace": "Mi Espacio",
     "sopLibrary": "Biblioteca de POE",
     "quizzes": "Cuestionarios",
-    "materials": "Materiales",
+    "materials": "Catálogo de Artículos",
     "equipment": "Equipos",
     "tasks": "Tareas",
     "hiring": "Contratación",
@@ -798,7 +798,18 @@
     "aiFilled": "IA completó los detalles del material",
     "aiGenerationFailed": "Error en la generación por IA",
     "moveMaterials": "Mover Materiales",
-    "moving": "Moviendo..."
+    "moving": "Moviendo...",
+    "catalogTitle": "Catálogo de Artículos",
+    "manageDesc": "Gestiona tu catálogo de artículos y categorías",
+    "browseDesc": "Explora los artículos disponibles",
+    "addWithAI": "Agregar con IA",
+    "materialsTab": "Artículos",
+    "categoriesTab": "Categorías",
+    "categoriesTitle": "Categorías",
+    "deleteCategoryTitle": "¿Eliminar \"{{name}}\"?",
+    "deleteCategoryWithMaterials": "Esto también eliminará {{count}} artículos en esta categoría.",
+    "noCategories": "Sin categorías todavía",
+    "itemCount": "{{count}} artículos"
   },
   "messages": {
     "title": "Mensajes",

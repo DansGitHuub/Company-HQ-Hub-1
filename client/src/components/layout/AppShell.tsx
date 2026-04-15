@@ -50,6 +50,7 @@ import {
   TrendingUp,
   BookMarked,
   Clock,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -382,6 +383,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     inbox: { icon: Mail, label: t("nav.messages"), href: "/inbox" },
     admin: { icon: Shield, label: t("nav.adminPanel"), href: "/admin" },
     catalog: { icon: BookMarked, label: "Materials Catalog", href: "/catalog" },
+    budget_settings: { icon: DollarSign, label: "Budget & Pricing", href: "/budget-settings" },
     tools: { icon: Snowflake, label: t("nav.tools"), href: "/tools" },
   plow_mapper: { icon: Snowflake, label: t("nav.plowMapper"), href: "/tools/plow-mapper" },
   };
@@ -400,7 +402,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "todos", "daily_worksheet", "my_day", "my_hours", "time_tracking", "invoices", "reports", "mors_budget", "scheduling", "equipment", "materials"] },
     { label: "PEOPLE", items: ["employees", "education", "hiring"] },
     { label: "COMPANY", items: ["inbox", "sops", "testing", "hq"] },
-    { label: "ADMIN", items: ["admin", "catalog", "tools", "forms"] },
+    { label: "ADMIN", items: ["admin", "catalog", "budget_settings", "tools", "forms"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {

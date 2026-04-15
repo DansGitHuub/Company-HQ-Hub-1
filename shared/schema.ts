@@ -229,7 +229,13 @@ export const materials = pgTable("materials", {
   class: varchar("class", { length: 50 }),
   cost: numeric("cost", { precision: 10, scale: 2 }),
   markup: numeric("markup", { precision: 5, scale: 2 }),
-  taxable: boolean("taxable").default(true),
+  taxable: boolean("taxable").default(false),
+  taxRate: numeric("tax_rate", { precision: 5, scale: 4 }).default("0.0825"),
+  overheadOverride: numeric("overhead_override", { precision: 5, scale: 4 }),
+  profitMarginOverride: numeric("profit_margin_override", { precision: 5, scale: 4 }),
+  priceLastUpdated: timestamp("price_last_updated"),
+  lastUsed: timestamp("last_used"),
+  retired: boolean("retired").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   qbItemId: varchar("qb_item_id", { length: 50 }),
@@ -243,6 +249,27 @@ export const insertMaterialSchema = createInsertSchema(materials).omit({
 
 export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
 export type Material = typeof materials.$inferSelect;
+
+// Class Pricing Defaults - overhead and profit margin defaults per class per year
+export const classPricingDefaults = pgTable("class_pricing_defaults", {
+  id: serial("id").primaryKey(),
+  classId: integer("class_id").notNull(),
+  year: integer("year").notNull(),
+  overheadPct: numeric("overhead_pct", { precision: 5, scale: 4 }).notNull().default("0.15"),
+  profitMarginPct: numeric("profit_margin_pct", { precision: 5, scale: 4 }).notNull().default("0.20"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  classYearUnique: unique().on(table.classId, table.year),
+}));
+
+export const insertClassPricingDefaultSchema = createInsertSchema(classPricingDefaults).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertClassPricingDefault = z.infer<typeof insertClassPricingDefaultSchema>;
+export type ClassPricingDefault = typeof classPricingDefaults.$inferSelect;
 
 // Material Field Values - stores dynamic field values per material
 export const materialFieldValues = pgTable("material_field_values", {

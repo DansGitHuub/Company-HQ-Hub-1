@@ -56,7 +56,7 @@ import {
   type User,
   activityLog
 } from "@shared/schema";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod";
 import { autoClassifySOPTitle, getTaxonomy } from "@shared/sopClassification";
@@ -3581,12 +3581,34 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
 
   app.post("/api/materials", requireAuth, async (req, res) => {
     try {
-      const { name, categoryId, status, description, vendor, unitOfMeasure, primaryImage, galleryImages, tags } = req.body;
+      const { name, categoryId, status, description, vendor, unitOfMeasure, primaryImage, galleryImages, tags,
+              class: cls, cost, taxable, retired, taxRate, overheadOverride, profitMarginOverride } = req.body;
       
       if (!name || typeof name !== "string" || !name.trim()) {
         return res.status(400).json({ message: "Material name is required" });
       }
-      
+
+      // Auto-generate SKU if not provided
+      let sku: string | undefined;
+      if (!req.body.sku) {
+        const { rows } = await pool.query(
+          `SELECT MAX(CAST(REPLACE(sku, 'SKU-', '') AS INTEGER)) AS max_num FROM materials WHERE sku ~ '^SKU-[0-9]+$'`
+        );
+        const maxNum = rows[0]?.max_num ?? 0;
+        sku = `SKU-${String(maxNum + 1).padStart(6, "0")}`;
+      } else {
+        sku = req.body.sku;
+      }
+
+      const extra: Record<string, any> = { sku };
+      if (cls !== undefined) extra.class = cls;
+      if (cost !== undefined) extra.cost = cost;
+      if (taxable !== undefined) extra.taxable = taxable;
+      if (retired !== undefined) extra.retired = retired;
+      if (taxRate !== undefined) extra.taxRate = taxRate;
+      if (overheadOverride !== undefined) extra.overheadOverride = overheadOverride;
+      if (profitMarginOverride !== undefined) extra.profitMarginOverride = profitMarginOverride;
+
       const material = await storage.createMaterial({
         name: name.trim(),
         categoryId: categoryId || null,
@@ -3597,6 +3619,7 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
         primaryImage: primaryImage || null,
         galleryImages: galleryImages || [],
         tags: tags || [],
+        ...extra,
       });
       res.status(201).json(material);
     } catch (err: any) {
@@ -3609,7 +3632,8 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
   app.patch("/api/materials/:id", requireAuth, async (req, res) => {
     try {
       const id = req.params.id as string;
-      const { name, categoryId, status, description, vendor, unitOfMeasure, primaryImage, galleryImages, tags , taxable} = req.body;
+      const { name, categoryId, status, description, vendor, unitOfMeasure, primaryImage, galleryImages, tags,
+              taxable, class: cls, cost, retired, taxRate, overheadOverride, profitMarginOverride } = req.body;
       
       const updates: any = {};
       if (name !== undefined) updates.name = name;
@@ -3622,6 +3646,12 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
       if (galleryImages !== undefined) updates.galleryImages = galleryImages;
       if (tags !== undefined) updates.tags = tags;
       if (taxable !== undefined) updates.taxable = taxable;
+      if (cls !== undefined) updates.class = cls;
+      if (cost !== undefined) updates.cost = cost;
+      if (retired !== undefined) updates.retired = retired;
+      if (taxRate !== undefined) updates.taxRate = taxRate;
+      if (overheadOverride !== undefined) updates.overheadOverride = overheadOverride;
+      if (profitMarginOverride !== undefined) updates.profitMarginOverride = profitMarginOverride;
       
       const material = await storage.updateMaterial(id, updates);
       if (!material) {
@@ -3646,6 +3676,55 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
     } catch (err: any) {
       console.error("[materials] Error deleting material:", err);
       res.status(500).json({ message: "Error deleting material", error: err?.message });
+    }
+  });
+
+  // ── Class Pricing Defaults ──────────────────────────────────────────────────
+  app.get("/api/class-pricing-defaults", requireAuth, async (req, res) => {
+    try {
+      const year = parseInt(req.query.year as string || String(new Date().getFullYear()), 10);
+      const { rows } = await pool.query(
+        `SELECT * FROM class_pricing_defaults WHERE year = $1 ORDER BY class_id`,
+        [year]
+      );
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/class-pricing-defaults/:classId", requireAuth, async (req, res) => {
+    try {
+      const year = parseInt(req.query.year as string || String(new Date().getFullYear()), 10);
+      const { rows } = await pool.query(
+        `SELECT * FROM class_pricing_defaults WHERE class_id = $1 AND year = $2`,
+        [req.params.classId, year]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: "Not found" });
+      res.json(rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put("/api/class-pricing-defaults/:classId", requireAuth, requireRole(["Admin"]), async (req, res) => {
+    try {
+      const classId = parseInt(req.params.classId, 10);
+      const year = req.body.year ?? new Date().getFullYear();
+      const { overheadPct, profitMarginPct } = req.body;
+      const { rows } = await pool.query(
+        `INSERT INTO class_pricing_defaults (class_id, year, overhead_pct, profit_margin_pct, updated_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (class_id, year) DO UPDATE
+           SET overhead_pct = EXCLUDED.overhead_pct,
+               profit_margin_pct = EXCLUDED.profit_margin_pct,
+               updated_at = NOW()
+         RETURNING *`,
+        [classId, year, overheadPct, profitMarginPct]
+      );
+      res.json(rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
