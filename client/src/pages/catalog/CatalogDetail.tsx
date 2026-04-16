@@ -23,6 +23,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
 import { ArrowLeft, Save, Trash2, X, Plus, Tag, DollarSign } from "lucide-react";
 
 const CLASS_OPTIONS = ["Labor", "Equipment", "Materials", "Subcontracting"];
@@ -75,11 +78,34 @@ export default function CatalogDetail() {
   const [form, setForm] = useState<Partial<CatalogItemDetail> | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [showEstimateDialog, setShowEstimateDialog] = useState(false);
 
   // Pricing panel local state
   const [taxRate, setTaxRate] = useState(8.25);
   const [overheadPct, setOverheadPct] = useState(15);
   const [profitPct, setProfitPct] = useState(20);
+
+  const { data: estimates = [] } = useQuery<any[]>({
+    queryKey: ["/api/estimates"],
+    queryFn: () => apiRequest("GET", "/api/estimates").then(r => r.json()),
+    enabled: showEstimateDialog,
+  });
+
+  const addToEstimateMut = useMutation({
+    mutationFn: async (estimateId: number) => {
+      const cost = parseFloat(form?.cost ?? "0");
+      const breakeven = cost * (1 + overheadPct / 100);
+      const unitPrice = breakeven * (1 + profitPct / 100);
+      return apiRequest("POST", `/api/estimates/${estimateId}/line-items`, {
+        description: form?.name ?? "Catalog Item",
+        unit_price: unitPrice.toFixed(2),
+        quantity: 1,
+        units: form?.units ?? "",
+      }).then(r => r.json());
+    },
+    onSuccess: () => { setShowEstimateDialog(false); toast({ title: "Added to estimate" }); },
+    onError: () => toast({ title: "Failed to add", variant: "destructive" }),
+  });
 
   const { data: item, isLoading, isError } = useQuery<CatalogItemDetail>({
     queryKey: ["/api/catalog", id],
@@ -259,6 +285,28 @@ export default function CatalogDetail() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+        <Dialog open={showEstimateDialog} onOpenChange={setShowEstimateDialog}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Add to Estimate</DialogTitle>
+              <DialogDescription>Select an estimate to add this item to.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 max-h-64 overflow-y-auto py-2">
+              {estimates.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No estimates found.</p>}
+              {estimates.map((est: any) => (
+                <button key={est.id} className="w-full text-left px-3 py-2 rounded-md border hover:bg-muted text-sm"
+                  onClick={() => addToEstimateMut.mutate(est.id)} disabled={addToEstimateMut.isPending}>
+                  <span className="font-medium">{est.estimate_number ?? "#" + est.id}</span>
+                  {est.customer_name && <span className="text-muted-foreground ml-2">— {est.customer_name}</span>}
+                </button>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEstimateDialog(false)}>Cancel</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         </div>
       </div>
 
