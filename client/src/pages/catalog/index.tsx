@@ -24,7 +24,7 @@ type CatalogRow = {
   taxable: boolean | null;
   description: string | null;
   sku: string | null;
-  isActive: boolean | null;
+  is_active: boolean | null;
   tags: Tag[];
 };
 
@@ -42,8 +42,8 @@ export default function CatalogPage() {
   const [exporting, setExporting] = useState(false);
 
   const { data: items = [], isLoading } = useQuery<CatalogRow[]>({
-    queryKey: ["/api/catalog"],
-    queryFn: () => apiRequest("GET", "/api/catalog?active_only=false").then(r => r.json()),
+    queryKey: ["/api/catalog", showInactive],
+    queryFn: () => apiRequest("GET", showInactive ? "/api/catalog?active_only=false" : "/api/catalog").then(r => r.json()),
   });
 
   const toggleTaxableMut = useMutation({
@@ -69,7 +69,7 @@ export default function CatalogPage() {
 
   const filtered = useMemo(() => {
     return items.filter(item => {
-      if (!showInactive && !item.isActive) return false;
+      if (!showInactive && !item.is_active) return false;
       if (classTab !== "All" && (item.class ?? "") !== classTab) return false;
       if (categoryFilter !== "all" && item.category !== categoryFilter) return false;
       if (search) {
@@ -101,7 +101,7 @@ export default function CatalogPage() {
           item.taxable ? "TRUE" : "FALSE",
           item.sku ?? "",
           `"${item.tags.map(t => t.name).join("; ")}"`,
-          item.isActive ? "TRUE" : "FALSE",
+          item.is_active ? "TRUE" : "FALSE",
         ].join(","))
       ].join("\n");
       const blob = new Blob([rows], { type: "text/csv" });
@@ -213,7 +213,7 @@ export default function CatalogPage() {
               filtered.map(item => (
                 <tr
                   key={item.id}
-                  className={`border-b hover:bg-muted/30 transition-colors cursor-pointer ${!item.isActive ? "opacity-50" : ""}`}
+                  className={`border-b hover:bg-muted/30 transition-colors cursor-pointer ${!item.is_active ? "opacity-50" : ""}`}
                   onClick={e => {
                     if ((e.target as HTMLElement).closest('[role="switch"]')) return;
                     navigate(`/catalog/${item.id}`);
@@ -225,7 +225,7 @@ export default function CatalogPage() {
                   </td>
                   <td className="px-4 py-3 font-medium" data-testid={`text-name-${item.id}`}>
                     {item.name}
-                    {!item.isActive && (
+                    {!item.is_active && (
                       <Badge variant="outline" className="ml-2 text-xs">Inactive</Badge>
                     )}
                   </td>
