@@ -29,7 +29,7 @@ export function CatalogBrowser({ open, areaKey, onClose, onSelect }: Props) {
 
   const { data, isLoading } = useQuery<CatalogItem[]>({
     queryKey: ["/api/catalog"],
-    queryFn: () => apiRequest("GET", "/api/catalog").then((r: any) => r.json()),
+    queryFn: () => apiRequest("GET", "/api/catalog") as Promise<CatalogItem[]>,
     enabled: open,
   });
 
