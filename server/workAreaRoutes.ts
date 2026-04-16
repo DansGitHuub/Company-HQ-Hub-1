@@ -28,6 +28,17 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
   pool.query(`ALTER TABLE job_work_areas ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true`)
     .catch((err: any) => console.error("[workAreaRoutes] is_active migration:", err.message));
 
+  // ── Migrate: cost_code + qb_service_name on work_area_types (fire-and-forget) ──
+  pool.query(`
+    ALTER TABLE work_area_types
+      ADD COLUMN IF NOT EXISTS cost_code      TEXT,
+      ADD COLUMN IF NOT EXISTS qb_service_name TEXT
+  `).catch((err: any) => console.error("[workAreaRoutes] cost_code migration:", err.message));
+
+  // ── Migrate: cost_code on estimate_work_areas (fire-and-forget) ────────────
+  pool.query(`ALTER TABLE estimate_work_areas ADD COLUMN IF NOT EXISTS cost_code TEXT`)
+    .catch((err: any) => console.error("[workAreaRoutes] estimate_work_areas cost_code migration:", err.message));
+
   // ── GET /api/work-area-types ─────────────────────────────────────────────
   // ?all=true returns inactive items too (used by settings page)
   app.get("/api/work-area-types", requireAuth, async (req, res) => {

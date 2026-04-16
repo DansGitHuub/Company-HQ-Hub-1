@@ -363,7 +363,7 @@ export default function EstimateDetail() {
                       <div className="space-y-0.5">
                         {/* Column headers */}
                         <div className="grid grid-cols-[100px_1fr_60px_60px_90px_80px] gap-2 text-[10px] text-muted-foreground font-medium px-1 pb-1">
-                          <span>Type</span>
+                          <span>Class</span>
                           <span>Description</span>
                           <span className="text-right">Qty</span>
                           <span>Unit</span>

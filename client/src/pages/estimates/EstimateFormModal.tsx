@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
@@ -33,10 +33,19 @@ interface WorkAreaDraft {
   _key: string;
   name: string;
   work_area_type_id: string;
+  cost_code: string;
   category: string;
   area_description: string;
   line_items: LineItem[];
   collapsed: boolean;
+}
+
+interface WorkAreaType {
+  id: string;
+  name: string;
+  division: string | null;
+  is_active: boolean;
+  cost_code: string | null;
 }
 
 interface Template {
@@ -75,7 +84,7 @@ function defaultLineItem(): LineItem {
 }
 
 function defaultArea(name = ""): WorkAreaDraft {
-  return { _key: key(), name, work_area_type_id: "", category: "", area_description: "", line_items: [defaultLineItem()], collapsed: false };
+  return { _key: key(), name, work_area_type_id: "", cost_code: "", category: "", area_description: "", line_items: [defaultLineItem()], collapsed: false };
 }
 
 function lineAmount(item: LineItem) {
@@ -124,6 +133,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
         _key: key(),
         name: a.name,
         work_area_type_id: a.work_area_type_id ?? "",
+        cost_code: a.cost_code ?? "",
         category: a.category ?? "",
         area_description: a.area_description ?? "",
         collapsed: false,
@@ -146,6 +156,15 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
   const { data: templates = [] } = useQuery<Template[]>({ queryKey: ["/api/estimate-templates"] });
   const { data: allStaff = [] } = useQuery<any[]>({ queryKey: ["/api/users"] });
   const staff = (allStaff as any[]).filter((u: any) => ["Admin","Manager","Master Admin"].includes(u.role));
+  const { data: workAreaTypes = [] } = useQuery<WorkAreaType[]>({ queryKey: ["/api/work-area-types"] });
+
+  // Group work area types by division for the dropdown
+  const workAreaTypesByDivision = workAreaTypes.reduce<Record<string, WorkAreaType[]>>((acc, t) => {
+    const div = t.division ?? "Other";
+    if (!acc[div]) acc[div] = [];
+    acc[div].push(t);
+    return acc;
+  }, {});
 
   // Customer search
   const { data: customerResults = [] } = useQuery<CustomerRow[]>({
@@ -257,13 +276,20 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
   const addLineItem = (aKey: string) =>
     setAreas(prev => prev.map(a => a._key === aKey ? { ...a, line_items: [...a.line_items, defaultLineItem()] } : a));
 
+  function catalogClassToItemType(cls: string | undefined): "service" | "material" | "labor" {
+    const c = (cls ?? "").toLowerCase();
+    if (c === "labor") return "labor";
+    if (c === "materials" || c === "material") return "material";
+    return "service";
+  }
+
   const addCatalogItem = (aKey: string, item: CatalogItem) => {
     const cost = parseFloat((item.cost ?? "0").toString().replace(/[$,]/g, "")) || 0;
     setAreas(prev => prev.map(a => a._key === aKey ? {
       ...a,
       line_items: [...a.line_items, {
         _key: key(),
-        item_type: "service",
+        item_type: catalogClassToItemType(item.class),
         description: item.name,
         quantity: 1,
         unit: item.units ?? "",
@@ -330,6 +356,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
       work_areas: areas.map(a => ({
         name: a.name,
         work_area_type_id: a.work_area_type_id || null,
+        cost_code: a.cost_code || null,
         category: a.category || null,
         area_description: a.area_description || null,
         line_items: a.line_items.map(li => ({
@@ -559,12 +586,41 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                       <button type="button" onClick={() => toggleArea(area._key)} className="text-muted-foreground hover:text-foreground">
                         {area.collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
                       </button>
-                      <Input
-                        value={area.name}
-                        onChange={e => updateArea(area._key, { name: e.target.value })}
-                        className="flex-1 h-7 text-sm font-medium bg-transparent border-0 focus-visible:ring-0 px-0"
-                        data-testid={`input-area-name-${aIdx}`}
-                      />
+                      <Select
+                        value={area.work_area_type_id || "_custom"}
+                        onValueChange={v => {
+                          if (v === "_custom") {
+                            updateArea(area._key, { work_area_type_id: "" });
+                            return;
+                          }
+                          const type = workAreaTypes.find(t => t.id === v);
+                          if (type) {
+                            updateArea(area._key, {
+                              work_area_type_id: type.id,
+                              name: type.name,
+                              cost_code: area.cost_code || type.cost_code || "",
+                            });
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="flex-1 h-7 text-sm font-medium border-0 bg-transparent focus:ring-0 shadow-none px-0" data-testid={`select-area-type-${aIdx}`}>
+                          <SelectValue placeholder="Select work area type…">
+                            {area.work_area_type_id
+                              ? (workAreaTypes.find(t => t.id === area.work_area_type_id)?.name ?? area.name)
+                              : (area.name || "Select work area type…")}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(workAreaTypesByDivision).map(([div, types]) => (
+                            <SelectGroup key={div}>
+                              <SelectLabel className="text-xs text-muted-foreground">{div}</SelectLabel>
+                              {types.map(t => (
+                                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <span className="text-xs text-muted-foreground ml-2 shrink-0">{fmtMoney(areaSub)}</span>
                       <button type="button" onClick={() => removeArea(area._key)}
                         className="text-muted-foreground hover:text-destructive ml-1" data-testid={`btn-remove-area-${aIdx}`}>
@@ -575,8 +631,18 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                     {/* Line items */}
                     {!area.collapsed && (
                       <div className="p-3 space-y-2">
-                        {/* Category + Description row */}
-                        <div className="grid grid-cols-[1fr_1fr] gap-2 mb-2">
+                        {/* Cost Code + Category + Description row */}
+                        <div className="grid grid-cols-[120px_1fr_1fr] gap-2 mb-2">
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Cost Code</Label>
+                            <Input
+                              value={area.cost_code}
+                              onChange={e => updateArea(area._key, { cost_code: e.target.value })}
+                              className="h-7 text-xs mt-0.5"
+                              placeholder="e.g. 4100"
+                              data-testid={`input-cost-code-${aIdx}`}
+                            />
+                          </div>
                           <div>
                             <Label className="text-[10px] text-muted-foreground">Category</Label>
                             <Select value={area.category || ""} onValueChange={v => updateArea(area._key, { category: v })}>
@@ -603,7 +669,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                         </div>
                         {/* Column headers */}
                         <div className="grid grid-cols-[90px_1fr_60px_70px_80px_70px_28px] gap-1 text-[10px] text-muted-foreground font-medium px-1">
-                          <span>Type</span>
+                          <span>Class</span>
                           <span>Description</span>
                           <span>Qty</span>
                           <span>Unit</span>

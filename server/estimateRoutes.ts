@@ -202,8 +202,8 @@ export function registerEstimateRoutes(app: Express) {
       for (let aIdx = 0; aIdx < work_areas.length; aIdx++) {
         const area = work_areas[aIdx];
         const { rows: ar } = await client.query(
-          `INSERT INTO estimate_work_areas (estimate_id, name, work_area_type_id, sort_order, category, area_description, photo_url) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-          [estimateId, area.name, area.work_area_type_id || null, aIdx, area.category || null, area.area_description || null, area.photo_url || null]
+          `INSERT INTO estimate_work_areas (estimate_id, name, work_area_type_id, sort_order, category, area_description, photo_url, cost_code) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+          [estimateId, area.name, area.work_area_type_id || null, aIdx, area.category || null, area.area_description || null, area.photo_url || null, area.cost_code || null]
         );
         const areaId = ar[0].id;
         for (let iIdx = 0; iIdx < (area.line_items || []).length; iIdx++) {
@@ -267,8 +267,8 @@ export function registerEstimateRoutes(app: Express) {
         for (let aIdx = 0; aIdx < work_areas.length; aIdx++) {
           const area = work_areas[aIdx];
           const { rows: ar } = await client.query(
-            `INSERT INTO estimate_work_areas (estimate_id, name, work_area_type_id, sort_order, category, area_description, photo_url) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-            [req.params.id, area.name, area.work_area_type_id || null, aIdx, area.category || null, area.area_description || null, area.photo_url || null]
+            `INSERT INTO estimate_work_areas (estimate_id, name, work_area_type_id, sort_order, category, area_description, photo_url, cost_code) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+            [req.params.id, area.name, area.work_area_type_id || null, aIdx, area.category || null, area.area_description || null, area.photo_url || null, area.cost_code || null]
           );
           const areaId = ar[0].id;
           for (let iIdx = 0; iIdx < (area.line_items || []).length; iIdx++) {
