@@ -286,12 +286,12 @@ export default function CatalogDetail() {
 
             <div className="space-y-1.5">
               <Label>Class</Label>
-              <Select value={form.class ?? ""} onValueChange={v => field("class", v || null)}>
+              <Select value={form.class ?? "none"} onValueChange={v => field("class", v === "none" ? null : v)}>
                 <SelectTrigger data-testid="select-class">
                   <SelectValue placeholder="Select class…" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">— None —</SelectItem>
+                  <SelectItem value="none">— None —</SelectItem>
                   {CLASS_OPTIONS.map(c => (
                     <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}

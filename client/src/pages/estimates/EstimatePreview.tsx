@@ -1,208 +1,28 @@
-import React, { useState, useRef, useEffect } from "react";
+import React from "react";
 import { useRoute } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { Loader2, Printer, FileText, PenLine, CheckCircle } from "lucide-react";
+import { Loader2, Printer, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtMoney(v: any) {
   const n = parseFloat(v ?? "0");
-  if (isNaN(n)) return "$0.00";
-  return "$" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
-  try { return format(parseISO(d), "MMM d, yyyy"); } catch { return d; }
+  try { return format(parseISO(d), "MMMM d, yyyy"); } catch { return d; }
 }
+function num(v: any) { return parseFloat(v ?? "0"); }
 
-function SignatureSection({ est, onSignClick }: { est: any; onSignClick: () => void }) {
-  if (est.signedAt) {
-    return (
-      <div className="mt-8 pt-6 border-t-2 border-green-700">
-        <div className="flex items-center gap-2 mb-4">
-          <CheckCircle className="text-green-600 h-5 w-5" />
-          <h3 className="text-base font-bold text-green-800">Electronically Signed</h3>
-        </div>
-        <div className="grid grid-cols-2 gap-4 text-sm text-gray-700">
-          {est.signatureData && est.signatureType !== "typed" && (
-            <div className="col-span-2">
-              <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-1">Signature</p>
-              <img src={est.signatureData} alt="Customer signature" className="border border-gray-200 rounded max-h-20 bg-white" />
-            </div>
-          )}
-          {est.signatureData && est.signatureType === "typed" && (
-            <div className="col-span-2">
-              <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-1">Signature</p>
-              <p style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontSize: "1.5rem", color: "#1E3A2F" }}>{est.signerName}</p>
-            </div>
-          )}
-          <div>
-            <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-1">Signed By</p>
-            <p className="font-medium">{est.signerName}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-1">Initials</p>
-            <p className="font-medium">{est.signerInitials}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-1">Date &amp; Time</p>
-            <p className="font-medium">{format(new Date(est.signedAt), "MMM d, yyyy 'at' h:mm a")}</p>
-          </div>
-          {est.signerIp && (
-            <div>
-              <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-1">IP Address</p>
-              <p className="font-medium font-mono text-xs">{est.signerIp}</p>
-            </div>
-          )}
-        </div>
-        <p className="text-xs text-gray-400 mt-4 italic">This is a legally binding electronic signature record.</p>
-      </div>
-    );
-  }
+// ── Simple Template ───────────────────────────────────────────────────────────
+function SimpleTemplate({ est }: { est: any }) {
+  const taxPct = (num(est.tax_rate) * 100).toFixed(2);
+
   return (
-    <div className="mt-8 pt-6 border-t border-gray-300">
-      <div className="print:hidden">
-        <h3 className="text-base font-semibold text-gray-700 mb-2">Approve &amp; Sign</h3>
-        <p className="text-sm text-gray-500 mb-4">By signing below, you agree to the scope of work and pricing outlined in this estimate.</p>
-        <Button onClick={onSignClick} className="bg-green-700 hover:bg-green-800 text-white gap-2">
-          <PenLine className="h-4 w-4" />Sign This Estimate
-        </Button>
-      </div>
-      <div className="hidden print:block">
-        <p className="text-sm font-semibold text-gray-700 mb-1">Authorized Signature</p>
-        <div className="border-b border-gray-400 mt-8 mb-1" />
-        <p className="text-xs text-gray-400">Signature&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Date</p>
-        <div className="border-b border-gray-400 mt-8 mb-1" />
-        <p className="text-xs text-gray-400">Printed Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Initials</p>
-      </div>
-    </div>
-  );
-}
-
-function SignatureModal({ open, onClose, onSubmit, isPending }: {
-  open: boolean; onClose: () => void;
-  onSubmit: (d: { signatureData: string; signatureType: string; signerName: string; signerInitials: string }) => void;
-  isPending: boolean;
-}) {
-  const [mode, setMode] = useState<"draw" | "type">("draw");
-  const [signerName, setSignerName] = useState("");
-  const [signerInitials, setSignerInitials] = useState("");
-  const [confirmed, setConfirmed] = useState(false);
-  const [typedSig, setTypedSig] = useState("");
-  const [isDrawing, setIsDrawing] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const lastPos = useRef<{ x: number; y: number } | null>(null);
-
-  useEffect(() => {
-    if (open) { setMode("draw"); setSignerName(""); setSignerInitials(""); setConfirmed(false); setTypedSig(""); clearCanvas(); }
-  }, [open]);
-
-  function clearCanvas() {
-    const c = canvasRef.current; if (!c) return;
-    const ctx = c.getContext("2d"); if (!ctx) return;
-    ctx.clearRect(0, 0, c.width, c.height);
-  }
-  function getPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
-    const r = canvas.getBoundingClientRect();
-    const sx = canvas.width / r.width, sy = canvas.height / r.height;
-    if ("touches" in e) return { x: (e.touches[0].clientX - r.left) * sx, y: (e.touches[0].clientY - r.top) * sy };
-    return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy };
-  }
-  function startDraw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
-    e.preventDefault(); const c = canvasRef.current; if (!c) return;
-    setIsDrawing(true); lastPos.current = getPos(e, c);
-  }
-  function draw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
-    e.preventDefault(); if (!isDrawing) return;
-    const c = canvasRef.current; if (!c) return;
-    const ctx = c.getContext("2d"); if (!ctx || !lastPos.current) return;
-    const pos = getPos(e, c);
-    ctx.beginPath(); ctx.moveTo(lastPos.current.x, lastPos.current.y); ctx.lineTo(pos.x, pos.y);
-    ctx.strokeStyle = "#1E3A2F"; ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.stroke();
-    lastPos.current = pos;
-  }
-  function endDraw() { setIsDrawing(false); lastPos.current = null; }
-  function canvasIsBlank() {
-    const c = canvasRef.current; if (!c) return true;
-    const ctx = c.getContext("2d"); if (!ctx) return true;
-    return !ctx.getImageData(0, 0, c.width, c.height).data.some((v) => v !== 0);
-  }
-  function handleSubmit() {
-    if (!signerName.trim() || !signerInitials.trim() || !confirmed) return;
-    if (mode === "draw") {
-      if (canvasIsBlank()) return;
-      onSubmit({ signatureData: canvasRef.current!.toDataURL("image/png"), signatureType: "draw", signerName: signerName.trim(), signerInitials: signerInitials.trim() });
-    } else {
-      if (!typedSig.trim()) return;
-      onSubmit({ signatureData: typedSig.trim(), signatureType: "typed", signerName: signerName.trim(), signerInitials: signerInitials.trim() });
-    }
-  }
-  const canSubmit = !!(signerName.trim() && signerInitials.trim() && confirmed && (mode === "draw" ? !canvasIsBlank() : typedSig.trim()));
-  return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle className="text-green-800">Sign Estimate</DialogTitle></DialogHeader>
-        <div className="space-y-4">
-          <div className="flex gap-2">
-            <Button variant={mode === "draw" ? "default" : "outline"} size="sm" onClick={() => setMode("draw")} className={mode === "draw" ? "bg-green-700 hover:bg-green-800" : ""}>Draw Signature</Button>
-            <Button variant={mode === "type" ? "default" : "outline"} size="sm" onClick={() => setMode("type")} className={mode === "type" ? "bg-green-700 hover:bg-green-800" : ""}>Type Signature</Button>
-          </div>
-          {mode === "draw" && (
-            <div>
-              <Label className="text-xs text-gray-500 mb-1 block">Draw your signature below</Label>
-              <canvas ref={canvasRef} width={480} height={140} className="border-2 border-gray-300 rounded w-full bg-white cursor-crosshair touch-none" style={{ touchAction: "none" }}
-                onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
-                onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw} />
-              <Button variant="ghost" size="sm" onClick={clearCanvas} className="mt-1 text-xs text-gray-400">Clear</Button>
-            </div>
-          )}
-          {mode === "type" && (
-            <div>
-              <Label className="text-xs text-gray-500 mb-1 block">Type your full name to sign</Label>
-              <Input value={typedSig} onChange={(e) => setTypedSig(e.target.value)} placeholder="Your full name" style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontSize: "1.2rem" }} />
-              {typedSig && <p className="mt-2 text-2xl text-green-900 border-b border-gray-400 pb-2" style={{ fontFamily: "Georgia, serif", fontStyle: "italic" }}>{typedSig}</p>}
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="sig-name" className="text-xs text-gray-500 mb-1 block">Full Name *</Label>
-              <Input id="sig-name" value={signerName} onChange={(e) => setSignerName(e.target.value)} placeholder="Your full name" />
-            </div>
-            <div>
-              <Label htmlFor="sig-initials" className="text-xs text-gray-500 mb-1 block">Initials *</Label>
-              <Input id="sig-initials" value={signerInitials} onChange={(e) => setSignerInitials(e.target.value)} placeholder="e.g. J.D." maxLength={6} />
-            </div>
-          </div>
-          <div className="flex items-start gap-3 p-3 bg-gray-50 rounded border">
-            <Checkbox id="sig-confirm" checked={confirmed} onCheckedChange={(v) => setConfirmed(!!v)} className="mt-0.5" />
-            <Label htmlFor="sig-confirm" className="text-sm text-gray-600 leading-relaxed cursor-pointer">
-              I agree that this electronic signature is the legal equivalent of my handwritten signature and I authorize Chapin Landscapes to proceed with the work described in this estimate.
-            </Label>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={!canSubmit || isPending} className="bg-green-700 hover:bg-green-800 text-white">
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Submit Signature
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function SimpleTemplate({ est, onSign }: { est: any; onSign: () => void }) {
-  const items: any[] = est.items ?? [];
-  const subtotal = items.reduce((s: number, i: any) => s + parseFloat(i.total ?? "0"), 0);
-  const taxRate = parseFloat(est.taxRate ?? "0") / 100;
-  const total = subtotal + subtotal * taxRate;
-  return (
-    <div className="max-w-3xl mx-auto bg-white p-8 print:p-4 font-sans">
+    <div className="max-w-2xl mx-auto bg-white text-gray-900 p-10 min-h-screen font-sans">
+      {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-green-800 tracking-tight">CHAPIN LANDSCAPES</h1>
@@ -213,6 +33,8 @@ function SimpleTemplate({ est, onSign }: { est: any; onSign: () => void }) {
           <div className="text-xs text-gray-500 mt-0.5 uppercase tracking-wide">Estimate</div>
         </div>
       </div>
+
+      {/* Customer + Date row */}
       <div className="grid grid-cols-2 gap-6 mb-8">
         <div>
           <div className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">Prepared For</div>
@@ -222,230 +44,310 @@ function SimpleTemplate({ est, onSign }: { est: any; onSign: () => void }) {
           {est.property_address && <div className="text-sm text-gray-600 mt-1">{est.property_address}</div>}
         </div>
         <div className="text-right space-y-1">
-          <div><span className="text-xs text-gray-400 uppercase tracking-wide">Date:&nbsp;</span><span className="text-sm font-medium">{fmtDate(est.issued_date)}</span></div>
-          {est.valid_until && <div><span className="text-xs text-gray-400 uppercase tracking-wide">Valid Until:&nbsp;</span><span className="text-sm font-medium">{fmtDate(est.valid_until)}</span></div>}
-          {est.salesperson_name && <div><span className="text-xs text-gray-400 uppercase tracking-wide">Advisor:&nbsp;</span><span className="text-sm font-medium">{est.salesperson_name}</span></div>}
+          <div><span className="text-xs text-gray-400 uppercase tracking-wide">Date:&nbsp;</span>
+            <span className="text-sm font-medium">{fmtDate(est.issued_date)}</span></div>
+          {est.valid_until && <div><span className="text-xs text-gray-400 uppercase tracking-wide">Valid Until:&nbsp;</span>
+            <span className="text-sm font-medium">{fmtDate(est.valid_until)}</span></div>}
+          {est.salesperson_name && <div><span className="text-xs text-gray-400 uppercase tracking-wide">Salesperson:&nbsp;</span>
+            <span className="text-sm font-medium">{est.salesperson_name}</span></div>}
         </div>
       </div>
+
+      {/* Project Title */}
+      <div className="bg-green-800 text-white rounded px-4 py-2 mb-6">
+        <div className="text-[10px] uppercase tracking-widest opacity-70">Project</div>
+        <div className="font-semibold text-base">{est.title}</div>
+      </div>
+
+      {/* Customer message */}
       {est.customer_message && (
-        <section className="p-4 bg-green-50 border border-green-200 rounded mb-6">
-          <h2 className="text-sm font-bold text-green-800 mb-2">Dear {est.customer_name ?? "Valued Customer"},</h2>
-          <p className="text-sm text-gray-700 leading-relaxed">{est.customer_message}</p>
-        </section>
-      )}
-      <table className="w-full text-sm mb-6">
-        <thead><tr className="border-b-2 border-green-700 text-green-800">
-          <th className="text-left py-2 font-semibold">Description</th>
-          <th className="text-right py-2 font-semibold w-16">Qty</th>
-          <th className="text-right py-2 font-semibold w-24">Unit Price</th>
-          <th className="text-right py-2 font-semibold w-24">Total</th>
-        </tr></thead>
-        <tbody>{items.map((item: any, i: number) => (
-          <tr key={i} className="border-b border-gray-100">
-            <td className="py-2.5"><div className="font-medium">{item.name}</div>{item.description && <div className="text-xs text-gray-500">{item.description}</div>}</td>
-            <td className="text-right py-2.5">{item.quantity}</td>
-            <td className="text-right py-2.5">{fmtMoney(item.unit_price)}</td>
-            <td className="text-right py-2.5">{fmtMoney(item.total)}</td>
-          </tr>
-        ))}</tbody>
-      </table>
-      <div className="flex justify-end mb-8">
-        <div className="w-56 space-y-1.5 text-sm">
-          <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{fmtMoney(subtotal)}</span></div>
-          {taxRate > 0 && <div className="flex justify-between text-gray-600"><span>Tax ({est.taxRate}%)</span><span>{fmtMoney(subtotal * taxRate)}</span></div>}
-          <div className="flex justify-between font-bold text-base border-t border-gray-200 pt-1.5 text-green-800"><span>Total</span><span>{fmtMoney(total)}</span></div>
+        <div className="mb-6 text-sm text-gray-700 italic border-l-4 border-green-300 pl-3">
+          {est.customer_message}
         </div>
-      </div>
-      {est.notes && (
-        <section className="border-t border-gray-200 pt-4 mb-6">
-          <h3 className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-2">Notes</h3>
-          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{est.notes}</p>
-        </section>
       )}
-      <SignatureSection est={est} onSignClick={onSign} />
+
+      {/* Work Areas summary table */}
+      <table className="w-full text-sm mb-6 border-collapse">
+        <thead>
+          <tr className="border-b border-gray-300">
+            <th className="text-left py-2 font-semibold text-gray-700">Work Area</th>
+            <th className="text-left py-2 font-semibold text-gray-700">Category</th>
+            <th className="text-right py-2 font-semibold text-gray-700">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(est.work_areas ?? []).map((wa: any) => {
+            const areaTotal = (wa.line_items ?? []).reduce((s: number, li: any) => s + num(li.amount), 0);
+            return (
+              <tr key={wa.id} className="border-b border-gray-100">
+                <td className="py-2">
+                  <div className="font-medium">{wa.name}</div>
+                  {wa.area_description && <div className="text-xs text-gray-500">{wa.area_description}</div>}
+                </td>
+                <td className="py-2 text-gray-600">{wa.category ?? "—"}</td>
+                <td className="py-2 text-right font-medium">{fmtMoney(areaTotal)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* Totals */}
+      <div className="ml-auto w-64 text-sm space-y-1 mb-8">
+        <div className="flex justify-between"><span className="text-gray-600">Subtotal</span><span>{fmtMoney(est.subtotal)}</span></div>
+        {num(est.discount_amount) > 0 && <div className="flex justify-between text-red-600"><span>Discount</span><span>–{fmtMoney(est.discount_amount)}</span></div>}
+        <div className="flex justify-between"><span className="text-gray-600">Tax ({taxPct}%)</span><span>{fmtMoney(est.tax_amount)}</span></div>
+        <div className="flex justify-between text-base font-bold border-t border-gray-300 pt-1 mt-1">
+          <span>Total</span><span>{fmtMoney(est.total)}</span>
+        </div>
+        {num(est.down_payment_percent) > 0 && (
+          <div className="flex justify-between text-green-700 font-medium">
+            <span>Deposit ({num(est.down_payment_percent).toFixed(0)}%)</span>
+            <span>{fmtMoney(est.down_payment_amount)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Terms / Notes */}
+      {(est.terms || est.notes) && (
+        <div className="border-t border-gray-200 pt-4 text-xs text-gray-500 space-y-2">
+          {est.terms && <div><span className="font-semibold">Terms & Conditions: </span>{est.terms}</div>}
+          {est.notes && <div><span className="font-semibold">Notes: </span>{est.notes}</div>}
+        </div>
+      )}
+
+      <div className="mt-10 text-center text-[10px] text-gray-400">
+        Thank you for the opportunity to serve you. — Chapin Landscapes
+      </div>
     </div>
   );
 }
 
-function BookletTemplate({ est, onSign }: { est: any; onSign: () => void }) {
-  const items: any[] = est.items ?? [];
-  const subtotal = items.reduce((s: number, i: any) => s + parseFloat(i.total ?? "0"), 0);
-  const taxRate = parseFloat(est.taxRate ?? "0") / 100;
-  const total = subtotal + subtotal * taxRate;
+// ── Booklet Template ──────────────────────────────────────────────────────────
+function BookletTemplate({ est }: { est: any }) {
+  const taxPct = (num(est.tax_rate) * 100).toFixed(2);
+
   return (
-    <div className="max-w-3xl mx-auto print:max-w-none font-sans">
-      <div className="bg-gradient-to-br from-green-900 to-green-700 text-white p-10 print:p-8 rounded-t-lg print:rounded-none min-h-[220px] flex flex-col justify-between">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">CHAPIN LANDSCAPES</h1>
-            <p className="text-green-300 mt-1 text-sm">Professional Landscape Services</p>
-          </div>
-          <div className="text-right">
-            <div className="text-sm text-green-300 uppercase tracking-widest">Proposal</div>
-            <div className="text-2xl font-bold mt-1">{est.estimate_number}</div>
-          </div>
+    <div className="max-w-3xl mx-auto bg-white text-gray-900 font-sans">
+      {/* Cover page */}
+      <div className="min-h-[50vh] bg-gradient-to-br from-green-900 to-green-700 text-white p-12 flex flex-col justify-between print:min-h-screen">
+        <div>
+          <h1 className="text-4xl font-extrabold tracking-tight mb-1">CHAPIN LANDSCAPES</h1>
+          <p className="text-green-300 text-sm uppercase tracking-widest">Professional Landscape Services</p>
         </div>
-        <div className="mt-6">
-          <div className="text-sm text-green-300 mb-1">Prepared for:</div>
-          <div className="text-xl font-semibold">{est.customer_name ?? "—"}</div>
-          {est.property_address && <div className="text-green-200 text-sm mt-0.5">{est.property_address}</div>}
+        <div>
+          <div className="text-xs uppercase tracking-widest text-green-300 mb-1">Proposal</div>
+          <div className="text-3xl font-bold mb-1">{est.title}</div>
+          <div className="text-green-200 text-sm">{est.estimate_number}</div>
         </div>
-        <div className="flex gap-8 text-sm text-green-200 mt-4">
-          <span>Date: {fmtDate(est.issued_date)}</span>
-          {est.valid_until && <span>Valid Until: {fmtDate(est.valid_until)}</span>}
-          {est.salesperson_name && <span>Advisor: {est.salesperson_name}</span>}
+        <div className="text-sm text-green-200 space-y-0.5">
+          <div>Prepared for: <span className="text-white font-semibold">{est.customer_name ?? "—"}</span></div>
+          <div>Date: <span className="text-white">{fmtDate(est.issued_date)}</span></div>
+          {est.salesperson_name && <div>Advisor: <span className="text-white">{est.salesperson_name}</span></div>}
         </div>
       </div>
-      <div className="bg-white p-10 print:p-8 rounded-b-lg print:rounded-none border border-t-0 border-gray-100">
+
+      <div className="p-10 space-y-10">
+        {/* Introduction */}
         {est.customer_message && (
-          <section className="mb-8 pb-6 border-b border-gray-100">
-            <h2 className="text-lg font-bold text-green-800 border-b border-green-200 pb-3 mb-3">Dear {est.customer_name ?? "Valued Customer"},</h2>
+          <section>
+            <h2 className="text-lg font-bold text-green-800 border-b border-green-200 pb-1 mb-3">Dear {est.customer_name ?? "Valued Customer"},</h2>
             <p className="text-sm text-gray-700 leading-relaxed">{est.customer_message}</p>
           </section>
         )}
-        {(est.customer_email || est.customer_phone) && (
-          <section className="mb-8">
-            <h2 className="text-lg font-bold text-green-800 border-b border-green-200 pb-3 mb-3">Project Information</h2>
-            <div className="grid grid-cols-2 gap-6 text-sm">
-              <div className="space-y-1">
-                <div className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">Customer</div>
-                <div className="font-medium">{est.customer_name ?? "—"}</div>
-                {est.customer_email && <div className="text-gray-600">{est.customer_email}</div>}
-                {est.customer_phone && <div className="text-gray-600">{est.customer_phone}</div>}
+
+        {/* Customer / Property info */}
+        <section>
+          <h2 className="text-lg font-bold text-green-800 border-b border-green-200 pb-1 mb-3">Project Information</h2>
+          <div className="grid grid-cols-2 gap-6 text-sm">
+            <div className="space-y-1">
+              <div className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">Customer</div>
+              <div className="font-medium">{est.customer_name ?? "—"}</div>
+              {est.customer_email && <div className="text-gray-600">{est.customer_email}</div>}
+              {est.customer_phone && <div className="text-gray-600">{est.customer_phone}</div>}
+            </div>
+            <div className="space-y-1">
+              <div className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">Property</div>
+              <div className="text-gray-700">{est.property_address ?? "—"}</div>
+              <div className="mt-2 text-[10px] uppercase tracking-widest text-gray-400 font-semibold">Valid Until</div>
+              <div className="text-gray-700">{fmtDate(est.valid_until)}</div>
+            </div>
+          </div>
+        </section>
+
+        {/* Detailed Work Areas */}
+        <section>
+          <h2 className="text-lg font-bold text-green-800 border-b border-green-200 pb-1 mb-4">Scope of Work</h2>
+          <div className="space-y-8">
+            {(est.work_areas ?? []).map((wa: any, idx: number) => {
+              const areaTotal = (wa.line_items ?? []).reduce((s: number, li: any) => s + num(li.amount), 0);
+              return (
+                <div key={wa.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-green-50 border-b border-green-100 px-4 py-2.5 flex justify-between items-start">
+                    <div>
+                      <div className="font-bold text-green-900">{idx + 1}. {wa.name}</div>
+                      {wa.category && <div className="text-xs text-green-700 mt-0.5">{wa.category}</div>}
+                      {wa.area_description && <div className="text-xs text-gray-600 mt-1">{wa.area_description}</div>}
+                    </div>
+                    <div className="text-right font-bold text-green-800">{fmtMoney(areaTotal)}</div>
+                  </div>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50 text-gray-500">
+                        <th className="text-left py-1.5 px-3 font-medium">Item</th>
+                        <th className="text-left py-1.5 px-2 font-medium">Description</th>
+                        <th className="text-right py-1.5 px-2 font-medium">Qty</th>
+                        <th className="text-right py-1.5 px-2 font-medium">Unit Price</th>
+                        <th className="text-right py-1.5 px-3 font-medium">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(wa.line_items ?? []).map((li: any) => (
+                        <tr key={li.id} className="border-b border-gray-50 hover:bg-gray-50">
+                          <td className="py-1.5 px-3 capitalize text-gray-600">{li.item_type}</td>
+                          <td className="py-1.5 px-2">{li.description}</td>
+                          <td className="py-1.5 px-2 text-right">{num(li.quantity)} {li.unit}</td>
+                          <td className="py-1.5 px-2 text-right">{fmtMoney(li.unit_price)}</td>
+                          <td className="py-1.5 px-3 text-right font-medium">{fmtMoney(li.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Investment Summary */}
+        <section>
+          <h2 className="text-lg font-bold text-green-800 border-b border-green-200 pb-1 mb-4">Investment Summary</h2>
+          <div className="max-w-sm ml-auto text-sm space-y-2">
+            <div className="flex justify-between"><span className="text-gray-600">Subtotal</span><span>{fmtMoney(est.subtotal)}</span></div>
+            {num(est.discount_amount) > 0 && (
+              <div className="flex justify-between text-red-600"><span>Discount</span><span>–{fmtMoney(est.discount_amount)}</span></div>
+            )}
+            <div className="flex justify-between"><span className="text-gray-600">Tax ({taxPct}%)</span><span>{fmtMoney(est.tax_amount)}</span></div>
+            <div className="flex justify-between text-lg font-extrabold border-t-2 border-green-800 pt-2 mt-2 text-green-900">
+              <span>Total Investment</span><span>{fmtMoney(est.total)}</span>
+            </div>
+            {num(est.down_payment_percent) > 0 && (
+              <div className="bg-green-50 rounded p-3 mt-2 flex justify-between items-center">
+                <span className="text-green-800 font-medium">Required Deposit ({num(est.down_payment_percent).toFixed(0)}%)</span>
+                <span className="text-green-900 font-bold">{fmtMoney(est.down_payment_amount)}</span>
               </div>
-              <div className="text-right space-y-1">
-                <div><span className="text-xs text-gray-400 uppercase tracking-wide">Date:&nbsp;</span><span className="font-medium">{fmtDate(est.issued_date)}</span></div>
-                {est.valid_until && <div><span className="text-xs text-gray-400 uppercase tracking-wide">Valid Until:&nbsp;</span><span className="font-medium">{fmtDate(est.valid_until)}</span></div>}
-              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Terms */}
+        {(est.terms || est.notes) && (
+          <section className="border-t border-gray-200 pt-6">
+            <h2 className="text-lg font-bold text-green-800 border-b border-green-200 pb-1 mb-3">Terms & Notes</h2>
+            <div className="space-y-3 text-sm text-gray-700">
+              {est.terms && <div><span className="font-semibold">Terms & Conditions: </span>{est.terms}</div>}
+              {est.notes && <div><span className="font-semibold">Additional Notes: </span>{est.notes}</div>}
             </div>
           </section>
         )}
-        <section className="mb-8">
-          <h2 className="text-lg font-bold text-green-800 border-b border-green-200 pb-3 mb-3">Scope of Work</h2>
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-green-700 text-green-800">
-              <th className="text-left py-2 font-semibold">Description</th>
-              <th className="text-right py-2 font-semibold w-16">Qty</th>
-              <th className="text-right py-2 font-semibold w-24">Unit Price</th>
-              <th className="text-right py-2 font-semibold w-24">Total</th>
-            </tr></thead>
-            <tbody>{items.map((item: any, i: number) => (
-              <tr key={i} className="border-b border-gray-100">
-                <td className="py-2.5"><div className="font-medium">{item.name}</div>{item.description && <div className="text-xs text-gray-500">{item.description}</div>}</td>
-                <td className="text-right py-2.5">{item.quantity}</td>
-                <td className="text-right py-2.5">{fmtMoney(item.unit_price)}</td>
-                <td className="text-right py-2.5">{fmtMoney(item.total)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </section>
-        <div className="flex justify-end mb-8">
-          <div className="w-64 space-y-1.5 text-sm">
-            <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{fmtMoney(subtotal)}</span></div>
-            {taxRate > 0 && <div className="flex justify-between text-gray-600"><span>Tax ({est.taxRate}%)</span><span>{fmtMoney(subtotal * taxRate)}</span></div>}
-            <div className="flex justify-between font-bold text-base border-t-2 border-green-700 pt-2 text-green-800"><span>Total Investment</span><span>{fmtMoney(total)}</span></div>
+
+        {/* Signature area */}
+        <section className="border border-gray-200 rounded-lg p-6">
+          <h2 className="text-base font-bold text-green-800 mb-4">Acceptance</h2>
+          <p className="text-sm text-gray-600 mb-6">
+            By signing below, you agree to the scope of work and investment outlined in this proposal.
+          </p>
+          <div className="grid grid-cols-2 gap-8 text-sm">
+            <div>
+              <div className="border-b border-gray-400 mt-8 mb-1" />
+              <div className="text-gray-500">Customer Signature</div>
+              <div className="border-b border-gray-400 mt-6 mb-1" />
+              <div className="text-gray-500">Date</div>
+            </div>
+            <div>
+              <div className="border-b border-gray-400 mt-8 mb-1" />
+              <div className="text-gray-500">Printed Name</div>
+              <div className="text-xs text-gray-400 mt-4 leading-relaxed">
+                Chapin Landscapes<br />
+                Professional Landscape Services
+              </div>
+            </div>
           </div>
+        </section>
+
+        <div className="text-center text-[10px] text-gray-400 pt-2">
+          Thank you for choosing Chapin Landscapes. We look forward to transforming your outdoor space.
         </div>
-        {est.notes && (
-          <section className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded">
-            <h3 className="text-xs uppercase tracking-widest text-amber-700 font-semibold mb-2">Notes &amp; Terms</h3>
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{est.notes}</p>
-          </section>
-        )}
-        <SignatureSection est={est} onSignClick={onSign} />
       </div>
     </div>
   );
 }
 
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function EstimatePreview() {
   const [, params] = useRoute("/estimates/:id/preview");
   const id = params?.id;
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const [showSignModal, setShowSignModal] = useState(false);
 
   const { data: est, isLoading, isError } = useQuery<any>({
     queryKey: [`/api/estimates/${id}`],
-    queryFn: () => fetch(`/api/estimates/${id}`, { credentials: "include" }).then((r) => r.json()),
     enabled: !!id,
   });
 
-  const signMutation = useMutation({
-    mutationFn: async (payload: { signatureData: string; signatureType: string; signerName: string; signerInitials: string }) => {
-      const res = await fetch(`/api/estimates/${id}/sign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message ?? "Failed to submit signature");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/estimates/${id}`] });
-      setShowSignModal(false);
-      toast({ title: "Estimate signed!", description: "A confirmation has been sent to your email." });
-    },
-    onError: (err: any) => {
-      toast({ title: "Signature failed", description: err.message, variant: "destructive" });
-    },
-  });
+  const handlePrint = () => {
+    window.print();
+  };
 
-  if (isLoading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-green-700" />
-    </div>
-  );
-
-  if (isError || !est) return (
-    <div className="min-h-screen flex items-center justify-center text-gray-500">
-      <div className="text-center">
-        <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
-        <p>Estimate not found.</p>
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
-    </div>
-  );
+    );
+  }
 
-  const style = est.template_style ?? "booklet";
+  if (isError || !est) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-muted-foreground">
+        Estimate not found.
+      </div>
+    );
+  }
+
+  const style: "simple" | "booklet" = est.presentation_style === "booklet" ? "booklet" : "simple";
 
   return (
     <>
-      <div className="print:hidden sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <FileText className="h-4 w-4" />
-          <span>{est.estimate_number} — {est.customer_name}</span>
-          {est.signedAt && (
-            <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-medium px-2 py-0.5 rounded-full">
-              <CheckCircle className="h-3 w-3" /> Signed
-            </span>
-          )}
+      {/* Print controls — hidden when printing */}
+      <div className="print:hidden sticky top-0 z-50 bg-white border-b shadow-sm px-4 py-2 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <FileText className="h-4 w-4 text-green-700" />
+          <span className="font-medium">{est.estimate_number}</span>
+          <span className="text-gray-400">·</span>
+          <span>{est.title}</span>
+          <span className="ml-2 text-xs bg-green-100 text-green-800 rounded px-1.5 py-0.5 capitalize font-medium">
+            {style}
+          </span>
         </div>
-        <div className="flex gap-2">
-          {!est.signedAt && (
-            <Button size="sm" onClick={() => setShowSignModal(true)} className="bg-green-700 hover:bg-green-800 text-white gap-1.5">
-              <PenLine className="h-4 w-4" />Approve &amp; Sign
-            </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={() => window.print()} className="gap-1.5">
-            <Printer className="h-4 w-4" />Print
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handlePrint} data-testid="btn-print">
+            <Printer className="h-4 w-4 mr-1.5" />
+            Print / Save PDF
           </Button>
         </div>
       </div>
-      <div className="py-6 px-4 print:p-0 bg-gray-50 print:bg-white min-h-screen">
-        {style === "booklet"
-          ? <BookletTemplate est={est} onSign={() => setShowSignModal(true)} />
-          : <SimpleTemplate est={est} onSign={() => setShowSignModal(true)} />}
+
+      {/* Preview content */}
+      <div className="min-h-screen bg-gray-100 py-8 print:bg-white print:p-0">
+        {style === "booklet" ? <BookletTemplate est={est} /> : <SimpleTemplate est={est} />}
       </div>
-      <SignatureModal
-        open={showSignModal}
-        onClose={() => setShowSignModal(false)}
-        onSubmit={(data) => signMutation.mutate(data)}
-        isPending={signMutation.isPending}
-      />
-      <style>{`@media print { @page { margin: 0.5in; } body { background: white !important; } }`}</style>
+
+      {/* Print styles */}
+      <style>{`
+        @media print {
+          @page { margin: 0.5in; }
+          body { background: white !important; }
+        }
+      `}</style>
     </>
   );
 }
