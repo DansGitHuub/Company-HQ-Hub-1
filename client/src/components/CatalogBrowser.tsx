@@ -27,13 +27,13 @@ interface Props {
 export function CatalogBrowser({ open, areaKey, onClose, onSelect }: Props) {
   const [search, setSearch] = useState("");
 
-  const { data, isLoading } = useQuery<{ items: CatalogItem[] }>({
+  const { data, isLoading } = useQuery<CatalogItem[]>({
     queryKey: ["/api/catalog"],
     queryFn: () => apiRequest("GET", "/api/catalog").then((r: any) => r.json()),
     enabled: open,
   });
 
-  const items = data?.items ?? [];
+  const items = (data ?? []) as CatalogItem[];
   const filtered = items.filter(it => {
     const q = search.toLowerCase();
     return !q || it.name?.toLowerCase().includes(q) || it.class?.toLowerCase().includes(q) || it.sku?.toLowerCase().includes(q) || it.description?.toLowerCase().includes(q);
