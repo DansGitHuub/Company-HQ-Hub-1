@@ -27,6 +27,7 @@ interface LineItem {
   unit_price: number;
   amount: number;
   is_optional: boolean;
+  image_url?: string | null;
 }
 
 interface WorkAreaDraft {
@@ -283,7 +284,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
     return "service";
   }
 
-  const addCatalogItem = (aKey: string, item: CatalogItem) => {
+  const addCatalogItem = (aKey: string, item: CatalogItem, imageUrl?: string) => {
     const cost = parseFloat((item.cost ?? "0").toString().replace(/[$,]/g, "")) || 0;
     setAreas(prev => prev.map(a => a._key === aKey ? {
       ...a,
@@ -296,6 +297,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
         unit_price: cost,
         amount: cost,
         is_optional: false,
+        image_url: imageUrl ?? null,
       }]
     } : a));
   };

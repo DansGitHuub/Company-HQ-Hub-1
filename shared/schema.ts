@@ -3108,6 +3108,8 @@ export const catalogItems = pgTable("catalog_items", {
   description: text("description"),
   sku: varchar("sku", { length: 100 }),
   otherOptions: text("other_options"),
+  imageUrl: text("image_url"),
+  optionImages: jsonb("option_images").$type<Record<string, string>>().default({}),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

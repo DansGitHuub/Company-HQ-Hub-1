@@ -26,7 +26,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Save, Trash2, X, Plus, Tag, DollarSign } from "lucide-react";
+import { ArrowLeft, Save, Trash2, X, Plus, Tag, DollarSign, Upload, ImageIcon } from "lucide-react";
 
 const CLASS_OPTIONS = ["Labor", "Equipment", "Materials", "Subcontracting"];
 
@@ -51,6 +51,8 @@ type CatalogItemDetail = {
   description: string | null;
   sku: string | null;
   otherOptions: string | null;
+  imageUrl: string | null;
+  optionImages: Record<string, string> | null;
   isActive: boolean | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -79,6 +81,8 @@ export default function CatalogDetail() {
   const [tagInput, setTagInput] = useState("");
   const [dirty, setDirty] = useState(false);
   const [showEstimateDialog, setShowEstimateDialog] = useState(false);
+  const [uploadingPrimary, setUploadingPrimary] = useState(false);
+  const [uploadingOption, setUploadingOption] = useState<Record<string, boolean>>({});
 
   // Pricing panel local state
   const [taxRate, setTaxRate] = useState(8.25);
@@ -192,6 +196,62 @@ export default function CatalogDetail() {
 
   function handleTagKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") { e.preventDefault(); addTag(); }
+  }
+
+  async function uploadPrimaryPhoto(file: File) {
+    if (!id) return;
+    setUploadingPrimary(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/catalog/${id}/image`, { method: "POST", credentials: "include", body: fd });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      setForm(f => f ? { ...f, imageUrl: data.image_url } : f);
+      queryClient.invalidateQueries({ queryKey: ["/api/catalog", id] });
+      toast({ title: "Primary photo updated" });
+    } catch {
+      toast({ title: "Photo upload failed", variant: "destructive" });
+    } finally {
+      setUploadingPrimary(false);
+    }
+  }
+
+  async function uploadOptionPhoto(option: string, file: File) {
+    if (!id) return;
+    setUploadingOption(prev => ({ ...prev, [option]: true }));
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("option", option);
+      const res = await fetch(`/api/catalog/${id}/option-image`, { method: "POST", credentials: "include", body: fd });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      setForm(f => f ? { ...f, optionImages: { ...(f.optionImages ?? {}), [option]: data.image_url } } : f);
+      queryClient.invalidateQueries({ queryKey: ["/api/catalog", id] });
+      toast({ title: `Photo for "${option}" updated` });
+    } catch {
+      toast({ title: "Photo upload failed", variant: "destructive" });
+    } finally {
+      setUploadingOption(prev => ({ ...prev, [option]: false }));
+    }
+  }
+
+  async function removeOptionPhoto(option: string) {
+    if (!id) return;
+    try {
+      await fetch(`/api/catalog/${id}/option-image/${encodeURIComponent(option)}`, { method: "DELETE", credentials: "include" });
+      setForm(f => {
+        if (!f) return f;
+        const next = { ...(f.optionImages ?? {}) };
+        delete next[option];
+        return { ...f, optionImages: next };
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/catalog", id] });
+      toast({ title: `Photo for "${option}" removed` });
+    } catch {
+      toast({ title: "Remove failed", variant: "destructive" });
+    }
   }
 
   if (isLoading) {
@@ -474,6 +534,139 @@ export default function CatalogDetail() {
               </Button>
             </div>
           </div>
+
+          {form.class === "Materials" && (() => {
+            const options = (form.otherOptions ?? "")
+              .split(",")
+              .map(o => o.trim())
+              .filter(Boolean);
+            return (
+              <div className="space-y-4">
+                <Label className="flex items-center gap-1.5 text-base font-semibold">
+                  <ImageIcon className="w-4 h-4" /> Photos
+                </Label>
+
+                {/* Primary photo */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">Primary Photo</p>
+                  <div className="flex items-start gap-4">
+                    {form.imageUrl ? (
+                      <img
+                        src={form.imageUrl}
+                        alt="Primary"
+                        className="w-24 h-24 object-cover rounded-md border"
+                        data-testid="img-primary-photo"
+                      />
+                    ) : (
+                      <div className="w-24 h-24 rounded-md border border-dashed flex items-center justify-center bg-muted/30">
+                        <ImageIcon className="w-8 h-8 text-muted-foreground/40" />
+                      </div>
+                    )}
+                    <div>
+                      <label htmlFor="upload-primary">
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          disabled={uploadingPrimary}
+                          data-testid="btn-upload-primary-photo"
+                        >
+                          <span>
+                            {uploadingPrimary ? (
+                              <>Uploading…</>
+                            ) : (
+                              <><Upload className="w-3.5 h-3.5 mr-1.5" />{form.imageUrl ? "Replace" : "Upload"}</>
+                            )}
+                          </span>
+                        </Button>
+                      </label>
+                      <input
+                        id="upload-primary"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={e => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadPrimaryPhoto(f);
+                          e.target.value = "";
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">PNG or JPG</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Option photos */}
+                {options.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-muted-foreground">Option Photos</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {options.map(opt => {
+                        const optUrl = (form.optionImages ?? {})[opt];
+                        const isUploading = uploadingOption[opt] ?? false;
+                        return (
+                          <div key={opt} className="border rounded-md p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">{opt}</span>
+                              {optUrl && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => removeOptionPhoto(opt)}
+                                  data-testid={`btn-remove-option-photo-${opt}`}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {optUrl ? (
+                                <img
+                                  src={optUrl}
+                                  alt={opt}
+                                  className="w-16 h-16 object-cover rounded border"
+                                  data-testid={`img-option-photo-${opt}`}
+                                />
+                              ) : (
+                                <div className="w-16 h-16 rounded border border-dashed flex items-center justify-center bg-muted/30">
+                                  <ImageIcon className="w-5 h-5 text-muted-foreground/40" />
+                                </div>
+                              )}
+                              <label htmlFor={`upload-opt-${opt}`}>
+                                <Button
+                                  asChild
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isUploading}
+                                  data-testid={`btn-upload-option-photo-${opt}`}
+                                >
+                                  <span>
+                                    {isUploading ? "Uploading…" : <><Upload className="w-3 h-3 mr-1" />{optUrl ? "Replace" : "Upload"}</>}
+                                  </span>
+                                </Button>
+                              </label>
+                              <input
+                                id={`upload-opt-${opt}`}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={e => {
+                                  const f = e.target.files?.[0];
+                                  if (f) uploadOptionPhoto(opt, f);
+                                  e.target.value = "";
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           <Separator />
 

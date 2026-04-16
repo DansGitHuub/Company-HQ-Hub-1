@@ -82,6 +82,9 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
       )
     `);
     await pool.query(`UPDATE catalog_items SET is_active = true WHERE is_active = false OR is_active IS NULL`);
+    await pool.query(`ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS image_url TEXT`);
+    await pool.query(`ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS option_images JSONB DEFAULT '{}'`);
+    await pool.query(`ALTER TABLE estimate_line_items ADD COLUMN IF NOT EXISTS image_url TEXT`);
     console.log("[migration] Catalog tables ready");
   })();
 
@@ -211,6 +214,88 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
     try {
       const id = parseInt(req.params.id);
       await pool.query(`UPDATE catalog_items SET is_active=FALSE, updated_at=NOW() WHERE id=$1`, [id]);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // POST /api/catalog/:id/image — upload primary photo
+  app.post("/api/catalog/:id/image", requireAuth, upload.single("file"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+      if (!privateDir) return res.status(500).json({ message: "Storage not configured" });
+      const SIDECAR = "http://127.0.0.1:1106";
+      const imageId = (await import("crypto")).randomUUID();
+      const ext = req.file.mimetype.includes("png") ? "png" : "jpg";
+      const objectPath = `${privateDir}/catalog-images/${imageId}.${ext}`;
+      const pathParts = objectPath.startsWith("/") ? objectPath.slice(1).split("/") : objectPath.split("/");
+      const bucketName = pathParts[0];
+      const objectName = pathParts.slice(1).join("/");
+      const signRes = await fetch(`${SIDECAR}/object-storage/signed-object-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bucket_name: bucketName, object_name: objectName, method: "PUT", expires_at: new Date(Date.now() + 900 * 1000).toISOString() }),
+      });
+      if (!signRes.ok) return res.status(500).json({ message: "Storage signing failed" });
+      const { signed_url } = await signRes.json() as { signed_url: string };
+      const uploadRes = await fetch(signed_url, { method: "PUT", headers: { "Content-Type": req.file.mimetype }, body: req.file.buffer });
+      if (!uploadRes.ok) return res.status(500).json({ message: "Upload failed" });
+      const imageUrl = `/objects/catalog-images/${imageId}.${ext}`;
+      await pool.query(`UPDATE catalog_items SET image_url=$1, updated_at=NOW() WHERE id=$2`, [imageUrl, id]);
+      res.json({ image_url: imageUrl });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // POST /api/catalog/:id/option-image — upload photo for a specific option
+  app.post("/api/catalog/:id/option-image", requireAuth, upload.single("file"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const option = req.body?.option;
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      if (!option) return res.status(400).json({ message: "option is required" });
+      const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+      if (!privateDir) return res.status(500).json({ message: "Storage not configured" });
+      const SIDECAR = "http://127.0.0.1:1106";
+      const imageId = (await import("crypto")).randomUUID();
+      const ext = req.file.mimetype.includes("png") ? "png" : "jpg";
+      const objectPath = `${privateDir}/catalog-images/${imageId}.${ext}`;
+      const pathParts = objectPath.startsWith("/") ? objectPath.slice(1).split("/") : objectPath.split("/");
+      const bucketName = pathParts[0];
+      const objectName = pathParts.slice(1).join("/");
+      const signRes = await fetch(`${SIDECAR}/object-storage/signed-object-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bucket_name: bucketName, object_name: objectName, method: "PUT", expires_at: new Date(Date.now() + 900 * 1000).toISOString() }),
+      });
+      if (!signRes.ok) return res.status(500).json({ message: "Storage signing failed" });
+      const { signed_url } = await signRes.json() as { signed_url: string };
+      const uploadRes = await fetch(signed_url, { method: "PUT", headers: { "Content-Type": req.file.mimetype }, body: req.file.buffer });
+      if (!uploadRes.ok) return res.status(500).json({ message: "Upload failed" });
+      const imageUrl = `/objects/catalog-images/${imageId}.${ext}`;
+      await pool.query(
+        `UPDATE catalog_items SET option_images = COALESCE(option_images, '{}'::jsonb) || $1::jsonb, updated_at=NOW() WHERE id=$2`,
+        [JSON.stringify({ [option]: imageUrl }), id]
+      );
+      res.json({ option, image_url: imageUrl });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // DELETE /api/catalog/:id/option-image/:optionName — remove one option image
+  app.delete("/api/catalog/:id/option-image/:optionName", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const optionName = req.params.optionName;
+      await pool.query(
+        `UPDATE catalog_items SET option_images = COALESCE(option_images, '{}'::jsonb) - $1, updated_at=NOW() WHERE id=$2`,
+        [optionName, id]
+      );
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });

@@ -205,7 +205,18 @@ function BookletTemplate({ est }: { est: any }) {
                       {(wa.line_items ?? []).map((li: any) => (
                         <tr key={li.id} className="border-b border-gray-50 hover:bg-gray-50">
                           <td className="py-1.5 px-3 capitalize text-gray-600">{li.item_type}</td>
-                          <td className="py-1.5 px-2">{li.description}</td>
+                          <td className="py-1.5 px-2">
+                            <div className="flex items-center gap-2">
+                              {li.image_url && (
+                                <img
+                                  src={li.image_url}
+                                  alt={li.description}
+                                  className="w-16 h-16 object-cover rounded border shrink-0"
+                                />
+                              )}
+                              <span>{li.description}</span>
+                            </div>
+                          </td>
                           <td className="py-1.5 px-2 text-right">{num(li.quantity)} {li.unit}</td>
                           <td className="py-1.5 px-2 text-right">{fmtMoney(li.unit_price)}</td>
                           <td className="py-1.5 px-3 text-right font-medium">{fmtMoney(li.amount)}</td>

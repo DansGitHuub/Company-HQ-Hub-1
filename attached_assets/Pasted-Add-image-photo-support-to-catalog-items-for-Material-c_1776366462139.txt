@@ -1,0 +1,224 @@
+Add image/photo support to catalog items for Material class items. Here is the full spec to implement:
+
+## DATABASE — catalogRoutes.ts startup migration
+
+Add these two ALTER TABLE statements to the existing startup IIFE (after the existing CREATE TABLE and UPDATE statements):
+
+```sql
+ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS option_images JSONB DEFAULT '{}';
+```
+
+image_url = the default/primary photo for the item
+option_images = a JSON object mapping option names to photo URLs, e.g. {"Red": "https://...", "Charcoal": "https://..."}
+
+---
+
+## SERVER — catalogRoutes.ts new endpoints
+
+Add multer at the top of catalogRoutes.ts:
+```ts
+import multer from "multer";
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+```
+
+The app uses Replit SIDECAR object storage. Pattern (same as SOP media in routes.ts):
+```ts
+const SIDECAR = "http://127.0.0.1:1106";
+const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+// Get bucket:
+const bucketRes = await fetch(`${SIDECAR}/object-storage/default-bucket`);
+const { bucket_name: bucketName } = await bucketRes.json();
+// Sign URL:
+const signRes = await fetch(`${SIDECAR}/object-storage/signed-object-url`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ bucket_name: bucketName, object_name: objectPath, method: "PUT", expires_at: new Date(Date.now() + 900000).toISOString() })
+});
+const { signed_url } = await signRes.json();
+// Upload:
+await fetch(signed_url, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: req.file.buffer });
+// Public URL:
+const publicUrl = `/objects/${bucketName}/${objectPath}`;
+```
+
+**Add these 3 endpoints inside registerCatalogRoutes:**
+
+### POST /api/catalog/:id/image
+upload.single("image"), requireAuth middleware
+- objectPath = `catalog-images/${req.params.id}/primary-${Date.now()}.jpg`
+- Upload to SIDECAR as above
+- UPDATE catalog_items SET image_url = $1, updated_at = NOW() WHERE id = $2 RETURNING *
+- Return the updated row
+
+### POST /api/catalog/:id/option-image
+upload.single("image"), requireAuth middleware
+- req.body.option = the option name (e.g. "Red")
+- objectPath = `catalog-images/${req.params.id}/option-${req.body.option.replace(/[^a-z0-9]/gi,'_')}-${Date.now()}.jpg`
+- Upload to SIDECAR
+- UPDATE catalog_items SET option_images = COALESCE(option_images, '{}')::jsonb || $1::jsonb, updated_at = NOW() WHERE id = $2 RETURNING *
+  where $1 = JSON.stringify({ [req.body.option]: publicUrl })
+- Return updated row
+
+### DELETE /api/catalog/:id/option-image/:optionName
+requireAuth middleware
+- UPDATE catalog_items SET option_images = (option_images - $1), updated_at = NOW() WHERE id = $2 RETURNING *
+  where $1 = decodeURIComponent(req.params.optionName)
+- Return updated row
+
+Also add GET /api/catalog/:id — return single item by id:
+```sql
+SELECT ci.*, COALESCE(json_agg(json_build_object('id', ct.id, 'name', ct.name)) FILTER (WHERE ct.id IS NOT NULL), '[]') AS tags
+FROM catalog_items ci
+LEFT JOIN catalog_item_tags cit ON cit.item_id = ci.id
+LEFT JOIN catalog_tags ct ON ct.id = cit.tag_id
+WHERE ci.id = $1
+GROUP BY ci.id
+```
+
+---
+
+## CLIENT — CatalogDetail.tsx
+
+Read the full file first. Then:
+
+1. Add image_url and option_images to the form state type/interface
+2. Initialize them from the fetched item data
+3. After the existing form fields section, add an Images section that ONLY renders when form.class === "Material":
+
+```tsx
+{form.class === "Material" && (
+  <div className="space-y-5 pt-2 border-t">
+    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide pt-2">Photos</p>
+    
+    {/* Primary photo */}
+    <div className="space-y-2">
+      <Label>Primary Photo</Label>
+      {form.image_url ? (
+        <div className="flex items-center gap-3">
+          <img src={form.image_url} alt="Primary" className="h-24 w-24 object-cover rounded-lg border" />
+          <span className="text-xs text-muted-foreground">Current photo</span>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">No photo yet</p>
+      )}
+      <label className="inline-flex items-center gap-2 cursor-pointer">
+        <span className="text-xs bg-secondary text-secondary-foreground px-3 py-1.5 rounded-md hover:bg-secondary/80">
+          {form.image_url ? "Replace Photo" : "Upload Photo"}
+        </span>
+        <input
+          type="file" accept="image/*" className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file || !item?.id) return;
+            const fd = new FormData();
+            fd.append("image", file);
+            const res = await fetch(`/api/catalog/${item.id}/image`, { method: "POST", credentials: "include", body: fd });
+            if (res.ok) {
+              const updated = await res.json();
+              setForm(f => ({ ...f, image_url: updated.image_url }));
+            }
+          }}
+        />
+      </label>
+    </div>
+
+    {/* Option photos — only when other_options has values */}
+    {form.other_options && form.other_options.trim() && (
+      <div className="space-y-3">
+        <Label>Option Photos</Label>
+        <p className="text-xs text-muted-foreground">Upload a photo for each color/style option</p>
+        <div className="grid grid-cols-1 gap-2">
+          {form.other_options.split(",").map(o => o.trim()).filter(Boolean).map(opt => {
+            const optImgs = (form.option_images ?? {}) as Record<string, string>;
+            const imgUrl = optImgs[opt];
+            return (
+              <div key={opt} className="flex items-center gap-3 p-3 border rounded-lg">
+                {imgUrl ? (
+                  <img src={imgUrl} alt={opt} className="h-16 w-16 object-cover rounded border flex-shrink-0" />
+                ) : (
+                  <div className="h-16 w-16 rounded border bg-muted flex items-center justify-center flex-shrink-0 text-xs text-muted-foreground text-center p-1">No photo</div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium mb-1">{opt}</p>
+                  <label className="inline-flex items-center gap-1 cursor-pointer">
+                    <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded hover:bg-secondary/80">
+                      {imgUrl ? "Replace" : "Upload"}
+                    </span>
+                    <input
+                      type="file" accept="image/*" className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !item?.id) return;
+                        const fd = new FormData();
+                        fd.append("image", file);
+                        fd.append("option", opt);
+                        const res = await fetch(`/api/catalog/${item.id}/option-image`, { method: "POST", credentials: "include", body: fd });
+                        if (res.ok) {
+                          const updated = await res.json();
+                          setForm(f => ({ ...f, option_images: updated.option_images }));
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                {imgUrl && (
+                  <button
+                    type="button" className="text-xs text-destructive hover:underline flex-shrink-0"
+                    onClick={async () => {
+                      if (!item?.id) return;
+                      const res = await fetch(`/api/catalog/${item.id}/option-image/${encodeURIComponent(opt)}`, { method: "DELETE", credentials: "include" });
+                      if (res.ok) {
+                        const updated = await res.json();
+                        setForm(f => ({ ...f, option_images: updated.option_images }));
+                      }
+                    }}
+                  >Remove</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+  </div>
+)}
+```
+
+---
+
+## CLIENT — CatalogBrowser.tsx
+
+Read the full file first. Then:
+
+1. Add to CatalogItem interface:
+```ts
+image_url?: string | null;
+option_images?: Record<string, string> | null;
+other_options?: string | null;
+```
+
+2. Update onSelect prop:
+```ts
+onSelect: (areaKey: string, item: CatalogItem, selectedOption?: string | null, resolvedImageUrl?: string | null) => void;
+```
+
+3. Add local state for selected options: `const [selectedOptions, setSelectedOptions] = useState<Record<number, string>>({});`
+
+4. In the item list, for each item show a small image thumbnail if image_url exists (20x20 rounded).
+   For Material items that have other_options, show option pills below the item name. When an option pill is clicked, call onSelect with the option and the resolved image (option_images?.[opt] ?? item.image_url ?? null). For Material items with NO other_options that DO have an image_url, pass the image_url directly when selecting. For non-Material items or items without images, behavior stays the same.
+
+5. Update all existing onSelect call sites in this file to match the new signature (add null for the new optional params where not needed).
+
+---
+
+## EstimatePreview.tsx
+
+Read the full file. Find where line items / work area items are rendered. When a line item has an image_url property set, render it as a thumbnail next to the item name in the detailed and booklet templates. If there's only a SimpleTemplate, add image support to it as well. Keep it clean — just a small image (64px) to the left of the item description row.
+
+Also check the estimate line item data structure to see if image_url is stored per line item. If the estimate stores catalog items as snapshots, the image_url would need to be included when the item is selected in CatalogBrowser. Look at how line items are structured in the est object.
+
+---
+
+## After all changes
+Confirm which files were changed and what still needs to be tested. Do NOT republish yet — just confirm the changes are complete.
