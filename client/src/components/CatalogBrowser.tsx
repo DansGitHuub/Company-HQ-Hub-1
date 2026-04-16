@@ -32,6 +32,9 @@ export function CatalogBrowser({ open, areaKey, onClose, onSelect }: Props) {
   const [search, setSearch] = useState("");
 
   const { data, isLoading } = useQuery<CatalogItem[]>({
+    queryKey: ["/api/catalog"],
+    queryFn: () =>
+      fetch("/api/catalog", { credentials: "include" }).then((r) => r.json()),
     enabled: open,
   });
 
