@@ -1,4 +1,4 @@
-const CACHE_NAME = "companyhq-v1";
+const CACHE_NAME = "companyhq-v2";
 const PRECACHE_URLS = ["/", "/index.html", "/my-day", "/time"];
 
 // ── Install: precache app shell ───────────────────────────────────────────────
@@ -53,6 +53,31 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // SPA navigation: always serve index.html for page navigations
+  // This handles cases where the CDN returns 404 for client-side routes like /catalog/1
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request).then((response) => {
+        // If server returns a non-OK status for a navigation (e.g. CDN 404 for SPA route),
+        // fall back to index.html so the React router can handle the path
+        if (!response.ok) {
+          return caches.match("/index.html").then((cached) => {
+            if (cached) return cached;
+            return fetch("/index.html");
+          });
+        }
+        // Cache the successful response and return it
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        return response;
+      }).catch(() => {
+        // Offline fallback
+        return caches.match("/index.html");
+      })
+    );
+    return;
+  }
+
   // Cache-first for static assets
   event.respondWith(
     caches.match(request).then((cached) => {
@@ -65,10 +90,7 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       }).catch(() => {
-        // Offline fallback: serve index.html for navigation requests
-        if (request.mode === "navigate") {
-          return caches.match("/index.html");
-        }
+        return new Response("", { status: 503 });
       });
     })
   );
