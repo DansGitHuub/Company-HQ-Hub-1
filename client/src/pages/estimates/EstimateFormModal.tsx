@@ -10,8 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { CatalogBrowser } from "@/components/CatalogBrowser";
+import type { CatalogItem } from "@/components/CatalogBrowser";
 import {
-  Plus, Trash2, ChevronDown, ChevronUp, Loader2, Calculator, Package, Hammer, Wrench
+  Plus, Trash2, ChevronDown, ChevronUp, Loader2, Calculator, Package, Hammer, Wrench, Search
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -115,6 +117,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
   const [presentationStyle, setPresentationStyle] = useState<"simple" | "booklet">(existing?.presentation_style ?? "simple");
 
   // Work areas
+  const [catalogAreaKey, setCatalogAreaKey] = useState<string | null>(null);
   const [areas, setAreas] = useState<WorkAreaDraft[]>(() => {
     if (existing?.work_areas?.length) {
       return existing.work_areas.map((a: any) => ({
@@ -253,6 +256,23 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
 
   const addLineItem = (aKey: string) =>
     setAreas(prev => prev.map(a => a._key === aKey ? { ...a, line_items: [...a.line_items, defaultLineItem()] } : a));
+
+  const addCatalogItem = (aKey: string, item: CatalogItem) => {
+    const cost = parseFloat((item.cost ?? "0").toString().replace(/[$,]/g, "")) || 0;
+    setAreas(prev => prev.map(a => a._key === aKey ? {
+      ...a,
+      line_items: [...a.line_items, {
+        _key: key(),
+        item_type: "service",
+        description: item.name,
+        quantity: 1,
+        unit: item.units ?? "",
+        unit_price: cost,
+        amount: cost,
+        is_optional: false,
+      }]
+    } : a));
+  };
 
   const removeLineItem = (aKey: string, iKey: string) =>
     setAreas(prev => prev.map(a => a._key === aKey
@@ -638,7 +658,11 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                             </button>
                           </div>
                         ))}
-                        <Button type="button" size="sm" variant="ghost" onClick={() => addLineItem(area._key)}
+                        <Button type="button" size="sm" variant="outline" onClick={() => setCatalogAreaKey(area._key)}
+                    className="h-7 text-xs gap-1">
+                    <Search className="h-3 w-3" /> Browse Catalog
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => addLineItem(area._key)}
                           className="h-7 text-xs" data-testid={`btn-add-item-${aIdx}`}>
                           <Plus className="h-3 w-3 mr-1" /> Add Line Item
                         </Button>
@@ -731,6 +755,12 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
             {isEdit ? "Save Changes" : "Create Estimate"}
           </Button>
         </div>
+      <CatalogBrowser
+        open={catalogAreaKey !== null}
+        areaKey={catalogAreaKey}
+        onClose={() => setCatalogAreaKey(null)}
+        onSelect={addCatalogItem}
+      />
       </DialogContent>
     </Dialog>
   );
