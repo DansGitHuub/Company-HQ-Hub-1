@@ -81,6 +81,7 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
         PRIMARY KEY (item_id, tag_id)
       )
     `);
+    await pool.query(`UPDATE catalog_items SET is_active = true WHERE is_active = false OR is_active IS NULL`);
     console.log("[migration] Catalog tables ready");
   })();
 
