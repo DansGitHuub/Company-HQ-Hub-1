@@ -30,9 +30,9 @@ function allowedRecipientRoles(senderRole: string): string[] {
 }
 
 export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
-  // ── GET /api/messages/users ─────────────────────────────────────────────────
+  // ── GET /api/dm/users ─────────────────────────────────────────────────
   // Users the caller is allowed to message (role-filtered)
-  app.get("/api/messages/users", requireAuth, async (req, res) => {
+  app.get("/api/dm/users", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
       const myRole: string = (req.user as any).role ?? "";
@@ -54,9 +54,9 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  // ── GET /api/messages/unread-count ──────────────────────────────────────────
+  // ── GET /api/dm/unread-count ──────────────────────────────────────────
   // Count of messages received by me that are unread
-  app.get("/api/messages/unread-count", requireAuth, async (req, res) => {
+  app.get("/api/dm/unread-count", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
       const { rows } = await pool.query(
@@ -73,11 +73,11 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  // ── GET /api/messages/contacts ──────────────────────────────────────────────
+  // ── GET /api/dm/contacts ──────────────────────────────────────────────
   // All unique people I've exchanged messages with (both sent AND received),
   // with last message preview and unread count. This makes conversations
   // visible to BOTH the sender and recipient.
-  app.get("/api/messages/contacts", requireAuth, async (req, res) => {
+  app.get("/api/dm/contacts", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
       const { rows } = await pool.query(
@@ -131,10 +131,10 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  // ── GET /api/messages/conversation/:userId ──────────────────────────────────
+  // ── GET /api/dm/conversation/:userId ──────────────────────────────────
   // Full thread between me and :userId, oldest first.
   // Auto-marks all received unread messages as read.
-  app.get("/api/messages/conversation/:userId", requireAuth, async (req, res) => {
+  app.get("/api/dm/conversation/:userId", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
       const other = req.params.userId;
@@ -186,9 +186,9 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  // ── POST /api/messages ──────────────────────────────────────────────────────
+  // ── POST /api/dm ──────────────────────────────────────────────────────
   // Send a new message. Enforces access rules. Creates notification row.
-  app.post("/api/messages", requireAuth, async (req, res) => {
+  app.post("/api/dm", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
       const myRole: string = (req.user as any).role ?? "";
@@ -230,9 +230,9 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  // ── DELETE /api/messages/:id ────────────────────────────────────────────────
+  // ── DELETE /api/dm/:id ────────────────────────────────────────────────
   // Soft-delete: sets deleted_by_sender or deleted_by_recipient
-  app.delete("/api/messages/:id", requireAuth, async (req, res) => {
+  app.delete("/api/dm/:id", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
       const { id } = req.params;

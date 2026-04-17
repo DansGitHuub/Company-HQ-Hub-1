@@ -118,19 +118,19 @@ function ComposeDialog({
   }, [open, initialRecipientId]);
 
   const { data: users = [] } = useQuery<MessageableUser[]>({
-    queryKey: ["/api/messages/users"],
+    queryKey: ["/api/dm/users"],
     enabled: open,
   });
 
   const sendMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/messages", { recipientId, subject, body });
+      await apiRequest("POST", "/api/dm", { recipientId, subject, body });
     },
     onSuccess: () => {
       toast({ title: "Message sent" });
-      qc.invalidateQueries({ queryKey: ["/api/messages/contacts"] });
-      qc.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
-      qc.invalidateQueries({ queryKey: ["/api/messages/conversation", recipientId] });
+      qc.invalidateQueries({ queryKey: ["/api/dm/contacts"] });
+      qc.invalidateQueries({ queryKey: ["/api/dm/unread-count"] });
+      qc.invalidateQueries({ queryKey: ["/api/dm/conversation", recipientId] });
       onClose(recipientId);
     },
     onError: (err: any) => {
@@ -294,9 +294,9 @@ function ConversationThread({ userId, myId, onBack }: {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const { data: messages = [], isLoading } = useQuery<ThreadMessage[]>({
-    queryKey: ["/api/messages/conversation", userId],
+    queryKey: ["/api/dm/conversation", userId],
     queryFn: async () => {
-      const res = await fetch(`/api/messages/conversation/${userId}`, { credentials: "include" });
+      const res = await fetch(`/api/dm/conversation/${userId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load");
       return res.json();
     },
@@ -306,8 +306,8 @@ function ConversationThread({ userId, myId, onBack }: {
 
   // After messages load, refresh contacts and unread badge
   useEffect(() => {
-    qc.invalidateQueries({ queryKey: ["/api/messages/contacts"] });
-    qc.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+    qc.invalidateQueries({ queryKey: ["/api/dm/contacts"] });
+    qc.invalidateQueries({ queryKey: ["/api/dm/unread-count"] });
   }, [messages]);
 
   useEffect(() => {
@@ -316,12 +316,12 @@ function ConversationThread({ userId, myId, onBack }: {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/messages/${id}`);
+      await apiRequest("DELETE", `/api/dm/${id}`);
     },
     onSuccess: () => {
       toast({ title: "Message deleted" });
-      qc.invalidateQueries({ queryKey: ["/api/messages/conversation", userId] });
-      qc.invalidateQueries({ queryKey: ["/api/messages/contacts"] });
+      qc.invalidateQueries({ queryKey: ["/api/dm/conversation", userId] });
+      qc.invalidateQueries({ queryKey: ["/api/dm/contacts"] });
       setDeleteTarget(null);
     },
     onError: (err: any) => {
@@ -452,7 +452,7 @@ export default function MessagesPage() {
   const [search, setSearch] = useState("");
 
   const { data: contacts = [], isLoading } = useQuery<Contact[]>({
-    queryKey: ["/api/messages/contacts"],
+    queryKey: ["/api/dm/contacts"],
     refetchInterval: 10000,
   });
 

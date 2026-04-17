@@ -289,12 +289,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   const { data: unreadData } = useQuery<{ count: number }>({
-    queryKey: ["/api/messages/unread-count"],
+    queryKey: ["/api/dm/unread-count"],
     refetchInterval: 30000,
   });
 
   const { data: dmUnreadData } = useQuery<{ count: number }>({
-    queryKey: ["/api/messages/unread-count"],
+    queryKey: ["/api/dm/unread-count"],
     refetchInterval: 15000,
     enabled: !!user,
   });
