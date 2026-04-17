@@ -294,7 +294,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   });
 
   const { data: dmUnreadData } = useQuery<{ count: number }>({
-    queryKey: ["/api/direct-messages/unread-count"],
+    queryKey: ["/api/messages/unread-count"],
     refetchInterval: 15000,
     enabled: !!user,
   });

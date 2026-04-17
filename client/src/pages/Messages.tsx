@@ -24,14 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Send,
-  Pencil,
-  Trash2,
-  ArrowLeft,
-  MessageSquare,
-  Search,
-} from "lucide-react";
+import { Send, Pencil, Trash2, ArrowLeft, MessageSquare, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, isToday, isYesterday } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
@@ -45,20 +38,18 @@ interface MessageableUser {
   profile_picture: string | null;
 }
 
-interface InboxMessage {
-  id: string;
-  sender_id: string;
-  recipient_id: string;
-  subject: string | null;
-  body: string;
-  sent_at: string;
-  read_at: string | null;
-  sender_name: string;
-  sender_role: string;
-  sender_picture: string | null;
+interface Contact {
+  other_user_id: string;
+  other_user_name: string;
+  other_user_role: string;
+  other_user_picture: string | null;
+  last_message: string;
+  last_message_at: string;
+  last_sender_id: string;
+  unread_count: number;
 }
 
-interface ConversationMessage {
+interface ThreadMessage {
   id: string;
   sender_id: string;
   recipient_id: string;
@@ -83,40 +74,17 @@ function formatTime(dateStr: string): string {
   return format(d, "MMM d");
 }
 
-function formatFull(dateStr: string): string {
-  return format(new Date(dateStr), "MMM d, yyyy 'at' h:mm a");
-}
-
-function Avatar({
-  name,
-  picture,
-  size = 36,
-}: {
-  name: string;
-  picture?: string | null;
-  size?: number;
-}) {
+function Avatar({ name, picture, size = 36 }: { name: string; picture?: string | null; size?: number }) {
   if (picture) {
     return (
-      <img
-        src={picture}
-        alt={name}
-        className="rounded-full object-cover flex-shrink-0"
-        style={{ width: size, height: size }}
-      />
+      <img src={picture} alt={name} className="rounded-full object-cover flex-shrink-0"
+        style={{ width: size, height: size }} />
     );
   }
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
   return (
-    <div
-      className="rounded-full bg-primary/15 text-primary flex items-center justify-center font-semibold flex-shrink-0"
-      style={{ width: size, height: size, fontSize: size * 0.33 }}
-    >
+    <div className="rounded-full bg-primary/15 text-primary flex items-center justify-center font-semibold flex-shrink-0"
+      style={{ width: size, height: size, fontSize: size * 0.33 }}>
       {initials}
     </div>
   );
@@ -128,55 +96,56 @@ function ComposeDialog({
   open,
   onClose,
   initialRecipientId,
-  initialSubject,
 }: {
   open: boolean;
-  onClose: () => void;
+  onClose: (sentToId?: string) => void;
   initialRecipientId?: string;
-  initialSubject?: string;
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [recipientId, setRecipientId] = useState(initialRecipientId ?? "");
-  const [subject, setSubject] = useState(initialSubject ?? "");
+  const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (open) {
       setRecipientId(initialRecipientId ?? "");
-      setSubject(initialSubject ?? "");
+      setSubject("");
       setBody("");
       setSearch("");
     }
-  }, [open, initialRecipientId, initialSubject]);
+  }, [open, initialRecipientId]);
 
   const { data: users = [] } = useQuery<MessageableUser[]>({
-    queryKey: ["/api/users/messageable"],
+    queryKey: ["/api/messages/users"],
     enabled: open,
   });
 
   const sendMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/direct-messages", { recipientId, subject, body });
+      await apiRequest("POST", "/api/messages", { recipientId, subject, body });
     },
     onSuccess: () => {
       toast({ title: "Message sent" });
-      qc.invalidateQueries({ queryKey: ["/api/direct-messages/inbox"] });
-      qc.invalidateQueries({ queryKey: ["/api/direct-messages/unread-count"] });
-      qc.invalidateQueries({ queryKey: ["/api/direct-messages/conversation", recipientId] });
-      onClose();
+      qc.invalidateQueries({ queryKey: ["/api/messages/contacts"] });
+      qc.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+      qc.invalidateQueries({ queryKey: ["/api/messages/conversation", recipientId] });
+      onClose(recipientId);
     },
     onError: (err: any) => {
       toast({ title: "Failed to send", description: err.message, variant: "destructive" });
     },
   });
 
-  const filtered = users.filter(
-    (u) =>
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.role.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = search
+    ? users.filter(
+        (u) =>
+          u.name.toLowerCase().includes(search.toLowerCase()) ||
+          u.role.toLowerCase().includes(search.toLowerCase())
+      )
+    : users;
+
   const selected = users.find((u) => u.id === recipientId);
 
   return (
@@ -195,13 +164,8 @@ function ComposeDialog({
                 <Avatar name={selected.name} picture={selected.profile_picture} size={28} />
                 <span className="text-sm font-medium">{selected.name}</span>
                 <span className="text-xs text-muted-foreground">({selected.role})</span>
-                <button
-                  className="ml-auto text-muted-foreground hover:text-foreground text-xs"
-                  onClick={() => setRecipientId("")}
-                  data-testid="button-clear-recipient"
-                >
-                  ✕
-                </button>
+                <button className="ml-auto text-muted-foreground hover:text-foreground text-xs"
+                  onClick={() => setRecipientId("")} data-testid="button-clear-recipient">✕</button>
               </div>
             ) : (
               <div className="border rounded-md">
@@ -215,31 +179,26 @@ function ComposeDialog({
                     data-testid="input-recipient-search"
                   />
                 </div>
-                {(search || !selected) && users.length > 0 && (
-                  <div className="border-t max-h-40 overflow-y-auto">
-                    {(search ? filtered : users).length === 0 ? (
-                      <p className="px-3 py-2 text-sm text-muted-foreground">No users found</p>
-                    ) : (
-                      (search ? filtered : users).map((u) => (
-                        <button
-                          key={u.id}
-                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/50 text-left"
-                          onClick={() => {
-                            setRecipientId(u.id);
-                            setSearch("");
-                          }}
-                          data-testid={`button-select-user-${u.id}`}
-                        >
-                          <Avatar name={u.name} picture={u.profile_picture} size={28} />
-                          <div>
-                            <p className="text-sm font-medium">{u.name}</p>
-                            <p className="text-xs text-muted-foreground">{u.role}</p>
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
+                <div className="border-t max-h-44 overflow-y-auto">
+                  {filtered.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-muted-foreground">
+                      {users.length === 0 ? "No users available" : "No results"}
+                    </p>
+                  ) : (
+                    filtered.map((u) => (
+                      <button key={u.id}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/50 text-left"
+                        onClick={() => { setRecipientId(u.id); setSearch(""); }}
+                        data-testid={`button-select-user-${u.id}`}>
+                        <Avatar name={u.name} picture={u.profile_picture} size={28} />
+                        <div>
+                          <p className="text-sm font-medium">{u.name}</p>
+                          <p className="text-xs text-muted-foreground">{u.role}</p>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -247,36 +206,25 @@ function ComposeDialog({
           {/* Subject */}
           <div className="space-y-1">
             <Label>Subject <span className="text-muted-foreground text-xs">(optional)</span></Label>
-            <Input
-              placeholder="Subject…"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              data-testid="input-subject"
-            />
+            <Input placeholder="Subject…" value={subject}
+              onChange={(e) => setSubject(e.target.value)} data-testid="input-subject" />
           </div>
 
           {/* Body */}
           <div className="space-y-1">
             <Label>Message</Label>
-            <Textarea
-              placeholder="Write your message…"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={5}
-              data-testid="textarea-body"
-            />
+            <Textarea placeholder="Write your message…" value={body}
+              onChange={(e) => setBody(e.target.value)} rows={5} data-testid="textarea-body" />
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} data-testid="button-compose-cancel">
+          <Button variant="outline" onClick={() => onClose()} data-testid="button-compose-cancel">
             Cancel
           </Button>
-          <Button
-            onClick={() => sendMutation.mutate()}
+          <Button onClick={() => sendMutation.mutate()}
             disabled={!recipientId || !body.trim() || sendMutation.isPending}
-            data-testid="button-send-message"
-          >
+            data-testid="button-send-message">
             <Send className="h-4 w-4 mr-1.5" />
             {sendMutation.isPending ? "Sending…" : "Send"}
           </Button>
@@ -286,85 +234,47 @@ function ComposeDialog({
   );
 }
 
-// ── Contact row in left panel ──────────────────────────────────────────────────
+// ── Contact row ────────────────────────────────────────────────────────────────
 
-interface ContactEntry {
-  userId: string;
-  name: string;
-  role: string;
-  picture: string | null;
-  lastMessage: string;
-  lastTime: string;
-  unreadCount: number;
-}
-
-function buildContactList(inbox: InboxMessage[], myId: string): ContactEntry[] {
-  const map = new Map<string, ContactEntry>();
-  for (const msg of inbox) {
-    const userId = msg.sender_id;
-    const existing = map.get(userId);
-    if (!existing) {
-      map.set(userId, {
-        userId,
-        name: msg.sender_name,
-        role: msg.sender_role,
-        picture: msg.sender_picture,
-        lastMessage: msg.body,
-        lastTime: msg.sent_at,
-        unreadCount: msg.read_at ? 0 : 1,
-      });
-    } else {
-      if (msg.sent_at > existing.lastTime) {
-        existing.lastMessage = msg.body;
-        existing.lastTime = msg.sent_at;
-      }
-      if (!msg.read_at) existing.unreadCount++;
-    }
-  }
-  return Array.from(map.values()).sort(
-    (a, b) => new Date(b.lastTime).getTime() - new Date(a.lastTime).getTime()
-  );
-}
-
-function ContactRow({
-  contact,
-  selected,
-  onClick,
-}: {
-  contact: ContactEntry;
+function ContactRow({ contact, selected, myId, onClick }: {
+  contact: Contact;
   selected: boolean;
+  myId: string;
   onClick: () => void;
 }) {
+  const unread = Number(contact.unread_count);
+  const preview = contact.last_sender_id === myId
+    ? `You: ${contact.last_message}`
+    : contact.last_message;
+
   return (
-    <button
-      onClick={onClick}
-      data-testid={`row-contact-${contact.userId}`}
+    <button onClick={onClick} data-testid={`row-contact-${contact.other_user_id}`}
       className={cn(
-        "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40",
-        selected && "bg-primary/8 border-l-2 border-l-primary",
-        !selected && "border-l-2 border-l-transparent"
-      )}
-    >
+        "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40 border-l-2",
+        selected ? "bg-primary/8 border-l-primary" : "border-l-transparent"
+      )}>
       <div className="relative flex-shrink-0">
-        <Avatar name={contact.name} picture={contact.picture} size={40} />
-        {contact.unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] font-bold flex items-center justify-center" data-testid={`badge-unread-${contact.userId}`}>
-            {contact.unreadCount > 9 ? "9+" : contact.unreadCount}
+        <Avatar name={contact.other_user_name} picture={contact.other_user_picture} size={40} />
+        {unread > 0 && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] font-bold flex items-center justify-center"
+            data-testid={`badge-unread-${contact.other_user_id}`}>
+            {unread > 9 ? "9+" : unread}
           </span>
         )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-1">
-          <span className={cn("text-sm truncate", contact.unreadCount > 0 ? "font-semibold" : "font-medium text-muted-foreground")} data-testid={`text-contact-name-${contact.userId}`}>
-            {contact.name}
+          <span className={cn("text-sm truncate", unread > 0 ? "font-semibold" : "font-medium text-muted-foreground")}
+            data-testid={`text-contact-name-${contact.other_user_id}`}>
+            {contact.other_user_name}
           </span>
           <span className="text-xs text-muted-foreground flex-shrink-0">
-            {formatTime(contact.lastTime)}
+            {formatTime(contact.last_message_at)}
           </span>
         </div>
-        <p className="text-xs text-muted-foreground truncate">{contact.role}</p>
-        <p className={cn("text-xs truncate mt-0.5", contact.unreadCount > 0 ? "text-foreground" : "text-muted-foreground")}>
-          {contact.lastMessage}
+        <p className="text-xs text-muted-foreground truncate">{contact.other_user_role}</p>
+        <p className={cn("text-xs truncate mt-0.5", unread > 0 ? "text-foreground font-medium" : "text-muted-foreground")}>
+          {preview}
         </p>
       </div>
     </button>
@@ -373,11 +283,7 @@ function ContactRow({
 
 // ── Conversation thread ────────────────────────────────────────────────────────
 
-function ConversationThread({
-  userId,
-  myId,
-  onBack,
-}: {
+function ConversationThread({ userId, myId, onBack }: {
   userId: string;
   myId: string;
   onBack: () => void;
@@ -387,12 +293,10 @@ function ConversationThread({
   const bottomRef = useRef<HTMLDivElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const { data: messages = [], isLoading } = useQuery<ConversationMessage[]>({
-    queryKey: ["/api/direct-messages/conversation", userId],
+  const { data: messages = [], isLoading } = useQuery<ThreadMessage[]>({
+    queryKey: ["/api/messages/conversation", userId],
     queryFn: async () => {
-      const res = await fetch(`/api/direct-messages/conversation/${userId}`, {
-        credentials: "include",
-      });
+      const res = await fetch(`/api/messages/conversation/${userId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load");
       return res.json();
     },
@@ -400,26 +304,24 @@ function ConversationThread({
     staleTime: 0,
   });
 
+  // After messages load, refresh contacts and unread badge
+  useEffect(() => {
+    qc.invalidateQueries({ queryKey: ["/api/messages/contacts"] });
+    qc.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+  }, [messages]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // Invalidate inbox unread after loading conversation (marks read)
-  useEffect(() => {
-    if (messages.length > 0) {
-      qc.invalidateQueries({ queryKey: ["/api/direct-messages/inbox"] });
-      qc.invalidateQueries({ queryKey: ["/api/direct-messages/unread-count"] });
-    }
-  }, [messages.length]);
-
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/direct-messages/${id}`);
+      await apiRequest("DELETE", `/api/messages/${id}`);
     },
     onSuccess: () => {
       toast({ title: "Message deleted" });
-      qc.invalidateQueries({ queryKey: ["/api/direct-messages/conversation", userId] });
-      qc.invalidateQueries({ queryKey: ["/api/direct-messages/inbox"] });
+      qc.invalidateQueries({ queryKey: ["/api/messages/conversation", userId] });
+      qc.invalidateQueries({ queryKey: ["/api/messages/contacts"] });
       setDeleteTarget(null);
     },
     onError: (err: any) => {
@@ -428,42 +330,19 @@ function ConversationThread({
     },
   });
 
-  const other = messages.find(
-    (m) => m.sender_id === userId || m.recipient_id === userId
-  );
-  const otherName =
-    other
-      ? other.sender_id === userId
-        ? other.sender_name
-        : other.recipient_name
-      : "Conversation";
-  const otherRole =
-    other
-      ? other.sender_id === userId
-        ? other.sender_role
-        : other.recipient_role
-      : "";
-  const otherPicture =
-    other
-      ? other.sender_id === userId
-        ? other.sender_picture
-        : other.recipient_picture
-      : null;
+  const other = messages.find((m) => m.sender_id === userId || m.recipient_id === userId);
+  const otherName = other ? (other.sender_id === userId ? other.sender_name : other.recipient_name) : "Conversation";
+  const otherRole = other ? (other.sender_id === userId ? other.sender_role : other.recipient_role) : "";
+  const otherPicture = other ? (other.sender_id === userId ? other.sender_picture : other.recipient_picture) : null;
 
-  // Group messages by date
   let lastDate = "";
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onBack}
-          className="md:hidden flex-shrink-0"
-          data-testid="button-back"
-        >
+        <Button variant="ghost" size="icon" onClick={onBack} className="md:hidden flex-shrink-0"
+          data-testid="button-back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <Avatar name={otherName} picture={otherPicture} size={36} />
@@ -496,32 +375,28 @@ function ConversationThread({
                       <div className="flex-1 h-px bg-border" />
                     </div>
                   )}
-                  <div
-                    className={cn("flex items-end gap-2 group", isMine ? "flex-row-reverse" : "flex-row")}
-                    data-testid={`msg-${msg.id}`}
-                  >
+                  <div className={cn("flex items-end gap-2 group", isMine ? "flex-row-reverse" : "flex-row")}
+                    data-testid={`msg-${msg.id}`}>
                     {!isMine && (
                       <Avatar name={msg.sender_name} picture={msg.sender_picture} size={28} />
                     )}
-                    <div className={cn("max-w-[70%] space-y-0.5", isMine ? "items-end" : "items-start", "flex flex-col")}>
+                    <div className={cn("max-w-[70%] flex flex-col", isMine ? "items-end" : "items-start")}>
                       {msg.subject && (
-                        <p className={cn("text-xs font-medium px-1", isMine ? "text-right" : "")}>
+                        <p className={cn("text-xs font-medium px-1 mb-0.5", isMine ? "text-right" : "")}>
                           {msg.subject}
                         </p>
                       )}
-                      <div
-                        className={cn(
-                          "rounded-2xl px-3 py-2 text-sm",
-                          isMine
-                            ? "bg-primary text-primary-foreground rounded-br-sm"
-                            : "bg-muted text-foreground rounded-bl-sm"
-                        )}
-                      >
-                        <p className="whitespace-pre-wrap break-words leading-relaxed" data-testid={`text-body-${msg.id}`}>
+                      <div className={cn("rounded-2xl px-3 py-2 text-sm",
+                        isMine
+                          ? "bg-primary text-primary-foreground rounded-br-sm"
+                          : "bg-muted text-foreground rounded-bl-sm"
+                      )}>
+                        <p className="whitespace-pre-wrap break-words leading-relaxed"
+                          data-testid={`text-body-${msg.id}`}>
                           {msg.body}
                         </p>
                       </div>
-                      <div className={cn("flex items-center gap-1 px-1", isMine ? "flex-row-reverse" : "")}>
+                      <div className={cn("flex items-center gap-1 px-1 mt-0.5", isMine ? "flex-row-reverse" : "")}>
                         <span className="text-[10px] text-muted-foreground">
                           {format(new Date(msg.sent_at), "h:mm a")}
                         </span>
@@ -530,11 +405,9 @@ function ConversationThread({
                         )}
                       </div>
                     </div>
-                    <button
-                      onClick={() => setDeleteTarget(msg.id)}
+                    <button onClick={() => setDeleteTarget(msg.id)}
                       className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1 flex-shrink-0"
-                      data-testid={`button-delete-${msg.id}`}
-                    >
+                      data-testid={`button-delete-${msg.id}`}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -560,8 +433,7 @@ function ConversationThread({
             <AlertDialogAction
               onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-delete-confirm"
-            >
+              data-testid="button-delete-confirm">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -577,42 +449,39 @@ export default function MessagesPage() {
   const { user } = useAuth();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
-  const [composeRecipientId, setComposeRecipientId] = useState<string | undefined>();
-  const [composeSubject, setComposeSubject] = useState<string | undefined>();
   const [search, setSearch] = useState("");
 
-  const { data: inbox = [], isLoading } = useQuery<InboxMessage[]>({
-    queryKey: ["/api/direct-messages/inbox"],
+  const { data: contacts = [], isLoading } = useQuery<Contact[]>({
+    queryKey: ["/api/messages/contacts"],
     refetchInterval: 10000,
   });
 
-  const contacts = buildContactList(inbox, user?.id ?? "");
   const filtered = search
-    ? contacts.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
+    ? contacts.filter((c) =>
+        c.other_user_name.toLowerCase().includes(search.toLowerCase())
+      )
     : contacts;
 
-  function openCompose(recipientId?: string, subject?: string) {
-    setComposeRecipientId(recipientId);
-    setComposeSubject(subject);
-    setComposeOpen(true);
+  function handleComposeClosed(sentToId?: string) {
+    setComposeOpen(false);
+    // After sending, open the conversation with that person
+    if (sentToId) setSelectedUserId(sentToId);
   }
 
   const showThread = !!selectedUserId;
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
-      {/* ── Left panel: contact list ── */}
-      <div
-        className={cn(
-          "w-full md:w-72 flex-shrink-0 border-r flex flex-col bg-background",
-          showThread && "hidden md:flex"
-        )}
-      >
+      {/* ── Left panel: contact/conversation list ── */}
+      <div className={cn(
+        "w-full md:w-72 flex-shrink-0 border-r flex flex-col bg-background",
+        showThread && "hidden md:flex"
+      )}>
         {/* Header */}
         <div className="px-4 py-3 border-b space-y-2">
           <div className="flex items-center justify-between">
             <h1 className="font-semibold text-sm">Messages</h1>
-            <Button size="sm" onClick={() => openCompose()} data-testid="button-compose">
+            <Button size="sm" onClick={() => setComposeOpen(true)} data-testid="button-compose">
               <Pencil className="h-3.5 w-3.5 mr-1.5" />
               Compose
             </Button>
@@ -629,7 +498,7 @@ export default function MessagesPage() {
           </div>
         </div>
 
-        {/* Contact list */}
+        {/* List */}
         <ScrollArea className="flex-1">
           {isLoading ? (
             <p className="text-sm text-muted-foreground text-center py-8">Loading…</p>
@@ -637,30 +506,28 @@ export default function MessagesPage() {
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
               <MessageSquare className="h-8 w-8 opacity-25" />
               <p className="text-sm" data-testid="text-empty-state">
-                {search ? "No results" : "No messages yet"}
+                {search ? "No results" : "No conversations yet"}
               </p>
             </div>
           ) : (
             filtered.map((contact) => (
               <ContactRow
-                key={contact.userId}
+                key={contact.other_user_id}
                 contact={contact}
-                selected={selectedUserId === contact.userId}
-                onClick={() => setSelectedUserId(contact.userId)}
+                myId={user?.id ?? ""}
+                selected={selectedUserId === contact.other_user_id}
+                onClick={() => setSelectedUserId(contact.other_user_id)}
               />
             ))
           )}
         </ScrollArea>
       </div>
 
-      {/* ── Right panel: conversation thread ── */}
-      <div
-        className={cn(
-          "flex-1 flex-col bg-background",
-          showThread ? "flex w-full" : "hidden md:flex"
-        )}
-        style={{ minWidth: 0 }}
-      >
+      {/* ── Right panel: thread ── */}
+      <div className={cn(
+        "flex-1 flex-col bg-background",
+        showThread ? "flex w-full" : "hidden md:flex"
+      )} style={{ minWidth: 0 }}>
         {selectedUserId && user ? (
           <ConversationThread
             userId={selectedUserId}
@@ -668,7 +535,7 @@ export default function MessagesPage() {
             onBack={() => setSelectedUserId(null)}
           />
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 select-none">
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 select-none">
             <MessageSquare className="h-12 w-12 opacity-15" />
             <p className="text-sm" data-testid="text-select-prompt">
               Select a conversation to read it
@@ -680,9 +547,7 @@ export default function MessagesPage() {
       {/* ── Compose dialog ── */}
       <ComposeDialog
         open={composeOpen}
-        onClose={() => { setComposeOpen(false); setComposeRecipientId(undefined); setComposeSubject(undefined); }}
-        initialRecipientId={composeRecipientId}
-        initialSubject={composeSubject}
+        onClose={handleComposeClosed}
       />
     </div>
   );
