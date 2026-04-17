@@ -398,6 +398,29 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── PATCH /api/dm/:id/unread ─────────────────────────────────────────────────
+  // Mark a received message as unread by setting read_at = NULL
+  app.patch("/api/dm/:id/unread", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { id } = req.params;
+
+      const { rows } = await pool.query(
+        `SELECT sender_id, recipient_id FROM direct_messages WHERE id = $1`,
+        [id]
+      );
+      if (!rows.length) return res.status(404).json({ message: "Not found" });
+      if (rows[0].recipient_id !== me) {
+        return res.status(403).json({ message: "Can only mark received messages as unread" });
+      }
+
+      await pool.query(`UPDATE direct_messages SET read_at = NULL WHERE id = $1`, [id]);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── PATCH /api/dm/conversation/:userId/star ──────────────────────────────────
   app.patch("/api/dm/conversation/:userId/star", requireAuth, async (req, res) => {
     try {
