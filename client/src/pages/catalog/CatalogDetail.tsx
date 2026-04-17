@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -26,7 +26,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Save, Trash2, X, Plus, Tag, DollarSign, Upload, ImageIcon, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Save, Trash2, X, Plus, Tag, DollarSign, Upload, ImageIcon, Eye, EyeOff, Copy } from "lucide-react";
 
 const CLASS_OPTIONS = ["Labor", "Equipment", "Materials", "Subcontracting"];
 
@@ -85,6 +85,12 @@ export default function CatalogDetail() {
   const [showEstimateDialog, setShowEstimateDialog] = useState(false);
   const [uploadingPrimary, setUploadingPrimary] = useState(false);
   const [uploadingOption, setUploadingOption] = useState<Record<string, boolean>>({});
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Detect if this is a freshly duplicated item (navigate passed ?fresh=1)
+  const isFreshDuplicate = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("fresh") === "1";
 
   // Pricing panel local state
   const [taxRate, setTaxRate] = useState(8.25);
@@ -124,11 +130,40 @@ export default function CatalogDetail() {
     queryFn: () => apiRequest("GET", `/api/class-pricing-defaults`).then(r => r.json()),
   });
 
+  // For name-uniqueness validation on freshly duplicated items
+  const { data: allCatalogItems = [] } = useQuery<Array<{ id: number; name: string }>>({
+    queryKey: ["/api/catalog", "all-names"],
+    queryFn: () => fetch("/api/catalog?active_only=false", { credentials: "include" }).then(r => r.json()),
+    enabled: isFreshDuplicate,
+  });
+
+  const nameConflict = isFreshDuplicate && !!form?.name
+    && allCatalogItems.some(it => it.id !== parseInt(id ?? "0") && it.name.toLowerCase() === (form.name ?? "").toLowerCase());
+
+  // Reset form when navigating to a different item (e.g. after duplication)
+  const prevIdRef = useRef(id);
+  useEffect(() => {
+    if (prevIdRef.current !== id) {
+      prevIdRef.current = id;
+      setForm(null);
+      setDirty(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     if (item && !form) {
       setForm({ ...item });
     }
   }, [item]);
+
+  // Auto-focus + select name field when arriving on a freshly duplicated item
+  useEffect(() => {
+    if (isFreshDuplicate && form && nameInputRef.current) {
+      const el = nameInputRef.current;
+      el.focus();
+      el.select();
+    }
+  }, [isFreshDuplicate, form]);
 
   // When the item's class changes, update overhead/profit defaults from class_pricing_defaults
   useEffect(() => {
@@ -173,6 +208,20 @@ export default function CatalogDetail() {
       navigate("/catalog");
     },
     onError: () => toast({ title: "Delete failed", variant: "destructive" }),
+  });
+
+  const duplicateMut = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/catalog/duplicate/${id}`);
+      if (!res.ok) throw new Error("Duplicate failed");
+      return res.json() as Promise<{ id: number }>;
+    },
+    onSuccess: ({ id: newId }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/catalog"] });
+      setShowDuplicateDialog(false);
+      navigate(`/catalog/${newId}?fresh=1`);
+    },
+    onError: () => toast({ title: "Duplicate failed", variant: "destructive" }),
   });
 
   function field<K extends keyof CatalogItemDetail>(key: K, value: CatalogItemDetail[K]) {
@@ -346,13 +395,43 @@ export default function CatalogDetail() {
             <Badge variant="secondary" className="text-xs">Unsaved changes</Badge>
           )}
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowDuplicateDialog(true)}
+            data-testid="btn-duplicate"
+          >
+            <Copy className="w-4 h-4 mr-1.5" /> Duplicate
+          </Button>
+          <Button
             onClick={() => saveMut.mutate(form as CatalogItemDetail)}
-            disabled={saveMut.isPending || !dirty}
+            disabled={saveMut.isPending || !dirty || nameConflict}
             data-testid="btn-save"
           >
             <Save className="w-4 h-4 mr-2" />
             {saveMut.isPending ? "Saving…" : "Save"}
           </Button>
+          <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Duplicate this item?</DialogTitle>
+                <DialogDescription>
+                  A copy will be created and you'll be taken to it to set a unique name before saving.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setShowDuplicateDialog(false)} data-testid="btn-duplicate-cancel">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => duplicateMut.mutate()}
+                  disabled={duplicateMut.isPending}
+                  data-testid="btn-duplicate-confirm"
+                >
+                  {duplicateMut.isPending ? "Duplicating…" : "Duplicate"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="icon" data-testid="btn-delete-trigger">
@@ -419,10 +498,17 @@ export default function CatalogDetail() {
               <Label htmlFor="field-name">Name</Label>
               <Input
                 id="field-name"
+                ref={nameInputRef}
                 value={form.name ?? ""}
                 onChange={e => field("name", e.target.value)}
+                className={nameConflict ? "border-destructive focus-visible:ring-destructive" : ""}
                 data-testid="input-name"
               />
+              {nameConflict && (
+                <p className="text-xs text-destructive" data-testid="text-name-conflict">
+                  This name already exists. Please change it to something unique before saving.
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">

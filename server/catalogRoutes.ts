@@ -306,6 +306,34 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // POST /api/catalog/duplicate/:id — copy all fields into a new row, returns { id }
+  app.post("/api/catalog/duplicate/:id", requireAuth, async (req, res) => {
+    try {
+      const srcId = parseInt(req.params.id);
+      const { rows } = await pool.query(`SELECT * FROM catalog_items WHERE id=$1`, [srcId]);
+      if (!rows.length) return res.status(404).json({ message: "Item not found" });
+      const orig = rows[0];
+      const newNum = await nextItemNumber();
+      const { rows: inserted } = await pool.query(
+        `INSERT INTO catalog_items
+           (item_number, name, class, category, units, cost, taxable, description, sku,
+            other_options, image_url, option_images, image_hidden, option_images_hidden, is_active)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         RETURNING id`,
+        [
+          newNum, `Copy of ${orig.name}`, orig.class, orig.category, orig.units,
+          orig.cost, orig.taxable, orig.description, orig.sku,
+          orig.other_options, orig.image_url,
+          orig.option_images ?? {}, orig.image_hidden ?? false,
+          orig.option_images_hidden ?? {}, orig.is_active,
+        ]
+      );
+      res.status(201).json({ id: inserted[0].id });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // PATCH /api/catalog/:id/image-visibility — toggle hidden flag for primary or option photo
   app.patch("/api/catalog/:id/image-visibility", requireAuth, async (req, res) => {
     try {
