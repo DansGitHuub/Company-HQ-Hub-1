@@ -207,7 +207,7 @@ function BookletTemplate({ est }: { est: any }) {
                           <td className="py-1.5 px-3 capitalize text-gray-600">{li.item_type}</td>
                           <td className="py-1.5 px-2">
                             <div className="flex items-center gap-2">
-                              {li.image_url && (
+                              {li.image_url && !li.image_hidden && (
                                 <img
                                   src={li.image_url}
                                   alt={li.description}

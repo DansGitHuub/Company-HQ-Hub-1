@@ -84,7 +84,10 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
     await pool.query(`UPDATE catalog_items SET is_active = true WHERE is_active = false OR is_active IS NULL`);
     await pool.query(`ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS image_url TEXT`);
     await pool.query(`ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS option_images JSONB DEFAULT '{}'`);
+    await pool.query(`ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS image_hidden BOOLEAN DEFAULT FALSE`);
+    await pool.query(`ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS option_images_hidden JSONB DEFAULT '{}'`);
     await pool.query(`ALTER TABLE estimate_line_items ADD COLUMN IF NOT EXISTS image_url TEXT`);
+    await pool.query(`ALTER TABLE estimate_line_items ADD COLUMN IF NOT EXISTS image_hidden BOOLEAN DEFAULT FALSE`);
     console.log("[migration] Catalog tables ready");
   })();
 
@@ -298,6 +301,31 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
         [optionName, id]
       );
       res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // PATCH /api/catalog/:id/image-visibility — toggle hidden flag for primary or option photo
+  app.patch("/api/catalog/:id/image-visibility", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { type, option, hidden } = req.body;
+      if (type === "primary") {
+        await pool.query(
+          `UPDATE catalog_items SET image_hidden=$1, updated_at=NOW() WHERE id=$2`,
+          [!!hidden, id]
+        );
+      } else if (type === "option" && option) {
+        await pool.query(
+          `UPDATE catalog_items SET option_images_hidden = COALESCE(option_images_hidden, '{}'::jsonb) || $1::jsonb, updated_at=NOW() WHERE id=$2`,
+          [JSON.stringify({ [option]: !!hidden }), id]
+        );
+      } else {
+        return res.status(400).json({ message: "type must be 'primary' or 'option'" });
+      }
+      const item = await getItemWithTags(id);
+      res.json(item);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

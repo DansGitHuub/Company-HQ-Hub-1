@@ -26,7 +26,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Save, Trash2, X, Plus, Tag, DollarSign, Upload, ImageIcon } from "lucide-react";
+import { ArrowLeft, Save, Trash2, X, Plus, Tag, DollarSign, Upload, ImageIcon, Eye, EyeOff } from "lucide-react";
 
 const CLASS_OPTIONS = ["Labor", "Equipment", "Materials", "Subcontracting"];
 
@@ -52,7 +52,9 @@ type CatalogItemDetail = {
   sku: string | null;
   otherOptions: string | null;
   imageUrl: string | null;
+  imageHidden: boolean | null;
   optionImages: Record<string, string> | null;
+  optionImagesHidden: Record<string, boolean> | null;
   isActive: boolean | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -251,6 +253,37 @@ export default function CatalogDetail() {
       toast({ title: `Photo for "${option}" removed` });
     } catch {
       toast({ title: "Remove failed", variant: "destructive" });
+    }
+  }
+
+  async function toggleImageVisibility(type: "primary" | "option", option?: string) {
+    if (!id || !form) return;
+    const currentHidden = type === "primary"
+      ? (form.imageHidden ?? false)
+      : ((form.optionImagesHidden ?? {})[option!] ?? false);
+    const newHidden = !currentHidden;
+    if (type === "primary") {
+      setForm(f => f ? { ...f, imageHidden: newHidden } : f);
+    } else {
+      setForm(f => f ? { ...f, optionImagesHidden: { ...(f.optionImagesHidden ?? {}), [option!]: newHidden } } : f);
+    }
+    try {
+      const res = await fetch(`/api/catalog/${id}/image-visibility`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, option, hidden: newHidden }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast({ title: newHidden ? "Photo hidden from estimates" : "Photo visible in estimates" });
+      queryClient.invalidateQueries({ queryKey: ["/api/catalog", id] });
+    } catch {
+      if (type === "primary") {
+        setForm(f => f ? { ...f, imageHidden: currentHidden } : f);
+      } else {
+        setForm(f => f ? { ...f, optionImagesHidden: { ...(f.optionImagesHidden ?? {}), [option!]: currentHidden } } : f);
+      }
+      toast({ title: "Failed to update visibility", variant: "destructive" });
     }
   }
 
@@ -553,18 +586,25 @@ export default function CatalogDetail() {
                   </p>
                   <div className="flex items-start gap-4">
                     {form.imageUrl ? (
-                      <img
-                        src={form.imageUrl}
-                        alt="Primary"
-                        className="w-24 h-24 object-cover rounded-md border"
-                        data-testid="img-primary-photo"
-                      />
+                      <div className="relative">
+                        <img
+                          src={form.imageUrl}
+                          alt="Primary"
+                          className={`w-24 h-24 object-cover rounded-md border transition-opacity ${form.imageHidden ? "opacity-40" : ""}`}
+                          data-testid="img-primary-photo"
+                        />
+                        {form.imageHidden && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <EyeOff className="w-6 h-6 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <div className="w-24 h-24 rounded-md border border-dashed flex items-center justify-center bg-muted/30">
                         <ImageIcon className="w-8 h-8 text-muted-foreground/40" />
                       </div>
                     )}
-                    <div>
+                    <div className="space-y-1.5">
                       <label htmlFor="upload-primary">
                         <Button
                           asChild
@@ -593,7 +633,22 @@ export default function CatalogDetail() {
                           e.target.value = "";
                         }}
                       />
-                      <p className="text-xs text-muted-foreground mt-1">PNG or JPG</p>
+                      {form.imageUrl && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex items-center gap-1.5 text-xs px-2 h-7"
+                          onClick={() => toggleImageVisibility("primary")}
+                          title={form.imageHidden ? "Show in estimates" : "Hide from estimates"}
+                          data-testid="btn-toggle-primary-visibility"
+                        >
+                          {form.imageHidden
+                            ? <><EyeOff className="w-3.5 h-3.5" /> Hidden</>
+                            : <><Eye className="w-3.5 h-3.5" /> Visible</>
+                          }
+                        </Button>
+                      )}
+                      <p className="text-xs text-muted-foreground">PNG or JPG</p>
                     </div>
                   </div>
                 </div>
@@ -608,30 +663,52 @@ export default function CatalogDetail() {
                       {options.map(opt => {
                         const optUrl = (form.optionImages ?? {})[opt];
                         const isUploading = uploadingOption[opt] ?? false;
+                        const optHidden = (form.optionImagesHidden ?? {})[opt] ?? false;
                         return (
                           <div key={opt} className="border rounded-md p-3 space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="text-sm font-medium">{opt}</span>
-                              {optUrl && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => removeOptionPhoto(opt)}
-                                  data-testid={`btn-remove-option-photo-${opt}`}
-                                >
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              )}
+                              <div className="flex items-center gap-1">
+                                {optUrl && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => toggleImageVisibility("option", opt)}
+                                    title={optHidden ? "Show in estimates" : "Hide from estimates"}
+                                    data-testid={`btn-toggle-option-visibility-${opt}`}
+                                  >
+                                    {optHidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                  </Button>
+                                )}
+                                {optUrl && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => removeOptionPhoto(opt)}
+                                    data-testid={`btn-remove-option-photo-${opt}`}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center gap-3">
                               {optUrl ? (
-                                <img
-                                  src={optUrl}
-                                  alt={opt}
-                                  className="w-16 h-16 object-cover rounded border"
-                                  data-testid={`img-option-photo-${opt}`}
-                                />
+                                <div className="relative">
+                                  <img
+                                    src={optUrl}
+                                    alt={opt}
+                                    className={`w-16 h-16 object-cover rounded border transition-opacity ${optHidden ? "opacity-40" : ""}`}
+                                    data-testid={`img-option-photo-${opt}`}
+                                  />
+                                  {optHidden && (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <EyeOff className="w-4 h-4 text-muted-foreground" />
+                                    </div>
+                                  )}
+                                </div>
                               ) : (
                                 <div className="w-16 h-16 rounded border border-dashed flex items-center justify-center bg-muted/30">
                                   <ImageIcon className="w-5 h-5 text-muted-foreground/40" />

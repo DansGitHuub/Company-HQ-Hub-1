@@ -28,6 +28,7 @@ interface LineItem {
   amount: number;
   is_optional: boolean;
   image_url?: string | null;
+  image_hidden?: boolean | null;
 }
 
 interface WorkAreaDraft {

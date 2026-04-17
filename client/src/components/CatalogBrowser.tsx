@@ -21,7 +21,9 @@ export interface CatalogItem {
   sku?: string;
   category?: string;
   image_url?: string | null;
+  image_hidden?: boolean | null;
   option_images?: Record<string, string> | null;
+  option_images_hidden?: Record<string, boolean> | null;
   other_options?: string | null;
 }
 
@@ -70,7 +72,8 @@ export function CatalogBrowser({ open, areaKey, onClose, onSelect }: Props) {
     if (item.class === "Materials" && options.length > 0) {
       setPendingItem(item);
     } else {
-      onSelect(areaKey, item, item.image_url ?? undefined);
+      const imageUrl = item.image_hidden ? undefined : (item.image_url ?? undefined);
+      onSelect(areaKey, item, imageUrl);
       setSearch("");
       onClose();
     }
@@ -78,8 +81,10 @@ export function CatalogBrowser({ open, areaKey, onClose, onSelect }: Props) {
 
   function handleOptionSelect(opt: string) {
     if (!areaKey || !pendingItem) return;
-    const resolvedUrl =
-      (pendingItem.option_images ?? {})[opt] ?? pendingItem.image_url ?? undefined;
+    const optHidden = (pendingItem.option_images_hidden ?? {})[opt] ?? false;
+    const resolvedUrl = optHidden
+      ? undefined
+      : ((pendingItem.option_images ?? {})[opt] ?? (pendingItem.image_hidden ? undefined : pendingItem.image_url ?? undefined));
     onSelect(areaKey, pendingItem, resolvedUrl);
     setSearch("");
     setPendingItem(null);
