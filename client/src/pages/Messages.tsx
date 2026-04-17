@@ -377,12 +377,10 @@ function ConversationThread({
   userId,
   myId,
   onBack,
-  onCompose,
 }: {
   userId: string;
   myId: string;
   onBack: () => void;
-  onCompose: (recipientId: string) => void;
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -473,15 +471,6 @@ function ConversationThread({
           <p className="font-semibold text-sm" data-testid="text-thread-name">{otherName}</p>
           <p className="text-xs text-muted-foreground">{otherRole}</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onCompose(userId)}
-          data-testid="button-reply"
-        >
-          <Pencil className="h-3.5 w-3.5 mr-1.5" />
-          New message
-        </Button>
       </div>
 
       {/* Messages */}
@@ -650,11 +639,6 @@ export default function MessagesPage() {
               <p className="text-sm" data-testid="text-empty-state">
                 {search ? "No results" : "No messages yet"}
               </p>
-              {!search && (
-                <Button variant="outline" size="sm" onClick={() => openCompose()} data-testid="button-compose-empty">
-                  Send your first message
-                </Button>
-              )}
             </div>
           ) : (
             filtered.map((contact) => (
@@ -682,18 +666,13 @@ export default function MessagesPage() {
             userId={selectedUserId}
             myId={user.id}
             onBack={() => setSelectedUserId(null)}
-            onCompose={(recipientId) => openCompose(recipientId)}
           />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 select-none">
             <MessageSquare className="h-12 w-12 opacity-15" />
             <p className="text-sm" data-testid="text-select-prompt">
-              Select a conversation or compose a new message
+              Select a conversation to read it
             </p>
-            <Button variant="outline" size="sm" onClick={() => openCompose()} data-testid="button-compose-placeholder">
-              <Pencil className="h-3.5 w-3.5 mr-1.5" />
-              Compose
-            </Button>
           </div>
         )}
       </div>
