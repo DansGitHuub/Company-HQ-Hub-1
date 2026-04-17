@@ -548,7 +548,9 @@ export default function CatalogDetail() {
 
                 {/* Primary photo */}
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground">Primary Photo</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Primary Photo <span className="font-normal text-xs">(optional)</span>
+                  </p>
                   <div className="flex items-start gap-4">
                     {form.imageUrl ? (
                       <img
@@ -599,7 +601,9 @@ export default function CatalogDetail() {
                 {/* Option photos */}
                 {options.length > 0 && (
                   <div className="space-y-3">
-                    <p className="text-sm font-medium text-muted-foreground">Option Photos</p>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Option Photos <span className="font-normal text-xs">(each slot is optional — upload any, skip others)</span>
+                    </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {options.map(opt => {
                         const optUrl = (form.optionImages ?? {})[opt];
