@@ -1,20 +1,48 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Search, Send, Plus, ChevronLeft } from "lucide-react";
+import {
+  Inbox,
+  Send,
+  Pencil,
+  Trash2,
+  ArrowLeft,
+  User,
+  Clock,
+  ChevronRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, isToday, isYesterday } from "date-fns";
+import { apiRequest } from "@/lib/queryClient";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 
-interface DmUser {
+interface StaffUser {
   id: string;
   name: string;
   role: string;
@@ -22,535 +50,614 @@ interface DmUser {
   email: string;
 }
 
-interface Conversation {
-  id: number;
-  last_message_at: string | null;
-  other_user_id: string;
-  other_user_name: string;
-  other_user_role: string;
-  other_user_picture: string | null;
-  last_message_body: string | null;
-  last_message_sender_id: string | null;
-  has_unread: boolean;
-}
-
-interface Message {
-  id: number;
-  body: string;
-  created_at: string;
+interface DirectMessage {
+  id: string;
   sender_id: string;
+  recipient_id: string;
+  subject: string | null;
+  body: string;
+  sent_at: string;
+  read_at: string | null;
+  deleted_by_sender: boolean;
+  deleted_by_recipient: boolean;
+  // inbox fields
+  sender_name?: string;
+  sender_role?: string;
+  sender_picture?: string | null;
+  // sent fields
+  recipient_name?: string;
+  recipient_role?: string;
+  recipient_picture?: string | null;
+}
+
+interface FullMessage extends DirectMessage {
   sender_name: string;
+  sender_role: string;
   sender_picture: string | null;
+  recipient_name: string;
+  recipient_role: string;
+  recipient_picture: string | null;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map(p => p[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-function fmtTime(iso: string) {
-  const d = new Date(iso);
+function formatTimestamp(dateStr: string): string {
+  const d = new Date(dateStr);
   if (isToday(d)) return format(d, "h:mm a");
   if (isYesterday(d)) return "Yesterday";
   return format(d, "MMM d");
 }
 
-function Avatar({ name, picture, size = 9 }: { name: string; picture: string | null; size?: number }) {
+function formatFull(dateStr: string): string {
+  return format(new Date(dateStr), "MMM d, yyyy 'at' h:mm a");
+}
+
+function avatar(name: string, picture: string | null | undefined, size = 36) {
   if (picture) {
     return (
       <img
         src={picture}
         alt={name}
-        className={`w-${size} h-${size} rounded-full object-cover shrink-0`}
+        className="rounded-full object-cover flex-shrink-0"
+        style={{ width: size, height: size }}
       />
     );
   }
-  const colors = [
-    "bg-blue-500", "bg-green-500", "bg-purple-500",
-    "bg-amber-500", "bg-rose-500", "bg-cyan-500", "bg-indigo-500",
-  ];
-  const color = colors[name.charCodeAt(0) % colors.length];
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
   return (
     <div
-      className={cn(
-        `w-${size} h-${size} rounded-full shrink-0 flex items-center justify-center text-white font-semibold`,
-        color,
-        size <= 8 ? "text-xs" : "text-sm"
-      )}
+      className="rounded-full bg-primary/15 text-primary flex items-center justify-center font-semibold flex-shrink-0 text-xs"
+      style={{ width: size, height: size }}
     >
-      {initials(name)}
+      {initials}
     </div>
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Compose Dialog ─────────────────────────────────────────────────────────────
 
-function NewConversationDialog({
+function ComposeDialog({
   open,
   onClose,
-  onSelect,
+  initialRecipientId,
 }: {
   open: boolean;
   onClose: () => void;
-  onSelect: (userId: string) => void;
+  initialRecipientId?: string;
 }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [recipientId, setRecipientId] = useState(initialRecipientId ?? "");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
   const [search, setSearch] = useState("");
-  const { data: users = [] } = useQuery<DmUser[]>({
+
+  const { data: users = [] } = useQuery<StaffUser[]>({
     queryKey: ["/api/dm/users"],
-    queryFn: () => fetch("/api/dm/users", { credentials: "include" }).then(r => r.json()),
     enabled: open,
   });
-  const filtered = users.filter(u =>
-    !search || u.name.toLowerCase().includes(search.toLowerCase())
+
+  const sendMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/dm", { recipientId, subject, body });
+    },
+    onSuccess: () => {
+      toast({ title: "Message sent" });
+      qc.invalidateQueries({ queryKey: ["/api/dm/sent"] });
+      qc.invalidateQueries({ queryKey: ["/api/dm/unread-count"] });
+      setRecipientId(initialRecipientId ?? "");
+      setSubject("");
+      setBody("");
+      setSearch("");
+      onClose();
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const filtered = users.filter(
+    (u) =>
+      u.name.toLowerCase().includes(search.toLowerCase()) ||
+      u.role.toLowerCase().includes(search.toLowerCase())
   );
+  const selected = users.find((u) => u.id === recipientId);
+
+  function handleClose() {
+    setRecipientId(initialRecipientId ?? "");
+    setSubject("");
+    setBody("");
+    setSearch("");
+    onClose();
+  }
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-sm">
+    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>New Message</DialogTitle>
         </DialogHeader>
-        <Input
-          placeholder="Search team members…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          autoFocus
-          data-testid="input-user-search"
-        />
-        <ScrollArea className="max-h-72">
-          <div className="space-y-1 pt-1">
-            {filtered.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-6">No team members found.</p>
+
+        <div className="space-y-4 py-2">
+          {/* Recipient */}
+          <div className="space-y-1">
+            <Label>To</Label>
+            {selected ? (
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2 bg-muted/30">
+                {avatar(selected.name, selected.profile_picture, 28)}
+                <span className="text-sm font-medium">{selected.name}</span>
+                <span className="text-xs text-muted-foreground">({selected.role})</span>
+                <button
+                  className="ml-auto text-muted-foreground hover:text-foreground text-xs"
+                  onClick={() => setRecipientId("")}
+                  data-testid="button-clear-recipient"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div className="border rounded-md">
+                <Input
+                  placeholder="Search by name or role…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="border-0 focus-visible:ring-0"
+                  data-testid="input-recipient-search"
+                />
+                {search && (
+                  <div className="border-t max-h-40 overflow-y-auto">
+                    {filtered.length === 0 ? (
+                      <p className="px-3 py-2 text-sm text-muted-foreground">No users found</p>
+                    ) : (
+                      filtered.map((u) => (
+                        <button
+                          key={u.id}
+                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/50 text-left"
+                          onClick={() => {
+                            setRecipientId(u.id);
+                            setSearch("");
+                          }}
+                          data-testid={`button-select-user-${u.id}`}
+                        >
+                          {avatar(u.name, u.profile_picture, 28)}
+                          <div>
+                            <p className="text-sm font-medium">{u.name}</p>
+                            <p className="text-xs text-muted-foreground">{u.role}</p>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             )}
-            {filtered.map(u => (
-              <button
-                key={u.id}
-                className="w-full flex items-center gap-3 px-2 py-2 rounded-md hover:bg-muted text-left transition-colors"
-                onClick={() => { onSelect(u.id); onClose(); setSearch(""); }}
-                data-testid={`btn-select-user-${u.id}`}
-              >
-                <Avatar name={u.name} picture={u.profile_picture} size={8} />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{u.name}</p>
-                  <p className="text-xs text-muted-foreground">{u.role}</p>
-                </div>
-              </button>
-            ))}
           </div>
-        </ScrollArea>
+
+          {/* Subject */}
+          <div className="space-y-1">
+            <Label>Subject</Label>
+            <Input
+              placeholder="Optional subject…"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              data-testid="input-subject"
+            />
+          </div>
+
+          {/* Body */}
+          <div className="space-y-1">
+            <Label>Message</Label>
+            <Textarea
+              placeholder="Write your message…"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={6}
+              data-testid="textarea-body"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose} data-testid="button-compose-cancel">
+            Cancel
+          </Button>
+          <Button
+            onClick={() => sendMutation.mutate()}
+            disabled={!recipientId || !body.trim() || sendMutation.isPending}
+            data-testid="button-send-message"
+          >
+            <Send className="h-4 w-4 mr-1" />
+            {sendMutation.isPending ? "Sending…" : "Send"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-function ConversationList({
-  conversations,
-  activeId,
-  currentUserId,
-  onSelect,
-  search,
-  onSearchChange,
+// ── Message Row ────────────────────────────────────────────────────────────────
+
+function MessageRow({
+  msg,
+  folder,
+  selected,
+  onClick,
 }: {
-  conversations: Conversation[];
-  activeId: number | null;
-  currentUserId: string;
-  onSelect: (c: Conversation) => void;
-  search: string;
-  onSearchChange: (v: string) => void;
+  msg: DirectMessage;
+  folder: "inbox" | "sent";
+  selected: boolean;
+  onClick: () => void;
 }) {
-  const filtered = conversations.filter(c =>
-    !search || c.other_user_name.toLowerCase().includes(search.toLowerCase())
-  );
+  const isUnread = folder === "inbox" && !msg.read_at;
+  const name = folder === "inbox" ? msg.sender_name ?? "?" : msg.recipient_name ?? "?";
+  const pic = folder === "inbox" ? msg.sender_picture : msg.recipient_picture;
 
   return (
-    <div className="flex flex-col h-full border-r">
-      <div className="p-3 space-y-2">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            className="pl-8 h-8 text-sm"
-            placeholder="Search conversations…"
-            value={search}
-            onChange={e => onSearchChange(e.target.value)}
-            data-testid="input-conversation-search"
-          />
+    <button
+      onClick={onClick}
+      data-testid={`row-message-${msg.id}`}
+      className={cn(
+        "w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors",
+        selected && "bg-primary/8 border-l-2 border-primary",
+        !selected && "border-l-2 border-transparent"
+      )}
+    >
+      <div className="pt-0.5 flex-shrink-0">{avatar(name, pic, 36)}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline justify-between gap-2">
+          <span
+            className={cn("text-sm truncate", isUnread ? "font-semibold" : "font-medium text-muted-foreground")}
+            data-testid={`text-sender-${msg.id}`}
+          >
+            {name}
+          </span>
+          <span className="text-xs text-muted-foreground flex-shrink-0" data-testid={`text-time-${msg.id}`}>
+            {formatTimestamp(msg.sent_at)}
+          </span>
         </div>
+        <p className={cn("text-sm truncate", isUnread ? "font-medium" : "text-muted-foreground")} data-testid={`text-subject-${msg.id}`}>
+          {msg.subject || "(no subject)"}
+        </p>
+        <p className="text-xs text-muted-foreground truncate">{msg.body}</p>
       </div>
-      <Separator />
-      <ScrollArea className="flex-1">
-        {filtered.length === 0 && (
-          <div className="py-12 text-center text-sm text-muted-foreground px-4">
-            {conversations.length === 0
-              ? "No conversations yet. Start one with the + button."
-              : "No matches."}
-          </div>
-        )}
-        <div className="py-1">
-          {filtered.map(c => {
-            const isActive = c.id === activeId;
-            const preview = c.last_message_body
-              ? (c.last_message_sender_id === currentUserId ? "You: " : "") +
-                c.last_message_body.slice(0, 60) + (c.last_message_body.length > 60 ? "…" : "")
-              : "No messages yet";
-            return (
-              <button
-                key={c.id}
-                onClick={() => onSelect(c)}
-                className={cn(
-                  "w-full flex items-start gap-3 px-3 py-3 hover:bg-muted/60 transition-colors text-left",
-                  isActive && "bg-muted"
-                )}
-                data-testid={`btn-conversation-${c.id}`}
-              >
-                <div className="relative mt-0.5">
-                  <Avatar name={c.other_user_name} picture={c.other_user_picture} size={9} />
-                  {c.has_unread && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 border-background" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className={cn("text-sm truncate", c.has_unread ? "font-semibold" : "font-medium")}>
-                      {c.other_user_name}
-                    </span>
-                    {c.last_message_at && (
-                      <span className="text-[11px] text-muted-foreground shrink-0">
-                        {fmtTime(c.last_message_at)}
-                      </span>
-                    )}
-                  </div>
-                  <p className={cn("text-xs mt-0.5 truncate", c.has_unread ? "text-foreground" : "text-muted-foreground")}>
-                    {preview}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </ScrollArea>
-    </div>
+      {isUnread && (
+        <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-2" data-testid={`dot-unread-${msg.id}`} />
+      )}
+    </button>
   );
 }
 
-function ChatThread({
-  conversation,
-  currentUserId,
+// ── Message Detail ─────────────────────────────────────────────────────────────
+
+function MessageDetail({
+  msgId,
+  folder,
   onBack,
+  onDelete,
+  onReply,
 }: {
-  conversation: Conversation;
-  currentUserId: string;
+  msgId: string;
+  folder: "inbox" | "sent";
   onBack: () => void;
+  onDelete: (id: string) => void;
+  onReply: (recipientId: string) => void;
 }) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [draft, setDraft] = useState("");
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const { data: messages = [], refetch } = useQuery<Message[]>({
-    queryKey: ["/api/dm/conversations", conversation.id, "messages"],
-    queryFn: () =>
-      fetch(`/api/dm/conversations/${conversation.id}/messages`, { credentials: "include" }).then(r => r.json()),
-    refetchInterval: 5000,
-  });
-
-  // Mark as read when opening
-  useEffect(() => {
-    fetch(`/api/dm/conversations/${conversation.id}/read`, {
-      method: "POST",
-      credentials: "include",
-    }).then(() => {
-      queryClient.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dm/unread-count"] });
-    });
-  }, [conversation.id]);
-
-  // Scroll to bottom on new messages
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Focus input when conversation changes
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, [conversation.id]);
-
-  const sendMut = useMutation({
-    mutationFn: async (body: string) => {
-      const res = await fetch(`/api/dm/conversations/${conversation.id}/messages`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body }),
-      });
-      if (!res.ok) throw new Error("Send failed");
+  const { user } = useAuth();
+  const { data: msg, isLoading } = useQuery<FullMessage>({
+    queryKey: ["/api/dm", msgId],
+    queryFn: async () => {
+      const res = await fetch(`/api/dm/${msgId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load message");
       return res.json();
     },
-    onSuccess: () => {
-      setDraft("");
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
-    },
-    onError: () => toast({ title: "Failed to send message", variant: "destructive" }),
+    staleTime: 0,
   });
 
-  function handleSend() {
-    const body = draft.trim();
-    if (!body || sendMut.isPending) return;
-    sendMut.mutate(body);
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+        Loading…
+      </div>
+    );
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  }
+  if (!msg) return null;
 
-  // Group messages by date
-  const groups: { date: string; msgs: Message[] }[] = [];
-  for (const msg of messages) {
-    const d = new Date(msg.created_at);
-    let label: string;
-    if (isToday(d)) label = "Today";
-    else if (isYesterday(d)) label = "Yesterday";
-    else label = format(d, "MMMM d, yyyy");
-    const last = groups[groups.length - 1];
-    if (last && last.date === label) last.msgs.push(msg);
-    else groups.push({ date: label, msgs: [msg] });
-  }
+  const isSender = msg.sender_id === user?.id;
+  const replyTo = isSender ? msg.recipient_id : msg.sender_id;
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
+      <div className="flex items-center gap-2 px-4 py-3 border-b">
+        <Button variant="ghost" size="icon" onClick={onBack} className="md:hidden" data-testid="button-back">
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-semibold text-sm truncate" data-testid="text-detail-subject">
+            {msg.subject || "(no subject)"}
+          </h2>
+        </div>
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden h-8 w-8"
-          onClick={onBack}
-          data-testid="btn-back-to-conversations"
+          onClick={() => onDelete(msg.id)}
+          className="text-muted-foreground hover:text-destructive"
+          data-testid="button-delete-message"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <Trash2 className="h-4 w-4" />
         </Button>
-        <Avatar name={conversation.other_user_name} picture={conversation.other_user_picture} size={8} />
-        <div>
-          <p className="font-semibold text-sm leading-tight">{conversation.other_user_name}</p>
-          <p className="text-xs text-muted-foreground">{conversation.other_user_role}</p>
+      </div>
+
+      {/* Meta */}
+      <div className="px-4 py-3 border-b space-y-1.5">
+        <div className="flex items-center gap-2">
+          {avatar(msg.sender_name, msg.sender_picture, 40)}
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium" data-testid="text-detail-sender">{msg.sender_name}</span>
+              <span className="text-xs text-muted-foreground">{msg.sender_role}</span>
+            </div>
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <span>To:</span>
+              <span data-testid="text-detail-recipient">{msg.recipient_name}</span>
+            </div>
+          </div>
+          <div className="ml-auto text-right">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground" data-testid="text-detail-time">
+              <Clock className="h-3 w-3" />
+              {formatFull(msg.sent_at)}
+            </div>
+            {folder === "inbox" && (
+              <div className="text-xs text-muted-foreground mt-0.5" data-testid="text-read-status">
+                {msg.read_at ? `Read ${formatFull(msg.read_at)}` : "Unread"}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 px-4">
-        <div className="py-4 space-y-4">
-          {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 gap-2 text-muted-foreground">
-              <MessageSquare className="h-10 w-10 opacity-20" />
-              <p className="text-sm">No messages yet. Say hi!</p>
-            </div>
-          )}
-          {groups.map(group => (
-            <div key={group.date} className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Separator className="flex-1" />
-                <span className="text-[11px] text-muted-foreground shrink-0">{group.date}</span>
-                <Separator className="flex-1" />
-              </div>
-              {group.msgs.map((msg, idx) => {
-                const isMe = msg.sender_id === currentUserId;
-                const prevMsg = group.msgs[idx - 1];
-                const sameSenderAsPrev = prevMsg?.sender_id === msg.sender_id;
-                return (
-                  <div
-                    key={msg.id}
-                    className={cn("flex items-end gap-2", isMe ? "flex-row-reverse" : "flex-row")}
-                  >
-                    {!isMe && (
-                      <div className="w-7 shrink-0">
-                        {!sameSenderAsPrev && (
-                          <Avatar name={msg.sender_name} picture={msg.sender_picture} size={7} />
-                        )}
-                      </div>
-                    )}
-                    <div className={cn("flex flex-col gap-0.5 max-w-[70%]", isMe ? "items-end" : "items-start")}>
-                      {!sameSenderAsPrev && !isMe && (
-                        <span className="text-[11px] text-muted-foreground ml-1">{msg.sender_name}</span>
-                      )}
-                      <div
-                        className={cn(
-                          "px-3 py-2 rounded-2xl text-sm leading-snug",
-                          isMe
-                            ? "bg-primary text-primary-foreground rounded-br-sm"
-                            : "bg-muted text-foreground rounded-bl-sm"
-                        )}
-                        data-testid={`msg-bubble-${msg.id}`}
-                      >
-                        {msg.body}
-                      </div>
-                      <span className="text-[10px] text-muted-foreground px-1">
-                        {format(new Date(msg.created_at), "h:mm a")}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-          <div ref={bottomRef} />
-        </div>
+      {/* Body */}
+      <ScrollArea className="flex-1 px-4 py-4">
+        <p className="text-sm whitespace-pre-wrap leading-relaxed" data-testid="text-detail-body">
+          {msg.body}
+        </p>
       </ScrollArea>
 
-      {/* Composer */}
-      <div className="border-t px-3 py-3 shrink-0">
-        <div className="flex items-center gap-2">
-          <Input
-            ref={inputRef}
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={`Message ${conversation.other_user_name}…`}
-            className="flex-1"
-            disabled={sendMut.isPending}
-            data-testid="input-message-draft"
-          />
-          <Button
-            size="icon"
-            onClick={handleSend}
-            disabled={!draft.trim() || sendMut.isPending}
-            data-testid="btn-send-message"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
+      {/* Actions */}
+      <div className="px-4 py-3 border-t">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onReply(replyTo)}
+          data-testid="button-reply"
+        >
+          <Pencil className="h-3.5 w-3.5 mr-1.5" />
+          Reply
+        </Button>
       </div>
     </div>
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+// ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function MessagesPage() {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const [activeConv, setActiveConv] = useState<Conversation | null>(null);
-  const [showNewDlg, setShowNewDlg] = useState(false);
-  const [search, setSearch] = useState("");
-  const [mobileShowThread, setMobileShowThread] = useState(false);
+  const [folder, setFolder] = useState<"inbox" | "sent">("inbox");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeRecipientId, setComposeRecipientId] = useState<string | undefined>();
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const { toast } = useToast();
+  const qc = useQueryClient();
 
-  const { data: conversations = [], refetch: refetchConvs } = useQuery<Conversation[]>({
-    queryKey: ["/api/dm/conversations"],
-    queryFn: () =>
-      fetch("/api/dm/conversations", { credentials: "include" }).then(r => r.json()),
-    refetchInterval: 10000,
+  const { data: inbox = [], isLoading: inboxLoading } = useQuery<DirectMessage[]>({
+    queryKey: ["/api/dm/inbox"],
+    refetchInterval: 15000,
   });
 
-  // Start/open a conversation with a user
-  const startConvMut = useMutation({
-    mutationFn: async (recipientId: string) => {
-      const res = await fetch("/api/dm/conversations", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipientId }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      return res.json() as Promise<{ id: number }>;
+  const { data: sent = [], isLoading: sentLoading } = useQuery<DirectMessage[]>({
+    queryKey: ["/api/dm/sent"],
+    refetchInterval: 30000,
+  });
+
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/dm/unread-count"],
+    refetchInterval: 15000,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/dm/${id}`);
     },
-    onSuccess: async ({ id }) => {
-      await refetchConvs();
-      queryClient.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
-      // Find and activate the conversation
-      const updated = await fetch("/api/dm/conversations", { credentials: "include" }).then(r => r.json()) as Conversation[];
-      const conv = updated.find(c => c.id === id);
-      if (conv) {
-        setActiveConv(conv);
-        setMobileShowThread(true);
-      }
+    onSuccess: () => {
+      toast({ title: "Message deleted" });
+      qc.invalidateQueries({ queryKey: ["/api/dm/inbox"] });
+      qc.invalidateQueries({ queryKey: ["/api/dm/sent"] });
+      qc.invalidateQueries({ queryKey: ["/api/dm/unread-count"] });
+      if (selectedId === deleteTarget) setSelectedId(null);
+      setDeleteTarget(null);
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to delete", description: err.message, variant: "destructive" });
+      setDeleteTarget(null);
     },
   });
 
-  function handleSelectConversation(c: Conversation) {
-    setActiveConv(c);
-    setMobileShowThread(true);
+  const messages = folder === "inbox" ? inbox : sent;
+  const isLoading = folder === "inbox" ? inboxLoading : sentLoading;
+  const unread = unreadData?.count ?? 0;
+
+  function handleReply(recipientId: string) {
+    setComposeRecipientId(recipientId);
+    setComposeOpen(true);
   }
 
-  if (!user) return null;
+  function handleCompose() {
+    setComposeRecipientId(undefined);
+    setComposeOpen(true);
+  }
+
+  const showDetail = !!selectedId;
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden">
-      {/* Left panel — conversation list */}
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
+      {/* ── Left sidebar: folder nav ── */}
       <div
         className={cn(
-          "w-full md:w-80 flex-shrink-0 flex flex-col",
-          mobileShowThread ? "hidden md:flex" : "flex"
+          "w-full md:w-64 flex-shrink-0 border-r flex flex-col bg-background",
+          showDetail && "hidden md:flex"
         )}
       >
-        <div className="flex items-center justify-between px-3 pt-4 pb-2">
-          <h1 className="text-lg font-bold">Messages</h1>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8"
-            onClick={() => setShowNewDlg(true)}
-            data-testid="btn-new-conversation"
-            title="New message"
-          >
-            <Plus className="h-4 w-4" />
+        {/* Compose button */}
+        <div className="p-3 border-b">
+          <Button className="w-full" onClick={handleCompose} data-testid="button-compose">
+            <Pencil className="h-4 w-4 mr-2" />
+            Compose
           </Button>
         </div>
-        <ConversationList
-          conversations={conversations}
-          activeId={activeConv?.id ?? null}
-          currentUserId={user.id}
-          onSelect={handleSelectConversation}
-          search={search}
-          onSearchChange={setSearch}
-        />
+
+        {/* Folder buttons */}
+        <div className="p-2 space-y-1">
+          <button
+            onClick={() => { setFolder("inbox"); setSelectedId(null); }}
+            data-testid="button-folder-inbox"
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+              folder === "inbox"
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted/50"
+            )}
+          >
+            <Inbox className="h-4 w-4 flex-shrink-0" />
+            <span className="flex-1 text-left">Inbox</span>
+            {unread > 0 && (
+              <Badge className="bg-blue-500 text-white text-xs h-5 px-1.5" data-testid="badge-unread-count">
+                {unread > 99 ? "99+" : unread}
+              </Badge>
+            )}
+          </button>
+          <button
+            onClick={() => { setFolder("sent"); setSelectedId(null); }}
+            data-testid="button-folder-sent"
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+              folder === "sent"
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted/50"
+            )}
+          >
+            <Send className="h-4 w-4 flex-shrink-0" />
+            <span className="flex-1 text-left">Sent</span>
+          </button>
+        </div>
       </div>
 
-      {/* Right panel — thread or empty state */}
+      {/* ── Message list ── */}
       <div
         className={cn(
-          "flex-1 flex flex-col min-w-0",
-          mobileShowThread ? "flex" : "hidden md:flex"
+          "flex-1 md:w-80 md:flex-none border-r flex flex-col bg-background",
+          showDetail && "hidden md:flex"
         )}
+        style={{ minWidth: 0, maxWidth: "100%", width: "100%" }}
       >
-        {activeConv ? (
-          <ChatThread
-            key={activeConv.id}
-            conversation={activeConv}
-            currentUserId={user.id}
-            onBack={() => setMobileShowThread(false)}
+        <div className="px-4 py-3 border-b">
+          <h1 className="font-semibold text-sm capitalize" data-testid="text-folder-name">
+            {folder === "inbox" ? "Inbox" : "Sent"}
+          </h1>
+        </div>
+
+        <ScrollArea className="flex-1">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
+              Loading…
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
+              {folder === "inbox" ? (
+                <Inbox className="h-8 w-8 opacity-30" />
+              ) : (
+                <Send className="h-8 w-8 opacity-30" />
+              )}
+              <p className="text-sm" data-testid="text-empty-state">
+                {folder === "inbox" ? "No messages in your inbox" : "No sent messages"}
+              </p>
+            </div>
+          ) : (
+            <div>
+              {messages.map((msg, i) => (
+                <React.Fragment key={msg.id}>
+                  <MessageRow
+                    msg={msg}
+                    folder={folder}
+                    selected={selectedId === msg.id}
+                    onClick={() => setSelectedId(msg.id)}
+                  />
+                  {i < messages.length - 1 && <Separator />}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+
+      {/* ── Detail pane ── */}
+      <div
+        className={cn(
+          "flex-1 flex-col bg-background",
+          showDetail ? "flex w-full" : "hidden md:flex"
+        )}
+        style={{ minWidth: 0 }}
+      >
+        {selectedId ? (
+          <MessageDetail
+            msgId={selectedId}
+            folder={folder}
+            onBack={() => setSelectedId(null)}
+            onDelete={(id) => setDeleteTarget(id)}
+            onReply={handleReply}
           />
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-            <MessageSquare className="h-14 w-14 opacity-15" />
-            <p className="text-sm font-medium">Select a conversation</p>
-            <p className="text-xs">or start a new one with the + button</p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="mt-2"
-              onClick={() => setShowNewDlg(true)}
-              data-testid="btn-start-first-message"
-            >
-              <Plus className="h-4 w-4 mr-1.5" /> New Message
-            </Button>
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 select-none">
+            <Inbox className="h-10 w-10 opacity-20" />
+            <p className="text-sm" data-testid="text-select-prompt">Select a message to read</p>
           </div>
         )}
       </div>
 
-      <NewConversationDialog
-        open={showNewDlg}
-        onClose={() => setShowNewDlg(false)}
-        onSelect={id => startConvMut.mutate(id)}
+      {/* ── Compose dialog ── */}
+      <ComposeDialog
+        open={composeOpen}
+        onClose={() => { setComposeOpen(false); setComposeRecipientId(undefined); }}
+        initialRecipientId={composeRecipientId}
       />
+
+      {/* ── Delete confirm ── */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the message from your view. The recipient will still have their copy.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-delete-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-delete-confirm"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

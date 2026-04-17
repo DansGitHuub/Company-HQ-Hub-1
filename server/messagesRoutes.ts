@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { pool } from "./db";
 
 async function migrate() {
+  // Keep legacy tables intact (do not drop)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dm_conversations (
       id SERIAL PRIMARY KEY,
@@ -29,6 +30,22 @@ async function migrate() {
       PRIMARY KEY (conversation_id, user_id)
     )
   `);
+
+  // New flat direct_messages table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS direct_messages (
+      id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+      sender_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      recipient_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      subject TEXT,
+      body TEXT NOT NULL,
+      sent_at TIMESTAMP DEFAULT NOW(),
+      read_at TIMESTAMP,
+      deleted_by_sender BOOLEAN NOT NULL DEFAULT FALSE,
+      deleted_by_recipient BOOLEAN NOT NULL DEFAULT FALSE
+    )
+  `);
+
   console.log("[migration] DM messaging tables ready");
 }
 
@@ -54,36 +71,20 @@ export function registerMessagesRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  // List conversations for current user with last message and unread flag
-  app.get("/api/dm/conversations", requireAuth, async (req, res) => {
+  // Inbox: messages received by me, not deleted by me
+  app.get("/api/dm/inbox", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
       const { rows } = await pool.query(
         `SELECT
-           c.id,
-           c.last_message_at,
-           c.created_at,
-           CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END AS other_user_id,
-           u.name AS other_user_name,
-           u.role AS other_user_role,
-           u.profile_picture AS other_user_picture,
-           m.body AS last_message_body,
-           m.sender_id AS last_message_sender_id,
-           CASE
-             WHEN r.last_read_at IS NULL THEN TRUE
-             WHEN m.created_at > r.last_read_at AND m.sender_id != $1 THEN TRUE
-             ELSE FALSE
-           END AS has_unread
-         FROM dm_conversations c
-         JOIN users u ON u.id = CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END
-         LEFT JOIN LATERAL (
-           SELECT body, created_at, sender_id FROM dm_messages
-           WHERE conversation_id = c.id
-           ORDER BY created_at DESC LIMIT 1
-         ) m ON TRUE
-         LEFT JOIN dm_reads r ON r.conversation_id = c.id AND r.user_id = $1
-         WHERE c.participant1_id = $1 OR c.participant2_id = $1
-         ORDER BY c.last_message_at DESC NULLS LAST`,
+           m.id, m.sender_id, m.recipient_id, m.subject, m.body,
+           m.sent_at, m.read_at, m.deleted_by_sender, m.deleted_by_recipient,
+           u.name AS sender_name, u.role AS sender_role, u.profile_picture AS sender_picture
+         FROM direct_messages m
+         JOIN users u ON u.id = m.sender_id
+         WHERE m.recipient_id = $1
+           AND m.deleted_by_recipient = FALSE
+         ORDER BY m.sent_at DESC`,
         [me]
       );
       res.json(rows);
@@ -92,51 +93,21 @@ export function registerMessagesRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  // Start or get existing conversation with another user
-  app.post("/api/dm/conversations", requireAuth, async (req, res) => {
+  // Sent: messages sent by me, not deleted by me
+  app.get("/api/dm/sent", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
-      const { recipientId } = req.body;
-      if (!recipientId) return res.status(400).json({ message: "recipientId required" });
-      // Always store p1 < p2 lexicographically to enforce uniqueness
-      const p1 = me < recipientId ? me : recipientId;
-      const p2 = me < recipientId ? recipientId : me;
-      await pool.query(
-        `INSERT INTO dm_conversations (participant1_id, participant2_id)
-         VALUES ($1, $2)
-         ON CONFLICT (participant1_id, participant2_id) DO NOTHING`,
-        [p1, p2]
-      );
       const { rows } = await pool.query(
-        `SELECT id FROM dm_conversations WHERE participant1_id = $1 AND participant2_id = $2`,
-        [p1, p2]
-      );
-      res.json({ id: rows[0].id });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  // Get messages in a conversation (last 100)
-  app.get("/api/dm/conversations/:id/messages", requireAuth, async (req, res) => {
-    try {
-      const me = req.user!.id;
-      const convId = parseInt(req.params.id);
-      // Verify user is a participant
-      const { rows: check } = await pool.query(
-        `SELECT id FROM dm_conversations WHERE id = $1 AND (participant1_id = $2 OR participant2_id = $2)`,
-        [convId, me]
-      );
-      if (!check.length) return res.status(403).json({ message: "Not a participant" });
-      const { rows } = await pool.query(
-        `SELECT m.id, m.body, m.created_at, m.sender_id,
-                u.name AS sender_name, u.profile_picture AS sender_picture
-         FROM dm_messages m
-         JOIN users u ON u.id = m.sender_id
-         WHERE m.conversation_id = $1
-         ORDER BY m.created_at ASC
-         LIMIT 100`,
-        [convId]
+        `SELECT
+           m.id, m.sender_id, m.recipient_id, m.subject, m.body,
+           m.sent_at, m.read_at, m.deleted_by_sender, m.deleted_by_recipient,
+           u.name AS recipient_name, u.role AS recipient_role, u.profile_picture AS recipient_picture
+         FROM direct_messages m
+         JOIN users u ON u.id = m.recipient_id
+         WHERE m.sender_id = $1
+           AND m.deleted_by_sender = FALSE
+         ORDER BY m.sent_at DESC`,
+        [me]
       );
       res.json(rows);
     } catch (err: any) {
@@ -144,35 +115,53 @@ export function registerMessagesRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  // Send a message
-  app.post("/api/dm/conversations/:id/messages", requireAuth, async (req, res) => {
+  // Get a single message and mark it read if I'm the recipient
+  app.get("/api/dm/:id", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
-      const convId = parseInt(req.params.id);
-      const { body } = req.body;
-      if (!body?.trim()) return res.status(400).json({ message: "body required" });
-      // Verify participant
-      const { rows: check } = await pool.query(
-        `SELECT id FROM dm_conversations WHERE id = $1 AND (participant1_id = $2 OR participant2_id = $2)`,
-        [convId, me]
-      );
-      if (!check.length) return res.status(403).json({ message: "Not a participant" });
+      const { id } = req.params;
       const { rows } = await pool.query(
-        `INSERT INTO dm_messages (conversation_id, sender_id, body)
-         VALUES ($1, $2, $3) RETURNING id, body, created_at, sender_id`,
-        [convId, me, body.trim()]
+        `SELECT
+           m.id, m.sender_id, m.recipient_id, m.subject, m.body,
+           m.sent_at, m.read_at, m.deleted_by_sender, m.deleted_by_recipient,
+           s.name AS sender_name, s.role AS sender_role, s.profile_picture AS sender_picture,
+           r.name AS recipient_name, r.role AS recipient_role, r.profile_picture AS recipient_picture
+         FROM direct_messages m
+         JOIN users s ON s.id = m.sender_id
+         JOIN users r ON r.id = m.recipient_id
+         WHERE m.id = $1
+           AND (m.sender_id = $2 OR m.recipient_id = $2)`,
+        [id, me]
       );
-      // Update last_message_at
-      await pool.query(
-        `UPDATE dm_conversations SET last_message_at = NOW() WHERE id = $1`,
-        [convId]
-      );
-      // Update read timestamp for sender (so it doesn't show as unread to sender)
-      await pool.query(
-        `INSERT INTO dm_reads (conversation_id, user_id, last_read_at)
-         VALUES ($1, $2, NOW())
-         ON CONFLICT (conversation_id, user_id) DO UPDATE SET last_read_at = NOW()`,
-        [convId, me]
+      if (!rows.length) return res.status(404).json({ message: "Not found" });
+      const msg = rows[0];
+      // Mark as read if I'm the recipient and not yet read
+      if (msg.recipient_id === me && !msg.read_at) {
+        await pool.query(
+          `UPDATE direct_messages SET read_at = NOW() WHERE id = $1`,
+          [id]
+        );
+        msg.read_at = new Date().toISOString();
+      }
+      res.json(msg);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Compose: send a new message
+  app.post("/api/dm", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { recipientId, subject, body } = req.body;
+      if (!recipientId) return res.status(400).json({ message: "recipientId required" });
+      if (!body?.trim()) return res.status(400).json({ message: "body required" });
+
+      const { rows } = await pool.query(
+        `INSERT INTO direct_messages (id, sender_id, recipient_id, subject, body)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4)
+         RETURNING id, sender_id, recipient_id, subject, body, sent_at, read_at`,
+        [me, recipientId, subject?.trim() || null, body.trim()]
       );
       res.status(201).json(rows[0]);
     } catch (err: any) {
@@ -180,40 +169,47 @@ export function registerMessagesRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  // Mark conversation as read
-  app.post("/api/dm/conversations/:id/read", requireAuth, async (req, res) => {
+  // Soft-delete a message
+  app.delete("/api/dm/:id", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
-      const convId = parseInt(req.params.id);
-      await pool.query(
-        `INSERT INTO dm_reads (conversation_id, user_id, last_read_at)
-         VALUES ($1, $2, NOW())
-         ON CONFLICT (conversation_id, user_id) DO UPDATE SET last_read_at = NOW()`,
-        [convId, me]
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT sender_id, recipient_id FROM direct_messages WHERE id = $1`,
+        [id]
       );
+      if (!rows.length) return res.status(404).json({ message: "Not found" });
+      const msg = rows[0];
+      if (msg.sender_id !== me && msg.recipient_id !== me) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      if (msg.sender_id === me) {
+        await pool.query(
+          `UPDATE direct_messages SET deleted_by_sender = TRUE WHERE id = $1`,
+          [id]
+        );
+      } else {
+        await pool.query(
+          `UPDATE direct_messages SET deleted_by_recipient = TRUE WHERE id = $1`,
+          [id]
+        );
+      }
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  // Unread conversation count for current user
+  // Unread count: messages received by me, unread, not deleted by me
   app.get("/api/dm/unread-count", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
       const { rows } = await pool.query(
         `SELECT COUNT(*) AS count
-         FROM dm_conversations c
-         LEFT JOIN LATERAL (
-           SELECT created_at, sender_id FROM dm_messages
-           WHERE conversation_id = c.id
-           ORDER BY created_at DESC LIMIT 1
-         ) m ON TRUE
-         LEFT JOIN dm_reads r ON r.conversation_id = c.id AND r.user_id = $1
-         WHERE (c.participant1_id = $1 OR c.participant2_id = $1)
-           AND m.sender_id IS NOT NULL
-           AND m.sender_id != $1
-           AND (r.last_read_at IS NULL OR m.created_at > r.last_read_at)`,
+         FROM direct_messages
+         WHERE recipient_id = $1
+           AND read_at IS NULL
+           AND deleted_by_recipient = FALSE`,
         [me]
       );
       res.json({ count: parseInt(rows[0].count) });
