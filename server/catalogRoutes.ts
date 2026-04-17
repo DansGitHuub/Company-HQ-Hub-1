@@ -199,7 +199,8 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
          description=$7, sku=$8, other_options=$9, is_active=$10, updated_at=NOW() WHERE id=$11`,
         [body.name, body.class ?? null, body.category ?? null, body.units ?? null,
          body.cost ?? 0, body.taxable ?? false, body.description ?? null, body.sku ?? null,
-         body.other_options ?? null, body.is_active ?? true, id]
+         body.other_options ?? body.otherOptions ?? null,
+         body.is_active ?? body.isActive ?? true, id]
       );
       if (Array.isArray(tags)) await syncItemTags(id, tags);
       const item = await getItemWithTags(id);
