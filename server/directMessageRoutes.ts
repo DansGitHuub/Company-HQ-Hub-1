@@ -1,6 +1,20 @@
 import type { Express } from "express";
 import { pool } from "./db";
 
+function canMessage(senderRole: string, recipientRole: string): boolean {
+  switch (senderRole) {
+    case "Admin":
+    case "Manager":
+      return true; // can message anyone
+    case "Crew":
+      return ["Admin", "Manager", "Crew"].includes(recipientRole);
+    case "Customer":
+      return ["Admin", "Manager"].includes(recipientRole);
+    default:
+      return false;
+  }
+}
+
 function allowedRecipientRoles(senderRole: string): string[] {
   switch (senderRole) {
     case "Admin":
@@ -191,8 +205,7 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
       if (!recipRows.length) {
         return res.status(404).json({ message: "Recipient not found" });
       }
-      const allowed = allowedRecipientRoles(myRole);
-      if (!allowed.includes(recipRows[0].role)) {
+      if (!canMessage(myRole, recipRows[0].role)) {
         return res.status(403).json({ message: "You are not allowed to message this user" });
       }
 
