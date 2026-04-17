@@ -57,6 +57,10 @@ async function migrate() {
     )
   `);
 
+  // Indexes for query performance
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_dm_sender ON direct_messages(sender_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_dm_recipient ON direct_messages(recipient_id)`);
+
   console.log("[migration] DM messaging tables ready");
 }
 
