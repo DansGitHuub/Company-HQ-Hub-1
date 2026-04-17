@@ -380,7 +380,7 @@ export default function AdminPanel() {
     { id: "hq", label: "Company HQ", icon: Building2 },
     { id: "marketing", label: "Marketing", icon: Megaphone },
     { id: "forms", label: "Forms", icon: FileText },
-    { id: "inbox", label: "Messages", icon: Inbox },
+
     { id: "integrations", label: "Integrations", icon: Settings },
     { id: "admin", label: "Admin Panel", icon: Shield },
   ];

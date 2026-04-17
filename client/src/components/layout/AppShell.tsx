@@ -401,7 +401,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "", items: ["dashboard"] },
     { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "todos", "daily_worksheet", "my_day", "my_hours", "time_tracking", "invoices", "reports", "mors_budget", "scheduling", "equipment"] },
     { label: "PEOPLE", items: ["employees", "education", "hiring"] },
-    { label: "COMPANY", items: ["inbox", "sops", "testing", "hq"] },
+    { label: "COMPANY", items: ["sops", "testing", "hq"] },
     { label: "ADMIN", items: ["admin", "catalog", "budget_settings", "tools", "forms"] },
   ];
 
