@@ -364,6 +364,40 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── PATCH /api/dm/:id/archive ────────────────────────────────────────────────
+  // Toggle archive on a single message for the current user
+  app.patch("/api/dm/:id/archive", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { id } = req.params;
+
+      const { rows } = await pool.query(
+        `SELECT sender_id, recipient_id, archived_by_sender, archived_by_recipient
+         FROM direct_messages WHERE id = $1`,
+        [id]
+      );
+      if (!rows.length) return res.status(404).json({ message: "Not found" });
+
+      const { sender_id, recipient_id, archived_by_sender, archived_by_recipient } = rows[0];
+      if (sender_id !== me && recipient_id !== me) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      let archived: boolean;
+      if (sender_id === me) {
+        archived = !archived_by_sender;
+        await pool.query(`UPDATE direct_messages SET archived_by_sender = $1 WHERE id = $2`, [archived, id]);
+      } else {
+        archived = !archived_by_recipient;
+        await pool.query(`UPDATE direct_messages SET archived_by_recipient = $1 WHERE id = $2`, [archived, id]);
+      }
+
+      res.json({ archived });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── PATCH /api/dm/conversation/:userId/star ──────────────────────────────────
   app.patch("/api/dm/conversation/:userId/star", requireAuth, async (req, res) => {
     try {
