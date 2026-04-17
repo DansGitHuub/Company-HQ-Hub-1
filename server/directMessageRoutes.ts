@@ -73,11 +73,11 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  // ── GET /api/dm/contacts ──────────────────────────────────────────────
+  // ── GET /api/dm/conversations ──────────────────────────────────────────────
   // All unique people I've exchanged messages with (both sent AND received),
   // with last message preview and unread count. This makes conversations
   // visible to BOTH the sender and recipient.
-  app.get("/api/dm/contacts", requireAuth, async (req, res) => {
+  app.get("/api/dm/conversations", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
       const { rows } = await pool.query(

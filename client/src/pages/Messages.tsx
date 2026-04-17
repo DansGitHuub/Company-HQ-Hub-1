@@ -128,7 +128,7 @@ function ComposeDialog({
     },
     onSuccess: () => {
       toast({ title: "Message sent" });
-      qc.invalidateQueries({ queryKey: ["/api/dm/contacts"] });
+      qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
       qc.invalidateQueries({ queryKey: ["/api/dm/unread-count"] });
       qc.invalidateQueries({ queryKey: ["/api/dm/conversation", recipientId] });
       onClose(recipientId);
@@ -306,7 +306,7 @@ function ConversationThread({ userId, myId, onBack }: {
 
   // After messages load, refresh contacts and unread badge
   useEffect(() => {
-    qc.invalidateQueries({ queryKey: ["/api/dm/contacts"] });
+    qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
     qc.invalidateQueries({ queryKey: ["/api/dm/unread-count"] });
   }, [messages]);
 
@@ -321,7 +321,7 @@ function ConversationThread({ userId, myId, onBack }: {
     onSuccess: () => {
       toast({ title: "Message deleted" });
       qc.invalidateQueries({ queryKey: ["/api/dm/conversation", userId] });
-      qc.invalidateQueries({ queryKey: ["/api/dm/contacts"] });
+      qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
       setDeleteTarget(null);
     },
     onError: (err: any) => {
@@ -452,7 +452,7 @@ export default function MessagesPage() {
   const [search, setSearch] = useState("");
 
   const { data: contacts = [], isLoading } = useQuery<Contact[]>({
-    queryKey: ["/api/dm/contacts"],
+    queryKey: ["/api/dm/conversations"],
     refetchInterval: 10000,
   });
 
