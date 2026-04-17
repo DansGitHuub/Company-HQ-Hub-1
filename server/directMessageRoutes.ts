@@ -330,6 +330,40 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── PATCH /api/dm/:id/star ───────────────────────────────────────────────────
+  // Toggle star on a single message for the current user
+  app.patch("/api/dm/:id/star", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { id } = req.params;
+
+      const { rows } = await pool.query(
+        `SELECT sender_id, recipient_id, starred_by_sender, starred_by_recipient
+         FROM direct_messages WHERE id = $1`,
+        [id]
+      );
+      if (!rows.length) return res.status(404).json({ message: "Not found" });
+
+      const { sender_id, recipient_id, starred_by_sender, starred_by_recipient } = rows[0];
+      if (sender_id !== me && recipient_id !== me) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      let starred: boolean;
+      if (sender_id === me) {
+        starred = !starred_by_sender;
+        await pool.query(`UPDATE direct_messages SET starred_by_sender = $1 WHERE id = $2`, [starred, id]);
+      } else {
+        starred = !starred_by_recipient;
+        await pool.query(`UPDATE direct_messages SET starred_by_recipient = $1 WHERE id = $2`, [starred, id]);
+      }
+
+      res.json({ starred });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── PATCH /api/dm/conversation/:userId/star ──────────────────────────────────
   app.patch("/api/dm/conversation/:userId/star", requireAuth, async (req, res) => {
     try {
