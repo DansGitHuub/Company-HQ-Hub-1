@@ -61,6 +61,12 @@ async function migrate() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_dm_sender ON direct_messages(sender_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_dm_recipient ON direct_messages(recipient_id)`);
 
+  // Star and archive columns (added in later migration)
+  await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS starred_by_sender BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS starred_by_recipient BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS archived_by_sender BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS archived_by_recipient BOOLEAN NOT NULL DEFAULT FALSE`);
+
   console.log("[migration] DM messaging tables ready");
 }
 
