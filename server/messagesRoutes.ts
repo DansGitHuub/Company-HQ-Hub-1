@@ -60,21 +60,40 @@ async function migrate() {
   console.log("[migration] DM messaging tables ready");
 }
 
+// Which roles the given sender role is allowed to message
+function allowedRecipientRoles(senderRole: string): string[] {
+  switch (senderRole) {
+    case "Admin":
+    case "Manager":
+      return ["Admin", "Manager", "Crew", "Customer"];
+    case "Crew":
+      return ["Admin", "Manager", "Crew"];
+    case "Customer":
+      return ["Admin", "Manager"];
+    default:
+      return [];
+  }
+}
+
 export function registerMessagesRoutes(app: Express, requireAuth: any) {
   migrate().catch(console.error);
 
-  // List all messageable staff users (not self, not customers)
+  // List messageable users based on sender's role
   app.get("/api/dm/users", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
+      const myRole: string = (req.user as any).role ?? "";
+      const allowed = allowedRecipientRoles(myRole);
+      if (!allowed.length) return res.json([]);
+      const placeholders = allowed.map((_, i) => `$${i + 2}`).join(", ");
       const { rows } = await pool.query(
         `SELECT id, name, role, profile_picture, email
          FROM users
          WHERE id != $1
            AND is_active = TRUE
-           AND role IN ('Admin', 'Manager', 'Crew')
+           AND role IN (${placeholders})
          ORDER BY name`,
-        [me]
+        [me, ...allowed]
       );
       res.json(rows);
     } catch (err: any) {
@@ -171,9 +190,22 @@ export function registerMessagesRoutes(app: Express, requireAuth: any) {
   app.post("/api/dm", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
+      const myRole: string = (req.user as any).role ?? "";
       const { recipientId, subject, body } = req.body;
       if (!recipientId) return res.status(400).json({ message: "recipientId required" });
       if (!body?.trim()) return res.status(400).json({ message: "body required" });
+
+      // Enforce access rules — look up recipient's role and validate
+      const { rows: recipientRows } = await pool.query(
+        `SELECT role FROM users WHERE id = $1 AND is_active = TRUE`,
+        [recipientId]
+      );
+      if (!recipientRows.length) return res.status(404).json({ message: "Recipient not found" });
+      const recipientRole: string = recipientRows[0].role;
+      const allowed = allowedRecipientRoles(myRole);
+      if (!allowed.includes(recipientRole)) {
+        return res.status(403).json({ message: "You are not allowed to message this user" });
+      }
 
       const { rows } = await pool.query(
         `INSERT INTO direct_messages (id, sender_id, recipient_id, subject, body)
