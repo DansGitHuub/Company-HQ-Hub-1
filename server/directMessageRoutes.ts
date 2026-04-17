@@ -97,6 +97,32 @@ async function getConversations(userId: string, folder: string) {
 
 export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
 
+  // ── GET /api/dm/inbox ────────────────────────────────────────────────────────
+  // Messages where I am recipient, not archived, not deleted, newest first
+  app.get("/api/dm/inbox", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { rows } = await pool.query(
+        `SELECT
+           m.id, m.sender_id, m.recipient_id, m.subject, m.body,
+           m.sent_at, m.read_at,
+           m.starred_by_recipient AS is_starred,
+           m.archived_by_recipient AS is_archived,
+           s.name AS sender_name, s.role AS sender_role, s.profile_picture AS sender_picture
+         FROM direct_messages m
+         JOIN users s ON s.id = m.sender_id
+         WHERE m.recipient_id = $1
+           AND m.deleted_by_recipient = FALSE
+           AND m.archived_by_recipient = FALSE
+         ORDER BY m.sent_at DESC`,
+        [me]
+      );
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── GET /api/dm/messageable-users ───────────────────────────────────────────
   app.get("/api/dm/messageable-users", requireAuth, async (req, res) => {
     try {
