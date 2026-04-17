@@ -31,7 +31,7 @@ async function migrate() {
     )
   `);
 
-  // New flat direct_messages table
+  // Flat direct_messages table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS direct_messages (
       id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -43,6 +43,17 @@ async function migrate() {
       read_at TIMESTAMP,
       deleted_by_sender BOOLEAN NOT NULL DEFAULT FALSE,
       deleted_by_recipient BOOLEAN NOT NULL DEFAULT FALSE
+    )
+  `);
+
+  // Notification tracking per message per user
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS message_notifications (
+      id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      message_id VARCHAR(36) NOT NULL REFERENCES direct_messages(id) ON DELETE CASCADE,
+      seen BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT NOW()
     )
   `);
 
@@ -135,13 +146,20 @@ export function registerMessagesRoutes(app: Express, requireAuth: any) {
       );
       if (!rows.length) return res.status(404).json({ message: "Not found" });
       const msg = rows[0];
-      // Mark as read if I'm the recipient and not yet read
+      // Mark as read and mark notification seen if I'm the recipient
       if (msg.recipient_id === me && !msg.read_at) {
         await pool.query(
           `UPDATE direct_messages SET read_at = NOW() WHERE id = $1`,
           [id]
         );
         msg.read_at = new Date().toISOString();
+      }
+      if (msg.recipient_id === me) {
+        await pool.query(
+          `UPDATE message_notifications SET seen = TRUE
+           WHERE message_id = $1 AND user_id = $2`,
+          [id, me]
+        );
       }
       res.json(msg);
     } catch (err: any) {
@@ -163,7 +181,14 @@ export function registerMessagesRoutes(app: Express, requireAuth: any) {
          RETURNING id, sender_id, recipient_id, subject, body, sent_at, read_at`,
         [me, recipientId, subject?.trim() || null, body.trim()]
       );
-      res.status(201).json(rows[0]);
+      const msg = rows[0];
+      // Create a notification for the recipient
+      await pool.query(
+        `INSERT INTO message_notifications (id, user_id, message_id, seen)
+         VALUES (gen_random_uuid(), $1, $2, FALSE)`,
+        [recipientId, msg.id]
+      );
+      res.status(201).json(msg);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -200,16 +225,17 @@ export function registerMessagesRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  // Unread count: messages received by me, unread, not deleted by me
+  // Unread count: unseen notifications for me (excludes messages I've deleted)
   app.get("/api/dm/unread-count", requireAuth, async (req, res) => {
     try {
       const me = req.user!.id;
       const { rows } = await pool.query(
         `SELECT COUNT(*) AS count
-         FROM direct_messages
-         WHERE recipient_id = $1
-           AND read_at IS NULL
-           AND deleted_by_recipient = FALSE`,
+         FROM message_notifications n
+         JOIN direct_messages m ON m.id = n.message_id
+         WHERE n.user_id = $1
+           AND n.seen = FALSE
+           AND m.deleted_by_recipient = FALSE`,
         [me]
       );
       res.json({ count: parseInt(rows[0].count) });
