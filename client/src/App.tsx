@@ -79,6 +79,7 @@ import CatalogPage from "@/pages/catalog/index";
 import CatalogImport from "@/pages/catalog/CatalogImport";
 import CatalogDetail from "@/pages/catalog/CatalogDetail";
 import CustomerPortal from "@/pages/CustomerPortal";
+import MessagesPage from "@/pages/Messages";
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
@@ -192,6 +193,7 @@ function AppRoutes() {
         <Route path="/calendar" component={CalendarPage} />
         <Route path="/testing" component={TestingKnowledge} />
         <Route path="/settings" component={SettingsPage} />
+        <Route path="/messages" component={MessagesPage} />
         <Route path="/catalog/import" component={CatalogImport} />
         <Route path="/catalog/:id" component={CatalogDetail} />
         <Route path="/catalog" component={CatalogPage} />

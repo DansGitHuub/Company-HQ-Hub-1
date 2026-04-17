@@ -51,6 +51,7 @@ import {
   BookMarked,
   Clock,
   DollarSign,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -292,6 +293,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     refetchInterval: 30000,
   });
 
+  const { data: dmUnreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/dm/unread-count"],
+    refetchInterval: 15000,
+    enabled: !!user && user.role !== "Customer",
+  });
+
   const { data: companySettings } = useQuery<CompanySettings>({
     queryKey: ["/api/company-settings"],
     staleTime: 60000,
@@ -381,6 +388,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     marketing: { icon: Megaphone, label: t("nav.marketing"), href: "/marketing" },
     forms: { icon: FileText, label: t("nav.forms"), href: "/forms" },
     inbox: { icon: Mail, label: t("nav.messages"), href: "/inbox" },
+    messages: { icon: MessageSquare, label: "Messages", href: "/messages" },
     admin: { icon: Shield, label: t("nav.adminPanel"), href: "/admin" },
     catalog: { icon: BookMarked, label: "Item Catalog", href: "/catalog" },
     budget_settings: { icon: DollarSign, label: "Budget & Pricing", href: "/budget-settings" },
@@ -401,7 +409,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "", items: ["dashboard"] },
     { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "todos", "daily_worksheet", "my_day", "my_hours", "time_tracking", "invoices", "reports", "mors_budget", "scheduling", "equipment"] },
     { label: "PEOPLE", items: ["employees", "education", "hiring"] },
-    { label: "COMPANY", items: ["sops", "testing", "hq"] },
+    { label: "COMPANY", items: ["messages", "sops", "testing", "hq"] },
     { label: "ADMIN", items: ["admin", "catalog", "budget_settings", "tools", "forms"] },
   ];
 
@@ -532,6 +540,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 const isActive = getIsActive(item);
                 const helpContent = menuHelpContent[item.id];
                 const showTodoBadge = item.id === "todos" && todoActiveStatus?.isActive && todoActiveStatus.unreadCount > 0;
+                const showMessagesBadge = item.id === "messages" && (dmUnreadData?.count ?? 0) > 0;
                 return (
                   <div key={item.id} className="flex items-center group w-full">
                     <Link href={item.href} className="flex-1 min-w-0 block" style={{ height: 36, overflow: 'hidden' }}>
@@ -558,6 +567,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                           {showTodoBadge && (
                             <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
                               {todoActiveStatus.unreadCount > 9 ? "9+" : todoActiveStatus.unreadCount}
+                            </span>
+                          )}
+                          {showMessagesBadge && (
+                            <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">
+                              {(dmUnreadData?.count ?? 0) > 9 ? "9+" : dmUnreadData?.count}
                             </span>
                           )}
                         </div>

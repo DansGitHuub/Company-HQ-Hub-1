@@ -32,6 +32,7 @@ import { registerConsultationRoutes } from "./consultationRoutes";
 import { registerQuickBooksRoutes } from "./quickbooksRoutes";
 import { registerMorsRoutes } from "./morsRoutes";
 import { registerCatalogRoutes } from "./catalogRoutes";
+import { registerMessagesRoutes } from "./messagesRoutes";
 import { searchProductImages } from "./imageSearchService";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail, sendApplicationLinkEmail } from "./email";
 import { logActivity } from "./activityLogger";
@@ -80,6 +81,7 @@ export async function registerRoutes(
   await registerQuickBooksRoutes(app, requireAuth);
   await registerMorsRoutes(app, requireAuth, requireAdmin);
   registerCatalogRoutes(app, requireAuth);
+  registerMessagesRoutes(app, requireAuth);
 
   // Global search endpoint - searches everything based on user role
   app.get("/api/search", requireAuth, async (req, res) => {
