@@ -410,7 +410,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "MY SPACE", items: ["dashboard", "my_day", "my_hours", "daily_worksheet", "messages"] },
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["todos", "scheduling", "time_tracking", "equipment", "forms"] },
-    { label: "RESOURCES", items: ["sops", "education", "testing", "hq"] },
+    { label: "RESOURCES", items: ["sops", "education", "testing"] },
     { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "mors_budget", "catalog", "budget_settings", "tools"] },
   ];
 
@@ -659,6 +659,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 {t("nav.myProfile")}
               </button>
             </Link>
+            <Link href="/hq">
+              <button
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-white/10 text-sidebar-foreground transition-colors"
+                onClick={() => setIsMobileOpen(false)}
+                data-testid="link-hq-mobile"
+              >
+                <Building2 className="h-4 w-4 opacity-70 shrink-0" />
+                CompanyHQ
+              </button>
+            </Link>
             <Link href="/settings">
               <button
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-white/10 text-sidebar-foreground transition-colors"
@@ -701,6 +711,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   </p>
                 </div>
               </div>
+            </Link>
+            <Link href="/hq">
+              <button
+                className="p-1 rounded-lg hover:bg-white/10 text-sidebar-foreground transition-colors shrink-0"
+                title="CompanyHQ"
+                data-testid="link-hq"
+              >
+                <Building2 className="h-8 w-8 opacity-40 shrink-0" />
+              </button>
             </Link>
             <Link href="/settings">
               <button
