@@ -501,11 +501,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {effectiveRole !== "Customer" ? displaySections.map((section, sectionIdx) => (
           <div key={section.label || "workspace"} className={cn(sectionIdx > 0 ? "mt-4" : "")}>
             {section.label && (
-              <div className="px-4 py-1.5 mb-1">
-                <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-sidebar-foreground/40" data-testid={`section-header-${section.label.toLowerCase().replace(' ', '-')}`}>
-                  {sectionLabels[section.label] || section.label}
-                </span>
-              </div>
+              <>
+                {section.label === "ADMIN" && (
+                  <hr className="mx-3 mb-3 border-white/10" />
+                )}
+                <div className={cn(
+                  "px-4 py-1.5 mb-1",
+                  section.label === "ADMIN" && "mx-1 rounded-md bg-black/20"
+                )}>
+                  {section.label === "ADMIN" ? (
+                    <span className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.15em] uppercase text-rose-500" data-testid="section-header-admin">
+                      <Shield className="h-3 w-3 flex-shrink-0" />
+                      {sectionLabels[section.label] || section.label}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-sidebar-foreground/40" data-testid={`section-header-${section.label.toLowerCase().replace(/ /g, '-')}`}>
+                      {sectionLabels[section.label] || section.label}
+                    </span>
+                  )}
+                </div>
+              </>
             )}
             <div className="space-y-0.5">
               {section.items.filter(id => internalNavItems[id]).map((itemId) => {
