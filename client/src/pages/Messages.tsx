@@ -18,7 +18,13 @@ import {
   Send, Pencil, Trash2, ArrowLeft, MessageSquare, Search,
   Star, Archive, MailOpen, Check, CheckCheck, Inbox, Mail, Paperclip, FileText,
   Briefcase, Link2, X as XIcon, ChevronDown,
+  FolderPlus, FolderOpen, MoreHorizontal, Plus,
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger,
+  DropdownMenuTrigger, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandItem, CommandEmpty } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +35,15 @@ import { apiRequest } from "@/lib/queryClient";
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type Folder = "inbox" | "sent" | "starred" | "archive";
+
+interface MessageFolder {
+  id: string;
+  name: string;
+  color: string;
+  created_at: string;
+}
+
+const FOLDER_COLORS = ["#6366f1", "#ef4444", "#22c55e", "#f59e0b", "#3b82f6"];
 
 interface Attachment {
   id: string;
@@ -363,21 +378,22 @@ function LinkDropdown({
 }
 
 // ── ConversationRow ────────────────────────────────────────────────────────────
-function ConversationRow({ conv, selected, myId, onClick }: {
+function ConversationRow({ conv, selected, myId, onClick, folders, onAddToFolder }: {
   conv: Conversation;
   selected: boolean;
   myId: string;
   onClick: () => void;
+  folders?: MessageFolder[];
+  onAddToFolder?: (folderId: string, partnerId: string) => void;
 }) {
   const unread = Number(conv.unread_count);
   const isUnread = unread > 0;
 
   return (
-    <button onClick={onClick} data-testid={`row-conv-${conv.other_user_id}`}
-      className={cn(
-        "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-l-2",
-        selected ? "bg-blue-50 border-l-blue-500" : "hover:bg-gray-50 border-l-transparent"
-      )}>
+    <div className={cn(
+      "group relative flex items-center gap-3 px-4 py-3 transition-colors border-l-2 cursor-pointer",
+      selected ? "bg-blue-50 border-l-blue-500" : "hover:bg-gray-50 border-l-transparent"
+    )} onClick={onClick} data-testid={`row-conv-${conv.other_user_id}`}>
       <div className="relative flex-shrink-0">
         <Avatar name={conv.other_user_name} picture={conv.other_user_picture} size={42} />
         {isUnread && (
@@ -391,9 +407,48 @@ function ConversationRow({ conv, selected, myId, onClick }: {
             data-testid={`text-conv-name-${conv.other_user_id}`}>
             {conv.other_user_name}
           </span>
-          <span className="text-[11px] text-gray-400 flex-shrink-0">
+          <span className="text-[11px] text-gray-400 flex-shrink-0 group-hover:hidden">
             {relativeTime(conv.last_message_at)}
           </span>
+          {/* ... menu — visible on hover */}
+          {folders && onAddToFolder && (
+            <div className="hidden group-hover:flex items-center" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-0.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600"
+                    data-testid={`button-conv-menu-${conv.other_user_id}`}>
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  {folders.length > 0 ? (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <FolderOpen className="h-3.5 w-3.5 mr-2 text-gray-500" />
+                        Add to folder
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="w-40">
+                        {folders.map((f) => (
+                          <DropdownMenuItem key={f.id}
+                            onClick={() => onAddToFolder(f.id, conv.other_user_id)}
+                            data-testid={`menuitem-addfolder-${f.id}`}>
+                            <span className="w-2.5 h-2.5 rounded-full mr-2 flex-shrink-0"
+                              style={{ backgroundColor: f.color }} />
+                            <span className="truncate">{f.name}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  ) : (
+                    <DropdownMenuItem disabled>
+                      <FolderOpen className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                      No folders yet
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
           <p className={cn("text-xs truncate flex-1",
@@ -420,7 +475,7 @@ function ConversationRow({ conv, selected, myId, onClick }: {
           {unread > 9 ? "9+" : unread}
         </span>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -553,6 +608,24 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
     },
   });
 
+  const { data: folders = [] } = useQuery<MessageFolder[]>({
+    queryKey: ["/api/dm/folders"],
+    queryFn: () => fetch("/api/dm/folders", { credentials: "include" }).then(r => r.json()),
+  });
+
+  const [folderPopoverOpen, setFolderPopoverOpen] = useState(false);
+
+  const addToFolderFromThread = useMutation({
+    mutationFn: (folderId: string) =>
+      apiRequest("POST", `/api/dm/folders/${folderId}/conversations`, { conversationPartnerId: userId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/dm/folders"] });
+      setFolderPopoverOpen(false);
+      toast({ title: "Added to folder" });
+    },
+    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+  });
+
   async function sendReply() {
     if (!reply.trim() || isSending) return;
     setIsSending(true);
@@ -613,6 +686,33 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
             data-testid="button-mark-unread">
             <MailOpen className="h-4 w-4" />
           </Button>
+          <Popover open={folderPopoverOpen} onOpenChange={setFolderPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" title="Add to folder"
+                className="h-8 w-8 text-gray-400 hover:text-indigo-600"
+                data-testid="button-add-to-folder">
+                <FolderPlus className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-1" align="end">
+              {folders.length === 0 ? (
+                <p className="text-xs text-gray-400 px-2 py-1.5">No folders yet. Create one in the sidebar.</p>
+              ) : (
+                <div className="space-y-0.5">
+                  {folders.map((f) => (
+                    <button key={f.id}
+                      onClick={() => addToFolderFromThread.mutate(f.id)}
+                      disabled={addToFolderFromThread.isPending}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 transition-colors"
+                      data-testid={`menuitem-thread-folder-${f.id}`}>
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: f.color }} />
+                      <span className="truncate text-gray-700">{f.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
           <Button variant="ghost" size="icon"
             onClick={() => { if (lastSentByMe) deleteMutation.mutate(lastSentByMe.id); }}
             disabled={!lastSentByMe || deleteMutation.isPending}
@@ -794,6 +894,51 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
   );
 }
 
+// ── Custom Folder Row ──────────────────────────────────────────────────────────
+function FolderCustomRow({ folder, active, onClick, onRename, onDelete }: {
+  folder: MessageFolder;
+  active: boolean;
+  onClick: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className={cn(
+      "group flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors",
+      active ? "bg-blue-50" : "hover:bg-gray-100"
+    )}>
+      <button className="flex-1 flex items-center gap-1.5 text-sm min-w-0" onClick={onClick}
+        data-testid={`tab-folder-${folder.id}`}>
+        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: folder.color }} />
+        <span className={cn("flex-1 text-left truncate font-medium",
+          active ? "text-blue-700" : "text-gray-600")}>
+          {folder.name}
+        </span>
+      </button>
+      <div onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-opacity"
+              data-testid={`button-folder-menu-${folder.id}`}>
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-36">
+            <DropdownMenuItem onClick={onRename} data-testid={`menuitem-rename-${folder.id}`}>
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onDelete} className="text-red-500 focus:text-red-500"
+              data-testid={`menuitem-delete-${folder.id}`}>
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
+
 // ── Folder Tab ─────────────────────────────────────────────────────────────────
 
 function FolderTab({ label, icon: Icon, active, badge, onClick }: {
@@ -826,11 +971,23 @@ function FolderTab({ label, icon: Icon, active, badge, onClick }: {
 export default function MessagesPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { toast } = useToast();
+
+  // System folder state
   const [folder, setFolder] = useState<Folder>("inbox");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Custom folder state
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [createFolderName, setCreateFolderName] = useState("");
+  const [createFolderColor, setCreateFolderColor] = useState(FOLDER_COLORS[0]);
+  const [renamingFolder, setRenamingFolder] = useState<MessageFolder | null>(null);
+  const [renameFolderName, setRenameFolderName] = useState("");
+  const [renameFolderColor, setRenameFolderColor] = useState(FOLDER_COLORS[0]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -848,7 +1005,7 @@ export default function MessagesPage() {
     },
     refetchInterval: 20000,
     staleTime: 0,
-    enabled: !isSearchActive,
+    enabled: !isSearchActive && !selectedFolderId,
   });
 
   const { data: searchResults = [], isFetching: isSearching } = useQuery<Conversation[]>({
@@ -868,11 +1025,77 @@ export default function MessagesPage() {
   });
   const unreadCount = unreadData?.count ?? 0;
 
-  const displayed = isSearchActive ? searchResults : conversations;
-  const isLoading_ = isSearchActive ? isSearching : isLoading;
+  // Custom folders list
+  const { data: folders = [] } = useQuery<MessageFolder[]>({
+    queryKey: ["/api/dm/folders"],
+    queryFn: () => fetch("/api/dm/folders", { credentials: "include" }).then(r => r.json()),
+  });
+
+  // Conversations in selected custom folder
+  const { data: folderConvs = [], isLoading: isFolderLoading } = useQuery<Conversation[]>({
+    queryKey: ["/api/dm/folders", selectedFolderId, "conversations"],
+    queryFn: () => fetch(`/api/dm/folders/${selectedFolderId}/conversations`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!selectedFolderId && !isSearchActive,
+    refetchInterval: 20000,
+    staleTime: 0,
+  });
+
+  // Folder mutations
+  const createFolderMutation = useMutation({
+    mutationFn: (data: { name: string; color: string }) => apiRequest("POST", "/api/dm/folders", data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/dm/folders"] });
+      setCreateFolderOpen(false);
+      setCreateFolderName("");
+      setCreateFolderColor(FOLDER_COLORS[0]);
+    },
+    onError: (err: any) => toast({ title: "Failed to create folder", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteFolderMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/dm/folders/${id}`, {}),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ["/api/dm/folders"] });
+      if (selectedFolderId === id) setSelectedFolderId(null);
+    },
+    onError: (err: any) => toast({ title: "Failed to delete folder", description: err.message, variant: "destructive" }),
+  });
+
+  const renameFolderMutation = useMutation({
+    mutationFn: (data: { id: string; name: string; color: string }) =>
+      apiRequest("PATCH", `/api/dm/folders/${data.id}`, { name: data.name, color: data.color }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/dm/folders"] });
+      setRenamingFolder(null);
+    },
+    onError: (err: any) => toast({ title: "Failed to rename folder", description: err.message, variant: "destructive" }),
+  });
+
+  const addToFolderMutation = useMutation({
+    mutationFn: (data: { folderId: string; partnerId: string }) =>
+      apiRequest("POST", `/api/dm/folders/${data.folderId}/conversations`, { conversationPartnerId: data.partnerId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/dm/folders"] });
+      toast({ title: "Added to folder" });
+    },
+    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+  });
+
+  // Which conversations to display
+  const displayed = isSearchActive
+    ? searchResults
+    : selectedFolderId ? folderConvs : conversations;
+  const isLoading_ = isSearchActive ? isSearching : selectedFolderId ? isFolderLoading : isLoading;
 
   function handleFolderChange(f: Folder) {
     setFolder(f);
+    setSelectedFolderId(null);
+    setSelectedUserId(null);
+    setSearch("");
+  }
+
+  function handleCustomFolderChange(id: string) {
+    setSelectedFolderId(id);
     setSelectedUserId(null);
     setSearch("");
   }
@@ -907,16 +1130,45 @@ export default function MessagesPage() {
             </Button>
           </div>
 
-          {/* Folder tabs */}
+          {/* System folder tabs */}
           <div className="space-y-0.5">
-            <FolderTab label="Inbox" icon={Inbox} active={folder === "inbox"}
+            <FolderTab label="Inbox" icon={Inbox} active={!selectedFolderId && folder === "inbox"}
               badge={unreadCount} onClick={() => handleFolderChange("inbox")} />
-            <FolderTab label="Sent" icon={Send} active={folder === "sent"}
+            <FolderTab label="Sent" icon={Send} active={!selectedFolderId && folder === "sent"}
               onClick={() => handleFolderChange("sent")} />
-            <FolderTab label="Starred" icon={Star} active={folder === "starred"}
+            <FolderTab label="Starred" icon={Star} active={!selectedFolderId && folder === "starred"}
               onClick={() => handleFolderChange("starred")} />
-            <FolderTab label="Archive" icon={Archive} active={folder === "archive"}
+            <FolderTab label="Archive" icon={Archive} active={!selectedFolderId && folder === "archive"}
               onClick={() => handleFolderChange("archive")} />
+          </div>
+
+          {/* My Folders section */}
+          <div className="mt-3">
+            <div className="flex items-center px-1 mb-1">
+              <span className="flex-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-2">
+                My Folders
+              </span>
+              <button onClick={() => setCreateFolderOpen(true)}
+                className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                title="Create folder" data-testid="button-create-folder">
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="space-y-0.5">
+              {folders.map((f) => (
+                <FolderCustomRow
+                  key={f.id}
+                  folder={f}
+                  active={selectedFolderId === f.id}
+                  onClick={() => handleCustomFolderChange(f.id)}
+                  onRename={() => { setRenamingFolder(f); setRenameFolderName(f.name); setRenameFolderColor(f.color); }}
+                  onDelete={() => deleteFolderMutation.mutate(f.id)}
+                />
+              ))}
+              {folders.length === 0 && (
+                <p className="text-xs text-gray-400 px-3 py-1">No folders yet</p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -942,12 +1194,13 @@ export default function MessagesPage() {
               <MessageSquare className="h-9 w-9 opacity-25" />
               <p className="text-sm" data-testid="text-empty-conversations">
                 {isSearchActive ? "No results found"
+                  : selectedFolderId ? "No conversations in this folder"
                   : folder === "starred" ? "No starred conversations"
                   : folder === "archive" ? "Nothing archived"
                   : folder === "sent" ? "No sent messages"
                   : "No conversations yet"}
               </p>
-              {folder === "inbox" && !isSearchActive && (
+              {folder === "inbox" && !isSearchActive && !selectedFolderId && (
                 <Button size="sm" variant="outline" onClick={() => setComposeOpen(true)}
                   className="text-xs" data-testid="button-compose-empty">
                   Start a conversation
@@ -961,6 +1214,8 @@ export default function MessagesPage() {
               myId={user?.id ?? ""}
               selected={selectedUserId === conv.other_user_id}
               onClick={() => setSelectedUserId(conv.other_user_id)}
+              folders={folders}
+              onAddToFolder={(folderId, partnerId) => addToFolderMutation.mutate({ folderId, partnerId })}
             />
           ))}
         </ScrollArea>
@@ -993,6 +1248,101 @@ export default function MessagesPage() {
 
       {/* ── Compose dialog ── */}
       <ComposeDialog open={composeOpen} onClose={handleComposeClosed} />
+
+      {/* ── Create Folder dialog ── */}
+      <Dialog open={createFolderOpen} onOpenChange={(o) => {
+        if (!o) { setCreateFolderOpen(false); setCreateFolderName(""); setCreateFolderColor(FOLDER_COLORS[0]); }
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>New Folder</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700">Name</label>
+              <Input
+                value={createFolderName}
+                onChange={(e) => setCreateFolderName(e.target.value)}
+                placeholder="e.g. Clients, VIP, Project X…"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && createFolderName.trim())
+                    createFolderMutation.mutate({ name: createFolderName.trim(), color: createFolderColor });
+                }}
+                data-testid="input-folder-name"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700">Color</label>
+              <div className="flex gap-2">
+                {FOLDER_COLORS.map((c) => (
+                  <button key={c} onClick={() => setCreateFolderColor(c)}
+                    className={cn("w-7 h-7 rounded-full transition-all border-2",
+                      createFolderColor === c ? "border-gray-800 scale-110" : "border-transparent")}
+                    style={{ backgroundColor: c }}
+                    data-testid={`color-option-${c}`} />
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateFolderOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => createFolderMutation.mutate({ name: createFolderName.trim(), color: createFolderColor })}
+              disabled={!createFolderName.trim() || createFolderMutation.isPending}
+              data-testid="button-confirm-create-folder">
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Rename Folder dialog ── */}
+      <Dialog open={!!renamingFolder} onOpenChange={(o) => { if (!o) setRenamingFolder(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rename Folder</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700">Name</label>
+              <Input
+                value={renameFolderName}
+                onChange={(e) => setRenameFolderName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && renameFolderName.trim() && renamingFolder)
+                    renameFolderMutation.mutate({ id: renamingFolder.id, name: renameFolderName.trim(), color: renameFolderColor });
+                }}
+                data-testid="input-rename-folder"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700">Color</label>
+              <div className="flex gap-2">
+                {FOLDER_COLORS.map((c) => (
+                  <button key={c} onClick={() => setRenameFolderColor(c)}
+                    className={cn("w-7 h-7 rounded-full transition-all border-2",
+                      renameFolderColor === c ? "border-gray-800 scale-110" : "border-transparent")}
+                    style={{ backgroundColor: c }}
+                    data-testid={`rename-color-${c}`} />
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenamingFolder(null)}>Cancel</Button>
+            <Button
+              onClick={() => renamingFolder && renameFolderMutation.mutate({
+                id: renamingFolder.id, name: renameFolderName.trim(), color: renameFolderColor
+              })}
+              disabled={!renameFolderName.trim() || renameFolderMutation.isPending}
+              data-testid="button-confirm-rename-folder">
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

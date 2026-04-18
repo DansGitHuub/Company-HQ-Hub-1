@@ -811,4 +811,182 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
       res.status(500).json({ message: err.message });
     }
   });
+
+  // ── GET /api/dm/folders ───────────────────────────────────────────────────────
+  app.get("/api/dm/folders", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { rows } = await pool.query(
+        `SELECT id, name, color, created_at FROM message_folders WHERE user_id = $1 ORDER BY created_at ASC`,
+        [me]
+      );
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── POST /api/dm/folders ──────────────────────────────────────────────────────
+  app.post("/api/dm/folders", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { name, color } = req.body;
+      if (!name?.trim()) return res.status(400).json({ message: "Name required" });
+      const { rows } = await pool.query(
+        `INSERT INTO message_folders (id, user_id, name, color)
+         VALUES (gen_random_uuid(), $1, $2, $3)
+         RETURNING id, name, color, created_at`,
+        [me, name.trim(), color || "#6366f1"]
+      );
+      res.status(201).json(rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── PATCH /api/dm/folders/:id ─────────────────────────────────────────────────
+  app.patch("/api/dm/folders/:id", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { id } = req.params;
+      const { name, color } = req.body;
+      const updates: string[] = [];
+      const params: any[] = [];
+      if (name !== undefined) { updates.push(`name = $${params.length + 1}`); params.push(name.trim()); }
+      if (color !== undefined) { updates.push(`color = $${params.length + 1}`); params.push(color); }
+      if (!updates.length) return res.status(400).json({ message: "No updates" });
+      params.push(id, me);
+      const { rowCount } = await pool.query(
+        `UPDATE message_folders SET ${updates.join(", ")} WHERE id = $${params.length - 1} AND user_id = $${params.length}`,
+        params
+      );
+      if (!rowCount) return res.status(404).json({ message: "Folder not found" });
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── DELETE /api/dm/folders/:id ────────────────────────────────────────────────
+  app.delete("/api/dm/folders/:id", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { id } = req.params;
+      await pool.query(`DELETE FROM message_folders WHERE id = $1 AND user_id = $2`, [id, me]);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── POST /api/dm/folders/:id/conversations ────────────────────────────────────
+  app.post("/api/dm/folders/:id/conversations", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { id: folderId } = req.params;
+      const { conversationPartnerId } = req.body;
+      if (!conversationPartnerId) return res.status(400).json({ message: "conversationPartnerId required" });
+
+      const { rows: folderRows } = await pool.query(
+        `SELECT id FROM message_folders WHERE id = $1 AND user_id = $2`, [folderId, me]
+      );
+      if (!folderRows.length) return res.status(404).json({ message: "Folder not found" });
+
+      await pool.query(
+        `INSERT INTO message_folder_items (id, folder_id, conversation_partner_id, user_id)
+         VALUES (gen_random_uuid(), $1, $2, $3)
+         ON CONFLICT (folder_id, conversation_partner_id, user_id) DO NOTHING`,
+        [folderId, conversationPartnerId, me]
+      );
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── DELETE /api/dm/folders/:id/conversations/:partnerId ───────────────────────
+  app.delete("/api/dm/folders/:id/conversations/:partnerId", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { id: folderId, partnerId } = req.params;
+      await pool.query(
+        `DELETE FROM message_folder_items WHERE folder_id = $1 AND conversation_partner_id = $2 AND user_id = $3`,
+        [folderId, partnerId, me]
+      );
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── GET /api/dm/folders/:id/conversations ─────────────────────────────────────
+  // Same shape as inbox — filtered to conversations in this folder
+  app.get("/api/dm/folders/:id/conversations", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { id: folderId } = req.params;
+      const { rows } = await pool.query(
+        `WITH last_msg AS (
+           SELECT DISTINCT ON (
+             CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END
+           )
+             CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END AS other_id,
+             id, body, sent_at, sender_id, read_at, job_id, task_id
+           FROM direct_messages
+           WHERE (sender_id = $1 AND deleted_by_sender = FALSE)
+              OR (recipient_id = $1 AND deleted_by_recipient = FALSE)
+           ORDER BY
+             CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END,
+             sent_at DESC
+         ),
+         starred_check AS (
+           SELECT
+             CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END AS other_id,
+             BOOL_OR(CASE WHEN sender_id = $1 THEN starred_by_sender ELSE starred_by_recipient END) AS is_starred,
+             BOOL_OR(CASE WHEN sender_id = $1 THEN archived_by_sender ELSE archived_by_recipient END) AS is_archived
+           FROM direct_messages
+           WHERE (sender_id = $1 AND deleted_by_sender = FALSE)
+              OR (recipient_id = $1 AND deleted_by_recipient = FALSE)
+           GROUP BY other_id
+         ),
+         unread_counts AS (
+           SELECT sender_id AS other_id, COUNT(*) AS cnt
+           FROM direct_messages
+           WHERE recipient_id = $1
+             AND read_at IS NULL
+             AND deleted_by_recipient = FALSE
+           GROUP BY sender_id
+         )
+         SELECT
+           u.id             AS other_user_id,
+           u.name           AS other_user_name,
+           u.role           AS other_user_role,
+           u.profile_picture AS other_user_picture,
+           lm.body          AS last_message,
+           lm.sent_at       AS last_message_at,
+           lm.sender_id     AS last_sender_id,
+           lm.read_at       AS last_read_at,
+           COALESCE(sc.is_starred,  FALSE) AS is_starred,
+           COALESCE(sc.is_archived, FALSE) AS is_archived,
+           COALESCE(uc.cnt, 0)             AS unread_count,
+           lm.job_id, lm.task_id,
+           j.client AS job_title, t.title AS task_title
+         FROM last_msg lm
+         JOIN users u ON u.id = lm.other_id
+         JOIN message_folder_items fi
+           ON fi.conversation_partner_id = lm.other_id
+           AND fi.folder_id = $2
+           AND fi.user_id = $1
+         LEFT JOIN starred_check sc ON sc.other_id = lm.other_id
+         LEFT JOIN unread_counts uc ON uc.other_id = lm.other_id
+         LEFT JOIN jobs j  ON j.id  = lm.job_id
+         LEFT JOIN tasks t ON t.id  = lm.task_id
+         ORDER BY lm.sent_at DESC`,
+        [me, folderId]
+      );
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
 }

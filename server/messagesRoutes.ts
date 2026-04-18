@@ -67,6 +67,29 @@ async function migrate() {
   await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS archived_by_sender BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS archived_by_recipient BOOLEAN NOT NULL DEFAULT FALSE`);
 
+  // Custom message folders
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS message_folders (
+      id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#6366f1',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS message_folder_items (
+      id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+      folder_id VARCHAR(36) NOT NULL REFERENCES message_folders(id) ON DELETE CASCADE,
+      conversation_partner_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(folder_id, conversation_partner_id, user_id)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_mf_user ON message_folders(user_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_mfi_folder ON message_folder_items(folder_id)`);
+
   // Job + task link columns
   await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS job_id  VARCHAR(36) REFERENCES jobs(id)  ON DELETE SET NULL`);
   await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS task_id VARCHAR(36) REFERENCES tasks(id) ON DELETE SET NULL`);
