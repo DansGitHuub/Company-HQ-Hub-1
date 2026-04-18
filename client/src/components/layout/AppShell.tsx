@@ -416,37 +416,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const getSectionsForRole = (role: string): NavSection[] => {
     const isAdmin = role === "Admin" || (user as any)?.isMasterAdmin;
-    if (role === "Crew" || role === "New Hire") {
-      return sidebarSections
-        .filter(s => s.label !== "ADMIN")
-        .map(s => ({
-          ...s,
-          items: s.items
-            .filter(i => i !== "hiring" && i !== "mors_budget")
-            .map(i => i === "employees" ? "my_profile" : i),
-        }));
+    if (!isAdmin) {
+      return sidebarSections.filter(s => s.label !== "ADMIN");
     }
-    if (role === "Crew Lead") {
-      return sidebarSections
-        .filter(s => s.label !== "ADMIN")
-        .map(s => ({
-          ...s,
-          items: s.items
-            .filter(i => i !== "hiring" && i !== "mors_budget")
-            .map(i => i === "employees" ? "my_profile" : i),
-        }));
-    }
-    if (role === "Manager" || role === "HR" || role === "Sales") {
-      return sidebarSections
-        .filter(s => s.label !== "ADMIN")
-        .map(s => ({
-          ...s,
-          items: s.items
-            .filter(i => i !== "hiring" && (!isAdmin && i === "mors_budget" ? false : true))
-            .map(i => i === "employees" ? "my_profile" : i),
-        }));
-    }
-    // Admin / Master Admin: full access
     return sidebarSections;
   };
 
