@@ -147,7 +147,6 @@ export default function Settings() {
     ...(isAdminOrManager ? [
       { id: "divisions" as const, label: "Divisions", icon: Tag },
       { id: "estimate-templates" as const, label: "Estimate Templates", icon: FileText },
-      { id: "company" as const, label: "Company Info", icon: Building2 },
     ] : []),
     ...(isAdmin ? [{ id: "quickbooks" as const, label: "QuickBooks", icon: ArrowLeftRight }] : []),
     ...(isAdmin ? [{ id: "terms" as const, label: "Terms & Conditions", icon: FileText }] : []),

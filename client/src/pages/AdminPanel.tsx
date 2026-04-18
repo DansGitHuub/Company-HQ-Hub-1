@@ -134,7 +134,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
     {
       label: "Company",
       items: [
-        { value: "company", label: "Branding & Settings", icon: Building2 },
+        { value: "company", label: "Company Info & Branding", icon: Building2 },
       ],
     },
     {
