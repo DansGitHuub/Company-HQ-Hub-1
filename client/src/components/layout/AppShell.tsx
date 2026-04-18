@@ -399,10 +399,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   type NavSection = { label: string; items: string[] };
 
   const sectionLabels: Record<string, string> = {
-    "WORK": t("nav.sections.work"),
-    "PEOPLE": t("nav.sections.people"),
-    "COMPANY": t("nav.sections.company"),
-    "ADMIN": t("nav.sections.admin"),
+    "MY SPACE": "My Space",
+    "SALES": "Sales",
+    "OPERATIONS": "Operations",
+    "RESOURCES": "Resources",
+    "ADMIN": "Admin",
   };
 
   const sidebarSections: NavSection[] = [
