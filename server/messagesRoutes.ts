@@ -67,6 +67,20 @@ async function migrate() {
   await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS archived_by_sender BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS archived_by_recipient BOOLEAN NOT NULL DEFAULT FALSE`);
 
+  // Attachments table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS message_attachments (
+      id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+      message_id VARCHAR(36) NOT NULL REFERENCES direct_messages(id) ON DELETE CASCADE,
+      file_name TEXT NOT NULL,
+      file_size INTEGER NOT NULL DEFAULT 0,
+      mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      storage_key TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_dm_att_message ON message_attachments(message_id)`);
+
   console.log("[migration] DM messaging tables ready");
 }
 

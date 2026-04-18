@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { pool } from "./db";
+import crypto from "crypto";
 
 function canMessage(senderRole: string, recipientRole: string): boolean {
   switch (senderRole) {
@@ -317,7 +318,17 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
            m.id, m.sender_id, m.recipient_id, m.subject, m.body,
            m.sent_at, m.read_at,
            s.name AS sender_name, s.role AS sender_role, s.profile_picture AS sender_picture,
-           r.name AS recipient_name, r.role AS recipient_role, r.profile_picture AS recipient_picture
+           r.name AS recipient_name, r.role AS recipient_role, r.profile_picture AS recipient_picture,
+           COALESCE(
+             (SELECT json_agg(json_build_object(
+               'id',       a.id,
+               'fileName', a.file_name,
+               'fileSize', a.file_size,
+               'mimeType', a.mime_type
+             ) ORDER BY a.created_at)
+             FROM message_attachments a WHERE a.message_id = m.id),
+             '[]'::json
+           ) AS attachments
          FROM direct_messages m
          JOIN users s ON s.id = m.sender_id
          JOIN users r ON r.id = m.recipient_id
@@ -564,6 +575,108 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── POST /api/dm/:id/attachments ─────────────────────────────────────────────
+  app.post("/api/dm/:id/attachments", requireAuth, async (req: any, res) => {
+    try {
+      const me = req.user!.id;
+      const messageId = req.params.id;
+
+      // Verify message exists and user is the sender
+      const { rows: msgRows } = await pool.query(
+        `SELECT sender_id FROM direct_messages WHERE id = $1`,
+        [messageId]
+      );
+      if (!msgRows.length) return res.status(404).json({ message: "Message not found" });
+      if (msgRows[0].sender_id !== me) return res.status(403).json({ message: "Forbidden" });
+
+      const multer = (await import("multer")).default;
+      const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }).single("file");
+      await new Promise<void>((resolve, reject) => upload(req, res, (err: any) => err ? reject(err) : resolve()));
+
+      const file: Express.Multer.File = (req as any).file;
+      if (!file) return res.status(400).json({ message: "No file provided" });
+
+      const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+      if (!privateDir) return res.status(500).json({ message: "Object storage not configured" });
+
+      const fileId = crypto.randomUUID();
+      const ext = file.originalname.includes(".")
+        ? "." + file.originalname.split(".").pop()!.toLowerCase()
+        : "";
+      const objectPath = `${privateDir}/dm-attachments/${fileId}${ext}`;
+      const storageKey = `/objects/dm-attachments/${fileId}${ext}`;
+      const pathParts = objectPath.startsWith("/") ? objectPath.slice(1).split("/") : objectPath.split("/");
+      const bucketName = pathParts[0];
+      const objectName = pathParts.slice(1).join("/");
+
+      const SIDECAR = "http://127.0.0.1:1106";
+      const signRes = await fetch(`${SIDECAR}/object-storage/signed-object-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bucket_name: bucketName,
+          object_name: objectName,
+          method: "PUT",
+          expires_at: new Date(Date.now() + 900_000).toISOString(),
+        }),
+      });
+      if (!signRes.ok) return res.status(500).json({ message: "Failed to get upload URL" });
+      const { signed_url } = await signRes.json() as { signed_url: string };
+
+      const uploadRes = await fetch(signed_url, {
+        method: "PUT",
+        headers: { "Content-Type": file.mimetype || "application/octet-stream" },
+        body: file.buffer,
+      });
+      if (!uploadRes.ok) return res.status(500).json({ message: "Failed to upload file to storage" });
+
+      const { rows } = await pool.query(
+        `INSERT INTO message_attachments (id, message_id, file_name, file_size, mime_type, storage_key)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)
+         RETURNING id, file_name AS "fileName", file_size AS "fileSize", mime_type AS "mimeType"`,
+        [messageId, file.originalname, file.size, file.mimetype || "application/octet-stream", storageKey]
+      );
+
+      res.status(201).json({ ...rows[0], url: `/api/dm/attachments/${rows[0].id}/download` });
+    } catch (err: any) {
+      console.error("[dm/attachments] upload error:", err.message);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── GET /api/dm/attachments/:attachmentId/download ────────────────────────────
+  app.get("/api/dm/attachments/:attachmentId/download", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { attachmentId } = req.params;
+
+      const { rows } = await pool.query(
+        `SELECT a.id, a.file_name, a.mime_type, a.storage_key,
+                m.sender_id, m.recipient_id
+         FROM message_attachments a
+         JOIN direct_messages m ON m.id = a.message_id
+         WHERE a.id = $1`,
+        [attachmentId]
+      );
+      if (!rows.length) return res.status(404).json({ message: "Attachment not found" });
+
+      const att = rows[0];
+      if (att.sender_id !== me && att.recipient_id !== me) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+      const svc = new ObjectStorageService();
+      const objectFile = await svc.getObjectEntityFile(att.storage_key);
+      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(att.file_name)}"`);
+      res.setHeader("Content-Type", att.mime_type || "application/octet-stream");
+      await svc.downloadObject(objectFile, res);
+    } catch (err: any) {
+      console.error("[dm/attachments] download error:", err.message);
+      if (!res.headersSent) res.status(500).json({ message: err.message });
     }
   });
 

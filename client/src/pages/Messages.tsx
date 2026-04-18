@@ -16,7 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import {
   Send, Pencil, Trash2, ArrowLeft, MessageSquare, Search,
-  Star, Archive, MailOpen, Check, CheckCheck, Inbox, Mail,
+  Star, Archive, MailOpen, Check, CheckCheck, Inbox, Mail, Paperclip, FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, isToday, isYesterday, formatDistanceToNowStrict } from "date-fns";
@@ -25,6 +25,13 @@ import { apiRequest } from "@/lib/queryClient";
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type Folder = "inbox" | "sent" | "starred" | "archive";
+
+interface Attachment {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+}
 
 interface MessageableUser {
   id: string;
@@ -61,6 +68,7 @@ interface ThreadMessage {
   recipient_name: string;
   recipient_role: string;
   recipient_picture: string | null;
+  attachments: Attachment[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -74,6 +82,24 @@ function relativeTime(dateStr: string): string {
 
 function initials(name: string): string {
   return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function uploadAttachments(messageId: string, files: File[]): Promise<void> {
+  for (const file of files) {
+    const fd = new FormData();
+    fd.append("file", file);
+    await fetch(`/api/dm/${messageId}/attachments`, {
+      method: "POST",
+      credentials: "include",
+      body: fd,
+    });
+  }
 }
 
 function Avatar({ name, picture, size = 36 }: { name: string; picture?: string | null; size?: number }) {
@@ -107,6 +133,8 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [search, setSearch] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -114,6 +142,7 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
       setSubject("");
       setBody("");
       setSearch("");
+      setPendingFiles([]);
     }
   }, [open, initialRecipientId]);
 
@@ -125,9 +154,11 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
   const sendMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/dm", { recipientId, subject, body });
-      return res;
+      const msg = await res.json();
+      if (pendingFiles.length > 0) await uploadAttachments(msg.id, pendingFiles);
+      return msg;
     },
-    onSuccess: () => {
+    onSuccess: (msg: any) => {
       toast({ title: "Message sent" });
       qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
       qc.invalidateQueries({ queryKey: ["/api/dm/unread-count"] });
@@ -204,9 +235,38 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
           </div>
 
           <div className="space-y-1">
-            <Label>Message</Label>
+            <div className="flex items-center justify-between">
+              <Label>Message</Label>
+              <button type="button" onClick={() => fileInputRef.current?.click()}
+                className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                data-testid="button-attach-compose">
+                <Paperclip className="h-3.5 w-3.5" /> Attach file
+              </button>
+            </div>
             <Textarea placeholder="Write your message…" value={body}
-              onChange={(e) => setBody(e.target.value)} rows={5} data-testid="textarea-body" />
+              onChange={(e) => setBody(e.target.value)} rows={4} data-testid="textarea-body" />
+            <input ref={fileInputRef} type="file" multiple className="hidden"
+              data-testid="input-file-compose"
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                if (files.length) setPendingFiles((prev) => [...prev, ...files]);
+                e.target.value = "";
+              }} />
+            {pendingFiles.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {pendingFiles.map((f, i) => (
+                  <div key={i} className="flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 text-xs max-w-full"
+                    data-testid={`chip-file-compose-${i}`}>
+                    <FileText className="h-3 w-3 text-gray-500 flex-shrink-0" />
+                    <span className="truncate max-w-[140px] text-gray-700">{f.name}</span>
+                    <span className="text-gray-400 flex-shrink-0">({formatFileSize(f.size)})</span>
+                    <button onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
+                      className="text-gray-400 hover:text-red-500 ml-0.5 flex-shrink-0" type="button"
+                      data-testid={`button-remove-file-compose-${i}`}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -289,6 +349,8 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [reply, setReply] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const prevCountRef = useRef(0);
 
   const { data: messages = [], isLoading } = useQuery<ThreadMessage[]>({
@@ -379,9 +441,13 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
   async function sendReply() {
     if (!reply.trim() || isSending) return;
     setIsSending(true);
+    const filesToSend = [...pendingFiles];
     try {
-      await apiRequest("POST", "/api/dm", { recipientId: userId, body: reply.trim() });
+      const res = await apiRequest("POST", "/api/dm", { recipientId: userId, body: reply.trim() });
+      const msg = await res.json();
       setReply("");
+      setPendingFiles([]);
+      if (filesToSend.length > 0) await uploadAttachments(msg.id, filesToSend);
       qc.invalidateQueries({ queryKey: ["/api/dm/conversation", userId] });
       qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
     } catch (err: any) {
@@ -488,6 +554,25 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
                         <p className="whitespace-pre-wrap break-words" data-testid={`text-body-${msg.id}`}>
                           {msg.body}
                         </p>
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-white/20">
+                            {msg.attachments.map((att) => (
+                              <button key={att.id}
+                                onClick={() => window.open(`/api/dm/attachments/${att.id}/download`)}
+                                className={cn(
+                                  "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors",
+                                  isMine
+                                    ? "bg-white/20 hover:bg-white/30 text-white"
+                                    : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200"
+                                )}
+                                data-testid={`chip-attachment-${att.id}`}>
+                                <FileText className="h-3 w-3 flex-shrink-0" />
+                                <span className="truncate max-w-[120px]">{att.fileName}</span>
+                                <span className="opacity-70 flex-shrink-0">({formatFileSize(att.fileSize)})</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className={cn("flex items-center gap-1 px-1 mt-0.5",
                         isMine ? "flex-row-reverse" : "flex-row")}>
@@ -520,6 +605,21 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
 
       {/* Reply box */}
       <div className="border-t px-4 py-3 bg-white">
+        {pendingFiles.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {pendingFiles.map((f, i) => (
+              <div key={i} className="flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 text-xs"
+                data-testid={`chip-file-reply-${i}`}>
+                <FileText className="h-3 w-3 text-gray-500 flex-shrink-0" />
+                <span className="truncate max-w-[120px] text-gray-700">{f.name}</span>
+                <span className="text-gray-400 flex-shrink-0">({formatFileSize(f.size)})</span>
+                <button onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
+                  className="text-gray-400 hover:text-red-500 ml-0.5" type="button"
+                  data-testid={`button-remove-file-reply-${i}`}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex gap-2 items-end">
           <Textarea
             placeholder="Reply…"
@@ -532,6 +632,18 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
             className="resize-none text-sm flex-1"
             data-testid="textarea-reply"
           />
+          <input ref={fileInputRef} type="file" multiple className="hidden"
+            data-testid="input-file-reply"
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              if (files.length) setPendingFiles((prev) => [...prev, ...files]);
+              e.target.value = "";
+            }} />
+          <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}
+            className="h-9 w-9 flex-shrink-0 text-gray-400 hover:text-gray-600"
+            title="Attach file" type="button" data-testid="button-attach-reply">
+            <Paperclip className="h-4 w-4" />
+          </Button>
           <Button onClick={sendReply} disabled={!reply.trim() || isSending}
             size="icon" className="h-9 w-9 flex-shrink-0" data-testid="button-reply-send">
             <Send className="h-4 w-4" />
