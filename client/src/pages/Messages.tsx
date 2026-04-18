@@ -18,7 +18,7 @@ import {
   Send, Pencil, Trash2, ArrowLeft, MessageSquare, Search,
   Star, Archive, MailOpen, Check, CheckCheck, Inbox, Mail, Paperclip, FileText,
   Briefcase, Link2, X as XIcon, ChevronDown,
-  FolderPlus, FolderOpen, MoreHorizontal, Plus,
+  FolderPlus, FolderOpen, MoreHorizontal, Plus, Printer, Download,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -44,6 +44,111 @@ interface MessageFolder {
 }
 
 const FOLDER_COLORS = ["#6366f1", "#ef4444", "#22c55e", "#f59e0b", "#3b82f6"];
+
+// ── Export helpers ─────────────────────────────────────────────────────────────
+
+function buildPrintHTML(messages: ThreadMessage[], myId: string, otherName: string): string {
+  const myName =
+    messages.find((m) => m.sender_id === myId)?.sender_name ??
+    messages.find((m) => m.recipient_id === myId)?.recipient_name ??
+    "Me";
+  const dateStr = format(new Date(), "MMMM d, yyyy 'at' h:mm a");
+
+  const msgRows = messages
+    .map((m) => {
+      const senderLabel = m.sender_id === myId ? myName : otherName;
+      const ts = format(new Date(m.sent_at), "MMM d, yyyy · h:mm a");
+      const atts =
+        m.attachments?.length
+          ? `<div class="atts">📎 Attachments: ${m.attachments.map((a) => a.fileName).join(", ")}</div>`
+          : "";
+      return `
+        <div class="msg">
+          <div class="msg-header">
+            <span class="sender">${senderLabel}</span>
+            <span class="ts">${ts}</span>
+          </div>
+          <div class="body">${m.body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")}</div>
+          ${atts}
+        </div>`;
+    })
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Conversation – ${otherName}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Georgia, "Times New Roman", serif; max-width: 720px; margin: 40px auto; color: #111; line-height: 1.6; padding: 0 24px; }
+    .hd { border-bottom: 2px solid #111; padding-bottom: 16px; margin-bottom: 28px; }
+    .logo { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; font-family: Arial, sans-serif; }
+    .sub { font-size: 15px; margin-top: 4px; }
+    .meta { font-size: 12px; color: #666; margin-top: 6px; }
+    .msg { margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid #ddd; }
+    .msg:last-child { border-bottom: none; }
+    .msg-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+    .sender { font-weight: 700; font-size: 14px; font-family: Arial, sans-serif; }
+    .ts { font-size: 11px; color: #888; }
+    .body { font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+    .atts { margin-top: 8px; font-size: 12px; color: #555; font-family: Arial, sans-serif; }
+    @media print { body { margin: 16px; } }
+  </style>
+</head>
+<body>
+  <div class="hd">
+    <div class="logo">🌿 Chapin Landscapes</div>
+    <div class="sub">Conversation between <strong>${myName}</strong> and <strong>${otherName}</strong></div>
+    <div class="meta">Printed ${dateStr} · ${messages.length} message${messages.length !== 1 ? "s" : ""}</div>
+  </div>
+  ${msgRows}
+  <script>window.onload = function() { window.print(); };<\/script>
+</body>
+</html>`;
+}
+
+function buildTextExport(messages: ThreadMessage[], myId: string, otherName: string): string {
+  const myName =
+    messages.find((m) => m.sender_id === myId)?.sender_name ??
+    messages.find((m) => m.recipient_id === myId)?.recipient_name ??
+    "Me";
+  const dateStr = format(new Date(), "yyyy-MM-dd HH:mm");
+  const divider = "=".repeat(60);
+
+  const lines = [
+    `Conversation between ${myName} and ${otherName}`,
+    `Exported: ${dateStr}`,
+    divider,
+    "",
+    ...messages.map((m) => {
+      const senderLabel = m.sender_id === myId ? myName : otherName;
+      const ts = format(new Date(m.sent_at), "yyyy-MM-dd h:mm a");
+      const parts = [`[${ts}] ${senderLabel}:`, m.body];
+      if (m.attachments?.length) {
+        parts.push(`Attachments: ${m.attachments.map((a) => a.fileName).join(", ")}`);
+      }
+      return parts.join("\n");
+    }),
+  ];
+  return lines.join("\n\n");
+}
+
+function triggerTxtDownload(text: string, filename: string) {
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.style.position = "fixed";
+  a.style.opacity = "0";
+  document.body.appendChild(a);
+  a.click();
+  requestAnimationFrame(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+}
 
 interface Attachment {
   id: string;
@@ -378,22 +483,31 @@ function LinkDropdown({
 }
 
 // ── ConversationRow ────────────────────────────────────────────────────────────
-function ConversationRow({ conv, selected, myId, onClick, folders, onAddToFolder }: {
+function ConversationRow({ conv, selected, myId, onClick, folders, onAddToFolder, onExport }: {
   conv: Conversation;
   selected: boolean;
   myId: string;
   onClick: () => void;
   folders?: MessageFolder[];
   onAddToFolder?: (folderId: string, partnerId: string) => void;
+  onExport?: (partnerId: string, partnerName: string) => void;
 }) {
   const unread = Number(conv.unread_count);
   const isUnread = unread > 0;
+  const [isHovered, setIsHovered] = useState(false);
+  const hasMenu = !!(folders && onAddToFolder);
 
   return (
-    <div className={cn(
-      "group relative flex items-center gap-3 px-4 py-3 transition-colors border-l-2 cursor-pointer",
-      selected ? "bg-blue-50 border-l-blue-500" : "hover:bg-gray-50 border-l-transparent"
-    )} onClick={onClick} data-testid={`row-conv-${conv.other_user_id}`}>
+    <div
+      className={cn(
+        "relative flex items-center gap-3 px-4 py-3 transition-colors border-l-2 cursor-pointer",
+        selected ? "bg-blue-50 border-l-blue-500" : "hover:bg-gray-50 border-l-transparent"
+      )}
+      onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      data-testid={`row-conv-${conv.other_user_id}`}
+    >
       <div className="relative flex-shrink-0">
         <Avatar name={conv.other_user_name} picture={conv.other_user_picture} size={42} />
         {isUnread && (
@@ -407,20 +521,27 @@ function ConversationRow({ conv, selected, myId, onClick, folders, onAddToFolder
             data-testid={`text-conv-name-${conv.other_user_id}`}>
             {conv.other_user_name}
           </span>
-          <span className="text-[11px] text-gray-400 flex-shrink-0 group-hover:hidden">
+          <span className={cn("text-[11px] text-gray-400 flex-shrink-0 transition-opacity",
+            hasMenu && isHovered ? "opacity-0" : "")}>
             {relativeTime(conv.last_message_at)}
           </span>
-          {/* ... menu — visible on hover */}
-          {folders && onAddToFolder && (
-            <div className="hidden group-hover:flex items-center" onClick={(e) => e.stopPropagation()}>
+          {/* ... menu — visible when row is hovered (React state, reliable for automation) */}
+          {hasMenu && (
+            <div
+              className={cn("flex items-center ml-0.5 transition-opacity", isHovered ? "opacity-100" : "opacity-0 pointer-events-none")}
+              onClick={(e) => e.stopPropagation()}
+            >
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="p-0.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600"
-                    data-testid={`button-conv-menu-${conv.other_user_id}`}>
+                  <button
+                    className="p-0.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600"
+                    data-testid={`button-conv-menu-${conv.other_user_id}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <MoreHorizontal className="h-3.5 w-3.5" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuContent align="end" className="w-48">
                   {folders.length > 0 ? (
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
@@ -444,6 +565,17 @@ function ConversationRow({ conv, selected, myId, onClick, folders, onAddToFolder
                       <FolderOpen className="h-3.5 w-3.5 mr-2 text-gray-400" />
                       No folders yet
                     </DropdownMenuItem>
+                  )}
+                  {onExport && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => onExport(conv.other_user_id, conv.other_user_name)}
+                        data-testid={`menuitem-export-${conv.other_user_id}`}>
+                        <Download className="h-3.5 w-3.5 mr-2 text-gray-500" />
+                        Export (.txt)
+                      </DropdownMenuItem>
+                    </>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -713,6 +845,31 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
               )}
             </PopoverContent>
           </Popover>
+          <Button variant="ghost" size="icon"
+            title="Print conversation"
+            className="h-8 w-8 text-gray-400 hover:text-gray-700"
+            data-testid="button-print"
+            disabled={messages.length === 0}
+            onClick={() => {
+              const html = buildPrintHTML(messages, myId, otherName);
+              const win = window.open("", "_blank", "width=800,height=700");
+              if (win) { win.document.write(html); win.document.close(); }
+            }}>
+            <Printer className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon"
+            title="Download conversation (.txt)"
+            className="h-8 w-8 text-gray-400 hover:text-gray-700"
+            data-testid="button-download"
+            disabled={messages.length === 0}
+            onClick={() => {
+              const text = buildTextExport(messages, myId, otherName);
+              const safeName = otherName.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+              const dateTag = format(new Date(), "yyyy-MM-dd");
+              triggerTxtDownload(text, `conversation-${safeName}-${dateTag}.txt`);
+            }}>
+            <Download className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon"
             onClick={() => { if (lastSentByMe) deleteMutation.mutate(lastSentByMe.id); }}
             disabled={!lastSentByMe || deleteMutation.isPending}
@@ -1100,6 +1257,21 @@ export default function MessagesPage() {
     setSearch("");
   }
 
+  async function handleExportConversation(partnerId: string, partnerName: string) {
+    try {
+      const res = await fetch(`/api/dm/conversation/${partnerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      const msgs: ThreadMessage[] = await res.json();
+      if (!msgs.length) { toast({ title: "No messages to export" }); return; }
+      const text = buildTextExport(msgs, user?.id ?? "", partnerName);
+      const safeName = partnerName.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+      const dateTag = format(new Date(), "yyyy-MM-dd");
+      triggerTxtDownload(text, `conversation-${safeName}-${dateTag}.txt`);
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    }
+  }
+
   function handleComposeClosed(sentToId?: string) {
     setComposeOpen(false);
     if (sentToId) {
@@ -1216,6 +1388,7 @@ export default function MessagesPage() {
               onClick={() => setSelectedUserId(conv.other_user_id)}
               folders={folders}
               onAddToFolder={(folderId, partnerId) => addToFolderMutation.mutate({ folderId, partnerId })}
+              onExport={handleExportConversation}
             />
           ))}
         </ScrollArea>
