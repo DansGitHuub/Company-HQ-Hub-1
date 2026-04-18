@@ -378,7 +378,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     invoices: { icon: FileText, label: "Invoices", href: "/invoices" },
     customers: { icon: Contact, label: t("nav.customers"), href: "/customers" },
     daily_worksheet: { icon: ClipboardList, label: "Daily Worksheet", href: "/daily-worksheet" },
-    time_tracking: { icon: Timer, label: "Time Tracking", href: "/time" },
+    time_tracking: { icon: Timer, label: "Clock In / Out", href: "/time" },
     consultations: { icon: CalendarClock, label: "Consultations", href: "/consultations" },
     reports: { icon: BarChart2, label: "Reports", href: "/reports" },
     mors_budget: { icon: TrendingUp, label: "MORS Budget", href: "/mors-budget" },
