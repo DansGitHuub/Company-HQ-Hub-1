@@ -407,11 +407,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const sidebarSections: NavSection[] = [
-    { label: "", items: ["dashboard"] },
-    { label: "WORK", items: ["customers", "consultations", "estimates", "jobs", "todos", "daily_worksheet", "my_day", "my_hours", "time_tracking", "invoices", "reports", "mors_budget", "scheduling", "equipment"] },
-    { label: "PEOPLE", items: ["employees", "education", "hiring"] },
-    { label: "COMPANY", items: ["messages", "sops", "testing", "hq"] },
-    { label: "ADMIN", items: ["admin", "catalog", "budget_settings", "tools", "forms"] },
+    { label: "MY SPACE", items: ["dashboard", "my_day", "my_hours", "daily_worksheet", "messages"] },
+    { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
+    { label: "OPERATIONS", items: ["todos", "scheduling", "time_tracking", "equipment", "forms"] },
+    { label: "RESOURCES", items: ["sops", "education", "testing", "hq"] },
+    { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "mors_budget", "catalog", "budget_settings", "tools"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {
