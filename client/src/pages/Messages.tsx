@@ -579,6 +579,14 @@ export default function MessagesPage() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const isSearchActive = debouncedSearch.length > 0;
 
   const { data: conversations = [], isLoading } = useQuery<Conversation[]>({
     queryKey: ["/api/dm/conversations", folder],
@@ -589,6 +597,18 @@ export default function MessagesPage() {
     },
     refetchInterval: 20000,
     staleTime: 0,
+    enabled: !isSearchActive,
+  });
+
+  const { data: searchResults = [], isFetching: isSearching } = useQuery<Conversation[]>({
+    queryKey: ["/api/dm/search", debouncedSearch],
+    queryFn: async () => {
+      const res = await fetch(`/api/dm/search?q=${encodeURIComponent(debouncedSearch)}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: isSearchActive,
+    staleTime: 0,
   });
 
   const { data: unreadData } = useQuery<{ count: number }>({
@@ -597,11 +617,8 @@ export default function MessagesPage() {
   });
   const unreadCount = unreadData?.count ?? 0;
 
-  const filtered = search
-    ? conversations.filter((c) =>
-        c.other_user_name.toLowerCase().includes(search.toLowerCase())
-      )
-    : conversations;
+  const displayed = isSearchActive ? searchResults : conversations;
+  const isLoading_ = isSearchActive ? isSearching : isLoading;
 
   function handleFolderChange(f: Folder) {
     setFolder(f);
@@ -665,25 +682,28 @@ export default function MessagesPage() {
 
         {/* Conversation list */}
         <ScrollArea className="flex-1">
-          {isLoading ? (
-            <p className="text-sm text-gray-400 text-center py-10">Loading…</p>
-          ) : filtered.length === 0 ? (
+          {isLoading_ ? (
+            <p className="text-sm text-gray-400 text-center py-10">
+              {isSearchActive ? "Searching…" : "Loading…"}
+            </p>
+          ) : displayed.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
               <MessageSquare className="h-9 w-9 opacity-25" />
               <p className="text-sm" data-testid="text-empty-conversations">
-                {search ? "No results" : folder === "starred" ? "No starred conversations"
+                {isSearchActive ? "No results found"
+                  : folder === "starred" ? "No starred conversations"
                   : folder === "archive" ? "Nothing archived"
                   : folder === "sent" ? "No sent messages"
                   : "No conversations yet"}
               </p>
-              {folder === "inbox" && !search && (
+              {folder === "inbox" && !isSearchActive && (
                 <Button size="sm" variant="outline" onClick={() => setComposeOpen(true)}
                   className="text-xs" data-testid="button-compose-empty">
                   Start a conversation
                 </Button>
               )}
             </div>
-          ) : filtered.map((conv) => (
+          ) : displayed.map((conv) => (
             <ConversationRow
               key={conv.other_user_id}
               conv={conv}

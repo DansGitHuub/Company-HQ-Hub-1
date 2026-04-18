@@ -236,6 +236,64 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── GET /api/dm/search?q= ────────────────────────────────────────────────────
+  app.get("/api/dm/search", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const q = ((req.query.q as string) || "").trim().toLowerCase();
+      if (!q) return res.json([]);
+      const like = `%${q}%`;
+      const { rows } = await pool.query(
+        `WITH matched AS (
+           SELECT
+             m.id,
+             m.sender_id,
+             m.recipient_id,
+             m.body,
+             m.subject,
+             m.sent_at,
+             m.read_at,
+             CASE WHEN m.sender_id = $1 THEN m.recipient_id ELSE m.sender_id END AS other_id,
+             u_s.name   AS sender_name,   u_s.role   AS sender_role,   u_s.profile_picture AS sender_picture,
+             u_r.name   AS recipient_name, u_r.role  AS recipient_role, u_r.profile_picture AS recipient_picture,
+             CASE WHEN m.sender_id = $1 THEN m.starred_by_sender   ELSE m.starred_by_recipient   END AS is_starred,
+             CASE WHEN m.sender_id = $1 THEN m.archived_by_sender  ELSE m.archived_by_recipient  END AS is_archived
+           FROM direct_messages m
+           JOIN users u_s ON u_s.id = m.sender_id
+           JOIN users u_r ON u_r.id = m.recipient_id
+           WHERE (
+             (m.sender_id    = $1 AND m.deleted_by_sender    = FALSE)
+             OR (m.recipient_id = $1 AND m.deleted_by_recipient = FALSE)
+           )
+           AND (
+             LOWER(m.body)        LIKE $2
+             OR LOWER(m.subject)  LIKE $2
+             OR LOWER(u_s.name)   LIKE $2
+             OR LOWER(u_r.name)   LIKE $2
+           )
+         )
+         SELECT DISTINCT ON (other_id)
+           other_id                                                                    AS other_user_id,
+           CASE WHEN sender_id = $1 THEN recipient_name  ELSE sender_name  END        AS other_user_name,
+           CASE WHEN sender_id = $1 THEN recipient_role  ELSE sender_role  END        AS other_user_role,
+           CASE WHEN sender_id = $1 THEN recipient_picture ELSE sender_picture END    AS other_user_picture,
+           SUBSTRING(body, 1, 120)                                                    AS last_message,
+           sent_at                                                                    AS last_message_at,
+           sender_id                                                                  AS last_sender_id,
+           read_at                                                                    AS last_read_at,
+           is_starred,
+           is_archived,
+           0                                                                          AS unread_count
+         FROM matched
+         ORDER BY other_id, sent_at DESC`,
+        [me, like]
+      );
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── GET /api/dm/conversations?folder=inbox|sent|starred|archive ──────────────
   app.get("/api/dm/conversations", requireAuth, async (req, res) => {
     try {
