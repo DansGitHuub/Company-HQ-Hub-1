@@ -513,6 +513,45 @@ export default function Tasks() {
   );
 }
 
+function TaskLinkedMessages({ taskId }: { taskId: string }) {
+  const { data: msgs = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/dm/by-task", taskId],
+    queryFn: () => fetch(`/api/dm/by-task/${taskId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!taskId,
+  });
+  if (isLoading) return null;
+  if (msgs.length === 0) return (
+    <div>
+      <Separator />
+      <p className="text-sm font-medium text-muted-foreground mb-2">Linked Messages</p>
+      <p className="text-xs text-muted-foreground">No messages linked to this task yet.</p>
+    </div>
+  );
+  return (
+    <div data-testid="task-linked-messages">
+      <Separator />
+      <p className="text-sm font-medium text-muted-foreground mb-2">Linked Messages</p>
+      <div className="space-y-2 max-h-48 overflow-y-auto">
+        {msgs.map((m: any) => (
+          <div key={m.id} className="flex gap-2 p-2 rounded bg-muted/50">
+            <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1 mb-0.5">
+                <span className="text-xs font-medium">{m.sender_name}</span>
+                <span className="text-xs text-muted-foreground">→ {m.recipient_name}</span>
+                <span className="text-[10px] text-muted-foreground ml-auto">
+                  {new Date(m.sent_at).toLocaleDateString()}
+                </span>
+              </div>
+              <p className="text-xs text-gray-700 line-clamp-2">{m.body}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TaskModal({ task, isOpen, onClose, users, currentUser, isManagerOrAdmin, userMap }: {
   task: Task | null; isOpen: boolean; onClose: () => void;
   users: TaskUser[]; currentUser: any; isManagerOrAdmin: boolean;
@@ -831,6 +870,8 @@ function TaskModal({ task, isOpen, onClose, users, currentUser, isManagerOrAdmin
               {task?.cancelledAt && (
                 <p className="text-xs text-red-500">Cancelled: {new Date(task.cancelledAt).toLocaleString()}</p>
               )}
+
+              <TaskLinkedMessages taskId={task!.id} />
             </>
           )}
         </div>

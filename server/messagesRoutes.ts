@@ -67,6 +67,12 @@ async function migrate() {
   await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS archived_by_sender BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS archived_by_recipient BOOLEAN NOT NULL DEFAULT FALSE`);
 
+  // Job + task link columns
+  await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS job_id  VARCHAR(36) REFERENCES jobs(id)  ON DELETE SET NULL`);
+  await pool.query(`ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS task_id VARCHAR(36) REFERENCES tasks(id) ON DELETE SET NULL`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_dm_job  ON direct_messages(job_id)  WHERE job_id  IS NOT NULL`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_dm_task ON direct_messages(task_id) WHERE task_id IS NOT NULL`);
+
   // Attachments table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS message_attachments (

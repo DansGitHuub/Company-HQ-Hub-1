@@ -17,7 +17,11 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Send, Pencil, Trash2, ArrowLeft, MessageSquare, Search,
   Star, Archive, MailOpen, Check, CheckCheck, Inbox, Mail, Paperclip, FileText,
+  Briefcase, Link2, X as XIcon, ChevronDown,
 } from "lucide-react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandItem, CommandEmpty } from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { format, isToday, isYesterday, formatDistanceToNowStrict } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
@@ -52,6 +56,10 @@ interface Conversation {
   is_starred: boolean;
   is_archived: boolean;
   unread_count: number;
+  job_id: string | null;
+  task_id: string | null;
+  job_title: string | null;
+  task_title: string | null;
 }
 
 interface ThreadMessage {
@@ -69,7 +77,14 @@ interface ThreadMessage {
   recipient_role: string;
   recipient_picture: string | null;
   attachments: Attachment[];
+  job_id: string | null;
+  task_id: string | null;
+  job_title: string | null;
+  task_title: string | null;
 }
+
+interface JobItem { id: string; client: string; }
+interface TaskItem { id: string; task_id: string; title: string; }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -288,6 +303,66 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
 
 // ── Conversation Row ───────────────────────────────────────────────────────────
 
+// ── LinkDropdown ───────────────────────────────────────────────────────────────
+function LinkDropdown({
+  value, options, getLabel, placeholder, onChange, disabled,
+}: {
+  value: string | null;
+  options: { id: string; [key: string]: any }[];
+  getLabel: (item: any) => string;
+  placeholder: string;
+  onChange: (id: string | null) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.id === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "flex items-center gap-1 text-xs px-2 py-0.5 rounded border transition-colors max-w-[140px]",
+            selected
+              ? "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              : "bg-white border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600"
+          )}
+          disabled={disabled}
+          data-testid={`dropdown-link-${placeholder.toLowerCase().replace(/\s+/g, "-")}`}
+        >
+          <span className="truncate">{selected ? getLabel(selected) : placeholder}</span>
+          {selected ? (
+            <XIcon className="h-3 w-3 flex-shrink-0 ml-auto" onClick={(e) => { e.stopPropagation(); onChange(null); }} />
+          ) : (
+            <ChevronDown className="h-3 w-3 flex-shrink-0" />
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start">
+        <Command>
+          <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} className="h-8 text-xs" />
+          <CommandList className="max-h-48">
+            <CommandEmpty className="text-xs py-3 text-center text-muted-foreground">No results</CommandEmpty>
+            {value && (
+              <CommandItem onSelect={() => { onChange(null); setOpen(false); }}
+                className="text-xs text-red-500 cursor-pointer">
+                ✕ Clear selection
+              </CommandItem>
+            )}
+            {options.map((item) => (
+              <CommandItem key={item.id} value={getLabel(item)}
+                onSelect={() => { onChange(item.id); setOpen(false); }}
+                className={cn("text-xs cursor-pointer", item.id === value && "font-semibold")}>
+                {getLabel(item)}
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ── ConversationRow ────────────────────────────────────────────────────────────
 function ConversationRow({ conv, selected, myId, onClick }: {
   conv: Conversation;
   selected: boolean;
@@ -320,10 +395,24 @@ function ConversationRow({ conv, selected, myId, onClick }: {
             {relativeTime(conv.last_message_at)}
           </span>
         </div>
-        <p className={cn("text-xs truncate mt-0.5",
-          isUnread ? "text-gray-800 font-medium" : "text-gray-500")}>
-          {conv.last_sender_id === myId ? `You: ${conv.last_message}` : conv.last_message}
-        </p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <p className={cn("text-xs truncate flex-1",
+            isUnread ? "text-gray-800 font-medium" : "text-gray-500")}>
+            {conv.last_sender_id === myId ? `You: ${conv.last_message}` : conv.last_message}
+          </p>
+          {conv.job_id && (
+            <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded"
+              data-testid={`badge-job-${conv.other_user_id}`}>
+              <Briefcase className="h-2.5 w-2.5" />Job
+            </span>
+          )}
+          {conv.task_id && !conv.job_id && (
+            <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded"
+              data-testid={`badge-task-${conv.other_user_id}`}>
+              <Link2 className="h-2.5 w-2.5" />Task
+            </span>
+          )}
+        </div>
       </div>
       {isUnread && (
         <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center"
@@ -362,6 +451,32 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
     },
     refetchInterval: 8000,
     staleTime: 0,
+  });
+
+  const { data: allJobs = [] } = useQuery<JobItem[]>({
+    queryKey: ["/api/jobs"],
+    queryFn: () => fetch("/api/jobs", { credentials: "include" }).then(r => r.json()),
+  });
+
+  const { data: allTasks = [] } = useQuery<TaskItem[]>({
+    queryKey: ["/api/tasks"],
+    queryFn: () => fetch("/api/tasks", { credentials: "include" }).then(r => r.json()),
+  });
+
+  // Derive link state from the most recent message
+  const latestMsg = messages[messages.length - 1] ?? null;
+  const linkedJobId = latestMsg?.job_id ?? null;
+  const linkedTaskId = latestMsg?.task_id ?? null;
+
+  const linkMutation = useMutation({
+    mutationFn: (payload: { jobId?: string | null; taskId?: string | null }) =>
+      apiRequest("PATCH", `/api/dm/${latestMsg!.id}/link`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/dm/conversation", userId] });
+      qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
+      toast({ title: "Conversation linked" });
+    },
+    onError: (err: any) => toast({ title: "Failed to link", description: err.message, variant: "destructive" }),
   });
 
   // Toast on new incoming messages when thread is open
@@ -508,6 +623,30 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
           </Button>
         </div>
       </div>
+
+      {/* Link to Job / Task bar */}
+      {latestMsg && (
+        <div className="flex items-center gap-2 px-4 py-1.5 border-b bg-gray-50/80" data-testid="link-bar">
+          <Link2 className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+          <span className="text-[11px] text-gray-400">Linked to:</span>
+          <LinkDropdown
+            value={linkedJobId}
+            options={allJobs}
+            getLabel={(j) => j.client || j.id}
+            placeholder="Job…"
+            onChange={(id) => linkMutation.mutate({ jobId: id })}
+            disabled={linkMutation.isPending}
+          />
+          <LinkDropdown
+            value={linkedTaskId}
+            options={allTasks}
+            getLabel={(t) => `${t.task_id}: ${t.title}`}
+            placeholder="Task…"
+            onChange={(id) => linkMutation.mutate({ taskId: id })}
+            disabled={linkMutation.isPending}
+          />
+        </div>
+      )}
 
       {/* Messages */}
       <ScrollArea className="flex-1 px-4 py-3">

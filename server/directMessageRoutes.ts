@@ -38,7 +38,7 @@ async function getConversations(userId: string, folder: string) {
          CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END
        )
          CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END AS other_id,
-         id, body, sent_at, sender_id, read_at
+         id, body, sent_at, sender_id, read_at, job_id, task_id
        FROM direct_messages
        WHERE (sender_id = $1 AND deleted_by_sender = FALSE)
           OR (recipient_id = $1 AND deleted_by_recipient = FALSE)
@@ -75,11 +75,17 @@ async function getConversations(userId: string, folder: string) {
        lm.read_at       AS last_read_at,
        COALESCE(sc.is_starred,  FALSE) AS is_starred,
        COALESCE(sc.is_archived, FALSE) AS is_archived,
-       COALESCE(uc.cnt, 0)             AS unread_count
+       COALESCE(uc.cnt, 0)             AS unread_count,
+       lm.job_id,
+       lm.task_id,
+       j.client         AS job_title,
+       t.title          AS task_title
      FROM last_msg lm
      JOIN users u ON u.id = lm.other_id
      LEFT JOIN starred_check sc ON sc.other_id = lm.other_id
      LEFT JOIN unread_counts uc ON uc.other_id = lm.other_id
+     LEFT JOIN jobs j  ON j.id  = lm.job_id
+     LEFT JOIN tasks t ON t.id  = lm.task_id
      ORDER BY lm.sent_at DESC`,
     [userId]
   );
@@ -317,6 +323,9 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
         `SELECT
            m.id, m.sender_id, m.recipient_id, m.subject, m.body,
            m.sent_at, m.read_at,
+           m.job_id, m.task_id,
+           j.client  AS job_title,
+           t.title   AS task_title,
            s.name AS sender_name, s.role AS sender_role, s.profile_picture AS sender_picture,
            r.name AS recipient_name, r.role AS recipient_role, r.profile_picture AS recipient_picture,
            COALESCE(
@@ -332,6 +341,8 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
          FROM direct_messages m
          JOIN users s ON s.id = m.sender_id
          JOIN users r ON r.id = m.recipient_id
+         LEFT JOIN jobs j  ON j.id  = m.job_id
+         LEFT JOIN tasks t ON t.id  = m.task_id
          WHERE (m.sender_id = $1 AND m.recipient_id = $2 AND m.deleted_by_sender = FALSE)
             OR (m.sender_id = $2 AND m.recipient_id = $1 AND m.deleted_by_recipient = FALSE)
          ORDER BY m.sent_at ASC`,
@@ -394,6 +405,98 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
       );
 
       res.status(201).json(msg);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── PATCH /api/dm/:id/link ───────────────────────────────────────────────────
+  // Link / unlink an entire conversation (all msgs between the two users) to a job or task
+  app.patch("/api/dm/:id/link", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const { id } = req.params;
+
+      const { rows: msgRows } = await pool.query(
+        `SELECT sender_id, recipient_id FROM direct_messages WHERE id = $1`,
+        [id]
+      );
+      if (!msgRows.length) return res.status(404).json({ message: "Message not found" });
+      const { sender_id, recipient_id } = msgRows[0];
+      if (sender_id !== me && recipient_id !== me) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const updates: string[] = [];
+      const params: any[] = [];
+      if ("jobId" in req.body) {
+        updates.push(`job_id = $${params.length + 1}`);
+        params.push(req.body.jobId || null);
+      }
+      if ("taskId" in req.body) {
+        updates.push(`task_id = $${params.length + 1}`);
+        params.push(req.body.taskId || null);
+      }
+      if (!updates.length) return res.status(400).json({ message: "No fields to update" });
+
+      // Apply to ALL messages between these two users
+      const p1 = params.length + 1;
+      const p2 = params.length + 2;
+      await pool.query(
+        `UPDATE direct_messages SET ${updates.join(", ")}
+         WHERE (sender_id = $${p1} AND recipient_id = $${p2})
+            OR (sender_id = $${p2} AND recipient_id = $${p1})`,
+        [...params, sender_id, recipient_id]
+      );
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── GET /api/dm/by-job/:jobId ─────────────────────────────────────────────────
+  // All messages linked to a job (for the Job detail Messages tab)
+  app.get("/api/dm/by-job/:jobId", requireAuth, async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      const { rows } = await pool.query(
+        `SELECT
+           m.id, m.sender_id, m.recipient_id, m.subject, m.body, m.sent_at, m.read_at,
+           m.job_id, m.task_id,
+           s.name AS sender_name, s.role AS sender_role, s.profile_picture AS sender_picture,
+           r.name AS recipient_name, r.role AS recipient_role
+         FROM direct_messages m
+         JOIN users s ON s.id = m.sender_id
+         JOIN users r ON r.id = m.recipient_id
+         WHERE m.job_id = $1
+         ORDER BY m.sent_at DESC`,
+        [jobId]
+      );
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── GET /api/dm/by-task/:taskId ───────────────────────────────────────────────
+  // All messages linked to a task (for the Task detail Messages section)
+  app.get("/api/dm/by-task/:taskId", requireAuth, async (req, res) => {
+    try {
+      const { taskId } = req.params;
+      const { rows } = await pool.query(
+        `SELECT
+           m.id, m.sender_id, m.recipient_id, m.subject, m.body, m.sent_at, m.read_at,
+           m.job_id, m.task_id,
+           s.name AS sender_name, s.role AS sender_role, s.profile_picture AS sender_picture,
+           r.name AS recipient_name, r.role AS recipient_role
+         FROM direct_messages m
+         JOIN users s ON s.id = m.sender_id
+         JOIN users r ON r.id = m.recipient_id
+         WHERE m.task_id = $1
+         ORDER BY m.sent_at DESC`,
+        [taskId]
+      );
+      res.json(rows);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

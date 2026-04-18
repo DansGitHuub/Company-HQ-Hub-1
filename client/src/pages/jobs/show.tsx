@@ -14,7 +14,7 @@ import {
 import {
   ChevronLeft, Pencil, User, MapPin, Calendar, Clock,
   DollarSign, Briefcase, Timer, ChevronDown, Loader2, FileText,
-  Plus, Trash2, HardHat,
+  Plus, Trash2, HardHat, MessageSquare,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -118,6 +118,44 @@ interface InvoiceSummary {
   id: string; invoice_number: string; status: string;
   issued_date: string; due_date: string | null;
   total: string; balance_due: string;
+}
+
+function JobMessagesTab({ jobId }: { jobId: string }) {
+  const { data: msgs = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/dm/by-job", jobId],
+    queryFn: () => fetch(`/api/dm/by-job/${jobId}`, { credentials: "include" }).then(r => r.json()),
+  });
+  if (isLoading) return <p className="text-sm text-muted-foreground py-4 text-center">Loading…</p>;
+  if (msgs.length === 0) return (
+    <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
+      No messages linked to this job yet. Open a conversation in Messages and link it to this job.
+    </CardContent></Card>
+  );
+  return (
+    <div className="space-y-2" data-testid="job-messages-list">
+      {msgs.map((m: any) => (
+        <Card key={m.id} className="hover:bg-muted/40 transition-colors">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-xs font-medium">{m.sender_name}</span>
+                  <span className="text-xs text-muted-foreground">→</span>
+                  <span className="text-xs font-medium">{m.recipient_name}</span>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {new Date(m.sent_at).toLocaleDateString()}
+                  </span>
+                </div>
+                {m.subject && <p className="text-xs font-semibold text-muted-foreground mb-0.5">{m.subject}</p>}
+                <p className="text-sm text-gray-700 line-clamp-2">{m.body}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
 }
 
 function JobInvoicesTab({ jobId }: { jobId: string }) {
@@ -471,6 +509,7 @@ export default function JobDetailPage() {
             <TabsTrigger value="time">Time Entries</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
             <TabsTrigger value="invoices">Invoices</TabsTrigger>
+            <TabsTrigger value="messages" data-testid="tab-messages">Messages</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
 
@@ -623,6 +662,11 @@ export default function JobDetailPage() {
           {/* Invoices Tab */}
           <TabsContent value="invoices">
             <JobInvoicesTab jobId={job.id} />
+          </TabsContent>
+
+          {/* Messages Tab */}
+          <TabsContent value="messages">
+            <JobMessagesTab jobId={job.id} />
           </TabsContent>
 
           {/* Activity Tab */}
