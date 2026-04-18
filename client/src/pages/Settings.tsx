@@ -145,7 +145,6 @@ export default function Settings() {
     { id: "language" as const, label: "Language & Display", icon: Globe },
     { id: "appearance" as const, label: "Appearance", icon: Palette },
     ...(isAdminOrManager ? [
-      { id: "work-areas" as const, label: "Work Areas", icon: Layers },
       { id: "divisions" as const, label: "Divisions", icon: Tag },
       { id: "estimate-templates" as const, label: "Estimate Templates", icon: FileText },
       { id: "company" as const, label: "Company Info", icon: Building2 },
