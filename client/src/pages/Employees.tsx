@@ -87,17 +87,22 @@ export default function Employees() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Gradient page header */}
+      <div className="rounded-xl bg-gradient-to-r from-green-700 to-emerald-600 px-6 py-5 text-white flex items-center justify-between shadow-md">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-employees-title">
             <Users className="h-6 w-6" /> {t("employees.title")}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {employees.length} {t("common.total")} &middot; {activeCount} {t("status.active")}{onLeaveCount > 0 ? ` \u00b7 ${onLeaveCount} ${t("status.onHold")}` : ""}
+          <p className="text-sm text-green-100 mt-0.5">
+            {employees.length} {t("common.total")} &middot; {activeCount} {t("status.active")}{onLeaveCount > 0 ? ` · ${onLeaveCount} ${t("status.onHold")}` : ""}
           </p>
         </div>
         {isAdmin && (
-          <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-employee">
+          <Button
+            onClick={() => setShowAddDialog(true)}
+            data-testid="button-add-employee"
+            className="bg-white/15 border border-white/30 text-white hover:bg-white/25 hover:text-white"
+          >
             <Plus className="h-4 w-4 mr-2" /> {t("employees.addEmployee")}
           </Button>
         )}
@@ -136,41 +141,47 @@ export default function Employees() {
           </CardContent>
         </Card>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-xl overflow-hidden shadow-sm">
           <table className="w-full" data-testid="table-employees">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="text-left p-3 text-sm font-medium">{t("common.name")}</th>
-                <th className="text-left p-3 text-sm font-medium">{t("employees.position")}</th>
-                <th className="text-left p-3 text-sm font-medium">{t("employees.department")}</th>
-                <th className="text-left p-3 text-sm font-medium">{t("employees.startDate")}</th>
-                <th className="text-left p-3 text-sm font-medium">{t("common.status")}</th>
+            <thead>
+              <tr className="bg-gradient-to-r from-green-700 to-emerald-600 text-white">
+                <th className="text-left px-4 py-3 text-sm font-semibold">{t("common.name")}</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold">{t("employees.position")}</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold">{t("employees.department")}</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold">{t("employees.startDate")}</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold">{t("common.status")}</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((emp: any) => (
+              {filtered.map((emp: any, idx: number) => (
                 <tr
                   key={emp.id}
-                  className="border-t cursor-pointer hover:bg-muted/30 transition-colors"
+                  className={`border-t cursor-pointer hover:bg-emerald-50/50 transition-colors ${idx % 2 !== 0 ? "bg-muted/20" : ""}`}
                   onClick={() => setSelectedEmployee(emp.id)}
                   data-testid={`row-employee-${emp.id}`}
                 >
-                  <td className="p-3">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                      <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-xs font-bold text-green-700">
                         {getInitials(`${emp.firstName} ${emp.lastName}`)}
                       </div>
                       <span className="font-medium text-sm">{emp.firstName} {emp.lastName}</span>
                     </div>
                   </td>
-                  <td className="p-3 text-sm">{emp.jobTitle || "\u2014"}</td>
-                  <td className="p-3 text-sm">{emp.department || "\u2014"}</td>
-                  <td className="p-3 text-sm">{emp.startDate || "\u2014"}</td>
-                  <td className="p-3">
-                    <Badge variant="outline" className={
-                      emp.status === "Active" ? "text-green-700 bg-green-50" :
-                      emp.status === "Terminated" ? "text-red-700 bg-red-50" :
-                      emp.status === "On Leave" ? "text-yellow-700 bg-yellow-50" : ""
+                  <td className="px-4 py-3 text-sm">{emp.jobTitle || "—"}</td>
+                  <td className="px-4 py-3 text-sm">{emp.department || "—"}</td>
+                  <td className="px-4 py-3 text-sm">{emp.startDate || "—"}</td>
+                  <td className="px-4 py-3">
+                    <Badge className={
+                      emp.status === "Active"
+                        ? "bg-green-100 text-green-700 border border-green-200"
+                        : emp.status === "Terminated"
+                        ? "bg-red-100 text-red-700 border border-red-200"
+                        : emp.status === "On Leave"
+                        ? "bg-yellow-100 text-yellow-700 border border-yellow-200"
+                        : emp.status === "Seasonal Off"
+                        ? "bg-slate-100 text-slate-600 border border-slate-200"
+                        : "bg-muted text-muted-foreground"
                     }>
                       {emp.status}
                     </Badge>

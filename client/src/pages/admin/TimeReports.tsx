@@ -168,15 +168,22 @@ export default function TimeReports() {
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-6">
+      {/* Gradient page header */}
+      <div className="rounded-xl bg-gradient-to-r from-green-700 to-emerald-600 px-6 py-5 text-white flex items-center justify-between mb-6 shadow-md">
         <div className="flex items-center gap-3">
-          <ClipboardList className="h-6 w-6 text-primary" />
+          <ClipboardList className="h-6 w-6" />
           <div>
             <h1 className="text-2xl font-bold" data-testid="heading-time-reports">Time Reports</h1>
-            <p className="text-sm text-muted-foreground">All employee clock-in / clock-out records</p>
+            <p className="text-sm text-green-100">All employee clock-in / clock-out records</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={exportCSV} disabled={!data?.entries.length} data-testid="button-export-csv">
+        <Button
+          size="sm"
+          onClick={exportCSV}
+          disabled={!data?.entries.length}
+          data-testid="button-export-csv"
+          className="bg-white/15 border border-white/30 text-white hover:bg-white/25 hover:text-white"
+        >
           <Download className="h-4 w-4 mr-2" /> Export CSV
         </Button>
       </div>
@@ -346,8 +353,12 @@ export default function TimeReports() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.entries.map((entry) => (
-                    <TableRow key={entry.id} data-testid={`row-time-entry-${entry.id}`}>
+                  {data.entries.map((entry, idx) => (
+                    <TableRow
+                      key={entry.id}
+                      data-testid={`row-time-entry-${entry.id}`}
+                      className={`hover:bg-emerald-50/40 transition-colors ${idx % 2 !== 0 ? "bg-muted/20" : ""}`}
+                    >
                       <TableCell className="font-medium" data-testid={`text-employee-${entry.id}`}>
                         {entry.employee_name || entry.username}
                       </TableCell>
@@ -372,9 +383,17 @@ export default function TimeReports() {
                         {entry.customer ?? <span className="text-muted-foreground text-xs">—</span>}
                       </TableCell>
                       <TableCell data-testid={`text-type-${entry.id}`}>
-                        <Badge variant="secondary" className="capitalize text-xs">
-                          {entry.entry_type.replace("_", " ")}
-                        </Badge>
+                        {entry.entry_type === "billable" ? (
+                          <Badge className="bg-green-100 text-green-700 border border-green-200 text-xs">Billable</Badge>
+                        ) : entry.entry_type === "drive_time" ? (
+                          <Badge className="bg-blue-100 text-blue-700 border border-blue-200 text-xs">Drive Time</Badge>
+                        ) : entry.entry_type === "shop_time" ? (
+                          <Badge className="bg-slate-100 text-slate-600 border border-slate-200 text-xs">Shop Time</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="capitalize text-xs">
+                            {entry.entry_type.replace("_", " ")}
+                          </Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

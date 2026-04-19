@@ -177,11 +177,21 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
     },
   ];
 
+  const groupLabelColor = (label: string) => {
+    switch (label) {
+      case "People & HR": return "text-blue-600 dark:text-blue-400";
+      case "Company Settings": return "text-purple-600 dark:text-purple-400";
+      case "Operations": return "text-green-600 dark:text-green-400";
+      case "AI & Automation": return "text-orange-500 dark:text-orange-400";
+      default: return "text-muted-foreground/60";
+    }
+  };
+
   return (
     <nav className="flex flex-col gap-1 py-1" data-testid="admin-sidebar">
       {groups.map((group) => (
         <div key={group.label} className="mb-3">
-          <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 select-none">
+          <p className={`px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest select-none ${groupLabelColor(group.label)}`}>
             {group.label}
           </p>
           {group.items.map((item) => {
@@ -595,25 +605,31 @@ export default function AdminPanel() {
 
   return (
     <div className="space-y-4 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center">
+      {/* Gradient page header */}
+      <div className="rounded-xl bg-gradient-to-r from-green-700 to-emerald-600 px-6 py-5 text-white flex justify-between items-center shadow-md">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-3">
-            <Shield className="w-8 h-8 text-primary" /> {t("nav.adminPanel")}
-            {isMasterAdmin && <Badge className="bg-amber-100 text-amber-800"><Crown className="w-3 h-3 mr-1" /> Master</Badge>}
+          <h1 className="text-2xl font-heading font-bold flex items-center gap-3">
+            <Shield className="w-7 h-7" /> {t("nav.adminPanel")}
+            {isMasterAdmin && (
+              <Badge className="bg-white/20 text-white border-white/30 text-xs">
+                <Crown className="w-3 h-3 mr-1" /> Master
+              </Badge>
+            )}
           </h1>
-          <p className="text-muted-foreground">{t("settings.adminSettingsDesc")}</p>
+          <p className="text-green-100 text-sm mt-0.5">{t("settings.adminSettingsDesc")}</p>
         </div>
         <CreateUserDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} isMasterAdmin={isMasterAdmin} />
       </div>
 
+      {/* Stat cards with colored left-border accents */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="border-l-4 border-l-blue-500">
           <CardContent className="pt-6">
-            <div className="text-3xl font-bold text-primary">{users.length}</div>
+            <div className="text-3xl font-bold text-blue-600">{users.length}</div>
             <p className="text-sm text-muted-foreground">{t("common.total")} {t("nav.employees")}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-green-500">
           <CardContent className="pt-6">
             <div className="text-3xl font-bold text-green-600">
               {users.filter(u => u.isActive).length}
@@ -621,7 +637,7 @@ export default function AdminPanel() {
             <p className="text-sm text-muted-foreground">{t("status.active")}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-orange-500">
           <CardContent className="pt-6">
             <div className="text-3xl font-bold text-orange-600">
               {pendingRequests.length}
@@ -629,7 +645,7 @@ export default function AdminPanel() {
             <p className="text-sm text-muted-foreground">{t("status.pending")} {t("hiring.communications")}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-amber-500">
           <CardContent className="pt-6">
             <div className="text-3xl font-bold text-amber-600">
               {users.filter(u => u.role === "Admin").length}
