@@ -12,6 +12,8 @@ import { runNotificationMigration } from "./notificationMigration";
 import { startTaskScheduler } from "./taskScheduler";
 import { startSopPipelineScheduler } from "./sopPipelineScheduler";
 import { startProcessAuditScheduler } from "./processAuditScheduler";
+import { startNotificationScheduler } from "./notificationScheduler";
+import { registerNotificationPreferenceRoutes } from "./notificationPreferencesRoutes";
 import { seedOemTemplates } from "./equipmentSeed";
 import { runSharedLinksMigration } from "./sharedLinksMigration";
 import { runDocumentMigration } from "./documentMigration";
@@ -127,6 +129,7 @@ app.use((req, res, next) => {
   // Public pages must be registered BEFORE registerRoutes (which sets up the React catch-all)
   registerPublicPages(app);
 
+  registerNotificationPreferenceRoutes(app);
   await registerRoutes(httpServer, app);
   
   await seedUsers();
@@ -180,6 +183,7 @@ app.use((req, res, next) => {
       startProcessAuditScheduler();
       startApplicationTokenScheduler();
       startQuickBooksScheduler();
+        startNotificationScheduler();
     },
   );
 })();

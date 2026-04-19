@@ -1,20 +1,21 @@
 // Twilio SMS Service — Server-to-Server
-// Required secrets: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER
+// Required secrets: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_MESSAGING_SERVICE_SID (preferred) or TWILIO_PHONE_NUMBER
 
 export function isSmsConfigured(): boolean {
   return !!(
     process.env.TWILIO_ACCOUNT_SID &&
     process.env.TWILIO_AUTH_TOKEN &&
-    process.env.TWILIO_PHONE_NUMBER
+    (process.env.TWILIO_MESSAGING_SERVICE_SID || process.env.TWILIO_PHONE_NUMBER)
   );
 }
 
 export async function sendSms(to: string, body: string): Promise<boolean> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
   const from = process.env.TWILIO_PHONE_NUMBER;
 
-  if (!accountSid || !authToken || !from) {
+  if (!accountSid || !authToken || (!messagingServiceSid && !from)) {
     console.warn("[sms] Twilio credentials not configured — skipping SMS to:", to);
     return false;
   }
@@ -28,7 +29,16 @@ export async function sendSms(to: string, body: string): Promise<boolean> {
 
   try {
     const credentials = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
-    const payload = new URLSearchParams({ To: normalized, From: from, Body: body }).toString();
+
+    // Prefer MessagingServiceSid over From number
+    const params: Record<string, string> = { To: normalized, Body: body };
+    if (messagingServiceSid) {
+      params.MessagingServiceSid = messagingServiceSid;
+    } else {
+      params.From = from!;
+    }
+
+    const payload = new URLSearchParams(params).toString();
 
     const response = await fetch(
       `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,

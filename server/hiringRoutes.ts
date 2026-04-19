@@ -189,6 +189,21 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
     }
   }
 
+        // Notify all admin staff of hiring stage change via in-app + SMS
+        try {
+          const ns = await import("./notificationService");
+          const adminUsers = await storage.getUsers();
+          const adminIds = adminUsers
+            .filter((u: any) => u.role === "Admin" || u.role === "Manager")
+            .map((u: any) => u.id);
+          await ns.notifyStageChange(
+            adminIds,
+            candidate.name || "Applicant",
+            candidate.role || "the position",
+            newStage,
+            candidateId
+          );
+        } catch (ne: any) { console.error("[notify] stage change:", ne.message); }
   // Send SMS notification for all stages (if candidate has a phone)
   if (candidate.phone && isSmsConfigured()) {
     try {

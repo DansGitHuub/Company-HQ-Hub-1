@@ -4319,6 +4319,18 @@ Generate detailed information for this landscaping material.`;
       if (!job) return res.status(404).json({ message: "Job not found" });
       if (req.body.stage) {
         logActivity("job_stage_change", `Work card "${job.client}" moved to ${req.body.stage}`, "/jobs", req.user?.id);
+          // Trigger SMS/email/in-app notification for customer
+          try {
+            const ns = await import("./notificationService");
+            await ns.notifyJobStatusUpdate(
+              null,
+              (job as any).contactEmail || "",
+              (job as any).contactPhone || null,
+              job.id,
+              job.client || "your job",
+              req.body.stage
+            );
+          } catch (ne: any) { console.error("[notify] job stage:", ne.message); }
       }
       res.json(job);
     } catch (err) {
@@ -5139,6 +5151,17 @@ Generate detailed information for this landscaping material.`;
         }
       }
 
+        // Trigger SMS/email/in-app notification for customer
+        try {
+          const ns = await import("./notificationService");
+          await ns.notifyEstimateSent(
+            null,
+            estimate.contactEmail || "",
+            (estimate as any).contactPhone || null,
+            req.params.id,
+            estimate.estimatedValue ?? 0
+          );
+        } catch (ne: any) { console.error("[notify] estimate sent:", ne.message); }
       res.json(updated);
     } catch (err) {
       res.status(500).json({ message: "Error sending estimate" });
@@ -10362,6 +10385,16 @@ Provide accurate information based on publicly available documentation.`;
         console.error("[apply] Notification error:", notifyErr);
       }
 
+        // Trigger in-app + SMS notification for admins (email sent above)
+        try {
+          const ns = await import("./notificationService");
+          await ns.notifyApplicationReceived(
+            notifyUsers.map((u: any) => u.id),
+            fullName || "an applicant",
+            position,
+            app.id
+          );
+        } catch (ne: any) { console.error("[notify] application received:", ne.message); }
       return res.json({ message: "Application submitted successfully" });
     } catch (err) {
       console.error("[apply] Submit error:", err);

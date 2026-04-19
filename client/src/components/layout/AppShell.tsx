@@ -71,6 +71,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { NotificationBell } from "@/components/ui/NotificationBell";
 import { Badge } from "@/components/ui/badge";
 import WorksheetWidget from "@/components/WorksheetWidget";
 
@@ -875,6 +876,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <NotificationBell userId={user?.id} />
 
           </div>
         </header>
