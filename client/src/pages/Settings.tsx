@@ -27,7 +27,7 @@ import {
   User, Bell, BellOff, Globe, Palette, Shield, Save, Loader2, Lock, Eye, EyeOff, Check,
   Settings as SettingsIcon, Mail, Monitor, Sun, Moon, Layers, Tag, FileText, Building2,
   Plus, Pencil, Trash2, Link2, Link2Off, RefreshCw, CheckCircle, XCircle, AlertCircle,
-  ArrowLeftRight,
+  ArrowLeftRight, Info,
 } from "lucide-react";
 import { themes, getTheme, applyTheme, type ThemeId } from "@/lib/themes";
 
@@ -144,12 +144,6 @@ export default function Settings() {
     { id: "notifications" as const, label: "Notifications", icon: Bell },
     { id: "language" as const, label: "Language & Display", icon: Globe },
     { id: "appearance" as const, label: "Appearance", icon: Palette },
-    ...(isAdminOrManager ? [
-      { id: "divisions" as const, label: "Divisions", icon: Tag },
-      { id: "estimate-templates" as const, label: "Estimate Templates", icon: FileText },
-    ] : []),
-    ...(isAdmin ? [{ id: "quickbooks" as const, label: "QuickBooks", icon: ArrowLeftRight }] : []),
-    ...(isAdmin ? [{ id: "terms" as const, label: "Terms & Conditions", icon: FileText }] : []),
   ];
 
   if (isLoading) {
@@ -197,11 +191,18 @@ export default function Settings() {
           {activeSection === "appearance" && <AppearanceSection />}
 
           {activeSection === "work-areas" && isAdminOrManager && <WorkAreasSection />}
-          {activeSection === "divisions" && isAdminOrManager && <DivisionsSection />}
-          {activeSection === "estimate-templates" && isAdminOrManager && <EstimateTemplatesSection />}
           {activeSection === "company" && isAdminOrManager && <CompanyInfoSection />}
-          {activeSection === "quickbooks" && isAdmin && <QuickBooksSection qbParam={qbParam} />}
-          {activeSection === "terms" && isAdmin && <TermsSection />}
+          {(["divisions", "estimate-templates", "quickbooks", "terms"] as const).includes(activeSection as any) && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 flex gap-3 items-start">
+              <Info className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold text-blue-900 mb-1">Moved to Admin Panel</p>
+                <p className="text-sm text-blue-700">
+                  Company-wide settings — <span className="font-medium">Divisions, Estimate Templates, QuickBooks,</span> and <span className="font-medium">Terms &amp; Conditions</span> — are now managed in <span className="font-medium">Admin Panel → Company Settings</span>.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
