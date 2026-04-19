@@ -160,10 +160,8 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
       label: "Operations",
       items: [
         { value: "process-auditor", label: "Process Auditor", icon: ClipboardCheck },
-        { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle },
         { value: "worksheet-review", label: "Worksheet Review", icon: FileText, href: "/worksheet-review" },
         { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
-        { value: "qbo-export", label: "QB Export", icon: Upload, href: "/admin/qbo-export" },
         { value: "archive", label: "Archive", icon: Archive, href: "/admin/archive" },
       ],
     },
@@ -693,9 +691,7 @@ export default function AdminPanel() {
             <SelectGroup>
               <SelectLabel>Operations</SelectLabel>
               <SelectItem value="process-auditor">Process Auditor</SelectItem>
-              <SelectItem value="integration-wizard">Integration Wizard</SelectItem>
               <SelectItem value="work-areas">Work Areas</SelectItem>
-              <SelectItem value="qbo-export">QB Export</SelectItem>
               <SelectItem value="archive">Archive</SelectItem>
             </SelectGroup>
             <SelectGroup>
