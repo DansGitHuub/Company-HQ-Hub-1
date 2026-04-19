@@ -130,7 +130,7 @@ export async function notifyAllStaff(
   roleFilter?: string
 ): Promise<void> {
   try {
-    const allUsers = await storage.getUsers();
+    const allUsers = await storage.getAllUsers();
     const targets = roleFilter
       ? allUsers.filter((u: any) => u.role === roleFilter)
       : allUsers;

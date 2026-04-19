@@ -192,7 +192,7 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
         // Notify all admin staff of hiring stage change via in-app + SMS
         try {
           const ns = await import("./notificationService");
-          const adminUsers = await storage.getUsers();
+          const adminUsers = await storage.getAllUsers();
           const adminIds = adminUsers
             .filter((u: any) => u.role === "Admin" || u.role === "Manager")
             .map((u: any) => u.id);
