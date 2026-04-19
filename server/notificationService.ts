@@ -7,8 +7,11 @@
 
 import { storage } from "./storage";
 import { sendSms, isSmsConfigured } from "./smsService";
-import { sendEmail } from "./email";
+import { sendEmail as _sendEmailRaw } from "./emailService";
 import { log } from "./index";
+
+const sendEmail = ({ to, subject, html }: { to: string; subject: string; html: string }) =>
+  _sendEmailRaw(to, subject, html);
 
 // ─────────────────────────────────────────────────────────────
 // Types
