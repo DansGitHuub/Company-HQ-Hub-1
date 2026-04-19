@@ -138,6 +138,17 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
       ],
     },
     {
+      label: "Company Settings",
+      items: [
+        { value: "divisions", label: "Divisions", icon: Layers, href: "/settings?tab=divisions" },
+        { value: "estimate-templates", label: "Estimate Templates", icon: FileText, href: "/settings?tab=estimate-templates" },
+        { value: "quickbooks", label: "QuickBooks", icon: DollarSign, href: "/settings?tab=quickbooks" },
+        { value: "terms", label: "Terms & Conditions", icon: FileSignature, href: "/settings?tab=terms" },
+        { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle },
+        { value: "qbo-export-cs", label: "QB Export", icon: Upload, href: "/admin/qbo-export" },
+      ],
+    },
+    {
       label: "AI & Automation",
       items: [
         { value: "assistant-agents", label: "AI Assistant", icon: Sparkles },
@@ -634,6 +645,11 @@ export default function AdminPanel() {
           if (v === "work-areas") { navigate("/admin/work-areas"); return; }
           if (v === "qbo-export") { navigate("/admin/qbo-export"); return; }
           if (v === "archive") { navigate("/admin/archive"); return; }
+          if (v === "divisions") { navigate("/settings?tab=divisions"); return; }
+          if (v === "estimate-templates") { navigate("/settings?tab=estimate-templates"); return; }
+          if (v === "quickbooks") { navigate("/settings?tab=quickbooks"); return; }
+          if (v === "terms") { navigate("/settings?tab=terms"); return; }
+          if (v === "qbo-export-cs") { navigate("/admin/qbo-export"); return; }
           setActiveTab(v);
         }}>
           <SelectTrigger className="w-full" data-testid="admin-mobile-nav">
@@ -657,7 +673,16 @@ export default function AdminPanel() {
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>Company</SelectLabel>
-              <SelectItem value="company">Branding &amp; Settings</SelectItem>
+              <SelectItem value="company">Company Info &amp; Branding</SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>Company Settings</SelectLabel>
+              <SelectItem value="divisions">Divisions</SelectItem>
+              <SelectItem value="estimate-templates">Estimate Templates</SelectItem>
+              <SelectItem value="quickbooks">QuickBooks</SelectItem>
+              <SelectItem value="terms">Terms &amp; Conditions</SelectItem>
+              <SelectItem value="integration-wizard">Integration Wizard</SelectItem>
+              <SelectItem value="qbo-export-cs">QB Export</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>AI &amp; Automation</SelectLabel>
