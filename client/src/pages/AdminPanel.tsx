@@ -63,6 +63,7 @@ import {
   Lightbulb,
   Zap,
   ClipboardCheck,
+  ClipboardList,
   Puzzle,
   Mail,
   FileSignature,
@@ -159,6 +160,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
     {
       label: "Operations",
       items: [
+        { value: "time-reports", label: "Time Reports", icon: ClipboardList, href: "/admin/time-reports" },
         { value: "process-auditor", label: "Process Auditor", icon: ClipboardCheck },
         { value: "worksheet-review", label: "Worksheet Review", icon: FileText, href: "/worksheet-review" },
         { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
@@ -640,6 +642,7 @@ export default function AdminPanel() {
       {/* Mobile section picker — visible only on small screens */}
       <div className="block md:hidden">
         <Select value={activeTab} onValueChange={(v) => {
+          if (v === "time-reports") { navigate("/admin/time-reports"); return; }
           if (v === "work-areas") { navigate("/admin/work-areas"); return; }
           if (v === "qbo-export") { navigate("/admin/qbo-export"); return; }
           if (v === "archive") { navigate("/admin/archive"); return; }
@@ -690,6 +693,7 @@ export default function AdminPanel() {
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>Operations</SelectLabel>
+              <SelectItem value="time-reports">Time Reports</SelectItem>
               <SelectItem value="process-auditor">Process Auditor</SelectItem>
               <SelectItem value="work-areas">Work Areas</SelectItem>
               <SelectItem value="archive">Archive</SelectItem>

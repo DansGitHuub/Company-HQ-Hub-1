@@ -390,6 +390,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     inbox: { icon: Mail, label: t("nav.messages"), href: "/inbox" },
     messages: { icon: MessageSquare, label: "Messages", href: "/messages" },
     admin: { icon: Shield, label: t("nav.adminPanel"), href: "/admin" },
+  time_reports: { icon: ClipboardList, label: "Time Reports", href: "/admin/time-reports" },
     catalog: { icon: BookMarked, label: "Item Catalog", href: "/catalog" },
     budget_settings: { icon: DollarSign, label: "Budget & Pricing", href: "/budget-settings" },
     tools: { icon: Snowflake, label: t("nav.tools"), href: "/tools" },
@@ -411,7 +412,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["todos", "scheduling", "time_tracking", "equipment", "forms"] },
     { label: "RESOURCES", items: ["sops", "education", "testing"] },
-    { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "mors_budget", "catalog", "budget_settings", "tools"] },
+    { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "time_reports", "mors_budget", "catalog", "budget_settings", "tools"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {

@@ -80,6 +80,7 @@ import CatalogImport from "@/pages/catalog/CatalogImport";
 import CatalogDetail from "@/pages/catalog/CatalogDetail";
 import CustomerPortal from "@/pages/CustomerPortal";
 import MessagesPage from "@/pages/Messages";
+import TimeReports from "@/pages/admin/TimeReports";
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
@@ -176,6 +177,7 @@ function AppRoutes() {
         <Route path="/admin/work-areas" component={WorkAreasPage} />
         <Route path="/admin/qbo-export" component={QBOExportPage} />
         <Route path="/admin/archive" component={ArchivePage} />
+        <Route path="/admin/time-reports" component={TimeReports} />
         <Route path="/budget-settings" component={BudgetSettings} />
         <Route path="/time" component={TimeTracking} />
         <Route path="/reports" component={ReportsPage} />

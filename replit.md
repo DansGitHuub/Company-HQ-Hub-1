@@ -33,6 +33,7 @@ The frontend is built using React and TypeScript, leveraging React Query for ser
 - **My Day (Crew Mobile View)**: Mobile-first page for daily job assignments, clock-in/out functionality, drive time, shop time, and break tracking with live timers and GPS integration.
 - **Scheduling / Dispatch Calendar**: Full-screen weekly dispatch board for assigning unscheduled jobs to crews, with division color-coding and time-slot management.
 - **Admin Tools**: A suite of tools including a dynamic Form Builder, Company Branding, Help System, Global Search, Communications Center, Lead Qualifier, Plow Site Mapper, AI Agents System, Update Notification System, Help Articles, Diagnostic Report System, PDF Field Placer, and Property Report Card tool, all accessible via full-screen overlay modals.
+- **Time Reports (Admin)**: Admin-only page at `/admin/time-reports` that aggregates all employee clock-in/clock-out records. Features Employee, Job, Customer, Year, and Date Range filters. Displays a table with Employee Name, Date, Clock In, Clock Out, Total Hours, Job, Customer, and Type columns plus a summary footer row and total-hours badge. Includes CSV export. API: `GET /api/admin/time-reports`. Listed in AppShell ADMIN sidebar and AdminPanel Operations group.
 - **Task Management System**: Full task system with Kanban board, list view, open pool, quick add, and scheduling.
 - **Document Sharing System**: Cross-module document sharing from a central Document Library.
 - **Customer Suggestions**: Allows customers to submit improvement suggestions for admin review.

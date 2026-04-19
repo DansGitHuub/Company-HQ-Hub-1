@@ -176,6 +176,95 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── Admin: Time Reports ─────────────────────────────────────────────────────
+  app.get("/api/admin/time-reports", requireAuth, async (req, res) => {
+    const requestingUser = req.user as any;
+    if (requestingUser.role !== "Admin" && !requestingUser.isMasterAdmin) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const { user_id, job_id, customer, date_from, date_to, year } = req.query as Record<string, string>;
+
+    try {
+      let q = `
+        SELECT
+          te.id,
+          te.clock_in,
+          te.clock_out,
+          te.duration_minutes,
+          te.entry_type,
+          te.notes,
+          te.work_area_name,
+          u.id        AS user_id,
+          u.name      AS employee_name,
+          u.username,
+          j.id        AS job_id,
+          j.client    AS customer,
+          j.type      AS job_type
+        FROM time_entries te
+        JOIN users u ON u.id = te.user_id
+        LEFT JOIN jobs j ON j.id = te.job_id
+        WHERE 1=1
+      `;
+      const params: any[] = [];
+
+      if (user_id) {
+        params.push(user_id);
+        q += ` AND te.user_id = $${params.length}`;
+      }
+      if (job_id) {
+        params.push(job_id);
+        q += ` AND te.job_id = $${params.length}`;
+      }
+      if (customer) {
+        params.push(`%${customer}%`);
+        q += ` AND j.client ILIKE $${params.length}`;
+      }
+      if (year) {
+        params.push(parseInt(year));
+        q += ` AND EXTRACT(YEAR FROM te.clock_in) = $${params.length}`;
+      }
+      if (date_from) {
+        params.push(date_from);
+        q += ` AND te.clock_in::date >= $${params.length}`;
+      }
+      if (date_to) {
+        params.push(date_to);
+        q += ` AND te.clock_in::date <= $${params.length}`;
+      }
+
+      q += ` ORDER BY te.clock_in DESC`;
+
+      const result = await pool.query(q, params);
+
+      const totalMinutes = result.rows.reduce((sum: number, row: any) => {
+        if (row.duration_minutes) return sum + Number(row.duration_minutes);
+        if (row.clock_in && row.clock_out) {
+          const ms = new Date(row.clock_out).getTime() - new Date(row.clock_in).getTime();
+          return sum + Math.round(ms / 60000);
+        }
+        return sum;
+      }, 0);
+
+      // Get distinct employees and jobs for filter dropdowns
+      const empResult = await pool.query(
+        `SELECT DISTINCT u.id, u.name, u.username FROM time_entries te JOIN users u ON u.id = te.user_id ORDER BY u.name`
+      );
+      const jobResult = await pool.query(
+        `SELECT DISTINCT j.id, j.client, j.type FROM time_entries te JOIN jobs j ON j.id = te.job_id WHERE te.job_id IS NOT NULL ORDER BY j.client`
+      );
+
+      return res.json({
+        entries: result.rows,
+        totalMinutes,
+        employees: empResult.rows,
+        jobs: jobResult.rows,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── GPS Ping ────────────────────────────────────────────────────────────────
   app.post("/api/gps/ping", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
