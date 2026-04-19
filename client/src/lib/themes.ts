@@ -1,4 +1,5 @@
 export type ThemeId = 
+  | "chapin"
   | "forest" 
   | "ocean" 
   | "sunset" 
@@ -38,6 +39,32 @@ export interface Theme {
 }
 
 export const themes: Theme[] = [
+  {
+    id: "chapin",
+    name: "Chapin Landscapes",
+    description: "Warm earth tones with vibrant lime-green accents",
+    icon: "🌿",
+    colors: {
+      primary: "86 54% 51%",
+      primaryForeground: "0 0% 100%",
+      accent: "27 30% 67%",
+      accentForeground: "28 9% 9%",
+      cardGlow: "rgba(126, 176, 79, 0.15)",
+      gradientFrom: "28 9% 12%",
+      gradientTo: "28 9% 8%",
+      sidebar: "28 9% 8%",
+      sidebarForeground: "36 20% 90%",
+      sidebarAccent: "86 54% 51%",
+    },
+    style: {
+      borderRadius: "0.5rem",
+      cardShadow: "0 2px 8px -2px rgba(0,0,0,0.08), 0 4px 16px -4px rgba(126,176,79,0.08)",
+      buttonStyle: "solid",
+      sidebarStyle: "solid",
+      cardBorder: "1px solid hsl(34 24% 83%)",
+      inputStyle: "bordered",
+    },
+  },
   {
     id: "forest",
     name: "Forest",

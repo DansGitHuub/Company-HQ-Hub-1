@@ -24,14 +24,12 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  User, Bell, BellOff, Globe, Palette, Shield, Save, Loader2, Lock, Eye, EyeOff, Check,
+  User, Bell, BellOff, Globe, Shield, Save, Loader2, Lock, Eye, EyeOff, Check,
   Settings as SettingsIcon, Mail, Monitor, Sun, Moon, Layers, Tag, FileText, Building2,
   Plus, Pencil, Trash2, Link2, Link2Off, RefreshCw, CheckCircle, XCircle, AlertCircle,
   ArrowLeftRight, Info,
 } from "lucide-react";
-import { themes, getTheme, applyTheme, type ThemeId } from "@/lib/themes";
-
-type SettingsSection = "profile" | "notifications" | "language" | "appearance" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks" | "terms";
+type SettingsSection = "profile" | "notifications" | "language" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks" | "terms";
 
 function TermsSection() {
   const { toast } = useToast();
@@ -143,7 +141,6 @@ export default function Settings() {
     { id: "profile" as const, label: "Profile & Account", icon: User },
     { id: "notifications" as const, label: "Notifications", icon: Bell },
     { id: "language" as const, label: "Language & Display", icon: Globe },
-    { id: "appearance" as const, label: "Appearance", icon: Palette },
   ];
 
   if (isLoading) {
@@ -188,8 +185,6 @@ export default function Settings() {
           {activeSection === "profile" && <ProfileSection profile={profile} />}
           {activeSection === "notifications" && <NotificationsSection profile={profile} />}
           {activeSection === "language" && <LanguageSection profile={profile} />}
-          {activeSection === "appearance" && <AppearanceSection />}
-
           {activeSection === "work-areas" && isAdminOrManager && <WorkAreasSection />}
           {activeSection === "company" && isAdminOrManager && <CompanyInfoSection />}
           {(["divisions", "estimate-templates", "quickbooks", "terms"] as const).includes(activeSection as any) && (
@@ -462,61 +457,6 @@ function LanguageSection({ profile }: { profile: any }) {
     </div>
   );
 }
-
-function AppearanceSection() {
-  const { toast } = useToast();
-  const [selectedTheme, setSelectedTheme] = useState<ThemeId>(() => {
-    return (localStorage.getItem("selectedTheme") as ThemeId) || "default";
-  });
-
-  const handleThemeChange = (themeId: ThemeId) => {
-    setSelectedTheme(themeId);
-    const theme = getTheme(themeId);
-    applyTheme(theme);
-    localStorage.setItem("selectedTheme", themeId);
-    toast({ title: `Theme changed to ${theme.name}` });
-  };
-
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5" /> Theme</CardTitle>
-          <CardDescription>Choose a visual theme for the application</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {themes.map((theme) => (
-              <button
-                key={theme.id}
-                onClick={() => handleThemeChange(theme.id)}
-                className={`relative p-3 rounded-lg border-2 transition-all text-left ${
-                  selectedTheme === theme.id ? "border-primary ring-2 ring-primary/20" : "border-muted hover:border-foreground/20"
-                }`}
-                data-testid={`theme-option-${theme.id}`}
-              >
-                <div
-                  className="w-full h-8 rounded-md mb-2 flex gap-1 overflow-hidden"
-                >
-                  <div className="flex-1 h-full" style={{ background: `hsl(${theme.colors.primary})` }} />
-                  <div className="flex-1 h-full" style={{ background: `hsl(${theme.colors.accent})` }} />
-                  <div className="flex-1 h-full" style={{ background: `hsl(${theme.colors.sidebar})` }} />
-                </div>
-                <p className="text-sm font-medium">{theme.name}</p>
-                {selectedTheme === theme.id && (
-                  <div className="absolute top-1 right-1">
-                    <Check className="h-4 w-4 text-primary" />
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DIVISIONS_LIST = ["Maintenance", "Install", "Snow", "General"] as const;

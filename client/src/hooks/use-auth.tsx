@@ -48,7 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const theme = getTheme(user.theme);
       applyTheme(theme);
     } else {
-      const defaultTheme = getTheme("forest");
+      const savedTheme = localStorage.getItem("selectedTheme");
+      const defaultTheme = getTheme(savedTheme || "chapin");
       applyTheme(defaultTheme);
     }
   }, [user?.theme]);
