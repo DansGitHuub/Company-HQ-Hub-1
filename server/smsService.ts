@@ -55,11 +55,11 @@ export async function sendSms(to: string, body: string): Promise<boolean> {
     const data = await response.json() as any;
 
     if (!response.ok) {
-      console.error("[sms] Twilio error:", data?.message || data);
+      console.error(`[sms] Twilio error (HTTP ${response.status}):`, JSON.stringify(data));
       return false;
     }
 
-    console.log(`[sms] SMS sent to ${normalized} (SID: ${data.sid})`);
+    console.log(`[sms] SMS sent successfully to ${normalized} (SID: ${data.sid})`);
     return true;
   } catch (err: any) {
     console.error("[sms] Failed to send SMS:", err.message);

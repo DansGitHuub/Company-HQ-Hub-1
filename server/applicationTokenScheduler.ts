@@ -19,6 +19,14 @@ const DEFAULT_TEMPLATES: Array<{ stage: string; subject: string; body: string }>
 <p>Best regards,<br>Chapin Landscapes HR Team</p>`,
   },
   {
+    stage: "2nd Interview",
+    subject: "Next Steps: 2nd Interview — {{position}}",
+    body: `<p>Dear {{name}},</p>
+<p>Thank you for your time during the first interview for the <strong>{{position}}</strong> position at Chapin Landscapes. We enjoyed learning more about you and are pleased to invite you for a second interview. Our team will follow up shortly with the details.</p>
+<p>Please let us know if you have any questions.</p>
+<p>Best regards,<br>Chapin Landscapes HR Team</p>`,
+  },
+  {
     stage: "Offer Extended",
     subject: "Offer of Employment — {{position}} at Chapin Landscapes",
     body: `<p>Dear {{name}},</p>

@@ -205,9 +205,14 @@ async function handleStageChange(candidateId: string, newStage: string, candidat
           );
         } catch (ne: any) { console.error("[notify] stage change:", ne.message); }
   // Send SMS notification for all stages (if candidate has a phone)
-  if (candidate.phone && isSmsConfigured()) {
+  if (!isSmsConfigured()) {
+    console.warn("[hiring] SMS skipped — Twilio not configured");
+  } else if (!candidate.phone) {
+    console.warn(`[hiring] SMS skipped for ${candidate.name} — no phone number on file`);
+  } else {
     try {
-      await sendStageSms(candidate.phone, candidate.name, newStage, candidate.role || "");
+      const smsSent = await sendStageSms(candidate.phone, candidate.name, newStage, candidate.role || "");
+      console.log(`[hiring] Stage SMS for ${newStage} to ${candidate.name}: ${smsSent ? "sent" : "failed"}`);
     } catch (err: any) {
       console.error(`[hiring] Stage SMS failed for ${newStage}:`, err.message);
     }
