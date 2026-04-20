@@ -449,11 +449,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const NavContent = ({ isMobileSheet = false }: { isMobileSheet?: boolean } = {}) => {
-    const { t: tNav } = useTranslation();
+    const { t: tNav, i18n: i18nNav } = useTranslation();
     const { shapeClass, sizeClass } = getLogoClasses();
     const hasLogo = !!companySettings?.logoUrl;
+    const currentLang = i18nNav.language;
 
-    const navLabels: Record<string, string> = {
+    const navLabels: Record<string, string> = React.useMemo(() => ({
       dashboard: tNav("nav.myWorkspace"),
       applicant_portal: tNav("nav.myApplication"),
       sops: tNav("nav.sopLibrary"),
@@ -489,15 +490,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       budget_settings: tNav("nav.budgetPricing"),
       tools: tNav("nav.tools"),
       plow_mapper: tNav("nav.plowMapper"),
-    };
+    }), [currentLang]);
 
-    const navSectionLabels: Record<string, string> = {
+    const navSectionLabels: Record<string, string> = React.useMemo(() => ({
       "MY SPACE": tNav("nav.sections.mySpace"),
       "SALES": tNav("nav.sections.sales"),
       "OPERATIONS": tNav("nav.sections.operations"),
       "RESOURCES": tNav("nav.sections.resources"),
       "ADMIN": tNav("nav.sections.admin"),
-    };
+    }), [currentLang]);
     
     return (
     <div className="sidebar-themed flex flex-col h-full text-sidebar-foreground">
@@ -798,7 +799,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex flex-col w-[260px] border-r border-sidebar-border bg-sidebar overflow-hidden">
-        <NavContent />
+        <NavContent key={i18n.language} />
       </aside>
 
       {/* Main Content Area */}
@@ -813,7 +814,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-[280px] border-r-0">
-                <NavContent isMobileSheet={true} />
+                <NavContent key={`${i18n.language}-mobile`} isMobileSheet={true} />
               </SheetContent>
             </Sheet>
             <Link href="/" className="flex items-center gap-2">
