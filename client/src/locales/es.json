@@ -30,11 +30,29 @@
     "logOut": "Cerrar sesión",
     "myProfile": "Mi Perfil",
     "settings": "Configuración",
+    "jobs": "Trabajos",
+    "scheduling": "Programación",
+    "myDay": "Mi Día",
+    "myHours": "Mis Horas",
+    "estimates": "Estimados",
+    "invoices": "Facturas",
+    "dailyWorksheet": "Hoja de Trabajo Diaria",
+    "clockInOut": "Marcar Entrada / Salida",
+    "consultations": "Consultas",
+    "reports": "Reportes",
+    "morsBudget": "Presupuesto MORS",
+    "timeReports": "Reportes de Tiempo",
+    "catalog": "Catálogo de Artículos",
+    "budgetPricing": "Presupuesto y Precios",
     "sections": {
       "work": "VENTAS",
       "people": "PERSONAS",
       "company": "EMPRESA",
-      "admin": "ADMIN"
+      "admin": "Admin",
+      "mySpace": "Mi Espacio",
+      "sales": "Ventas",
+      "operations": "Operaciones",
+      "resources": "Recursos"
     }
   },
   "common": {

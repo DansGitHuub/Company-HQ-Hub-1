@@ -10,11 +10,15 @@ i18n
       en: { translation: en },
       es: { translation: es },
     },
-    lng: 'en',
+    lng: localStorage.getItem('i18n-language') || 'en',
     fallbackLng: 'en',
     interpolation: {
       escapeValue: false,
     },
   });
+
+i18n.on('languageChanged', (lng) => {
+  localStorage.setItem('i18n-language', lng);
+});
 
 export default i18n;

@@ -30,11 +30,29 @@
     "logOut": "Log out",
     "myProfile": "My Profile",
     "settings": "Settings",
+    "jobs": "Jobs",
+    "scheduling": "Scheduling",
+    "myDay": "My Day",
+    "myHours": "My Hours",
+    "estimates": "Estimates",
+    "invoices": "Invoices",
+    "dailyWorksheet": "Daily Worksheet",
+    "clockInOut": "Clock In / Out",
+    "consultations": "Consultations",
+    "reports": "Reports",
+    "morsBudget": "MORS Budget",
+    "timeReports": "Time Reports",
+    "catalog": "Item Catalog",
+    "budgetPricing": "Budget & Pricing",
     "sections": {
       "work": "SALES",
       "people": "PEOPLE",
       "company": "COMPANY",
-      "admin": "ADMIN"
+      "admin": "Admin",
+      "mySpace": "My Space",
+      "sales": "Sales",
+      "operations": "Operations",
+      "resources": "Resources"
     }
   },
   "common": {
