@@ -9,6 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Loader2, ClipboardList, Download } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -37,7 +38,7 @@ function statusBadgeVariant(status: string) {
 
 function fmt(val: string | number) {
   const n = typeof val === "string" ? parseFloat(val) : val;
-  if (isNaN(n) || n === 0) return "—";
+  if (isNaN(n) || n === 0) return "\u2014";
   return `$${n.toFixed(2)}`;
 }
 
@@ -49,6 +50,7 @@ function fmtDate(dateStr: string) {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function WorksheetReviewList() {
+  const { t } = useTranslation("worksheetReview");
   const [, navigate] = useLocation();
   const [exporting, setExporting] = useState(false);
 
@@ -92,9 +94,9 @@ export default function WorksheetReviewList() {
             <ClipboardList className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Worksheet Review</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
             <p className="text-sm text-muted-foreground">
-              Review and approve submitted daily worksheets from field staff.
+              {t("subtitle")}
             </p>
           </div>
         </div>
@@ -109,7 +111,7 @@ export default function WorksheetReviewList() {
           {exporting
             ? <Loader2 className="h-4 w-4 animate-spin" />
             : <Download className="h-4 w-4" />}
-          Export CSV
+          {t("exportCsv")}
         </Button>
       </div>
 
@@ -131,7 +133,7 @@ export default function WorksheetReviewList() {
       {/* Table */}
       <Card data-testid="card-worksheet-list">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">All Worksheets</CardTitle>
+          <CardTitle className="text-base">{t("allWorksheets")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -140,22 +142,22 @@ export default function WorksheetReviewList() {
             </div>
           ) : error ? (
             <p className="text-center text-sm text-destructive py-10">
-              Failed to load worksheets.
+              {t("failedToLoad")}
             </p>
           ) : sorted.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-10">
-              No worksheets found.
+              {t("noWorksheets")}
             </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Job / Area</TableHead>
-                  <TableHead className="text-right">Materials $</TableHead>
-                  <TableHead className="text-right">Expenses $</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{t("employee")}</TableHead>
+                  <TableHead>{t("date")}</TableHead>
+                  <TableHead>{t("jobArea")}</TableHead>
+                  <TableHead className="text-right">{t("materials")}</TableHead>
+                  <TableHead className="text-right">{t("expenses")}</TableHead>
+                  <TableHead>{t("status")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -173,7 +175,7 @@ export default function WorksheetReviewList() {
                       {fmtDate(w.date)}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {w.job_name ?? "—"}
+                      {w.job_name ?? "\u2014"}
                     </TableCell>
                     <TableCell className="text-right text-sm">
                       {fmt(w.materials_total)}

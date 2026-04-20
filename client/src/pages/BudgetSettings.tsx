@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Save, DollarSign, RefreshCw } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const CLASS_NAMES: Record<number, string> = {
   1: "Labor",
@@ -43,6 +44,7 @@ function displayToPct(val: string): number {
 }
 
 export default function BudgetSettings() {
+  const { t } = useTranslation("budgetSettings");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -92,11 +94,11 @@ export default function BudgetSettings() {
       );
     },
     onSuccess: () => {
-      toast({ title: "✓ Pricing defaults saved" });
+      toast({ title: `\u2713 ${t("saved")}` });
       queryClient.invalidateQueries({ queryKey: ["/api/class-pricing-defaults"] });
     },
     onError: (err: any) => {
-      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+      toast({ title: t("saveFailed"), description: err.message, variant: "destructive" });
     },
   });
 
@@ -110,10 +112,10 @@ export default function BudgetSettings() {
     <div className="max-w-3xl mx-auto px-4 pb-12 pt-4 space-y-6">
       <div>
         <h1 data-testid="budget-settings-title" className="text-2xl font-bold text-gray-900">
-          Budget &amp; Pricing Settings
+          {t("title")}
         </h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Set default overhead and profit margin percentages by class for {currentYear}. These apply when no per-item override is set.
+          {t("subtitle")}
         </p>
       </div>
 
@@ -121,7 +123,7 @@ export default function BudgetSettings() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-green-600" />
-            Class Pricing Defaults — {currentYear}
+            {t("cardTitle")} &mdash; {currentYear}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -134,10 +136,10 @@ export default function BudgetSettings() {
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-4 gap-4 text-xs font-semibold text-gray-500 uppercase tracking-wide px-3">
-                <span>Class</span>
-                <span>Overhead %</span>
-                <span>Profit Margin %</span>
-                <span>Effective Price Multiplier</span>
+                <span>{t("colClass")}</span>
+                <span>{t("colOverhead")}</span>
+                <span>{t("colMargin")}</span>
+                <span>{t("colMultiplier")}</span>
               </div>
 
               {rows.map((row) => {
@@ -160,7 +162,7 @@ export default function BudgetSettings() {
                     </div>
 
                     <div>
-                      <Label className="sr-only">Overhead %</Label>
+                      <Label className="sr-only">{t("colOverhead")}</Label>
                       <div className="relative">
                         <Input
                           type="number"
@@ -177,7 +179,7 @@ export default function BudgetSettings() {
                     </div>
 
                     <div>
-                      <Label className="sr-only">Profit Margin %</Label>
+                      <Label className="sr-only">{t("colMargin")}</Label>
                       <div className="relative">
                         <Input
                           type="number"
@@ -194,9 +196,9 @@ export default function BudgetSettings() {
                     </div>
 
                     <div className="text-sm font-mono text-gray-700">
-                      {multiplier.toFixed(4)}×
+                      {multiplier.toFixed(4)}&times;
                       <span className="text-xs text-gray-400 ml-1">
-                        (cost × {multiplier.toFixed(2)})
+                        (cost &times; {multiplier.toFixed(2)})
                       </span>
                     </div>
                   </div>
@@ -204,7 +206,7 @@ export default function BudgetSettings() {
               })}
 
               <p className="text-xs text-gray-400 px-3">
-                Formula: Sell Price = Cost × (1 + Overhead%) × (1 + Profit Margin%). Per-item overrides on the Item Catalog take precedence.
+                {t("formula")}
               </p>
             </div>
           )}
@@ -219,7 +221,7 @@ export default function BudgetSettings() {
           data-testid="save-pricing-button"
         >
           <Save className="w-4 h-4" />
-          {saveMutation.isPending ? "Saving…" : "Save Pricing Defaults"}
+          {saveMutation.isPending ? `${t("saving")}\u2026` : t("savePricing")}
         </Button>
         <Button
           variant="ghost"

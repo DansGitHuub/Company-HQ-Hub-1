@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { CheckCircle, Loader2, AlertCircle, Clock, Save } from "lucide-react";
 
 const TOKEN = window.location.pathname.split("/apply/")[1]?.split("/")[0] || "";
@@ -125,6 +126,7 @@ function Field({ children }: { children: React.ReactNode }) {
 }
 
 export default function PublicApplicationForm() {
+  const { t } = useTranslation("publicApplication");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [application, setApplication] = useState<JobApplication | null>(null);
@@ -224,7 +226,7 @@ export default function PublicApplicationForm() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader2 className="h-10 w-10 animate-spin text-green-700 mx-auto mb-3" />
-          <p className="text-gray-600 text-sm">Loading your application...</p>
+          <p className="text-gray-600 text-sm">{t("loading")}</p>
         </div>
       </div>
     );
@@ -235,7 +237,7 @@ export default function PublicApplicationForm() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="bg-white rounded-xl shadow-md border border-red-200 p-8 max-w-md w-full text-center">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Unable to Load Application</h2>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">{t("unableToLoad")}</h2>
           <p className="text-gray-600 text-sm mb-4">{error}</p>
           <p className="text-gray-500 text-xs">If you believe this is a mistake, please contact us at <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline">office@chapinlandscapes.com</a> or text <a href="tel:4402260518" className="text-green-700 underline">440.226.0518</a>.</p>
         </div>
@@ -248,13 +250,13 @@ export default function PublicApplicationForm() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="bg-white rounded-xl shadow-md border border-green-200 p-10 max-w-lg w-full text-center">
           <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-5" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-3">Thank You for Applying!</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-3">{t("thankYou")}</h2>
           <p className="text-gray-600 mb-5 leading-relaxed">
-            Your application has been submitted. We will be in touch soon.
+            {t("submitted")}
           </p>
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-gray-700">
-            <p className="font-semibold text-green-800 mb-1">Need to follow up?</p>
-            <p>If you don't receive a phone call or text within <strong>48 hours</strong>, please reach out:</p>
+            <p className="font-semibold text-green-800 mb-1">{t("needFollowUp")}</p>
+            <p>{t("48hours")}</p>
             <p className="mt-2">
               <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline font-medium">office@chapinlandscapes.com</a>
               <span className="mx-2 text-gray-400">or</span>
@@ -276,19 +278,19 @@ export default function PublicApplicationForm() {
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold">Chapin Landscapes</h1>
-            <p className="text-green-200 text-sm mt-0.5">Employment Application</p>
+            <p className="text-green-200 text-sm mt-0.5">{t("employmentApplication")}</p>
           </div>
           <div className="flex items-center gap-2 text-green-200 text-xs">
             {saveStatus === "saving" && (
-              <><Loader2 className="h-3.5 w-3.5 animate-spin" /><span>Saving...</span></>
+              <><Loader2 className="h-3.5 w-3.5 animate-spin" /><span>{t("saving")}</span></>
             )}
             {saveStatus === "saved" && (
-              <><Save className="h-3.5 w-3.5" /><span>Saved</span></>
+              <><Save className="h-3.5 w-3.5" /><span>{t("saved")}</span></>
             )}
             {application?.expiresAt && (
               <span className="ml-3 flex items-center gap-1 opacity-70">
                 <Clock className="h-3 w-3" />
-                Expires {new Date(application.expiresAt).toLocaleDateString()}
+                {t("expires")} {new Date(application.expiresAt).toLocaleDateString()}
               </span>
             )}
           </div>
@@ -307,9 +309,9 @@ export default function PublicApplicationForm() {
             </div>
             <span className="text-xs text-gray-500 whitespace-nowrap">
               {allFilled ? (
-                <span className="text-green-600 font-semibold flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> All required fields complete</span>
+                <span className="text-green-600 font-semibold flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> {t("allFieldsComplete")}</span>
               ) : (
-                <span className="text-amber-600 font-medium">{remaining} required field{remaining !== 1 ? "s" : ""} remaining</span>
+                <span className="text-amber-600 font-medium">{remaining} {t("requiredRemaining")}</span>
               )}
             </span>
           </div>
@@ -320,238 +322,238 @@ export default function PublicApplicationForm() {
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
 
         {/* APPLICANT INFORMATION */}
-        <SectionCard title="Applicant Information">
+        <SectionCard title={t("applicantInfo")}>
           <Row cols={3}>
             <Field>
-              <Label required>Last Name</Label>
-              <Input name="lastName" value={data.lastName || ""} onChange={handleChange} placeholder="Last" disabled={isDisabled} />
+              <Label required>{t("lastName")}</Label>
+              <Input name="lastName" value={data.lastName || ""} onChange={handleChange} placeholder={t("lastName")} disabled={isDisabled} />
             </Field>
             <Field>
-              <Label required>First Name</Label>
-              <Input name="firstName" value={data.firstName || ""} onChange={handleChange} placeholder="First" disabled={isDisabled} />
+              <Label required>{t("firstName")}</Label>
+              <Input name="firstName" value={data.firstName || ""} onChange={handleChange} placeholder={t("firstName")} disabled={isDisabled} />
             </Field>
             <Field>
-              <Label>M.I.</Label>
-              <Input name="mi" value={data.mi || ""} onChange={handleChange} placeholder="M.I." disabled={isDisabled} />
+              <Label>{t("mi")}</Label>
+              <Input name="mi" value={data.mi || ""} onChange={handleChange} placeholder={t("mi")} disabled={isDisabled} />
             </Field>
           </Row>
           <Field>
-            <Label required>Street Address</Label>
-            <Input name="streetAddress" value={data.streetAddress || ""} onChange={handleChange} placeholder="Street Address" disabled={isDisabled} />
+            <Label required>{t("streetAddress")}</Label>
+            <Input name="streetAddress" value={data.streetAddress || ""} onChange={handleChange} placeholder={t("streetAddress")} disabled={isDisabled} />
           </Field>
           <Row cols={4}>
             <div className="col-span-2 sm:col-span-2">
-              <Label required>City</Label>
-              <Input name="city" value={data.city || ""} onChange={handleChange} placeholder="City" disabled={isDisabled} />
+              <Label required>{t("city")}</Label>
+              <Input name="city" value={data.city || ""} onChange={handleChange} placeholder={t("city")} disabled={isDisabled} />
             </div>
             <Field>
-              <Label required>State</Label>
-              <Input name="state" value={data.state || ""} onChange={handleChange} placeholder="State" disabled={isDisabled} />
+              <Label required>{t("state")}</Label>
+              <Input name="state" value={data.state || ""} onChange={handleChange} placeholder={t("state")} disabled={isDisabled} />
             </Field>
             <Field>
-              <Label required>ZIP</Label>
-              <Input name="zip" value={data.zip || ""} onChange={handleChange} placeholder="ZIP" disabled={isDisabled} />
+              <Label required>{t("zip")}</Label>
+              <Input name="zip" value={data.zip || ""} onChange={handleChange} placeholder={t("zip")} disabled={isDisabled} />
             </Field>
           </Row>
           <Row>
             <Field>
-              <Label required>Phone</Label>
-              <Input name="phone" value={data.phone || ""} onChange={handleChange} placeholder="Phone" type="tel" disabled={isDisabled} />
+              <Label required>{t("phone")}</Label>
+              <Input name="phone" value={data.phone || ""} onChange={handleChange} placeholder={t("phone")} type="tel" disabled={isDisabled} />
             </Field>
             <Field>
-              <Label required>Email</Label>
-              <Input name="email" value={data.email || ""} onChange={handleChange} placeholder="Email" type="email" disabled={isDisabled} />
+              <Label required>{t("email")}</Label>
+              <Input name="email" value={data.email || ""} onChange={handleChange} placeholder={t("email")} type="email" disabled={isDisabled} />
             </Field>
           </Row>
           <Row cols={3}>
             <Field>
-              <Label required>Date Available</Label>
+              <Label required>{t("dateAvailable")}</Label>
               <Input name="dateAvailable" value={data.dateAvailable || ""} onChange={handleChange} type="date" disabled={isDisabled} />
             </Field>
             <Field>
-              <Label>SSN</Label>
+              <Label>{t("ssn")}</Label>
               <Input name="ssn" value={data.ssn || ""} onChange={handleChange} placeholder="XXX-XX-XXXX" disabled={isDisabled} />
             </Field>
             <Field>
-              <Label>Desired Salary</Label>
+              <Label>{t("desiredSalary")}</Label>
               <Input name="desiredSalary" value={data.desiredSalary || ""} onChange={handleChange} placeholder="$ per hour" disabled={isDisabled} />
             </Field>
           </Row>
           <Field>
-            <Label required>Position Applied For</Label>
+            <Label required>{t("positionApplied")}</Label>
             <Input name="positionAppliedFor" value={data.positionAppliedFor || ""} onChange={handleChange} placeholder="e.g. Landscape Crew Member" disabled={isDisabled} />
           </Field>
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-4">
-              <Label required>Are you a U.S. citizen?</Label>
+              <Label required>{t("usCitizen")}</Label>
               <YesNo name="usCitizen" value={data.usCitizen || ""} onChange={handleChange} disabled={isDisabled} />
             </div>
             {data.usCitizen === "No" && (
               <div className="flex flex-wrap items-center gap-4 ml-6">
-                <Label>If no, authorized to work in U.S.?</Label>
+                <Label>{t("authorizedToWork")}</Label>
                 <YesNo name="authorizedToWork" value={data.authorizedToWork || ""} onChange={handleChange} disabled={isDisabled} />
               </div>
             )}
           </div>
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-4">
-              <Label required>Have you ever worked for this company?</Label>
+              <Label required>{t("workedHere")}</Label>
               <YesNo name="workedHereBefore" value={data.workedHereBefore || ""} onChange={handleChange} disabled={isDisabled} />
             </div>
             {data.workedHereBefore === "Yes" && (
               <div className="ml-6">
-                <Label>If yes, when?</Label>
+                <Label>{t("ifYesWhen")}</Label>
                 <Input name="workedHereWhen" value={data.workedHereWhen || ""} onChange={handleChange} placeholder="Year(s)" disabled={isDisabled} className="max-w-xs" />
               </div>
             )}
           </div>
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-4">
-              <Label required>Have you ever been convicted of a felony?</Label>
+              <Label required>{t("convictedFelony")}</Label>
               <YesNo name="convictedFelony" value={data.convictedFelony || ""} onChange={handleChange} disabled={isDisabled} />
             </div>
             {data.convictedFelony === "Yes" && (
               <div className="ml-6">
-                <Label>If yes, explain:</Label>
-                <TextArea name="felonyExplanation" value={data.felonyExplanation || ""} onChange={handleChange} placeholder="Please explain..." disabled={isDisabled} />
+                <Label>{t("ifYesExplain")}</Label>
+                <TextArea name="felonyExplanation" value={data.felonyExplanation || ""} onChange={handleChange} placeholder={t("pleaseExplain")} disabled={isDisabled} />
               </div>
             )}
           </div>
         </SectionCard>
 
         {/* EDUCATION */}
-        <SectionCard title="Education">
+        <SectionCard title={t("education")}>
           {[
-            { label: "High School", prefix: "highSchool", degreeLabel: "Diploma", required: true },
-            { label: "College", prefix: "college", degreeLabel: "Degree", required: false },
-            { label: "Other", prefix: "otherEdu", degreeLabel: "Degree", required: false },
+            { labelKey: "highSchool", prefix: "highSchool", degreeKey: "diploma", required: true },
+            { labelKey: "college", prefix: "college", degreeKey: "degree", required: false },
+            { labelKey: "other", prefix: "otherEdu", degreeKey: "degree", required: false },
           ].map(edu => (
             <div key={edu.prefix} className="border border-gray-100 rounded-lg p-4 space-y-3">
-              <h3 className="font-semibold text-gray-700 text-sm">{edu.label}</h3>
+              <h3 className="font-semibold text-gray-700 text-sm">{t(edu.labelKey)}</h3>
               <Row>
                 <Field>
-                  <Label required={edu.required}>{edu.label} Name</Label>
-                  <Input name={`${edu.prefix}Name`} value={data[`${edu.prefix}Name`] || ""} onChange={handleChange} placeholder={`${edu.label} Name`} disabled={isDisabled} />
+                  <Label required={edu.required}>{t(edu.labelKey)} {t("name")}</Label>
+                  <Input name={`${edu.prefix}Name`} value={data[`${edu.prefix}Name`] || ""} onChange={handleChange} placeholder={`${t(edu.labelKey)} ${t("name")}`} disabled={isDisabled} />
                 </Field>
                 <Field>
-                  <Label>Address</Label>
-                  <Input name={`${edu.prefix}Address`} value={data[`${edu.prefix}Address`] || ""} onChange={handleChange} placeholder="School Address" disabled={isDisabled} />
+                  <Label>{t("address")}</Label>
+                  <Input name={`${edu.prefix}Address`} value={data[`${edu.prefix}Address`] || ""} onChange={handleChange} placeholder={t("schoolAddress")} disabled={isDisabled} />
                 </Field>
               </Row>
               <Row cols={4}>
                 <Field>
-                  <Label>From</Label>
-                  <Input name={`${edu.prefix}From`} value={data[`${edu.prefix}From`] || ""} onChange={handleChange} placeholder="Year" disabled={isDisabled} />
+                  <Label>{t("from")}</Label>
+                  <Input name={`${edu.prefix}From`} value={data[`${edu.prefix}From`] || ""} onChange={handleChange} placeholder={t("year")} disabled={isDisabled} />
                 </Field>
                 <Field>
-                  <Label>To</Label>
-                  <Input name={`${edu.prefix}To`} value={data[`${edu.prefix}To`] || ""} onChange={handleChange} placeholder="Year" disabled={isDisabled} />
+                  <Label>{t("to")}</Label>
+                  <Input name={`${edu.prefix}To`} value={data[`${edu.prefix}To`] || ""} onChange={handleChange} placeholder={t("year")} disabled={isDisabled} />
                 </Field>
                 <div className="col-span-2">
-                  <Label>Did you graduate?</Label>
+                  <Label>{t("didYouGraduate")}</Label>
                   <YesNo name={`${edu.prefix}Graduated`} value={data[`${edu.prefix}Graduated`] || ""} onChange={handleChange} disabled={isDisabled} />
                 </div>
               </Row>
               <Field>
-                <Label>{edu.degreeLabel}</Label>
-                <Input name={`${edu.prefix}Degree`} value={data[`${edu.prefix}Degree`] || ""} onChange={handleChange} placeholder={edu.degreeLabel} disabled={isDisabled} className="max-w-xs" />
+                <Label>{t(edu.degreeKey)}</Label>
+                <Input name={`${edu.prefix}Degree`} value={data[`${edu.prefix}Degree`] || ""} onChange={handleChange} placeholder={t(edu.degreeKey)} disabled={isDisabled} className="max-w-xs" />
               </Field>
             </div>
           ))}
         </SectionCard>
 
         {/* REFERENCES */}
-        <SectionCard title="References — Please list three professional references">
+        <SectionCard title={t("referencesTitle")}>
           {[1, 2, 3].map(n => (
             <div key={n} className="border border-gray-100 rounded-lg p-4 space-y-3">
-              <h3 className="font-semibold text-gray-700 text-sm">Reference {n}</h3>
+              <h3 className="font-semibold text-gray-700 text-sm">{t("reference")} {n}</h3>
               <Row>
                 <Field>
-                  <Label required={n === 1}>Full Name</Label>
-                  <Input name={`ref${n}FullName`} value={data[`ref${n}FullName`] || ""} onChange={handleChange} placeholder="Full Name" disabled={isDisabled} />
+                  <Label required={n === 1}>{t("fullName")}</Label>
+                  <Input name={`ref${n}FullName`} value={data[`ref${n}FullName`] || ""} onChange={handleChange} placeholder={t("fullName")} disabled={isDisabled} />
                 </Field>
                 <Field>
-                  <Label>Relationship</Label>
-                  <Input name={`ref${n}Relationship`} value={data[`ref${n}Relationship`] || ""} onChange={handleChange} placeholder="e.g. Supervisor" disabled={isDisabled} />
+                  <Label>{t("relationship")}</Label>
+                  <Input name={`ref${n}Relationship`} value={data[`ref${n}Relationship`] || ""} onChange={handleChange} placeholder={t("egSupervisor")} disabled={isDisabled} />
                 </Field>
               </Row>
               <Row>
                 <Field>
-                  <Label>Company</Label>
-                  <Input name={`ref${n}Company`} value={data[`ref${n}Company`] || ""} onChange={handleChange} placeholder="Company" disabled={isDisabled} />
+                  <Label>{t("company")}</Label>
+                  <Input name={`ref${n}Company`} value={data[`ref${n}Company`] || ""} onChange={handleChange} placeholder={t("company")} disabled={isDisabled} />
                 </Field>
                 <Field>
-                  <Label required={n === 1}>Phone</Label>
-                  <Input name={`ref${n}Phone`} value={data[`ref${n}Phone`] || ""} onChange={handleChange} placeholder="Phone" type="tel" disabled={isDisabled} />
+                  <Label required={n === 1}>{t("phone")}</Label>
+                  <Input name={`ref${n}Phone`} value={data[`ref${n}Phone`] || ""} onChange={handleChange} placeholder={t("phone")} type="tel" disabled={isDisabled} />
                 </Field>
               </Row>
               <Field>
-                <Label>Address</Label>
-                <Input name={`ref${n}Address`} value={data[`ref${n}Address`] || ""} onChange={handleChange} placeholder="Address" disabled={isDisabled} />
+                <Label>{t("address")}</Label>
+                <Input name={`ref${n}Address`} value={data[`ref${n}Address`] || ""} onChange={handleChange} placeholder={t("address")} disabled={isDisabled} />
               </Field>
             </div>
           ))}
         </SectionCard>
 
         {/* PREVIOUS EMPLOYMENT */}
-        <SectionCard title="Previous Employment">
+        <SectionCard title={t("previousEmployment")}>
           {[1, 2, 3].map(n => (
             <div key={n} className="border border-gray-100 rounded-lg p-4 space-y-3">
-              <h3 className="font-semibold text-gray-700 text-sm">Employer {n}</h3>
+              <h3 className="font-semibold text-gray-700 text-sm">{t("employer")} {n}</h3>
               <Row>
                 <Field>
-                  <Label required={n === 1}>Company</Label>
-                  <Input name={`emp${n}Company`} value={data[`emp${n}Company`] || ""} onChange={handleChange} placeholder="Company Name" disabled={isDisabled} />
+                  <Label required={n === 1}>{t("company")}</Label>
+                  <Input name={`emp${n}Company`} value={data[`emp${n}Company`] || ""} onChange={handleChange} placeholder={t("companyName")} disabled={isDisabled} />
                 </Field>
                 <Field>
-                  <Label required={n === 1}>Phone</Label>
-                  <Input name={`emp${n}Phone`} value={data[`emp${n}Phone`] || ""} onChange={handleChange} placeholder="Phone" type="tel" disabled={isDisabled} />
+                  <Label required={n === 1}>{t("phone")}</Label>
+                  <Input name={`emp${n}Phone`} value={data[`emp${n}Phone`] || ""} onChange={handleChange} placeholder={t("phone")} type="tel" disabled={isDisabled} />
                 </Field>
               </Row>
               <Row>
                 <Field>
-                  <Label>Address</Label>
-                  <Input name={`emp${n}Address`} value={data[`emp${n}Address`] || ""} onChange={handleChange} placeholder="Address" disabled={isDisabled} />
+                  <Label>{t("address")}</Label>
+                  <Input name={`emp${n}Address`} value={data[`emp${n}Address`] || ""} onChange={handleChange} placeholder={t("address")} disabled={isDisabled} />
                 </Field>
                 <Field>
-                  <Label>Supervisor</Label>
-                  <Input name={`emp${n}Supervisor`} value={data[`emp${n}Supervisor`] || ""} onChange={handleChange} placeholder="Supervisor Name" disabled={isDisabled} />
+                  <Label>{t("supervisor")}</Label>
+                  <Input name={`emp${n}Supervisor`} value={data[`emp${n}Supervisor`] || ""} onChange={handleChange} placeholder={t("supervisorName")} disabled={isDisabled} />
                 </Field>
               </Row>
               <Row cols={3}>
                 <Field>
-                  <Label>Job Title</Label>
-                  <Input name={`emp${n}JobTitle`} value={data[`emp${n}JobTitle`] || ""} onChange={handleChange} placeholder="Job Title" disabled={isDisabled} />
+                  <Label>{t("jobTitle")}</Label>
+                  <Input name={`emp${n}JobTitle`} value={data[`emp${n}JobTitle`] || ""} onChange={handleChange} placeholder={t("jobTitle")} disabled={isDisabled} />
                 </Field>
                 <Field>
-                  <Label>Start Salary</Label>
+                  <Label>{t("startSalary")}</Label>
                   <Input name={`emp${n}StartSalary`} value={data[`emp${n}StartSalary`] || ""} onChange={handleChange} placeholder="$ per hour" disabled={isDisabled} />
                 </Field>
                 <Field>
-                  <Label>End Salary</Label>
+                  <Label>{t("endSalary")}</Label>
                   <Input name={`emp${n}EndSalary`} value={data[`emp${n}EndSalary`] || ""} onChange={handleChange} placeholder="$ per hour" disabled={isDisabled} />
                 </Field>
               </Row>
               <Field>
-                <Label>Responsibilities</Label>
-                <TextArea name={`emp${n}Responsibilities`} value={data[`emp${n}Responsibilities`] || ""} onChange={handleChange} placeholder="Describe your responsibilities..." disabled={isDisabled} />
+                <Label>{t("responsibilities")}</Label>
+                <TextArea name={`emp${n}Responsibilities`} value={data[`emp${n}Responsibilities`] || ""} onChange={handleChange} placeholder={t("describeResponsibilities")} disabled={isDisabled} />
               </Field>
               <Row cols={3}>
                 <Field>
-                  <Label>From</Label>
-                  <Input name={`emp${n}From`} value={data[`emp${n}From`] || ""} onChange={handleChange} placeholder="Month/Year" disabled={isDisabled} />
+                  <Label>{t("from")}</Label>
+                  <Input name={`emp${n}From`} value={data[`emp${n}From`] || ""} onChange={handleChange} placeholder={t("monthYear")} disabled={isDisabled} />
                 </Field>
                 <Field>
-                  <Label>To</Label>
-                  <Input name={`emp${n}To`} value={data[`emp${n}To`] || ""} onChange={handleChange} placeholder="Month/Year" disabled={isDisabled} />
+                  <Label>{t("to")}</Label>
+                  <Input name={`emp${n}To`} value={data[`emp${n}To`] || ""} onChange={handleChange} placeholder={t("monthYear")} disabled={isDisabled} />
                 </Field>
                 <Field>
-                  <Label>Reason for Leaving</Label>
-                  <Input name={`emp${n}ReasonLeaving`} value={data[`emp${n}ReasonLeaving`] || ""} onChange={handleChange} placeholder="Reason" disabled={isDisabled} />
+                  <Label>{t("reasonLeaving")}</Label>
+                  <Input name={`emp${n}ReasonLeaving`} value={data[`emp${n}ReasonLeaving`] || ""} onChange={handleChange} placeholder={t("reason")} disabled={isDisabled} />
                 </Field>
               </Row>
               <div className="flex flex-wrap items-center gap-4">
-                <Label>May we contact your previous supervisor?</Label>
+                <Label>{t("contactSupervisor")}</Label>
                 <YesNo name={`emp${n}ContactSupervisor`} value={data[`emp${n}ContactSupervisor`] || ""} onChange={handleChange} disabled={isDisabled} />
               </div>
             </div>
@@ -559,47 +561,47 @@ export default function PublicApplicationForm() {
         </SectionCard>
 
         {/* MILITARY SERVICE */}
-        <SectionCard title="Military Service">
+        <SectionCard title={t("militaryService")}>
           <Row cols={3}>
             <Field>
-              <Label>Branch</Label>
-              <Input name="militaryBranch" value={data.militaryBranch || ""} onChange={handleChange} placeholder="Branch" disabled={isDisabled} />
+              <Label>{t("branch")}</Label>
+              <Input name="militaryBranch" value={data.militaryBranch || ""} onChange={handleChange} placeholder={t("branch")} disabled={isDisabled} />
             </Field>
             <Field>
-              <Label>From</Label>
-              <Input name="militaryFrom" value={data.militaryFrom || ""} onChange={handleChange} placeholder="Year" disabled={isDisabled} />
+              <Label>{t("from")}</Label>
+              <Input name="militaryFrom" value={data.militaryFrom || ""} onChange={handleChange} placeholder={t("year")} disabled={isDisabled} />
             </Field>
             <Field>
-              <Label>To</Label>
-              <Input name="militaryTo" value={data.militaryTo || ""} onChange={handleChange} placeholder="Year" disabled={isDisabled} />
+              <Label>{t("to")}</Label>
+              <Input name="militaryTo" value={data.militaryTo || ""} onChange={handleChange} placeholder={t("year")} disabled={isDisabled} />
             </Field>
           </Row>
           <Row>
             <Field>
-              <Label>Rank at Discharge</Label>
-              <Input name="militaryRank" value={data.militaryRank || ""} onChange={handleChange} placeholder="Rank" disabled={isDisabled} />
+              <Label>{t("rankAtDischarge")}</Label>
+              <Input name="militaryRank" value={data.militaryRank || ""} onChange={handleChange} placeholder={t("rank")} disabled={isDisabled} />
             </Field>
             <Field>
-              <Label>Type of Discharge</Label>
-              <Input name="militaryDischarge" value={data.militaryDischarge || ""} onChange={handleChange} placeholder="Type" disabled={isDisabled} />
+              <Label>{t("typeOfDischarge")}</Label>
+              <Input name="militaryDischarge" value={data.militaryDischarge || ""} onChange={handleChange} placeholder={t("type")} disabled={isDisabled} />
             </Field>
           </Row>
           <Field>
-            <Label>If other than honorable, explain:</Label>
-            <TextArea name="militaryDischargeExplanation" value={data.militaryDischargeExplanation || ""} onChange={handleChange} placeholder="Explanation..." disabled={isDisabled} />
+            <Label>{t("ifNotHonorable")}</Label>
+            <TextArea name="militaryDischargeExplanation" value={data.militaryDischargeExplanation || ""} onChange={handleChange} placeholder={t("explanation")} disabled={isDisabled} />
           </Field>
         </SectionCard>
 
         {/* Submit Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-gray-600 leading-relaxed mb-5">
-            <p className="font-semibold text-gray-700 mb-1">Disclaimer</p>
-            <p>I certify that my answers are true and complete to the best of my knowledge. If this application leads to employment, I understand that false or misleading information in my application or interview may result in my release.</p>
+            <p className="font-semibold text-gray-700 mb-1">{t("disclaimer")}</p>
+            <p>{t("disclaimerText")}</p>
           </div>
           {!allFilled && (
             <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
               <p className="text-amber-800 text-sm font-semibold mb-2">
-                Please complete these required fields before submitting:
+                {t("completeBeforeSubmit")}
               </p>
               <ul className="list-disc list-inside space-y-0.5">
                 {missingFields.map(f => (
@@ -618,7 +620,7 @@ export default function PublicApplicationForm() {
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }`}
           >
-            {isDisabled ? "Application Submitted" : "Submit Application"}
+            {isDisabled ? t("applicationSubmitted") : t("submitApplication")}
           </button>
         </div>
       </div>
@@ -627,28 +629,28 @@ export default function PublicApplicationForm() {
       {showSubmitModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Confirm & Sign</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">{t("confirmSign")}</h3>
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 leading-relaxed mb-4">
-              I certify that my answers are true and complete to the best of my knowledge. If this application leads to employment, I understand that false or misleading information in my application or interview may result in my release.
+              {t("disclaimerText")}
             </div>
-            <p className="text-sm text-gray-700 mb-2 font-medium">Please type your full name as your signature:</p>
+            <p className="text-sm text-gray-700 mb-2 font-medium">{t("typeSignature")}</p>
             <input
               data-testid="input-signature-name"
               type="text"
               value={signatureName}
               onChange={e => setSignatureName(e.target.value)}
-              placeholder="Full Name"
+              placeholder={t("fullName")}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 mb-1 font-serif italic"
               autoFocus
             />
-            <p className="text-xs text-gray-400 mb-5">Date: {new Date().toLocaleDateString()}</p>
+            <p className="text-xs text-gray-400 mb-5">{t("date")}: {new Date().toLocaleDateString()}</p>
             <div className="flex gap-3">
               <button
                 data-testid="button-cancel-submit"
                 onClick={() => setShowSubmitModal(false)}
                 className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 data-testid="button-confirm-submit"
@@ -661,8 +663,8 @@ export default function PublicApplicationForm() {
                 }`}
               >
                 {submitting ? (
-                  <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Submitting...</span>
-                ) : "Submit Application"}
+                  <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {t("submitting")}</span>
+                ) : t("submitApplication")}
               </button>
             </div>
           </div>

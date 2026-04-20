@@ -24,6 +24,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
 import { CustomerFormModal, CustomerFormData, EMPTY_FORM } from "./CustomerFormModal";
+import { useTranslation } from "react-i18next";
 
 // ── Invoice status badge helper ─────────────────────────────────────────────
 const INV_STATUS_CLS: Record<string, string> = {
@@ -44,6 +45,7 @@ interface InvoiceSummary {
 }
 
 function CustomerInvoicesTab({ customerId }: { customerId: string }) {
+  const { t } = useTranslation("customerShow");
   const [, nav] = useLocation();
   const { data: invoices = [], isLoading } = useQuery<InvoiceSummary[]>({
     queryKey: ["/api/invoices", "customer", customerId],
@@ -62,27 +64,27 @@ function CustomerInvoicesTab({ customerId }: { customerId: string }) {
   return (
     <Card>
       <CardHeader className="pb-3 pt-4 flex flex-row items-center justify-between">
-        <CardTitle className="text-sm">Invoices</CardTitle>
+        <CardTitle className="text-sm">{t("invoicesTitle")}</CardTitle>
         <Button size="sm" variant="outline" onClick={() => nav("/invoices")} className="text-xs h-7 px-2">
-          <Plus className="h-3.5 w-3.5 mr-1" /> New Invoice
+          <Plus className="h-3.5 w-3.5 mr-1" /> {t("newInvoice")}
         </Button>
       </CardHeader>
       <CardContent className="pb-4 px-0">
         {invoices.length === 0 ? (
           <div className="py-12 text-center text-muted-foreground">
             <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            <p className="text-sm">No invoices yet.</p>
+            <p className="text-sm">{t("noInvoicesYet")}</p>
           </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="pl-6">Invoice #</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Issued</TableHead>
-                <TableHead>Due</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right pr-6">Balance</TableHead>
+                <TableHead className="pl-6">{t("invoiceNum")}</TableHead>
+                <TableHead>{t("status")}</TableHead>
+                <TableHead>{t("issued")}</TableHead>
+                <TableHead>{t("due")}</TableHead>
+                <TableHead className="text-right">{t("total")}</TableHead>
+                <TableHead className="text-right pr-6">{t("balance")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -113,6 +115,7 @@ function CustomerInvoicesTab({ customerId }: { customerId: string }) {
 
 // ── Customer Estimates Tab ────────────────────────────────────────────────────
 function CustomerEstimatesTab({ customerId }: { customerId: string }) {
+  const { t } = useTranslation("customerShow");
   const [, nav] = useLocation();
   const fmtMoney = (v: any) => `$${parseFloat(v ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
   const fmtDate = (d: string | null) => { if (!d) return "—"; try { return format(parseISO(d), "MMM d, yyyy"); } catch { return d; } };
@@ -137,26 +140,26 @@ function CustomerEstimatesTab({ customerId }: { customerId: string }) {
   return (
     <Card>
       <CardHeader className="pb-3 pt-4 flex flex-row items-center justify-between">
-        <CardTitle className="text-sm">Estimates</CardTitle>
+        <CardTitle className="text-sm">{t("estimatesTitle")}</CardTitle>
         <Button size="sm" variant="outline" onClick={() => nav("/estimates")} className="text-xs h-7 px-2">
-          <Plus className="h-3.5 w-3.5 mr-1" /> New Estimate
+          <Plus className="h-3.5 w-3.5 mr-1" /> {t("newEstimate")}
         </Button>
       </CardHeader>
       <CardContent className="pb-4 px-0">
         {estimates.length === 0 ? (
           <div className="py-12 text-center text-muted-foreground">
             <Calculator className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            <p className="text-sm">No estimates yet.</p>
+            <p className="text-sm">{t("noEstimatesYet")}</p>
           </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="pl-6">Estimate #</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Issued</TableHead>
-                <TableHead className="text-right pr-6">Total</TableHead>
+                <TableHead className="pl-6">{t("estimateNum")}</TableHead>
+                <TableHead>{t("titleCol")}</TableHead>
+                <TableHead>{t("status")}</TableHead>
+                <TableHead>{t("issued")}</TableHead>
+                <TableHead className="text-right pr-6">{t("total")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -250,6 +253,7 @@ function StatCard({ title, value, sub, icon: Icon, color = "text-green-600" }:
 // ── Property Modal ─────────────────────────────────────────────────────────────
 function PropertyModal({ open, onClose, customerId, editing, onSaved }:
   { open: boolean; onClose: () => void; customerId: string; editing: Property | null; onSaved: () => void }) {
+  const { t } = useTranslation("customerShow");
   const { toast } = useToast();
   const [form, setForm] = useState<PropertyFormState>(EMPTY_PROP);
 
@@ -267,14 +271,14 @@ function PropertyModal({ open, onClose, customerId, editing, onSaved }:
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.address.trim()) { toast({ title: "Address is required", variant: "destructive" }); return; }
+    if (!form.address.trim()) { toast({ title: t("propertyModal.addressRequired"), variant: "destructive" }); return; }
     setSaving(true);
     try {
       const url = editing ? `/api/properties/${editing.id}` : `/api/customers/${customerId}/properties`;
       const method = editing ? "PUT" : "POST";
       const res = await apiRequest(method, url, form);
       if (!res.ok) { const err = await res.json(); throw new Error(err.message); }
-      toast({ title: editing ? "Property updated" : "Property added" });
+      toast({ title: editing ? t("propertyModal.propertyUpdated") : t("propertyModal.propertyAdded") });
       onSaved();
       onClose();
     } catch (err: any) {
@@ -288,50 +292,50 @@ function PropertyModal({ open, onClose, customerId, editing, onSaved }:
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit Property" : "Add Property"}</DialogTitle>
+          <DialogTitle>{editing ? t("propertyModal.editTitle") : t("propertyModal.addTitle")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSave} className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Street Address <span className="text-red-500">*</span></Label>
+            <Label>{t("propertyModal.streetAddress")} <span className="text-red-500">*</span></Label>
             <Input placeholder="123 Main St" value={form.address}
               onChange={(e) => set("address", e.target.value)} data-testid="input-prop-address" />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5 col-span-1">
-              <Label>City</Label>
+              <Label>{t("propertyModal.city")}</Label>
               <Input placeholder="Springfield" value={form.city}
                 onChange={(e) => set("city", e.target.value)} data-testid="input-prop-city" />
             </div>
             <div className="space-y-1.5">
-              <Label>State</Label>
+              <Label>{t("propertyModal.state")}</Label>
               <Input placeholder="MA" value={form.state}
                 onChange={(e) => set("state", e.target.value)} data-testid="input-prop-state" />
             </div>
             <div className="space-y-1.5">
-              <Label>ZIP</Label>
+              <Label>{t("propertyModal.zip")}</Label>
               <Input placeholder="01001" value={form.zip}
                 onChange={(e) => set("zip", e.target.value)} data-testid="input-prop-zip" />
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Property Type</Label>
+            <Label>{t("propertyModal.propertyType")}</Label>
             <select value={form.property_type} onChange={(e) => set("property_type", e.target.value)}
               className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               data-testid="select-prop-type">
-              <option value="">Select type…</option>
-              {PROP_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              <option value="">{t("propertyModal.selectType")}&hellip;</option>
+              {PROP_TYPES.map((pt) => <option key={pt} value={pt}>{pt}</option>)}
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Notes</Label>
-            <Textarea placeholder="Any notes about this property…" value={form.notes}
+            <Label>{t("propertyModal.notes")}</Label>
+            <Textarea placeholder={t("propertyModal.notesPlaceholder")} value={form.notes}
               onChange={(e) => set("notes", e.target.value)} rows={2} data-testid="textarea-prop-notes" />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>{t("common:cancel", "Cancel")}</Button>
             <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white"
               disabled={saving} data-testid="button-save-property">
-              {saving ? "Saving…" : editing ? "Save Changes" : "Add Property"}
+              {saving ? `${t("propertyModal.saving")}\u2026` : editing ? t("propertyModal.saveChanges") : t("propertyModal.addTitle")}
             </Button>
           </DialogFooter>
         </form>
@@ -342,6 +346,7 @@ function PropertyModal({ open, onClose, customerId, editing, onSaved }:
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CustomerDetailPage() {
+  const { t } = useTranslation("customerShow");
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -378,18 +383,18 @@ export default function CustomerDetailPage() {
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/customers"] }),
-    onError: () => toast({ title: "Could not update status", variant: "destructive" }),
+    onError: () => toast({ title: t("couldNotUpdateStatus"), variant: "destructive" }),
   });
 
   // ── Delete property ──
   const deleteProp = async (propId: string) => {
-    if (!confirm("Remove this property?")) return;
+    if (!confirm(t("removePropConfirm"))) return;
     try {
       await apiRequest("DELETE", `/api/properties/${propId}`);
       queryClient.invalidateQueries({ queryKey: ["/api/customers", id] });
-      toast({ title: "Property removed" });
+      toast({ title: t("propRemoved") });
     } catch {
-      toast({ title: "Failed to remove property", variant: "destructive" });
+      toast({ title: t("propRemoveFailed"), variant: "destructive" });
     }
   };
 
@@ -430,7 +435,7 @@ export default function CustomerDetailPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading customer…
+        <Loader2 className="h-5 w-5 animate-spin mr-2" /> {t("loading")}&hellip;
       </div>
     );
   }
@@ -438,9 +443,9 @@ export default function CustomerDetailPage() {
     return (
       <div className="p-6 max-w-4xl mx-auto">
         <Button variant="ghost" size="sm" onClick={() => setLocation("/customers")} className="mb-4">
-          <ChevronLeft className="h-4 w-4 mr-1" /> Back to Customers
+          <ChevronLeft className="h-4 w-4 mr-1" /> {t("backToCustomers")}
         </Button>
-        <p className="text-muted-foreground">Customer not found.</p>
+        <p className="text-muted-foreground">{t("notFound")}</p>
       </div>
     );
   }
@@ -455,7 +460,7 @@ export default function CustomerDetailPage() {
       {/* Back */}
       <Button variant="ghost" size="sm" onClick={() => setLocation("/customers")}
         className="-ml-2" data-testid="button-back-customers">
-        <ChevronLeft className="h-4 w-4 mr-1" /> Back to Customers
+        <ChevronLeft className="h-4 w-4 mr-1" /> {t("backToCustomers")}
       </Button>
 
       {/* Two-column layout */}
@@ -499,15 +504,15 @@ export default function CustomerDetailPage() {
                   }`}
                 >
                   {customer.is_active
-                    ? <><CheckCircle2 className="h-3 w-3" /> Active</>
-                    : <><XCircle className="h-3 w-3" /> Inactive</>}
+                    ? <><CheckCircle2 className="h-3 w-3" /> {t("active")}</>
+                    : <><XCircle className="h-3 w-3" /> {t("inactive")}</>}
                 </button>
               </div>
 
               <Button size="sm" variant="secondary"
                 className="mt-3 w-full bg-white/20 hover:bg-white/30 text-white border-0"
                 onClick={() => setShowEdit(true)} data-testid="button-edit-customer">
-                <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit Customer
+                <Pencil className="h-3.5 w-3.5 mr-1.5" /> {t("editCustomer")}
               </Button>
             </div>
 
@@ -516,7 +521,7 @@ export default function CustomerDetailPage() {
               {/* Phones */}
               {customer.phones.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Phone</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("phone")}</p>
                   {customer.phones.map((p) => (
                     <div key={p.id} className="flex items-center gap-2 text-sm" data-testid={`phone-${p.id}`}>
                       <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -531,7 +536,7 @@ export default function CustomerDetailPage() {
               {/* Emails */}
               {customer.emails.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Email</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("email")}</p>
                   {customer.emails.map((e) => (
                     <div key={e.id} className="flex items-center gap-2 text-sm" data-testid={`email-${e.id}`}>
                       <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -547,7 +552,7 @@ export default function CustomerDetailPage() {
                 <>
                   <Separator />
                   <div className="space-y-1.5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Billing Address</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("billingAddress")}</p>
                     <div className="flex items-start gap-2 text-sm">
                       <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                       <p className="text-muted-foreground whitespace-pre-line">{billingFull}</p>
@@ -561,7 +566,7 @@ export default function CustomerDetailPage() {
                 <>
                   <Separator />
                   <div className="space-y-1.5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Notes</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("notes")}</p>
                     <div className="flex items-start gap-2 text-sm">
                       <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                       <p className="text-muted-foreground text-xs leading-relaxed">{customer.notes}</p>
@@ -573,7 +578,7 @@ export default function CustomerDetailPage() {
               <Separator />
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <CalendarDays className="h-3 w-3" />
-                Added {format(new Date(customer.created_at), "MMMM d, yyyy")}
+                {t("added")} {format(new Date(customer.created_at), "MMMM d, yyyy")}
               </div>
             </CardContent>
           </Card>
@@ -584,10 +589,10 @@ export default function CustomerDetailPage() {
           <Tabs defaultValue="overview">
             <TabsList className="flex w-full overflow-x-auto h-auto flex-wrap gap-1 bg-muted p-1 rounded-lg">
               <TabsTrigger value="overview" className="flex items-center gap-1.5 text-xs" data-testid="tab-overview">
-                <LayoutGrid className="h-3.5 w-3.5" /> Overview
+                <LayoutGrid className="h-3.5 w-3.5" /> {t("tabOverview")}
               </TabsTrigger>
               <TabsTrigger value="properties" className="flex items-center gap-1.5 text-xs" data-testid="tab-properties">
-                <Home className="h-3.5 w-3.5" /> Properties
+                <Home className="h-3.5 w-3.5" /> {t("tabProperties")}
                 {customer.properties.length > 0 && (
                   <Badge variant="secondary" className="ml-1 h-4 min-w-4 text-xs px-1">
                     {customer.properties.length}
@@ -595,63 +600,63 @@ export default function CustomerDetailPage() {
                 )}
               </TabsTrigger>
               <TabsTrigger value="jobs" className="flex items-center gap-1.5 text-xs" data-testid="tab-jobs">
-                <Briefcase className="h-3.5 w-3.5" /> Jobs
+                <Briefcase className="h-3.5 w-3.5" /> {t("tabJobs")}
                 {jobs.length > 0 && (
                   <Badge variant="secondary" className="ml-1 h-4 min-w-4 text-xs px-1">{jobs.length}</Badge>
                 )}
               </TabsTrigger>
               <TabsTrigger value="estimates" className="flex items-center gap-1.5 text-xs" data-testid="tab-estimates">
-                <Calculator className="h-3.5 w-3.5" /> Estimates
+                <Calculator className="h-3.5 w-3.5" /> {t("tabEstimates")}
               </TabsTrigger>
               <TabsTrigger value="invoices" className="flex items-center gap-1.5 text-xs" data-testid="tab-invoices">
-                <FileText className="h-3.5 w-3.5" /> Invoices
+                <FileText className="h-3.5 w-3.5" /> {t("tabInvoices")}
               </TabsTrigger>
               <TabsTrigger value="payments" className="flex items-center gap-1.5 text-xs" data-testid="tab-payments">
-                <DollarSign className="h-3.5 w-3.5" /> Payments
+                <DollarSign className="h-3.5 w-3.5" /> {t("tabPayments")}
               </TabsTrigger>
               <TabsTrigger value="activity" className="flex items-center gap-1.5 text-xs" data-testid="tab-activity">
-                <Clock className="h-3.5 w-3.5" /> Activity
+                <Clock className="h-3.5 w-3.5" /> {t("tabActivity")}
               </TabsTrigger>
             </TabsList>
 
             {/* ── Overview ── */}
             <TabsContent value="overview" className="mt-4 space-y-4">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <StatCard title="Total Jobs" value={jobs.length}
-                  sub={jobs.length === 1 ? "1 job linked" : `${jobs.length} jobs linked`}
+                <StatCard title={t("totalJobs")} value={jobs.length}
+                  sub={jobs.length === 1 ? `1 ${t("jobLinkedSub")}` : `${jobs.length} ${t("jobsLinkedSub")}`}
                   icon={Briefcase} />
-                <StatCard title="Total Billed" value={`$${totalBilled.toLocaleString()}`}
-                  sub="across all jobs" icon={DollarSign} color="text-blue-600" />
-                <StatCard title="Outstanding" value="$0"
-                  sub="invoices coming soon" icon={FileText} color="text-orange-500" />
-                <StatCard title="Last Visit" value={lastVisit}
-                  sub="most recent job date" icon={CalendarDays} color="text-purple-600" />
+                <StatCard title={t("totalBilled")} value={`$${totalBilled.toLocaleString()}`}
+                  sub={t("acrossAllJobs")} icon={DollarSign} color="text-blue-600" />
+                <StatCard title={t("outstanding")} value="$0"
+                  sub={t("invoicesComingSoon")} icon={FileText} color="text-orange-500" />
+                <StatCard title={t("lastVisit")} value={lastVisit}
+                  sub={t("mostRecentJobDate")} icon={CalendarDays} color="text-purple-600" />
               </div>
 
               {/* Quick summary */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Quick Summary</CardTitle>
+                  <CardTitle className="text-sm">{t("quickSummary")}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Properties on file</span>
+                    <span className="text-muted-foreground">{t("propertiesOnFile")}</span>
                     <span className="font-medium">{customer.properties.length}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Contact numbers</span>
+                    <span className="text-muted-foreground">{t("contactNumbers")}</span>
                     <span className="font-medium">{customer.phones.length}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Email addresses</span>
+                    <span className="text-muted-foreground">{t("emailAddresses")}</span>
                     <span className="font-medium">{customer.emails.length}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Lead source</span>
+                    <span className="text-muted-foreground">{t("leadSource")}</span>
                     <span className="font-medium">{customer.source || "—"}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Customer since</span>
+                    <span className="text-muted-foreground">{t("customerSince")}</span>
                     <span className="font-medium">{format(new Date(customer.created_at), "MMMM yyyy")}</span>
                   </div>
                 </CardContent>
@@ -661,10 +666,10 @@ export default function CustomerDetailPage() {
               {jobs.length > 0 && (
                 <Card>
                   <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                    <CardTitle className="text-sm">Recent Jobs</CardTitle>
+                    <CardTitle className="text-sm">{t("recentJobs")}</CardTitle>
                     <Button variant="ghost" size="sm" className="text-xs h-7"
                       onClick={() => document.querySelector<HTMLButtonElement>('[data-testid="tab-jobs"]')?.click()}>
-                      View all
+                      {t("viewAll")}
                     </Button>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -697,21 +702,21 @@ export default function CustomerDetailPage() {
             <TabsContent value="properties" className="mt-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-3">
-                  <CardTitle className="text-base">Properties</CardTitle>
+                  <CardTitle className="text-base">{t("tabProperties")}</CardTitle>
                   <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => setPropModal({ open: true, editing: null })}
                     data-testid="button-add-property">
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Property
+                    <Plus className="h-3.5 w-3.5 mr-1" /> {t("addProperty")}
                   </Button>
                 </CardHeader>
                 <CardContent>
                   {customer.properties.length === 0 ? (
                     <div className="text-center py-10 text-muted-foreground">
                       <Home className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">No properties on file yet.</p>
+                      <p className="text-sm">{t("noPropertiesYet")}</p>
                       <Button variant="outline" size="sm" className="mt-3"
                         onClick={() => setPropModal({ open: true, editing: null })}>
-                        Add First Property
+                        {t("addFirstProperty")}
                       </Button>
                     </div>
                   ) : (
@@ -761,23 +766,23 @@ export default function CustomerDetailPage() {
             <TabsContent value="jobs" className="mt-4">
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Linked Jobs</CardTitle>
+                  <CardTitle className="text-base">{t("linkedJobs")}</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   {jobs.length === 0 ? (
                     <div className="text-center py-10 text-muted-foreground">
                       <Briefcase className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">No jobs linked to this customer yet.</p>
+                      <p className="text-sm">{t("noJobsLinked")}</p>
                     </div>
                   ) : (
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Client / Job</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Stage</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead className="text-right">Value</TableHead>
+                          <TableHead>{t("clientJob")}</TableHead>
+                          <TableHead>{t("type")}</TableHead>
+                          <TableHead>{t("stage")}</TableHead>
+                          <TableHead>{t("date")}</TableHead>
+                          <TableHead className="text-right">{t("value")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -824,8 +829,8 @@ export default function CustomerDetailPage() {
               <Card>
                 <CardContent className="py-16 text-center text-muted-foreground">
                   <DollarSign className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm font-medium">Payment History Coming Soon</p>
-                  <p className="text-xs mt-1 opacity-70">Payment tracking will be available once invoicing is set up.</p>
+                  <p className="text-sm font-medium">{t("paymentHistoryTitle")}</p>
+                  <p className="text-xs mt-1 opacity-70">{t("paymentHistoryDesc")}</p>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -834,7 +839,7 @@ export default function CustomerDetailPage() {
             <TabsContent value="activity" className="mt-4">
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Activity Log</CardTitle>
+                  <CardTitle className="text-base">{t("activityLog")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="relative space-y-0">
@@ -842,7 +847,7 @@ export default function CustomerDetailPage() {
                     <ActivityItem
                       date={customer.created_at}
                       icon={<CheckCircle2 className="h-3.5 w-3.5 text-green-600" />}
-                      label="Customer record created"
+                      label={t("customerCreated")}
                     />
                     {/* Properties added */}
                     {customer.properties.map((prop) => (
@@ -850,7 +855,7 @@ export default function CustomerDetailPage() {
                         key={prop.id}
                         date={prop.created_at ?? customer.created_at}
                         icon={<Home className="h-3.5 w-3.5 text-blue-500" />}
-                        label={`Property added: ${prop.address}`}
+                        label={`${t("propertyAdded")} ${prop.address}`}
                       />
                     ))}
                     {/* Jobs */}
@@ -859,7 +864,7 @@ export default function CustomerDetailPage() {
                         key={job.id}
                         date={job.created_at}
                         icon={<Briefcase className="h-3.5 w-3.5 text-purple-500" />}
-                        label={`Job linked: ${job.client} — ${job.type} (${job.stage})`}
+                        label={`${t("jobLinked")} ${job.client} — ${job.type} (${job.stage})`}
                         onClick={() => setLocation(`/jobs/${job.id}`)}
                       />
                     ))}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import {
   DollarSign, Briefcase, TrendingUp, TrendingDown, Clock, Users,
@@ -26,13 +27,13 @@ function fmt$(n: number) {
 function fmtHrs(n: number) { return `${n.toFixed(1)} hrs`; }
 function fmtPct(n: number) { return `${n.toFixed(1)}%`; }
 
-// ─── Summary Card ─────────────────────────────────────────────────────────────
 function StatCard({
   title, value, sub, icon: Icon, trend, color = "default",
 }: {
   title: string; value: string; sub?: string;
   icon: React.ElementType; trend?: number | null; color?: string;
 }) {
+  const { t } = useTranslation("reports");
   return (
     <Card data-testid={`stat-card-${title.toLowerCase().replace(/\s+/g, "-")}`}>
       <CardContent className="pt-5 pb-4">
@@ -44,7 +45,7 @@ function StatCard({
             {trend != null && (
               <p className={`text-xs mt-1 flex items-center gap-1 ${trend >= 0 ? "text-green-600" : "text-red-500"}`}>
                 {trend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                {Math.abs(trend).toFixed(1)}% vs prior period
+                {Math.abs(trend).toFixed(1)}{t("vsPriorPeriodLabel")}
               </p>
             )}
           </div>
@@ -57,7 +58,6 @@ function StatCard({
   );
 }
 
-// ─── Bucket badge ─────────────────────────────────────────────────────────────
 function AgingBadge({ bucket }: { bucket: string }) {
   const styles: Record<string, string> = {
     current:  "bg-green-100 text-green-700",
@@ -73,10 +73,8 @@ function AgingBadge({ bucket }: { bucket: string }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Tab 1 — Revenue Report
-// ═══════════════════════════════════════════════════════════════════════════════
 function RevenueReport() {
+  const { t } = useTranslation("reports");
   const thisYear = new Date().getFullYear();
   const [filters, setFilters] = useState({
     date_from: `${thisYear}-01-01`,
@@ -97,66 +95,63 @@ function RevenueReport() {
 
   return (
     <div className="space-y-5">
-      {/* Filters */}
       <Card>
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="space-y-1">
-              <Label className="text-xs">From</Label>
+              <Label className="text-xs">{t("from")}</Label>
               <Input type="date" className="h-8 text-sm w-36" value={filters.date_from}
                 onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))}
                 data-testid="filter-revenue-from" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">To</Label>
+              <Label className="text-xs">{t("to")}</Label>
               <Input type="date" className="h-8 text-sm w-36" value={filters.date_to}
                 onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))}
                 data-testid="filter-revenue-to" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Division</Label>
+              <Label className="text-xs">{t("division")}</Label>
               <Select value={filters.division} onValueChange={v => setFilters(f => ({ ...f, division: v === "_all" ? "" : v }))}>
                 <SelectTrigger className="h-8 text-sm w-40" data-testid="filter-revenue-division">
-                  <SelectValue placeholder="All Divisions" />
+                  <SelectValue placeholder={t("allDivisions")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_all">All Divisions</SelectItem>
+                  <SelectItem value="_all">{t("allDivisions")}</SelectItem>
                   {DIVISIONS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <Button size="sm" className="h-8" onClick={() => setApplied(filters)}
               data-testid="btn-apply-revenue-filters">
-              Apply Filters
+              {t("applyFilters")}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {isLoading && <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
-      {error && <div className="flex items-center gap-2 text-destructive text-sm"><AlertCircle className="h-4 w-4" />Failed to load report</div>}
+      {error && <div className="flex items-center gap-2 text-destructive text-sm"><AlertCircle className="h-4 w-4" />{t("failedToLoad")}</div>}
 
       {data && !isLoading && (
         <>
-          {/* Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard title="Total Revenue" value={fmt$(data.summary.total_revenue)} icon={DollarSign}
+            <StatCard title={t("totalRevenue")} value={fmt$(data.summary.total_revenue)} icon={DollarSign}
               trend={data.summary.pct_vs_prior} color="green" />
-            <StatCard title="Jobs Completed" value={String(data.summary.total_jobs)} icon={Briefcase}
-              sub="with price data" color="blue" />
-            <StatCard title="Avg Job Value" value={fmt$(data.summary.avg_job_value)} icon={TrendingUp} />
-            <StatCard title="vs Prior Period"
+            <StatCard title={t("jobsCompleted")} value={String(data.summary.total_jobs)} icon={Briefcase}
+              sub={t("withPriceData")} color="blue" />
+            <StatCard title={t("avgJobValue")} value={fmt$(data.summary.avg_job_value)} icon={TrendingUp} />
+            <StatCard title={t("vsPriorPeriod")}
               value={data.summary.pct_vs_prior != null ? `${data.summary.pct_vs_prior >= 0 ? "+" : ""}${data.summary.pct_vs_prior.toFixed(1)}%` : "—"}
               icon={data.summary.pct_vs_prior != null && data.summary.pct_vs_prior < 0 ? TrendingDown : TrendingUp}
               color={data.summary.pct_vs_prior != null && data.summary.pct_vs_prior < 0 ? "red" : "green"}
-              sub="requires date filter" />
+              sub={t("requiresDateFilter")} />
           </div>
 
-          {/* Bar Chart */}
           {data.by_month.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Revenue by Month</CardTitle>
+                <CardTitle className="text-sm font-semibold">{t("revenueByMonth")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={260}>
@@ -165,27 +160,26 @@ function RevenueReport() {
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                     <YAxis tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} width={52} />
                     <Tooltip formatter={(v: any) => fmt$(Number(v))} />
-                    <Bar dataKey="revenue" name="Revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="revenue" name={t("revenue")} fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
           )}
 
-          {/* Division Table */}
           {data.by_division.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Revenue by Division</CardTitle>
+                <CardTitle className="text-sm font-semibold">{t("revenueByDivision")}</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <Table data-testid="revenue-division-table">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Division</TableHead>
-                      <TableHead className="text-right">Revenue</TableHead>
-                      <TableHead className="text-right">Jobs</TableHead>
-                      <TableHead className="text-right">% of Total</TableHead>
+                      <TableHead>{t("division")}</TableHead>
+                      <TableHead className="text-right">{t("revenue")}</TableHead>
+                      <TableHead className="text-right">{t("jobs")}</TableHead>
+                      <TableHead className="text-right">{t("pctOfTotal")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -212,7 +206,7 @@ function RevenueReport() {
 
           {data.by_month.length === 0 && data.by_division.length === 0 && (
             <div className="text-center py-12 text-muted-foreground text-sm">
-              No revenue data found for the selected filters
+              {t("noRevenueData")}
             </div>
           )}
         </>
@@ -221,12 +215,10 @@ function RevenueReport() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Tab 2 — Job Costing
-// ═══════════════════════════════════════════════════════════════════════════════
 const JOB_STATUSES = ["Lead", "Scheduled", "In Progress", "Completed", "Invoiced"];
 
 function JobCosting() {
+  const { t } = useTranslation("reports");
   const thisYear = new Date().getFullYear();
   const [filters, setFilters] = useState({ date_from: `${thisYear}-01-01`, date_to: `${thisYear}-12-31`, status: "", division: "" });
   const [applied, setApplied] = useState(filters);
@@ -248,89 +240,89 @@ function JobCosting() {
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="space-y-1">
-              <Label className="text-xs">From</Label>
+              <Label className="text-xs">{t("from")}</Label>
               <Input type="date" className="h-8 text-sm w-36" value={filters.date_from}
                 onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))}
                 data-testid="filter-costing-from" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">To</Label>
+              <Label className="text-xs">{t("to")}</Label>
               <Input type="date" className="h-8 text-sm w-36" value={filters.date_to}
                 onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))}
                 data-testid="filter-costing-to" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Status</Label>
+              <Label className="text-xs">{t("status")}</Label>
               <Select value={filters.status} onValueChange={v => setFilters(f => ({ ...f, status: v === "_all" ? "" : v }))}>
                 <SelectTrigger className="h-8 text-sm w-36" data-testid="filter-costing-status">
-                  <SelectValue placeholder="All Statuses" />
+                  <SelectValue placeholder={t("allStatuses")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_all">All Statuses</SelectItem>
+                  <SelectItem value="_all">{t("allStatuses")}</SelectItem>
                   {JOB_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Division</Label>
+              <Label className="text-xs">{t("division")}</Label>
               <Select value={filters.division} onValueChange={v => setFilters(f => ({ ...f, division: v === "_all" ? "" : v }))}>
                 <SelectTrigger className="h-8 text-sm w-36" data-testid="filter-costing-division">
-                  <SelectValue placeholder="All Divisions" />
+                  <SelectValue placeholder={t("allDivisions")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_all">All Divisions</SelectItem>
+                  <SelectItem value="_all">{t("allDivisions")}</SelectItem>
                   {DIVISIONS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <Button size="sm" className="h-8" onClick={() => setApplied(filters)}
               data-testid="btn-apply-costing-filters">
-              Apply Filters
+              {t("applyFilters")}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {isLoading && <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
-      {error && <div className="flex items-center gap-2 text-destructive text-sm"><AlertCircle className="h-4 w-4" />Failed to load report</div>}
+      {error && <div className="flex items-center gap-2 text-destructive text-sm"><AlertCircle className="h-4 w-4" />{t("failedToLoad")}</div>}
 
       {data && !isLoading && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard title="Est. Cost" value={fmt$(data.summary.total_est_cost)} icon={Briefcase} />
-            <StatCard title="Actual Cost" value={fmt$(data.summary.total_actual_cost)} icon={DollarSign}
+            <StatCard title={t("estCost")} value={fmt$(data.summary.total_est_cost)} icon={Briefcase} />
+            <StatCard title={t("actualCost")} value={fmt$(data.summary.total_actual_cost)} icon={DollarSign}
               color={data.summary.total_actual_cost > data.summary.total_est_cost ? "red" : "green"} />
-            <StatCard title="Gross Profit" value={fmt$(data.summary.total_gross_profit)} icon={TrendingUp}
+            <StatCard title={t("grossProfit")} value={fmt$(data.summary.total_gross_profit)} icon={TrendingUp}
               color={data.summary.total_gross_profit >= 0 ? "green" : "red"} />
-            <StatCard title="Avg Margin" value={fmtPct(data.summary.avg_margin_pct)} icon={BarChart2}
+            <StatCard title={t("avgMargin")} value={fmtPct(data.summary.avg_margin_pct)} icon={BarChart2}
               color={data.summary.avg_margin_pct >= 30 ? "green" : data.summary.avg_margin_pct >= 15 ? "blue" : "red"}
-              sub={`${data.jobs.length} jobs`} />
+              sub={`${data.jobs.length} ${t("jobs").toLowerCase()}`} />
           </div>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Job Detail</CardTitle>
-              <CardDescription className="text-xs">Cost estimates based on 60% cost ratio; OT from variance</CardDescription>
+              <CardTitle className="text-sm font-semibold">{t("jobDetail")}</CardTitle>
+              <CardDescription className="text-xs">{t("jobCostingDesc2")}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {data.jobs.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground text-sm">No jobs found</div>
+                <div className="p-8 text-center text-muted-foreground text-sm">{t("noJobs")}</div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table data-testid="job-costing-table">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Job</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Contract</TableHead>
-                        <TableHead className="text-right">Est Cost</TableHead>
-                        <TableHead className="text-right">Actual Cost</TableHead>
-                        <TableHead className="text-right">Profit</TableHead>
-                        <TableHead className="text-right">Margin</TableHead>
-                        <TableHead className="text-right">Est Hrs</TableHead>
-                        <TableHead className="text-right">Act Hrs</TableHead>
-                        <TableHead className="text-right">Variance</TableHead>
+                        <TableHead>{t("job")}</TableHead>
+                        <TableHead>{t("customer")}</TableHead>
+                        <TableHead>{t("status")}</TableHead>
+                        <TableHead className="text-right">{t("contract")}</TableHead>
+                        <TableHead className="text-right">{t("estCostCol")}</TableHead>
+                        <TableHead className="text-right">{t("actualCostCol")}</TableHead>
+                        <TableHead className="text-right">{t("profit")}</TableHead>
+                        <TableHead className="text-right">{t("margin")}</TableHead>
+                        <TableHead className="text-right">{t("estHrs")}</TableHead>
+                        <TableHead className="text-right">{t("actHrs")}</TableHead>
+                        <TableHead className="text-right">{t("variance")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -371,10 +363,8 @@ function JobCosting() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Tab 3 — Invoice Aging
-// ═══════════════════════════════════════════════════════════════════════════════
 function InvoiceAging() {
+  const { t } = useTranslation("reports");
   const [asOf, setAsOf] = useState(new Date().toISOString().split("T")[0]);
   const [applied, setApplied] = useState(asOf);
   const [bucketFilter, setBucketFilter] = useState("");
@@ -392,72 +382,72 @@ function InvoiceAging() {
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="space-y-1">
-              <Label className="text-xs">As of Date</Label>
+              <Label className="text-xs">{t("asOfDate")}</Label>
               <Input type="date" className="h-8 text-sm w-40" value={asOf}
                 onChange={e => setAsOf(e.target.value)} data-testid="filter-aging-date" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Bucket</Label>
+              <Label className="text-xs">{t("bucket")}</Label>
               <Select value={bucketFilter} onValueChange={v => setBucketFilter(v === "_all" ? "" : v)}>
                 <SelectTrigger className="h-8 text-sm w-36" data-testid="filter-aging-bucket">
-                  <SelectValue placeholder="All Buckets" />
+                  <SelectValue placeholder={t("allBuckets")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_all">All Buckets</SelectItem>
-                  <SelectItem value="current">Current</SelectItem>
-                  <SelectItem value="1-30">1–30 days</SelectItem>
-                  <SelectItem value="31-60">31–60 days</SelectItem>
-                  <SelectItem value="61-90">61–90 days</SelectItem>
-                  <SelectItem value="90+">90+ days</SelectItem>
+                  <SelectItem value="_all">{t("allBuckets")}</SelectItem>
+                  <SelectItem value="current">{t("current")}</SelectItem>
+                  <SelectItem value="1-30">1–30</SelectItem>
+                  <SelectItem value="31-60">31–60</SelectItem>
+                  <SelectItem value="61-90">61–90</SelectItem>
+                  <SelectItem value="90+">90+</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <Button size="sm" className="h-8" onClick={() => setApplied(asOf)}
               data-testid="btn-apply-aging-filters">
-              Apply
+              {t("apply")}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {isLoading && <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
-      {error && <div className="flex items-center gap-2 text-destructive text-sm"><AlertCircle className="h-4 w-4" />Failed to load report</div>}
+      {error && <div className="flex items-center gap-2 text-destructive text-sm"><AlertCircle className="h-4 w-4" />{t("failedToLoad")}</div>}
 
       {data && !isLoading && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard title="Current" value={fmt$(data.summary.current)} icon={DollarSign} color="green"
-              sub="Not yet due" />
-            <StatCard title="1–30 Days" value={fmt$(data.summary.days_1_30)} icon={Clock} color="blue" />
-            <StatCard title="31–60 Days" value={fmt$(data.summary.days_31_60)} icon={AlertCircle} color="default" />
-            <StatCard title="61–90 Days" value={fmt$(data.summary.days_61_90)} icon={AlertCircle} color="red" />
+            <StatCard title={t("current")} value={fmt$(data.summary.current)} icon={DollarSign} color="green"
+              sub={t("notYetDue")} />
+            <StatCard title={t("days1to30")} value={fmt$(data.summary.days_1_30)} icon={Clock} color="blue" />
+            <StatCard title={t("days31to60")} value={fmt$(data.summary.days_31_60)} icon={AlertCircle} color="default" />
+            <StatCard title={t("days61to90")} value={fmt$(data.summary.days_61_90)} icon={AlertCircle} color="red" />
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard title="90+ Days" value={fmt$(data.summary.days_90plus)} icon={AlertCircle} color="red"
-              sub="Critical overdue" />
-            <StatCard title="Total AR" value={fmt$(data.summary.total_ar)} icon={DollarSign}
-              sub={`${data.summary.invoice_count} open invoices`} />
+            <StatCard title={t("days90plus")} value={fmt$(data.summary.days_90plus)} icon={AlertCircle} color="red"
+              sub={t("criticalOverdue")} />
+            <StatCard title={t("totalAR")} value={fmt$(data.summary.total_ar)} icon={DollarSign}
+              sub={`${data.summary.invoice_count}`} />
           </div>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Open Invoices</CardTitle>
+              <CardTitle className="text-sm font-semibold">{t("openInvoices")}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {filtered.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground text-sm">No open invoices found</div>
+                <div className="p-8 text-center text-muted-foreground text-sm">{t("noOpenInvoices")}</div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table data-testid="aging-table">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Invoice #</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Issued</TableHead>
-                        <TableHead>Due</TableHead>
-                        <TableHead className="text-right">Balance Due</TableHead>
-                        <TableHead>Aging</TableHead>
+                        <TableHead>{t("invoiceNum")}</TableHead>
+                        <TableHead>{t("customer")}</TableHead>
+                        <TableHead>{t("status")}</TableHead>
+                        <TableHead>{t("issued")}</TableHead>
+                        <TableHead>{t("due")}</TableHead>
+                        <TableHead className="text-right">{t("balanceDue")}</TableHead>
+                        <TableHead>{t("aging")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -499,10 +489,8 @@ function InvoiceAging() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Tab 4 — Crew Hours
-// ═══════════════════════════════════════════════════════════════════════════════
 function CrewHours() {
+  const { t } = useTranslation("reports");
   const today = new Date();
   const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 90);
   const [filters, setFilters] = useState({
@@ -528,43 +516,43 @@ function CrewHours() {
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="space-y-1">
-              <Label className="text-xs">From</Label>
+              <Label className="text-xs">{t("from")}</Label>
               <Input type="date" className="h-8 text-sm w-36" value={filters.date_from}
                 onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))}
                 data-testid="filter-crew-from" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">To</Label>
+              <Label className="text-xs">{t("to")}</Label>
               <Input type="date" className="h-8 text-sm w-36" value={filters.date_to}
                 onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))}
                 data-testid="filter-crew-to" />
             </div>
             <Button size="sm" className="h-8" onClick={() => setApplied(filters)}
               data-testid="btn-apply-crew-filters">
-              Apply Filters
+              {t("applyFilters")}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {isLoading && <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
-      {error && <div className="flex items-center gap-2 text-destructive text-sm"><AlertCircle className="h-4 w-4" />Failed to load report</div>}
+      {error && <div className="flex items-center gap-2 text-destructive text-sm"><AlertCircle className="h-4 w-4" />{t("failedToLoad")}</div>}
 
       {data && !isLoading && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard title="Total Hours" value={fmtHrs(data.summary.total_hours)} icon={Clock}
-              sub={`${data.summary.employee_count} employees`} color="blue" />
-            <StatCard title="Regular Hours" value={fmtHrs(data.summary.regular_hours)} icon={Timer} color="green" />
-            <StatCard title="Overtime Hours" value={fmtHrs(data.summary.ot_hours)} icon={AlertCircle}
+            <StatCard title={t("totalHours")} value={fmtHrs(data.summary.total_hours)} icon={Clock}
+              sub={`${data.summary.employee_count} ${t("employees")}`} color="blue" />
+            <StatCard title={t("regularHours")} value={fmtHrs(data.summary.regular_hours)} icon={Timer} color="green" />
+            <StatCard title={t("overtimeHours")} value={fmtHrs(data.summary.ot_hours)} icon={AlertCircle}
               color={data.summary.ot_hours > 0 ? "red" : "default"} />
-            <StatCard title="Avg / Employee" value={fmtHrs(data.summary.avg_hours)} icon={Users} />
+            <StatCard title={t("avgPerEmployee")} value={fmtHrs(data.summary.avg_hours)} icon={Users} />
           </div>
 
           {data.by_week.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Weekly Hours Trend</CardTitle>
+                <CardTitle className="text-sm font-semibold">{t("weeklyHoursTrend")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={240}>
@@ -572,8 +560,8 @@ function CrewHours() {
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis dataKey="week_label" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} width={40} unit="h" />
-                    <Tooltip formatter={(v: any) => [`${Number(v).toFixed(1)} hrs`, "Total Hours"]} />
-                    <Bar dataKey="total_hours" name="Total Hours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    <Tooltip formatter={(v: any) => [`${Number(v).toFixed(1)} hrs`, t("totalHours")]} />
+                    <Bar dataKey="total_hours" name={t("totalHours")} fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -582,21 +570,21 @@ function CrewHours() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Employee Hours Breakdown</CardTitle>
+              <CardTitle className="text-sm font-semibold">{t("employeeHoursBreakdown")}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {data.by_employee.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground text-sm">No time entries found for this period</div>
+                <div className="p-8 text-center text-muted-foreground text-sm">{t("noTimeEntries")}</div>
               ) : (
                 <Table data-testid="crew-hours-table">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Employee</TableHead>
-                      <TableHead className="text-right">Days Worked</TableHead>
-                      <TableHead className="text-right">Total Hours</TableHead>
-                      <TableHead className="text-right">Regular Hrs</TableHead>
-                      <TableHead className="text-right">OT Hours</TableHead>
-                      <TableHead className="text-right">Avg / Day</TableHead>
+                      <TableHead>{t("employees")}</TableHead>
+                      <TableHead className="text-right">{t("daysWorked")}</TableHead>
+                      <TableHead className="text-right">{t("totalHours")}</TableHead>
+                      <TableHead className="text-right">{t("regularHours")}</TableHead>
+                      <TableHead className="text-right">{t("overtimeHours")}</TableHead>
+                      <TableHead className="text-right">{t("avgPerDay")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -623,26 +611,24 @@ function CrewHours() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Main Reports Page
-// ═══════════════════════════════════════════════════════════════════════════════
-const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] = [
-  { id: "revenue",       label: "Revenue Report",  icon: DollarSign, desc: "Revenue trends, job volume, and division breakdown" },
-  { id: "job-costing",   label: "Job Costing",     icon: Layers,     desc: "Estimated vs actual cost, gross profit, and margins" },
-  { id: "invoice-aging", label: "Invoice Aging",   icon: FileText,   desc: "Outstanding AR bucketed by days past due" },
-  { id: "crew-hours",    label: "Crew Hours",      icon: Timer,      desc: "Employee hours, overtime, and weekly trends" },
-];
-
 export default function Reports() {
+  const { t } = useTranslation("reports");
   const [activeTab, setActiveTab] = useState<Tab>("revenue");
+
+  const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] = [
+    { id: "revenue",       label: t("revenueReport"),  icon: DollarSign, desc: t("revenueDesc") },
+    { id: "job-costing",   label: t("jobCosting"),     icon: Layers,     desc: t("jobCostingDesc") },
+    { id: "invoice-aging", label: t("invoiceAging"),   icon: FileText,   desc: t("invoiceAgingDesc") },
+    { id: "crew-hours",    label: t("crewHours"),      icon: Timer,      desc: t("crewHoursDesc") },
+  ];
 
   return (
     <div className="container max-w-6xl mx-auto py-6 px-4" data-testid="reports-page">
       <div className="mb-6">
         <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-reports-title">
-          <BarChart2 className="h-6 w-6" /> Reports
+          <BarChart2 className="h-6 w-6" /> {t("title")}
         </h1>
-        <p className="text-muted-foreground mt-1">Financial and operational analytics for your business</p>
+        <p className="text-muted-foreground mt-1">{t("subtitle")}</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-6">

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +14,6 @@ import { format, parseISO } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 import { InvoiceFormModal } from "./InvoiceFormModal";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
 interface InvoiceRow {
   id: string; invoice_number: string; status: string;
   issued_date: string; due_date: string | null;
@@ -23,23 +23,44 @@ interface InvoiceRow {
   job_title: string | null; job_client: string | null;
 }
 
-// ── Status ────────────────────────────────────────────────────────────────────
+const STATUS_CLS: Record<string, string> = {
+  draft:             "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  sent:              "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  viewed:            "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300",
+  accepted:          "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+  declined:          "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+  changes_requested: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  paid:              "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+  void:              "bg-muted text-muted-foreground",
+};
+
 export const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft:             { label: "Draft",             cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
-  sent:              { label: "Sent",              cls: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
-  viewed:            { label: "Viewed",            cls: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300" },
-  accepted:          { label: "Accepted",          cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300" },
-  declined:          { label: "Declined",          cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
-  changes_requested: { label: "Changes Requested", cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" },
-  paid:              { label: "Paid",              cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
-  void:              { label: "Void",              cls: "bg-muted text-muted-foreground" },
+  draft:             { label: "Draft",             cls: STATUS_CLS.draft },
+  sent:              { label: "Sent",              cls: STATUS_CLS.sent },
+  viewed:            { label: "Viewed",            cls: STATUS_CLS.viewed },
+  accepted:          { label: "Accepted",          cls: STATUS_CLS.accepted },
+  declined:          { label: "Declined",          cls: STATUS_CLS.declined },
+  changes_requested: { label: "Changes Requested", cls: STATUS_CLS.changes_requested },
+  paid:              { label: "Paid",              cls: STATUS_CLS.paid },
+  void:              { label: "Void",              cls: STATUS_CLS.void },
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_MAP[status] ?? { label: status, cls: "bg-muted text-muted-foreground" };
+  const { t } = useTranslation("invoices");
+  const labels: Record<string, string> = {
+    draft:             t("statusDraft"),
+    sent:              t("statusSent"),
+    viewed:            t("statusViewed"),
+    accepted:          t("statusAccepted"),
+    declined:          t("statusDeclined"),
+    changes_requested: t("statusChangesRequested"),
+    paid:              t("statusPaid"),
+    void:              t("statusVoid"),
+  };
+  const cls = STATUS_CLS[status] ?? "bg-muted text-muted-foreground";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${s.cls}`}>
-      {s.label}
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}>
+      {labels[status] ?? status}
     </span>
   );
 }
@@ -60,18 +81,8 @@ function fmtDate(d: string | null) {
   try { return format(parseISO(d), "MMM d, yyyy"); } catch { return d; }
 }
 
-const TABS = [
-  { value: "all",               label: "All" },
-  { value: "draft",             label: "Draft" },
-  { value: "sent",              label: "Sent" },
-  { value: "accepted",          label: "Accepted" },
-  { value: "changes_requested", label: "Changes Requested" },
-  { value: "declined",          label: "Declined" },
-  { value: "paid",              label: "Paid" },
-];
-
-// ── Main ──────────────────────────────────────────────────────────────────────
 export default function InvoicesPage() {
+  const { t } = useTranslation("invoices");
   const [, navigate] = useLocation();
   const { effectiveRole } = useAuth();
   const isAdminOrManager = ["Admin", "Manager", "Master Admin"].includes(effectiveRole ?? "");
@@ -79,6 +90,16 @@ export default function InvoicesPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
+
+  const TABS = [
+    { value: "all",               label: t("tabAll") },
+    { value: "draft",             label: t("statusDraft") },
+    { value: "sent",              label: t("statusSent") },
+    { value: "accepted",          label: t("statusAccepted") },
+    { value: "changes_requested", label: t("statusChangesRequested") },
+    { value: "declined",          label: t("statusDeclined") },
+    { value: "paid",              label: t("statusPaid") },
+  ];
 
   const params = new URLSearchParams();
   if (activeTab !== "all") params.set("status", activeTab);
@@ -101,15 +122,15 @@ export default function InvoicesPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Invoices</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {invoices.length} invoice{invoices.length !== 1 ? "s" : ""}
-            {totalOutstanding > 0 && ` · ${fmtMoney(totalOutstanding)} outstanding`}
+            {invoices.length}
+            {totalOutstanding > 0 && ` · ${fmtMoney(totalOutstanding)}`}
           </p>
         </div>
         {isAdminOrManager && (
           <Button onClick={() => setShowModal(true)} className="bg-primary" data-testid="button-new-invoice">
-            <Plus className="h-4 w-4 mr-1.5" /> New Invoice
+            <Plus className="h-4 w-4 mr-1.5" /> {t("newInvoice")}
           </Button>
         )}
       </div>
@@ -136,7 +157,7 @@ export default function InvoicesPage() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search invoices, customers…"
+          placeholder={t("searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9"
@@ -148,14 +169,14 @@ export default function InvoicesPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="py-16 text-center text-muted-foreground text-sm">Loading invoices…</div>
+            <div className="py-16 text-center text-muted-foreground text-sm">{t("loading", { ns: "common" })}</div>
           ) : invoices.length === 0 ? (
             <div className="py-16 text-center">
               <FileText className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
-              <p className="text-sm font-semibold text-muted-foreground">No invoices found</p>
+              <p className="text-sm font-semibold text-muted-foreground">{t("noInvoices")}</p>
               {activeTab === "all" && !search && isAdminOrManager && (
                 <Button onClick={() => setShowModal(true)} className="mt-4 bg-primary" size="sm">
-                  <Plus className="h-4 w-4 mr-1.5" /> Create your first invoice
+                  <Plus className="h-4 w-4 mr-1.5" /> {t("newInvoice")}
                 </Button>
               )}
             </div>
@@ -163,14 +184,14 @@ export default function InvoicesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Invoice #</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="hidden lg:table-cell">Job</TableHead>
-                  <TableHead className="hidden md:table-cell">Issued</TableHead>
-                  <TableHead className="hidden md:table-cell">Due</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right hidden sm:table-cell">Balance</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{t("status")} #</TableHead>
+                  <TableHead>{t("customer")}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t("amount")}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t("date")}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t("dueDate")}</TableHead>
+                  <TableHead className="text-right">{t("amount")}</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">{t("amount")}</TableHead>
+                  <TableHead>{t("status")}</TableHead>
                   <TableHead className="w-8" />
                 </TableRow>
               </TableHeader>

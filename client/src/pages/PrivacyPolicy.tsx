@@ -1,4 +1,7 @@
+import { useTranslation } from "react-i18next";
+
 export default function PrivacyPolicy() {
+  const { t } = useTranslation("privacy");
   const effectiveDate = "March 23, 2026";
   const companyName = "Chapin Landscapes";
   const contactEmail = "dan@chapinlandscapes.com";
@@ -9,13 +12,13 @@ export default function PrivacyPolicy() {
       <div className="bg-green-800 py-8 px-6">
         <div className="max-w-3xl mx-auto">
           <h1 className="text-3xl font-bold text-white">{companyName}</h1>
-          <p className="text-green-200 mt-1">Privacy Policy</p>
+          <p className="text-green-200 mt-1">{t("subtitle")}</p>
         </div>
       </div>
 
       <div className="max-w-3xl mx-auto px-6 py-10 space-y-8 text-gray-700 text-sm leading-relaxed">
 
-        <p className="text-xs text-gray-500">Effective Date: {effectiveDate}</p>
+        <p className="text-xs text-gray-500">{t("effectiveDate")}: {effectiveDate}</p>
 
         <p>
           {companyName} ("we," "our," or "us") is committed to protecting the privacy of individuals
@@ -131,7 +134,7 @@ export default function PrivacyPolicy() {
         </section>
 
         <p className="text-xs text-gray-400 pt-4 border-t">
-          &copy; {new Date().getFullYear()} {companyName}. All rights reserved.
+          &copy; {new Date().getFullYear()} {companyName}. {t("allRightsReserved")}
         </p>
       </div>
     </div>

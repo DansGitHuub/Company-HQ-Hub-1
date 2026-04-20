@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, ArrowLeft, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const EXPECTED_COLUMNS = ["sku", "name", "category", "class", "unit", "cost", "markup", "taxable", "description"];
 
@@ -13,6 +14,7 @@ type PreviewRow = Record<string, string>;
 type ImportResult = { imported: number; updated: number; skipped: number; errors: string[] };
 
 export default function CatalogImport() {
+  const { t } = useTranslation("catalogImport");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -52,7 +54,7 @@ export default function CatalogImport() {
     setDragOver(false);
     const f = e.dataTransfer.files[0];
     if (f && f.name.endsWith(".csv")) handleFileSelected(f);
-    else toast({ title: "Please drop a CSV file", variant: "destructive" });
+    else toast({ title: t("dropCsvOnly"), variant: "destructive" });
   }
 
   async function handleImport() {
@@ -71,7 +73,7 @@ export default function CatalogImport() {
       setResult(data);
       toast({ title: `Imported ${data.imported} new, updated ${data.updated}${data.skipped ? `, skipped ${data.skipped}` : ""}` });
     } catch (err: any) {
-      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+      toast({ title: t("importFailed"), description: err.message, variant: "destructive" });
     } finally {
       setImporting(false);
     }
@@ -81,19 +83,19 @@ export default function CatalogImport() {
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => navigate("/catalog")} data-testid="btn-back">
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back to Catalog
+          <ArrowLeft className="w-4 h-4 mr-1" /> {t("backToCatalog")}
         </Button>
       </div>
 
       <div>
-        <h1 className="text-2xl font-bold">Import Catalog Items</h1>
-        <p className="text-muted-foreground text-sm mt-1">Upload a CSV file to bulk-import items into the catalog</p>
+        <h1 className="text-2xl font-bold">{t("title")}</h1>
+        <p className="text-muted-foreground text-sm mt-1">{t("subtitle")}</p>
       </div>
 
       {/* Expected Format */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Expected CSV Columns</CardTitle>
+          <CardTitle className="text-sm font-medium">{t("expectedColumns")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
@@ -102,10 +104,10 @@ export default function CatalogImport() {
             ))}
           </div>
           <div className="mt-3 text-xs text-muted-foreground space-y-1">
-            <p><strong>Cost</strong>: Dollar sign and commas are stripped automatically (e.g. "$1,250.00" → 1250)</p>
-            <p><strong>Taxable</strong>: Use TRUE or FALSE</p>
-            <p><strong>Tags</strong>: Comma or semicolon separated within the cell</p>
-            <p><strong>Categories</strong>: Maps to category field; new categories are created automatically</p>
+            <p>{t("hintCost")}</p>
+            <p>{t("hintTaxable")}</p>
+            <p>{t("hintTags")}</p>
+            <p>{t("hintCategories")}</p>
           </div>
         </CardContent>
       </Card>
@@ -133,13 +135,13 @@ export default function CatalogImport() {
           <div className="space-y-2">
             <FileText className="w-10 h-10 mx-auto text-primary" />
             <p className="font-medium">{file.name}</p>
-            <p className="text-sm text-muted-foreground">{(file.size / 1024).toFixed(1)} KB · Click to replace</p>
+            <p className="text-sm text-muted-foreground">{(file.size / 1024).toFixed(1)} KB &middot; {t("clickToReplace")}</p>
           </div>
         ) : (
           <div className="space-y-2">
             <Upload className="w-10 h-10 mx-auto text-muted-foreground" />
-            <p className="font-medium">Drop CSV here or click to browse</p>
-            <p className="text-sm text-muted-foreground">Accepts .csv files</p>
+            <p className="font-medium">{t("dropHint")}</p>
+            <p className="text-sm text-muted-foreground">{t("acceptsCsv")}</p>
           </div>
         )}
       </div>
@@ -148,7 +150,7 @@ export default function CatalogImport() {
       {preview.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Preview (first 5 rows)</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("preview")}</CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -172,7 +174,7 @@ export default function CatalogImport() {
                 ))}
               </tbody>
             </table>
-            <p className="text-xs text-muted-foreground mt-2">* Unrecognized columns will be ignored</p>
+            <p className="text-xs text-muted-foreground mt-2">{t("unknownColumns")}</p>
           </CardContent>
         </Card>
       )}
@@ -181,7 +183,7 @@ export default function CatalogImport() {
       {file && !result && (
         <div className="flex justify-end">
           <Button onClick={handleImport} disabled={importing} className="min-w-[140px]" data-testid="btn-run-import">
-            {importing ? "Importing..." : "Import Items"}
+            {importing ? `${t("importing")}...` : t("importItems")}
           </Button>
         </div>
       )}
@@ -191,7 +193,7 @@ export default function CatalogImport() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-500" /> Import Complete
+              <CheckCircle className="w-4 h-4 text-green-500" /> {t("importComplete")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -199,13 +201,13 @@ export default function CatalogImport() {
               <div className="flex items-center gap-2 text-green-600">
                 <CheckCircle className="w-5 h-5" />
                 <span className="font-semibold text-lg">{result.imported}</span>
-                <span className="text-sm">imported</span>
+                <span className="text-sm">{t("imported")}</span>
               </div>
               {result.skipped > 0 && (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <AlertCircle className="w-5 h-5" />
                   <span className="font-semibold text-lg">{result.skipped}</span>
-                  <span className="text-sm">skipped</span>
+                  <span className="text-sm">{t("skipped")}</span>
                 </div>
               )}
             </div>
@@ -213,7 +215,7 @@ export default function CatalogImport() {
             {result.errors.length > 0 && (
               <div className="space-y-1">
                 <p className="text-xs font-medium text-destructive flex items-center gap-1">
-                  <XCircle className="w-3 h-3" /> Errors
+                  <XCircle className="w-3 h-3" /> {t("errors")}
                 </p>
                 <div className="bg-destructive/5 border border-destructive/20 rounded p-3 max-h-40 overflow-y-auto">
                   {result.errors.map((e, i) => (
@@ -224,9 +226,9 @@ export default function CatalogImport() {
             )}
 
             <div className="flex gap-2 pt-2">
-              <Button onClick={() => navigate("/catalog")} data-testid="btn-view-catalog">View Catalog</Button>
+              <Button onClick={() => navigate("/catalog")} data-testid="btn-view-catalog">{t("viewCatalog")}</Button>
               <Button variant="outline" onClick={() => { setFile(null); setPreview([]); setResult(null); setHeaders([]); }}
-                data-testid="btn-import-another">Import Another</Button>
+                data-testid="btn-import-another">{t("importAnother")}</Button>
             </div>
           </CardContent>
         </Card>

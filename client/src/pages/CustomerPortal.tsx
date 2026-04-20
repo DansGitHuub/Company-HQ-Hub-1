@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 
 const GREEN = "#2d5016";
 
@@ -27,6 +28,7 @@ function fmt(v: string | number | null | undefined) {
 }
 
 export default function CustomerPortal() {
+  const { t } = useTranslation("customerPortal");
   const token = window.location.pathname.split("/portal/")[1]?.split("?")[0] ?? "";
 
   const [estimate, setEstimate] = useState<Estimate | null>(null);
@@ -36,13 +38,11 @@ export default function CustomerPortal() {
   const [phase, setPhase] = useState<"viewing" | "declined-note" | "done">("viewing");
   const [doneAction, setDoneAction] = useState<"approved" | "declined" | null>(null);
 
-  // Acceptance form state
   const [tcScrolled, setTcScrolled] = useState(false);
   const [initials, setInitials] = useState("");
   const [declineNote, setDeclineNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Canvas signature
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSig, setHasSig] = useState(false);
@@ -50,7 +50,6 @@ export default function CustomerPortal() {
 
   const tcBoxRef = useRef<HTMLDivElement>(null);
 
-  // Fetch estimate + active T&C
   useEffect(() => {
     if (!token) { setError("Invalid link."); setLoading(false); return; }
     Promise.all([
@@ -64,7 +63,6 @@ export default function CustomerPortal() {
       .finally(() => setLoading(false));
   }, [token]);
 
-  // Signature canvas helpers
   const getPos = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
     const rect = canvas.getBoundingClientRect();
     if ("touches" in e) {
@@ -152,7 +150,7 @@ export default function CustomerPortal() {
   if (loading) {
     return (
       <div style={{ fontFamily: "system-ui, sans-serif", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f8f9fa" }}>
-        <p style={{ color: "#666" }}>Loading proposal…</p>
+        <p style={{ color: "#666" }}>{t("loading")}&hellip;</p>
       </div>
     );
   }
@@ -164,7 +162,7 @@ export default function CustomerPortal() {
           <h1 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }}>Chapin Landscapes</h1>
         </header>
         <div style={{ maxWidth: 600, margin: "60px auto", padding: "0 24px", textAlign: "center" }}>
-          <p style={{ color: "#dc3545", fontSize: "1.1rem" }}>{error || "Proposal not found."}</p>
+          <p style={{ color: "#dc3545", fontSize: "1.1rem" }}>{error || t("proposalNotFound")}</p>
         </div>
       </div>
     );
@@ -205,20 +203,20 @@ export default function CustomerPortal() {
       <div style={s.page}>
         <header style={s.header}>
           <h1 style={s.headerH1}>Chapin Landscapes</h1>
-          <p style={s.headerSub}>Proposal Review</p>
+          <p style={s.headerSub}>{t("proposalReview")}</p>
         </header>
         <div style={s.main}>
           {doneAction === "approved" ? (
             <div style={s.successCard} data-testid="portal-approved-confirmation">
-              <div style={{ fontSize: "3rem", marginBottom: 12 }}>✅</div>
-              <h2 style={s.successTitle}>Thank you, {estimate.customer_name}!</h2>
-              <p style={s.successText}>Your approval has been confirmed. Our team will be in touch shortly to schedule your project. A deposit invoice will be sent to you soon.</p>
+              <div style={{ fontSize: "3rem", marginBottom: 12 }}>&#9989;</div>
+              <h2 style={s.successTitle}>{t("thankyouTitle")}, {estimate.customer_name}!</h2>
+              <p style={s.successText}>{t("approvedMsg")}</p>
             </div>
           ) : (
             <div style={s.declineCard} data-testid="portal-declined-confirmation">
-              <div style={{ fontSize: "3rem", marginBottom: 12 }}>🙏</div>
-              <h2 style={{ color: "#856404", fontSize: "1.3rem", fontWeight: 700, margin: "0 0 10px" }}>Response Recorded</h2>
-              <p style={{ color: "#856404", fontSize: "0.95rem", margin: 0 }}>Thank you for letting us know. We appreciate your consideration and hope to work with you in the future.</p>
+              <div style={{ fontSize: "3rem", marginBottom: 12 }}>&#128591;</div>
+              <h2 style={{ color: "#856404", fontSize: "1.3rem", fontWeight: 700, margin: "0 0 10px" }}>{t("responseRecorded")}</h2>
+              <p style={{ color: "#856404", fontSize: "0.95rem", margin: 0 }}>{t("declinedMsg")}</p>
             </div>
           )}
         </div>
@@ -231,29 +229,29 @@ export default function CustomerPortal() {
       <div style={s.page}>
         <header style={s.header}>
           <h1 style={s.headerH1}>Chapin Landscapes</h1>
-          <p style={s.headerSub}>Proposal Review</p>
+          <p style={s.headerSub}>{t("proposalReview")}</p>
         </header>
         <div style={s.main}>
           <div style={s.card}>
-            <div style={s.cardHead}><h3 style={s.cardTitle}>Decline Proposal</h3></div>
+            <div style={s.cardHead}><h3 style={s.cardTitle}>{t("declineTitle")}</h3></div>
             <div style={s.cardBody}>
-              <p style={{ color: "#555", marginBottom: 14, fontSize: "0.9rem" }}>We're sorry to hear that. Would you like to share any feedback? (optional)</p>
+              <p style={{ color: "#555", marginBottom: 14, fontSize: "0.9rem" }}>{t("declineMsg")}</p>
               <textarea
                 style={s.textarea}
-                placeholder="Let us know why you're declining…"
+                placeholder={`${t("declinePlaceholder")}\u2026`}
                 value={declineNote}
                 onChange={e => setDeclineNote(e.target.value)}
                 data-testid="input-decline-note"
               />
               <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-                <button onClick={() => setPhase("viewing")} style={{ ...s.declineBtn, flex: 1 }}>Go Back</button>
+                <button onClick={() => setPhase("viewing")} style={{ ...s.declineBtn, flex: 1 }}>{t("goBack")}</button>
                 <button
                   onClick={() => submit("declined")}
                   disabled={submitting}
                   style={{ flex: 2, padding: "12px", background: "#dc3545", color: "#fff", border: "none", borderRadius: 8, fontSize: "0.95rem", fontWeight: 700, cursor: "pointer" }}
                   data-testid="btn-confirm-decline"
                 >
-                  {submitting ? "Submitting…" : "Decline Proposal"}
+                  {submitting ? `${t("submitting")}\u2026` : t("confirmDecline")}
                 </button>
               </div>
             </div>
@@ -265,7 +263,6 @@ export default function CustomerPortal() {
 
   return (
     <div style={s.page}>
-      {/* Header */}
       <header style={s.header}>
         <h1 style={s.headerH1}>Chapin Landscapes</h1>
         <p style={s.headerSub}>Landscaping &amp; Maintenance Services</p>
@@ -276,21 +273,21 @@ export default function CustomerPortal() {
         {isAlreadyActed && (
           <div style={{ background: "#e8f4e8", border: "1px solid #c3e6cb", borderRadius: 8, padding: "12px 16px", marginBottom: 20, fontSize: "0.9rem", color: "#2d5016" }}>
             {estimate.status === "approved"
-              ? "✅ You have already approved this proposal. Thank you!"
-              : "This proposal has been declined."}
+              ? `\u2705 ${t("alreadyApproved")}`
+              : t("alreadyDeclined")}
           </div>
         )}
 
         {/* 1 — Estimate Header */}
         <div style={s.card}>
-          <div style={s.cardHead}><h3 style={s.cardTitle}>Proposal Details</h3></div>
+          <div style={s.cardHead}><h3 style={s.cardTitle}>{t("proposalDetails")}</h3></div>
           <div style={s.cardBody}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px", fontSize: "0.9rem" }}>
-              <div><span style={{ color: "#888", fontSize: "0.8rem" }}>Proposal #</span><div style={{ fontWeight: 700 }}>{estimate.estimate_number || "—"}</div></div>
-              <div><span style={{ color: "#888", fontSize: "0.8rem" }}>Title</span><div>{estimate.title}</div></div>
-              <div><span style={{ color: "#888", fontSize: "0.8rem" }}>Customer</span><div>{estimate.customer_name}</div></div>
-              {estimate.property_address && <div><span style={{ color: "#888", fontSize: "0.8rem" }}>Property</span><div>{estimate.property_address}</div></div>}
-              {estimate.salesperson_name && <div><span style={{ color: "#888", fontSize: "0.8rem" }}>Prepared by</span><div>{estimate.salesperson_name}</div></div>}
+              <div><span style={{ color: "#888", fontSize: "0.8rem" }}>{t("proposalNum")}</span><div style={{ fontWeight: 700 }}>{estimate.estimate_number || "\u2014"}</div></div>
+              <div><span style={{ color: "#888", fontSize: "0.8rem" }}>{t("titleLabel")}</span><div>{estimate.title}</div></div>
+              <div><span style={{ color: "#888", fontSize: "0.8rem" }}>{t("customer")}</span><div>{estimate.customer_name}</div></div>
+              {estimate.property_address && <div><span style={{ color: "#888", fontSize: "0.8rem" }}>{t("property")}</span><div>{estimate.property_address}</div></div>}
+              {estimate.salesperson_name && <div><span style={{ color: "#888", fontSize: "0.8rem" }}>{t("preparedBy")}</span><div>{estimate.salesperson_name}</div></div>}
             </div>
           </div>
         </div>
@@ -298,7 +295,7 @@ export default function CustomerPortal() {
         {/* 2 — Scope of Work */}
         {estimate.work_areas?.length > 0 && (
           <div style={s.card}>
-            <div style={s.cardHead}><h3 style={s.cardTitle}>Scope of Work</h3></div>
+            <div style={s.cardHead}><h3 style={s.cardTitle}>{t("scopeOfWork")}</h3></div>
             <div style={s.cardBody}>
               {estimate.work_areas.map(area => (
                 <div key={area.id} style={{ marginBottom: 18 }}>
@@ -306,19 +303,19 @@ export default function CustomerPortal() {
                   {area.line_items?.map(item => (
                     <div key={item.id} style={s.row} data-testid={`row-lineitem-${item.id}`}>
                       <span style={{ flex: 1, paddingRight: 12 }}>{item.description}</span>
-                      <span style={{ color: "#888", marginRight: 16, whiteSpace: "nowrap" as const }}>{item.quantity} × {fmt(item.unit_price)}</span>
+                      <span style={{ color: "#888", marginRight: 16, whiteSpace: "nowrap" as const }}>{item.quantity} &times; {fmt(item.unit_price)}</span>
                       <span style={{ fontWeight: 600, whiteSpace: "nowrap" as const }}>{fmt(item.amount)}</span>
                     </div>
                   ))}
                 </div>
               ))}
               <div style={s.totalRow} data-testid="text-estimate-total">
-                <span>Total</span>
+                <span>{t("total")}</span>
                 <span>{fmt(estimate.total)}</span>
               </div>
               {(estimate.deposit_percentage ?? 50) > 0 && (
                 <div style={{ fontSize: "0.85rem", color: "#666", marginTop: 4 }}>
-                  Deposit required: {estimate.deposit_percentage ?? 50}% ({fmt(parseFloat(estimate.total ?? "0") * (estimate.deposit_percentage ?? 50) / 100)}) due within 7 days of signing
+                  {t("depositRequired")}: {estimate.deposit_percentage ?? 50}% ({fmt(parseFloat(estimate.total ?? "0") * (estimate.deposit_percentage ?? 50) / 100)}) {t("dueWithinDays")}
                 </div>
               )}
             </div>
@@ -328,9 +325,9 @@ export default function CustomerPortal() {
         {/* 3 — Terms & Conditions */}
         {tcContent && !isAlreadyActed && (
           <div style={s.card}>
-            <div style={s.cardHead}><h3 style={s.cardTitle}>Terms &amp; Conditions</h3></div>
+            <div style={s.cardHead}><h3 style={s.cardTitle}>{t("termsConditions")}</h3></div>
             <div style={s.cardBody}>
-              <p style={{ fontSize: "0.85rem", color: "#555", marginBottom: 10 }}>Please read the full terms and conditions below before signing.</p>
+              <p style={{ fontSize: "0.85rem", color: "#555", marginBottom: 10 }}>{t("readTermsHint")}</p>
               <div
                 ref={tcBoxRef}
                 style={s.tcBox}
@@ -340,10 +337,10 @@ export default function CustomerPortal() {
                 {tcContent}
               </div>
               {!tcScrolled && (
-                <p style={s.tcHint}>↓ Scroll to the bottom to unlock the signature fields</p>
+                <p style={s.tcHint}>&darr; {t("scrollToUnlock")}</p>
               )}
               {tcScrolled && (
-                <p style={{ ...s.tcHint, color: GREEN, fontWeight: 600 }}>✓ You have read the Terms &amp; Conditions</p>
+                <p style={{ ...s.tcHint, color: GREEN, fontWeight: 600 }}>&check; {t("termsRead")}</p>
               )}
             </div>
           </div>
@@ -352,11 +349,11 @@ export default function CustomerPortal() {
         {/* 4 — Initials */}
         {!isAlreadyActed && (
           <div style={s.card}>
-            <div style={s.cardHead}><h3 style={s.cardTitle}>Initials</h3></div>
+            <div style={s.cardHead}><h3 style={s.cardTitle}>{t("initials")}</h3></div>
             <div style={s.cardBody}>
               <label style={s.label} htmlFor="initials-input">
-                Type your initials to confirm you have read and agree to the Terms &amp; Conditions above
-                <span style={s.sublabel}>(required)</span>
+                {t("initialsLabel")}
+                <span style={s.sublabel}>{t("initialsRequired")}</span>
               </label>
               <input
                 id="initials-input"
@@ -380,9 +377,9 @@ export default function CustomerPortal() {
         {/* 5 — Signature Pad */}
         {!isAlreadyActed && (
           <div style={s.card}>
-            <div style={s.cardHead}><h3 style={s.cardTitle}>Signature</h3></div>
+            <div style={s.cardHead}><h3 style={s.cardTitle}>{t("signature")}</h3></div>
             <div style={s.cardBody}>
-              <label style={s.label}>Draw your signature below <span style={s.sublabel}>(use mouse or finger)</span></label>
+              <label style={s.label}>{t("drawSignature")} <span style={s.sublabel}>{t("drawHint")}</span></label>
               <div
                 style={{
                   ...s.canvasWrap,
@@ -403,10 +400,10 @@ export default function CustomerPortal() {
                   onTouchEnd={endDraw}
                   data-testid="canvas-signature"
                 />
-                <button onClick={clearSig} style={s.clearBtn}>Clear</button>
+                <button onClick={clearSig} style={s.clearBtn}>{t("clear")}</button>
               </div>
               {!hasSig && initials.trim() && (
-                <p style={s.tcHint}>Draw your signature in the box above</p>
+                <p style={s.tcHint}>{t("drawHintBox")}</p>
               )}
             </div>
           </div>
@@ -418,7 +415,7 @@ export default function CustomerPortal() {
             <div style={s.cardBody}>
               {!canAccept && (
                 <p style={{ fontSize: "0.83rem", color: "#888", textAlign: "center", marginBottom: 12 }}>
-                  {!tcScrolled && tcContent ? "Scroll through the terms" : !initials.trim() ? "Enter your initials" : "Draw your signature"} to enable approval
+                  {!tcScrolled && tcContent ? t("scrollTerms") : !initials.trim() ? t("enterInitials") : t("drawSig")} {t("toEnable")}
                 </p>
               )}
               <button
@@ -427,7 +424,7 @@ export default function CustomerPortal() {
                 style={s.acceptBtn}
                 data-testid="btn-accept-proposal"
               >
-                {submitting ? "Submitting…" : "✅ Accept & Approve Proposal"}
+                {submitting ? `${t("submitting")}\u2026` : `\u2705 ${t("acceptProposal")}`}
               </button>
               <button
                 onClick={() => setPhase("declined-note")}
@@ -435,7 +432,7 @@ export default function CustomerPortal() {
                 style={s.declineBtn}
                 data-testid="btn-decline-proposal"
               >
-                Decline Proposal
+                {t("declineProposal")}
               </button>
             </div>
           </div>

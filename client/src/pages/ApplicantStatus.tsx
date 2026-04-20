@@ -1,46 +1,53 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Clock, Loader2, AlertTriangle, Mail, Phone, MapPin, ChevronRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
-const STEPS = [
-  { id: 1, label: "Applied" },
-  { id: 2, label: "Under Review" },
-  { id: 3, label: "Interview" },
-  { id: 4, label: "Final Review" },
-  { id: 5, label: "Offer" },
-  { id: 6, label: "Hired" },
-];
+function useSteps() {
+  const { t } = useTranslation("applicantStatus");
+  return [
+    { id: 1, label: t("stepApplied") },
+    { id: 2, label: t("stepUnderReview") },
+    { id: 3, label: t("stepInterview") },
+    { id: 4, label: t("stepFinalReview") },
+    { id: 5, label: t("stepOffer") },
+    { id: 6, label: t("stepHired") },
+  ];
+}
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation("applicantStatus");
   if (status === "hired") return (
     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-      <CheckCircle2 className="h-4 w-4" /> Hired
+      <CheckCircle2 className="h-4 w-4" /> {t("statusHired")}
     </span>
   );
   if (status === "declined") return (
     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
-      Application Closed
+      {t("statusClosed")}
     </span>
   );
   if (status === "draft") return (
     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800">
-      <Clock className="h-4 w-4" /> In Progress
+      <Clock className="h-4 w-4" /> {t("statusInProgress")}
     </span>
   );
   return (
     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-      <Clock className="h-4 w-4" /> Active
+      <Clock className="h-4 w-4" /> {t("statusActive")}
     </span>
   );
 }
 
 function ProgressBar({ progress, declined }: { progress: number; declined: boolean }) {
+  const steps = useSteps();
+
   if (declined) {
     return (
       <div className="my-6">
         <div className="flex items-center justify-between mb-2">
-          {STEPS.map((step) => (
-            <div key={step.id} className="flex flex-col items-center" style={{ width: `${100 / STEPS.length}%` }}>
+          {steps.map((step) => (
+            <div key={step.id} className="flex flex-col items-center" style={{ width: `${100 / steps.length}%` }}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium border-2 ${
                 step.id === 1 ? "bg-gray-200 border-gray-300 text-gray-500" : "bg-gray-100 border-gray-200 text-gray-400"
               }`}>
@@ -55,17 +62,16 @@ function ProgressBar({ progress, declined }: { progress: number; declined: boole
     );
   }
 
-  const progressPct = Math.max(0, Math.min(100, ((progress - 1) / (STEPS.length - 1)) * 100));
+  const progressPct = Math.max(0, Math.min(100, ((progress - 1) / (steps.length - 1)) * 100));
 
   return (
     <div className="my-6">
       <div className="flex items-center justify-between mb-2">
-        {STEPS.map((step) => {
+        {steps.map((step) => {
           const done = step.id < progress;
           const active = step.id === progress;
-          const upcoming = step.id > progress;
           return (
-            <div key={step.id} className="flex flex-col items-center" style={{ width: `${100 / STEPS.length}%` }}>
+            <div key={step.id} className="flex flex-col items-center" style={{ width: `${100 / steps.length}%` }}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium border-2 transition-all ${
                 done ? "bg-green-600 border-green-600 text-white" :
                 active ? "bg-white border-green-600 text-green-700 ring-4 ring-green-100" :
@@ -91,6 +97,7 @@ function ProgressBar({ progress, declined }: { progress: number; declined: boole
 }
 
 export default function ApplicantStatus() {
+  const { t } = useTranslation("applicantStatus");
   const token = window.location.pathname.replace("/status/", "").replace(/\/$/, "");
 
   const { data, isLoading, error } = useQuery({
@@ -113,10 +120,10 @@ export default function ApplicantStatus() {
         <div className="max-w-2xl mx-auto px-4 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold tracking-tight">Chapin Landscapes</h1>
-            <p className="text-green-200 text-sm mt-0.5">design • build • maintain</p>
+            <p className="text-green-200 text-sm mt-0.5">design &bull; build &bull; maintain</p>
           </div>
           <div className="text-right">
-            <p className="text-green-200 text-xs">Application Status</p>
+            <p className="text-green-200 text-xs">{t("applicationStatus")}</p>
           </div>
         </div>
       </div>
@@ -125,17 +132,17 @@ export default function ApplicantStatus() {
         {isLoading && (
           <div className="bg-white rounded-xl shadow-sm border p-12 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-green-600 mx-auto mb-3" />
-            <p className="text-gray-500 text-sm">Loading your application status...</p>
+            <p className="text-gray-500 text-sm">{t("loading")}&hellip;</p>
           </div>
         )}
 
         {error && (
           <div className="bg-white rounded-xl shadow-sm border p-8 text-center">
             <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-            <h2 className="text-lg font-semibold text-gray-800 mb-1">Unable to Load Status</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">{t("unableToLoad")}</h2>
             <p className="text-gray-500 text-sm mb-4">{(error as Error).message}</p>
             <p className="text-gray-400 text-xs">
-              If you believe this is an error, contact us at{" "}
+              {t("contactError")}{" "}
               <a href="mailto:office@chapinlandscapes.com" className="text-green-600 hover:underline">
                 office@chapinlandscapes.com
               </a>
@@ -149,14 +156,14 @@ export default function ApplicantStatus() {
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <div className="flex items-start justify-between flex-wrap gap-3">
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Applicant</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">{t("applicant")}</p>
                   <h2 className="text-xl font-bold text-gray-800" data-testid="text-applicant-name">{data.applicantName}</h2>
                   <p className="text-gray-500 text-sm mt-0.5">
-                    Applied for: <span className="font-medium text-gray-700" data-testid="text-position">{data.position}</span>
+                    {t("appliedFor")}: <span className="font-medium text-gray-700" data-testid="text-position">{data.position}</span>
                   </p>
                   {data.submittedAt && (
                     <p className="text-gray-400 text-xs mt-1">
-                      Submitted: {new Date(data.submittedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                      {t("submitted")}: {new Date(data.submittedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
                     </p>
                   )}
                 </div>
@@ -188,7 +195,7 @@ export default function ApplicantStatus() {
                   </div>
                 )}
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Current Status</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">{t("currentStatus")}</p>
                   <h3 className="text-lg font-semibold text-gray-800" data-testid="text-stage-label">{data.stageLabel}</h3>
                   <p className="text-gray-600 text-sm mt-1 leading-relaxed" data-testid="text-stage-message">{data.stageMessage}</p>
                 </div>
@@ -203,7 +210,7 @@ export default function ApplicantStatus() {
                     <ChevronRight className="h-4 w-4 text-amber-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">What Comes Next</p>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">{t("whatsNext")}</p>
                     <p className="text-gray-700 text-sm leading-relaxed" data-testid="text-next-step">{data.nextStep}</p>
                   </div>
                 </div>
@@ -212,7 +219,7 @@ export default function ApplicantStatus() {
 
             {/* Contact card */}
             <div className="bg-white rounded-xl shadow-sm border p-6">
-              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-3">Questions? Contact Us</p>
+              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-3">{t("contactUs")}</p>
               <div className="space-y-2 text-sm">
                 <a
                   href={`mailto:${data.contactEmail}`}
@@ -234,7 +241,7 @@ export default function ApplicantStatus() {
             </div>
 
             <p className="text-center text-xs text-gray-400 pt-2">
-              This page is unique to your application. Please bookmark it to check your status at any time.
+              {t("bookmarkHint")}
             </p>
           </div>
         )}

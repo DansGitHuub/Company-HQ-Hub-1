@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,15 +27,6 @@ interface TimeEntry {
   notes: string | null;
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  billable:     "Billable",
-  non_billable: "Non-Billable",
-  drive_time:   "Drive Time",
-  break:        "Break",
-  shop_time:    "Shop Time",
-  meeting:      "Meeting",
-};
-
 const TYPE_COLORS: Record<string, string> = {
   billable:     "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
   non_billable: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
@@ -57,7 +49,17 @@ function fmtTime(iso: string) {
 }
 
 export default function TimeTrackingPage() {
+  const { t } = useTranslation("timeTracking");
   const [date, setDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+
+  const TYPE_LABELS: Record<string, string> = {
+    billable:     t("billable"),
+    non_billable: t("nonBillable"),
+    drive_time:   t("driveTime"),
+    break:        t("breakTime"),
+    shop_time:    t("shopTime"),
+    meeting:      t("meeting"),
+  };
 
   const { data: entries = [], isLoading, refetch } = useQuery<TimeEntry[]>({
     queryKey: ["/api/time/entries", date],
@@ -92,16 +94,15 @@ export default function TimeTrackingPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Time Tracking</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Your time entries and clock history
+            {t("subtitle")}
           </p>
         </div>
-        {/* Clock widget (also in header but handy here too) */}
         <div className="flex items-center gap-2">
           <TimeClock />
           <Button variant="outline" size="sm" onClick={() => refetch()} className="text-xs">
-            Refresh
+            {t("refresh")}
           </Button>
         </div>
       </div>
@@ -127,7 +128,7 @@ export default function TimeTrackingPage() {
         {!isToday && (
           <Button variant="ghost" size="sm" className="text-xs h-8"
             onClick={() => setDate(format(new Date(), "yyyy-MM-dd"))}>
-            Today
+            {t("today", { ns: "common" })}
           </Button>
         )}
       </div>
@@ -138,7 +139,7 @@ export default function TimeTrackingPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Timer className="h-4 w-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Total Time</span>
+              <span className="text-xs font-medium uppercase tracking-wide">{t("totalTime")}</span>
             </div>
             <p className="text-2xl font-bold" data-testid="stat-total-time">{fmtMinutes(totalTime || null)}</p>
           </CardContent>
@@ -147,7 +148,7 @@ export default function TimeTrackingPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Briefcase className="h-4 w-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Billable</span>
+              <span className="text-xs font-medium uppercase tracking-wide">{t("totalBillable")}</span>
             </div>
             <p className="text-2xl font-bold" data-testid="stat-billable-time">{fmtMinutes(totalBillable || null)}</p>
           </CardContent>
@@ -156,7 +157,7 @@ export default function TimeTrackingPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Clock className="h-4 w-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Entries</span>
+              <span className="text-xs font-medium uppercase tracking-wide">{t("clockIn")}</span>
             </div>
             <p className="text-2xl font-bold" data-testid="stat-entries">{entries.length}</p>
           </CardContent>
@@ -165,15 +166,15 @@ export default function TimeTrackingPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Clock className="h-4 w-4 text-green-500" />
-              <span className="text-xs font-medium uppercase tracking-wide">Status</span>
+              <span className="text-xs font-medium uppercase tracking-wide">{t("clockOut")}</span>
             </div>
             <p className="text-sm font-semibold mt-1" data-testid="stat-status">
               {openEntry
                 ? <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse inline-block" />
-                    Clocked In
+                    {t("clockIn")}
                   </span>
-                : <span className="text-muted-foreground">Clocked Out</span>}
+                : <span className="text-muted-foreground">{t("clockOut")}</span>}
             </p>
           </CardContent>
         </Card>
@@ -183,30 +184,29 @@ export default function TimeTrackingPage() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
-            {isToday ? "Today's Entries" : `Entries for ${format(new Date(date + "T12:00:00"), "MMMM d, yyyy")}`}
+            {isToday
+              ? t("clockIn")
+              : `${t("clockOut")} ${format(new Date(date + "T12:00:00"), "MMMM d, yyyy")}`}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="py-12 text-center text-muted-foreground text-sm">Loading entries…</div>
+            <div className="py-12 text-center text-muted-foreground text-sm">{t("noEntries")}</div>
           ) : entries.length === 0 ? (
             <div className="py-12 text-center">
               <Clock className="h-8 w-8 mx-auto mb-2 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No time entries for this day.</p>
-              {isToday && (
-                <p className="text-xs text-muted-foreground mt-1">Use the Clock In button to start tracking time.</p>
-              )}
+              <p className="text-sm text-muted-foreground">{t("noEntries")}</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Clock In</TableHead>
-                  <TableHead>Clock Out</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Work Area</TableHead>
-                  <TableHead>Job</TableHead>
-                  <TableHead>Notes</TableHead>
+                  <TableHead>{t("clockIn")}</TableHead>
+                  <TableHead>{t("clockOut")}</TableHead>
+                  <TableHead>{t("duration")}</TableHead>
+                  <TableHead>{t("workArea")}</TableHead>
+                  <TableHead>{t("job")}</TableHead>
+                  <TableHead>{t("notes")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -221,7 +221,7 @@ export default function TimeTrackingPage() {
                         ? fmtTime(entry.clock_out)
                         : <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
                             <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                            Active
+                            {t("active")}
                           </span>}
                     </TableCell>
                     <TableCell className="text-sm font-medium">
@@ -251,7 +251,6 @@ export default function TimeTrackingPage() {
   );
 }
 
-// Running timer for active entry in the table
 function RunningTimer({ clockIn }: { clockIn: string }) {
   const [display, setDisplay] = useState("");
   React.useEffect(() => {

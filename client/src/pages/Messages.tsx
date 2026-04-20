@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { format, isToday, isYesterday, formatDistanceToNowStrict } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
+import { useTranslation } from "react-i18next";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ function buildPrintHTML(messages: ThreadMessage[], myId: string, otherName: stri
       const ts = format(new Date(m.sent_at), "MMM d, yyyy · h:mm a");
       const atts =
         m.attachments?.length
-          ? `<div class="atts">📎 Attachments: ${m.attachments.map((a) => a.fileName).join(", ")}</div>`
+          ? `<div class="atts">&#128206; Attachments: ${m.attachments.map((a) => a.fileName).join(", ")}</div>`
           : "";
       return `
         <div class="msg">
@@ -98,9 +99,9 @@ function buildPrintHTML(messages: ThreadMessage[], myId: string, otherName: stri
 </head>
 <body>
   <div class="hd">
-    <div class="logo">🌿 Chapin Landscapes</div>
+    <div class="logo">&#127807; Chapin Landscapes</div>
     <div class="sub">Conversation between <strong>${myName}</strong> and <strong>${otherName}</strong></div>
-    <div class="meta">Printed ${dateStr} · ${messages.length} message${messages.length !== 1 ? "s" : ""}</div>
+    <div class="meta">Printed ${dateStr} &middot; ${messages.length} message${messages.length !== 1 ? "s" : ""}</div>
   </div>
   ${msgRows}
   <script>window.onload = function() { window.print(); };<\/script>
@@ -262,6 +263,7 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
   onClose: (sentToId?: string) => void;
   initialRecipientId?: string;
 }) {
+  const { t } = useTranslation("messages");
   const { toast } = useToast();
   const qc = useQueryClient();
   const [recipientId, setRecipientId] = useState(initialRecipientId ?? "");
@@ -293,15 +295,15 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
       if (pendingFiles.length > 0) await uploadAttachments(msg.id, pendingFiles);
       return msg;
     },
-    onSuccess: (msg: any) => {
-      toast({ title: "Message sent" });
+    onSuccess: () => {
+      toast({ title: t("messageSent") });
       qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
       qc.invalidateQueries({ queryKey: ["/api/dm/unread-count"] });
       qc.invalidateQueries({ queryKey: ["/api/dm/conversation", recipientId] });
       onClose(recipientId);
     },
     onError: (err: any) => {
-      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+      toast({ title: t("failedToSend"), description: err.message, variant: "destructive" });
     },
   });
 
@@ -318,25 +320,25 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>New Message</DialogTitle>
+          <DialogTitle>{t("newMessage")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-1">
-            <Label>To</Label>
+            <Label>{t("to")}</Label>
             {selected ? (
               <div className="flex items-center gap-2 rounded-md border px-3 py-2 bg-muted/30">
                 <Avatar name={selected.name} picture={selected.profile_picture} size={26} />
                 <span className="text-sm font-medium">{selected.name}</span>
                 <span className="text-xs text-muted-foreground">({selected.role})</span>
                 <button className="ml-auto text-muted-foreground hover:text-foreground text-xs"
-                  onClick={() => setRecipientId("")} data-testid="button-clear-recipient">✕</button>
+                  onClick={() => setRecipientId("")} data-testid="button-clear-recipient">&times;</button>
               </div>
             ) : (
               <div className="border rounded-md">
                 <div className="flex items-center px-3 gap-2">
                   <Search className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                  <Input placeholder="Search by name or role…" value={search}
+                  <Input placeholder={`${t("searchByNameOrRole")}\u2026`} value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="border-0 px-0 focus-visible:ring-0 h-9 text-sm"
                     data-testid="input-recipient-search" />
@@ -344,7 +346,7 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
                 <div className="border-t max-h-44 overflow-y-auto">
                   {filtered.length === 0 ? (
                     <p className="px-3 py-2 text-sm text-muted-foreground">
-                      {users.length === 0 ? "No users available" : "No results"}
+                      {users.length === 0 ? t("noUsersAvailable") : t("noResults")}
                     </p>
                   ) : filtered.map((u) => (
                     <button key={u.id}
@@ -364,21 +366,21 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
           </div>
 
           <div className="space-y-1">
-            <Label>Subject <span className="text-muted-foreground text-xs">(optional)</span></Label>
-            <Input placeholder="Subject…" value={subject}
+            <Label>{t("subjectOptional")}</Label>
+            <Input placeholder={`${t("subjectOptional")}\u2026`} value={subject}
               onChange={(e) => setSubject(e.target.value)} data-testid="input-subject" />
           </div>
 
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <Label>Message</Label>
+              <Label>{t("message")}</Label>
               <button type="button" onClick={() => fileInputRef.current?.click()}
                 className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
                 data-testid="button-attach-compose">
-                <Paperclip className="h-3.5 w-3.5" /> Attach file
+                <Paperclip className="h-3.5 w-3.5" /> {t("attachFile")}
               </button>
             </div>
-            <Textarea placeholder="Write your message…" value={body}
+            <Textarea placeholder={`${t("writeYourMessage")}\u2026`} value={body}
               onChange={(e) => setBody(e.target.value)} rows={4} data-testid="textarea-body" />
             <input ref={fileInputRef} type="file" multiple className="hidden"
               data-testid="input-file-compose"
@@ -397,7 +399,7 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
                     <span className="text-gray-400 flex-shrink-0">({formatFileSize(f.size)})</span>
                     <button onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
                       className="text-gray-400 hover:text-red-500 ml-0.5 flex-shrink-0" type="button"
-                      data-testid={`button-remove-file-compose-${i}`}>✕</button>
+                      data-testid={`button-remove-file-compose-${i}`}>&times;</button>
                   </div>
                 ))}
               </div>
@@ -407,21 +409,19 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onClose()} data-testid="button-compose-cancel">
-            Cancel
+            {t("cancel")}
           </Button>
           <Button onClick={() => sendMutation.mutate()}
             disabled={!recipientId || !body.trim() || sendMutation.isPending}
             data-testid="button-send-message">
             <Send className="h-4 w-4 mr-1.5" />
-            {sendMutation.isPending ? "Sending…" : "Send"}
+            {sendMutation.isPending ? `${t("sending")}\u2026` : t("send")}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
-// ── Conversation Row ───────────────────────────────────────────────────────────
 
 // ── LinkDropdown ───────────────────────────────────────────────────────────────
 function LinkDropdown({
@@ -465,7 +465,7 @@ function LinkDropdown({
             {value && (
               <CommandItem onSelect={() => { onChange(null); setOpen(false); }}
                 className="text-xs text-red-500 cursor-pointer">
-                ✕ Clear selection
+                &times; Clear selection
               </CommandItem>
             )}
             {options.map((item) => (
@@ -492,6 +492,7 @@ function ConversationRow({ conv, selected, myId, onClick, folders, onAddToFolder
   onAddToFolder?: (folderId: string, partnerId: string) => void;
   onExport?: (partnerId: string, partnerName: string) => void;
 }) {
+  const { t } = useTranslation("messages");
   const unread = Number(conv.unread_count);
   const isUnread = unread > 0;
   const [isHovered, setIsHovered] = useState(false);
@@ -525,7 +526,6 @@ function ConversationRow({ conv, selected, myId, onClick, folders, onAddToFolder
             hasMenu && isHovered ? "opacity-0" : "")}>
             {relativeTime(conv.last_message_at)}
           </span>
-          {/* ... menu — visible when row is hovered (React state, reliable for automation) */}
           {hasMenu && (
             <div
               className={cn("flex items-center ml-0.5 transition-opacity", isHovered ? "opacity-100" : "opacity-0 pointer-events-none")}
@@ -546,7 +546,7 @@ function ConversationRow({ conv, selected, myId, onClick, folders, onAddToFolder
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
                         <FolderOpen className="h-3.5 w-3.5 mr-2 text-gray-500" />
-                        Add to folder
+                        {t("addToFolder")}
                       </DropdownMenuSubTrigger>
                       <DropdownMenuSubContent className="w-40">
                         {folders.map((f) => (
@@ -563,7 +563,7 @@ function ConversationRow({ conv, selected, myId, onClick, folders, onAddToFolder
                   ) : (
                     <DropdownMenuItem disabled>
                       <FolderOpen className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                      No folders yet
+                      {t("noFoldersDropdown")}
                     </DropdownMenuItem>
                   )}
                   {onExport && (
@@ -573,7 +573,7 @@ function ConversationRow({ conv, selected, myId, onClick, folders, onAddToFolder
                         onClick={() => onExport(conv.other_user_id, conv.other_user_name)}
                         data-testid={`menuitem-export-${conv.other_user_id}`}>
                         <Download className="h-3.5 w-3.5 mr-2 text-gray-500" />
-                        Export (.txt)
+                        {t("exportTxt")}
                       </DropdownMenuItem>
                     </>
                   )}
@@ -585,18 +585,18 @@ function ConversationRow({ conv, selected, myId, onClick, folders, onAddToFolder
         <div className="flex items-center gap-1.5 mt-0.5">
           <p className={cn("text-xs truncate flex-1",
             isUnread ? "text-gray-800 font-medium" : "text-gray-500")}>
-            {conv.last_sender_id === myId ? `You: ${conv.last_message}` : conv.last_message}
+            {conv.last_sender_id === myId ? `${t("youPrefix")} ${conv.last_message}` : conv.last_message}
           </p>
           {conv.job_id && (
             <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded"
               data-testid={`badge-job-${conv.other_user_id}`}>
-              <Briefcase className="h-2.5 w-2.5" />Job
+              <Briefcase className="h-2.5 w-2.5" />{t("jobBadge")}
             </span>
           )}
           {conv.task_id && !conv.job_id && (
             <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded"
               data-testid={`badge-task-${conv.other_user_id}`}>
-              <Link2 className="h-2.5 w-2.5" />Task
+              <Link2 className="h-2.5 w-2.5" />{t("taskBadge")}
             </span>
           )}
         </div>
@@ -620,6 +620,7 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
   onBack: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation("messages");
   const { toast } = useToast();
   const qc = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -650,7 +651,6 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
     queryFn: () => fetch("/api/tasks", { credentials: "include" }).then(r => r.json()),
   });
 
-  // Derive link state from the most recent message
   const latestMsg = messages[messages.length - 1] ?? null;
   const linkedJobId = latestMsg?.job_id ?? null;
   const linkedTaskId = latestMsg?.task_id ?? null;
@@ -661,32 +661,28 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/dm/conversation", userId] });
       qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
-      toast({ title: "Conversation linked" });
+      toast({ title: t("conversationLinked") });
     },
-    onError: (err: any) => toast({ title: "Failed to link", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: t("failedToLink"), description: err.message, variant: "destructive" }),
   });
 
-  // Toast on new incoming messages when thread is open
   useEffect(() => {
     const incoming = messages.filter((m) => m.sender_id === userId);
     if (prevCountRef.current > 0 && incoming.length > prevCountRef.current) {
-      toast({ title: "New message", description: incoming[incoming.length - 1].body.slice(0, 60) });
+      toast({ title: t("newMessageNotif"), description: incoming[incoming.length - 1].body.slice(0, 60) });
     }
     prevCountRef.current = incoming.length;
   }, [messages]);
 
-  // Refresh sidebar after messages load (marks read)
   useEffect(() => {
     qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
     qc.invalidateQueries({ queryKey: ["/api/dm/unread-count"] });
   }, [messages.length]);
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // Derive other user info from messages
   const other = messages.find((m) => m.sender_id === userId || m.recipient_id === userId);
   const otherName = other
     ? (other.sender_id === userId ? other.sender_name : other.recipient_name)
@@ -698,7 +694,6 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
     ? (other.sender_id === userId ? other.sender_picture : other.recipient_picture)
     : null;
 
-  // Current star/archive state from conversations cache
   const convs = qc.getQueryData<Conversation[]>(["/api/dm/conversations", folder]) ??
     qc.getQueryData<Conversation[]>(["/api/dm/conversations"]) ?? [];
   const conv = convs.find((c) => c.other_user_id === userId);
@@ -709,7 +704,7 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
     mutationFn: () => apiRequest("PATCH", `/api/dm/conversation/${userId}/star`, {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
-      toast({ title: isStarred ? "Unstarred" : "Starred" });
+      toast({ title: isStarred ? t("unstarred") : t("starred") });
     },
   });
 
@@ -717,7 +712,7 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
     mutationFn: () => apiRequest("PATCH", `/api/dm/conversation/${userId}/archive`, {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
-      toast({ title: isArchived ? "Moved to Inbox" : "Archived" });
+      toast({ title: isArchived ? t("movedToInbox") : t("archived") });
       onClose();
     },
   });
@@ -727,7 +722,7 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
       qc.invalidateQueries({ queryKey: ["/api/dm/unread-count"] });
-      toast({ title: "Marked as unread" });
+      toast({ title: t("markedAsUnread") });
       onClose();
     },
   });
@@ -753,9 +748,9 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/dm/folders"] });
       setFolderPopoverOpen(false);
-      toast({ title: "Added to folder" });
+      toast({ title: t("addedToFolder") });
     },
-    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: t("failedGeneric"), description: err.message, variant: "destructive" }),
   });
 
   async function sendReply() {
@@ -771,15 +766,13 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
       qc.invalidateQueries({ queryKey: ["/api/dm/conversation", userId] });
       qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
     } catch (err: any) {
-      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+      toast({ title: t("failedToSend"), description: err.message, variant: "destructive" });
     } finally {
       setIsSending(false);
     }
   }
 
-  // Find the last message sent by me for delivery status
   const lastSentByMe = [...messages].reverse().find((m) => m.sender_id === myId);
-
   let lastDate = "";
 
   return (
@@ -799,28 +792,28 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" onClick={() => starMutation.mutate()}
             disabled={starMutation.isPending}
-            title={isStarred ? "Unstar" : "Star"}
+            title={isStarred ? t("unstar") : t("star")}
             className={cn("h-8 w-8", isStarred ? "text-amber-500" : "text-gray-400 hover:text-amber-500")}
             data-testid="button-star">
             <Star className={cn("h-4 w-4", isStarred && "fill-amber-500")} />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => archiveMutation.mutate()}
             disabled={archiveMutation.isPending}
-            title={isArchived ? "Move to Inbox" : "Archive"}
+            title={isArchived ? t("moveToInbox") : t("archiveAction")}
             className="h-8 w-8 text-gray-400 hover:text-gray-600"
             data-testid="button-archive">
             <Archive className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => unreadMutation.mutate()}
             disabled={unreadMutation.isPending}
-            title="Mark as unread"
+            title={t("markAsUnread")}
             className="h-8 w-8 text-gray-400 hover:text-gray-600"
             data-testid="button-mark-unread">
             <MailOpen className="h-4 w-4" />
           </Button>
           <Popover open={folderPopoverOpen} onOpenChange={setFolderPopoverOpen}>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" title="Add to folder"
+              <Button variant="ghost" size="icon" title={t("addToFolderTitle")}
                 className="h-8 w-8 text-gray-400 hover:text-indigo-600"
                 data-testid="button-add-to-folder">
                 <FolderPlus className="h-4 w-4" />
@@ -828,7 +821,7 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
             </PopoverTrigger>
             <PopoverContent className="w-48 p-1" align="end">
               {folders.length === 0 ? (
-                <p className="text-xs text-gray-400 px-2 py-1.5">No folders yet. Create one in the sidebar.</p>
+                <p className="text-xs text-gray-400 px-2 py-1.5">{t("noFoldersHint")}</p>
               ) : (
                 <div className="space-y-0.5">
                   {folders.map((f) => (
@@ -846,7 +839,7 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
             </PopoverContent>
           </Popover>
           <Button variant="ghost" size="icon"
-            title="Print conversation"
+            title={t("printConversation")}
             className="h-8 w-8 text-gray-400 hover:text-gray-700"
             data-testid="button-print"
             disabled={messages.length === 0}
@@ -858,7 +851,7 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
             <Printer className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon"
-            title="Download conversation (.txt)"
+            title={t("downloadConversation")}
             className="h-8 w-8 text-gray-400 hover:text-gray-700"
             data-testid="button-download"
             disabled={messages.length === 0}
@@ -873,7 +866,7 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
           <Button variant="ghost" size="icon"
             onClick={() => { if (lastSentByMe) deleteMutation.mutate(lastSentByMe.id); }}
             disabled={!lastSentByMe || deleteMutation.isPending}
-            title="Delete last message"
+            title={t("deleteLastMessage")}
             className="h-8 w-8 text-gray-400 hover:text-red-500"
             data-testid="button-delete">
             <Trash2 className="h-4 w-4" />
@@ -885,20 +878,20 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
       {latestMsg && (
         <div className="flex items-center gap-2 px-4 py-1.5 border-b bg-gray-50/80" data-testid="link-bar">
           <Link2 className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-          <span className="text-[11px] text-gray-400">Linked to:</span>
+          <span className="text-[11px] text-gray-400">{t("linkedTo")}</span>
           <LinkDropdown
             value={linkedJobId}
             options={allJobs}
             getLabel={(j) => j.client || j.id}
-            placeholder="Job…"
+            placeholder="Job&hellip;"
             onChange={(id) => linkMutation.mutate({ jobId: id })}
             disabled={linkMutation.isPending}
           />
           <LinkDropdown
             value={linkedTaskId}
             options={allTasks}
-            getLabel={(t) => `${t.task_id}: ${t.title}`}
-            placeholder="Task…"
+            getLabel={(tk) => `${tk.task_id}: ${tk.title}`}
+            placeholder="Task&hellip;"
             onChange={(id) => linkMutation.mutate({ taskId: id })}
             disabled={linkMutation.isPending}
           />
@@ -908,9 +901,9 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
       {/* Messages */}
       <ScrollArea className="flex-1 px-4 py-3">
         {isLoading ? (
-          <p className="text-center text-sm text-gray-400 py-8">Loading…</p>
+          <p className="text-center text-sm text-gray-400 py-8">{t("loading")}&hellip;</p>
         ) : messages.length === 0 ? (
-          <p className="text-center text-sm text-gray-400 py-8">No messages yet. Send one below.</p>
+          <p className="text-center text-sm text-gray-400 py-8">{t("noMessagesYet")}</p>
         ) : (
           <div className="space-y-1 pb-2">
             {messages.map((msg, idx) => {
@@ -975,7 +968,6 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
                         <span className="text-[10px] text-gray-400">
                           {format(new Date(msg.sent_at), "h:mm a")}
                         </span>
-                        {/* Delivery status on last sent message only */}
                         {isMine && isLastSentByMe && (
                           msg.read_at ? (
                             <span className="flex items-center gap-0.5 text-blue-400" title={`Read ${format(new Date(msg.read_at), "h:mm a")}`}>
@@ -1011,14 +1003,14 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
                 <span className="text-gray-400 flex-shrink-0">({formatFileSize(f.size)})</span>
                 <button onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
                   className="text-gray-400 hover:text-red-500 ml-0.5" type="button"
-                  data-testid={`button-remove-file-reply-${i}`}>✕</button>
+                  data-testid={`button-remove-file-reply-${i}`}>&times;</button>
               </div>
             ))}
           </div>
         )}
         <div className="flex gap-2 items-end">
           <Textarea
-            placeholder="Reply…"
+            placeholder={`${t("replyPlaceholder")}\u2026`}
             value={reply}
             onChange={(e) => setReply(e.target.value)}
             onKeyDown={(e) => {
@@ -1037,7 +1029,7 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
             }} />
           <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}
             className="h-9 w-9 flex-shrink-0 text-gray-400 hover:text-gray-600"
-            title="Attach file" type="button" data-testid="button-attach-reply">
+            title={t("attachFile")} type="button" data-testid="button-attach-reply">
             <Paperclip className="h-4 w-4" />
           </Button>
           <Button onClick={sendReply} disabled={!reply.trim() || isSending}
@@ -1045,7 +1037,7 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
             <Send className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1">Enter to send · Shift+Enter for new line</p>
+        <p className="text-[10px] text-gray-400 mt-1">{t("enterToSend")} &middot; {t("shiftEnterNewLine")}</p>
       </div>
     </div>
   );
@@ -1059,6 +1051,7 @@ function FolderCustomRow({ folder, active, onClick, onRename, onDelete }: {
   onRename: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation("messages");
   return (
     <div className={cn(
       "group flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors",
@@ -1082,12 +1075,12 @@ function FolderCustomRow({ folder, active, onClick, onRename, onDelete }: {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-36">
             <DropdownMenuItem onClick={onRename} data-testid={`menuitem-rename-${folder.id}`}>
-              Rename
+              {t("rename")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onDelete} className="text-red-500 focus:text-red-500"
               data-testid={`menuitem-delete-${folder.id}`}>
-              Delete
+              {t("delete")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -1106,7 +1099,7 @@ function FolderTab({ label, icon: Icon, active, badge, onClick }: {
   onClick: () => void;
 }) {
   return (
-    <button onClick={onClick} data-testid={`tab-${label.toLowerCase()}`}
+    <button onClick={onClick} data-testid={`tab-${label.toLowerCase().replace(/\s+/g, "-")}`}
       className={cn(
         "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors w-full",
         active ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-100"
@@ -1115,7 +1108,7 @@ function FolderTab({ label, icon: Icon, active, badge, onClick }: {
       <span className="flex-1 text-left">{label}</span>
       {badge != null && badge > 0 && (
         <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center"
-          data-testid={`badge-folder-${label.toLowerCase()}`}>
+          data-testid={`badge-folder-${label.toLowerCase().replace(/\s+/g, "-")}`}>
           {badge > 99 ? "99+" : badge}
         </span>
       )}
@@ -1126,18 +1119,17 @@ function FolderTab({ label, icon: Icon, active, badge, onClick }: {
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function MessagesPage() {
+  const { t } = useTranslation("messages");
   const { user } = useAuth();
   const qc = useQueryClient();
   const { toast } = useToast();
 
-  // System folder state
   const [folder, setFolder] = useState<Folder>("inbox");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // Custom folder state
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [createFolderName, setCreateFolderName] = useState("");
@@ -1147,8 +1139,8 @@ export default function MessagesPage() {
   const [renameFolderColor, setRenameFolderColor] = useState(FOLDER_COLORS[0]);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
   }, [search]);
 
   const isSearchActive = debouncedSearch.length > 0;
@@ -1182,13 +1174,11 @@ export default function MessagesPage() {
   });
   const unreadCount = unreadData?.count ?? 0;
 
-  // Custom folders list
   const { data: folders = [] } = useQuery<MessageFolder[]>({
     queryKey: ["/api/dm/folders"],
     queryFn: () => fetch("/api/dm/folders", { credentials: "include" }).then(r => r.json()),
   });
 
-  // Conversations in selected custom folder
   const { data: folderConvs = [], isLoading: isFolderLoading } = useQuery<Conversation[]>({
     queryKey: ["/api/dm/folders", selectedFolderId, "conversations"],
     queryFn: () => fetch(`/api/dm/folders/${selectedFolderId}/conversations`, { credentials: "include" }).then(r => r.json()),
@@ -1197,7 +1187,6 @@ export default function MessagesPage() {
     staleTime: 0,
   });
 
-  // Folder mutations
   const createFolderMutation = useMutation({
     mutationFn: (data: { name: string; color: string }) => apiRequest("POST", "/api/dm/folders", data),
     onSuccess: () => {
@@ -1206,7 +1195,7 @@ export default function MessagesPage() {
       setCreateFolderName("");
       setCreateFolderColor(FOLDER_COLORS[0]);
     },
-    onError: (err: any) => toast({ title: "Failed to create folder", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: t("failedCreateFolder"), description: err.message, variant: "destructive" }),
   });
 
   const deleteFolderMutation = useMutation({
@@ -1215,7 +1204,7 @@ export default function MessagesPage() {
       qc.invalidateQueries({ queryKey: ["/api/dm/folders"] });
       if (selectedFolderId === id) setSelectedFolderId(null);
     },
-    onError: (err: any) => toast({ title: "Failed to delete folder", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: t("failedDeleteFolder"), description: err.message, variant: "destructive" }),
   });
 
   const renameFolderMutation = useMutation({
@@ -1225,7 +1214,7 @@ export default function MessagesPage() {
       qc.invalidateQueries({ queryKey: ["/api/dm/folders"] });
       setRenamingFolder(null);
     },
-    onError: (err: any) => toast({ title: "Failed to rename folder", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: t("failedRenameFolder"), description: err.message, variant: "destructive" }),
   });
 
   const addToFolderMutation = useMutation({
@@ -1233,12 +1222,11 @@ export default function MessagesPage() {
       apiRequest("POST", `/api/dm/folders/${data.folderId}/conversations`, { conversationPartnerId: data.partnerId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/dm/folders"] });
-      toast({ title: "Added to folder" });
+      toast({ title: t("addedToFolder") });
     },
-    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: t("failedGeneric"), description: err.message, variant: "destructive" }),
   });
 
-  // Which conversations to display
   const displayed = isSearchActive
     ? searchResults
     : selectedFolderId ? folderConvs : conversations;
@@ -1262,13 +1250,13 @@ export default function MessagesPage() {
       const res = await fetch(`/api/dm/conversation/${partnerId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       const msgs: ThreadMessage[] = await res.json();
-      if (!msgs.length) { toast({ title: "No messages to export" }); return; }
+      if (!msgs.length) { toast({ title: t("noMessagesToExport") }); return; }
       const text = buildTextExport(msgs, user?.id ?? "", partnerName);
       const safeName = partnerName.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
       const dateTag = format(new Date(), "yyyy-MM-dd");
       triggerTxtDownload(text, `conversation-${safeName}-${dateTag}.txt`);
     } catch {
-      toast({ title: "Export failed", variant: "destructive" });
+      toast({ title: t("exportFailed"), variant: "destructive" });
     }
   }
 
@@ -1293,24 +1281,24 @@ export default function MessagesPage() {
         {/* Header */}
         <div className="px-4 pt-4 pb-2 border-b">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-bold text-gray-900" data-testid="text-messages-heading">Messages</h1>
+            <h1 className="text-lg font-bold text-gray-900" data-testid="text-messages-heading">{t("heading")}</h1>
             <Button size="sm" onClick={() => setComposeOpen(true)}
               className="bg-blue-500 hover:bg-blue-600 text-white h-8 px-3 text-xs"
               data-testid="button-compose">
               <Pencil className="h-3.5 w-3.5 mr-1.5" />
-              Compose
+              {t("compose")}
             </Button>
           </div>
 
           {/* System folder tabs */}
           <div className="space-y-0.5">
-            <FolderTab label="Inbox" icon={Inbox} active={!selectedFolderId && folder === "inbox"}
+            <FolderTab label={t("folderInbox")} icon={Inbox} active={!selectedFolderId && folder === "inbox"}
               badge={unreadCount} onClick={() => handleFolderChange("inbox")} />
-            <FolderTab label="Sent" icon={Send} active={!selectedFolderId && folder === "sent"}
+            <FolderTab label={t("folderSent")} icon={Send} active={!selectedFolderId && folder === "sent"}
               onClick={() => handleFolderChange("sent")} />
-            <FolderTab label="Starred" icon={Star} active={!selectedFolderId && folder === "starred"}
+            <FolderTab label={t("folderStarred")} icon={Star} active={!selectedFolderId && folder === "starred"}
               onClick={() => handleFolderChange("starred")} />
-            <FolderTab label="Archive" icon={Archive} active={!selectedFolderId && folder === "archive"}
+            <FolderTab label={t("folderArchive")} icon={Archive} active={!selectedFolderId && folder === "archive"}
               onClick={() => handleFolderChange("archive")} />
           </div>
 
@@ -1318,11 +1306,11 @@ export default function MessagesPage() {
           <div className="mt-3">
             <div className="flex items-center px-1 mb-1">
               <span className="flex-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-2">
-                My Folders
+                {t("myFolders")}
               </span>
               <button onClick={() => setCreateFolderOpen(true)}
                 className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-                title="Create folder" data-testid="button-create-folder">
+                title={t("createFolderTitle")} data-testid="button-create-folder">
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -1338,7 +1326,7 @@ export default function MessagesPage() {
                 />
               ))}
               {folders.length === 0 && (
-                <p className="text-xs text-gray-400 px-3 py-1">No folders yet</p>
+                <p className="text-xs text-gray-400 px-3 py-1">{t("noFoldersYet")}</p>
               )}
             </div>
           </div>
@@ -1348,7 +1336,7 @@ export default function MessagesPage() {
         <div className="px-3 py-2 border-b">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-            <Input placeholder="Search conversations…" value={search}
+            <Input placeholder={`${t("searchConversations")}\u2026`} value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8 h-8 text-sm bg-gray-50 border-gray-200"
               data-testid="input-search" />
@@ -1359,23 +1347,23 @@ export default function MessagesPage() {
         <ScrollArea className="flex-1">
           {isLoading_ ? (
             <p className="text-sm text-gray-400 text-center py-10">
-              {isSearchActive ? "Searching…" : "Loading…"}
+              {isSearchActive ? `${t("searching")}\u2026` : `${t("loading")}\u2026`}
             </p>
           ) : displayed.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
               <MessageSquare className="h-9 w-9 opacity-25" />
               <p className="text-sm" data-testid="text-empty-conversations">
-                {isSearchActive ? "No results found"
-                  : selectedFolderId ? "No conversations in this folder"
-                  : folder === "starred" ? "No starred conversations"
-                  : folder === "archive" ? "Nothing archived"
-                  : folder === "sent" ? "No sent messages"
-                  : "No conversations yet"}
+                {isSearchActive ? t("noResultsFound")
+                  : selectedFolderId ? t("noConvInFolder")
+                  : folder === "starred" ? t("noStarredConv")
+                  : folder === "archive" ? t("nothingArchived")
+                  : folder === "sent" ? t("noSentMessages")
+                  : t("noConversationsYet")}
               </p>
               {folder === "inbox" && !isSearchActive && !selectedFolderId && (
                 <Button size="sm" variant="outline" onClick={() => setComposeOpen(true)}
                   className="text-xs" data-testid="button-compose-empty">
-                  Start a conversation
+                  {t("startConversation")}
                 </Button>
               )}
             </div>
@@ -1413,8 +1401,8 @@ export default function MessagesPage() {
             <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
               <Mail className="h-7 w-7 opacity-40" />
             </div>
-            <p className="text-sm font-medium" data-testid="text-select-prompt">Select a conversation</p>
-            <p className="text-xs text-gray-300">or compose a new message</p>
+            <p className="text-sm font-medium" data-testid="text-select-prompt">{t("selectConversation")}</p>
+            <p className="text-xs text-gray-300">{t("orComposeNew")}</p>
           </div>
         )}
       </div>
@@ -1428,15 +1416,15 @@ export default function MessagesPage() {
       }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>New Folder</DialogTitle>
+            <DialogTitle>{t("newFolderTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-700">Name</label>
+              <label className="text-sm font-medium text-gray-700">{t("name")}</label>
               <Input
                 value={createFolderName}
                 onChange={(e) => setCreateFolderName(e.target.value)}
-                placeholder="e.g. Clients, VIP, Project X…"
+                placeholder={`${t("folderNamePlaceholder")}\u2026`}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && createFolderName.trim())
                     createFolderMutation.mutate({ name: createFolderName.trim(), color: createFolderColor });
@@ -1446,7 +1434,7 @@ export default function MessagesPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-700">Color</label>
+              <label className="text-sm font-medium text-gray-700">{t("color")}</label>
               <div className="flex gap-2">
                 {FOLDER_COLORS.map((c) => (
                   <button key={c} onClick={() => setCreateFolderColor(c)}
@@ -1459,12 +1447,12 @@ export default function MessagesPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateFolderOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setCreateFolderOpen(false)}>{t("cancel")}</Button>
             <Button
               onClick={() => createFolderMutation.mutate({ name: createFolderName.trim(), color: createFolderColor })}
               disabled={!createFolderName.trim() || createFolderMutation.isPending}
               data-testid="button-confirm-create-folder">
-              Create
+              {t("create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1474,11 +1462,11 @@ export default function MessagesPage() {
       <Dialog open={!!renamingFolder} onOpenChange={(o) => { if (!o) setRenamingFolder(null); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Rename Folder</DialogTitle>
+            <DialogTitle>{t("renameFolderTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-700">Name</label>
+              <label className="text-sm font-medium text-gray-700">{t("name")}</label>
               <Input
                 value={renameFolderName}
                 onChange={(e) => setRenameFolderName(e.target.value)}
@@ -1491,7 +1479,7 @@ export default function MessagesPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-700">Color</label>
+              <label className="text-sm font-medium text-gray-700">{t("color")}</label>
               <div className="flex gap-2">
                 {FOLDER_COLORS.map((c) => (
                   <button key={c} onClick={() => setRenameFolderColor(c)}
@@ -1504,14 +1492,14 @@ export default function MessagesPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRenamingFolder(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setRenamingFolder(null)}>{t("cancel")}</Button>
             <Button
               onClick={() => renamingFolder && renameFolderMutation.mutate({
                 id: renamingFolder.id, name: renameFolderName.trim(), color: renameFolderColor
               })}
               disabled={!renameFolderName.trim() || renameFolderMutation.isPending}
               data-testid="button-confirm-rename-folder">
-              Save
+              {t("save")}
             </Button>
           </DialogFooter>
         </DialogContent>

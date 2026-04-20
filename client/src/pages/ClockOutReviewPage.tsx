@@ -12,6 +12,7 @@ import {
   ArrowLeft, Loader2, PackageOpen, Receipt, StickyNote,
   Users, ClipboardCheck, PenLine, Eraser, CheckCircle2,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -57,9 +58,11 @@ interface ActiveEntry {
 function SignaturePad({
   onSigned,
   onCleared,
+  clearLabel,
 }: {
   onSigned: (dataUrl: string) => void;
   onCleared: () => void;
+  clearLabel: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -154,7 +157,7 @@ function SignaturePad({
           className="gap-1.5"
         >
           <Eraser className="h-3.5 w-3.5" />
-          Clear
+          {clearLabel}
         </Button>
       </div>
     </div>
@@ -164,6 +167,7 @@ function SignaturePad({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ClockOutReviewPage() {
+  const { t } = useTranslation("clockOutReview");
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -175,13 +179,11 @@ export default function ClockOutReviewPage() {
   const allChecked = checkedMaterials && checkedExpenses && checkedNotes;
   const canSubmit = allChecked && signatureDataUrl !== null;
 
-  // Fetch today's worksheet
   const { data: worksheet, isLoading: wsLoading, error: wsError } = useQuery<Worksheet>({
     queryKey: ["/api/worksheets/today"],
     queryFn: () => apiRequest("GET", "/api/worksheets/today").then((r) => r.json()),
   });
 
-  // Fetch active time entry (for clock-out)
   const { data: activeEntry } = useQuery<ActiveEntry | null>({
     queryKey: ["/api/time/active"],
     queryFn: () => apiRequest("GET", "/api/time/active").then((r) => r.json()),
@@ -204,14 +206,14 @@ export default function ClockOutReviewPage() {
     },
     onSuccess: () => {
       toast({
-        title: "Clocked out successfully",
-        description: "Your worksheet has been submitted and your time recorded.",
+        title: t("clockedOut"),
+        description: t("clockedOutDesc"),
       });
       navigate("/");
     },
     onError: (err: any) => {
       toast({
-        title: "Submission failed",
+        title: t("submitFailed"),
         description: err.message ?? "Something went wrong. Please try again.",
         variant: "destructive",
       });
@@ -223,8 +225,6 @@ export default function ClockOutReviewPage() {
     submitMutation.mutate();
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       {/* Back link */}
@@ -234,14 +234,14 @@ export default function ClockOutReviewPage() {
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Daily Worksheet
+        {t("backToWorksheet")}
       </button>
 
       {/* Page heading */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Clock-Out Review</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Review your day summary, confirm accuracy, sign, and submit.
+          {t("subtitle")}
         </p>
       </div>
 
@@ -253,7 +253,7 @@ export default function ClockOutReviewPage() {
       ) : wsError ? (
         <Card className="border-destructive">
           <CardContent className="py-6 text-center text-sm text-destructive">
-            Failed to load worksheet. Please go back and try again.
+            {t("failedLoad")}
           </CardContent>
         </Card>
       ) : worksheet ? (
@@ -262,7 +262,7 @@ export default function ClockOutReviewPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <ClipboardCheck className="h-4 w-4 text-primary" />
-                Day Summary
+                {t("daySummary")}
               </CardTitle>
               <Badge
                 variant={worksheet.status === "submitted" ? "default" : "secondary"}
@@ -282,13 +282,13 @@ export default function ClockOutReviewPage() {
             <div data-testid="section-materials">
               <div className="flex items-center gap-2 mb-2">
                 <PackageOpen className="h-4 w-4 text-emerald-600" />
-                <span className="text-sm font-medium text-emerald-700">Materials Used</span>
+                <span className="text-sm font-medium text-emerald-700">{t("materialsUsed")}</span>
                 <Badge variant="secondary" className="text-xs h-5 px-1.5">
                   {worksheet.materials.length}
                 </Badge>
               </div>
               {worksheet.materials.length === 0 ? (
-                <p className="text-xs text-muted-foreground pl-6">No materials recorded.</p>
+                <p className="text-xs text-muted-foreground pl-6">{t("noMaterials")}</p>
               ) : (
                 <ul className="pl-6 space-y-1">
                   {worksheet.materials.map((m) => (
@@ -297,10 +297,10 @@ export default function ClockOutReviewPage() {
                       data-testid={`item-material-${m.id}`}
                       className="text-sm text-foreground"
                     >
-                      <span className="font-medium">{m.material_name ?? "—"}</span>
+                      <span className="font-medium">{m.material_name ?? "\u2014"}</span>
                       {m.quantity && (
                         <span className="text-muted-foreground ml-1.5">
-                          × {m.quantity} {m.unit ?? ""}
+                          &times; {m.quantity} {m.unit ?? ""}
                         </span>
                       )}
                       {m.unit_cost && (
@@ -320,13 +320,13 @@ export default function ClockOutReviewPage() {
             <div data-testid="section-expenses">
               <div className="flex items-center gap-2 mb-2">
                 <Receipt className="h-4 w-4 text-orange-600" />
-                <span className="text-sm font-medium text-orange-700">Expenses</span>
+                <span className="text-sm font-medium text-orange-700">{t("expenses")}</span>
                 <Badge variant="secondary" className="text-xs h-5 px-1.5">
                   {worksheet.expenses.length}
                 </Badge>
               </div>
               {worksheet.expenses.length === 0 ? (
-                <p className="text-xs text-muted-foreground pl-6">No expenses recorded.</p>
+                <p className="text-xs text-muted-foreground pl-6">{t("noExpenses")}</p>
               ) : (
                 <ul className="pl-6 space-y-1">
                   {worksheet.expenses.map((e) => (
@@ -335,7 +335,7 @@ export default function ClockOutReviewPage() {
                       data-testid={`item-expense-${e.id}`}
                       className="text-sm text-foreground"
                     >
-                      <span className="font-medium">{e.description ?? "—"}</span>
+                      <span className="font-medium">{e.description ?? "\u2014"}</span>
                       {e.amount && (
                         <span className="text-muted-foreground ml-1.5">
                           ${parseFloat(e.amount).toFixed(2)}
@@ -356,13 +356,13 @@ export default function ClockOutReviewPage() {
             <div data-testid="section-team">
               <div className="flex items-center gap-2 mb-2">
                 <Users className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-700">Team</span>
+                <span className="text-sm font-medium text-blue-700">{t("team")}</span>
                 <Badge variant="secondary" className="text-xs h-5 px-1.5">
                   {worksheet.teamMembers.length}
                 </Badge>
               </div>
               {worksheet.teamMembers.length === 0 ? (
-                <p className="text-xs text-muted-foreground pl-6">No team members added.</p>
+                <p className="text-xs text-muted-foreground pl-6">{t("noTeam")}</p>
               ) : (
                 <ul className="pl-6 space-y-1">
                   {worksheet.teamMembers.map((tm) => (
@@ -384,12 +384,12 @@ export default function ClockOutReviewPage() {
             <div data-testid="section-notes">
               <div className="flex items-center gap-2 mb-2">
                 <StickyNote className="h-4 w-4 text-yellow-600" />
-                <span className="text-sm font-medium text-yellow-700">Notes</span>
+                <span className="text-sm font-medium text-yellow-700">{t("notes")}</span>
               </div>
               {worksheet.notes ? (
                 <p className="pl-6 text-sm text-foreground whitespace-pre-wrap">{worksheet.notes}</p>
               ) : (
-                <p className="pl-6 text-xs text-muted-foreground">No notes added.</p>
+                <p className="pl-6 text-xs text-muted-foreground">{t("noNotes")}</p>
               )}
             </div>
           </CardContent>
@@ -401,7 +401,7 @@ export default function ClockOutReviewPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-primary" />
-            Confirm Accuracy
+            {t("confirmAccuracy")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -413,7 +413,7 @@ export default function ClockOutReviewPage() {
               onCheckedChange={(v) => setCheckedMaterials(Boolean(v))}
             />
             <Label htmlFor="check-materials" className="text-sm leading-snug cursor-pointer">
-              All materials used today are accurately recorded, including quantities and costs.
+              {t("checkMaterials")}
             </Label>
           </div>
           <div className="flex items-start gap-3">
@@ -424,7 +424,7 @@ export default function ClockOutReviewPage() {
               onCheckedChange={(v) => setCheckedExpenses(Boolean(v))}
             />
             <Label htmlFor="check-expenses" className="text-sm leading-snug cursor-pointer">
-              All expenses and receipts are correctly entered and categorized.
+              {t("checkExpenses")}
             </Label>
           </div>
           <div className="flex items-start gap-3">
@@ -435,7 +435,7 @@ export default function ClockOutReviewPage() {
               onCheckedChange={(v) => setCheckedNotes(Boolean(v))}
             />
             <Label htmlFor="check-notes" className="text-sm leading-snug cursor-pointer">
-              All field notes and observations are complete and accurate.
+              {t("checkNotes")}
             </Label>
           </div>
         </CardContent>
@@ -446,16 +446,17 @@ export default function ClockOutReviewPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <PenLine className="h-4 w-4 text-primary" />
-            Signature
+            {t("signatureTitle")}
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Sign below to certify that the information above is accurate.
+            {t("signatureSubtitle")}
           </p>
         </CardHeader>
         <CardContent>
           <SignaturePad
             onSigned={(url) => setSignatureDataUrl(url)}
             onCleared={() => setSignatureDataUrl(null)}
+            clearLabel={t("clear")}
           />
         </CardContent>
       </Card>
@@ -464,10 +465,10 @@ export default function ClockOutReviewPage() {
       {!canSubmit && (
         <p className="text-xs text-muted-foreground text-center" data-testid="text-validation-hint">
           {!allChecked && !signatureDataUrl
-            ? "Check all three boxes and add your signature to continue."
+            ? t("hintAllBoxes")
             : !allChecked
-            ? "Please check all three accuracy boxes to continue."
-            : "Please add your signature to continue."}
+            ? t("hintBoxesOnly")
+            : t("hintSignOnly")}
         </p>
       )}
 
@@ -482,10 +483,10 @@ export default function ClockOutReviewPage() {
         {submitMutation.isPending ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            Submitting…
+            {t("submitting")}&hellip;
           </>
         ) : (
-          "Submit & Clock Out"
+          t("submitClockOut")
         )}
       </Button>
     </div>

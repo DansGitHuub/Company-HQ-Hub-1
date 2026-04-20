@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { clockIn, clockOut, getActiveSession } from "@/lib/timeApi";
@@ -91,13 +92,6 @@ function divisionColor(division: string | null): string {
   return DIVISION_COLORS[division.toLowerCase()] ?? "#e5e7eb";
 }
 
-function greeting(name: string): string {
-  const h = new Date().getHours();
-  if (h < 12) return `Good morning, ${name}`;
-  if (h < 17) return `Good afternoon, ${name}`;
-  return `Good evening, ${name}`;
-}
-
 function formatTime(isoString: string | null): string {
   if (!isoString) return "—";
   const d = new Date(isoString);
@@ -135,15 +129,9 @@ function useLiveElapsed(clockIn: string | null): string {
   return elapsed;
 }
 
-// ─── Quick-chip row (Drive Time, Shop Time, Break) ────────────────────────────
-const QUICK_CHIPS = [
-  { label: "Drive Time", entryType: "drive_time", icon: Car },
-  { label: "Shop Time", entryType: "shop_time", icon: Wrench },
-  { label: "Break", entryType: "break", icon: Coffee },
-];
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function MyDayPage() {
+  const { t } = useTranslation("myDay");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<PendingClockIn | null>(null);
@@ -176,7 +164,6 @@ export default function MyDayPage() {
   // ── Mutations ──────────────────────────────────────────────────────────────
   const clockInMutation = useMutation({
     mutationFn: async (p: PendingClockIn) => {
-      // Auto-clock-out if active
       if (activeEntry) {
         const coPayload = activeEntry.isOffline
           ? { local_clock_in_id: activeEntry.localId }
@@ -189,18 +176,18 @@ export default function MyDayPage() {
         work_area_name: p.workAreaName,
         entry_type: p.entryType,
       });
-      if (!result.success) throw new Error(result.error ?? "Clock-in failed");
+      if (!result.success) throw new Error(result.error ?? t("clockInFailed"));
       return result;
     },
     onSuccess: (result: any) => {
       const offlineMsg = result?.offline ? " (saved offline)" : "";
-      toast({ title: `Clocked in${offlineMsg}!`, description: `Now working on ${pending?.workAreaName}` });
+      toast({ title: `${t("clockIn")}${offlineMsg}!`, description: pending?.workAreaName });
       setPending(null);
       queryClient.invalidateQueries({ queryKey: ["/api/time/active"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-day/time-entries"] });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("clockInFailed"), description: err.message, variant: "destructive" });
     },
   });
 
@@ -211,24 +198,24 @@ export default function MyDayPage() {
         ? { local_clock_in_id: activeEntry.localId }
         : { time_entry_id: activeEntry.id };
       const result = await clockOut(payload);
-      if (!result.success) throw new Error(result.error ?? "Clock-out failed");
+      if (!result.success) throw new Error(result.error ?? t("clockOutFailed"));
       return result;
     },
     onSuccess: (result: any) => {
       const offlineMsg = result?.offline ? " (saved offline)" : "";
-      toast({ title: `Clocked out${offlineMsg}!` });
+      toast({ title: `${t("clockOut")}${offlineMsg}!` });
       queryClient.invalidateQueries({ queryKey: ["/api/time/active"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-day/time-entries"] });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("clockOutFailed"), description: err.message, variant: "destructive" });
     },
   });
 
   const handleMyDayClockIn = () => {
     if (!pending) return;
     if (!navigator.geolocation) {
-      toast({ title: "GPS required", description: "This device does not support location. GPS is required to clock in.", variant: "destructive" });
+      toast({ title: t("gpsRequired"), description: t("gpsNotSupported"), variant: "destructive" });
       return;
     }
     setGpsChecking(true);
@@ -239,7 +226,7 @@ export default function MyDayPage() {
       },
       () => {
         setGpsChecking(false);
-        toast({ title: "GPS required", description: "Location access was denied. Please enable GPS for this app and try again.", variant: "destructive" });
+        toast({ title: t("gpsRequired"), description: t("gpsAccessDenied"), variant: "destructive" });
       },
       { enableHighAccuracy: false, timeout: 10000 }
     );
@@ -248,7 +235,7 @@ export default function MyDayPage() {
   const handlePickerConfirm = (p: PendingClockIn) => {
     setPickerJob(null);
     if (!navigator.geolocation) {
-      toast({ title: "GPS required", description: "This device does not support location. GPS is required to clock in.", variant: "destructive" });
+      toast({ title: t("gpsRequired"), description: t("gpsNotSupported"), variant: "destructive" });
       return;
     }
     setGpsChecking(true);
@@ -259,13 +246,20 @@ export default function MyDayPage() {
       },
       () => {
         setGpsChecking(false);
-        toast({ title: "GPS required", description: "Location access was denied. Please enable GPS for this app and try again.", variant: "destructive" });
+        toast({ title: t("gpsRequired"), description: t("gpsAccessDenied"), variant: "destructive" });
       },
       { enableHighAccuracy: false, timeout: 10000 }
     );
   };
 
   const firstName = user?.firstName || user?.username || "there";
+
+  const greetingText = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return t("goodMorning", { name: firstName });
+    if (h < 17) return t("goodAfternoon", { name: firstName });
+    return t("goodEvening", { name: firstName });
+  })();
 
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
@@ -275,7 +269,7 @@ export default function MyDayPage() {
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div>
         <h1 data-testid="my-day-greeting" className="text-2xl font-bold text-gray-900">
-          {greeting(firstName)}
+          {greetingText}
         </h1>
         <p className="text-sm text-gray-500 mt-0.5">{formatDate(new Date())}</p>
       </div>
@@ -313,7 +307,7 @@ export default function MyDayPage() {
             disabled={clockOutMutation.isPending}
           >
             <ClockOutIcon className="w-3.5 h-3.5 mr-1" />
-            Clock Out
+            {t("clockOut")}
           </Button>
         </div>
       )}
@@ -321,7 +315,7 @@ export default function MyDayPage() {
       {/* ── Today's Jobs ───────────────────────────────────────────────── */}
       <section>
         <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
-          Today's Jobs{jobs.length > 0 ? ` · ${jobs.length}` : ""}
+          {t("todaysJobs")}{jobs.length > 0 ? ` · ${jobs.length}` : ""}
         </h2>
 
         {jobsLoading ? (
@@ -334,7 +328,7 @@ export default function MyDayPage() {
           <Card>
             <CardContent className="py-10 text-center text-gray-400">
               <Sun className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">No jobs scheduled for today</p>
+              <p className="text-sm">{t("noJobsToday")}</p>
             </CardContent>
           </Card>
         ) : (
@@ -355,7 +349,7 @@ export default function MyDayPage() {
       {/* ── My Time Log ────────────────────────────────────────────────── */}
       <section>
         <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
-          My Time Log Today
+          {t("timeEntries")}
         </h2>
 
         {entriesLoading ? (
@@ -363,7 +357,7 @@ export default function MyDayPage() {
         ) : entries.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-gray-400 text-sm">
-              No time logged today yet
+              {t("noJobsToday")}
             </CardContent>
           </Card>
         ) : (
@@ -390,33 +384,33 @@ export default function MyDayPage() {
         <DialogContent className="max-w-sm mx-auto">
           <DialogHeader>
             <DialogTitle>
-              {activeEntry ? "Switch Work Area" : "Clock In"}
+              {activeEntry ? t("switchWorkArea") : t("clockIn")}
             </DialogTitle>
           </DialogHeader>
           <div className="py-2 text-sm text-gray-700 space-y-1">
             {activeEntry && (
               <p>
-                Clock out of{" "}
+                {t("clockOut")}{" "}
                 <span className="font-semibold">
                   {activeEntry.work_area_name || activeEntry.entry_type}
                 </span>{" "}
-                and clock into{" "}
+                →{" "}
                 <span className="font-semibold">{pending?.workAreaName}</span>?
               </p>
             )}
             {!activeEntry && (
               <p>
-                Clock into{" "}
+                {t("clockIn")}{" "}
                 <span className="font-semibold">{pending?.workAreaName}</span>
                 {pending?.jobTitle && (
-                  <> at <span className="font-semibold">{pending.jobTitle}</span></>
+                  <> @ <span className="font-semibold">{pending.jobTitle}</span></>
                 )}?
               </p>
             )}
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setPending(null)} data-testid="clock-in-cancel">
-              Cancel
+              {t("cancel", { ns: "common" })}
             </Button>
             <Button
               className="bg-green-600 hover:bg-green-700 text-white"
@@ -424,7 +418,7 @@ export default function MyDayPage() {
               disabled={clockInMutation.isPending || gpsChecking}
               data-testid="clock-in-confirm"
             >
-              {gpsChecking ? "Getting GPS…" : clockInMutation.isPending ? "Clocking in…" : "Confirm"}
+              {gpsChecking ? t("gettingGps") : clockInMutation.isPending ? t("clockingIn") : t("confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -445,6 +439,7 @@ function WorkAreaPickerDialog({
   onClose: () => void;
   onConfirm: (p: PendingClockIn) => void;
 }) {
+  const { t } = useTranslation("myDay");
   const { data: areas = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/jobs", pickerJob.jobId, "work-areas"],
     queryFn: () =>
@@ -465,9 +460,9 @@ function WorkAreaPickerDialog({
   }, [isLoading, pickerJob.preSelectedId]);
 
   function getSelectedName(): string {
-    if (selectedId === "__general__") return "General";
+    if (selectedId === "__general__") return t("general");
     const found = openAreas.find((wa: any) => wa.id === selectedId);
-    return found?.name ?? "General";
+    return found?.name ?? t("general");
   }
 
   function handleConfirm() {
@@ -484,23 +479,23 @@ function WorkAreaPickerDialog({
 
   const allOptions = [
     ...openAreas.map((wa: any) => ({ id: wa.id, name: wa.name, hours: wa.estimated_hours })),
-    { id: "__general__", name: "General", hours: null },
+    { id: "__general__", name: t("general"), hours: null },
   ];
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-sm mx-auto">
         <DialogHeader>
-          <DialogTitle>Select Work Area</DialogTitle>
+          <DialogTitle>{t("selectWorkArea")}</DialogTitle>
         </DialogHeader>
 
         {activeEntry && (
           <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            Will clock out of{" "}
+            {t("clockOut")}{" "}
             <span className="font-semibold">
               {activeEntry.work_area_name || activeEntry.entry_type}
             </span>{" "}
-            first.
+            {t("confirm").toLowerCase()}.
           </div>
         )}
 
@@ -545,7 +540,7 @@ function WorkAreaPickerDialog({
 
         <DialogFooter className="gap-2 pt-1">
           <Button variant="outline" onClick={onClose} data-testid="picker-cancel">
-            Cancel
+            {t("cancel", { ns: "common" })}
           </Button>
           <Button
             onClick={handleConfirm}
@@ -553,7 +548,7 @@ function WorkAreaPickerDialog({
             data-testid="picker-confirm"
             className="bg-green-600 hover:bg-green-700 text-white"
           >
-            {activeEntry ? "Switch Area" : "Clock In"}
+            {activeEntry ? t("switchArea") : t("clockIn")}
             <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
         </DialogFooter>
@@ -574,24 +569,31 @@ function JobCard({
   onChipTap: (p: PendingClockIn) => void;
   onPickerOpen: (picker: PickerJob) => void;
 }) {
+  const { t } = useTranslation("myDay");
   const borderColor = divisionColor(job.division);
   const timeLabel =
     job.scheduled_start_time
       ? `${job.scheduled_start_time.slice(0, 5)}${job.scheduled_end_time ? " – " + job.scheduled_end_time.slice(0, 5) : ""}`
       : null;
 
+  const QUICK_CHIPS = [
+    { label: t("driveTime"), entryType: "drive_time", icon: Car },
+    { label: t("shopTime"), entryType: "shop_time", icon: Wrench },
+    { label: t("breakTime"), entryType: "break", icon: Coffee },
+  ];
+
   function handleChip(workAreaId: string | null, workAreaName: string, entryType: string) {
     if (entryType === "billable") {
       onPickerOpen({
         jobId: job.id,
-        jobTitle: job.title || job.client || "Job",
+        jobTitle: job.title || job.client || t("unnamed"),
         preSelectedId: workAreaId,
         preSelectedName: workAreaName,
       });
     } else {
       onChipTap({
         jobId: job.id,
-        jobTitle: job.title || job.client || "Job",
+        jobTitle: job.title || job.client || t("unnamed"),
         workAreaId,
         workAreaName,
         entryType,
@@ -609,7 +611,7 @@ function JobCard({
         {/* Title + status */}
         <div className="flex items-start justify-between gap-2">
           <p data-testid={`job-title-${job.id}`} className="font-semibold text-gray-900 leading-snug">
-            {job.title || job.client || "Unnamed Job"}
+            {job.title || job.client || t("unnamed")}
           </p>
           {job.division && (
             <Badge
@@ -642,7 +644,6 @@ function JobCard({
         {/* Work area chips */}
         {job.work_areas.length > 0 && (
           <div className="space-y-2">
-            {/* Active / pending areas — tappable to clock in */}
             {(() => {
               const openAreas = job.work_areas.filter((wa) => wa.status !== "completed");
               const doneAreas = job.work_areas.filter((wa) => wa.status === "completed");
@@ -674,14 +675,13 @@ function JobCard({
                     </div>
                   )}
 
-                  {/* Completed areas — non-clickable, greyed with checkmark */}
                   {doneAreas.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {doneAreas.map((wa) => (
                         <span
                           key={wa.id}
                           data-testid={`work-area-done-${wa.id}`}
-                          title="Completed"
+                          title={t("completed")}
                           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-gray-50 text-gray-400 border border-gray-200 line-through cursor-default"
                         >
                           <CheckCircle2 className="inline w-3 h-3 text-gray-400 no-underline" style={{ textDecoration: "none" }} />
@@ -696,14 +696,14 @@ function JobCard({
           </div>
         )}
 
-        {/* Clock In button — always present, opens work area picker */}
+        {/* Clock In button */}
         <div className="flex justify-end">
           <button
             data-testid={`clock-in-job-${job.id}`}
             onClick={() =>
               onPickerOpen({
                 jobId: job.id,
-                jobTitle: job.title || job.client || "Job",
+                jobTitle: job.title || job.client || t("unnamed"),
                 preSelectedId: null,
                 preSelectedName: null,
               })
@@ -711,7 +711,7 @@ function JobCard({
             className="flex items-center gap-1 text-sm font-medium text-green-700 hover:text-green-800 active:text-green-900 transition-colors"
           >
             <Clock className="w-3.5 h-3.5" />
-            Clock In
+            {t("clockIn")}
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -748,6 +748,7 @@ function JobCard({
 
 // ─── Time Entry Row ───────────────────────────────────────────────────────────
 function TimeEntryRow({ entry }: { entry: TimeEntry }) {
+  const { t } = useTranslation("myDay");
   const elapsed = useLiveElapsed(entry.clock_out ? null : entry.clock_in);
   const isActive = !entry.clock_out;
 
@@ -771,7 +772,7 @@ function TimeEntryRow({ entry }: { entry: TimeEntry }) {
       <div className="ml-3 shrink-0 text-right">
         {isActive ? (
           <Badge className="bg-green-100 text-green-700 text-xs font-semibold">
-            {elapsed || "Active"}
+            {elapsed || t("active")}
           </Badge>
         ) : (
           <span className="text-sm font-semibold text-gray-700">

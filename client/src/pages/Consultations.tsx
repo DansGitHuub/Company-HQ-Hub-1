@@ -1,12 +1,12 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -28,7 +28,6 @@ import {
   Loader2, Search, ExternalLink, Filter,
 } from "lucide-react";
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
 type Status = "scheduled" | "completed" | "cancelled" | "no_show";
 
 interface Consultation {
@@ -75,13 +74,12 @@ interface Employee {
   last_name: string;
 }
 
-// ─── Constants ─────────────────────────────────────────────────────────────────
-const STATUSES: { value: Status; label: string; cls: string }[] = [
-  { value: "scheduled",  label: "Scheduled",  cls: "bg-blue-100 text-blue-700" },
-  { value: "completed",  label: "Completed",  cls: "bg-green-100 text-green-700" },
-  { value: "cancelled",  label: "Cancelled",  cls: "bg-gray-100 text-gray-600" },
-  { value: "no_show",    label: "No Show",    cls: "bg-red-100 text-red-600" },
-];
+const STATUS_CLS: Record<string, string> = {
+  scheduled: "bg-blue-100 text-blue-700",
+  completed:  "bg-green-100 text-green-700",
+  cancelled:  "bg-gray-100 text-gray-600",
+  no_show:    "bg-red-100 text-red-600",
+};
 
 const LEAD_SOURCES = [
   "Website", "Referral", "Google", "Social Media",
@@ -110,15 +108,20 @@ function fmtTime(t: string | null) {
 }
 
 function StatusBadge({ status }: { status: Status }) {
-  const s = STATUSES.find(s => s.value === status);
+  const { t } = useTranslation("consultations");
+  const labels: Record<string, string> = {
+    scheduled: t("statusScheduled"),
+    completed:  t("statusCompleted"),
+    cancelled:  t("statusCancelled"),
+    no_show:    t("statusNoShow"),
+  };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${s?.cls ?? "bg-muted"}`}>
-      {s?.label ?? status}
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_CLS[status] ?? "bg-muted"}`}>
+      {labels[status] ?? status}
     </span>
   );
 }
 
-// ─── Empty form ────────────────────────────────────────────────────────────────
 function emptyForm() {
   return {
     customer_id:        "",
@@ -139,9 +142,6 @@ function emptyForm() {
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Consultation Form Modal (shared for create + edit)
-// ═══════════════════════════════════════════════════════════════════════════════
 function ConsultationModal({
   open, onClose, editing, customers, employees,
 }: {
@@ -151,6 +151,7 @@ function ConsultationModal({
   customers: Customer[];
   employees: Employee[];
 }) {
+  const { t } = useTranslation("consultations");
   const { toast } = useToast();
   const qc = useQueryClient();
   const [, navigate] = useLocation();
@@ -158,7 +159,13 @@ function ConsultationModal({
   const [custSearch, setCustSearch] = useState("");
   const [custDropOpen, setCustDropOpen] = useState(false);
 
-  // Populate form when editing
+  const statusOptions: { value: Status; label: string }[] = [
+    { value: "scheduled", label: t("statusScheduled") },
+    { value: "completed", label: t("statusCompleted") },
+    { value: "cancelled", label: t("statusCancelled") },
+    { value: "no_show",   label: t("statusNoShow") },
+  ];
+
   useMemo(() => {
     if (open) {
       if (editing) {
@@ -179,7 +186,6 @@ function ConsultationModal({
           estimated_value:    editing.estimated_value != null ? String(editing.estimated_value) : "",
           lead_source:        editing.lead_source ?? "",
         });
-        // Pre-fill search with existing customer name
         setCustSearch(editing.customer_name ?? "");
       } else {
         setForm(emptyForm());
@@ -199,8 +205,6 @@ function ConsultationModal({
     [customers, custSearch]
   );
 
-  const selectedCustomer = customers.find(c => c.id === form.customer_id);
-
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["/api/consultations"] });
     qc.invalidateQueries({ queryKey: ["/api/consultations/stats"] });
@@ -208,14 +212,14 @@ function ConsultationModal({
 
   const createMut = useMutation({
     mutationFn: (d: any) => apiRequest("POST", "/api/consultations", d),
-    onSuccess: () => { toast({ title: "Consultation created" }); invalidate(); onClose(); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: () => { toast({ title: t("consultationCreated") }); invalidate(); onClose(); },
+    onError: (e: any) => toast({ title: t("error", { ns: "common" }), description: e.message, variant: "destructive" }),
   });
 
   const updateMut = useMutation({
     mutationFn: (d: any) => apiRequest("PATCH", `/api/consultations/${editing?.id}`, d),
-    onSuccess: () => { toast({ title: "Consultation updated" }); invalidate(); onClose(); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: () => { toast({ title: t("consultationUpdated") }); invalidate(); onClose(); },
+    onError: (e: any) => toast({ title: t("error", { ns: "common" }), description: e.message, variant: "destructive" }),
   });
 
   function handleSave() {
@@ -239,19 +243,19 @@ function ConsultationModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CalendarClock className="h-5 w-5 text-primary" />
-            {editing ? "Edit Consultation" : "New Consultation"}
+            {editing ? t("editConsultation") : t("newConsultation")}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-1">
           {/* Customer */}
           <div className="space-y-1 relative">
-            <Label>Customer</Label>
+            <Label>{t("customerName")}</Label>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 className="pl-8"
-                placeholder="Search customers…"
+                placeholder={t("searchPlaceholder")}
                 value={custSearch}
                 data-testid="input-cust-search"
                 onChange={e => { setCustSearch(e.target.value); setCustDropOpen(true); if (!e.target.value) f("customer_id", ""); }}
@@ -279,17 +283,17 @@ function ConsultationModal({
           {/* Contact info */}
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label>Contact Name</Label>
+              <Label>{t("contactName")}</Label>
               <Input placeholder="Jane Smith" data-testid="input-contact-name"
                 value={form.contact_name} onChange={e => f("contact_name", e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Contact Phone</Label>
+              <Label>{t("contactPhone")}</Label>
               <Input type="tel" placeholder="(555) 000-0000" data-testid="input-contact-phone"
                 value={form.contact_phone} onChange={e => f("contact_phone", e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Contact Email</Label>
+              <Label>{t("contactEmail")}</Label>
               <Input type="email" placeholder="jane@example.com" data-testid="input-contact-email"
                 value={form.contact_email} onChange={e => f("contact_email", e.target.value)} />
             </div>
@@ -298,17 +302,17 @@ function ConsultationModal({
           {/* Date / Time / Duration */}
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label>Date</Label>
+              <Label>{t("scheduledDate")}</Label>
               <Input type="date" data-testid="input-consult-date"
                 value={form.scheduled_date} onChange={e => f("scheduled_date", e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Time</Label>
+              <Label>{t("scheduledTime")}</Label>
               <Input type="time" data-testid="input-consult-time"
                 value={form.scheduled_time} onChange={e => f("scheduled_time", e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Duration</Label>
+              <Label>{t("duration")}</Label>
               <Select value={String(form.duration_minutes)}
                 onValueChange={v => f("duration_minutes", Number(v))}>
                 <SelectTrigger data-testid="select-duration"><SelectValue /></SelectTrigger>
@@ -322,26 +326,26 @@ function ConsultationModal({
           {/* Status / Lead Source / Estimated Value */}
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label>Status</Label>
+              <Label>{t("status", { ns: "common" })}</Label>
               <Select value={form.status} onValueChange={v => f("status", v as Status)}>
                 <SelectTrigger data-testid="select-status"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  {statusOptions.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Lead Source</Label>
+              <Label>{t("leadSource")}</Label>
               <Select value={form.lead_source || "_none"} onValueChange={v => f("lead_source", v === "_none" ? "" : v)}>
-                <SelectTrigger data-testid="select-lead-source"><SelectValue placeholder="Select source" /></SelectTrigger>
+                <SelectTrigger data-testid="select-lead-source"><SelectValue placeholder={t("select", { ns: "common" })} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_none">— None —</SelectItem>
+                  <SelectItem value="_none">{t("none")}</SelectItem>
                   {LEAD_SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Estimated Value ($)</Label>
+              <Label>{t("estimatedValue")} ($)</Label>
               <Input type="number" min="0" step="100" placeholder="0" data-testid="input-est-value"
                 value={form.estimated_value} onChange={e => f("estimated_value", e.target.value)} />
             </div>
@@ -349,19 +353,19 @@ function ConsultationModal({
 
           {/* Address */}
           <div className="space-y-1">
-            <Label>Address / Location</Label>
+            <Label>{t("address")}</Label>
             <Input placeholder="123 Main St, City, State" data-testid="input-address"
               value={form.address} onChange={e => f("address", e.target.value)} />
           </div>
 
           {/* Assigned To */}
           <div className="space-y-1">
-            <Label>Assigned To</Label>
+            <Label>{t("assignedTo")}</Label>
             <Select value={form.assigned_to || "_none"}
               onValueChange={v => f("assigned_to", v === "_none" ? "" : v)}>
-              <SelectTrigger data-testid="select-assigned"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+              <SelectTrigger data-testid="select-assigned"><SelectValue placeholder={t("unassigned")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="_none">Unassigned</SelectItem>
+                <SelectItem value="_none">{t("unassigned")}</SelectItem>
                 {employees.map(e => (
                   <SelectItem key={e.id} value={e.id}>{e.first_name} {e.last_name}</SelectItem>
                 ))}
@@ -371,7 +375,7 @@ function ConsultationModal({
 
           {/* Notes */}
           <div className="space-y-1">
-            <Label>Notes</Label>
+            <Label>{t("notes")}</Label>
             <Textarea rows={3} placeholder="Details about the site visit, scope, special requests…"
               data-testid="input-notes"
               value={form.notes} onChange={e => f("notes", e.target.value)} />
@@ -383,11 +387,11 @@ function ConsultationModal({
               <Switch checked={form.follow_up_required}
                 data-testid="switch-followup"
                 onCheckedChange={v => f("follow_up_required", v)} />
-              <Label className="cursor-pointer">Follow-up Required</Label>
+              <Label className="cursor-pointer">{t("followUpRequired")}</Label>
             </div>
             {form.follow_up_required && (
               <div className="flex-1 space-y-1">
-                <Label className="text-xs">Follow-up Date</Label>
+                <Label className="text-xs">{t("followUpDate")}</Label>
                 <Input type="date" className="max-w-xs" data-testid="input-followup-date"
                   value={form.follow_up_date} onChange={e => f("follow_up_date", e.target.value)} />
               </div>
@@ -404,13 +408,13 @@ function ConsultationModal({
                 navigate(`/estimates?customer_id=${editing.customer_id ?? ""}`);
               }}>
               <ExternalLink className="h-4 w-4 mr-2" />
-              Convert to Estimate
+              {t("convertToEstimate")}
             </Button>
           )}
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>{t("cancel", { ns: "common" })}</Button>
           <Button onClick={handleSave} disabled={isBusy} data-testid="btn-save-consultation">
             {isBusy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {editing ? "Save Changes" : "Create Consultation"}
+            {editing ? t("saveChanges") : t("createConsultation")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -418,26 +422,28 @@ function ConsultationModal({
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Main Page
-// ═══════════════════════════════════════════════════════════════════════════════
 export default function Consultations() {
+  const { t } = useTranslation("consultations");
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  // Filter state
   const [statusFilter,    setStatusFilter]    = useState("");
   const [dateFrom,        setDateFrom]        = useState("");
   const [dateTo,          setDateTo]          = useState("");
   const [assignedFilter,  setAssignedFilter]  = useState("");
   const [searchText,      setSearchText]      = useState("");
 
-  // Modal state
-  const [modalOpen,   setModalOpen]   = useState(false);
-  const [editing,     setEditing]     = useState<Consultation | null>(null);
+  const [modalOpen,    setModalOpen]    = useState(false);
+  const [editing,      setEditing]      = useState<Consultation | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Consultation | null>(null);
 
-  // ── Queries ──────────────────────────────────────────────────────────────────
+  const statusOptions: { value: Status; label: string }[] = [
+    { value: "scheduled", label: t("statusScheduled") },
+    { value: "completed", label: t("statusCompleted") },
+    { value: "cancelled", label: t("statusCancelled") },
+    { value: "no_show",   label: t("statusNoShow") },
+  ];
+
   const listParams = new URLSearchParams();
   if (statusFilter)   listParams.set("status",      statusFilter);
   if (dateFrom)       listParams.set("date_from",   dateFrom);
@@ -464,16 +470,15 @@ export default function Consultations() {
     queryFn: () => fetch("/api/scheduling/employees", { credentials: "include" }).then(r => r.json()),
   });
 
-  // ── Delete ───────────────────────────────────────────────────────────────────
   const deleteMut = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/consultations/${id}`),
     onSuccess: () => {
-      toast({ title: "Consultation deleted" });
+      toast({ title: t("consultationDeleted") });
       qc.invalidateQueries({ queryKey: ["/api/consultations"] });
       qc.invalidateQueries({ queryKey: ["/api/consultations/stats"] });
       setDeleteTarget(null);
     },
-    onError: () => toast({ title: "Delete failed", variant: "destructive" }),
+    onError: () => toast({ title: t("deleteFailed"), variant: "destructive" }),
   });
 
   function openNew() { setEditing(null); setModalOpen(true); }
@@ -487,32 +492,30 @@ export default function Consultations() {
 
   return (
     <div className="flex flex-col h-full" data-testid="consultations-page">
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b bg-background shrink-0">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
-            <CalendarClock className="h-5 w-5 text-primary" /> Consultations
+            <CalendarClock className="h-5 w-5 text-primary" /> {t("title")}
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Track site visits and sales consultations before estimates
-          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("subtitle")}</p>
         </div>
         <Button onClick={openNew} data-testid="btn-new-consultation">
-          <Plus className="h-4 w-4 mr-2" /> New Consultation
+          <Plus className="h-4 w-4 mr-2" /> {t("newConsultation")}
         </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         <div className="p-6 space-y-5">
-          {/* ── Summary Cards ──────────────────────────────────────────────── */}
+          {/* Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <Card data-testid="stat-card-scheduled">
               <CardContent className="pt-5 pb-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Scheduled</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("totalScheduled")}</p>
                     <p className="text-2xl font-bold mt-1">{stats?.total_scheduled ?? 0}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">upcoming</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t("upcoming")}</p>
                   </div>
                   <div className="p-2 rounded-lg bg-blue-100 text-blue-700">
                     <CalendarClock className="h-5 w-5" />
@@ -525,9 +528,9 @@ export default function Consultations() {
               <CardContent className="pt-5 pb-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Completed This Month</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("completedThisMonth")}</p>
                     <p className="text-2xl font-bold mt-1">{stats?.completed_this_month ?? 0}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">this month</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t("thisMonth")}</p>
                   </div>
                   <div className="p-2 rounded-lg bg-green-100 text-green-700">
                     <CheckCircle className="h-5 w-5" />
@@ -540,9 +543,9 @@ export default function Consultations() {
               <CardContent className="pt-5 pb-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">No Shows</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("noShows")}</p>
                     <p className="text-2xl font-bold mt-1">{stats?.no_shows ?? 0}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">all time</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t("allTime")}</p>
                   </div>
                   <div className="p-2 rounded-lg bg-red-100 text-red-600">
                     <XCircle className="h-5 w-5" />
@@ -555,9 +558,9 @@ export default function Consultations() {
               <CardContent className="pt-5 pb-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Est. Pipeline Value</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("pipelineValue")}</p>
                     <p className="text-2xl font-bold mt-1">{fmt$(stats?.pipeline_value ?? 0)}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">from scheduled</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t("fromScheduled")}</p>
                   </div>
                   <div className="p-2 rounded-lg bg-primary/10 text-primary">
                     <DollarSign className="h-5 w-5" />
@@ -567,24 +570,24 @@ export default function Consultations() {
             </Card>
           </div>
 
-          {/* ── Filter Bar ─────────────────────────────────────────────────── */}
+          {/* Filter Bar */}
           <div className="flex flex-wrap gap-2 items-center p-3 rounded-lg border bg-muted/20">
             <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
 
             <div className="relative">
               <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input className="pl-7 h-8 text-sm w-44" placeholder="Search…"
+              <Input className="pl-7 h-8 text-sm w-44" placeholder={t("searchPlaceholder")}
                 value={searchText} onChange={e => setSearchText(e.target.value)}
                 data-testid="filter-search" />
             </div>
 
             <Select value={statusFilter || "_all"} onValueChange={v => setStatusFilter(v === "_all" ? "" : v)}>
               <SelectTrigger className="h-8 text-sm w-36" data-testid="filter-status">
-                <SelectValue placeholder="All Statuses" />
+                <SelectValue placeholder={t("allStatuses")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="_all">All Statuses</SelectItem>
-                {STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                <SelectItem value="_all">{t("allStatuses")}</SelectItem>
+                {statusOptions.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
               </SelectContent>
             </Select>
 
@@ -599,10 +602,10 @@ export default function Consultations() {
             <Select value={assignedFilter || "_all"}
               onValueChange={v => setAssignedFilter(v === "_all" ? "" : v)}>
               <SelectTrigger className="h-8 text-sm w-40" data-testid="filter-assigned">
-                <SelectValue placeholder="All Assignees" />
+                <SelectValue placeholder={t("allAssignees")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="_all">All Assignees</SelectItem>
+                <SelectItem value="_all">{t("allAssignees")}</SelectItem>
                 {employees.map(e => (
                   <SelectItem key={e.id} value={e.id}>{e.first_name} {e.last_name}</SelectItem>
                 ))}
@@ -612,16 +615,16 @@ export default function Consultations() {
             {hasFilters && (
               <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={clearFilters}
                 data-testid="btn-clear-filters">
-                Clear
+                {t("clear")}
               </Button>
             )}
 
             <span className="ml-auto text-xs text-muted-foreground">
-              {consultations.length} result{consultations.length !== 1 ? "s" : ""}
+              {consultations.length}
             </span>
           </div>
 
-          {/* ── Table ──────────────────────────────────────────────────────── */}
+          {/* Table */}
           <div className="rounded-lg border overflow-hidden">
             {isLoading ? (
               <div className="flex justify-center py-16">
@@ -630,9 +633,9 @@ export default function Consultations() {
             ) : consultations.length === 0 ? (
               <div className="py-16 text-center text-muted-foreground">
                 <CalendarClock className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                <p className="font-medium text-sm">No consultations found</p>
+                <p className="font-medium text-sm">{t("noConsultations")}</p>
                 <p className="text-xs mt-1">
-                  {hasFilters ? "Try adjusting your filters" : "Click \"New Consultation\" to schedule one"}
+                  {hasFilters ? t("adjustFilters") : t("newConsultation")}
                 </p>
               </div>
             ) : (
@@ -640,14 +643,14 @@ export default function Consultations() {
                 <Table data-testid="consultations-table">
                   <TableHeader>
                     <TableRow className="bg-muted/30">
-                      <TableHead className="w-36">Date / Time</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Address</TableHead>
-                      <TableHead className="w-28">Status</TableHead>
-                      <TableHead>Assigned To</TableHead>
-                      <TableHead className="w-24 text-right">Est. Value</TableHead>
-                      <TableHead className="w-20 text-right">Actions</TableHead>
+                      <TableHead className="w-36">{t("dateTime")}</TableHead>
+                      <TableHead>{t("customerName")}</TableHead>
+                      <TableHead>{t("contact")}</TableHead>
+                      <TableHead>{t("address")}</TableHead>
+                      <TableHead className="w-28">{t("status", { ns: "common" })}</TableHead>
+                      <TableHead>{t("assignedTo")}</TableHead>
+                      <TableHead className="w-24 text-right">{t("estValue")}</TableHead>
+                      <TableHead className="w-20 text-right">{t("actions", { ns: "common" })}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -685,7 +688,7 @@ export default function Consultations() {
                           <StatusBadge status={c.status} />
                           {c.follow_up_required && (
                             <div className="text-[10px] text-amber-600 mt-0.5">
-                              Follow-up {c.follow_up_date ? fmtDate(c.follow_up_date) : "needed"}
+                              {t("followUpLabel")} {c.follow_up_date ? fmtDate(c.follow_up_date) : t("followUpNeeded")}
                             </div>
                           )}
                         </TableCell>
@@ -722,7 +725,7 @@ export default function Consultations() {
         </div>
       </div>
 
-      {/* ── Modals ─────────────────────────────────────────────────────────── */}
+      {/* Modals */}
       <ConsultationModal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditing(null); }}
@@ -734,21 +737,21 @@ export default function Consultations() {
       <AlertDialog open={!!deleteTarget} onOpenChange={o => { if (!o) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this consultation?</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteConsultation")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the consultation
-              {deleteTarget?.customer_name ? ` for ${deleteTarget.customer_name}` : ""} on{" "}
-              {deleteTarget ? fmtDate(deleteTarget.scheduled_date) : ""}. This cannot be undone.
+              {t("deleteDesc")}
+              {deleteTarget?.customer_name ? ` ${deleteTarget.customer_name}` : ""} —{" "}
+              {deleteTarget ? fmtDate(deleteTarget.scheduled_date) : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("cancel", { ns: "common" })}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
               data-testid="btn-confirm-delete"
             >
-              Delete
+              {t("delete", { ns: "common" })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import SignaturePad from "@/components/forms/SignaturePad";
+import { useTranslation } from "react-i18next";
 
 interface OfferDetails {
   candidateId: string;
@@ -29,9 +30,9 @@ interface OfferDetails {
 
 function formatPay(pay?: string | null, type?: string | null) {
   if (!pay) return null;
-  const num = parseFloat(pay);
-  if (isNaN(num)) return pay;
-  const formatted = num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const n = parseFloat(pay);
+  if (isNaN(n)) return pay;
+  const formatted = n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (type === "Salary") return `$${formatted} / year`;
   return `$${formatted} / hour`;
 }
@@ -48,6 +49,7 @@ function formatDate(dateStr?: string | null) {
 }
 
 export default function OfferAcceptancePage() {
+  const { t } = useTranslation("offerAcceptance");
   const token = window.location.pathname.split("/offer/")[1];
 
   const [offer, setOffer] = useState<OfferDetails | null>(null);
@@ -62,7 +64,7 @@ export default function OfferAcceptancePage() {
 
   useEffect(() => {
     if (!token) {
-      setError("No offer token found in this link.");
+      setError(t("noTokenError"));
       setLoading(false);
       return;
     }
@@ -89,8 +91,8 @@ export default function OfferAcceptancePage() {
   }, []);
 
   async function handleAccept() {
-    if (!signature) { alert("Please provide your signature before accepting."); return; }
-    if (!agreed) { alert("Please check the acknowledgment box to confirm."); return; }
+    if (!signature) { alert(t("provideSignature")); return; }
+    if (!agreed) { alert(t("checkAck")); return; }
     setSubmitting(true);
     try {
       const res = await fetch(`/api/offer/${token}/accept`, {
@@ -114,7 +116,7 @@ export default function OfferAcceptancePage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100">
         <div className="text-center space-y-3">
           <Loader2 className="h-10 w-10 animate-spin text-green-700 mx-auto" />
-          <p className="text-green-800 font-medium">Loading your offer…</p>
+          <p className="text-green-800 font-medium">{t("loadingOffer")}&hellip;</p>
         </div>
       </div>
     );
@@ -126,9 +128,9 @@ export default function OfferAcceptancePage() {
         <Card className="max-w-md w-full shadow-lg">
           <CardContent className="pt-8 pb-8 text-center space-y-4">
             <XCircle className="h-14 w-14 text-red-500 mx-auto" />
-            <h2 className="text-xl font-bold text-gray-800">Link Not Valid</h2>
+            <h2 className="text-xl font-bold text-gray-800">{t("linkNotValid")}</h2>
             <p className="text-gray-600">{error}</p>
-            <p className="text-sm text-gray-500">If you believe this is a mistake, please contact Chapin Landscapes directly.</p>
+            <p className="text-sm text-gray-500">{t("contactMistake")}</p>
           </CardContent>
         </Card>
       </div>
@@ -145,33 +147,33 @@ export default function OfferAcceptancePage() {
             <div className="mx-auto w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
               <CheckCircle2 className="h-12 w-12 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Offer Accepted!</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{t("offerAccepted")}</h2>
             <p className="text-gray-600 text-base leading-relaxed">
-              Congratulations, <strong>{offer.name}</strong>! Your offer for{" "}
+              {t("congratulations")}, <strong>{offer.name}</strong>! Your offer for{" "}
               <strong>{offer.role}</strong> at Chapin Landscapes has been accepted and recorded.
             </p>
             {offer.alreadyAccepted && offer.acceptedAt ? (
               <p className="text-sm text-gray-500">
-                Accepted on {new Date(offer.acceptedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                {t("acceptedOn")} {new Date(offer.acceptedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
               </p>
             ) : (
               acceptResult?.accountCreated && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left space-y-1">
-                  <p className="font-semibold text-green-800 text-sm">Your Account is Ready</p>
-                  <p className="text-sm text-green-700">Your login credentials have been sent to your email. Keep them safe!</p>
+                  <p className="font-semibold text-green-800 text-sm">{t("accountReady")}</p>
+                  <p className="text-sm text-green-700">{t("accountCreated")}</p>
                   {acceptResult.username && (
-                    <p className="text-sm text-green-700">Username: <strong>{acceptResult.username}</strong></p>
+                    <p className="text-sm text-green-700">{t("username")}: <strong>{acceptResult.username}</strong></p>
                   )}
                 </div>
               )
             )}
             <div className="bg-gray-50 rounded-lg p-3">
               <p className="text-sm text-gray-600">
-                Redirecting to login in <span className="font-bold text-green-700">{countdown}</span> seconds…
+                {t("redirecting")} <span className="font-bold text-green-700">{countdown}</span> {t("seconds")}&hellip;
               </p>
             </div>
             <Button className="w-full bg-green-700 hover:bg-green-800 text-white" onClick={() => (window.location.href = "/auth")} data-testid="button-go-to-login">
-              Go to Login <ArrowRight className="ml-2 h-4 w-4" />
+              {t("goToLogin")} <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </CardContent>
         </Card>
@@ -191,10 +193,10 @@ export default function OfferAcceptancePage() {
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 bg-green-800 text-white px-5 py-2 rounded-full text-sm font-semibold">
             <FileText className="h-4 w-4" />
-            Official Offer of Employment
+            {t("officialOffer")}
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Chapin Landscapes</h1>
-          <p className="text-gray-600">Please review your offer details and sign to accept.</p>
+          <p className="text-gray-600">{t("reviewAndSign")}</p>
         </div>
 
         {/* Candidate + Role */}
@@ -202,17 +204,17 @@ export default function OfferAcceptancePage() {
           <CardHeader className="bg-green-800 text-white rounded-t-xl py-5">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                <p className="text-green-300 text-xs uppercase tracking-widest font-medium mb-1">Offer Extended To</p>
+                <p className="text-green-300 text-xs uppercase tracking-widest font-medium mb-1">{t("offerExtendedTo")}</p>
                 <CardTitle className="text-2xl text-white" data-testid="text-candidate-name">{offer.name}</CardTitle>
               </div>
               <div className="text-right">
-                <p className="text-green-300 text-xs uppercase tracking-widest font-medium mb-1">Position</p>
+                <p className="text-green-300 text-xs uppercase tracking-widest font-medium mb-1">{t("position")}</p>
                 <p className="text-xl font-semibold text-white" data-testid="text-offer-role">{offer.role}</p>
               </div>
             </div>
             {offer.expiresAt && (
               <CardDescription className="text-green-300 text-xs mt-2">
-                This offer expires on {new Date(offer.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                {t("offerExpires")} {new Date(offer.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
               </CardDescription>
             )}
           </CardHeader>
@@ -228,7 +230,7 @@ export default function OfferAcceptancePage() {
                         <DollarSign className="h-4 w-4 text-green-700" />
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-0.5">Compensation</p>
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-0.5">{t("compensation")}</p>
                         <p className="font-semibold text-gray-900" data-testid="text-offer-pay">{payFormatted}</p>
                       </div>
                     </div>
@@ -239,7 +241,7 @@ export default function OfferAcceptancePage() {
                         <CalendarDays className="h-4 w-4 text-blue-700" />
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-0.5">Start Date</p>
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-0.5">{t("startDate")}</p>
                         <p className="font-semibold text-gray-900" data-testid="text-offer-start-date">{startDateFormatted}</p>
                       </div>
                     </div>
@@ -250,7 +252,7 @@ export default function OfferAcceptancePage() {
                         <Briefcase className="h-4 w-4 text-purple-700" />
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-0.5">Employment Type</p>
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-0.5">{t("employmentType")}</p>
                         <p className="font-semibold text-gray-900">{offer.offerEmploymentType}</p>
                       </div>
                     </div>
@@ -261,7 +263,7 @@ export default function OfferAcceptancePage() {
                         <Clock className="h-4 w-4 text-amber-700" />
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-0.5">Work Schedule</p>
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-0.5">{t("workSchedule")}</p>
                         <p className="font-semibold text-gray-900">{offer.offerSchedule}</p>
                       </div>
                     </div>
@@ -274,7 +276,7 @@ export default function OfferAcceptancePage() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                     <Shield className="h-4 w-4 text-green-600" />
-                    Benefits Package
+                    {t("benefitsPackage")}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {offer.offerBenefits.map((b) => (
@@ -291,7 +293,7 @@ export default function OfferAcceptancePage() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                     <StickyNote className="h-4 w-4 text-gray-500" />
-                    Additional Notes
+                    {t("additionalNotes")}
                   </div>
                   <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
                     {offer.offerNotes}
@@ -306,8 +308,8 @@ export default function OfferAcceptancePage() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-blue-800">
-            By accepting this offer, you are confirming your intent to join Chapin Landscapes as a{" "}
-            <strong>{offer.role}</strong>. You will receive your login credentials and onboarding information via email immediately after accepting.
+            {t("infoNotice")}{" "}
+            <strong>{offer.role}</strong>. {t("infoNotice2")}
           </p>
         </div>
 
@@ -317,7 +319,7 @@ export default function OfferAcceptancePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <FileText className="h-5 w-5 text-green-700" />
-                Attached Offer Letter
+                {t("attachedOfferLetter")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -325,7 +327,7 @@ export default function OfferAcceptancePage() {
                 <iframe src={offer.offerLetterUrl} className="w-full h-full" title="Offer Letter" data-testid="iframe-offer-letter" />
               </div>
               <a href={offer.offerLetterUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-green-700 underline mt-2 inline-block" data-testid="link-download-offer">
-                Open in new tab
+                {t("openInNewTab")}
               </a>
             </CardContent>
           </Card>
@@ -334,8 +336,8 @@ export default function OfferAcceptancePage() {
         {/* Signature & Accept */}
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="text-base">Your Digital Signature</CardTitle>
-            <CardDescription>Sign below using your mouse or finger to accept this offer.</CardDescription>
+            <CardTitle className="text-base">{t("yourDigitalSignature")}</CardTitle>
+            <CardDescription>{t("signDescription")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-2 bg-white">
@@ -343,7 +345,7 @@ export default function OfferAcceptancePage() {
             </div>
             {signature && (
               <p className="text-xs text-green-600 flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" /> Signature captured
+                <CheckCircle2 className="h-3 w-3" /> {t("signatureCaptured")}
               </p>
             )}
 
@@ -362,18 +364,18 @@ export default function OfferAcceptancePage() {
               data-testid="button-accept-offer"
             >
               {submitting
-                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing…</>
-                : <><CheckCircle2 className="mr-2 h-5 w-5" />I Accept This Offer</>}
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("processing")}&hellip;</>
+                : <><CheckCircle2 className="mr-2 h-5 w-5" />{t("iAccept")}</>}
             </Button>
 
             <p className="text-xs text-center text-gray-500">
-              Clicking "I Accept This Offer" constitutes a legally binding digital signature. A record of your acceptance is stored securely.
+              {t("legalNote")}
             </p>
           </CardContent>
         </Card>
 
         <div className="text-center text-xs text-gray-400 pb-6">
-          &copy; {new Date().getFullYear()} Chapin Landscapes · Company HQ Platform
+          &copy; {new Date().getFullYear()} Chapin Landscapes &middot; Company HQ Platform
         </div>
       </div>
     </div>

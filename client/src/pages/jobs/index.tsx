@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +16,6 @@ import { format, parseISO } from "date-fns";
 import { JobFormModal, EMPTY_JOB } from "./JobFormModal";
 import { useAuth } from "@/hooks/use-auth";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 interface JobRow {
   id: string; title: string; client: string; status: string;
   job_type: string | null; type: string | null;
@@ -27,24 +27,14 @@ interface JobRow {
   created_at: string;
 }
 
-// ── Status display ────────────────────────────────────────────────────────────
-const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  lead:        { label: "Lead",        cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
-  scheduled:   { label: "Scheduled",   cls: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
-  in_progress: { label: "In Progress", cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" },
-  completed:   { label: "Completed",   cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
-  invoiced:    { label: "Invoiced",    cls: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" },
-  cancelled:   { label: "Cancelled",   cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
+const STATUS_CLS: Record<string, string> = {
+  lead:        "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  scheduled:   "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  in_progress: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  completed:   "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+  invoiced:    "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  cancelled:   "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
 };
-
-function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_MAP[status] ?? { label: status, cls: "bg-muted text-muted-foreground" };
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${s.cls}`}>
-      {s.label}
-    </span>
-  );
-}
 
 function custName(j: JobRow) {
   if (j.cust_first && j.cust_last) return `${j.cust_first} ${j.cust_last}`;
@@ -68,17 +58,8 @@ function fmtMoney(v: any) {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-const STATUS_TABS = [
-  { value: "all",        label: "All" },
-  { value: "lead",       label: "Lead" },
-  { value: "scheduled",  label: "Scheduled" },
-  { value: "in_progress",label: "In Progress" },
-  { value: "completed",  label: "Completed" },
-  { value: "invoiced",   label: "Invoiced" },
-];
-
-// ── Main Component ────────────────────────────────────────────────────────────
 export default function JobsPage() {
+  const { t } = useTranslation("jobs");
   const [, navigate] = useLocation();
   const { effectiveRole } = useAuth();
   const isAdminOrManager = ["Admin", "Manager", "Master Admin"].includes(effectiveRole ?? "");
@@ -89,14 +70,31 @@ export default function JobsPage() {
   const [dateTo, setDateTo] = useState("");
   const [showModal, setShowModal] = useState(false);
 
-  // Build query params
+  const STATUS_LABELS: Record<string, string> = {
+    lead:        t("tabLead"),
+    scheduled:   t("tabScheduled"),
+    in_progress: t("tabInProgress"),
+    completed:   t("tabCompleted"),
+    invoiced:    t("tabInvoiced"),
+    cancelled:   t("tabCancelled"),
+  };
+
+  const STATUS_TABS = [
+    { value: "all",         label: t("tabAll") },
+    { value: "lead",        label: t("tabLead") },
+    { value: "scheduled",   label: t("tabScheduled") },
+    { value: "in_progress", label: t("tabInProgress") },
+    { value: "completed",   label: t("tabCompleted") },
+    { value: "invoiced",    label: t("tabInvoiced") },
+  ];
+
   const params = new URLSearchParams();
   if (activeTab !== "all") params.set("status", activeTab);
   if (search.trim()) params.set("search", search.trim());
   if (dateFrom) params.set("date_from", dateFrom);
   if (dateTo) params.set("date_to", dateTo);
 
-  const { data: jobs = [], isLoading, refetch } = useQuery<JobRow[]>({
+  const { data: jobs = [], isLoading } = useQuery<JobRow[]>({
     queryKey: ["/api/jobs", activeTab, search, dateFrom, dateTo],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/jobs?${params.toString()}`);
@@ -109,15 +107,14 @@ export default function JobsPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Jobs</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("soldJobs")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {jobs.length} job{jobs.length !== 1 ? "s" : ""}
-            {activeTab !== "all" ? ` · ${STATUS_MAP[activeTab]?.label ?? activeTab}` : ""}
+            {jobs.length} · {activeTab !== "all" ? STATUS_LABELS[activeTab] ?? activeTab : t("tabAll")}
           </p>
         </div>
         {isAdminOrManager && (
           <Button onClick={() => setShowModal(true)} className="bg-primary" data-testid="button-new-job">
-            <Plus className="h-4 w-4 mr-1.5" /> New Job
+            <Plus className="h-4 w-4 mr-1.5" /> {t("addJob")}
           </Button>
         )}
       </div>
@@ -145,7 +142,7 @@ export default function JobsPage() {
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search jobs, customers, address…"
+            placeholder={t("searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -156,13 +153,13 @@ export default function JobsPage() {
           <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
             className="w-36" data-testid="input-date-from" />
-          <span className="text-muted-foreground text-sm">to</span>
+          <span className="text-muted-foreground text-sm">{t("dateFrom")}</span>
           <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
             className="w-36" data-testid="input-date-to" />
           {(dateFrom || dateTo) && (
             <Button variant="ghost" size="sm" className="text-xs h-8"
               onClick={() => { setDateFrom(""); setDateTo(""); }}>
-              Clear
+              {t("cancel", { ns: "common" })}
             </Button>
           )}
         </div>
@@ -172,34 +169,29 @@ export default function JobsPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="py-16 text-center text-muted-foreground text-sm">Loading jobs…</div>
+            <div className="py-16 text-center text-muted-foreground text-sm">{t("loading", { ns: "common" })}</div>
           ) : jobs.length === 0 ? (
             <div className="py-16 text-center">
               <Briefcase className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
-              <p className="text-sm font-semibold text-muted-foreground">No jobs found</p>
-              {activeTab === "all" && !search && (
-                <>
-                  <p className="text-xs text-muted-foreground mt-1">Get started by creating your first job.</p>
-                  {isAdminOrManager && (
-                    <Button onClick={() => setShowModal(true)} className="mt-4 bg-primary" size="sm"
-                      data-testid="button-first-job">
-                      <Plus className="h-4 w-4 mr-1.5" /> Create your first job
-                    </Button>
-                  )}
-                </>
+              <p className="text-sm font-semibold text-muted-foreground">{t("noJobsFound")}</p>
+              {activeTab === "all" && !search && isAdminOrManager && (
+                <Button onClick={() => setShowModal(true)} className="mt-4 bg-primary" size="sm"
+                  data-testid="button-first-job">
+                  <Plus className="h-4 w-4 mr-1.5" /> {t("addJob")}
+                </Button>
               )}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Job Title</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="hidden lg:table-cell">Property</TableHead>
-                  <TableHead className="hidden md:table-cell">Type</TableHead>
-                  <TableHead className="hidden md:table-cell">Scheduled</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden sm:table-cell text-right">Price</TableHead>
+                  <TableHead>{t("jobTitle")}</TableHead>
+                  <TableHead>{t("client")}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t("address")}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t("type")}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t("date")}</TableHead>
+                  <TableHead>{t("status")}</TableHead>
+                  <TableHead className="hidden sm:table-cell text-right">{t("price")}</TableHead>
                   <TableHead className="w-8" />
                 </TableRow>
               </TableHeader>
@@ -212,7 +204,7 @@ export default function JobsPage() {
                     data-testid={`row-job-${job.id}`}
                   >
                     <TableCell className="font-medium">
-                      {job.title || job.client || "Untitled Job"}
+                      {job.title || job.client || t("untitledJob")}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {custName(job)}
@@ -227,7 +219,9 @@ export default function JobsPage() {
                       {fmtDate(job.scheduled_date)}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={job.status || "lead"} />
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_CLS[job.status] ?? "bg-muted text-muted-foreground"}`}>
+                        {STATUS_LABELS[job.status] ?? job.status}
+                      </span>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-sm font-medium text-right">
                       {fmtMoney(job.price ?? job.value)}
@@ -243,7 +237,6 @@ export default function JobsPage() {
         </CardContent>
       </Card>
 
-      {/* Create Modal */}
       <JobFormModal open={showModal} onOpenChange={setShowModal} initialData={EMPTY_JOB} />
     </div>
   );

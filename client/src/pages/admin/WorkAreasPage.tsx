@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -10,38 +11,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  ChevronDown,
-  ChevronRight,
-  Plus,
-  Pencil,
-  Ban,
-  Search,
-  CheckCircle2,
-  Clock,
-  Loader2,
-  MapPin,
+  ChevronDown, ChevronRight, Plus, Pencil, Ban, Search, CheckCircle2, Clock, Loader2, MapPin,
 } from "lucide-react";
 import { Redirect } from "wouter";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface Job {
   id: string;
   title: string;
@@ -64,19 +44,11 @@ interface WorkArea {
   is_active: boolean;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const STATUS_COLORS: Record<string, string> = {
   pending:   "bg-gray-100 text-gray-600 border-gray-200",
   active:    "bg-blue-50 text-blue-700 border-blue-200",
   on_hold:   "bg-yellow-50 text-yellow-700 border-yellow-200",
   completed: "bg-green-50 text-green-700 border-green-200",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  pending:   "Pending",
-  active:    "Active",
-  on_hold:   "On Hold",
-  completed: "Completed",
 };
 
 const JOB_STATUS_COLORS: Record<string, string> = {
@@ -93,8 +65,8 @@ function fmtHours(h: number | null | undefined) {
   return n % 1 === 0 ? `${n}h` : `${n.toFixed(1)}h`;
 }
 
-// ─── Inline Add Form ──────────────────────────────────────────────────────────
 function AddWorkAreaForm({ jobId, onDone }: { jobId: string; onDone: () => void }) {
+  const { t } = useTranslation("admin");
   const qc = useQueryClient();
   const { toast } = useToast();
   const [name, setName] = useState("");
@@ -109,12 +81,12 @@ function AddWorkAreaForm({ jobId, onDone }: { jobId: string; onDone: () => void 
         estimated_hours: estimatedHours ? parseFloat(estimatedHours) : null,
       }),
     onSuccess: () => {
-      toast({ title: "Work area added" });
+      toast({ title: t("workAreas.workAreaAdded") });
       qc.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/work-areas`] });
       onDone();
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("error", { ns: "common" }), description: err.message, variant: "destructive" });
     },
   });
 
@@ -124,11 +96,11 @@ function AddWorkAreaForm({ jobId, onDone }: { jobId: string; onDone: () => void 
       onSubmit={(e) => { e.preventDefault(); if (name.trim()) mutation.mutate(); }}
       className="border border-dashed border-primary/40 rounded-lg p-4 bg-primary/5 space-y-3"
     >
-      <p className="text-sm font-semibold text-primary">New Work Area</p>
+      <p className="text-sm font-semibold text-primary">{t("workAreas.newWorkArea")}</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label htmlFor={`wa-name-${jobId}`} className="text-xs">Name *</Label>
+          <Label htmlFor={`wa-name-${jobId}`} className="text-xs">{t("workAreas.name")}</Label>
           <Input
             id={`wa-name-${jobId}`}
             data-testid="input-work-area-name"
@@ -139,7 +111,7 @@ function AddWorkAreaForm({ jobId, onDone }: { jobId: string; onDone: () => void 
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor={`wa-hours-${jobId}`} className="text-xs">Estimated Hours</Label>
+          <Label htmlFor={`wa-hours-${jobId}`} className="text-xs">{t("workAreas.estimatedHours")}</Label>
           <Input
             id={`wa-hours-${jobId}`}
             data-testid="input-work-area-hours"
@@ -154,52 +126,33 @@ function AddWorkAreaForm({ jobId, onDone }: { jobId: string; onDone: () => void 
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor={`wa-notes-${jobId}`} className="text-xs">Notes / Description</Label>
+        <Label htmlFor={`wa-notes-${jobId}`} className="text-xs">{t("workAreas.notesDesc")}</Label>
         <Textarea
           id={`wa-notes-${jobId}`}
           data-testid="input-work-area-notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Any special instructions or scope details…"
+          placeholder={t("workAreas.notesPlaceholder")}
           rows={2}
           className="resize-none text-sm"
         />
       </div>
 
       <div className="flex items-center gap-2 justify-end">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          data-testid="button-cancel-add-work-area"
-          onClick={onDone}
-        >
-          Cancel
+        <Button type="button" variant="ghost" size="sm" data-testid="button-cancel-add-work-area" onClick={onDone}>
+          {t("cancel", { ns: "common" })}
         </Button>
-        <Button
-          type="submit"
-          size="sm"
-          data-testid="button-submit-work-area"
-          disabled={!name.trim() || mutation.isPending}
-        >
+        <Button type="submit" size="sm" data-testid="button-submit-work-area" disabled={!name.trim() || mutation.isPending}>
           {mutation.isPending && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
-          Add Work Area
+          {t("workAreas.addWorkArea")}
         </Button>
       </div>
     </form>
   );
 }
 
-// ─── Inline Edit Form ─────────────────────────────────────────────────────────
-function EditWorkAreaForm({
-  jobId,
-  area,
-  onDone,
-}: {
-  jobId: string;
-  area: WorkArea;
-  onDone: () => void;
-}) {
+function EditWorkAreaForm({ jobId, area, onDone }: { jobId: string; area: WorkArea; onDone: () => void }) {
+  const { t } = useTranslation("admin");
   const qc = useQueryClient();
   const { toast } = useToast();
   const [name, setName] = useState(area.name);
@@ -218,12 +171,12 @@ function EditWorkAreaForm({
         estimated_hours: estimatedHours ? parseFloat(estimatedHours) : null,
       }),
     onSuccess: () => {
-      toast({ title: "Work area updated" });
+      toast({ title: t("workAreas.workAreaUpdated") });
       qc.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/work-areas`] });
       onDone();
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("error", { ns: "common" }), description: err.message, variant: "destructive" });
     },
   });
 
@@ -233,11 +186,11 @@ function EditWorkAreaForm({
       onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}
       className="border border-blue-200 rounded-lg p-4 bg-blue-50/50 space-y-3"
     >
-      <p className="text-sm font-semibold text-blue-700">Edit: {area.name}</p>
+      <p className="text-sm font-semibold text-blue-700">{t("workAreas.editWorkArea")} {area.name}</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="sm:col-span-2 space-y-1">
-          <Label className="text-xs">Name *</Label>
+          <Label className="text-xs">{t("workAreas.name")}</Label>
           <Input
             data-testid={`input-edit-name-${area.id}`}
             value={name}
@@ -246,7 +199,7 @@ function EditWorkAreaForm({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Estimated Hours</Label>
+          <Label className="text-xs">{t("workAreas.estimatedHours")}</Label>
           <Input
             data-testid={`input-edit-hours-${area.id}`}
             type="number"
@@ -261,21 +214,21 @@ function EditWorkAreaForm({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs">Status</Label>
+          <Label className="text-xs">{t("workAreas.statusLabel")}</Label>
           <Select value={status} onValueChange={setStatus}>
             <SelectTrigger data-testid={`select-status-${area.id}`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="on_hold">On Hold</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="pending">{t("workAreas.pending")}</SelectItem>
+              <SelectItem value="active">{t("workAreas.active")}</SelectItem>
+              <SelectItem value="on_hold">{t("workAreas.on_hold")}</SelectItem>
+              <SelectItem value="completed">{t("workAreas.completed")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Notes / Description</Label>
+          <Label className="text-xs">{t("workAreas.notesDesc")}</Label>
           <Textarea
             data-testid={`input-edit-notes-${area.id}`}
             value={notes}
@@ -287,41 +240,39 @@ function EditWorkAreaForm({
       </div>
 
       <div className="flex items-center gap-2 justify-end">
-        <Button type="button" variant="ghost" size="sm" onClick={onDone}
-          data-testid={`button-cancel-edit-${area.id}`}>
-          Cancel
+        <Button type="button" variant="ghost" size="sm" onClick={onDone} data-testid={`button-cancel-edit-${area.id}`}>
+          {t("cancel", { ns: "common" })}
         </Button>
-        <Button type="submit" size="sm" disabled={!name.trim() || mutation.isPending}
-          data-testid={`button-save-edit-${area.id}`}>
+        <Button type="submit" size="sm" disabled={!name.trim() || mutation.isPending} data-testid={`button-save-edit-${area.id}`}>
           {mutation.isPending && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
-          Save Changes
+          {t("workAreas.saveChanges")}
         </Button>
       </div>
     </form>
   );
 }
 
-// ─── Work Area Row ────────────────────────────────────────────────────────────
-function WorkAreaRow({
-  jobId,
-  area,
-}: {
-  jobId: string;
-  area: WorkArea;
-}) {
+function WorkAreaRow({ jobId, area }: { jobId: string; area: WorkArea }) {
+  const { t } = useTranslation("admin");
   const qc = useQueryClient();
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
 
+  const STATUS_LABELS: Record<string, string> = {
+    pending:   t("workAreas.pending"),
+    active:    t("workAreas.active"),
+    on_hold:   t("workAreas.on_hold"),
+    completed: t("workAreas.completed"),
+  };
+
   const deactivateMutation = useMutation({
-    mutationFn: () =>
-      apiRequest("DELETE", `/api/jobs/${jobId}/work-areas/${area.id}`),
+    mutationFn: () => apiRequest("DELETE", `/api/jobs/${jobId}/work-areas/${area.id}`),
     onSuccess: () => {
-      toast({ title: "Work area deactivated" });
+      toast({ title: t("workAreas.workAreaDeactivated") });
       qc.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/work-areas`] });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("error", { ns: "common" }), description: err.message, variant: "destructive" });
     },
   });
 
@@ -341,7 +292,6 @@ function WorkAreaRow({
       data-testid={`work-area-row-${area.id}`}
       className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/40 group transition-colors"
     >
-      {/* Status dot */}
       <span
         className={`w-2 h-2 rounded-full shrink-0 ${
           area.status === "completed" ? "bg-green-500" :
@@ -350,16 +300,12 @@ function WorkAreaRow({
           "bg-gray-300"
         }`}
       />
-
-      {/* Name + notes */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{area.name}</p>
         {area.notes && (
           <p className="text-xs text-muted-foreground truncate">{area.notes}</p>
         )}
       </div>
-
-      {/* Status badge */}
       <Badge
         variant="outline"
         className={`text-xs shrink-0 ${STATUS_COLORS[area.status] ?? ""}`}
@@ -367,8 +313,6 @@ function WorkAreaRow({
       >
         {STATUS_LABELS[area.status] ?? area.status}
       </Badge>
-
-      {/* Hours */}
       {(estH || actualH) && (
         <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
           <Clock className="w-3 h-3" />
@@ -377,8 +321,6 @@ function WorkAreaRow({
           </span>
         </div>
       )}
-
-      {/* Actions — visible on hover / always visible on touch */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         <Button
           variant="ghost"
@@ -386,7 +328,7 @@ function WorkAreaRow({
           className="h-7 w-7"
           data-testid={`button-edit-area-${area.id}`}
           onClick={() => setEditing(true)}
-          title="Edit"
+          title={t("edit", { ns: "common" })}
         >
           <Pencil className="w-3.5 h-3.5" />
         </Button>
@@ -398,7 +340,7 @@ function WorkAreaRow({
               size="icon"
               className="h-7 w-7 text-destructive hover:text-destructive"
               data-testid={`button-deactivate-area-${area.id}`}
-              title="Deactivate"
+              title={t("workAreas.deactivate")}
               disabled={deactivateMutation.isPending}
             >
               {deactivateMutation.isPending
@@ -408,21 +350,19 @@ function WorkAreaRow({
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Deactivate work area?</AlertDialogTitle>
+              <AlertDialogTitle>{t("workAreas.deactivateTitle")}</AlertDialogTitle>
               <AlertDialogDescription>
-                "<span className="font-medium">{area.name}</span>" will be hidden from field
-                worker views immediately. Time history is preserved. This can be reversed by
-                re-activating the area.
+                "<span className="font-medium">{area.name}</span>" {t("workAreas.deactivateDesc")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{t("cancel", { ns: "common" })}</AlertDialogCancel>
               <AlertDialogAction
                 data-testid={`button-confirm-deactivate-${area.id}`}
                 onClick={() => deactivateMutation.mutate()}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Deactivate
+                {t("workAreas.deactivate")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -432,21 +372,19 @@ function WorkAreaRow({
   );
 }
 
-// ─── Job Card ─────────────────────────────────────────────────────────────────
 function JobCard({ job }: { job: Job }) {
+  const { t } = useTranslation("admin");
   const [expanded, setExpanded] = useState(false);
   const [adding, setAdding] = useState(false);
 
   const { data: workAreas = [], isLoading } = useQuery<WorkArea[]>({
     queryKey: [`/api/jobs/${job.id}/work-areas`],
-    queryFn: () =>
-      apiRequest("GET", `/api/jobs/${job.id}/work-areas`).then((r) => r.json()),
+    queryFn: () => apiRequest("GET", `/api/jobs/${job.id}/work-areas`).then((r) => r.json()),
     enabled: expanded,
   });
 
   return (
     <Card data-testid={`job-card-${job.id}`} className="overflow-hidden">
-      {/* Job header — click to expand */}
       <button
         data-testid={`button-expand-job-${job.id}`}
         className="w-full text-left"
@@ -455,17 +393,13 @@ function JobCard({ job }: { job: Job }) {
         <CardHeader className="py-3 px-4 hover:bg-muted/30 transition-colors">
           <div className="flex items-center gap-3">
             <span className="shrink-0 text-muted-foreground">
-              {expanded
-                ? <ChevronDown className="w-4 h-4" />
-                : <ChevronRight className="w-4 h-4" />}
+              {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </span>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate">{job.title}</p>
               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 {job.customer_name && (
-                  <span className="text-xs text-muted-foreground truncate">
-                    {job.customer_name}
-                  </span>
+                  <span className="text-xs text-muted-foreground truncate">{job.customer_name}</span>
                 )}
                 {job.address && (
                   <span className="text-xs text-muted-foreground flex items-center gap-0.5 truncate">
@@ -477,14 +411,9 @@ function JobCard({ job }: { job: Job }) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {job.division && (
-                <Badge variant="outline" className="text-xs capitalize">
-                  {job.division}
-                </Badge>
+                <Badge variant="outline" className="text-xs capitalize">{job.division}</Badge>
               )}
-              <Badge
-                variant="outline"
-                className={`text-xs capitalize ${JOB_STATUS_COLORS[job.status] ?? ""}`}
-              >
+              <Badge variant="outline" className={`text-xs capitalize ${JOB_STATUS_COLORS[job.status] ?? ""}`}>
                 {job.status.replace("_", " ")}
               </Badge>
             </div>
@@ -492,7 +421,6 @@ function JobCard({ job }: { job: Job }) {
         </CardHeader>
       </button>
 
-      {/* Expanded content */}
       {expanded && (
         <CardContent className="px-4 pb-4 pt-0 space-y-2">
           <div className="h-px bg-border mb-3" />
@@ -500,14 +428,12 @@ function JobCard({ job }: { job: Job }) {
           {isLoading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Loading work areas…
+              {t("workAreas.loadingWorkAreas")}
             </div>
           )}
 
           {!isLoading && workAreas.length === 0 && !adding && (
-            <p className="text-sm text-muted-foreground py-2 text-center">
-              No work areas yet for this job.
-            </p>
+            <p className="text-sm text-muted-foreground py-2 text-center">{t("workAreas.noWorkAreas")}</p>
           )}
 
           {!isLoading && workAreas.length > 0 && (
@@ -531,7 +457,7 @@ function JobCard({ job }: { job: Job }) {
               onClick={() => setAdding(true)}
             >
               <Plus className="w-3.5 h-3.5 mr-1.5" />
-              Add Work Area
+              {t("workAreas.addWorkArea")}
             </Button>
           )}
         </CardContent>
@@ -540,8 +466,8 @@ function JobCard({ job }: { job: Job }) {
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function WorkAreasPage() {
+  const { t } = useTranslation("admin");
   const { user } = useAuth();
   const [search, setSearch] = useState("");
 
@@ -550,7 +476,6 @@ export default function WorkAreasPage() {
     queryFn: () => apiRequest("GET", "/api/jobs").then((r) => r.json()),
   });
 
-  // Guard: admin only
   if (user && (user as any).role !== "Admin" && (user as any).role !== "MasterAdmin") {
     return <Redirect to="/admin" />;
   }
@@ -568,43 +493,38 @@ export default function WorkAreasPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 pb-16 pt-6 space-y-6">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" data-testid="page-title-work-areas">
-            Work Areas
+            {t("workAreas.title")}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage work areas across all active jobs. Add, edit, or deactivate areas for field crews.
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">{t("workAreas.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <CheckCircle2 className="w-4 h-4 text-green-500" />
-          <span>{allJobs.length} jobs loaded</span>
+          <span>{t("workAreas.jobsLoaded", { count: allJobs.length })}</span>
         </div>
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
         <Input
           data-testid="input-search-jobs"
           className="pl-9"
-          placeholder="Filter jobs by name, customer, address or division…"
+          placeholder={t("workAreas.searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
-      {/* Job list */}
       {isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
           <Loader2 className="w-5 h-5 animate-spin" />
-          Loading jobs…
+          {t("workAreas.loadingJobs")}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground text-sm">
-          {search ? "No jobs match your search." : "No jobs found."}
+          {search ? t("workAreas.noJobsSearch") : t("workAreas.noJobs")}
         </div>
       ) : (
         <div className="space-y-2">
