@@ -214,7 +214,14 @@
       "masterAdmin": "Master Admin"
     },
     "backToDashboard": "Back to Dashboard",
-    "locale": "en-US"
+    "locale": "en-US",
+    "openInGoogleMaps": "Open in Google Maps",
+    "days": "days",
+    "daysAgo": "days ago",
+    "discover": "Discover",
+    "expires": "Expires",
+    "in": "in",
+    "cancelled": "Cancelled"
   },
   "status": {
     "active": "Active",
@@ -612,7 +619,11 @@
     "location": "Location",
     "jobSiteAddress": "Job site address or description",
     "history": "History",
-    "stageUpdated": "Stage updated"
+    "stageUpdated": "Stage updated",
+    "checklistItems": "Checklist Items",
+    "everyXDays": "Every {{x}} days",
+    "frequency": "Frequency",
+    "failedToLoad": "Failed to load tasks"
   },
   "sops": {
     "title": "SOP Library",
@@ -1315,6 +1326,25 @@
     "qualify": "Qualify"
   },
   "assistant": {
-    "title": "AI Assistant"
+    "title": "AI Assistant",
+    "subtitle": "Your intelligent landscape management companion",
+    "botName": "Chapin AI",
+    "inputPlaceholder": "Ask me anything about your jobs, materials, or operations...",
+    "newChat": "New Chat",
+    "welcomeMessage": "Hi! I'm your AI assistant. How can I help you today?",
+    "errorMessage": "Something went wrong. Please try again.",
+    "poweredByAi": "Powered by AI",
+    "recommendedAdditions": "Recommended Additions",
+    "recDescription": "Based on your project, consider adding these items:",
+    "recCalculator": "Cost Calculator",
+    "recCalculatorDesc": "Estimate material quantities and costs",
+    "recEquipment": "Equipment Needs",
+    "recEquipmentDesc": "Recommended equipment for this job type",
+    "recSafety": "Safety Checklist",
+    "recSafetyDesc": "Safety items to review before starting",
+    "inDevelopment": "In Development",
+    "devPhotoMarkup": "Photo Markup Tool",
+    "devRouteOpt": "Route Optimization",
+    "devSubcontractor": "Subcontractor Portal"
   }
 }

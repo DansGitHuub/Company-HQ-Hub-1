@@ -214,7 +214,14 @@
       "masterAdmin": "Administrador Principal"
     },
     "backToDashboard": "Volver al Tablero",
-    "locale": "es-ES"
+    "locale": "es-ES",
+    "openInGoogleMaps": "Abrir en Google Maps",
+    "days": "días",
+    "daysAgo": "días atrás",
+    "discover": "Descubrir",
+    "expires": "Vence",
+    "in": "en",
+    "cancelled": "Cancelado"
   },
   "status": {
     "active": "Activo",
@@ -612,7 +619,11 @@
     "location": "Ubicación",
     "jobSiteAddress": "Dirección o descripción del sitio",
     "history": "Historial",
-    "stageUpdated": "Etapa actualizada"
+    "stageUpdated": "Etapa actualizada",
+    "checklistItems": "Elementos de Lista",
+    "everyXDays": "Cada {{x}} días",
+    "frequency": "Frecuencia",
+    "failedToLoad": "Error al cargar tareas"
   },
   "sops": {
     "title": "Biblioteca de POE",
@@ -1315,6 +1326,25 @@
     "qualify": "Calificar"
   },
   "assistant": {
-    "title": "Asistente de IA"
+    "title": "Asistente de IA",
+    "subtitle": "Tu compañero inteligente de gestión de paisajes",
+    "botName": "Chapin IA",
+    "inputPlaceholder": "Pregúntame sobre tus trabajos, materiales u operaciones...",
+    "newChat": "Nueva Conversación",
+    "welcomeMessage": "¡Hola! Soy tu asistente de IA. ¿Cómo puedo ayudarte hoy?",
+    "errorMessage": "Algo salió mal. Por favor, inténtalo de nuevo.",
+    "poweredByAi": "Impulsado por IA",
+    "recommendedAdditions": "Adiciones Recomendadas",
+    "recDescription": "Basado en tu proyecto, considera agregar estos elementos:",
+    "recCalculator": "Calculadora de Costos",
+    "recCalculatorDesc": "Estima cantidades y costos de materiales",
+    "recEquipment": "Necesidades de Equipo",
+    "recEquipmentDesc": "Equipo recomendado para este tipo de trabajo",
+    "recSafety": "Lista de Seguridad",
+    "recSafetyDesc": "Elementos de seguridad a revisar antes de comenzar",
+    "inDevelopment": "En Desarrollo",
+    "devPhotoMarkup": "Herramienta de Marcado de Fotos",
+    "devRouteOpt": "Optimización de Rutas",
+    "devSubcontractor": "Portal de Subcontratistas"
   }
 }
