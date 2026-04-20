@@ -7,12 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle2, FileSignature, Clock, XCircle, PenLine, Type } from "lucide-react";
 import SignaturePad from "@/components/forms/SignaturePad";
 import { cn } from "@/lib/utils";
-import { useTranslation } from "react-i18next";
 
 type SignMode = "draw" | "type";
 
 function TypedSignature({ onChange }: { onChange: (dataUrl: string) => void }) {
-  const { t } = useTranslation("agreementSigning");
   const [name, setName] = useState("");
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -33,12 +31,14 @@ function TypedSignature({ onChange }: { onChange: (dataUrl: string) => void }) {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, w, h);
     if (!text.trim()) { onChange(""); return; }
+    // Wait for font
     try { await document.fonts.load(`bold 52px "Dancing Script"`); } catch (_) {}
     ctx.font = `bold 52px "Dancing Script", cursive`;
     ctx.fillStyle = "#1a1a2e";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(text, w / 2, h / 2 - 4);
+    // Signature line
     ctx.strokeStyle = "#d1d5db";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -53,7 +53,7 @@ function TypedSignature({ onChange }: { onChange: (dataUrl: string) => void }) {
   return (
     <div className="space-y-3">
       <Input
-        placeholder={t("typeFullName")}
+        placeholder="Type your full legal name"
         value={name}
         onChange={e => setName(e.target.value)}
         className="text-base"
@@ -67,12 +67,12 @@ function TypedSignature({ onChange }: { onChange: (dataUrl: string) => void }) {
             style={{ display: "block", height: 120 }}
             data-testid="canvas-typed-signature"
           />
-          <p className="text-[10px] text-muted-foreground/40 absolute bottom-1 left-3">{t("yourSignature")}</p>
+          <p className="text-[10px] text-muted-foreground/40 absolute bottom-1 left-3">Your signature</p>
         </div>
       )}
       {!name.trim() && (
         <div className="rounded-lg border-2 border-dashed border-muted-foreground/20 bg-white h-[120px] flex items-center justify-center">
-          <p className="text-sm text-muted-foreground/50">{t("previewHere")}</p>
+          <p className="text-sm text-muted-foreground/50">Your signature preview will appear here</p>
         </div>
       )}
       {name.trim() && (
@@ -80,7 +80,7 @@ function TypedSignature({ onChange }: { onChange: (dataUrl: string) => void }) {
           className="text-xs text-muted-foreground underline"
           onClick={() => { setName(""); onChange(""); }}
         >
-          {t("clear")}
+          Clear
         </button>
       )}
     </div>
@@ -88,7 +88,6 @@ function TypedSignature({ onChange }: { onChange: (dataUrl: string) => void }) {
 }
 
 export default function AgreementSigningPage() {
-  const { t } = useTranslation("agreementSigning");
   const token = window.location.pathname.split("/agreement/")[1]?.split("?")[0] || "";
   const [signature, setSignature] = useState<string>("");
   const [agreed, setAgreed] = useState(false);
@@ -109,8 +108,8 @@ export default function AgreementSigningPage() {
 
   useEffect(() => {
     if (!submitted) return;
-    const timer = setInterval(() => setCountdown(c => c - 1), 1000);
-    return () => clearInterval(timer);
+    const t = setInterval(() => setCountdown(c => c - 1), 1000);
+    return () => clearInterval(t);
   }, [submitted]);
 
   useEffect(() => {
@@ -119,7 +118,7 @@ export default function AgreementSigningPage() {
 
   const signMutation = useMutation({
     mutationFn: async () => {
-      if (!signature) throw new Error(t("provideSignature"));
+      if (!signature) throw new Error("Please provide your signature.");
       const res = await fetch(`/api/agreement/${token}/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -145,8 +144,8 @@ export default function AgreementSigningPage() {
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="text-center max-w-md">
           <XCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-          <h2 className="text-xl font-bold mb-2">{t("linkInvalidTitle")}</h2>
-          <p className="text-muted-foreground">{(error as any)?.message || t("linkInvalidMsg")}</p>
+          <h2 className="text-xl font-bold mb-2">Link Invalid or Expired</h2>
+          <p className="text-muted-foreground">{(error as any)?.message || "This agreement link is no longer valid. Please contact your manager."}</p>
         </div>
       </div>
     );
@@ -157,12 +156,12 @@ export default function AgreementSigningPage() {
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="text-center max-w-md">
           <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-4" />
-          <h2 className="text-xl font-bold mb-2">{t("alreadySignedTitle")}</h2>
+          <h2 className="text-xl font-bold mb-2">Agreement Already Signed</h2>
           <p className="text-muted-foreground">
-            {t("alreadySigned")} {data.year} {data.positionTitle} Employment Agreement
+            You signed your {data.year} {data.positionTitle} Employment Agreement
             {data.signedAt ? ` on ${new Date(data.signedAt).toLocaleDateString()}` : ""}.
           </p>
-          <p className="text-sm text-muted-foreground mt-4">{t("managerHasCopy")}</p>
+          <p className="text-sm text-muted-foreground mt-4">Your manager has a copy on file.</p>
         </div>
       </div>
     );
@@ -173,12 +172,12 @@ export default function AgreementSigningPage() {
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="text-center max-w-md">
           <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-4" />
-          <h2 className="text-xl font-bold mb-2">{t("signedTitle")}</h2>
-          <p className="text-muted-foreground">{t("signedMsg")}</p>
+          <h2 className="text-xl font-bold mb-2">Agreement Signed!</h2>
+          <p className="text-muted-foreground">Thank you. Your signed agreement has been recorded and your manager has been notified.</p>
           <p className="text-sm text-muted-foreground mt-4">
-            {t("redirecting")} <strong>{countdown}</strong> {countdown !== 1 ? t("seconds") : t("second")}...
+            Redirecting to login in <strong>{countdown}</strong> second{countdown !== 1 ? "s" : ""}...
           </p>
-          <Button className="mt-4" onClick={() => window.location.href = "/auth"}>{t("goToLogin")}</Button>
+          <Button className="mt-4" onClick={() => window.location.href = "/auth"}>Go to Login</Button>
         </div>
       </div>
     );
@@ -194,20 +193,20 @@ export default function AgreementSigningPage() {
         <div className="bg-white rounded-xl border shadow-sm p-6 mb-6 text-center">
           <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 border border-green-200 rounded-full px-4 py-1.5 text-sm font-semibold mb-4">
             <FileSignature className="h-4 w-4" />
-            {t("reviewAndSign")}
+            Employment Agreement – Please Review &amp; Sign
           </div>
           <h1 className="text-2xl font-bold">{data.year} {data.positionTitle}</h1>
           <p className="text-muted-foreground mt-1">Chapin Landscapes</p>
           {expiresAt && (
             <div className="flex items-center justify-center gap-1.5 mt-3 text-xs text-muted-foreground">
               <Clock className="h-3.5 w-3.5" />
-              {t("linkExpires")} {expiresAt.toLocaleDateString()}
+              This link expires {expiresAt.toLocaleDateString()}
             </div>
           )}
           {data.payRate && (
             <div className="flex justify-center gap-3 mt-4 flex-wrap">
-              <Badge variant="secondary" className="text-sm">{t("payRate")}: ${data.payRate}/hr</Badge>
-              {data.startDate && <Badge variant="secondary" className="text-sm">{t("startDate")}: {new Date(data.startDate + "T12:00:00").toLocaleDateString()}</Badge>}
+              <Badge variant="secondary" className="text-sm">Pay Rate: ${data.payRate}/hr</Badge>
+              {data.startDate && <Badge variant="secondary" className="text-sm">Start Date: {new Date(data.startDate + "T12:00:00").toLocaleDateString()}</Badge>}
             </div>
           )}
         </div>
@@ -225,10 +224,10 @@ export default function AgreementSigningPage() {
           <div>
             <h3 className="font-semibold text-lg flex items-center gap-2 mb-1">
               <FileSignature className="h-5 w-5 text-primary" />
-              {t("signThisAgreement")}
+              Sign This Agreement
             </h3>
             <p className="text-sm text-muted-foreground">
-              {t("chooseHowToSign")}
+              Choose how you'd like to sign — no printing required. Your electronic signature is legally binding.
             </p>
           </div>
 
@@ -242,7 +241,7 @@ export default function AgreementSigningPage() {
               onClick={() => { setSignMode("type"); setSignature(""); }}
               data-testid="tab-type-signature"
             >
-              <Type className="h-4 w-4" /> {t("typeYourName")}
+              <Type className="h-4 w-4" /> Type Your Name
             </button>
             <button
               className={cn(
@@ -252,7 +251,7 @@ export default function AgreementSigningPage() {
               onClick={() => { setSignMode("draw"); setSignature(""); }}
               data-testid="tab-draw-signature"
             >
-              <PenLine className="h-4 w-4" /> {t("draw")}
+              <PenLine className="h-4 w-4" /> Draw
             </button>
           </div>
 
@@ -262,7 +261,7 @@ export default function AgreementSigningPage() {
           ) : (
             <div>
               <p className="text-sm text-muted-foreground mb-3">
-                {t("signUsingMouse")}
+                Sign using your mouse, trackpad, or finger on mobile.
               </p>
               <SignaturePad
                 value={signature}
@@ -281,7 +280,8 @@ export default function AgreementSigningPage() {
               data-testid="checkbox-agreement-ack"
             />
             <label htmlFor="agreement-ack" className="text-sm leading-relaxed cursor-pointer">
-              {t("ackText")}
+              I have read, understand, and agree to the terms of this Employment Agreement with Chapin Landscapes.
+              I acknowledge this electronic signature is legally binding.
             </label>
           </div>
 
@@ -296,17 +296,17 @@ export default function AgreementSigningPage() {
             data-testid="button-sign-agreement"
           >
             {signMutation.isPending ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("submitting")}...</>
-            ) : t("acceptAndSign")}
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Submitting...</>
+            ) : "I Accept & Sign This Agreement"}
           </Button>
 
           {!canSubmit && (
             <p className="text-xs text-center text-muted-foreground">
               {!signature
                 ? signMode === "type"
-                  ? t("typeNameHint")
-                  : t("drawHint")
-                : t("checkAckHint")}
+                  ? "Type your full name above to create your signature."
+                  : "Please draw your signature above."
+                : "Please check the acknowledgment box to continue."}
             </p>
           )}
         </div>

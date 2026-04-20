@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect } from "react";
-import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
@@ -94,7 +93,6 @@ function SimpleTable({
   renderEditFields: (form: Record<string, any>, setForm: (f: Record<string, any>) => void) => React.ReactNode;
   keyCalc?: (row: any) => string;
 }) {
-  const { t } = useTranslation("morsBudget");
   const { toast } = useToast();
   const qc = useQueryClient();
   const [editing, setEditing] = useState<any>(null);
@@ -108,12 +106,12 @@ function SimpleTable({
       editing?.id
         ? apiRequest("PUT", `/api/mors/budgets/${budgetId}/${endpoint}/${editing.id}`, data)
         : apiRequest("POST", `/api/mors/budgets/${budgetId}/${endpoint}`, data),
-    onSuccess: () => { invalidate(); setEditing(null); toast({ title: editing?.id ? t("updated") : t("added") }); },
+    onSuccess: () => { invalidate(); setEditing(null); toast({ title: editing?.id ? "Updated" : "Added" }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
   const delMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/mors/budgets/${budgetId}/${endpoint}/${id}`),
-    onSuccess: () => { invalidate(); del.clear(); toast({ title: t("deleted") }); },
+    onSuccess: () => { invalidate(); del.clear(); toast({ title: "Deleted" }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -121,7 +119,7 @@ function SimpleTable({
     <div>
       <div className="flex justify-end mb-2">
         <Button size="sm" onClick={() => setEditing(buildDefault())} data-testid={`btn-add-${endpoint}`}>
-          <Plus className="h-4 w-4 mr-1" /> {t("addItemBtn")}
+          <Plus className="h-4 w-4 mr-1" /> Add
         </Button>
       </div>
       <div className="rounded-lg border overflow-hidden">
@@ -129,12 +127,12 @@ function SimpleTable({
           <TableHeader>
             <TableRow className="bg-muted/30">
               {cols.map(c => <TableHead key={c}>{c}</TableHead>)}
-              <TableHead className="w-20 text-right">{t("actions")}</TableHead>
+              <TableHead className="w-20 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 && (
-              <TableRow><TableCell colSpan={cols.length + 1} className="text-center py-8 text-muted-foreground text-sm">{t("noItemsYet")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={cols.length + 1} className="text-center py-8 text-muted-foreground text-sm">No items yet</TableCell></TableRow>
             )}
             {rows.map((row, i) => (
               <TableRow key={keyCalc ? keyCalc(row) : row.id ?? i}>
@@ -153,14 +151,14 @@ function SimpleTable({
 
       <Dialog open={!!editing} onOpenChange={o => { if (!o) setEditing(null); }}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>{editing?.id ? t("edit") : t("addItemBtn")}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing?.id ? "Edit" : "Add"}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-1">
             {editing && renderEditFields(editing, setEditing)}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>{t("cancel")}</Button>
+            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
             <Button onClick={() => saveMut.mutate(editing)} disabled={saveMut.isPending}>
-              {saveMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} {t("save")}
+              {saveMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Save
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -169,12 +167,12 @@ function SimpleTable({
       <AlertDialog open={!!del.target} onOpenChange={o => { if (!o) del.clear(); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("deleteItem")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("cannotUndo")}</AlertDialogDescription>
+            <AlertDialogTitle>Delete this item?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => del.target && delMut.mutate(del.target.id)}>{t("delete")}</AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => del.target && delMut.mutate(del.target.id)}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -184,7 +182,6 @@ function SimpleTable({
 
 // ─── OVERVIEW TAB ─────────────────────────────────────────────────────────────
 function OverviewTab({ summary, budget }: { summary: Summary | undefined; budget: Budget | undefined }) {
-  const { t } = useTranslation("morsBudget");
   if (!summary || !budget) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
   const chartData = [
@@ -306,7 +303,6 @@ function OverviewTab({ summary, budget }: { summary: Summary | undefined; budget
 
 // ─── LABOR TAB ────────────────────────────────────────────────────────────────
 function LaborTab({ budgetId, data, summary }: { budgetId: number; data: any; summary: Summary | undefined }) {
-  const { t } = useTranslation("morsBudget");
   const { toast } = useToast();
   const qc = useQueryClient();
   const [subTab, setSubTab] = useState<"field" | "overhead">("field");
@@ -323,12 +319,12 @@ function LaborTab({ budgetId, data, summary }: { budgetId: number; data: any; su
       d.id
         ? apiRequest("PUT", `/api/mors/budgets/${budgetId}/employees/${d.id}`, d)
         : apiRequest("POST", `/api/mors/budgets/${budgetId}/employees`, d),
-    onSuccess: () => { invalidate(); setEditing(null); toast({ title: t("saved") }); },
+    onSuccess: () => { invalidate(); setEditing(null); toast({ title: "Saved" }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
   const delMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/mors/budgets/${budgetId}/employees/${id}`),
-    onSuccess: () => { invalidate(); del.clear(); toast({ title: t("deleted") }); },
+    onSuccess: () => { invalidate(); del.clear(); toast({ title: "Deleted" }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -355,24 +351,24 @@ function LaborTab({ budgetId, data, summary }: { budgetId: number; data: any; su
     <div className="space-y-4">
       {/* Summary stats */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <SummaryCard label={t("directLaborLabel")} value={$(fieldTotal)} sub={t("billableFieldStaff")} />
-        <SummaryCard label={t("unbillableLaborLabel")} value={$(unbillTotal)} sub={t("nonBillableOverhead")} color="text-amber-600" />
-        <SummaryCard label={t("overheadStaffLabel")} value={$(ohTotal)} sub={t("salaries")} />
-        <SummaryCard label={t("billableHoursLabel")} value={num(billHrs) + " hrs"} sub={t("chargeableHours")} />
-        <SummaryCard label={t("unbillableHoursLabel")} value={num(unbillHrs) + " hrs"} sub={pct((summary?.unbillable_pct ?? 0) * 100)} />
+        <SummaryCard label="Direct Labor"     value={$(fieldTotal)} sub="billable field staff" />
+        <SummaryCard label="Unbillable Labor"  value={$(unbillTotal)} sub="non-billable overhead" color="text-amber-600" />
+        <SummaryCard label="Overhead Staff"   value={$(ohTotal)} sub="salaries" />
+        <SummaryCard label="Billable Hours"   value={num(billHrs) + " hrs"} sub="chargeable hours" />
+        <SummaryCard label="Unbillable Hours" value={num(unbillHrs) + " hrs"} sub={pct((summary?.unbillable_pct ?? 0) * 100)} />
       </div>
 
       {/* Sub-tab selector */}
       <div className="flex gap-2 border-b">
-        {(["field", "overhead"] as const).map(tab => (
-          <button key={tab} onClick={() => setSubTab(tab)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${subTab === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-            {tab === "field" ? `${t("fieldStaff")} (${fieldEmps.length})` : `${t("overheadStaff")} (${ohStaff.length})`}
+        {(["field", "overhead"] as const).map(t => (
+          <button key={t} onClick={() => setSubTab(t)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${subTab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            {t === "field" ? `Field Staff (${fieldEmps.length})` : `Overhead Staff (${ohStaff.length})`}
           </button>
         ))}
         <div className="ml-auto pb-1">
           <Button size="sm" onClick={() => setEditing(newEmployee(subTab === "overhead"))}>
-            <Plus className="h-4 w-4 mr-1" /> {t("addItemBtn")}
+            <Plus className="h-4 w-4 mr-1" /> Add
           </Button>
         </div>
       </div>
@@ -456,40 +452,40 @@ function LaborTab({ budgetId, data, summary }: { budgetId: number; data: any; su
       {/* Employee edit modal */}
       <Dialog open={!!editing} onOpenChange={o => { if (!o) setEditing(null); }}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>{editing?.id ? t("editEmployee") : t("addEmployee")}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing?.id ? "Edit Employee" : "Add Employee"}</DialogTitle></DialogHeader>
           {editing && (
             <div className="grid grid-cols-2 gap-3 py-1">
-              <div className="space-y-1"><Label>{t("role")}</Label><Input value={editing.role ?? ""} onChange={e => f("role", e.target.value)} /></div>
-              <div className="space-y-1"><Label>{t("empName")}</Label><Input value={editing.name ?? ""} onChange={e => f("name", e.target.value)} /></div>
+              <div className="space-y-1"><Label>Role</Label><Input value={editing.role ?? ""} onChange={e => f("role", e.target.value)} /></div>
+              <div className="space-y-1"><Label>Name</Label><Input value={editing.name ?? ""} onChange={e => f("name", e.target.value)} /></div>
               <div className="space-y-1 col-span-2">
-                <Label>{t("type")}</Label>
+                <Label>Type</Label>
                 <Select value={editing.employee_type ?? "hourly"} onValueChange={v => f("employee_type", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="hourly">{t("hourly")}</SelectItem><SelectItem value="salaried">{t("salaried")}</SelectItem></SelectContent>
+                  <SelectContent><SelectItem value="hourly">Hourly</SelectItem><SelectItem value="salaried">Salaried</SelectItem></SelectContent>
                 </Select>
               </div>
               {editing.employee_type === "hourly" ? (
                 <>
-                  <div className="space-y-1"><Label>{t("hourlyWage")}</Label><Input type="number" value={editing.hourly_wage ?? 0} onChange={e => f("hourly_wage", +e.target.value)} /></div>
-                  <div className="space-y-1"><Label>{t("totalHrsYr")}</Label><Input type="number" value={editing.total_hours_per_year ?? 0} onChange={e => f("total_hours_per_year", +e.target.value)} /></div>
-                  <div className="space-y-1"><Label>{t("unbillableHrs")}</Label><Input type="number" value={editing.unbillable_hours_per_year ?? 0} onChange={e => f("unbillable_hours_per_year", +e.target.value)} /></div>
-                  <div className="space-y-1"><Label>{t("otHours")}</Label><Input type="number" value={editing.overtime_hours ?? 0} onChange={e => f("overtime_hours", +e.target.value)} /></div>
-                  <div className="space-y-1"><Label>{t("otMultiplier")}</Label><Input type="number" step="0.1" value={editing.overtime_multiplier ?? 1.5} onChange={e => f("overtime_multiplier", +e.target.value)} /></div>
+                  <div className="space-y-1"><Label>Hourly Wage ($)</Label><Input type="number" value={editing.hourly_wage ?? 0} onChange={e => f("hourly_wage", +e.target.value)} /></div>
+                  <div className="space-y-1"><Label>Total Hours/Yr</Label><Input type="number" value={editing.total_hours_per_year ?? 0} onChange={e => f("total_hours_per_year", +e.target.value)} /></div>
+                  <div className="space-y-1"><Label>Unbillable Hrs</Label><Input type="number" value={editing.unbillable_hours_per_year ?? 0} onChange={e => f("unbillable_hours_per_year", +e.target.value)} /></div>
+                  <div className="space-y-1"><Label>OT Hours</Label><Input type="number" value={editing.overtime_hours ?? 0} onChange={e => f("overtime_hours", +e.target.value)} /></div>
+                  <div className="space-y-1"><Label>OT Multiplier</Label><Input type="number" step="0.1" value={editing.overtime_multiplier ?? 1.5} onChange={e => f("overtime_multiplier", +e.target.value)} /></div>
                 </>
               ) : (
-                <div className="space-y-1 col-span-2"><Label>{t("annualSalary")}</Label><Input type="number" value={editing.annual_salary ?? 0} onChange={e => f("annual_salary", +e.target.value)} /></div>
+                <div className="space-y-1 col-span-2"><Label>Annual Salary ($)</Label><Input type="number" value={editing.annual_salary ?? 0} onChange={e => f("annual_salary", +e.target.value)} /></div>
               )}
-              <div className="space-y-1"><Label>{t("bonuses")}</Label><Input type="number" value={editing.bonuses ?? 0} onChange={e => f("bonuses", +e.target.value)} /></div>
+              <div className="space-y-1"><Label>Bonuses ($)</Label><Input type="number" value={editing.bonuses ?? 0} onChange={e => f("bonuses", +e.target.value)} /></div>
               <div className="space-y-1 flex items-center gap-2 pt-5">
                 <Switch checked={!!editing.is_overhead_staff} onCheckedChange={v => f("is_overhead_staff", v)} />
-                <Label>{t("overheadStaff")}</Label>
+                <Label>Overhead Staff</Label>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>{t("cancel")}</Button>
+            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
             <Button onClick={() => saveMut.mutate(editing)} disabled={saveMut.isPending}>
-              {saveMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} {t("save")}
+              {saveMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Save
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -497,10 +493,10 @@ function LaborTab({ budgetId, data, summary }: { budgetId: number; data: any; su
 
       <AlertDialog open={!!del.target} onOpenChange={o => { if (!o) del.clear(); }}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>{t("delete")} {del.target?.name}?</AlertDialogTitle><AlertDialogDescription>{t("cannotUndo")}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Delete {del.target?.name}?</AlertDialogTitle><AlertDialogDescription>This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => del.target && delMut.mutate(del.target.id)}>{t("delete")}</AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => del.target && delMut.mutate(del.target.id)}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -510,7 +506,6 @@ function LaborTab({ budgetId, data, summary }: { budgetId: number; data: any; su
 
 // ─── EQUIPMENT TAB ────────────────────────────────────────────────────────────
 function EquipmentTab({ budgetId, data, summary }: { budgetId: number; data: any; summary: Summary | undefined }) {
-  const { t } = useTranslation("morsBudget");
   const [subTab, setSubTab] = useState<"owned" | "leased">("owned");
   const ownedDetails  = summary?.equipment_owned_details  ?? data?.equipOwned  ?? [];
   const leasedDetails = summary?.equipment_leased_details ?? data?.equipLeased ?? [];
@@ -523,10 +518,10 @@ function EquipmentTab({ budgetId, data, summary }: { budgetId: number; data: any
       </div>
 
       <div className="flex gap-2 border-b">
-        {(["owned", "leased"] as const).map(tab => (
-          <button key={tab} onClick={() => setSubTab(tab)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${subTab === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-            {tab === "owned" ? `${t("ownedEquip")} (${data?.equipOwned?.length ?? 0})` : `${t("leasedEquip")} (${data?.equipLeased?.length ?? 0})`}
+        {(["owned", "leased"] as const).map(t => (
+          <button key={t} onClick={() => setSubTab(t)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${subTab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            {t === "owned" ? `Owned (${data?.equipOwned?.length ?? 0})` : `Leased (${data?.equipLeased?.length ?? 0})`}
           </button>
         ))}
       </div>
@@ -599,7 +594,6 @@ function EquipmentTab({ budgetId, data, summary }: { budgetId: number; data: any
 
 // ─── OVERHEAD TAB ─────────────────────────────────────────────────────────────
 function OverheadTab({ budgetId, data, summary }: { budgetId: number; data: any; summary: Summary | undefined }) {
-  const { t } = useTranslation("morsBudget");
   const { toast } = useToast();
   const qc = useQueryClient();
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
@@ -619,12 +613,12 @@ function OverheadTab({ budgetId, data, summary }: { budgetId: number; data: any;
       d.id
         ? apiRequest("PUT", `/api/mors/budgets/${budgetId}/overhead-items/${d.id}`, d)
         : apiRequest("POST", `/api/mors/budgets/${budgetId}/overhead-items`, d),
-    onSuccess: () => { invalidate(); setEditItem(null); toast({ title: t("saved") }); },
+    onSuccess: () => { invalidate(); setEditItem(null); toast({ title: "Saved" }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
   const delItemMut = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/mors/budgets/${budgetId}/overhead-items/${id}`),
-    onSuccess: () => { invalidate(); del.clear(); toast({ title: t("deleted") }); },
+    onSuccess: () => { invalidate(); del.clear(); toast({ title: "Deleted" }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -703,7 +697,7 @@ function OverheadTab({ budgetId, data, summary }: { budgetId: number; data: any;
       {/* Edit/Add item modal */}
       <Dialog open={!!editItem} onOpenChange={o => { if (!o) setEditItem(null); }}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editItem?.id ? t("edit") : t("addItemBtn")} {t("overheadItem")}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editItem?.id ? "Edit" : "Add"} Overhead Item</DialogTitle></DialogHeader>
           {editItem && (
             <div className="space-y-3 py-1">
               <div className="space-y-1"><Label>Name</Label><Input value={editItem.name ?? ""} onChange={e => setEditItem({ ...editItem, name: e.target.value })} /></div>
@@ -745,9 +739,8 @@ function OverheadTab({ budgetId, data, summary }: { budgetId: number; data: any;
 
 // ─── SALES TAB ────────────────────────────────────────────────────────────────
 function SalesTab({ budgetId, data, summary }: { budgetId: number; data: any; summary: Summary | undefined }) {
-  const { t } = useTranslation("morsBudget");
   const targets: any[] = data?.salesTargets ?? [];
-  const totalTargets = targets.reduce((s, tgt) => s + parseFloat(tgt.annual_revenue_target || 0), 0);
+  const totalTargets = targets.reduce((s, t) => s + parseFloat(t.annual_revenue_target || 0), 0);
   const required = summary?.required_revenue ?? 0;
   const gap = totalTargets - required;
   const onTrack = totalTargets >= required;
@@ -759,15 +752,15 @@ function SalesTab({ budgetId, data, summary }: { budgetId: number; data: any; su
         <CardContent className="pt-4 pb-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("requiredRevenueMors")}</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Required Revenue (MORS)</p>
               <p className="text-3xl font-bold mt-1">{$(required)}</p>
-              <p className="text-sm text-muted-foreground mt-1">{t("atTargetMargin", { pct: pct(summary?.net_margin_pct) })}</p>
+              <p className="text-sm text-muted-foreground mt-1">at {pct(summary?.net_margin_pct)} target margin</p>
             </div>
             <div className="text-right">
-              <p className="text-xs font-medium text-muted-foreground">{t("totalSalesTargets")}</p>
+              <p className="text-xs font-medium text-muted-foreground">Total Sales Targets</p>
               <p className="text-2xl font-bold">{$(totalTargets)}</p>
               <p className={`text-sm font-semibold mt-1 ${onTrack ? "text-green-600" : "text-red-600"}`}>
-                {onTrack ? "▲" : "▼"} {$(Math.abs(gap))} {onTrack ? t("aboveRequired") : t("belowRequired")}
+                {onTrack ? "▲" : "▼"} {$(Math.abs(gap))} {onTrack ? "above" : "below"} required
               </p>
             </div>
           </div>
@@ -810,7 +803,6 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
 ];
 
 export default function MorsBudget() {
-  const { t } = useTranslation("morsBudget");
   const { toast } = useToast();
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -822,7 +814,7 @@ export default function MorsBudget() {
   useEffect(() => {
     if (user && user.role !== "Admin" && !(user as any).isMasterAdmin) {
       nav("/");
-      toast({ title: t("accessDenied"), description: t("accessDeniedDesc"), variant: "destructive" });
+      toast({ title: "Access denied", description: "MORS Budget is for Admins only.", variant: "destructive" });
     }
   }, [user]);
 
@@ -859,7 +851,7 @@ export default function MorsBudget() {
       <div className="w-52 shrink-0 border-r flex flex-col bg-muted/10">
         {/* Budget selector */}
         <div className="p-3 border-b">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">{t("budget")}</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Budget</p>
           <Select value={budgetId ? String(budgetId) : ""} onValueChange={v => setBudgetId(Number(v))}>
             <SelectTrigger className="h-8 text-sm" data-testid="budget-selector"><SelectValue placeholder="Select…" /></SelectTrigger>
             <SelectContent>
@@ -884,15 +876,15 @@ export default function MorsBudget() {
         {summary && (
           <div className="px-3 py-2 border-b space-y-1">
             <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">{t("requiredRev")}</span>
+              <span className="text-muted-foreground">Required Rev</span>
               <span className="font-semibold text-primary">{$(summary.required_revenue)}</span>
             </div>
             <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">{t("laborRate")}</span>
+              <span className="text-muted-foreground">Labor Rate</span>
               <span className="font-semibold">{$2(summary.display_labor_rate)}/hr</span>
             </div>
             <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">{t("netProfit")}</span>
+              <span className="text-muted-foreground">Net Profit</span>
               <span className="font-semibold text-green-600">{$(summary.net_profit)}</span>
             </div>
           </div>
@@ -909,7 +901,7 @@ export default function MorsBudget() {
                   : "hover:bg-muted text-muted-foreground hover:text-foreground"
               }`}>
               <tab.icon className="h-4 w-4" />
-              {t(tab.id)}
+              {tab.label}
             </button>
           ))}
         </nav>
@@ -921,15 +913,15 @@ export default function MorsBudget() {
         <div className="px-6 py-4 border-b bg-background flex items-center justify-between">
           <div>
             <h1 className="text-lg font-bold">
-              {budget?.name ?? "MORS Budget"} — {t(activeTab)}
+              {budget?.name ?? "MORS Budget"} — {TABS.find(t => t.id === activeTab)?.label}
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {t("laborRatePlan")}
+              Labor Rate, Overhead Recovery &amp; Sales Planning
             </p>
           </div>
           {budget && (
             <div className="text-right text-xs text-muted-foreground">
-              <div>{t("season")}: {budget.work_season_start} → {budget.work_season_end}</div>
+              <div>Season: {budget.work_season_start} → {budget.work_season_end}</div>
               <div>{budget.production_days} production days · {budget.working_days_per_week} days/week</div>
             </div>
           )}

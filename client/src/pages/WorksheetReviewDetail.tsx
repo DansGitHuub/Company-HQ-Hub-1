@@ -9,7 +9,6 @@ import {
   ArrowLeft, Loader2, PackageOpen, Receipt, StickyNote, Users,
   CheckCircle2, PenLine, ThumbsUp, RotateCcw,
 } from "lucide-react";
-import { useTranslation } from "react-i18next";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -57,9 +56,9 @@ function fmtDate(dateStr: string) {
 }
 
 function fmt(val: string | number | null | undefined) {
-  if (val === null || val === undefined) return "\u2014";
+  if (val === null || val === undefined) return "—";
   const n = typeof val === "string" ? parseFloat(val) : val;
-  if (isNaN(n)) return "\u2014";
+  if (isNaN(n)) return "—";
   return `$${n.toFixed(2)}`;
 }
 
@@ -99,7 +98,6 @@ function Section({
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function WorksheetReviewDetail() {
-  const { t } = useTranslation("worksheetDetail");
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -118,19 +116,24 @@ export default function WorksheetReviewDetail() {
       qc.invalidateQueries({ queryKey: ["/api/worksheets"] });
       qc.invalidateQueries({ queryKey: [`/api/worksheets/${id}`] });
       toast({
-        title: status === "approved" ? t("approved") : t("sentBack"),
-        description: status === "approved" ? t("approvedDesc") : t("sentBackDesc"),
+        title: status === "approved" ? "Worksheet approved" : "Sent back for revision",
+        description:
+          status === "approved"
+            ? "The worksheet has been marked as approved."
+            : "The worksheet has been returned to draft status.",
       });
       navigate("/worksheet-review");
     },
     onError: (err: any) => {
       toast({
-        title: t("actionFailed"),
+        title: "Action failed",
         description: err.message ?? "Something went wrong.",
         variant: "destructive",
       });
     },
   });
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   if (isLoading) {
     return (
@@ -143,7 +146,7 @@ export default function WorksheetReviewDetail() {
   if (error || !ws) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-10 text-center text-sm text-destructive">
-        {t("failedToLoad")}
+        Failed to load worksheet. Please go back and try again.
       </div>
     );
   }
@@ -167,13 +170,13 @@ export default function WorksheetReviewDetail() {
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        {t("backToReview")}
+        Back to Worksheet Review
       </button>
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Worksheet Detail</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{fmtDate(ws.date)}</p>
         </div>
         <Badge
@@ -190,21 +193,21 @@ export default function WorksheetReviewDetail() {
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
             <p className="text-xl font-bold">{fmt(materialsTotalRaw)}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{t("materialsTotal")}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Materials Total</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
             <p className="text-xl font-bold">{fmt(expensesTotalRaw)}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{t("expensesTotal")}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Expenses Total</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Materials */}
-      <Section icon={PackageOpen} title={t("materialsUsed")} color="#10b981" count={ws.materials.length}>
+      <Section icon={PackageOpen} title="Materials Used" color="#10b981" count={ws.materials.length}>
         {ws.materials.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("noMaterials")}</p>
+          <p className="text-sm text-muted-foreground">No materials recorded.</p>
         ) : (
           <ul className="space-y-2">
             {ws.materials.map((m) => (
@@ -214,10 +217,10 @@ export default function WorksheetReviewDetail() {
                 className="flex items-start justify-between text-sm"
               >
                 <div>
-                  <span className="font-medium">{m.material_name ?? "\u2014"}</span>
+                  <span className="font-medium">{m.material_name ?? "—"}</span>
                   {m.quantity && (
                     <span className="text-muted-foreground ml-2">
-                      &times; {m.quantity} {m.unit ?? ""}
+                      × {m.quantity} {m.unit ?? ""}
                     </span>
                   )}
                   {m.notes && (
@@ -226,7 +229,7 @@ export default function WorksheetReviewDetail() {
                 </div>
                 {m.unit_cost && (
                   <span className="text-muted-foreground ml-4 whitespace-nowrap">
-                    {fmt(m.unit_cost)} / {t("perUnit")}
+                    {fmt(m.unit_cost)} / unit
                   </span>
                 )}
               </li>
@@ -236,9 +239,9 @@ export default function WorksheetReviewDetail() {
       </Section>
 
       {/* Expenses */}
-      <Section icon={Receipt} title={t("expenses")} color="#f97316" count={ws.expenses.length}>
+      <Section icon={Receipt} title="Expenses" color="#f97316" count={ws.expenses.length}>
         {ws.expenses.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("noExpenses")}</p>
+          <p className="text-sm text-muted-foreground">No expenses recorded.</p>
         ) : (
           <ul className="space-y-2">
             {ws.expenses.map((e) => (
@@ -248,7 +251,7 @@ export default function WorksheetReviewDetail() {
                 className="flex items-start justify-between text-sm"
               >
                 <div>
-                  <span className="font-medium">{e.description ?? "\u2014"}</span>
+                  <span className="font-medium">{e.description ?? "—"}</span>
                   {e.category && (
                     <span className="text-muted-foreground ml-2">({e.category})</span>
                   )}
@@ -263,9 +266,9 @@ export default function WorksheetReviewDetail() {
       </Section>
 
       {/* Team */}
-      <Section icon={Users} title={t("teamMembers")} color="#3b82f6" count={ws.teamMembers.length}>
+      <Section icon={Users} title="Team Members" color="#3b82f6" count={ws.teamMembers.length}>
         {ws.teamMembers.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("noTeam")}</p>
+          <p className="text-sm text-muted-foreground">No team members listed.</p>
         ) : (
           <ul className="space-y-1">
             {ws.teamMembers.map((tm) => (
@@ -282,16 +285,16 @@ export default function WorksheetReviewDetail() {
       </Section>
 
       {/* Notes */}
-      <Section icon={StickyNote} title={t("notes")} color="#eab308">
+      <Section icon={StickyNote} title="Notes" color="#eab308">
         {ws.notes ? (
           <p className="text-sm whitespace-pre-wrap">{ws.notes}</p>
         ) : (
-          <p className="text-sm text-muted-foreground">{t("noNotes")}</p>
+          <p className="text-sm text-muted-foreground">No notes added.</p>
         )}
       </Section>
 
       {/* Signature */}
-      <Section icon={PenLine} title={t("signature")} color="#8b5cf6">
+      <Section icon={PenLine} title="Signature" color="#8b5cf6">
         {ws.signature_url ? (
           <div className="border rounded-lg overflow-hidden bg-white">
             <img
@@ -302,7 +305,7 @@ export default function WorksheetReviewDetail() {
             />
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">{t("noSignature")}</p>
+          <p className="text-sm text-muted-foreground">No signature captured.</p>
         )}
       </Section>
 
@@ -319,7 +322,7 @@ export default function WorksheetReviewDetail() {
           ) : (
             <ThumbsUp className="h-4 w-4" />
           )}
-          {t("approve")}
+          Approve
         </Button>
         <Button
           data-testid="button-send-back"
@@ -333,7 +336,7 @@ export default function WorksheetReviewDetail() {
           ) : (
             <RotateCcw className="h-4 w-4" />
           )}
-          {t("sendBack")}
+          Send Back
         </Button>
       </div>
     </div>

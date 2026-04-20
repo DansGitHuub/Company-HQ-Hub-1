@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,7 +25,6 @@ interface Customer {
 }
 
 export default function CustomerList() {
-  const { t } = useTranslation("customers");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -63,20 +61,20 @@ export default function CustomerList() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Customers</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {customers.length}
+            {customers.length} customer{customers.length !== 1 ? "s" : ""} total
           </p>
         </div>
         <Button className="bg-green-600 hover:bg-green-700 text-white"
           onClick={openAdd} data-testid="button-add-customer">
-          <Plus className="h-4 w-4 mr-2" /> {t("addCustomer")}
+          <Plus className="h-4 w-4 mr-2" /> Add Customer
         </Button>
       </div>
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder={t("searchPlaceholder")} value={search}
+        <Input placeholder="Search customers..." value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9" data-testid="input-search-customers" />
       </div>
@@ -85,29 +83,29 @@ export default function CustomerList() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
-              {t("loading", { ns: "common" })}
+              Loading customers...
             </div>
           ) : customers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
               <Users className="h-10 w-10 text-muted-foreground/40" />
               <p className="text-sm font-medium text-muted-foreground">
-                {t("noCustomers")}
+                No customers yet. Add your first customer.
               </p>
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
-              {t("noCustomers")}
+              No customers match your search.
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t("name")}</TableHead>
-                  <TableHead>{t("company")}</TableHead>
-                  <TableHead>{t("phone")}</TableHead>
-                  <TableHead>{t("email")}</TableHead>
-                  <TableHead>{t("address")}</TableHead>
-                  <TableHead>{t("date", { ns: "common" })}</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Date Added</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -138,7 +136,7 @@ export default function CustomerList() {
                     <TableCell>
                       <button onClick={(e) => openEdit(e, customer)}
                         className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                        data-testid={`button-edit-customer-${customer.id}`} title={t("editCustomer")}>
+                        data-testid={`button-edit-customer-${customer.id}`} title="Edit customer">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                     </TableCell>

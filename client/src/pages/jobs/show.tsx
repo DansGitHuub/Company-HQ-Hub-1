@@ -27,7 +27,6 @@ import {
 import { format, parseISO } from "date-fns";
 import { JobFormModal, JOB_STATUSES } from "./JobFormModal";
 import { useAuth } from "@/hooks/use-auth";
-import { useTranslation } from "react-i18next";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TimeEntry {
@@ -66,6 +65,7 @@ function fmtDate(d: string | null) {
 }
 function fmtTime(t: string | null) {
   if (!t) return null;
+  // t is a TIME string like "08:00:00"
   const [h, m] = t.split(":");
   const hour = parseInt(h);
   const ampm = hour >= 12 ? "PM" : "AM";
@@ -121,15 +121,14 @@ interface InvoiceSummary {
 }
 
 function JobMessagesTab({ jobId }: { jobId: string }) {
-  const { t } = useTranslation("jobShow");
   const { data: msgs = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/dm/by-job", jobId],
     queryFn: () => fetch(`/api/dm/by-job/${jobId}`, { credentials: "include" }).then(r => r.json()),
   });
-  if (isLoading) return <p className="text-sm text-muted-foreground py-4 text-center">{t("common:loading", "Loading")}&hellip;</p>;
+  if (isLoading) return <p className="text-sm text-muted-foreground py-4 text-center">Loading…</p>;
   if (msgs.length === 0) return (
     <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
-      {t("noMessagesLinked")}
+      No messages linked to this job yet. Open a conversation in Messages and link it to this job.
     </CardContent></Card>
   );
   return (
@@ -142,7 +141,7 @@ function JobMessagesTab({ jobId }: { jobId: string }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className="text-xs font-medium">{m.sender_name}</span>
-                  <span className="text-xs text-muted-foreground">&rarr;</span>
+                  <span className="text-xs text-muted-foreground">→</span>
                   <span className="text-xs font-medium">{m.recipient_name}</span>
                   <span className="text-xs text-muted-foreground ml-auto">
                     {new Date(m.sent_at).toLocaleDateString()}
@@ -160,7 +159,6 @@ function JobMessagesTab({ jobId }: { jobId: string }) {
 }
 
 function JobInvoicesTab({ jobId }: { jobId: string }) {
-  const { t } = useTranslation("jobShow");
   const [, nav] = useLocation();
   const { data: invoices = [], isLoading } = useQuery<InvoiceSummary[]>({
     queryKey: ["/api/invoices", "job", jobId],
@@ -171,35 +169,35 @@ function JobInvoicesTab({ jobId }: { jobId: string }) {
     },
   });
 
-  const fmtMoneyLocal = (v: any) => `$${parseFloat(v ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-  const fmtDateLocal = (d: string | null) => { if (!d) return "—"; try { return format(parseISO(d), "MMM d, yyyy"); } catch { return d; } };
+  const fmtMoney = (v: any) => `$${parseFloat(v ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+  const fmtDate = (d: string | null) => { if (!d) return "—"; try { return format(parseISO(d), "MMM d, yyyy"); } catch { return d; } };
 
   if (isLoading) return <div className="py-12 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
   return (
     <Card>
       <CardHeader className="pb-3 pt-4 flex flex-row items-center justify-between">
-        <CardTitle className="text-sm">{t("tabInvoices")}</CardTitle>
+        <CardTitle className="text-sm">Invoices</CardTitle>
         <Button size="sm" variant="outline" onClick={() => nav("/invoices")} className="text-xs h-7 px-2">
-          <FileText className="h-3.5 w-3.5 mr-1" /> {t("allInvoices")}
+          <FileText className="h-3.5 w-3.5 mr-1" /> All Invoices
         </Button>
       </CardHeader>
       <CardContent className="pb-4 px-0">
         {invoices.length === 0 ? (
           <div className="py-12 text-center text-muted-foreground">
             <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            <p className="text-sm">{t("noInvoices")}</p>
+            <p className="text-sm">No invoices linked to this job yet.</p>
           </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="pl-6">{t("invoiceNum")}</TableHead>
-                <TableHead>{t("status")}</TableHead>
-                <TableHead>{t("issued")}</TableHead>
-                <TableHead>{t("due")}</TableHead>
-                <TableHead className="text-right">{t("total")}</TableHead>
-                <TableHead className="text-right pr-6">{t("balance")}</TableHead>
+                <TableHead className="pl-6">Invoice #</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Issued</TableHead>
+                <TableHead>Due</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right pr-6">Balance</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -212,11 +210,11 @@ function JobInvoicesTab({ jobId }: { jobId: string }) {
                       {inv.status.replace(/_/g, " ")}
                     </span>
                   </TableCell>
-                  <TableCell className="text-sm">{fmtDateLocal(inv.issued_date)}</TableCell>
-                  <TableCell className="text-sm">{fmtDateLocal(inv.due_date)}</TableCell>
-                  <TableCell className="text-right text-sm">{fmtMoneyLocal(inv.total)}</TableCell>
+                  <TableCell className="text-sm">{fmtDate(inv.issued_date)}</TableCell>
+                  <TableCell className="text-sm">{fmtDate(inv.due_date)}</TableCell>
+                  <TableCell className="text-right text-sm">{fmtMoney(inv.total)}</TableCell>
                   <TableCell className={`text-right text-sm font-medium pr-6 ${parseFloat(inv.balance_due) > 0 ? "text-red-600" : "text-green-600"}`}>
-                    {fmtMoneyLocal(inv.balance_due)}
+                    {fmtMoney(inv.balance_due)}
                   </TableCell>
                 </TableRow>
               ))}
@@ -230,7 +228,6 @@ function JobInvoicesTab({ jobId }: { jobId: string }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function JobDetailPage() {
-  const { t } = useTranslation("jobShow");
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -295,7 +292,7 @@ export default function JobDetailPage() {
       setShowAddArea(false);
       setAddAreaTypeId("");
       setAddAreaHours("");
-      toast({ title: t("workAreaAdded") });
+      toast({ title: "Work area added" });
     },
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
@@ -305,7 +302,7 @@ export default function JobDetailPage() {
       const res = await apiRequest("DELETE", `/api/job-work-areas/${areaId}`);
       if (!res.ok) throw new Error("Failed to delete");
     },
-    onSuccess: () => { refetchAreas(); toast({ title: t("workAreaRemoved") }); },
+    onSuccess: () => { refetchAreas(); toast({ title: "Work area removed" }); },
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
 
@@ -318,7 +315,7 @@ export default function JobDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
-      toast({ title: t("statusUpdated") });
+      toast({ title: "Status updated" });
     },
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
@@ -329,9 +326,9 @@ export default function JobDetailPage() {
     try {
       await apiRequest("PATCH", `/api/jobs/${id}`, { crew_notes: crewNotes, notes: crewNotes });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", id] });
-      toast({ title: t("notesSaved") });
+      toast({ title: "Notes saved" });
     } catch {
-      toast({ title: t("notesFailedSave"), variant: "destructive" });
+      toast({ title: "Failed to save notes", variant: "destructive" });
     } finally {
       setSavingNotes(false);
     }
@@ -341,7 +338,7 @@ export default function JobDetailPage() {
     return <div className="p-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
   if (error || !job) {
-    return <div className="p-8 text-center text-muted-foreground">{t("notFound")}</div>;
+    return <div className="p-8 text-center text-muted-foreground">Job not found.</div>;
   }
 
   const status = job.status || "lead";
@@ -358,14 +355,14 @@ export default function JobDetailPage() {
       <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="sm" onClick={() => navigate("/jobs")} className="text-muted-foreground"
           data-testid="button-back">
-          <ChevronLeft className="h-4 w-4 mr-1" /> {t("backToJobs")}
+          <ChevronLeft className="h-4 w-4 mr-1" /> Jobs
         </Button>
         <div className="flex-1">
           <h1 className="text-xl font-bold">{job.title || job.client}</h1>
         </div>
         {isAdminOrManager && (
           <Button variant="outline" size="sm" onClick={() => setShowEdit(true)} data-testid="button-edit-job">
-            <Pencil className="h-4 w-4 mr-1.5" /> {t("editJob")}
+            <Pencil className="h-4 w-4 mr-1.5" /> Edit Job
           </Button>
         )}
       </div>
@@ -377,7 +374,7 @@ export default function JobDetailPage() {
             <CardContent className="pt-5 pb-4">
               {/* Status — big, clickable */}
               <div className="mb-4">
-                <p className="text-xs text-muted-foreground font-medium mb-2">{t("status")}</p>
+                <p className="text-xs text-muted-foreground font-medium mb-2">Status</p>
                 {isAdminOrManager ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -412,22 +409,22 @@ export default function JobDetailPage() {
 
               {/* Info rows */}
               <InfoRow
-                icon={User} label={t("customer")} value={custName}
+                icon={User} label="Customer" value={custName}
                 href={job.customer_id ? `/customers/${job.customer_id}` : undefined}
               />
-              {propAddr && <InfoRow icon={MapPin} label={t("property")} value={propAddr} />}
-              <InfoRow icon={Briefcase} label={t("jobType")} value={job.job_type || job.type} />
+              {propAddr && <InfoRow icon={MapPin} label="Property" value={propAddr} />}
+              <InfoRow icon={Briefcase} label="Job Type" value={job.job_type || job.type} />
               <InfoRow
-                icon={Calendar} label={t("scheduled")}
+                icon={Calendar} label="Scheduled"
                 value={fmtDate(job.scheduled_date) ?? undefined}
               />
               {(job.scheduled_start_time || job.scheduled_end_time) && (
                 <InfoRow
-                  icon={Clock} label={t("time")}
-                  value={[fmtTime(job.scheduled_start_time), fmtTime(job.scheduled_end_time)].filter(Boolean).join(" \u2013 ")}
+                  icon={Clock} label="Time"
+                  value={[fmtTime(job.scheduled_start_time), fmtTime(job.scheduled_end_time)].filter(Boolean).join(" – ")}
                 />
               )}
-              <InfoRow icon={DollarSign} label={t("price")} value={fmtMoney(job.price ?? job.value) ?? undefined} />
+              <InfoRow icon={DollarSign} label="Price" value={fmtMoney(job.price ?? job.value) ?? undefined} />
             </CardContent>
           </Card>
 
@@ -435,7 +432,7 @@ export default function JobDetailPage() {
           {(job.crew_notes || job.notes) && (
             <Card>
               <CardHeader className="pb-2 pt-4 px-4">
-                <CardTitle className="text-sm text-muted-foreground font-medium">{t("crewNotes")}</CardTitle>
+                <CardTitle className="text-sm text-muted-foreground font-medium">Crew Notes</CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4">
                 <p className="text-sm whitespace-pre-wrap">{job.crew_notes || job.notes}</p>
@@ -448,19 +445,19 @@ export default function JobDetailPage() {
             <CardHeader className="pb-2 pt-4 px-4 flex flex-row items-center justify-between">
               <div className="flex items-center gap-2">
                 <HardHat className="h-4 w-4 text-muted-foreground" />
-                <CardTitle className="text-sm">{t("workAreas")}</CardTitle>
+                <CardTitle className="text-sm">Work Areas</CardTitle>
               </div>
               {isAdminOrManager && (
                 <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
                   onClick={() => setShowAddArea(true)} data-testid="button-add-work-area">
-                  <Plus className="h-3.5 w-3.5 mr-1" /> {t("add")}
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add
                 </Button>
               )}
             </CardHeader>
             <CardContent className="px-4 pb-4">
               {jobWorkAreas.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-4">
-                  {t("noWorkAreas")}
+                  No work areas yet. Add scopes of work for this job.
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -508,12 +505,12 @@ export default function JobDetailPage() {
         {/* ── Right Column ─────────────────────────────────────────────────── */}
         <Tabs defaultValue="overview">
           <TabsList className="mb-4">
-            <TabsTrigger value="overview">{t("tabOverview")}</TabsTrigger>
-            <TabsTrigger value="time">{t("tabTime")}</TabsTrigger>
-            <TabsTrigger value="notes">{t("tabNotes")}</TabsTrigger>
-            <TabsTrigger value="invoices">{t("tabInvoices")}</TabsTrigger>
-            <TabsTrigger value="messages" data-testid="tab-messages">{t("tabMessages")}</TabsTrigger>
-            <TabsTrigger value="activity">{t("tabActivity")}</TabsTrigger>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="time">Time Entries</TabsTrigger>
+            <TabsTrigger value="notes">Notes</TabsTrigger>
+            <TabsTrigger value="invoices">Invoices</TabsTrigger>
+            <TabsTrigger value="messages" data-testid="tab-messages">Messages</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -523,7 +520,7 @@ export default function JobDetailPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 text-muted-foreground mb-1">
                     <Timer className="h-4 w-4" />
-                    <span className="text-xs font-medium uppercase tracking-wide">{t("estimatedHours")}</span>
+                    <span className="text-xs font-medium uppercase tracking-wide">Estimated Hours</span>
                   </div>
                   <p className="text-2xl font-bold" data-testid="stat-est-hours">
                     {estimatedHours != null ? `${estimatedHours}h` : "—"}
@@ -534,7 +531,7 @@ export default function JobDetailPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 text-muted-foreground mb-1">
                     <Clock className="h-4 w-4" />
-                    <span className="text-xs font-medium uppercase tracking-wide">{t("actualHours")}</span>
+                    <span className="text-xs font-medium uppercase tracking-wide">Actual Hours</span>
                   </div>
                   <p className="text-2xl font-bold" data-testid="stat-actual-hours">
                     {actualHours > 0 ? `${actualHours.toFixed(1)}h` : "—"}
@@ -542,8 +539,8 @@ export default function JobDetailPage() {
                   {estimatedHours && actualHours > 0 && (
                     <p className={`text-xs mt-1 ${actualHours > estimatedHours ? "text-red-500" : "text-green-600"}`}>
                       {actualHours > estimatedHours
-                        ? `${(actualHours - estimatedHours).toFixed(1)}${t("over")}`
-                        : `${(estimatedHours - actualHours).toFixed(1)}${t("remaining")}`}
+                        ? `${(actualHours - estimatedHours).toFixed(1)}h over`
+                        : `${(estimatedHours - actualHours).toFixed(1)}h remaining`}
                     </p>
                   )}
                 </CardContent>
@@ -552,7 +549,7 @@ export default function JobDetailPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 text-muted-foreground mb-1">
                     <DollarSign className="h-4 w-4" />
-                    <span className="text-xs font-medium uppercase tracking-wide">{t("jobValue")}</span>
+                    <span className="text-xs font-medium uppercase tracking-wide">Job Value</span>
                   </div>
                   <p className="text-2xl font-bold" data-testid="stat-price">
                     {fmtMoney(job.price ?? job.value) ?? "—"}
@@ -563,7 +560,7 @@ export default function JobDetailPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 text-muted-foreground mb-1">
                     <Briefcase className="h-4 w-4" />
-                    <span className="text-xs font-medium uppercase tracking-wide">{t("timeEntries")}</span>
+                    <span className="text-xs font-medium uppercase tracking-wide">Time Entries</span>
                   </div>
                   <p className="text-2xl font-bold" data-testid="stat-entries-count">
                     {job.time_entries.length}
@@ -575,7 +572,7 @@ export default function JobDetailPage() {
             {job.description && (
               <Card className="mt-4">
                 <CardHeader className="pb-2 pt-4">
-                  <CardTitle className="text-sm">{t("scopeOfWork")}</CardTitle>
+                  <CardTitle className="text-sm">Scope of Work</CardTitle>
                 </CardHeader>
                 <CardContent className="pb-4">
                   <p className="text-sm whitespace-pre-wrap text-muted-foreground">{job.description}</p>
@@ -591,20 +588,20 @@ export default function JobDetailPage() {
                 {job.time_entries.length === 0 ? (
                   <div className="py-12 text-center">
                     <Clock className="h-8 w-8 mx-auto mb-2 text-muted-foreground/30" />
-                    <p className="text-sm text-muted-foreground">{t("noTimeEntries")}</p>
+                    <p className="text-sm text-muted-foreground">No time entries linked to this job yet.</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {t("clockInHint")}
+                      Use the Clock In widget and select this job to start tracking.
                     </p>
                   </div>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>{t("employee")}</TableHead>
-                        <TableHead>{t("clockIn")}</TableHead>
-                        <TableHead>{t("clockOut")}</TableHead>
-                        <TableHead>{t("duration")}</TableHead>
-                        <TableHead>{t("type")}</TableHead>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Clock In</TableHead>
+                        <TableHead>Clock Out</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead>Type</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -618,7 +615,7 @@ export default function JobDetailPage() {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {te.clock_out ? format(parseISO(te.clock_out), "MMM d, h:mm a") : (
-                              <span className="text-green-600 dark:text-green-400 font-medium">{t("active")}</span>
+                              <span className="text-green-600 dark:text-green-400 font-medium">Active</span>
                             )}
                           </TableCell>
                           <TableCell className="text-sm font-medium">
@@ -640,14 +637,14 @@ export default function JobDetailPage() {
           <TabsContent value="notes">
             <Card>
               <CardHeader className="pb-2 pt-4">
-                <CardTitle className="text-sm">{t("crewNotes")}</CardTitle>
+                <CardTitle className="text-sm">Crew Notes</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Textarea
                   value={crewNotes ?? ""}
                   onChange={(e) => setCrewNotes(e.target.value)}
                   rows={8}
-                  placeholder={`${t("crewNotesPlaceholder")}\u2026`}
+                  placeholder="Add internal crew notes here…"
                   className="resize-none"
                   data-testid="textarea-crew-notes"
                   readOnly={!isAdminOrManager}
@@ -655,7 +652,7 @@ export default function JobDetailPage() {
                 {isAdminOrManager && (
                   <Button size="sm" onClick={saveNotes} disabled={savingNotes} data-testid="button-save-notes">
                     {savingNotes ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-                    {t("saveNotes")}
+                    Save Notes
                   </Button>
                 )}
               </CardContent>
@@ -679,7 +676,7 @@ export default function JobDetailPage() {
                 <div className="flex items-start gap-3">
                   <div className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
                   <div>
-                    <p className="text-sm font-medium">{t("jobCreated")}</p>
+                    <p className="text-sm font-medium">Job created</p>
                     <p className="text-xs text-muted-foreground">
                       {job.created_at ? format(parseISO(job.created_at), "MMM d, yyyy 'at' h:mm a") : "—"}
                     </p>
@@ -689,7 +686,7 @@ export default function JobDetailPage() {
                   <div className="flex items-start gap-3">
                     <div className="h-2 w-2 rounded-full bg-muted-foreground mt-2 flex-shrink-0" />
                     <div>
-                      <p className="text-sm font-medium">{t("lastUpdated")}</p>
+                      <p className="text-sm font-medium">Last updated</p>
                       <p className="text-xs text-muted-foreground">
                         {format(parseISO(job.updated_at), "MMM d, yyyy 'at' h:mm a")}
                       </p>
@@ -700,12 +697,12 @@ export default function JobDetailPage() {
                   <div className={`h-2 w-2 rounded-full mt-2 flex-shrink-0 ${STATUS_MAP[status]?.dot ?? "bg-muted"}`} />
                   <div>
                     <p className="text-sm font-medium">
-                      {t("currentStatus")} <span className="font-semibold">{STATUS_MAP[status]?.label ?? status}</span>
+                      Current status: <span className="font-semibold">{STATUS_MAP[status]?.label ?? status}</span>
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {status === "completed" && job.completion_date
-                        ? `${t("completedOn")} ${fmtDate(job.completion_date)}`
-                        : t("setViaStatus")}
+                        ? `Completed on ${fmtDate(job.completion_date)}`
+                        : "Set via status control"}
                     </p>
                   </div>
                 </div>
@@ -719,35 +716,35 @@ export default function JobDetailPage() {
       <Dialog open={showAddArea} onOpenChange={(o) => { if (!o) { setShowAddArea(false); setAddAreaTypeId(""); setAddAreaHours(""); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{t("addWorkAreaDialog")}</DialogTitle>
+            <DialogTitle>Add Work Area</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-1">
             <div className="space-y-1">
-              <Label className="text-xs">{t("workAreaType")}</Label>
+              <Label className="text-xs">Work Area Type</Label>
               <select
                 value={addAreaTypeId}
                 onChange={(e) => setAddAreaTypeId(e.target.value)}
                 className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 data-testid="select-add-area-type"
               >
-                <option value="">{t("selectType")}&hellip;</option>
+                <option value="">Select type…</option>
                 {Object.entries(
-                  workAreaTypes.reduce<Record<string, typeof workAreaTypes>>((acc, wt) => {
-                    const div = wt.division ?? "Other";
-                    (acc[div] = acc[div] ?? []).push(wt);
+                  workAreaTypes.reduce<Record<string, typeof workAreaTypes>>((acc, t) => {
+                    const div = t.division ?? "Other";
+                    (acc[div] = acc[div] ?? []).push(t);
                     return acc;
                   }, {})
                 ).map(([div, types]) => (
                   <optgroup key={div} label={div}>
-                    {types.map((wt) => (
-                      <option key={wt.id} value={wt.id}>{wt.name}</option>
+                    {types.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
                   </optgroup>
                 ))}
               </select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">{t("estimatedHoursOptional")}</Label>
+              <Label className="text-xs">Estimated Hours <span className="text-muted-foreground">(optional)</span></Label>
               <Input
                 type="number"
                 step="0.5"
@@ -760,10 +757,10 @@ export default function JobDetailPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddArea(false)}>{t("common:cancel", "Cancel")}</Button>
+            <Button variant="outline" onClick={() => setShowAddArea(false)}>Cancel</Button>
             <Button onClick={() => addAreaMutation.mutate()} disabled={addAreaMutation.isPending || !addAreaTypeId}>
               {addAreaMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-              {t("addWorkAreaDialog")}
+              Add Work Area
             </Button>
           </DialogFooter>
         </DialogContent>

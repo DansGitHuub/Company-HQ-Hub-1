@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useTranslation } from "react-i18next";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -75,7 +74,6 @@ function fmt(n: number) {
 }
 
 export default function CatalogDetail() {
-  const { t } = useTranslation("catalogDetail");
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -117,8 +115,8 @@ export default function CatalogDetail() {
         units: form?.units ?? "",
       }).then(r => r.json());
     },
-    onSuccess: () => { setShowEstimateDialog(false); toast({ title: t("addedToEstimate") }); },
-    onError: () => toast({ title: t("failedToAdd"), variant: "destructive" }),
+    onSuccess: () => { setShowEstimateDialog(false); toast({ title: "Added to estimate" }); },
+    onError: () => toast({ title: "Failed to add", variant: "destructive" }),
   });
 
   const { data: item, isLoading, isError } = useQuery<CatalogItemDetail>({
@@ -184,7 +182,7 @@ export default function CatalogDetail() {
       const { tags, ...body } = data as CatalogItemDetail;
       const payload = {
         ...body,
-        tags: (tags ?? []).map(tag => tag.name),
+        tags: (tags ?? []).map(t => t.name),
       };
       const res = await apiRequest("PUT", `/api/catalog/${id}`, payload);
       return res.json();
@@ -194,9 +192,9 @@ export default function CatalogDetail() {
       setDirty(false);
       queryClient.invalidateQueries({ queryKey: ["/api/catalog", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/catalog"] });
-      toast({ title: t("itemSaved") });
+      toast({ title: "Item saved" });
     },
-    onError: () => toast({ title: t("saveFailed"), variant: "destructive" }),
+    onError: () => toast({ title: "Save failed", variant: "destructive" }),
   });
 
   const deleteMut = useMutation({
@@ -206,10 +204,10 @@ export default function CatalogDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/catalog"] });
-      toast({ title: t("itemDeactivated") });
+      toast({ title: "Item deactivated" });
       navigate("/catalog");
     },
-    onError: () => toast({ title: t("deleteFailed"), variant: "destructive" }),
+    onError: () => toast({ title: "Delete failed", variant: "destructive" }),
   });
 
   const duplicateMut = useMutation({
@@ -223,7 +221,7 @@ export default function CatalogDetail() {
       setShowDuplicateDialog(false);
       navigate(`/catalog/${newId}?fresh=1`);
     },
-    onError: () => toast({ title: t("duplicateFailed"), variant: "destructive" }),
+    onError: () => toast({ title: "Duplicate failed", variant: "destructive" }),
   });
 
   function field<K extends keyof CatalogItemDetail>(key: K, value: CatalogItemDetail[K]) {
@@ -262,9 +260,9 @@ export default function CatalogDetail() {
       const data = await res.json();
       setForm(f => f ? { ...f, imageUrl: data.image_url } : f);
       queryClient.invalidateQueries({ queryKey: ["/api/catalog", id] });
-      toast({ title: t("photoUpdated") });
+      toast({ title: "Primary photo updated" });
     } catch {
-      toast({ title: t("photoFailed"), variant: "destructive" });
+      toast({ title: "Photo upload failed", variant: "destructive" });
     } finally {
       setUploadingPrimary(false);
     }
@@ -326,7 +324,7 @@ export default function CatalogDetail() {
         body: JSON.stringify({ type, option, hidden: newHidden }),
       });
       if (!res.ok) throw new Error("Failed");
-      toast({ title: newHidden ? t("photoHidden") : t("photoVisible") });
+      toast({ title: newHidden ? "Photo hidden from estimates" : "Photo visible in estimates" });
       queryClient.invalidateQueries({ queryKey: ["/api/catalog", id] });
     } catch {
       if (type === "primary") {
@@ -334,7 +332,7 @@ export default function CatalogDetail() {
       } else {
         setForm(f => f ? { ...f, optionImagesHidden: { ...(f.optionImagesHidden ?? {}), [option!]: currentHidden } } : f);
       }
-      toast({ title: t("failedVisibility"), variant: "destructive" });
+      toast({ title: "Failed to update visibility", variant: "destructive" });
     }
   }
 
@@ -353,9 +351,9 @@ export default function CatalogDetail() {
   if (isError || !form) {
     return (
       <div className="p-6 max-w-3xl mx-auto text-center space-y-4">
-        <p className="text-muted-foreground">{t("itemNotFound")}</p>
+        <p className="text-muted-foreground">Item not found.</p>
         <Button variant="outline" onClick={() => navigate("/catalog")} data-testid="btn-back-not-found">
-          <ArrowLeft className="w-4 h-4 mr-2" /> {t("backToCatalog")}
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back to Catalog
         </Button>
       </div>
     );
@@ -394,7 +392,7 @@ export default function CatalogDetail() {
         </div>
         <div className="flex items-center gap-2">
           {dirty && (
-            <Badge variant="secondary" className="text-xs">{t("unsavedChanges")}</Badge>
+            <Badge variant="secondary" className="text-xs">Unsaved changes</Badge>
           )}
           <Button
             variant="outline"
@@ -402,7 +400,7 @@ export default function CatalogDetail() {
             onClick={() => setShowDuplicateDialog(true)}
             data-testid="btn-duplicate"
           >
-            <Copy className="w-4 h-4 mr-1.5" /> {t("duplicate")}
+            <Copy className="w-4 h-4 mr-1.5" /> Duplicate
           </Button>
           <Button
             onClick={() => saveMut.mutate(form as CatalogItemDetail)}
@@ -410,26 +408,26 @@ export default function CatalogDetail() {
             data-testid="btn-save"
           >
             <Save className="w-4 h-4 mr-2" />
-            {saveMut.isPending ? t("saving") : t("save")}
+            {saveMut.isPending ? "Saving…" : "Save"}
           </Button>
           <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
             <DialogContent className="max-w-sm">
               <DialogHeader>
-                <DialogTitle>{t("duplicateTitle")}</DialogTitle>
+                <DialogTitle>Duplicate this item?</DialogTitle>
                 <DialogDescription>
-                  {t("duplicateDesc")}
+                  A copy will be created and you'll be taken to it to set a unique name before saving.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button variant="outline" onClick={() => setShowDuplicateDialog(false)} data-testid="btn-duplicate-cancel">
-                  {t("cancel")}
+                  Cancel
                 </Button>
                 <Button
                   onClick={() => duplicateMut.mutate()}
                   disabled={duplicateMut.isPending}
                   data-testid="btn-duplicate-confirm"
                 >
-                  {duplicateMut.isPending ? t("duplicating") : t("duplicate")}
+                  {duplicateMut.isPending ? "Duplicating…" : "Duplicate"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -442,19 +440,19 @@ export default function CatalogDetail() {
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>{t("deactivateItem")}</AlertDialogTitle>
+                <AlertDialogTitle>Deactivate item?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {t("deactivateDesc")}
+                  This will mark <strong>{form.name}</strong> as inactive. It will no longer appear in the active catalog.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel data-testid="btn-delete-cancel">{t("cancel")}</AlertDialogCancel>
+                <AlertDialogCancel data-testid="btn-delete-cancel">Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => deleteMut.mutate()}
                   className="bg-destructive hover:bg-destructive/90"
                   data-testid="btn-delete-confirm"
                 >
-                  {t("deactivate")}
+                  Deactivate
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -463,11 +461,11 @@ export default function CatalogDetail() {
         <Dialog open={showEstimateDialog} onOpenChange={setShowEstimateDialog}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>{t("addToEstimate")}</DialogTitle>
-              <DialogDescription>{t("selectEstimate")}</DialogDescription>
+              <DialogTitle>Add to Estimate</DialogTitle>
+              <DialogDescription>Select an estimate to add this item to.</DialogDescription>
             </DialogHeader>
             <div className="space-y-2 max-h-64 overflow-y-auto py-2">
-              {estimates.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t("noEstimates")}</p>}
+              {estimates.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No estimates found.</p>}
               {estimates.map((est: any) => (
                 <button key={est.id} className="w-full text-left px-3 py-2 rounded-md border hover:bg-muted text-sm"
                   onClick={() => addToEstimateMut.mutate(est.id)} disabled={addToEstimateMut.isPending}>
@@ -477,7 +475,7 @@ export default function CatalogDetail() {
               ))}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowEstimateDialog(false)}>{t("cancel")}</Button>
+              <Button variant="outline" onClick={() => setShowEstimateDialog(false)}>Cancel</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -491,13 +489,13 @@ export default function CatalogDetail() {
 
           {!form.isActive && (
             <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-4 py-2 text-sm text-amber-700 dark:text-amber-400">
-              {t("inactive")}
+              This item is currently <strong>inactive</strong>.
             </div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="field-name">{t("name")}</Label>
+              <Label htmlFor="field-name">Name</Label>
               <Input
                 id="field-name"
                 ref={nameInputRef}
@@ -508,19 +506,19 @@ export default function CatalogDetail() {
               />
               {nameConflict && (
                 <p className="text-xs text-destructive" data-testid="text-name-conflict">
-                  {t("nameConflict")}
+                  This name already exists. Please change it to something unique before saving.
                 </p>
               )}
             </div>
 
             <div className="space-y-1.5">
-              <Label>{t("class")}</Label>
+              <Label>Class</Label>
               <Select value={form.class ?? "none"} onValueChange={v => field("class", v === "none" ? null : v)}>
                 <SelectTrigger data-testid="select-class">
-                  <SelectValue placeholder={t("selectClass")} />
+                  <SelectValue placeholder="Select class…" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">— {t("none")} —</SelectItem>
+                  <SelectItem value="none">— None —</SelectItem>
                   {CLASS_OPTIONS.map(c => (
                     <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
@@ -529,7 +527,7 @@ export default function CatalogDetail() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="field-category">{t("category")}</Label>
+              <Label htmlFor="field-category">Category</Label>
               <Input
                 id="field-category"
                 value={form.category ?? ""}
@@ -540,7 +538,7 @@ export default function CatalogDetail() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="field-sku">{t("sku")}</Label>
+              <Label htmlFor="field-sku">SKU</Label>
               <Input
                 id="field-sku"
                 value={form.sku ?? ""}
@@ -550,7 +548,7 @@ export default function CatalogDetail() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="field-units">{t("units")}</Label>
+              <Label htmlFor="field-units">Units</Label>
               <Input
                 id="field-units"
                 value={form.units ?? ""}
@@ -561,7 +559,7 @@ export default function CatalogDetail() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="field-cost">{t("cost")}</Label>
+              <Label htmlFor="field-cost">Cost ($)</Label>
               <Input
                 id="field-cost"
                 type="number"
@@ -574,32 +572,32 @@ export default function CatalogDetail() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>{t("taxable")}</Label>
+              <Label>Taxable</Label>
               <div className="flex items-center gap-2 pt-2">
                 <Switch
                   checked={form.taxable ?? false}
                   onCheckedChange={v => field("taxable", v)}
                   data-testid="switch-taxable"
                 />
-                <span className="text-sm text-muted-foreground">{form.taxable ? t("yes") : t("no")}</span>
+                <span className="text-sm text-muted-foreground">{form.taxable ? "Yes" : "No"}</span>
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label>{t("status")}</Label>
+              <Label>Status</Label>
               <div className="flex items-center gap-2 pt-2">
                 <Switch
                   checked={form.isActive ?? true}
                   onCheckedChange={v => field("isActive", v)}
                   data-testid="switch-active"
                 />
-                <span className="text-sm text-muted-foreground">{form.isActive ? t("activeStatus") : t("inactiveStatus")}</span>
+                <span className="text-sm text-muted-foreground">{form.isActive ? "Active" : "Inactive"}</span>
               </div>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="field-description">{t("description")}</Label>
+            <Label htmlFor="field-description">Description</Label>
             <Textarea
               id="field-description"
               rows={4}
@@ -611,7 +609,7 @@ export default function CatalogDetail() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="field-other-options">{t("otherOptions")}</Label>
+            <Label htmlFor="field-other-options">Other Options / Notes</Label>
             <Textarea
               id="field-other-options"
               rows={3}
@@ -624,17 +622,17 @@ export default function CatalogDetail() {
 
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5">
-              <Tag className="w-4 h-4" /> {t("tags")}
+              <Tag className="w-4 h-4" /> Tags
             </Label>
             <div className="flex flex-wrap gap-2">
-              {(form.tags ?? []).map(tag => (
-                <Badge key={tag.name} variant="secondary" className="gap-1 pr-1" data-testid={`badge-tag-${tag.name}`}>
-                  {tag.name}
+              {(form.tags ?? []).map(t => (
+                <Badge key={t.name} variant="secondary" className="gap-1 pr-1" data-testid={`badge-tag-${t.name}`}>
+                  {t.name}
                   <button
                     type="button"
-                    onClick={() => removeTag(tag.name)}
+                    onClick={() => removeTag(t.name)}
                     className="hover:text-destructive transition-colors"
-                    data-testid={`btn-remove-tag-${tag.name}`}
+                    data-testid={`btn-remove-tag-${t.name}`}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -646,7 +644,7 @@ export default function CatalogDetail() {
                 value={tagInput}
                 onChange={e => setTagInput(e.target.value)}
                 onKeyDown={handleTagKeyDown}
-                placeholder={t("addTag")}
+                placeholder="Add tag…"
                 className="max-w-xs"
                 data-testid="input-tag"
               />
@@ -664,13 +662,13 @@ export default function CatalogDetail() {
             return (
               <div className="space-y-4">
                 <Label className="flex items-center gap-1.5 text-base font-semibold">
-                  <ImageIcon className="w-4 h-4" /> {t("photos")}
+                  <ImageIcon className="w-4 h-4" /> Photos
                 </Label>
 
                 {/* Primary photo */}
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-muted-foreground">
-                    {t("primaryPhoto")} <span className="font-normal text-xs">{t("optional")}</span>
+                    Primary Photo <span className="font-normal text-xs">(optional)</span>
                   </p>
                   <div className="flex items-start gap-4">
                     {form.imageUrl ? (
@@ -703,9 +701,9 @@ export default function CatalogDetail() {
                         >
                           <span>
                             {uploadingPrimary ? (
-                              <>{t("uploading")}</>
+                              <>Uploading…</>
                             ) : (
-                              <><Upload className="w-3.5 h-3.5 mr-1.5" />{form.imageUrl ? t("replace") : t("upload")}</>
+                              <><Upload className="w-3.5 h-3.5 mr-1.5" />{form.imageUrl ? "Replace" : "Upload"}</>
                             )}
                           </span>
                         </Button>
@@ -731,12 +729,12 @@ export default function CatalogDetail() {
                           data-testid="btn-toggle-primary-visibility"
                         >
                           {form.imageHidden
-                            ? <><EyeOff className="w-3.5 h-3.5" /> {t("hidden")}</>
-                            : <><Eye className="w-3.5 h-3.5" /> {t("visible")}</>
+                            ? <><EyeOff className="w-3.5 h-3.5" /> Hidden</>
+                            : <><Eye className="w-3.5 h-3.5" /> Visible</>
                           }
                         </Button>
                       )}
-                      <p className="text-xs text-muted-foreground">{t("pngOrJpg")}</p>
+                      <p className="text-xs text-muted-foreground">PNG or JPG</p>
                     </div>
                   </div>
                 </div>
@@ -745,7 +743,7 @@ export default function CatalogDetail() {
                 {options.length > 0 && (
                   <div className="space-y-3">
                     <p className="text-sm font-medium text-muted-foreground">
-                      {t("optionPhotos")} <span className="font-normal text-xs">{t("optionPhotosHint")}</span>
+                      Option Photos <span className="font-normal text-xs">(each slot is optional — upload any, skip others)</span>
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {options.map(opt => {
@@ -811,7 +809,7 @@ export default function CatalogDetail() {
                                   data-testid={`btn-upload-option-photo-${opt}`}
                                 >
                                   <span>
-                                    {isUploading ? t("uploading") : <><Upload className="w-3 h-3 mr-1" />{optUrl ? t("replace") : t("upload")}</>}
+                                    {isUploading ? "Uploading…" : <><Upload className="w-3 h-3 mr-1" />{optUrl ? "Replace" : "Upload"}</>}
                                   </span>
                                 </Button>
                               </label>
@@ -840,12 +838,12 @@ export default function CatalogDetail() {
           <Separator />
 
           <div className="text-xs text-muted-foreground space-y-1">
-            <p data-testid="text-item-number-meta">{t("itemNum")}: <span className="font-mono">{form.itemNumber}</span></p>
+            <p data-testid="text-item-number-meta">Item #: <span className="font-mono">{form.itemNumber}</span></p>
             {form.createdAt && (
-              <p data-testid="text-created-at">{t("created")}: {new Date(form.createdAt).toLocaleDateString()}</p>
+              <p data-testid="text-created-at">Created: {new Date(form.createdAt).toLocaleDateString()}</p>
             )}
             {form.updatedAt && (
-              <p data-testid="text-updated-at">{t("lastUpdated")}: {new Date(form.updatedAt).toLocaleString()}</p>
+              <p data-testid="text-updated-at">Last updated: {new Date(form.updatedAt).toLocaleString()}</p>
             )}
           </div>
         </div>
@@ -856,13 +854,13 @@ export default function CatalogDetail() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <DollarSign className="w-4 h-4" />
-                {t("pricingBreakdown")}
+                Pricing Breakdown
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Unit Cost */}
               <div className="space-y-1">
-                <Label htmlFor="pricing-cost" className="text-xs">{t("unitCostLabel")}</Label>
+                <Label htmlFor="pricing-cost" className="text-xs">Unit Cost ($)</Label>
                 <Input
                   id="pricing-cost"
                   type="number"
@@ -877,7 +875,7 @@ export default function CatalogDetail() {
 
               {/* Taxable toggle */}
               <div className="flex items-center justify-between">
-                <Label className="text-xs">{t("taxable")}</Label>
+                <Label className="text-xs">Taxable</Label>
                 <Switch
                   checked={form.taxable ?? false}
                   onCheckedChange={v => field("taxable", v)}
@@ -888,7 +886,7 @@ export default function CatalogDetail() {
               {/* Tax Rate (only if taxable) */}
               {taxable && (
                 <div className="space-y-1">
-                  <Label htmlFor="pricing-tax-rate" className="text-xs">{t("taxRateLabel")}</Label>
+                  <Label htmlFor="pricing-tax-rate" className="text-xs">Tax Rate (%)</Label>
                   <Input
                     id="pricing-tax-rate"
                     type="number"
@@ -909,12 +907,12 @@ export default function CatalogDetail() {
               <div className="space-y-2 text-sm">
                 {taxable && (
                   <div className="flex justify-between text-muted-foreground">
-                    <span>{t("taxAmount")}</span>
+                    <span>Tax Amount</span>
                     <span data-testid="pricing-tax-amount">${fmt(taxAmount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-medium">
-                  <span>{t("subtotal")}</span>
+                  <span>Subtotal</span>
                   <span data-testid="pricing-subtotal">${fmt(subtotal)}</span>
                 </div>
               </div>
@@ -924,7 +922,7 @@ export default function CatalogDetail() {
               {/* Overhead */}
               <div className="space-y-1">
                 <Label htmlFor="pricing-overhead" className="text-xs flex items-center justify-between">
-                  <span>{t("overhead")}</span>
+                  <span>Overhead (%)</span>
                   {defaultOverheadHint && (
                     <span className="text-muted-foreground font-normal">{defaultOverheadHint}</span>
                   )}
@@ -944,11 +942,11 @@ export default function CatalogDetail() {
 
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between text-muted-foreground">
-                  <span>{t("overheadAmount")}</span>
+                  <span>Overhead Amount</span>
                   <span data-testid="pricing-overhead-amount">${fmt(overheadAmount)}</span>
                 </div>
                 <div className="flex justify-between font-medium">
-                  <span>{t("breakeven")}</span>
+                  <span>Breakeven</span>
                   <span data-testid="pricing-breakeven">${fmt(breakeven)}</span>
                 </div>
               </div>
@@ -958,7 +956,7 @@ export default function CatalogDetail() {
               {/* Profit */}
               <div className="space-y-1">
                 <Label htmlFor="pricing-profit" className="text-xs flex items-center justify-between">
-                  <span>{t("profit")}</span>
+                  <span>Profit (%)</span>
                   {defaultProfitHint && (
                     <span className="text-muted-foreground font-normal">{defaultProfitHint}</span>
                   )}
@@ -978,7 +976,7 @@ export default function CatalogDetail() {
 
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between text-muted-foreground">
-                  <span>{t("profitAmount")}</span>
+                  <span>Profit Amount</span>
                   <span data-testid="pricing-profit-amount">${fmt(profitAmount)}</span>
                 </div>
               </div>
@@ -987,7 +985,7 @@ export default function CatalogDetail() {
 
               {/* Unit Price */}
               <div className="flex justify-between items-center">
-                <span className="font-semibold text-sm">{t("unitPrice")}</span>
+                <span className="font-semibold text-sm">Unit Price</span>
                 <span
                   className="text-lg font-bold text-green-600 dark:text-green-400"
                   data-testid="pricing-unit-price"
@@ -1004,13 +1002,13 @@ export default function CatalogDetail() {
       {dirty && (
         <div className="sticky bottom-6 flex justify-end mt-6">
           <div className="bg-background border rounded-lg shadow-lg px-4 py-3 flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">{t("unsavedBanner")}</span>
+            <span className="text-sm text-muted-foreground">You have unsaved changes</span>
             <Button variant="outline" size="sm" onClick={() => { setForm({ ...item! }); setDirty(false); }} data-testid="btn-discard">
-              {t("discard")}
+              Discard
             </Button>
             <Button size="sm" onClick={() => saveMut.mutate(form as CatalogItemDetail)} disabled={saveMut.isPending} data-testid="btn-save-bottom">
               <Save className="w-4 h-4 mr-1" />
-              {saveMut.isPending ? t("saving") : t("saveChanges")}
+              {saveMut.isPending ? "Saving…" : "Save changes"}
             </Button>
           </div>
         </div>

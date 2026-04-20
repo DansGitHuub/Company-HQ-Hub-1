@@ -10,7 +10,6 @@ import {
 import { Plus, X, Star } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useTranslation } from "react-i18next";
 
 export interface PhoneEntry { phone: string; phone_type: string; is_primary: boolean; }
 export interface EmailEntry { email: string; email_type: string; is_primary: boolean; }
@@ -57,7 +56,6 @@ interface Props {
 }
 
 export function CustomerFormModal({ open, onClose, editing, initialData, onAfterSave }: Props) {
-  const { t } = useTranslation("customerForm");
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [form, setForm] = useState<CustomerFormData>(initialData ?? EMPTY_FORM);
@@ -77,7 +75,7 @@ export function CustomerFormModal({ open, onClose, editing, initialData, onAfter
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-      toast({ title: t("customerAdded") });
+      toast({ title: "Customer added successfully" });
       onAfterSave?.();
       onClose();
     },
@@ -92,7 +90,7 @@ export function CustomerFormModal({ open, onClose, editing, initialData, onAfter
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-      toast({ title: t("customerUpdated") });
+      toast({ title: "Customer updated successfully" });
       onAfterSave?.();
       onClose();
     },
@@ -104,7 +102,7 @@ export function CustomerFormModal({ open, onClose, editing, initialData, onAfter
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.first_name.trim() || !form.last_name.trim()) {
-      toast({ title: t("nameRequired"), variant: "destructive" });
+      toast({ title: "First name and last name are required", variant: "destructive" });
       return;
     }
     editing ? updateMutation.mutate(form) : createMutation.mutate(form);
@@ -128,37 +126,37 @@ export function CustomerFormModal({ open, onClose, editing, initialData, onAfter
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editing ? t("editTitle") : t("addTitle")}</DialogTitle>
+          <DialogTitle>{editing ? "Edit Customer" : "Add Customer"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Info */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t("basicInfo")}</h3>
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Basic Information</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>{t("firstName")} <span className="text-red-500">*</span></Label>
+                <Label>First Name <span className="text-red-500">*</span></Label>
                 <Input value={form.first_name} onChange={(e) => setField("first_name", e.target.value)}
                   placeholder="Jane" data-testid="input-first-name" />
               </div>
               <div className="space-y-1.5">
-                <Label>{t("lastName")} <span className="text-red-500">*</span></Label>
+                <Label>Last Name <span className="text-red-500">*</span></Label>
                 <Input value={form.last_name} onChange={(e) => setField("last_name", e.target.value)}
                   placeholder="Smith" data-testid="input-last-name" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>{t("company")}</Label>
+                <Label>Company</Label>
                 <Input value={form.company_name} onChange={(e) => setField("company_name", e.target.value)}
                   placeholder="Smith Properties LLC" data-testid="input-company-name" />
               </div>
               <div className="space-y-1.5">
-                <Label>{t("source")}</Label>
+                <Label>Source</Label>
                 <select value={form.source} onChange={(e) => setField("source", e.target.value)}
                   className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
                   data-testid="select-source">
-                  <option value="">{t("selectSource")}\u2026</option>
+                  <option value="">Select source…</option>
                   {SOURCE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
@@ -168,9 +166,9 @@ export function CustomerFormModal({ open, onClose, editing, initialData, onAfter
           {/* Phone Numbers */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t("phoneNumbers")}</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Phone Numbers</h3>
               <Button type="button" variant="outline" size="sm" onClick={addPhone}>
-                <Plus className="h-3.5 w-3.5 mr-1" /> {t("addPhone")}
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add Phone
               </Button>
             </div>
             {form.phones.map((p, i) => (
@@ -193,15 +191,15 @@ export function CustomerFormModal({ open, onClose, editing, initialData, onAfter
                 )}
               </div>
             ))}
-            <p className="text-xs text-muted-foreground">{t("primaryHint")}</p>
+            <p className="text-xs text-muted-foreground">Click ★ to mark a number as primary.</p>
           </div>
 
           {/* Email Addresses */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t("emailAddresses")}</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Email Addresses</h3>
               <Button type="button" variant="outline" size="sm" onClick={addEmail}>
-                <Plus className="h-3.5 w-3.5 mr-1" /> {t("addEmail")}
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add Email
               </Button>
             </div>
             {form.emails.map((e, i) => (
@@ -224,27 +222,27 @@ export function CustomerFormModal({ open, onClose, editing, initialData, onAfter
                 )}
               </div>
             ))}
-            <p className="text-xs text-muted-foreground">{t("primaryHint")}</p>
+            <p className="text-xs text-muted-foreground">Click ★ to mark an address as primary.</p>
           </div>
 
           {/* Billing Address */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t("billingAddress")}</h3>
-            <Input placeholder={t("streetAddress")} value={form.billing_address}
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Billing Address</h3>
+            <Input placeholder="Street address" value={form.billing_address}
               onChange={(e) => setField("billing_address", e.target.value)} data-testid="input-billing-address" />
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-1 space-y-1.5">
-                <Label>{t("city")}</Label>
+                <Label>City</Label>
                 <Input placeholder="Springfield" value={form.billing_city}
                   onChange={(e) => setField("billing_city", e.target.value)} data-testid="input-billing-city" />
               </div>
               <div className="space-y-1.5">
-                <Label>{t("state")}</Label>
+                <Label>State</Label>
                 <Input placeholder="MA" value={form.billing_state}
                   onChange={(e) => setField("billing_state", e.target.value)} data-testid="input-billing-state" />
               </div>
               <div className="space-y-1.5">
-                <Label>{t("zip")}</Label>
+                <Label>ZIP</Label>
                 <Input placeholder="01001" value={form.billing_zip}
                   onChange={(e) => setField("billing_zip", e.target.value)} data-testid="input-billing-zip" />
               </div>
@@ -253,16 +251,16 @@ export function CustomerFormModal({ open, onClose, editing, initialData, onAfter
 
           {/* Notes */}
           <div className="space-y-1.5">
-            <Label>{t("notes")}</Label>
-            <Textarea placeholder={`${t("notesPlaceholder")}\u2026`} value={form.notes}
+            <Label>Notes</Label>
+            <Textarea placeholder="Any additional notes about this customer…" value={form.notes}
               onChange={(e) => setField("notes", e.target.value)} rows={3} data-testid="textarea-notes" />
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>{t("cancel")}</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
             <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white"
               disabled={isSaving} data-testid="button-save-customer">
-              {isSaving ? `${t("saving")}\u2026` : editing ? t("saveChanges") : t("addCustomer")}
+              {isSaving ? "Saving…" : editing ? "Save Changes" : "Add Customer"}
             </Button>
           </DialogFooter>
         </form>

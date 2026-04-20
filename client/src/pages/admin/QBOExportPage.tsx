@@ -1,17 +1,28 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertCircle, CheckCircle2, Clock, RefreshCw, Upload, Users, TriangleAlert,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  RefreshCw,
+  Upload,
+  Users,
+  TriangleAlert,
 } from "lucide-react";
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -42,31 +53,33 @@ function today(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+// ─── Status chip ─────────────────────────────────────────────────────────────
+
 function StatusChip({ entry }: { entry: any }) {
-  const { t } = useTranslation("admin");
   if (entry.qbo_exported_at) {
     return (
       <Badge className="bg-green-100 text-green-700 border-green-200 text-xs gap-1">
-        <CheckCircle2 className="w-3 h-3" /> {t("qbo.chipExported")}
+        <CheckCircle2 className="w-3 h-3" /> Exported
       </Badge>
     );
   }
   if (entry.qbo_export_error) {
     return (
       <Badge className="bg-red-100 text-red-700 border-red-200 text-xs gap-1" title={entry.qbo_export_error}>
-        <AlertCircle className="w-3 h-3" /> {t("qbo.statusError")}
+        <AlertCircle className="w-3 h-3" /> Error
       </Badge>
     );
   }
   return (
     <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 text-xs gap-1">
-      <Clock className="w-3 h-3" /> {t("qbo.chipPending")}
+      <Clock className="w-3 h-3" /> Pending
     </Badge>
   );
 }
 
+// ─── Tab: Time Entries ────────────────────────────────────────────────────────
+
 function TimeEntriesTab() {
-  const { t } = useTranslation("admin");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -93,6 +106,7 @@ function TimeEntriesTab() {
     staleTime: 30_000,
   });
 
+  // Users dropdown
   const { data: empData } = useQuery<any>({
     queryKey: ["/api/quickbooks/employees"],
     queryFn: () => apiRequest("GET", "/api/quickbooks/employees").then((r) => r.json()),
@@ -106,18 +120,18 @@ function TimeEntriesTab() {
       const { exported, failed, errors } = result;
       if (failed > 0) {
         toast({
-          title: t("qbo.exportedFailed", { exported, failed }),
+          title: `Exported ${exported}, failed ${failed}`,
           description: errors.slice(0, 3).join("; "),
           variant: "destructive",
         });
       } else {
-        toast({ title: t("qbo.exportedSuccess", { count: exported }) });
+        toast({ title: `✓ Exported ${exported} entries to QuickBooks` });
       }
       setSelected(new Set());
       queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/export-time/entries"] });
     },
     onError: (err: any) => {
-      toast({ title: t("qbo.exportFailed"), description: err.message, variant: "destructive" });
+      toast({ title: "Export failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -147,11 +161,12 @@ function TimeEntriesTab() {
 
   return (
     <div className="space-y-4">
+      {/* Filters */}
       <Card>
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">{t("qbo.from")}</label>
+              <label className="text-xs text-gray-500">From</label>
               <input
                 type="date"
                 data-testid="filter-date-from"
@@ -161,7 +176,7 @@ function TimeEntriesTab() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">{t("qbo.to")}</label>
+              <label className="text-xs text-gray-500">To</label>
               <input
                 type="date"
                 data-testid="filter-date-to"
@@ -171,13 +186,13 @@ function TimeEntriesTab() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">{t("qbo.employee")}</label>
+              <label className="text-xs text-gray-500">Employee</label>
               <Select value={userIdFilter} onValueChange={(v) => { setUserIdFilter(v); setPage(1); setSelected(new Set()); }}>
                 <SelectTrigger data-testid="filter-employee" className="w-44 h-9 text-sm">
-                  <SelectValue placeholder={t("qbo.allEmployees")} />
+                  <SelectValue placeholder="All employees" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{t("qbo.allEmployees")}</SelectItem>
+                  <SelectItem value="all">All employees</SelectItem>
                   {(empData?.localUsers ?? []).map((u: any) => (
                     <SelectItem key={u.id} value={String(u.id)}>
                       {u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.username}
@@ -187,16 +202,16 @@ function TimeEntriesTab() {
               </Select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">{t("qbo.status")}</label>
+              <label className="text-xs text-gray-500">Status</label>
               <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); setSelected(new Set()); }}>
                 <SelectTrigger data-testid="filter-status" className="w-36 h-9 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{t("qbo.statusAll")}</SelectItem>
-                  <SelectItem value="pending">{t("qbo.statusPending")}</SelectItem>
-                  <SelectItem value="exported">{t("qbo.statusExported")}</SelectItem>
-                  <SelectItem value="error">{t("qbo.statusError")}</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="exported">Exported</SelectItem>
+                  <SelectItem value="error">Error</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -207,10 +222,11 @@ function TimeEntriesTab() {
         </CardContent>
       </Card>
 
+      {/* Actions bar */}
       {selected.size > 0 && (
         <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-2">
           <span className="text-sm text-green-800 font-medium">
-            {t("qbo.selected", { count: selected.size, pending: exportablePending.length })}
+            {selected.size} selected ({exportablePending.length} pending)
           </span>
           <Button
             size="sm"
@@ -220,11 +236,12 @@ function TimeEntriesTab() {
             data-testid="export-selected-button"
           >
             <Upload className="w-3.5 h-3.5 mr-1.5" />
-            {exportMutation.isPending ? t("qbo.exporting") : t("qbo.exportTo", { count: exportablePending.length })}
+            {exportMutation.isPending ? "Exporting…" : `Export ${exportablePending.length} to QuickBooks`}
           </Button>
         </div>
       )}
 
+      {/* Table */}
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="entries-table">
@@ -239,12 +256,12 @@ function TimeEntriesTab() {
                     className="rounded"
                   />
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("qbo.employee")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("qbo.date")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("qbo.job")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("qbo.workArea")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("qbo.hours")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("qbo.status")}</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Employee</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Date</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Job</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Work Area</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Hours</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -261,7 +278,7 @@ function TimeEntriesTab() {
               ) : entries.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
-                    {t("qbo.noEntries")}
+                    No time entries found for this filter
                   </td>
                 </tr>
               ) : (
@@ -309,28 +326,30 @@ function TimeEntriesTab() {
           </table>
         </div>
 
+        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-4 py-4 border-t border-gray-50">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} data-testid="pagination-prev">
-              {t("qbo.previous")}
+              Previous
             </Button>
-            <span className="text-sm text-gray-500">{t("qbo.pageOf", { page, total: totalPages })}</span>
+            <span className="text-sm text-gray-500">Page {page} of {totalPages}</span>
             <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} data-testid="pagination-next">
-              {t("qbo.next")}
+              Next
             </Button>
           </div>
         )}
       </Card>
 
       <p className="text-xs text-gray-400 text-center">
-        {t("qbo.totalEntries", { count: data?.totalCount ?? 0 })}
+        {data?.totalCount ?? 0} total entries · Select pending entries and click "Export to QuickBooks"
       </p>
     </div>
   );
 }
 
+// ─── Tab: Employee Mapping ────────────────────────────────────────────────────
+
 function EmployeeMappingTab() {
-  const { t } = useTranslation("admin");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -344,11 +363,11 @@ function EmployeeMappingTab() {
     mutationFn: ({ userId, qboEmployeeId }: { userId: string; qboEmployeeId: string | null }) =>
       apiRequest("PATCH", `/api/quickbooks/employees/${userId}`, { qboEmployeeId }).then((r) => r.json()),
     onSuccess: () => {
-      toast({ title: t("qbo.mappingSaved") });
+      toast({ title: "Employee mapping saved" });
       queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/employees"] });
     },
     onError: (err: any) => {
-      toast({ title: t("qbo.saveFailed"), description: err.message, variant: "destructive" });
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -361,12 +380,14 @@ function EmployeeMappingTab() {
       {noQbConnection && (
         <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-amber-800 text-sm">
           <TriangleAlert className="w-4 h-4 shrink-0" />
-          {t("qbo.noQbConnection")}
+          QuickBooks is not connected or has no employees — employee dropdowns will be empty. Connect QuickBooks in Settings first.
         </div>
       )}
 
       <div className="flex justify-between items-center">
-        <p className="text-sm text-gray-500">{t("qbo.mappingDesc")}</p>
+        <p className="text-sm text-gray-500">
+          Map each employee to their matching QuickBooks Employee record so time entries can be exported.
+        </p>
         <Button variant="ghost" size="icon" onClick={() => refetch()} data-testid="refresh-mapping">
           <RefreshCw className="w-4 h-4" />
         </Button>
@@ -377,10 +398,10 @@ function EmployeeMappingTab() {
           <table className="w-full text-sm" data-testid="mapping-table">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("qbo.employee")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("qbo.role")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("qbo.pendingEntries")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("qbo.qbEmployee")}</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Employee</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Role</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Pending Entries</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">QuickBooks Employee</th>
               </tr>
             </thead>
             <tbody>
@@ -396,7 +417,7 @@ function EmployeeMappingTab() {
                 ))
               ) : localUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-gray-400">{t("qbo.noEmployees")}</td>
+                  <td colSpan={4} className="px-4 py-10 text-center text-gray-400">No employees found</td>
                 </tr>
               ) : (
                 localUsers.map((user: any) => {
@@ -429,7 +450,7 @@ function EmployeeMappingTab() {
                         {showWarning ? (
                           <div className="flex items-center gap-1.5 text-amber-600">
                             <TriangleAlert className="w-3.5 h-3.5" />
-                            <span className="text-xs font-semibold">{user.pendingCount} {t("qbo.statusPending").toLowerCase()}</span>
+                            <span className="text-xs font-semibold">{user.pendingCount} pending</span>
                           </div>
                         ) : (
                           <span className="text-xs text-gray-400">{user.pendingCount || "—"}</span>
@@ -449,10 +470,10 @@ function EmployeeMappingTab() {
                             data-testid={`qb-employee-select-${user.id}`}
                             className={`h-8 text-sm ${showWarning ? "border-amber-300" : ""}`}
                           >
-                            <SelectValue placeholder={t("qbo.notMapped")} />
+                            <SelectValue placeholder="Not mapped" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="__none__">{t("qbo.notMapped")}</SelectItem>
+                            <SelectItem value="__none__">Not mapped</SelectItem>
                             {qbEmployees.map((emp: any) => (
                               <SelectItem key={emp.id} value={emp.id}>
                                 {emp.displayName}
@@ -473,19 +494,24 @@ function EmployeeMappingTab() {
   );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function QBOExportPage() {
-  const { t } = useTranslation("admin");
   const [activeTab, setActiveTab] = useState<"entries" | "mapping">("entries");
 
   return (
     <div className="max-w-5xl mx-auto px-4 pb-12 pt-4 space-y-6">
+      {/* Header */}
       <div>
         <h1 data-testid="qbo-export-title" className="text-2xl font-bold text-gray-900">
-          {t("qbo.title")}
+          QuickBooks Time Export
         </h1>
-        <p className="text-sm text-gray-500 mt-0.5">{t("qbo.subtitle")}</p>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Review and export completed time entries to QuickBooks Online for payroll
+        </p>
       </div>
 
+      {/* Tabs */}
       <div className="flex border-b border-gray-200">
         <button
           data-testid="tab-entries"
@@ -498,7 +524,7 @@ export default function QBOExportPage() {
           ].join(" ")}
         >
           <Clock className="inline w-4 h-4 mr-1.5 -mt-0.5" />
-          {t("qbo.timeEntriesTab")}
+          Time Entries
         </button>
         <button
           data-testid="tab-mapping"
@@ -511,7 +537,7 @@ export default function QBOExportPage() {
           ].join(" ")}
         >
           <Users className="inline w-4 h-4 mr-1.5 -mt-0.5" />
-          {t("qbo.employeeMappingTab")}
+          Employee Mapping
         </button>
       </div>
 

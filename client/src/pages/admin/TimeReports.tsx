@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Loader2, ClipboardList, Clock, Download, RotateCcw } from "lucide-react";
 import { format, parseISO } from "date-fns";
@@ -83,8 +92,8 @@ const THIS_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => THIS_YEAR - i);
 
 export default function TimeReports() {
-  const { t } = useTranslation("admin");
   const { user } = useAuth();
+  const [, navigate] = useLocation();
 
   const isAdmin = user?.role === "Admin" || (user as any)?.isMasterAdmin;
 
@@ -100,12 +109,12 @@ export default function TimeReports() {
 
   const queryParams = useMemo(() => {
     const p = new URLSearchParams();
-    if (applied.user_id)   p.set("user_id",   applied.user_id);
-    if (applied.job_id)    p.set("job_id",    applied.job_id);
-    if (applied.customer)  p.set("customer",  applied.customer);
+    if (applied.user_id) p.set("user_id", applied.user_id);
+    if (applied.job_id) p.set("job_id", applied.job_id);
+    if (applied.customer) p.set("customer", applied.customer);
     if (applied.date_from) p.set("date_from", applied.date_from);
-    if (applied.date_to)   p.set("date_to",   applied.date_to);
-    if (applied.year)      p.set("year",      applied.year);
+    if (applied.date_to) p.set("date_to", applied.date_to);
+    if (applied.year) p.set("year", applied.year);
     return p.toString();
   }, [applied]);
 
@@ -118,7 +127,7 @@ export default function TimeReports() {
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <p className="text-muted-foreground">{t("timeReports.adminRequired")}</p>
+        <p className="text-muted-foreground">Admin access required.</p>
       </div>
     );
   }
@@ -136,11 +145,7 @@ export default function TimeReports() {
 
   const exportCSV = () => {
     if (!data?.entries.length) return;
-    const headers = [
-      t("timeReports.employeeCol"), t("timeReports.date"), t("timeReports.clockIn"),
-      t("timeReports.clockOut"), t("timeReports.totalHoursCol"),
-      t("timeReports.job"), t("timeReports.customer"), t("timeReports.type"),
-    ];
+    const headers = ["Employee", "Date", "Clock In", "Clock Out", "Total Hours", "Job", "Customer", "Type"];
     const rows = data.entries.map((e) => [
       e.employee_name || e.username,
       formatDate(e.clock_in),
@@ -163,12 +168,13 @@ export default function TimeReports() {
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-7xl">
+      {/* Gradient page header */}
       <div className="rounded-xl bg-gradient-to-r from-green-700 to-emerald-600 px-6 py-5 text-white flex items-center justify-between mb-6 shadow-md">
         <div className="flex items-center gap-3">
           <ClipboardList className="h-6 w-6" />
           <div>
-            <h1 className="text-2xl font-bold" data-testid="heading-time-reports">{t("timeReports.title")}</h1>
-            <p className="text-sm text-green-100">{t("timeReports.subtitle")}</p>
+            <h1 className="text-2xl font-bold" data-testid="heading-time-reports">Time Reports</h1>
+            <p className="text-sm text-green-100">All employee clock-in / clock-out records</p>
           </div>
         </div>
         <Button
@@ -178,24 +184,29 @@ export default function TimeReports() {
           data-testid="button-export-csv"
           className="bg-white/15 border border-white/30 text-white hover:bg-white/25 hover:text-white"
         >
-          <Download className="h-4 w-4 mr-2" /> {t("timeReports.exportCsv")}
+          <Download className="h-4 w-4 mr-2" /> Export CSV
         </Button>
       </div>
 
+      {/* Filters */}
       <Card className="mb-6">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">{t("timeReports.filters")}</CardTitle>
+          <CardTitle className="text-base">Filters</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Employee */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="filter-employee">{t("timeReports.employee")}</Label>
-              <Select value={filters.user_id} onValueChange={(v) => setFilter("user_id", v === "__all__" ? "" : v)}>
+              <Label htmlFor="filter-employee">Employee</Label>
+              <Select
+                value={filters.user_id}
+                onValueChange={(v) => setFilter("user_id", v === "__all__" ? "" : v)}
+              >
                 <SelectTrigger id="filter-employee" data-testid="select-filter-employee">
-                  <SelectValue placeholder={t("timeReports.allEmployees")} />
+                  <SelectValue placeholder="All employees" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">{t("timeReports.allEmployees")}</SelectItem>
+                  <SelectItem value="__all__">All employees</SelectItem>
                   {data?.employees.map((e) => (
                     <SelectItem key={e.id} value={e.id} data-testid={`option-employee-${e.id}`}>
                       {e.name || e.username}
@@ -205,14 +216,18 @@ export default function TimeReports() {
               </Select>
             </div>
 
+            {/* Job */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="filter-job">{t("timeReports.job")}</Label>
-              <Select value={filters.job_id} onValueChange={(v) => setFilter("job_id", v === "__all__" ? "" : v)}>
+              <Label htmlFor="filter-job">Job</Label>
+              <Select
+                value={filters.job_id}
+                onValueChange={(v) => setFilter("job_id", v === "__all__" ? "" : v)}
+              >
                 <SelectTrigger id="filter-job" data-testid="select-filter-job">
-                  <SelectValue placeholder={t("timeReports.allJobs")} />
+                  <SelectValue placeholder="All jobs" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">{t("timeReports.allJobs")}</SelectItem>
+                  <SelectItem value="__all__">All jobs</SelectItem>
                   {data?.jobs.map((j) => (
                     <SelectItem key={j.id} value={j.id} data-testid={`option-job-${j.id}`}>
                       {j.client} — {j.job_type}
@@ -222,71 +237,92 @@ export default function TimeReports() {
               </Select>
             </div>
 
+            {/* Customer text search */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="filter-customer">{t("timeReports.customer")}</Label>
+              <Label htmlFor="filter-customer">Customer</Label>
               <Input
                 id="filter-customer"
                 data-testid="input-filter-customer"
-                placeholder={t("timeReports.searchCustomer")}
+                placeholder="Search customer…"
                 value={filters.customer}
                 onChange={(e) => setFilter("customer", e.target.value)}
               />
             </div>
 
+            {/* Year */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="filter-year">{t("timeReports.year")}</Label>
-              <Select value={filters.year} onValueChange={(v) => setFilter("year", v === "__all__" ? "" : v)}>
+              <Label htmlFor="filter-year">Year</Label>
+              <Select
+                value={filters.year}
+                onValueChange={(v) => setFilter("year", v === "__all__" ? "" : v)}
+              >
                 <SelectTrigger id="filter-year" data-testid="select-filter-year">
-                  <SelectValue placeholder={t("timeReports.allYears")} />
+                  <SelectValue placeholder="All years" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">{t("timeReports.allYears")}</SelectItem>
+                  <SelectItem value="__all__">All years</SelectItem>
                   {YEAR_OPTIONS.map((y) => (
-                    <SelectItem key={y} value={String(y)} data-testid={`option-year-${y}`}>{y}</SelectItem>
+                    <SelectItem key={y} value={String(y)} data-testid={`option-year-${y}`}>
+                      {y}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
+            {/* Date From */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="filter-date-from">{t("timeReports.dateFrom")}</Label>
-              <Input id="filter-date-from" data-testid="input-filter-date-from" type="date"
-                value={filters.date_from} onChange={(e) => setFilter("date_from", e.target.value)} />
+              <Label htmlFor="filter-date-from">Date From</Label>
+              <Input
+                id="filter-date-from"
+                data-testid="input-filter-date-from"
+                type="date"
+                value={filters.date_from}
+                onChange={(e) => setFilter("date_from", e.target.value)}
+              />
             </div>
 
+            {/* Date To */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="filter-date-to">{t("timeReports.dateTo")}</Label>
-              <Input id="filter-date-to" data-testid="input-filter-date-to" type="date"
-                value={filters.date_to} onChange={(e) => setFilter("date_to", e.target.value)} />
+              <Label htmlFor="filter-date-to">Date To</Label>
+              <Input
+                id="filter-date-to"
+                data-testid="input-filter-date-to"
+                type="date"
+                value={filters.date_to}
+                onChange={(e) => setFilter("date_to", e.target.value)}
+              />
             </div>
           </div>
 
           <div className="flex gap-2 mt-4">
             <Button onClick={applyFilters} data-testid="button-apply-filters">
-              {t("timeReports.applyFilters")}
+              Apply Filters
             </Button>
             <Button variant="outline" onClick={resetFilters} data-testid="button-reset-filters">
-              <RotateCcw className="h-4 w-4 mr-2" /> {t("timeReports.reset")}
+              <RotateCcw className="h-4 w-4 mr-2" /> Reset
             </Button>
           </div>
         </CardContent>
       </Card>
 
+      {/* Summary */}
       {data && (
         <div className="flex items-center gap-4 mb-4" data-testid="summary-row">
           <div className="flex items-center gap-2 text-sm">
             <Clock className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">{t("timeReports.totalHours")}</span>
+            <span className="text-muted-foreground">Total Hours:</span>
             <span className="font-semibold" data-testid="text-total-hours">
               {formatHours(data.totalMinutes)}
             </span>
           </div>
           <Badge variant="secondary" data-testid="badge-entry-count">
-            {data.entries.length} {data.entries.length === 1 ? t("timeReports.entry") : t("timeReports.entries")}
+            {data.entries.length} {data.entries.length === 1 ? "entry" : "entries"}
           </Badge>
         </div>
       )}
 
+      {/* Table */}
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
@@ -295,25 +331,25 @@ export default function TimeReports() {
             </div>
           ) : error ? (
             <div className="py-16 text-center text-destructive text-sm" data-testid="error-message">
-              {t("timeReports.failedToLoad")}
+              Failed to load time report data.
             </div>
           ) : !data?.entries.length ? (
             <div className="py-16 text-center text-muted-foreground text-sm" data-testid="empty-state">
-              {t("timeReports.noEntries")}
+              No time entries match the current filters.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table data-testid="table-time-reports">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{t("timeReports.employeeCol")}</TableHead>
-                    <TableHead>{t("timeReports.date")}</TableHead>
-                    <TableHead>{t("timeReports.clockIn")}</TableHead>
-                    <TableHead>{t("timeReports.clockOut")}</TableHead>
-                    <TableHead>{t("timeReports.totalHoursCol")}</TableHead>
-                    <TableHead>{t("timeReports.job")}</TableHead>
-                    <TableHead>{t("timeReports.customer")}</TableHead>
-                    <TableHead>{t("timeReports.type")}</TableHead>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Clock In</TableHead>
+                    <TableHead>Clock Out</TableHead>
+                    <TableHead>Total Hours</TableHead>
+                    <TableHead>Job</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Type</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -334,7 +370,7 @@ export default function TimeReports() {
                       </TableCell>
                       <TableCell data-testid={`text-clock-out-${entry.id}`}>
                         {entry.clock_out ? formatTime(entry.clock_out) : (
-                          <Badge variant="outline" className="text-amber-600 border-amber-300">{t("timeReports.active")}</Badge>
+                          <Badge variant="outline" className="text-amber-600 border-amber-300">Active</Badge>
                         )}
                       </TableCell>
                       <TableCell data-testid={`text-duration-${entry.id}`}>
@@ -348,11 +384,11 @@ export default function TimeReports() {
                       </TableCell>
                       <TableCell data-testid={`text-type-${entry.id}`}>
                         {entry.entry_type === "billable" ? (
-                          <Badge className="bg-green-100 text-green-700 border border-green-200 text-xs">{t("timeReports.billable")}</Badge>
+                          <Badge className="bg-green-100 text-green-700 border border-green-200 text-xs">Billable</Badge>
                         ) : entry.entry_type === "drive_time" ? (
-                          <Badge className="bg-blue-100 text-blue-700 border border-blue-200 text-xs">{t("timeReports.driveTime")}</Badge>
+                          <Badge className="bg-blue-100 text-blue-700 border border-blue-200 text-xs">Drive Time</Badge>
                         ) : entry.entry_type === "shop_time" ? (
-                          <Badge className="bg-slate-100 text-slate-600 border border-slate-200 text-xs">{t("timeReports.shopTime")}</Badge>
+                          <Badge className="bg-slate-100 text-slate-600 border border-slate-200 text-xs">Shop Time</Badge>
                         ) : (
                           <Badge variant="secondary" className="capitalize text-xs">
                             {entry.entry_type.replace("_", " ")}
@@ -361,9 +397,10 @@ export default function TimeReports() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {/* Summary footer row */}
                   <TableRow className="bg-muted/40 font-semibold" data-testid="row-summary-footer">
                     <TableCell colSpan={4} className="text-right text-sm text-muted-foreground pr-4">
-                      {t("timeReports.total")}
+                      Total
                     </TableCell>
                     <TableCell data-testid="text-footer-total-hours">
                       {formatHours(data.totalMinutes)}

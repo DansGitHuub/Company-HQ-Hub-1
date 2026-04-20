@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
-import { useTranslation } from "react-i18next";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 export const JOB_TYPES = [
@@ -68,7 +67,6 @@ interface Props {
 }
 
 export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId, onSuccess }: Props) {
-  const { t } = useTranslation("jobForm");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -132,7 +130,7 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
     },
     onSuccess: (job) => {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
-      toast({ title: isEdit ? t("jobUpdated") : t("jobCreated") });
+      toast({ title: isEdit ? "Job updated" : "Job created" });
       onOpenChange(false);
       onSuccess?.(job);
     },
@@ -142,7 +140,7 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) {
-      toast({ title: t("titleRequired"), variant: "destructive" });
+      toast({ title: "Job title is required", variant: "destructive" });
       return;
     }
     mutation.mutate(form);
@@ -152,13 +150,13 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? t("editTitle") : t("addTitle")}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Job" : "New Job"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
           {/* Title */}
           <div className="space-y-1">
-            <Label>{t("jobTitle")} <span className="text-destructive">*</span></Label>
+            <Label>Job Title <span className="text-destructive">*</span></Label>
             <Input
               value={form.title}
               onChange={(e) => set("title", e.target.value)}
@@ -171,9 +169,9 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
             {/* Customer */}
             {!lockedCustomerId && (
               <div className="space-y-1 col-span-2">
-                <Label>{t("customer")}</Label>
+                <Label>Customer</Label>
                 <Input
-                  placeholder={`${t("searchCustomers")}\u2026`}
+                  placeholder="Search customers…"
                   value={custSearch}
                   onChange={(e) => setCustSearch(e.target.value)}
                   className="mb-1"
@@ -188,7 +186,7 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
                   className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
                   data-testid="select-customer"
                 >
-                  <option value="">{t("noSpecificCustomer")}</option>
+                  <option value="">No specific customer</option>
                   {filteredCustomers.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.first_name} {c.last_name}{c.company_name ? ` — ${c.company_name}` : ""}
@@ -201,14 +199,14 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
             {/* Property */}
             {(form.customer_id || lockedCustomerId) && (
               <div className="space-y-1 col-span-2">
-                <Label>{t("property")}</Label>
+                <Label>Property</Label>
                 <select
                   value={form.property_id}
                   onChange={(e) => set("property_id", e.target.value)}
                   className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
                   data-testid="select-property"
                 >
-                  <option value="">{t("noSpecificProperty")}</option>
+                  <option value="">No specific property</option>
                   {properties.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.address}{p.city ? `, ${p.city}` : ""}{p.state ? `, ${p.state}` : ""}
@@ -220,21 +218,21 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
 
             {/* Job Type */}
             <div className="space-y-1">
-              <Label>{t("jobType")}</Label>
+              <Label>Job Type</Label>
               <select
                 value={form.job_type}
                 onChange={(e) => set("job_type", e.target.value)}
                 className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
                 data-testid="select-job-type"
               >
-                <option value="">{t("selectType")}\u2026</option>
+                <option value="">Select type…</option>
                 {JOB_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
 
             {/* Status */}
             <div className="space-y-1">
-              <Label>{t("status")}</Label>
+              <Label>Status</Label>
               <select
                 value={form.status}
                 onChange={(e) => set("status", e.target.value)}
@@ -249,7 +247,7 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
 
             {/* Scheduled Date */}
             <div className="space-y-1">
-              <Label>{t("scheduledDate")}</Label>
+              <Label>Scheduled Date</Label>
               <Input
                 type="date"
                 value={form.scheduled_date}
@@ -260,7 +258,7 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
 
             {/* Price */}
             <div className="space-y-1">
-              <Label>{t("price")}</Label>
+              <Label>Price ($)</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -274,7 +272,7 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
 
             {/* Start Time */}
             <div className="space-y-1">
-              <Label>{t("startTime")}</Label>
+              <Label>Start Time</Label>
               <Input
                 type="time"
                 value={form.scheduled_start_time}
@@ -285,7 +283,7 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
 
             {/* End Time */}
             <div className="space-y-1">
-              <Label>{t("endTime")}</Label>
+              <Label>End Time</Label>
               <Input
                 type="time"
                 value={form.scheduled_end_time}
@@ -296,7 +294,7 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
 
             {/* Estimated Hours */}
             <div className="space-y-1">
-              <Label>{t("estimatedHours")}</Label>
+              <Label>Estimated Hours</Label>
               <Input
                 type="number"
                 step="0.5"
@@ -311,34 +309,34 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
 
           {/* Description */}
           <div className="space-y-1">
-            <Label>{t("description")}</Label>
+            <Label>Description / Scope of Work</Label>
             <Textarea
               value={form.description}
               onChange={(e) => set("description", e.target.value)}
               rows={3}
-              placeholder={`${t("descriptionPlaceholder")}\u2026`}
+              placeholder="Describe the work to be done…"
               data-testid="textarea-description"
             />
           </div>
 
           {/* Crew Notes */}
           <div className="space-y-1">
-            <Label>{t("crewNotes")}</Label>
+            <Label>Crew Notes</Label>
             <Textarea
               value={form.crew_notes}
               onChange={(e) => set("crew_notes", e.target.value)}
               rows={2}
-              placeholder={`${t("crewNotesPlaceholder")}\u2026`}
+              placeholder="Internal notes for the crew…"
               data-testid="textarea-crew-notes"
             />
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              {t("cancel")}
+              Cancel
             </Button>
             <Button type="submit" disabled={mutation.isPending} className="bg-primary" data-testid="button-save-job">
-              {mutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("saving")}&hellip;</> : isEdit ? t("saveChanges") : t("createJob")}
+              {mutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving…</> : isEdit ? "Save Changes" : "Create Job"}
             </Button>
           </DialogFooter>
         </form>

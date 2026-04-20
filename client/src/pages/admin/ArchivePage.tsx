@@ -1,15 +1,20 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { AlertTriangle, Archive, Clock, RefreshCw, Search, ChevronDown, ChevronRight } from "lucide-react";
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -35,8 +40,9 @@ function ninetyDaysAgo(): string {
   return d.toISOString().split("T")[0];
 }
 
+// ─── Archive Tab ──────────────────────────────────────────────────────────────
+
 function ArchiveTab() {
-  const { t } = useTranslation("admin");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -55,7 +61,10 @@ function ArchiveTab() {
     setPreviewError(null);
     setPreviewing(true);
     try {
-      const r = await apiRequest("GET", `/api/archive/preview?startDate=${startDate}&endDate=${endDate}`);
+      const r = await apiRequest(
+        "GET",
+        `/api/archive/preview?startDate=${startDate}&endDate=${endDate}`
+      );
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Preview failed");
       setPreview(data);
@@ -74,7 +83,7 @@ function ArchiveTab() {
         return data;
       }),
     onSuccess: (result: any) => {
-      toast({ title: `✓ ${t("archive.archiveNow", { count: result.archived })}` });
+      toast({ title: `✓ Archived ${result.archived} entries` });
       setPreview(null);
       queryClient.invalidateQueries({ queryKey: ["/api/archive/history"] });
       queryClient.invalidateQueries({ queryKey: ["/api/archive/entries"] });
@@ -83,7 +92,7 @@ function ArchiveTab() {
       const employees: string[] = err?.data?.employees ?? [];
       toast({
         title: err.message,
-        description: employees.length ? `${t("archive.stilledClockedIn")} ${employees.join(", ")}` : undefined,
+        description: employees.length ? `Still clocked in: ${employees.join(", ")}` : undefined,
         variant: "destructive",
       });
     },
@@ -93,11 +102,14 @@ function ArchiveTab() {
     <div className="space-y-6 max-w-xl">
       <Card>
         <CardContent className="pt-5 pb-5 space-y-4">
-          <p className="text-sm text-gray-600">{t("archive.description")}</p>
+          <p className="text-sm text-gray-600">
+            Select a date range to move completed time entries into the archive. This frees up
+            the active table while keeping all data browsable in the View Archives tab.
+          </p>
 
           <div className="flex flex-wrap gap-4">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500 font-medium">{t("archive.startDate")}</label>
+              <label className="text-xs text-gray-500 font-medium">Start Date</label>
               <input
                 type="date"
                 data-testid="archive-start-date"
@@ -107,7 +119,7 @@ function ArchiveTab() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500 font-medium">{t("archive.endDate")}</label>
+              <label className="text-xs text-gray-500 font-medium">End Date</label>
               <input
                 type="date"
                 data-testid="archive-end-date"
@@ -126,7 +138,7 @@ function ArchiveTab() {
             className="gap-2"
           >
             <Search className="w-4 h-4" />
-            {previewing ? t("archive.previewing") : t("archive.preview")}
+            {previewing ? "Previewing…" : "Preview"}
           </Button>
 
           {previewError && (
@@ -143,12 +155,12 @@ function ArchiveTab() {
           <CardContent className="pt-5 pb-5 space-y-4">
             <div data-testid="preview-result">
               <p className="text-base font-semibold text-amber-900">
-                {preview.count.toLocaleString()} {preview.count === 1 ? t("archive.entries") : t("archive.entries")} —{" "}
-                <span className="font-bold">{preview.totalHours.toFixed(1)} h</span>{" "}
-                {formatDate(preview.startDate + "T12:00:00")} – {formatDate(preview.endDate + "T12:00:00")}
+                {preview.count.toLocaleString()} {preview.count === 1 ? "entry" : "entries"} covering{" "}
+                <span className="font-bold">{preview.totalHours.toFixed(1)} hours</span> from{" "}
+                {formatDate(preview.startDate + "T12:00:00")} to {formatDate(preview.endDate + "T12:00:00")} will be archived.
               </p>
               {preview.count === 0 && (
-                <p className="text-sm text-amber-700 mt-1">{t("archive.noEntriesInRange")}</p>
+                <p className="text-sm text-amber-700 mt-1">No completed entries found in this range.</p>
               )}
             </div>
 
@@ -157,7 +169,8 @@ function ArchiveTab() {
                 <div className="flex items-start gap-2 bg-amber-100 border border-amber-300 rounded-lg px-3 py-2 text-sm text-amber-800">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
-                    <strong>{t("archive.cannotUndo")}</strong> {t("archive.cannotUndoDesc")}
+                    <strong>This action cannot be undone.</strong> Entries will be removed from the active
+                    time table and moved to the archive.
                   </span>
                 </div>
                 <Button
@@ -168,7 +181,7 @@ function ArchiveTab() {
                   className="gap-2"
                 >
                   <Archive className="w-4 h-4" />
-                  {archiveMutation.isPending ? t("archive.archiving") : t("archive.archiveNow", { count: preview.count })}
+                  {archiveMutation.isPending ? "Archiving…" : `Archive ${preview.count} Entries Now`}
                 </Button>
               </>
             )}
@@ -179,14 +192,16 @@ function ArchiveTab() {
   );
 }
 
+// ─── View Archives Tab ────────────────────────────────────────────────────────
+
 function ArchiveHistoryTable() {
-  const { t } = useTranslation("admin");
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const { data, isLoading, refetch } = useQuery<any>({
     queryKey: ["/api/archive/history", page],
-    queryFn: () => apiRequest("GET", `/api/archive/history?page=${page}&limit=20`).then((r) => r.json()),
+    queryFn: () =>
+      apiRequest("GET", `/api/archive/history?page=${page}&limit=20`).then((r) => r.json()),
     staleTime: 30_000,
   });
 
@@ -199,7 +214,7 @@ function ArchiveHistoryTable() {
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center">
-        <h3 className="text-sm font-semibold text-gray-700">{t("archive.archiveHistory")}</h3>
+        <h3 className="text-sm font-semibold text-gray-700">Archive History</h3>
         <Button variant="ghost" size="icon" onClick={() => refetch()} data-testid="refresh-history">
           <RefreshCw className="w-4 h-4" />
         </Button>
@@ -210,11 +225,11 @@ function ArchiveHistoryTable() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide w-8" />
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("archive.dateRange")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("archive.entries")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("archive.totalHours")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("archive.archivedBy")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("archive.archivedAt")}</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Date Range</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Entries</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Total Hours</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Archived By</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Archived At</th>
               </tr>
             </thead>
             <tbody>
@@ -231,7 +246,7 @@ function ArchiveHistoryTable() {
               ) : batches.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
-                    {t("archive.noBatches")}
+                    No archive batches yet
                   </td>
                 </tr>
               ) : (
@@ -266,9 +281,9 @@ function ArchiveHistoryTable() {
         </div>
         {(data?.totalPages ?? 1) > 1 && (
           <div className="flex items-center justify-center gap-4 py-4 border-t border-gray-50">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} data-testid="history-prev">{t("archive.previous")}</Button>
-            <span className="text-sm text-gray-500">{t("archive.pageOf", { page, total: data?.totalPages })}</span>
-            <Button variant="outline" size="sm" disabled={page >= (data?.totalPages ?? 1)} onClick={() => setPage((p) => p + 1)} data-testid="history-next">{t("archive.next")}</Button>
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} data-testid="history-prev">Previous</Button>
+            <span className="text-sm text-gray-500">Page {page} of {data?.totalPages}</span>
+            <Button variant="outline" size="sm" disabled={page >= (data?.totalPages ?? 1)} onClick={() => setPage((p) => p + 1)} data-testid="history-next">Next</Button>
           </div>
         )}
       </Card>
@@ -277,7 +292,6 @@ function ArchiveHistoryTable() {
 }
 
 function BrowseArchiveTable() {
-  const { t } = useTranslation("admin");
   const [dateFrom, setDateFrom] = useState(ninetyDaysAgo());
   const [dateTo, setDateTo] = useState(today());
   const [userIdFilter, setUserIdFilter] = useState("all");
@@ -293,10 +307,12 @@ function BrowseArchiveTable() {
 
   const { data, isLoading, refetch } = useQuery<any>({
     queryKey: ["/api/archive/entries", dateFrom, dateTo, userIdFilter, page],
-    queryFn: () => apiRequest("GET", `/api/archive/entries?${buildQuery()}`).then((r) => r.json()),
+    queryFn: () =>
+      apiRequest("GET", `/api/archive/entries?${buildQuery()}`).then((r) => r.json()),
     staleTime: 30_000,
   });
 
+  // Employees dropdown from history endpoint reuse (just use /api/quickbooks/employees for user list)
   const { data: empData } = useQuery<any>({
     queryKey: ["/api/quickbooks/employees"],
     queryFn: () => apiRequest("GET", "/api/quickbooks/employees").then((r) => r.json()),
@@ -308,15 +324,16 @@ function BrowseArchiveTable() {
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center">
-        <h3 className="text-sm font-semibold text-gray-700">{t("archive.browseArchived")}</h3>
+        <h3 className="text-sm font-semibold text-gray-700">Browse Archived Entries</h3>
         <Button variant="ghost" size="icon" onClick={() => refetch()} data-testid="refresh-entries">
           <RefreshCw className="w-4 h-4" />
         </Button>
       </div>
 
+      {/* Filters */}
       <div className="flex flex-wrap gap-3 items-end">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500">{t("archive.from")}</label>
+          <label className="text-xs text-gray-500">From</label>
           <input
             type="date"
             data-testid="browse-date-from"
@@ -326,7 +343,7 @@ function BrowseArchiveTable() {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500">{t("archive.to")}</label>
+          <label className="text-xs text-gray-500">To</label>
           <input
             type="date"
             data-testid="browse-date-to"
@@ -336,13 +353,13 @@ function BrowseArchiveTable() {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500">{t("archive.employee")}</label>
+          <label className="text-xs text-gray-500">Employee</label>
           <Select value={userIdFilter} onValueChange={(v) => { setUserIdFilter(v); setPage(1); }}>
             <SelectTrigger data-testid="browse-employee-filter" className="w-44 h-9 text-sm">
-              <SelectValue placeholder={t("archive.allEmployees")} />
+              <SelectValue placeholder="All employees" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t("archive.allEmployees")}</SelectItem>
+              <SelectItem value="all">All employees</SelectItem>
               {(empData?.localUsers ?? []).map((u: any) => (
                 <SelectItem key={u.id} value={String(u.id)}>
                   {u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.username}
@@ -358,11 +375,11 @@ function BrowseArchiveTable() {
           <table className="w-full text-sm" data-testid="browse-table">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("archive.employee")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("timeReports.date")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("timeReports.job")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("archive.workArea")}</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">{t("archive.hours")}</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Employee</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Date</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Job</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Work Area</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Hours</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">QB</th>
               </tr>
             </thead>
@@ -380,7 +397,7 @@ function BrowseArchiveTable() {
               ) : entries.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
-                    {t("archive.noEntries")}
+                    No archived entries found
                   </td>
                 </tr>
               ) : (
@@ -408,7 +425,7 @@ function BrowseArchiveTable() {
                     </td>
                     <td className="px-4 py-3">
                       {entry.qbo_exported_at ? (
-                        <Badge className="bg-green-100 text-green-700 border-green-200 text-xs">{t("archive.exported")}</Badge>
+                        <Badge className="bg-green-100 text-green-700 border-green-200 text-xs">Exported</Badge>
                       ) : (
                         <Badge variant="outline" className="text-xs text-gray-400">—</Badge>
                       )}
@@ -421,13 +438,13 @@ function BrowseArchiveTable() {
         </div>
         {(data?.totalPages ?? 1) > 1 && (
           <div className="flex items-center justify-center gap-4 py-4 border-t border-gray-50">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} data-testid="browse-prev">{t("archive.previous")}</Button>
-            <span className="text-sm text-gray-500">{t("archive.pageOf", { page, total: data?.totalPages })}</span>
-            <Button variant="outline" size="sm" disabled={page >= (data?.totalPages ?? 1)} onClick={() => setPage((p) => p + 1)} data-testid="browse-next">{t("archive.next")}</Button>
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} data-testid="browse-prev">Previous</Button>
+            <span className="text-sm text-gray-500">Page {page} of {data?.totalPages}</span>
+            <Button variant="outline" size="sm" disabled={page >= (data?.totalPages ?? 1)} onClick={() => setPage((p) => p + 1)} data-testid="browse-next">Next</Button>
           </div>
         )}
       </Card>
-      <p className="text-xs text-gray-400 text-center">{t("archive.totalArchived", { count: data?.totalCount ?? 0 })}</p>
+      <p className="text-xs text-gray-400 text-center">{data?.totalCount ?? 0} total archived entries</p>
     </div>
   );
 }
@@ -441,17 +458,20 @@ function ViewArchivesTab() {
   );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function ArchivePage() {
-  const { t } = useTranslation("admin");
   const [activeTab, setActiveTab] = useState<"archive" | "view">("archive");
 
   return (
     <div className="max-w-5xl mx-auto px-4 pb-12 pt-4 space-y-6">
       <div>
         <h1 data-testid="archive-page-title" className="text-2xl font-bold text-gray-900">
-          {t("archive.title")}
+          Time Entry Archive
         </h1>
-        <p className="text-sm text-gray-500 mt-0.5">{t("archive.subtitle")}</p>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Archive old completed time entries to keep the active table fast while preserving all data
+        </p>
       </div>
 
       <div className="flex border-b border-gray-200">
@@ -466,7 +486,7 @@ export default function ArchivePage() {
           ].join(" ")}
         >
           <Archive className="inline w-4 h-4 mr-1.5 -mt-0.5" />
-          {t("archive.archiveTab")}
+          Archive
         </button>
         <button
           data-testid="tab-view"
@@ -479,7 +499,7 @@ export default function ArchivePage() {
           ].join(" ")}
         >
           <Clock className="inline w-4 h-4 mr-1.5 -mt-0.5" />
-          {t("archive.viewArchivesTab")}
+          View Archives
         </button>
       </div>
 

@@ -1,6 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,13 +8,15 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ChevronLeft, ChevronRight, CalendarCheck, X, Users, Briefcase, RotateCcw } from "lucide-react";
 import {
-  format, addWeeks, subWeeks, startOfWeek, addDays, isToday,
-  parseISO,
+  format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday,
+  parseISO, parse,
 } from "date-fns";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
 interface CrewMember { id: string; first_name: string; last_name: string; }
 interface ScheduledJob {
   id: string; title: string; status: string;
@@ -53,8 +54,9 @@ interface UndoAction {
   timestamp: number;
 }
 
-const HOURS = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
-const CELL_H = 64;
+// ── Constants ────────────────────────────────────────────────────────────────
+const HOURS = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]; // 6am – 7pm
+const CELL_H = 64; // px per hour
 
 const DIVISIONS = [
   { value: "Maintenance", color: "#22c55e" },
@@ -91,15 +93,16 @@ const STATUS_CLS: Record<string, string> = {
   completed: "bg-green-100 text-green-700",
 };
 
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function SchedulingCalendar() {
-  const { t } = useTranslation("scheduling");
   const { toast } = useToast();
   const [weekBase, setWeekBase] = useState(() => new Date());
-  const weekStart = startOfWeek(weekBase, { weekStartsOn: 1 });
+  const weekStart = startOfWeek(weekBase, { weekStartsOn: 1 }); // Monday
   const weekDays  = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const rangeStart = format(weekStart, "yyyy-MM-dd");
   const rangeEnd   = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
+  // ── Queries ──────────────────────────────────────────────────────────────────
   const { data: calJobs = [], isLoading: calLoading } = useQuery<ScheduledJob[]>({
     queryKey: ["/api/scheduling/calendar", rangeStart, rangeEnd],
     queryFn: async () => {
@@ -124,6 +127,7 @@ export default function SchedulingCalendar() {
     },
   });
 
+  // ── Mutations ─────────────────────────────────────────────────────────────────
   const scheduleMutation = useMutation({
     mutationFn: async (payload: {
       jobId: string; scheduled_date: string; scheduled_start: string;
@@ -142,7 +146,8 @@ export default function SchedulingCalendar() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/calendar"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/unscheduled"] });
-      toast({ title: t("jobScheduled") });
+      toast({ title: "Job scheduled!" });
+      // Record undo action from captured previous state
       if (previousStateRef.current) {
         const job = calJobs.find(j => j.id === variables.jobId)
           ?? unscheduled.find(j => j.id === variables.jobId);
@@ -156,7 +161,7 @@ export default function SchedulingCalendar() {
       }
       setPendingDrop(null);
     },
-    onError: () => toast({ title: t("errorScheduling"), variant: "destructive" }),
+    onError: () => toast({ title: "Error scheduling job", variant: "destructive" }),
   });
 
   const unscheduleMutation = useMutation({
@@ -166,11 +171,12 @@ export default function SchedulingCalendar() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/calendar"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/unscheduled"] });
-      toast({ title: t("removed") });
+      toast({ title: "Removed from schedule" });
     },
-    onError: () => toast({ title: t("errorScheduling"), variant: "destructive" }),
+    onError: () => toast({ title: "Error removing job", variant: "destructive" }),
   });
 
+  // ── Undo mutation ─────────────────────────────────────────────────────────────
   const undoMutation = useMutation({
     mutationFn: async ({ jobId, previousState }: { jobId: string; previousState: UndoPreviousState }) => {
       if (previousState.was_scheduled) {
@@ -189,12 +195,13 @@ export default function SchedulingCalendar() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/calendar"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/unscheduled"] });
-      toast({ title: t("undone") });
+      toast({ title: "Action undone" });
+      // Clear the undo button
       if (undoIntervalRef.current) clearInterval(undoIntervalRef.current);
       setUndoAction(null);
       setUndoSecondsLeft(0);
     },
-    onError: () => toast({ title: t("undoFailed"), variant: "destructive" }),
+    onError: () => toast({ title: "Undo failed", variant: "destructive" }),
   });
 
   function handleUndo() {
@@ -202,20 +209,25 @@ export default function SchedulingCalendar() {
     undoMutation.mutate({ jobId: undoAction.jobId, previousState: undoAction.previousState });
   }
 
+  // ── Drag & Drop state ─────────────────────────────────────────────────────────
   const draggingId = useRef<string | null>(null);
+
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
+  // Modal form state
   const [modalStartHour, setModalStartHour] = useState(8);
   const [modalEndHour,   setModalEndHour]   = useState(10);
   const [modalDivision,  setModalDivision]  = useState("Maintenance");
   const [modalColor,     setModalColor]     = useState("#22c55e");
   const [selectedEmpIds, setSelectedEmpIds] = useState<string[]>([]);
 
-  const UNDO_DURATION = 300;
+  // ── Undo state ────────────────────────────────────────────────────────────────
+  const UNDO_DURATION = 300; // seconds (5 minutes)
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
   const [undoSecondsLeft, setUndoSecondsLeft] = useState(0);
   const previousStateRef = useRef<UndoPreviousState | null>(null);
   const undoIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Countdown ticker – decrements every second, clears when it hits 0
   useEffect(() => {
     if (!undoAction) return;
     setUndoSecondsLeft(UNDO_DURATION);
@@ -231,7 +243,7 @@ export default function SchedulingCalendar() {
       });
     }, 1000);
     return () => { if (undoIntervalRef.current) clearInterval(undoIntervalRef.current); };
-  }, [undoAction?.timestamp]);
+  }, [undoAction?.timestamp]); // re-run only when a new action is recorded
 
   const handleDragStart = useCallback((e: React.DragEvent, jobId: string) => {
     draggingId.current = jobId;
@@ -249,10 +261,12 @@ export default function SchedulingCalendar() {
     const jobId = e.dataTransfer.getData("text/plain") || draggingId.current;
     if (!jobId) return;
 
+    // Find the job to detect its existing division/color
     const existingJob = calJobs.find(j => j.id === jobId) || null;
     const unschJob    = unscheduled.find(j => j.id === jobId) || null;
     const job         = existingJob ?? unschJob;
 
+    // Capture previous state for potential undo
     if (existingJob) {
       previousStateRef.current = {
         was_scheduled:       true,
@@ -282,6 +296,7 @@ export default function SchedulingCalendar() {
     setPendingDrop({ jobId, date: format(day, "yyyy-MM-dd"), hour });
   }, [calJobs, unscheduled]);
 
+  // Find the job in unscheduled or calJobs for modal display
   const pendingJob = pendingDrop
     ? (calJobs.find(j => j.id === pendingDrop.jobId) ?? unscheduled.find(j => j.id === pendingDrop.jobId))
     : null;
@@ -305,6 +320,7 @@ export default function SchedulingCalendar() {
     });
   }
 
+  // ── Helpers ───────────────────────────────────────────────────────────────────
   function getJobsForDay(day: Date): ScheduledJob[] {
     const dayStr = format(day, "yyyy-MM-dd");
     return calJobs.filter(j => j.scheduled_date === dayStr);
@@ -314,18 +330,19 @@ export default function SchedulingCalendar() {
     return getJobsForDay(day).length;
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-full overflow-hidden" data-testid="scheduling-page">
 
-      {/* Left: Unscheduled jobs panel */}
+      {/* ── Left: Unscheduled jobs panel ── */}
       <div className="w-64 flex-shrink-0 border-r flex flex-col bg-muted/20">
         <div className="px-3 py-3 border-b bg-background">
           <div className="flex items-center gap-2">
             <Briefcase className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">{t("unscheduledJobs")}</span>
+            <span className="text-sm font-semibold">Unscheduled</span>
             <Badge variant="secondary" className="ml-auto">{unscheduled.length}</Badge>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">{t("dragToSchedule")}</p>
+          <p className="text-xs text-muted-foreground mt-1">Drag jobs onto the calendar to schedule them</p>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
           {unschLoading && (
@@ -334,7 +351,7 @@ export default function SchedulingCalendar() {
           {!unschLoading && unscheduled.length === 0 && (
             <div className="py-10 text-center text-muted-foreground">
               <CalendarCheck className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p className="text-xs">{t("noUnscheduled")}</p>
+              <p className="text-xs">All jobs are scheduled!</p>
             </div>
           )}
           {unscheduled.map(job => {
@@ -371,7 +388,7 @@ export default function SchedulingCalendar() {
         </div>
       </div>
 
-      {/* Right: Calendar */}
+      {/* ── Right: Calendar ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-background shrink-0">
@@ -388,7 +405,7 @@ export default function SchedulingCalendar() {
               onClick={() => setWeekBase(new Date())}
               data-testid="btn-today"
             >
-              {t("today")}
+              Today
             </Button>
             <Button
               size="sm" variant="outline"
@@ -431,7 +448,7 @@ export default function SchedulingCalendar() {
                   {format(day, "d")}
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-0.5">
-                  {cnt > 0 ? `${cnt}` : ""}
+                  {cnt > 0 ? `${cnt} job${cnt !== 1 ? "s" : ""}` : ""}
                 </div>
               </div>
             );
@@ -484,7 +501,7 @@ export default function SchedulingCalendar() {
                       />
                     ))}
 
-                    {/* Scheduled job cards */}
+                    {/* Scheduled job cards — absolutely positioned */}
                     {dayJobs.map(job => {
                       const startH = parseHour(job.scheduled_start_time) ?? 8;
                       const endH   = parseHour(job.scheduled_end_time)   ?? startH + 2;
@@ -517,7 +534,7 @@ export default function SchedulingCalendar() {
                             className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 bg-black/30 rounded p-0.5 transition-opacity"
                             onClick={e => { e.stopPropagation(); unscheduleMutation.mutate(job.id); }}
                             data-testid={`btn-unschedule-${job.id}`}
-                            title={t("removeFromSchedule")}
+                            title="Remove from schedule"
                           >
                             <X className="h-2.5 w-2.5" />
                           </button>
@@ -532,7 +549,7 @@ export default function SchedulingCalendar() {
         </div>
       </div>
 
-      {/* Floating Undo Button */}
+      {/* ── Floating Undo Button (appears for 5 min after a scheduling action) ── */}
       {undoAction && (
         <div
           className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 shadow-lg"
@@ -550,7 +567,7 @@ export default function SchedulingCalendar() {
               ? <Loader2 className="h-4 w-4 animate-spin" />
               : <RotateCcw className="h-4 w-4" />}
             <span>
-              {undoAction.jobTitle} (
+              Undo "{undoAction.jobTitle}" (
               {String(Math.floor(undoSecondsLeft / 60)).padStart(1, "0")}:{String(undoSecondsLeft % 60).padStart(2, "0")}
               )
             </span>
@@ -559,19 +576,20 @@ export default function SchedulingCalendar() {
             onClick={() => { setUndoAction(null); if (undoIntervalRef.current) clearInterval(undoIntervalRef.current); }}
             className="flex items-center justify-center w-6 h-6 rounded-full bg-background border hover:bg-muted transition-colors"
             data-testid="btn-dismiss-undo"
+            title="Dismiss"
           >
             <X className="h-3 w-3 text-muted-foreground" />
           </button>
         </div>
       )}
 
-      {/* Schedule Modal */}
+      {/* ── Schedule Modal ── */}
       <Dialog open={!!pendingDrop} onOpenChange={open => !open && setPendingDrop(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarCheck className="h-5 w-5 text-primary" />
-              {t("title")}
+              Schedule Job
             </DialogTitle>
           </DialogHeader>
 
@@ -590,7 +608,7 @@ export default function SchedulingCalendar() {
 
               {/* Date */}
               <div>
-                <Label className="text-xs">{t("weekView", { ns: "scheduling" })}</Label>
+                <Label className="text-xs">Date</Label>
                 <div className="mt-1 text-sm font-medium">
                   {pendingDrop && format(parseISO(pendingDrop.date), "EEEE, MMMM d, yyyy")}
                 </div>
@@ -599,7 +617,7 @@ export default function SchedulingCalendar() {
               {/* Times */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs">{t("startTime")}</Label>
+                  <Label className="text-xs">Start Time</Label>
                   <Select
                     value={String(modalStartHour)}
                     onValueChange={v => setModalStartHour(Number(v))}
@@ -615,7 +633,7 @@ export default function SchedulingCalendar() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">{t("endTime")}</Label>
+                  <Label className="text-xs">End Time</Label>
                   <Select
                     value={String(modalEndHour)}
                     onValueChange={v => setModalEndHour(Number(v))}
@@ -634,7 +652,7 @@ export default function SchedulingCalendar() {
 
               {/* Division */}
               <div>
-                <Label className="text-xs">{t("division")}</Label>
+                <Label className="text-xs">Division</Label>
                 <Select
                   value={modalDivision}
                   onValueChange={v => {
@@ -662,7 +680,7 @@ export default function SchedulingCalendar() {
               {employees.length > 0 && (
                 <div>
                   <Label className="text-xs flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5" /> {t("assignCrew")} ({t("crewSelected", { count: selectedEmpIds.length })})
+                    <Users className="h-3.5 w-3.5" /> Assign Crew ({selectedEmpIds.length} selected)
                   </Label>
                   <div className="mt-2 max-h-36 overflow-y-auto border rounded-md divide-y">
                     {employees.map(emp => (
@@ -693,7 +711,7 @@ export default function SchedulingCalendar() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setPendingDrop(null)} data-testid="btn-cancel-schedule">
-              {t("cancel", { ns: "common" })}
+              Cancel
             </Button>
             <Button
               onClick={confirmSchedule}
@@ -701,7 +719,7 @@ export default function SchedulingCalendar() {
               data-testid="btn-confirm-schedule"
             >
               {scheduleMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {t("confirmSchedule")}
+              Confirm Schedule
             </Button>
           </DialogFooter>
         </DialogContent>

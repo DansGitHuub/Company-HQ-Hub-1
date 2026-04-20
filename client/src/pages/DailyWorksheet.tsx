@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +13,8 @@ import {
   Receipt, Users, StickyNote, Clock, Briefcase, ChevronDown, ChevronRight,
   ImagePlus, X,
 } from "lucide-react";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Material {
   id: number;
@@ -67,6 +68,8 @@ interface CrewUser {
   role: string;
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function formatDate(_dateStr?: string) {
   return new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -82,6 +85,8 @@ function formatElapsed(seconds: number) {
   const s = seconds % 60;
   return [h, m, s].map((v) => String(v).padStart(2, "0")).join(":");
 }
+
+// ─── Section wrapper ──────────────────────────────────────────────────────────
 
 function Section({
   icon: Icon, title, count, color, children,
@@ -114,14 +119,14 @@ function Section({
   );
 }
 
-const EXPENSE_CATEGORIES = ["Fuel", "Materials", "Equipment Rental", "Dump Fee", "Food", "Other"];
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function DailyWorksheet() {
-  const { t } = useTranslation("worksheet");
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
 
+  // ── Elapsed timer ────────────────────────────────────────────────────────────
   const [elapsed, setElapsed] = useState(0);
 
   const { data: activeEntry } = useQuery<ActiveEntry | null>({
@@ -141,21 +146,24 @@ export default function DailyWorksheet() {
       Math.floor((Date.now() - new Date(activeEntry.clock_in).getTime()) / 1000)
     );
     update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
   }, [activeEntry?.clock_in]);
 
+  // ── Today's worksheet ────────────────────────────────────────────────────────
   const { data: ws, isLoading } = useQuery<Worksheet>({
     queryKey: ["/api/worksheets/today"],
     queryFn: () => fetch("/api/worksheets/today").then((r) => r.json()),
   });
 
+  // ── Crew users list (for team member picker) ─────────────────────────────────
   const { data: crewUsers = [] } = useQuery<CrewUser[]>({
     queryKey: ["/api/users"],
     queryFn: () => fetch("/api/users").then((r) => r.json()),
     select: (data) => data.filter((u) => u.role !== "Customer"),
   });
 
+  // ── Notes state (local, saved on blur or submit) ─────────────────────────────
   const [notes, setNotes] = useState("");
   const notesInitialized = useRef(false);
   const notesDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -169,6 +177,7 @@ export default function DailyWorksheet() {
     }
   }, [ws]);
 
+  // ── Save notes ───────────────────────────────────────────────────────────────
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [notesSaved, setNotesSaved] = useState(false);
 
@@ -189,6 +198,7 @@ export default function DailyWorksheet() {
     }
   };
 
+  // ── Debounced 1s auto-save for notes ─────────────────────────────────────────
   useEffect(() => {
     if (!notesInitialized.current || !wsIdRef.current) return;
     if (notesDebounce.current) clearTimeout(notesDebounce.current);
@@ -206,6 +216,7 @@ export default function DailyWorksheet() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes]);
 
+  // ── Submit worksheet ─────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   const handleSubmit = async () => {
     if (!ws) return;
@@ -214,9 +225,9 @@ export default function DailyWorksheet() {
       await apiRequest("PATCH", `/api/worksheets/${ws.id}`, { notes });
       await apiRequest("POST", `/api/worksheets/${ws.id}/submit`, {});
       qc.invalidateQueries({ queryKey: ["/api/worksheets/today"] });
-      toast({ title: t("worksheetSubmitted"), description: t("worksheetSubmittedDesc") });
+      toast({ title: "Worksheet submitted!", description: "Your worksheet has been submitted." });
     } catch (err: any) {
-      toast({ title: t("submitFailed"), description: err.message, variant: "destructive" });
+      toast({ title: "Submit failed", description: err.message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -224,10 +235,12 @@ export default function DailyWorksheet() {
 
   const isSubmitted = ws?.status === "submitted" || ws?.status === "approved";
 
+  // ─── Materials form state ─────────────────────────────────────────────────────
   const [matForm, setMatForm] = useState({ material_name: "", quantity: "", unit: "", unit_cost: "", notes: "" });
   const [addingMat, setAddingMat] = useState(false);
   const [showMatForm, setShowMatForm] = useState(false);
 
+  // Catalog autocomplete
   const [catalogSuggestions, setCatalogSuggestions] = useState<{ id: string; name: string; unit: string | null; unit_cost: string | null }[]>([]);
   const [showCatalogDrop, setShowCatalogDrop] = useState(false);
   const catalogDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -263,9 +276,9 @@ export default function DailyWorksheet() {
       setMatForm({ material_name: "", quantity: "", unit: "", unit_cost: "", notes: "" });
       setShowMatForm(false);
       qc.invalidateQueries({ queryKey: ["/api/worksheets/today"] });
-      toast({ title: t("materialAdded") });
+      toast({ title: "Material added" });
     } catch (err: any) {
-      toast({ title: t("error", { ns: "common" }), description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setAddingMat(false);
     }
@@ -277,10 +290,12 @@ export default function DailyWorksheet() {
       await apiRequest("DELETE", `/api/worksheets/${ws.id}/materials/${materialId}`, undefined);
       qc.invalidateQueries({ queryKey: ["/api/worksheets/today"] });
     } catch (err: any) {
-      toast({ title: t("error", { ns: "common" }), description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
+  // ─── Expenses form state ──────────────────────────────────────────────────────
+  const EXPENSE_CATEGORIES = ["Fuel", "Materials", "Equipment Rental", "Dump Fee", "Food", "Other"];
   const receiptInputRef = useRef<HTMLInputElement>(null);
   const [expForm, setExpForm] = useState({ description: "", amount: "", category: "", receipt_url: "" });
   const [addingExp, setAddingExp] = useState(false);
@@ -305,9 +320,9 @@ export default function DailyWorksheet() {
       setExpForm({ description: "", amount: "", category: "", receipt_url: "" });
       setShowExpForm(false);
       qc.invalidateQueries({ queryKey: ["/api/worksheets/today"] });
-      toast({ title: t("expenseAdded") });
+      toast({ title: "Expense added" });
     } catch (err: any) {
-      toast({ title: t("error", { ns: "common" }), description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setAddingExp(false);
     }
@@ -319,10 +334,11 @@ export default function DailyWorksheet() {
       await apiRequest("DELETE", `/api/worksheets/${ws.id}/expenses/${expenseId}`, undefined);
       qc.invalidateQueries({ queryKey: ["/api/worksheets/today"] });
     } catch (err: any) {
-      toast({ title: t("error", { ns: "common" }), description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
+  // ─── Team members ─────────────────────────────────────────────────────────────
   const [selectedUserId, setSelectedUserId] = useState("");
   const [addingMember, setAddingMember] = useState(false);
 
@@ -334,7 +350,7 @@ export default function DailyWorksheet() {
       setSelectedUserId("");
       qc.invalidateQueries({ queryKey: ["/api/worksheets/today"] });
     } catch (err: any) {
-      toast({ title: t("error", { ns: "common" }), description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setAddingMember(false);
     }
@@ -346,10 +362,11 @@ export default function DailyWorksheet() {
       await apiRequest("DELETE", `/api/worksheets/${ws.id}/team-members/${memberId}`, undefined);
       qc.invalidateQueries({ queryKey: ["/api/worksheets/today"] });
     } catch (err: any) {
-      toast({ title: t("error", { ns: "common" }), description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
+  // ─── Loading ──────────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -363,17 +380,18 @@ export default function DailyWorksheet() {
   const addedMemberIds = new Set(ws.teamMembers.map((m) => m.user_id));
   const availableUsers = crewUsers.filter((u) => u.id !== user?.id && !addedMemberIds.has(u.id));
 
+  // ─── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 pb-28">
 
-      {/* HEADER */}
+      {/* ── HEADER ── */}
       <div className="bg-green-700 text-white px-4 pt-5 pb-4">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-2 mb-1">
             <ClipboardList className="h-5 w-5 opacity-80" />
-            <span className="text-xs font-semibold uppercase tracking-wider opacity-80">{t("title")}</span>
+            <span className="text-xs font-semibold uppercase tracking-wider opacity-80">Daily Worksheet</span>
             {isSubmitted && (
-              <Badge className="ml-2 bg-white/20 text-white border-white/30 text-xs">{t("submitted")}</Badge>
+              <Badge className="ml-2 bg-white/20 text-white border-white/30 text-xs">Submitted</Badge>
             )}
           </div>
           <h1 className="text-2xl font-bold">{formatDate(ws.date)}</h1>
@@ -403,21 +421,21 @@ export default function DailyWorksheet() {
                 </div>
                 <div className="flex items-center gap-1.5 opacity-75 text-xs">
                   <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                  {t("clockedIn")}
+                  Clocked In
                 </div>
               </div>
             </div>
           ) : (
-            <p className="mt-2 text-sm opacity-70">{t("notClockedIn")}</p>
+            <p className="mt-2 text-sm opacity-70">Not currently clocked in</p>
           )}
         </div>
       </div>
 
-      {/* SECTIONS */}
+      {/* ── SECTIONS ── */}
       <div className="max-w-2xl mx-auto px-4 pt-5 space-y-4">
 
-        {/* Materials */}
-        <Section icon={PackageOpen} title={t("materialsUsed")} count={ws.materials.length} color="#2563eb">
+        {/* Section 1 — Materials Used */}
+        <Section icon={PackageOpen} title="Materials Used" count={ws.materials.length} color="#2563eb">
           {ws.materials.length > 0 && (
             <div className="mb-3 divide-y divide-gray-100 rounded-lg border border-gray-100 overflow-hidden">
               {ws.materials.map((m) => (
@@ -449,7 +467,7 @@ export default function DailyWorksheet() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="col-span-2 relative">
                     <Input
-                      placeholder={t("materialName")}
+                      placeholder="Material name *"
                       value={matForm.material_name}
                       onChange={(e) => setMatForm((f) => ({ ...f, material_name: e.target.value }))}
                       onBlur={() => setTimeout(() => setShowCatalogDrop(false), 150)}
@@ -482,28 +500,28 @@ export default function DailyWorksheet() {
                       </div>
                     )}
                   </div>
-                  <Input placeholder={t("qty")} value={matForm.quantity} onChange={(e) => setMatForm((f) => ({ ...f, quantity: e.target.value }))} className="h-8 text-sm" data-testid="input-material-qty" />
-                  <Input placeholder={t("unit")} value={matForm.unit} onChange={(e) => setMatForm((f) => ({ ...f, unit: e.target.value }))} className="h-8 text-sm" data-testid="input-material-unit" />
-                  <Input placeholder={t("unitCost")} value={matForm.unit_cost} onChange={(e) => setMatForm((f) => ({ ...f, unit_cost: e.target.value }))} className="h-8 text-sm" data-testid="input-material-cost" />
-                  <Input placeholder={t("notesPlaceholder")} value={matForm.notes} onChange={(e) => setMatForm((f) => ({ ...f, notes: e.target.value }))} className="h-8 text-sm" data-testid="input-material-notes" />
+                  <Input placeholder="Qty" value={matForm.quantity} onChange={(e) => setMatForm((f) => ({ ...f, quantity: e.target.value }))} className="h-8 text-sm" data-testid="input-material-qty" />
+                  <Input placeholder="Unit (bag, gal…)" value={matForm.unit} onChange={(e) => setMatForm((f) => ({ ...f, unit: e.target.value }))} className="h-8 text-sm" data-testid="input-material-unit" />
+                  <Input placeholder="Unit cost ($)" value={matForm.unit_cost} onChange={(e) => setMatForm((f) => ({ ...f, unit_cost: e.target.value }))} className="h-8 text-sm" data-testid="input-material-cost" />
+                  <Input placeholder="Notes" value={matForm.notes} onChange={(e) => setMatForm((f) => ({ ...f, notes: e.target.value }))} className="h-8 text-sm" data-testid="input-material-notes" />
                 </div>
                 <div className="flex gap-2 pt-1">
                   <Button size="sm" onClick={addMaterial} disabled={!matForm.material_name || addingMat} className="h-7 text-xs bg-blue-600 hover:bg-blue-700" data-testid="btn-add-material">
-                    {addingMat ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3 mr-1" />} {t("add")}
+                    {addingMat ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3 mr-1" />} Add
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowMatForm(false)} className="h-7 text-xs">{t("cancel", { ns: "common" })}</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setShowMatForm(false)} className="h-7 text-xs">Cancel</Button>
                 </div>
               </div>
             ) : (
               <Button size="sm" variant="outline" onClick={() => setShowMatForm(true)} className="h-8 text-xs border-dashed" data-testid="btn-show-material-form">
-                <Plus className="h-3.5 w-3.5 mr-1" /> {t("addMaterial")}
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add Material
               </Button>
             )
           )}
         </Section>
 
-        {/* Expenses */}
-        <Section icon={Receipt} title={t("expenses")} count={ws.expenses.length} color="#7c3aed">
+        {/* Section 2 — Expenses */}
+        <Section icon={Receipt} title="Expenses" count={ws.expenses.length} color="#7c3aed">
           {ws.expenses.length > 0 && (
             <div className="mb-3 divide-y divide-gray-100 rounded-lg border border-gray-100 overflow-hidden">
               {ws.expenses.map((e) => (
@@ -528,14 +546,15 @@ export default function DailyWorksheet() {
             showExpForm ? (
               <div className="space-y-2 p-3 bg-purple-50 rounded-lg border border-purple-100">
                 <div className="grid grid-cols-2 gap-2">
-                  <Input placeholder={t("description")} value={expForm.description} onChange={(e) => setExpForm((f) => ({ ...f, description: e.target.value }))} className="h-8 text-sm col-span-2" data-testid="input-expense-desc" />
-                  <Input placeholder={t("amount")} value={expForm.amount} onChange={(e) => setExpForm((f) => ({ ...f, amount: e.target.value }))} className="h-8 text-sm" data-testid="input-expense-amount" />
+                  <Input placeholder="Description *" value={expForm.description} onChange={(e) => setExpForm((f) => ({ ...f, description: e.target.value }))} className="h-8 text-sm col-span-2" data-testid="input-expense-desc" />
+                  <Input placeholder="Amount ($)" value={expForm.amount} onChange={(e) => setExpForm((f) => ({ ...f, amount: e.target.value }))} className="h-8 text-sm" data-testid="input-expense-amount" />
                   <select value={expForm.category} onChange={(e) => setExpForm((f) => ({ ...f, category: e.target.value }))} className="h-8 text-sm rounded-md border border-input bg-background px-3" data-testid="select-expense-category">
-                    <option value="">{t("category")}</option>
+                    <option value="">Category…</option>
                     {EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
 
+                {/* Receipt upload */}
                 <input
                   ref={receiptInputRef}
                   type="file"
@@ -562,34 +581,34 @@ export default function DailyWorksheet() {
                     className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 py-1"
                     data-testid="btn-upload-receipt"
                   >
-                    <ImagePlus className="h-3.5 w-3.5" /> {t("attachReceipt")}
+                    <ImagePlus className="h-3.5 w-3.5" /> Attach receipt photo
                   </button>
                 )}
 
                 <div className="flex gap-2 pt-1">
                   <Button size="sm" onClick={addExpense} disabled={!expForm.description || addingExp} className="h-7 text-xs bg-purple-600 hover:bg-purple-700" data-testid="btn-add-expense">
-                    {addingExp ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3 mr-1" />} {t("add")}
+                    {addingExp ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3 mr-1" />} Add
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setShowExpForm(false); setExpForm({ description: "", amount: "", category: "", receipt_url: "" }); if (receiptInputRef.current) receiptInputRef.current.value = ""; }} className="h-7 text-xs">
-                    {t("cancel", { ns: "common" })}
-                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setShowExpForm(false); setExpForm({ description: "", amount: "", category: "", receipt_url: "" }); if (receiptInputRef.current) receiptInputRef.current.value = ""; }} className="h-7 text-xs">Cancel</Button>
                 </div>
               </div>
             ) : (
               <Button size="sm" variant="outline" onClick={() => setShowExpForm(true)} className="h-8 text-xs border-dashed" data-testid="btn-show-expense-form">
-                <Plus className="h-3.5 w-3.5 mr-1" /> {t("addExpense")}
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add Expense
               </Button>
             )
           )}
         </Section>
 
-        {/* Team Members */}
-        <Section icon={Users} title={t("crewOnSite")} count={ws.teamMembers.length + 1} color="#059669">
+        {/* Section 3 — Team Members */}
+        <Section icon={Users} title="Crew on Site" count={ws.teamMembers.length + 1} color="#059669">
           <div className="mb-3 flex flex-wrap gap-2">
+            {/* Logged-in user — always shown, no remove button */}
             <div className="flex items-center gap-1.5 bg-green-100 border border-green-300 text-green-900 text-sm px-3 py-1.5 rounded-full" data-testid="member-chip-self">
               <span className="font-medium">{user?.name || user?.username}</span>
-              <span className="text-xs text-green-600 font-normal">{t("youLabel")}</span>
+              <span className="text-xs text-green-600 font-normal">(You)</span>
             </div>
+            {/* Other crew members */}
             {ws.teamMembers.map((m) => (
               <div key={m.id} className="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-800 text-sm px-3 py-1.5 rounded-full" data-testid={`member-chip-${m.id}`}>
                 <span className="font-medium">{m.user_name || m.username}</span>
@@ -610,7 +629,7 @@ export default function DailyWorksheet() {
                 className="flex-1 h-8 text-sm rounded-md border border-input bg-background px-3"
                 data-testid="select-team-member"
               >
-                <option value="">{t("addCrewMember")}</option>
+                <option value="">Add crew member…</option>
                 {availableUsers.map((u) => (
                   <option key={u.id} value={u.id}>{u.name || u.username}</option>
                 ))}
@@ -622,10 +641,10 @@ export default function DailyWorksheet() {
           )}
         </Section>
 
-        {/* Notes */}
-        <Section icon={StickyNote} title={t("notes")} color="#d97706">
+        {/* Section 4 — Notes */}
+        <Section icon={StickyNote} title="Notes" color="#d97706">
           <Textarea
-            placeholder={t("notesPrompt")}
+            placeholder="Add any notes about today's work…"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={4}
@@ -636,22 +655,22 @@ export default function DailyWorksheet() {
           {!isSubmitted && (
             <div className="flex items-center gap-3 mt-2">
               <Button size="sm" variant="outline" onClick={saveNotes} disabled={isSavingNotes} className="h-7 text-xs" data-testid="btn-save-notes">
-                {isSavingNotes ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />} {t("saveNotes")}
+                {isSavingNotes ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />} Save Notes
               </Button>
               {notesSaved && (
                 <span className="text-xs text-green-600 font-medium flex items-center gap-1" data-testid="text-notes-saved">
-                  <span>✓</span> {t("saved")}
+                  <span>✓</span> Saved
                 </span>
               )}
               {isSavingNotes && !notesSaved && (
-                <span className="text-xs text-gray-400">{t("saving")}</span>
+                <span className="text-xs text-gray-400">Saving…</span>
               )}
             </div>
           )}
         </Section>
       </div>
 
-      {/* STICKY FOOTER */}
+      {/* ── STICKY FOOTER ── */}
       {!isSubmitted && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 z-30">
           <div className="max-w-2xl mx-auto flex gap-3">
@@ -663,7 +682,7 @@ export default function DailyWorksheet() {
               data-testid="btn-save-draft"
             >
               {isSavingNotes ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-              {t("saveDraft")}
+              Save Draft
             </Button>
             <Button
               onClick={handleSubmit}
@@ -672,7 +691,7 @@ export default function DailyWorksheet() {
               data-testid="btn-submit-worksheet"
             >
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-              {t("submitWorksheet")}
+              Submit Worksheet
             </Button>
           </div>
         </div>
@@ -681,7 +700,7 @@ export default function DailyWorksheet() {
       {isSubmitted && (
         <div className="fixed bottom-0 left-0 right-0 bg-green-50 border-t border-green-200 px-4 py-3 z-30 text-center">
           <p className="text-sm font-medium text-green-700">
-            {t("submittedForDate")} {formatDate(ws.date)}
+            ✓ Worksheet submitted for {formatDate(ws.date)}
           </p>
         </div>
       )}

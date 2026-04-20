@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +11,7 @@ import { Clock, RefreshCw } from "lucide-react";
 
 function getPayPeriod(biweekOffset = 0): { start: string; end: string } {
   const now = new Date();
-  const dow = now.getDay();
+  const dow = now.getDay(); // 0=Sun … 6=Sat
   const daysSinceSat = dow === 6 ? 0 : dow + 1;
   const endDate = new Date(now);
   endDate.setDate(now.getDate() - daysSinceSat - biweekOffset * 14);
@@ -60,6 +59,13 @@ function formatDateHeader(isoDate: string): string {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+const ENTRY_TYPE_LABELS: Record<string, string> = {
+  billable: "Billable",
+  drive_time: "Drive",
+  shop_time: "Shop",
+  break: "Break",
+};
+
 const ENTRY_TYPE_COLORS: Record<string, string> = {
   billable: "bg-green-100 text-green-700",
   drive_time: "bg-blue-100 text-blue-700",
@@ -70,20 +76,13 @@ const ENTRY_TYPE_COLORS: Record<string, string> = {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MyHoursPage() {
-  const { t } = useTranslation("myHours");
   const { pendingCount } = useOfflineSync();
   const thisPP = getPayPeriod(0);
   const [startDate, setStartDate] = useState(thisPP.start);
   const [endDate, setEndDate] = useState(thisPP.end);
   const [page, setPage] = useState(1);
 
-  const ENTRY_TYPE_LABELS: Record<string, string> = {
-    billable: t("billable"),
-    drive_time: t("drive"),
-    shop_time: t("shop"),
-    break: t("breakLabel"),
-  };
-
+  // Current pay period summary (always fixed to current pay period)
   const { data: ppData, isLoading: ppLoading } = useQuery<any>({
     queryKey: ["/api/time/my-hours/pay-period"],
     queryFn: () =>
@@ -91,6 +90,7 @@ export default function MyHoursPage() {
     staleTime: 60_000,
   });
 
+  // Paginated entries for the selected date range
   const { data: hoursData, isLoading: hoursLoading, refetch } = useQuery<any>({
     queryKey: ["/api/time/my-hours", startDate, endDate, page],
     queryFn: () =>
@@ -106,6 +106,7 @@ export default function MyHoursPage() {
   const summary = hoursData?.summary;
   const totalPages: number = hoursData?.totalPages ?? 1;
 
+  // Group entries by calendar date
   const grouped: Record<string, any[]> = {};
   for (const entry of entries) {
     const day = new Date(entry.clock_in).toISOString().split("T")[0];
@@ -138,9 +139,9 @@ export default function MyHoursPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 data-testid="my-hours-title" className="text-2xl font-bold text-gray-900">
-            {t("title")}
+            My Hours
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">{t("payPeriod")}</p>
+          <p className="text-sm text-gray-500 mt-0.5">Your time history</p>
         </div>
         <button
           data-testid="refresh-button"
@@ -167,7 +168,7 @@ export default function MyHoursPage() {
             <>
               <div className="flex items-center flex-wrap gap-2 mb-4">
                 <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-                  {t("currentPayPeriod")}
+                  Current Pay Period
                 </p>
                 {ppData?.payPeriodStart && (
                   <span className="text-xs text-gray-400">
@@ -190,28 +191,28 @@ export default function MyHoursPage() {
                     {ppData?.summary?.totalHours ?? "0.00"}
                     <span className="text-lg font-normal text-gray-400 ml-1">hrs</span>
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">{t("totalHours")}</p>
+                  <p className="text-xs text-gray-400 mt-1">Total Worked</p>
                 </div>
                 <div className="flex gap-6 pb-1">
                   <div>
                     <p data-testid="pp-regular-hours" className="text-xl font-semibold text-gray-700 tabular-nums">
                       {ppData?.summary?.regularHours ?? "0.00"}h
                     </p>
-                    <p className="text-xs text-gray-400">{t("billable")}</p>
+                    <p className="text-xs text-gray-400">Regular</p>
                   </div>
                   {(ppData?.summary?.overtimeHours ?? 0) > 0 && (
                     <div>
                       <p data-testid="pp-ot-hours" className="text-xl font-semibold text-amber-600 tabular-nums">
                         {ppData?.summary?.overtimeHours}h
                       </p>
-                      <p className="text-xs text-amber-500">{t("billableHours")}</p>
+                      <p className="text-xs text-amber-500">Overtime</p>
                     </div>
                   )}
                   <div>
                     <p data-testid="pp-days-worked" className="text-xl font-semibold text-gray-700 tabular-nums">
                       {ppData?.summary?.daysWorked ?? 0}
                     </p>
-                    <p className="text-xs text-gray-400">{t("payPeriod")}</p>
+                    <p className="text-xs text-gray-400">Days</p>
                   </div>
                 </div>
               </div>
@@ -230,7 +231,7 @@ export default function MyHoursPage() {
               data-testid="quick-this-pp"
               onClick={() => applyQuickSelect("this-pp")}
             >
-              {t("currentPayPeriod")}
+              This Pay Period
             </Button>
             <Button
               size="sm"
@@ -238,7 +239,7 @@ export default function MyHoursPage() {
               data-testid="quick-last-pp"
               onClick={() => applyQuickSelect("last-pp")}
             >
-              {t("payPeriod")}
+              Last Pay Period
             </Button>
             <Button
               size="sm"
@@ -246,13 +247,13 @@ export default function MyHoursPage() {
               data-testid="quick-this-month"
               onClick={() => applyQuickSelect("this-month")}
             >
-              {t("thisMonth")}
+              This Month
             </Button>
           </div>
 
           <div className="flex gap-3 items-end flex-wrap">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">{t("previous")}</label>
+              <label className="text-xs text-gray-500">From</label>
               <input
                 type="date"
                 data-testid="input-start-date"
@@ -265,7 +266,7 @@ export default function MyHoursPage() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">{t("next")}</label>
+              <label className="text-xs text-gray-500">To</label>
               <input
                 type="date"
                 data-testid="input-end-date"
@@ -281,9 +282,9 @@ export default function MyHoursPage() {
 
           {summary && !hoursLoading && (
             <p className="text-xs text-gray-400">
-              <span className="font-medium text-gray-600">{summary.totalHours}h</span> ·{" "}
-              <span className="font-medium text-gray-600">{summary.daysWorked}</span> ·{" "}
-              {hoursData?.totalCount ?? 0}
+              <span className="font-medium text-gray-600">{summary.totalHours}h</span> logged ·{" "}
+              <span className="font-medium text-gray-600">{summary.daysWorked}</span> days ·{" "}
+              {hoursData?.totalCount ?? 0} entries
             </p>
           )}
         </CardContent>
@@ -301,7 +302,8 @@ export default function MyHoursPage() {
           <Card className="shadow-sm">
             <CardContent className="py-14 text-center">
               <Clock className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-              <p className="text-gray-400 font-medium">{t("noEntries")}</p>
+              <p className="text-gray-400 font-medium">No time entries for this period</p>
+              <p className="text-gray-300 text-sm mt-1">Try a different date range</p>
             </CardContent>
           </Card>
         ) : (
@@ -337,7 +339,7 @@ export default function MyHoursPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-medium text-sm text-gray-900 truncate">
-                              {entry.work_area_name || entry.job_title || t("billable")}
+                              {entry.work_area_name || entry.job_title || "General"}
                             </p>
                             <Badge
                               className={`text-[10px] px-1.5 py-0 ${
@@ -365,7 +367,7 @@ export default function MyHoursPage() {
                               className="flex items-center gap-1.5 text-green-600 text-xs font-semibold"
                             >
                               <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                              {t("inProgress")}
+                              In progress
                             </div>
                           ) : (
                             <span
@@ -395,10 +397,10 @@ export default function MyHoursPage() {
               onClick={() => setPage((p) => p - 1)}
               data-testid="pagination-prev"
             >
-              {t("previous")}
+              Previous
             </Button>
             <span className="text-sm text-gray-500">
-              {t("page", { page, total: totalPages })}
+              Page {page} of {totalPages}
             </span>
             <Button
               variant="outline"
@@ -407,7 +409,7 @@ export default function MyHoursPage() {
               onClick={() => setPage((p) => p + 1)}
               data-testid="pagination-next"
             >
-              {t("next")}
+              Next
             </Button>
           </div>
         )}

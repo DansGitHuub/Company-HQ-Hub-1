@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -214,7 +213,6 @@ function ProcessFormDialog({
   onClose: () => void;
   existing?: BusinessProcess | null;
 }) {
-  const { t } = useTranslation("processAuditor");
   const { toast } = useToast();
   const [name, setName] = useState(existing?.name || "");
   const [description, setDescription] = useState(existing?.description || "");
@@ -251,15 +249,15 @@ function ProcessFormDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/business-processes"] });
-      toast({ title: existing ? t("processUpdated") : t("processCreated") });
+      toast({ title: existing ? "Process updated" : "Process created" });
       onClose();
     },
-    onError: () => toast({ title: t("failedToSave"), variant: "destructive" }),
+    onError: () => toast({ title: "Failed to save process", variant: "destructive" }),
   });
 
   const handleSave = () => {
     if (!name.trim()) {
-      toast({ title: t("processNameRequired"), variant: "destructive" });
+      toast({ title: "Process name is required", variant: "destructive" });
       return;
     }
     mutation.mutate({ name, description, category, estimatedDuration, rolesInvolved, stepsJson: steps });
@@ -269,15 +267,15 @@ function ProcessFormDialog({
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{existing ? t("editProcess") : t("createProcess")}</DialogTitle>
+          <DialogTitle>{existing ? "Edit Process" : "Create Process"}</DialogTitle>
           <DialogDescription>
-            {t("processFormDesc")}
+            Define the workflow steps and roles involved in this business process.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 pt-2">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 space-y-1.5">
-              <Label>{t("processName")}</Label>
+              <Label>Process Name *</Label>
               <Input
                 value={name}
                 onChange={e => setName(e.target.value)}
@@ -286,7 +284,7 @@ function ProcessFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>{t("category")}</Label>
+              <Label>Category</Label>
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger data-testid="select-process-category">
                   <SelectValue />
@@ -299,7 +297,7 @@ function ProcessFormDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>{t("estimatedDuration")}</Label>
+              <Label>Estimated Duration</Label>
               <Input
                 value={estimatedDuration}
                 onChange={e => setEstimatedDuration(e.target.value)}
@@ -308,7 +306,7 @@ function ProcessFormDialog({
               />
             </div>
             <div className="col-span-2 space-y-1.5">
-              <Label>{t("descriptionLabel")}</Label>
+              <Label>Description</Label>
               <Textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
@@ -320,7 +318,7 @@ function ProcessFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>{t("rolesInvolved")}</Label>
+            <Label>Roles Involved</Label>
             <div className="flex gap-2 flex-wrap">
               {ROLES.map(role => (
                 <Badge
@@ -337,15 +335,15 @@ function ProcessFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>{t("processSteps")}</Label>
+            <Label>Process Steps</Label>
             <StepEditor steps={steps} onChange={setSteps} />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={onClose}>{t("cancel")}</Button>
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
             <Button onClick={handleSave} disabled={mutation.isPending} data-testid="button-save-process">
               {mutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              {existing ? t("saveChanges") : t("createProcess")}
+              {existing ? "Save Changes" : "Create Process"}
             </Button>
           </div>
         </div>
@@ -365,7 +363,6 @@ function ScheduleDialog({
   processId: string;
   existingSchedule?: ProcessAuditSchedule | null;
 }) {
-  const { t } = useTranslation("processAuditor");
   const { toast } = useToast();
   const [frequency, setFrequency] = useState(existingSchedule?.frequency || "weekly");
   const [customDays, setCustomDays] = useState(existingSchedule?.customIntervalDays ?? 7);
@@ -390,10 +387,10 @@ function ScheduleDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/process-audit-schedules", processId] });
-      toast({ title: t("scheduleSaved") });
+      toast({ title: "Schedule saved" });
       onClose();
     },
-    onError: () => toast({ title: t("failedToSaveSchedule"), variant: "destructive" }),
+    onError: () => toast({ title: "Failed to save schedule", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -403,7 +400,7 @@ function ScheduleDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/process-audit-schedules", processId] });
-      toast({ title: t("scheduleRemoved") });
+      toast({ title: "Schedule removed" });
       onClose();
     },
   });
@@ -420,17 +417,17 @@ function ScheduleDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" /> {t("auditSchedule")}
+            <Calendar className="h-5 w-5" /> Audit Schedule
           </DialogTitle>
           <DialogDescription>
-            {t("scheduleDesc")}
+            Automatically run this audit on a recurring basis to catch issues early.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 pt-2">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium text-sm">{t("enableAutoAudits")}</p>
-              <p className="text-xs text-muted-foreground">{t("auditsBackground")}</p>
+              <p className="font-medium text-sm">Enable Automatic Audits</p>
+              <p className="text-xs text-muted-foreground">Audits will run in the background</p>
             </div>
             <Switch
               checked={isEnabled}
@@ -440,23 +437,23 @@ function ScheduleDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label>{t("frequency")}</Label>
+            <Label>Frequency</Label>
             <Select value={frequency} onValueChange={setFrequency}>
               <SelectTrigger data-testid="select-schedule-frequency">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="daily">{t("daily")}</SelectItem>
-                <SelectItem value="weekly">{t("weekly")}</SelectItem>
-                <SelectItem value="monthly">{t("monthly")}</SelectItem>
-                <SelectItem value="custom">{t("custom")}</SelectItem>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {frequency === "custom" && (
             <div className="space-y-1.5">
-              <Label>{t("runEvery")}</Label>
+              <Label>Run every</Label>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
@@ -467,14 +464,14 @@ function ScheduleDialog({
                   className="w-24"
                   data-testid="input-custom-days"
                 />
-                <span className="text-sm text-muted-foreground">{t("days")}</span>
+                <span className="text-sm text-muted-foreground">days</span>
               </div>
             </div>
           )}
 
           {isEnabled && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-              <p className="font-medium">{t("scheduleSummary")}</p>
+              <p className="font-medium">Schedule summary</p>
               <p className="mt-1 text-blue-700">{freqLabel[frequency]} — the AI will research your process against current best practices and report any new issues or improvements.</p>
             </div>
           )}
@@ -488,14 +485,14 @@ function ScheduleDialog({
                 disabled={deleteMutation.isPending}
                 data-testid="button-delete-schedule"
               >
-                {t("removeSchedule")}
+                Remove Schedule
               </Button>
             )}
             <div className="flex gap-2 ml-auto">
-              <Button variant="outline" onClick={onClose}>{t("cancel")}</Button>
+              <Button variant="outline" onClick={onClose}>Cancel</Button>
               <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} data-testid="button-save-schedule">
                 {mutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                {t("saveSchedule")}
+                Save Schedule
               </Button>
             </div>
           </div>
@@ -506,7 +503,6 @@ function ScheduleDialog({
 }
 
 export default function ProcessAuditor() {
-  const { t } = useTranslation("processAuditor");
   const { toast } = useToast();
   const [selectedProcessId, setSelectedProcessId] = useState<string>("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -545,12 +541,12 @@ export default function ProcessAuditor() {
       return apiRequest("POST", "/api/process-audits/run", { processId }).then(r => r.json());
     },
     onSuccess: (data) => {
-      toast({ title: t("auditStarted"), description: t("auditStartedDesc") });
+      toast({ title: "Audit started", description: "Researching best practices and analyzing your process..." });
       setPollingAuditId(data.auditId);
       setActiveTab("overview");
       refetchAudits();
     },
-    onError: () => toast({ title: t("failedToStart"), variant: "destructive" }),
+    onError: () => toast({ title: "Failed to start audit", variant: "destructive" }),
   });
 
   const deleteProcessMutation = useMutation({
@@ -560,7 +556,7 @@ export default function ProcessAuditor() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/business-processes"] });
       setSelectedProcessId("");
-      toast({ title: t("processDeleted") });
+      toast({ title: "Process deleted" });
     },
   });
 
@@ -570,10 +566,10 @@ export default function ProcessAuditor() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/business-processes"] });
-      toast({ title: t("stepAdded") });
+      toast({ title: "Step added to process" });
       setAddingStepIdx(null);
     },
-    onError: () => toast({ title: t("failedToAddStep"), variant: "destructive" }),
+    onError: () => toast({ title: "Failed to add step", variant: "destructive" }),
   });
 
   useEffect(() => {
@@ -614,14 +610,14 @@ export default function ProcessAuditor() {
         <div className="flex items-center gap-3">
           <ClipboardCheck className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-2xl font-heading font-bold text-foreground">{t("title")}</h1>
+            <h1 className="text-2xl font-heading font-bold text-foreground">Process Auditor</h1>
             <p className="text-muted-foreground text-sm">
-              {t("subtitle")}
+              AI-powered workflow analysis with best-practice research and connector health checks
             </p>
           </div>
         </div>
         <Button onClick={() => setShowCreateDialog(true)} data-testid="button-create-process">
-          <Plus className="h-4 w-4 mr-2" /> {t("newProcess")}
+          <Plus className="h-4 w-4 mr-2" /> New Process
         </Button>
       </div>
 
@@ -630,16 +626,16 @@ export default function ProcessAuditor() {
         <Card className="lg:col-span-1">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Shield className="h-4 w-4" /> {t("processes")}
+              <Shield className="h-4 w-4" /> Processes
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 p-3 pt-0">
             {processes.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 <ClipboardCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                <p>{t("noProcesses")}</p>
+                <p>No processes yet.</p>
                 <Button variant="link" size="sm" onClick={() => setShowCreateDialog(true)}>
-                  {t("createFirst")}
+                  Create your first one
                 </Button>
               </div>
             ) : (
@@ -673,16 +669,16 @@ export default function ProcessAuditor() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={e => { e.stopPropagation(); setEditProcess(proc); }}>
-                        <Pencil className="h-4 w-4 mr-2" /> {t("edit")}
+                        <Pencil className="h-4 w-4 mr-2" /> Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive focus:text-destructive"
                         onClick={e => {
                           e.stopPropagation();
-                          if (confirm(t("deleteProcess"))) deleteProcessMutation.mutate(proc.id);
+                          if (confirm("Delete this process?")) deleteProcessMutation.mutate(proc.id);
                         }}
                       >
-                        <Trash2 className="h-4 w-4 mr-2" /> {t("delete")}
+                        <Trash2 className="h-4 w-4 mr-2" /> Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -698,8 +694,8 @@ export default function ProcessAuditor() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                 <ClipboardCheck className="h-14 w-14 mb-4 opacity-30" />
-                <p className="text-lg font-medium">{t("selectProcess")}</p>
-                <p className="text-sm mt-1">{t("createNew")}</p>
+                <p className="text-lg font-medium">Select a process to audit</p>
+                <p className="text-sm mt-1">Or create a new one to get started</p>
               </CardContent>
             </Card>
           ) : (
@@ -711,7 +707,7 @@ export default function ProcessAuditor() {
                     <div className="flex-1">
                       <h2 className="text-lg font-semibold">{selectedProcess?.name}</h2>
                       <p className="text-sm text-muted-foreground mt-0.5">
-                        {selectedProcess?.description || t("noDescription")}
+                        {selectedProcess?.description || "No description"}
                       </p>
                       <div className="flex flex-wrap gap-2 mt-2">
                         <Badge variant="outline" className="capitalize">
@@ -738,7 +734,7 @@ export default function ProcessAuditor() {
                         data-testid="button-open-schedule"
                       >
                         <Calendar className="h-4 w-4 mr-1.5" />
-                        {schedule?.isEnabled ? t("scheduled") : t("schedule")}
+                        {schedule?.isEnabled ? "Scheduled" : "Schedule"}
                       </Button>
                       <Button
                         size="sm"
@@ -751,7 +747,7 @@ export default function ProcessAuditor() {
                         ) : (
                           <Play className="h-4 w-4 mr-1.5" />
                         )}
-                        {isRunning ? t("auditing") : t("runAudit")}
+                        {isRunning ? "Auditing..." : "Run Audit"}
                       </Button>
                     </div>
                   </div>
@@ -768,7 +764,7 @@ export default function ProcessAuditor() {
                     <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex gap-3">
                       <XCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-red-800">{t("auditFailed")}</p>
+                        <p className="text-sm font-medium text-red-800">Last audit failed</p>
                         <p className="text-sm text-red-700 mt-0.5">
                           {latestAudit.errorMessage || "An unexpected error occurred. Please try running the audit again."}
                         </p>
@@ -778,7 +774,7 @@ export default function ProcessAuditor() {
                           className="mt-2 border-red-300 text-red-700"
                           onClick={() => runAuditMutation.mutate(selectedProcessId)}
                         >
-                          <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> {t("retry")}
+                          <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Retry
                         </Button>
                       </div>
                     </div>
@@ -788,7 +784,7 @@ export default function ProcessAuditor() {
                   {schedule?.isEnabled && schedule.nextRunAt && (
                     <div className="mt-3 text-xs text-muted-foreground flex items-center gap-1.5">
                       <Calendar className="h-3.5 w-3.5" />
-                      {t("nextAudit")}: {new Date(schedule.nextRunAt).toLocaleDateString("en-US", {
+                      Next scheduled audit: {new Date(schedule.nextRunAt).toLocaleDateString("en-US", {
                         weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
                       })}
                     </div>
@@ -802,7 +798,7 @@ export default function ProcessAuditor() {
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
-                        <TrendingUp className="h-5 w-5" /> {t("auditResults")}
+                        <TrendingUp className="h-5 w-5" /> Audit Results
                       </CardTitle>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
@@ -848,9 +844,9 @@ export default function ProcessAuditor() {
 
                     <Tabs value={activeTab} onValueChange={setActiveTab}>
                       <TabsList className="w-full">
-                        <TabsTrigger value="overview" className="flex-1">{t("overview")}</TabsTrigger>
+                        <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
                         <TabsTrigger value="best-practices" className="flex-1">
-                          {t("bestPractices")}
+                          Best Practices
                           {bestPractices.filter(b => b.gap === "major").length > 0 && (
                             <Badge variant="destructive" className="ml-1.5 text-xs h-4 px-1">
                               {bestPractices.filter(b => b.gap === "major").length}
@@ -858,7 +854,7 @@ export default function ProcessAuditor() {
                           )}
                         </TabsTrigger>
                         <TabsTrigger value="suggestions" className="flex-1">
-                          {t("suggestions")}
+                          Suggestions
                           {suggestedSteps.length > 0 && (
                             <Badge className="ml-1.5 text-xs h-4 px-1 bg-blue-500">
                               {suggestedSteps.length}
@@ -866,35 +862,35 @@ export default function ProcessAuditor() {
                           )}
                         </TabsTrigger>
                         <TabsTrigger value="connectors" className="flex-1">
-                          {t("connectors")}
+                          Connectors
                           {connectorIssues.length > 0 && (
                             <Badge variant="destructive" className="ml-1.5 text-xs h-4 px-1">
                               {connectorIssues.length}
                             </Badge>
                           )}
                         </TabsTrigger>
-                        <TabsTrigger value="recommendations" className="flex-1">{t("actions")}</TabsTrigger>
+                        <TabsTrigger value="recommendations" className="flex-1">Actions</TabsTrigger>
                       </TabsList>
 
                       {/* Overview */}
                       <TabsContent value="overview" className="mt-4 space-y-4">
                         <div className="grid grid-cols-3 gap-3 text-sm">
                           <div className="p-3 border rounded-lg">
-                            <p className="text-xs text-muted-foreground">{t("issuesFound")}</p>
+                            <p className="text-xs text-muted-foreground">Issues Found</p>
                             <p className="text-2xl font-bold mt-1 text-foreground">{totalIssues}</p>
                           </div>
                           <div className="p-3 border rounded-lg">
-                            <p className="text-xs text-muted-foreground">{t("stepsToAdd")}</p>
+                            <p className="text-xs text-muted-foreground">Steps to Add</p>
                             <p className="text-2xl font-bold mt-1 text-foreground">{suggestedSteps.length}</p>
                           </div>
                           <div className="p-3 border rounded-lg">
-                            <p className="text-xs text-muted-foreground">{t("estImprovement")}</p>
+                            <p className="text-xs text-muted-foreground">Est. Improvement</p>
                             <p className="text-sm font-semibold mt-1">{latestAudit.estimatedImprovementTime || "N/A"}</p>
                           </div>
                         </div>
                         {findings.length > 0 && (
                           <div className="space-y-2">
-                            <p className="text-sm font-medium">{t("findings")}</p>
+                            <p className="text-sm font-medium">Findings</p>
                             {findings.map((f: any, idx: number) => (
                               <div key={idx} className="flex gap-2 p-3 border rounded-lg">
                                 {f.type === "strength"
@@ -1031,7 +1027,7 @@ export default function ProcessAuditor() {
                                     <p className="text-sm mt-1">{issue.description}</p>
                                     {issue.suggestedFix && (
                                       <p className="text-sm mt-1.5 font-medium">
-                                        {t("fix")}: <span className="font-normal">{issue.suggestedFix}</span>
+                                        Fix: <span className="font-normal">{issue.suggestedFix}</span>
                                       </p>
                                     )}
                                   </div>
@@ -1045,7 +1041,7 @@ export default function ProcessAuditor() {
                       {/* Recommendations */}
                       <TabsContent value="recommendations" className="mt-4">
                         {recommendations.length === 0 ? (
-                          <p className="text-center text-muted-foreground py-8">{t("noRecommendations")}</p>
+                          <p className="text-center text-muted-foreground py-8">No recommendations generated.</p>
                         ) : (
                           <div className="space-y-3">
                             {recommendations.map((rec: any, idx: number) => (
@@ -1059,10 +1055,10 @@ export default function ProcessAuditor() {
                                 <p className="text-sm text-muted-foreground">{rec.description}</p>
                                 <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
                                   <span className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3" /> {t("effort")}: {rec.estimatedEffort}
+                                    <Clock className="h-3 w-3" /> Effort: {rec.estimatedEffort}
                                   </span>
                                   <span className="flex items-center gap-1">
-                                    <Zap className="h-3 w-3" /> {t("impact")}: {rec.expectedImpact}
+                                    <Zap className="h-3 w-3" /> Impact: {rec.expectedImpact}
                                   </span>
                                 </div>
                               </div>
@@ -1080,8 +1076,8 @@ export default function ProcessAuditor() {
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-14 text-muted-foreground">
                     <Play className="h-12 w-12 mb-4 opacity-30" />
-                    <p className="font-medium">{t("selectProcess")}</p>
-                    <p className="text-sm mt-1">{t("createNew")}</p>
+                    <p className="font-medium">No audit results yet</p>
+                    <p className="text-sm mt-1">Click "Run Audit" to analyze this process with AI</p>
                   </CardContent>
                 </Card>
               )}
@@ -1090,7 +1086,7 @@ export default function ProcessAuditor() {
               {auditResults.length > 0 && (
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">{t("auditResults")}</CardTitle>
+                    <CardTitle className="text-base">Audit History</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {auditResults.slice(0, 6).map(audit => (
