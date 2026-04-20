@@ -1369,7 +1369,14 @@
     "company": "Company",
     "source": "Lead source",
     "converted": "Converted",
-    "customerSince2": "Customer since"
+    "customerSince2": "Customer since",
+    "searchPlaceholder": "Search customers...",
+    "loading": "Loading customers...",
+    "noCustomersYet": "No customers yet. Add your first customer.",
+    "noSearchResults": "No customers match your search.",
+    "name": "Name",
+    "sourceColumn": "Source",
+    "dateAdded": "Date Added"
   },
   "jobDetail": {
     "title": "Jobs",

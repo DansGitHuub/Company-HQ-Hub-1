@@ -1369,7 +1369,14 @@
     "company": "Empresa",
     "source": "Fuente del cliente",
     "converted": "Convertido",
-    "customerSince2": "Cliente desde"
+    "customerSince2": "Cliente desde",
+    "searchPlaceholder": "Buscar clientes...",
+    "loading": "Cargando clientes...",
+    "noCustomersYet": "Sin clientes aún. Agrega tu primer cliente.",
+    "noSearchResults": "Ningún cliente coincide con tu búsqueda.",
+    "name": "Nombre",
+    "sourceColumn": "Fuente",
+    "dateAdded": "Fecha Agregada"
   },
   "jobDetail": {
     "title": "Trabajos",
