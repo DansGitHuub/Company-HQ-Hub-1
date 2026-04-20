@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +67,13 @@ interface EstimateDetail {
   signedDocumentUrl: string | null;
 }
 
+const TYPE_LABEL_KEY: Record<string, string> = {
+  project: "typeLandscapeProject",
+  maintenance_contract: "typeMaintenanceContract",
+  snow_contract: "typeSnowIceContract",
+  other: "typeOther",
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtMoney(v: any) {
   const n = parseFloat(v ?? "0");
@@ -88,6 +96,7 @@ const ITEM_TYPE_CLS: Record<string, string> = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function EstimateDetail() {
+  const { t } = useTranslation("estimates");
   const [, params] = useRoute("/estimates/:id");
   const [, nav] = useLocation();
   const { user } = useAuth();
@@ -121,9 +130,9 @@ export default function EstimateDetail() {
 
   // Map estimate type to the correct T&C type slug
   const tcType = (() => {
-    const t = estimate?.estimate_type ?? "";
-    if (t === "maintenance_contract") return "maintenance";
-    if (t === "snow_contract") return "snow";
+    const et = estimate?.estimate_type ?? "";
+    if (et === "maintenance_contract") return "maintenance";
+    if (et === "snow_contract") return "snow";
     return "install";
   })();
 
@@ -138,20 +147,20 @@ export default function EstimateDetail() {
   // Status mutations
   const sendMutation = useMutation({
     mutationFn: () => apiRequest("PATCH", `/api/estimates/${id}/send`, {}),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/estimates", id] }); queryClient.invalidateQueries({ queryKey: ["/api/estimates"] }); toast({ title: "Estimate marked as sent" }); },
-    onError:   () => toast({ title: "Error", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/estimates", id] }); queryClient.invalidateQueries({ queryKey: ["/api/estimates"] }); toast({ title: t("estimateMarkedSent") }); },
+    onError:   () => toast({ title: t("error"), variant: "destructive" }),
   });
 
   const approveMutation = useMutation({
     mutationFn: () => apiRequest("PATCH", `/api/estimates/${id}/approve`, {}),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/estimates", id] }); queryClient.invalidateQueries({ queryKey: ["/api/estimates"] }); toast({ title: "Estimate approved" }); },
-    onError:   () => toast({ title: "Error", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/estimates", id] }); queryClient.invalidateQueries({ queryKey: ["/api/estimates"] }); toast({ title: t("estimateApproved") }); },
+    onError:   () => toast({ title: t("error"), variant: "destructive" }),
   });
 
   const declineMutation = useMutation({
     mutationFn: () => apiRequest("PATCH", `/api/estimates/${id}/decline`, {}),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/estimates", id] }); queryClient.invalidateQueries({ queryKey: ["/api/estimates"] }); toast({ title: "Estimate declined" }); },
-    onError:   () => toast({ title: "Error", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/estimates", id] }); queryClient.invalidateQueries({ queryKey: ["/api/estimates"] }); toast({ title: t("estimateDeclined") }); },
+    onError:   () => toast({ title: t("error"), variant: "destructive" }),
   });
 
   const convertMutation = useMutation({
@@ -160,15 +169,15 @@ export default function EstimateDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/estimates", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
-      toast({ title: "Converted to job!", description: "A new job has been created." });
+      toast({ title: t("convertedToJobTitle"), description: t("convertedToJobDesc") });
     },
-    onError: () => toast({ title: "Error converting", variant: "destructive" }),
+    onError: () => toast({ title: t("errorConverting"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => apiRequest("DELETE", `/api/estimates/${id}`, {}),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/estimates"] }); nav("/estimates"); },
-    onError:   () => toast({ title: "Error deleting", variant: "destructive" }),
+    onError:   () => toast({ title: t("errorDeleting"), variant: "destructive" }),
   });
 
   const sendToPortalMutation = useMutation({
@@ -179,7 +188,7 @@ export default function EstimateDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/estimates", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
     },
-    onError: () => toast({ title: "Error generating portal link", variant: "destructive" }),
+    onError: () => toast({ title: t("errorGeneratingPortal"), variant: "destructive" }),
   });
 
   const uploadSignedMutation = useMutation({
@@ -194,10 +203,10 @@ export default function EstimateDetail() {
       setShowUploadDialog(false);
       setUploadFileUrl("");
       setUploadSignerName("");
-      toast({ title: "Signed copy recorded", description: "Physical signature has been saved." });
+      toast({ title: t("signedCopyRecorded"), description: t("physicalSignatureSaved") });
     },
     onError: (err: any) => {
-      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+      toast({ title: t("uploadFailed"), description: err.message, variant: "destructive" });
     },
   });
 
@@ -215,7 +224,7 @@ export default function EstimateDetail() {
     );
   }
   if (!estimate) {
-    return <div className="p-8 text-center text-muted-foreground">Estimate not found.</div>;
+    return <div className="p-8 text-center text-muted-foreground">{t("notFound")}</div>;
   }
 
   const isExpired = estimate.valid_until
@@ -236,35 +245,35 @@ export default function EstimateDetail() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <button onClick={() => nav("/estimates")} className="hover:text-foreground flex items-center gap-1" data-testid="btn-back-estimates">
-            <ArrowLeft className="h-4 w-4" /> Estimates
+            <ArrowLeft className="h-4 w-4" /> {t("title")}
           </button>
           <span>/</span>
-          <span className="text-foreground font-medium">{estimate.estimate_number ?? "Draft"}</span>
+          <span className="text-foreground font-medium">{estimate.estimate_number ?? t("draft")}</span>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Status transitions */}
           {estimate.status === "draft" && canEdit && (
             <Button size="sm" variant="outline" onClick={() => sendMutation.mutate()} disabled={sendMutation.isPending} data-testid="btn-mark-sent">
-              <Send className="h-3.5 w-3.5 mr-1.5" /> Mark Sent
+              <Send className="h-3.5 w-3.5 mr-1.5" /> {t("markSent")}
             </Button>
           )}
           {(estimate.status === "sent" || estimate.status === "viewed") && canEdit && (
             <>
               <Button size="sm" variant="outline" className="text-green-700 border-green-300 hover:bg-green-50"
                 onClick={() => approveMutation.mutate()} disabled={approveMutation.isPending} data-testid="btn-approve">
-                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Approve
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> {t("approve")}
               </Button>
               <Button size="sm" variant="outline" className="text-red-700 border-red-300 hover:bg-red-50"
                 onClick={() => declineMutation.mutate()} disabled={declineMutation.isPending} data-testid="btn-decline">
-                <XCircle className="h-3.5 w-3.5 mr-1.5" /> Decline
+                <XCircle className="h-3.5 w-3.5 mr-1.5" /> {t("decline")}
               </Button>
             </>
           )}
           {estimate.status === "approved" && !estimate.converted_job_id && canEdit && (
             <Button size="sm" variant="outline" onClick={() => convertMutation.mutate()} disabled={convertMutation.isPending} data-testid="btn-convert-job">
               <Briefcase className="h-3.5 w-3.5 mr-1.5" />
-              {convertMutation.isPending ? "Converting…" : "Convert to Job"}
+              {convertMutation.isPending ? t("converting") : t("convertToJob")}
             </Button>
           )}
           {canEdit && estimate.status !== "converted" && (
@@ -281,15 +290,15 @@ export default function EstimateDetail() {
               disabled={sendToPortalMutation.isPending}
               data-testid="btn-send-to-portal">
               <Globe className="h-3.5 w-3.5 mr-1.5" />
-              {sendToPortalMutation.isPending ? "Generating…" : estimate.portal_token ? "Portal Link" : "Send to Portal"}
+              {sendToPortalMutation.isPending ? t("generating") : estimate.portal_token ? t("portalLink") : t("sendToPortal")}
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={() => nav(`/estimates/${id}/preview`)} data-testid="btn-preview-estimate">
-            <Eye className="h-3.5 w-3.5 mr-1.5" /> Preview / PDF
+            <Eye className="h-3.5 w-3.5 mr-1.5" /> {t("previewPdf")}
           </Button>
           {canEdit && estimate.status !== "converted" && (
             <Button size="sm" variant="outline" onClick={() => setShowEdit(true)} data-testid="btn-edit-estimate">
-              <Edit2 className="h-3.5 w-3.5 mr-1.5" /> Edit
+              <Edit2 className="h-3.5 w-3.5 mr-1.5" /> {t("edit")}
             </Button>
           )}
           {canDelete && (
@@ -318,9 +327,9 @@ export default function EstimateDetail() {
                   <div className="text-sm text-muted-foreground flex items-center gap-3 flex-wrap">
                     <span className="font-mono">{estimate.estimate_number ?? "—"}</span>
                     <span>·</span>
-                    <span>{ESTIMATE_TYPE_LABELS[estimate.estimate_type] ?? estimate.estimate_type}</span>
+                    <span>{TYPE_LABEL_KEY[estimate.estimate_type] ? t(TYPE_LABEL_KEY[estimate.estimate_type]) : estimate.estimate_type}</span>
                     {isExpired && estimate.status !== "approved" && estimate.status !== "converted" && (
-                      <><span>·</span><span className="text-red-500 font-medium">Expired</span></>
+                      <><span>·</span><span className="text-red-500 font-medium">{t("expired")}</span></>
                     )}
                   </div>
                 </div>
@@ -336,9 +345,9 @@ export default function EstimateDetail() {
               {estimate.converted_job_id && (
                 <div className="flex items-center gap-2 text-sm text-purple-700 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-300 rounded-md px-3 py-2 border border-purple-200 dark:border-purple-800">
                   <Briefcase className="h-4 w-4 shrink-0" />
-                  <span>Converted to job. </span>
+                  <span>{t("convertedToJob")} </span>
                   <Link href={`/jobs/${estimate.converted_job_id}`} className="underline font-medium ml-1" data-testid="link-converted-job">
-                    View Job →
+                    {t("viewJob")}
                   </Link>
                 </div>
               )}
@@ -349,7 +358,7 @@ export default function EstimateDetail() {
           {estimate.work_areas.length > 0 && (
             <Card>
               <CardHeader className="pb-2 pt-4 px-5">
-                <CardTitle className="text-sm">Scope of Work</CardTitle>
+                <CardTitle className="text-sm">{t("scopeOfWork")}</CardTitle>
               </CardHeader>
               <CardContent className="px-5 pb-5 space-y-5">
                 {estimate.work_areas.map(area => {
@@ -363,12 +372,12 @@ export default function EstimateDetail() {
                       <div className="space-y-0.5">
                         {/* Column headers */}
                         <div className="grid grid-cols-[100px_1fr_60px_60px_90px_80px] gap-2 text-[10px] text-muted-foreground font-medium px-1 pb-1">
-                          <span>Class</span>
-                          <span>Description</span>
-                          <span className="text-right">Qty</span>
-                          <span>Unit</span>
-                          <span className="text-right">Unit Price</span>
-                          <span className="text-right">Amount</span>
+                          <span>{t("colClass")}</span>
+                          <span>{t("colDescription")}</span>
+                          <span className="text-right">{t("colQty")}</span>
+                          <span>{t("colUnit")}</span>
+                          <span className="text-right">{t("colUnitPrice")}</span>
+                          <span className="text-right">{t("colAmount")}</span>
                         </div>
                         {area.line_items.map(li => (
                           <div key={li.id} className="grid grid-cols-[100px_1fr_60px_60px_90px_80px] gap-2 text-sm items-center py-1.5 rounded-sm hover:bg-muted/40 px-1">
@@ -390,29 +399,29 @@ export default function EstimateDetail() {
                 <div className="border-t pt-4 flex justify-end">
                   <div className="w-64 space-y-1.5 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="text-muted-foreground">{t("subtotal")}</span>
                       <span className="tabular-nums">{fmtMoney(subtotal)}</span>
                     </div>
                     {taxPct > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tax ({taxPct.toFixed(2)}%)</span>
+                        <span className="text-muted-foreground">{t("tax")} ({taxPct.toFixed(2)}%)</span>
                         <span className="tabular-nums">{fmtMoney(taxAmt)}</span>
                       </div>
                     )}
                     {discAmt > 0 && (
                       <div className="flex justify-between text-green-600">
-                        <span>Discount</span>
+                        <span>{t("discount")}</span>
                         <span className="tabular-nums">-{fmtMoney(discAmt)}</span>
                       </div>
                     )}
                     <Separator />
                     <div className="flex justify-between font-bold text-base">
-                      <span>Total</span>
+                      <span>{t("total")}</span>
                       <span className="tabular-nums">{fmtMoney(total)}</span>
                     </div>
                     {dpPct > 0 && (
                       <div className="flex justify-between text-blue-600 text-xs">
-                        <span>Down Payment ({dpPct}%)</span>
+                        <span>{t("downPayment")} ({dpPct}%)</span>
                         <span className="tabular-nums">{fmtMoney(dpAmt)}</span>
                       </div>
                     )}
@@ -436,9 +445,9 @@ export default function EstimateDetail() {
                   deposit_percentage: typeof depositDraft === "number" ? depositDraft : undefined,
                 });
                 qc.invalidateQueries({ queryKey: ["/api/estimates", id] });
-                toast({ title: "Terms updated" });
+                toast({ title: t("termsUpdated") });
                 setTcEditing(false);
-              } catch { toast({ title: "Failed to save terms", variant: "destructive" }); }
+              } catch { toast({ title: t("failedSaveTerms"), variant: "destructive" }); }
               finally { setSavingTC(false); }
             }
 
@@ -447,9 +456,9 @@ export default function EstimateDetail() {
               try {
                 await apiRequest("PATCH", `/api/estimates/${id}/terms`, { terms_and_conditions_override: null });
                 qc.invalidateQueries({ queryKey: ["/api/estimates", id] });
-                toast({ title: "Terms reset to default" });
+                toast({ title: t("termsResetDefault") });
                 setTcEditing(false);
-              } catch { toast({ title: "Failed to reset", variant: "destructive" }); }
+              } catch { toast({ title: t("failedReset"), variant: "destructive" }); }
               finally { setSavingTC(false); }
             }
 
@@ -461,18 +470,18 @@ export default function EstimateDetail() {
                 >
                   <div className="flex items-center gap-2">
                     {tcExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                    <CardTitle className="text-sm">Terms &amp; Conditions</CardTitle>
-                    {hasOverride && <Badge variant="outline" className="text-xs">Custom</Badge>}
+                    <CardTitle className="text-sm">{t("termsConditions")}</CardTitle>
+                    {hasOverride && <Badge variant="outline" className="text-xs">{t("custom")}</Badge>}
                   </div>
                   {canEdit && tcExpanded && !tcEditing && (
                     <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
                       {hasOverride && (
                         <Button size="sm" variant="ghost" onClick={resetTC} disabled={savingTC} className="text-xs h-7 px-2" data-testid="btn-reset-terms">
-                          <RotateCcw className="h-3 w-3 mr-1" />Reset to Default
+                          <RotateCcw className="h-3 w-3 mr-1" />{t("resetToDefault")}
                         </Button>
                       )}
                       <Button size="sm" variant="ghost" onClick={() => { setTcDraft(estimate.terms_and_conditions_override || defaultTC?.content || ""); setDepositDraft(depositPct); setTcEditing(true); }} className="text-xs h-7 px-2" data-testid="btn-edit-terms">
-                        <Pencil className="h-3 w-3 mr-1" />Edit Terms
+                        <Pencil className="h-3 w-3 mr-1" />{t("editTerms")}
                       </Button>
                     </div>
                   )}
@@ -480,7 +489,7 @@ export default function EstimateDetail() {
                 {tcExpanded && (
                   <CardContent className="px-5 pb-5 space-y-3">
                     <div className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground">Deposit %</span>
+                      <span className="text-xs text-muted-foreground">{t("depositPct")}</span>
                       {tcEditing ? (
                         <Input
                           type="number"
@@ -504,19 +513,19 @@ export default function EstimateDetail() {
                           data-testid="textarea-tc-edit"
                         />
                         <div className="flex gap-2 justify-end">
-                          <Button size="sm" variant="outline" onClick={() => setTcEditing(false)}>Cancel</Button>
+                          <Button size="sm" variant="outline" onClick={() => setTcEditing(false)}>{t("cancel")}</Button>
                           <Button size="sm" onClick={saveTC} disabled={savingTC} data-testid="btn-save-terms">
-                            {savingTC ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                            {savingTC ? <Loader2 className="h-4 w-4 animate-spin" /> : t("save")}
                           </Button>
                         </div>
                       </>
                     ) : (
                       <p className="text-xs text-muted-foreground whitespace-pre-wrap max-h-64 overflow-y-auto leading-relaxed">
-                        {tcContent || <span className="italic">No terms configured. Go to Settings → Terms &amp; Conditions to add them.</span>}
+                        {tcContent || <span className="italic">{t("noTermsConfigured")}</span>}
                       </p>
                     )}
                     {estimate.initials && (
-                      <p className="text-xs text-muted-foreground pt-1 border-t">Customer initials: <strong>{estimate.initials}</strong></p>
+                      <p className="text-xs text-muted-foreground pt-1 border-t">{t("customerInitials")} <strong>{estimate.initials}</strong></p>
                     )}
                   </CardContent>
                 )}
@@ -528,7 +537,7 @@ export default function EstimateDetail() {
           {estimate.notes && (
             <Card>
               <CardHeader className="pb-2 pt-4 px-5">
-                <CardTitle className="text-sm">Internal Notes</CardTitle>
+                <CardTitle className="text-sm">{t("internalNotes")}</CardTitle>
               </CardHeader>
               <CardContent className="px-5 pb-5">
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">{estimate.notes}</p>
@@ -543,7 +552,7 @@ export default function EstimateDetail() {
           <Card>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold">
-                <User className="h-4 w-4 text-muted-foreground" /> Customer
+                <User className="h-4 w-4 text-muted-foreground" /> {t("customerLabel")}
               </div>
               {estimate.customer_name ? (
                 <div>
@@ -558,7 +567,7 @@ export default function EstimateDetail() {
                   {estimate.customer_phone && <p className="text-xs text-muted-foreground">{estimate.customer_phone}</p>}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No customer assigned</p>
+                <p className="text-sm text-muted-foreground">{t("noCustomerAssigned")}</p>
               )}
               {estimate.property_address && (
                 <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
@@ -573,34 +582,34 @@ export default function EstimateDetail() {
           <Card>
             <CardContent className="p-4 space-y-2.5">
               <p className="text-sm font-semibold flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" /> Dates
+                <Calendar className="h-4 w-4 text-muted-foreground" /> {t("dates")}
               </p>
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Issued</span>
+                  <span className="text-muted-foreground">{t("issued")}</span>
                   <span>{fmtDate(estimate.issued_date)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Valid Until</span>
+                  <span className="text-muted-foreground">{t("validUntil")}</span>
                   <span className={isExpired && !["approved","converted"].includes(estimate.status) ? "text-red-500" : ""}>
                     {fmtDate(estimate.valid_until)}
                   </span>
                 </div>
                 {estimate.sent_at && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Sent</span>
+                    <span className="text-muted-foreground">{t("sent")}</span>
                     <span>{fmtDate(estimate.sent_at)}</span>
                   </div>
                 )}
                 {estimate.viewed_at && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Viewed</span>
+                    <span className="text-muted-foreground">{t("viewed")}</span>
                     <span>{fmtDate(estimate.viewed_at)}</span>
                   </div>
                 )}
                 {estimate.converted_at && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Converted</span>
+                    <span className="text-muted-foreground">{t("converted")}</span>
                     <span>{fmtDate(estimate.converted_at)}</span>
                   </div>
                 )}
@@ -612,7 +621,7 @@ export default function EstimateDetail() {
           {estimate.salesperson_name && (
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground mb-1">Salesperson</p>
+                <p className="text-xs text-muted-foreground mb-1">{t("salesperson")}</p>
                 <p className="text-sm font-medium">{estimate.salesperson_name}</p>
               </CardContent>
             </Card>
@@ -622,7 +631,7 @@ export default function EstimateDetail() {
           {estimate.customer_response && (
             <Card className={estimate.customer_response === "approved" ? "border-emerald-300" : "border-red-300"}>
               <CardContent className="p-4 space-y-1">
-                <p className="text-xs text-muted-foreground">Customer Response</p>
+                <p className="text-xs text-muted-foreground">{t("customerResponse")}</p>
                 <EstimateStatusBadge status={estimate.customer_response} />
                 {estimate.customer_response_at && (
                   <p className="text-xs text-muted-foreground">{fmtDateTime(estimate.customer_response_at)}</p>
@@ -638,12 +647,12 @@ export default function EstimateDetail() {
         <Card className={estimate.signedAt ? "border-emerald-300" : ""}>
           <CardContent className="p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground font-medium">Signature</p>
+              <p className="text-xs text-muted-foreground font-medium">{t("signature")}</p>
               {!estimate.signedAt && (
                 <Button size="sm" variant="outline"
                   onClick={() => setShowUploadDialog(true)}
                   className="text-xs h-7 gap-1" data-testid="btn-upload-signed">
-                  <Upload className="h-3 w-3" />Upload Signed Copy
+                  <Upload className="h-3 w-3" />{t("uploadSignedCopy")}
                 </Button>
               )}
             </div>
@@ -651,16 +660,16 @@ export default function EstimateDetail() {
               <div className="space-y-1">
                 <div className="flex items-center gap-1 text-emerald-600">
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  <span className="text-xs font-medium">Signed</span>
+                  <span className="text-xs font-medium">{t("signed")}</span>
                   {estimate.signatureType && (
                     <span className="text-xs text-muted-foreground ml-1">
-                      ({estimate.signatureType === "uploaded" ? "physical copy" : "electronic"})
+                      ({estimate.signatureType === "uploaded" ? t("physicalCopy") : t("electronic")})
                     </span>
                   )}
                 </div>
                 {estimate.signerName && (
                   <p className="text-xs text-muted-foreground">
-                    By: <span className="font-medium">{estimate.signerName}</span>
+                    {t("signerBy")} <span className="font-medium">{estimate.signerName}</span>
                     {estimate.signerInitials && (
                       <span className="ml-1 text-muted-foreground">({estimate.signerInitials})</span>
                     )}
@@ -673,17 +682,17 @@ export default function EstimateDetail() {
                 {estimate.signedDocumentUrl && (
                   <a href={estimate.signedDocumentUrl} target="_blank" rel="noopener noreferrer"
                     className="text-xs text-blue-600 underline block">
-                    View signed document
+                    {t("viewSignedDocument")}
                   </a>
                 )}
                 <Button size="sm" variant="ghost"
                   onClick={() => setShowUploadDialog(true)}
                   className="text-xs h-6 px-2 text-muted-foreground mt-1">
-                  Replace signed copy
+                  {t("replaceSignedCopy")}
                 </Button>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground italic">No signature recorded yet.</p>
+              <p className="text-xs text-muted-foreground italic">{t("noSignature")}</p>
             )}
           </CardContent>
         </Card>
@@ -691,9 +700,9 @@ export default function EstimateDetail() {
         {/* Activity */}
           <Card>
             <CardContent className="p-4 space-y-1">
-              <p className="text-xs text-muted-foreground">Created</p>
+              <p className="text-xs text-muted-foreground">{t("created")}</p>
               <p className="text-xs">{fmtDateTime(estimate.created_at)}</p>
-              <p className="text-xs text-muted-foreground mt-2">Last Updated</p>
+              <p className="text-xs text-muted-foreground mt-2">{t("lastUpdated")}</p>
               <p className="text-xs">{fmtDateTime(estimate.updated_at)}</p>
             </CardContent>
           </Card>
@@ -705,39 +714,39 @@ export default function EstimateDetail() {
         <DialogContent className="max-w-md" data-testid="dialog-upload-signed">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />Record Physical Signed Copy
+              <Upload className="h-5 w-5" />{t("recordPhysicalSignedCopy")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              Record a scanned or photographed signed document for this estimate.
+              {t("recordSignedCopyHint")}
             </p>
             <div className="space-y-2">
-              <Label htmlFor="upload-signer-name">Signer Name</Label>
-              <Input id="upload-signer-name" placeholder="Customer's full name"
+              <Label htmlFor="upload-signer-name">{t("signerName")}</Label>
+              <Input id="upload-signer-name" placeholder={t("signerNamePlaceholder")}
                 value={uploadSignerName}
                 onChange={(e) => setUploadSignerName(e.target.value)}
                 data-testid="input-upload-signer-name" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="upload-file-url">Document URL</Label>
+              <Label htmlFor="upload-file-url">{t("documentUrl")}</Label>
               <Input id="upload-file-url" placeholder="https://..."
                 value={uploadFileUrl}
                 onChange={(e) => setUploadFileUrl(e.target.value)}
                 data-testid="input-upload-file-url" />
               <p className="text-xs text-muted-foreground">
-                Paste the URL of the uploaded scan (e.g. from Google Drive, Dropbox, etc.)
+                {t("documentUrlHint")}
               </p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>{t("cancel")}</Button>
             <Button
               disabled={!uploadSignerName.trim() || !uploadFileUrl.trim() || uploadSignedMutation.isPending}
               onClick={() => uploadSignedMutation.mutate({ fileUrl: uploadFileUrl.trim(), signerName: uploadSignerName.trim() })}
               data-testid="btn-confirm-upload-signed">
               {uploadSignedMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              Save Signed Copy
+              {t("saveSignedCopy")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -759,19 +768,19 @@ export default function EstimateDetail() {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Estimate?</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteEstimate")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete <strong>{estimate.estimate_number ?? "this estimate"}</strong>. This action cannot be undone.
+              {t("deleteEstimatePre")} <strong>{estimate.estimate_number ?? t("thisEstimate")}</strong>. {t("cannotBeUndone")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => deleteMutation.mutate()}
               data-testid="btn-confirm-delete"
             >
-              Delete
+              {t("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -783,12 +792,12 @@ export default function EstimateDetail() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Globe className="h-5 w-5 text-green-600" />
-              Customer Portal Link
+              {t("customerPortalLink")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              Share this link with the customer so they can review and respond to the estimate online.
+              {t("portalLinkHint")}
             </p>
             <div className="flex gap-2">
               <Input
@@ -802,9 +811,9 @@ export default function EstimateDetail() {
                 {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
-            {copied && <p className="text-xs text-green-600 font-medium">Copied to clipboard!</p>}
+            {copied && <p className="text-xs text-green-600 font-medium">{t("copiedToClipboard")}</p>}
             <p className="text-xs text-muted-foreground">
-              The estimate status will update to <strong>Viewed</strong> when the customer opens the link, and to <strong>Approved</strong> or <strong>Declined</strong> when they respond.
+              {t("portalStatusNote")}
             </p>
           </div>
         </DialogContent>

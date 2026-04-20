@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,13 +30,25 @@ interface EstimateRow {
 }
 
 // ── Status ────────────────────────────────────────────────────────────────────
-export const ESTIMATE_STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft:     { label: "Draft",     cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
-  sent:      { label: "Sent",      cls: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
-  viewed:    { label: "Viewed",    cls: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300" },
-  approved:  { label: "Approved",  cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300" },
-  declined:  { label: "Declined",  cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
-  converted: { label: "Converted to Job", cls: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" },
+export const ESTIMATE_STATUS_MAP: Record<string, { cls: string }> = {
+  draft:     { cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
+  sent:      { cls: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
+  viewed:    { cls: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300" },
+  approved:  { cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300" },
+  declined:  { cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
+  converted: { cls: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" },
+};
+
+const STATUS_LABEL_KEY: Record<string, string> = {
+  draft: "draft", sent: "sent", viewed: "viewed",
+  approved: "approved", declined: "declined", converted: "convertedToJobStatus",
+};
+
+const TYPE_LABEL_KEY: Record<string, string> = {
+  project: "typeLandscapeProject",
+  maintenance_contract: "typeMaintenanceContract",
+  snow_contract: "typeSnowIceContract",
+  other: "typeOther",
 };
 
 export const ESTIMATE_TYPE_LABELS: Record<string, string> = {
@@ -46,10 +59,12 @@ export const ESTIMATE_TYPE_LABELS: Record<string, string> = {
 };
 
 export function EstimateStatusBadge({ status }: { status: string }) {
-  const s = ESTIMATE_STATUS_MAP[status] ?? { label: status, cls: "bg-muted text-muted-foreground" };
+  const { t } = useTranslation("estimates");
+  const cls = ESTIMATE_STATUS_MAP[status]?.cls ?? "bg-muted text-muted-foreground";
+  const label = STATUS_LABEL_KEY[status] ? t(STATUS_LABEL_KEY[status]) : status;
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${s.cls}`} data-testid={`badge-status-${status}`}>
-      {s.label}
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`} data-testid={`badge-status-${status}`}>
+      {label}
     </span>
   );
 }
@@ -68,6 +83,7 @@ const STATUS_TABS = ["all", "draft", "sent", "viewed", "approved", "declined", "
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function EstimateList() {
+  const { t } = useTranslation("estimates");
   const [, nav] = useLocation();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("all");
@@ -99,12 +115,12 @@ export default function EstimateList() {
       <div className="flex items-center justify-between px-6 py-4 border-b">
         <div className="flex items-center gap-2">
           <Calculator className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-bold">Estimates</h1>
+          <h1 className="text-xl font-bold">{t("title")}</h1>
           <Badge variant="secondary" className="ml-1">{estimates.length}</Badge>
         </div>
         {canCreate && (
           <Button onClick={() => setShowModal(true)} data-testid="btn-new-estimate">
-            <Plus className="h-4 w-4 mr-1.5" /> New Estimate
+            <Plus className="h-4 w-4 mr-1.5" /> {t("newEstimate")}
           </Button>
         )}
       </div>
@@ -113,6 +129,7 @@ export default function EstimateList() {
       <div className="flex items-center gap-1 px-6 py-2 border-b overflow-x-auto">
         {STATUS_TABS.map(tab => {
           const count = tab === "all" ? estimates.length : estimates.filter(e => e.status === tab).length;
+          const tabLabel = tab === "all" ? t("allTab") : (STATUS_LABEL_KEY[tab] ? t(STATUS_LABEL_KEY[tab]) : tab);
           return (
             <button
               key={tab}
@@ -124,7 +141,7 @@ export default function EstimateList() {
                   : "text-muted-foreground hover:bg-accent"
               }`}
             >
-              {tab === "all" ? "All" : ESTIMATE_STATUS_MAP[tab]?.label ?? tab} ({count})
+              {tabLabel} ({count})
             </button>
           );
         })}
@@ -137,7 +154,7 @@ export default function EstimateList() {
           <Input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search estimates..."
+            placeholder={t("searchEstimatesPlaceholder")}
             className="pl-8 h-8 text-sm"
             data-testid="input-search-estimates"
           />
@@ -147,14 +164,14 @@ export default function EstimateList() {
       {/* Table */}
       <div className="flex-1 overflow-auto px-6 pb-6">
         {isLoading ? (
-          <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">Loading…</div>
+          <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">{t("loading")}</div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground">
             <Calculator className="h-10 w-10 opacity-30" />
-            <p className="text-sm">{search ? "No estimates match your search." : "No estimates yet."}</p>
+            <p className="text-sm">{search ? t("noEstimatesSearch") : t("noEstimates")}</p>
             {canCreate && !search && (
               <Button size="sm" variant="outline" onClick={() => setShowModal(true)} data-testid="btn-empty-new-estimate">
-                <Plus className="h-4 w-4 mr-1" /> Create your first estimate
+                <Plus className="h-4 w-4 mr-1" /> {t("createFirstEstimate")}
               </Button>
             )}
           </div>
@@ -164,14 +181,14 @@ export default function EstimateList() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="pl-6 w-32">Number</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Issued</TableHead>
-                    <TableHead>Valid Until</TableHead>
-                    <TableHead className="text-right pr-4">Total</TableHead>
+                    <TableHead className="pl-6 w-32">{t("colNumber")}</TableHead>
+                    <TableHead>{t("colTitle")}</TableHead>
+                    <TableHead>{t("colCustomer")}</TableHead>
+                    <TableHead>{t("colType")}</TableHead>
+                    <TableHead>{t("colStatus")}</TableHead>
+                    <TableHead>{t("colIssued")}</TableHead>
+                    <TableHead>{t("colValidUntil")}</TableHead>
+                    <TableHead className="text-right pr-4">{t("colTotal")}</TableHead>
                     <TableHead className="w-8" />
                   </TableRow>
                 </TableHeader>
@@ -194,7 +211,7 @@ export default function EstimateList() {
                       </TableCell>
                       <TableCell className="text-sm">{est.customer_name ?? <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {ESTIMATE_TYPE_LABELS[est.estimate_type] ?? est.estimate_type}
+                        {TYPE_LABEL_KEY[est.estimate_type] ? t(TYPE_LABEL_KEY[est.estimate_type]) : est.estimate_type}
                       </TableCell>
                       <TableCell><EstimateStatusBadge status={est.status} /></TableCell>
                       <TableCell className="text-sm">{fmtDate(est.issued_date)}</TableCell>

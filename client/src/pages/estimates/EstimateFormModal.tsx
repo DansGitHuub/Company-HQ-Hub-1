@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -104,6 +105,7 @@ interface Props {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function EstimateFormModal({ open, onClose, existing }: Props) {
+  const { t } = useTranslation("estimates");
   const { toast } = useToast();
   const isEdit = !!existing;
 
@@ -115,7 +117,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
   const [propertySearch, setPropertySearch] = useState(existing?.property_address ?? "");
   const [showPropertyDrop, setShowPropertyDrop] = useState(false);
   const [estimateType, setEstimateType] = useState(existing?.estimate_type ?? "project");
-  const [title, setTitle] = useState(existing?.title ?? "New Estimate");
+  const [title, setTitle] = useState(existing?.title ?? t("newEstimate"));
   const [salespersonId, setSalespersonId] = useState(existing?.salesperson_id ?? "");
   const [issuedDate, setIssuedDate] = useState(existing?.issued_date?.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
   const [validUntil, setValidUntil] = useState(existing?.valid_until?.slice(0, 10) ?? "");
@@ -161,10 +163,10 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
   const { data: workAreaTypes = [] } = useQuery<WorkAreaType[]>({ queryKey: ["/api/work-area-types"] });
 
   // Group work area types by division for the dropdown
-  const workAreaTypesByDivision = workAreaTypes.reduce<Record<string, WorkAreaType[]>>((acc, t) => {
-    const div = t.division ?? "Other";
+  const workAreaTypesByDivision = workAreaTypes.reduce<Record<string, WorkAreaType[]>>((acc, wt) => {
+    const div = wt.division ?? "Other";
     if (!acc[div]) acc[div] = [];
-    acc[div].push(t);
+    acc[div].push(wt);
     return acc;
   }, {});
 
@@ -335,14 +337,14 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
-      toast({ title: isEdit ? "Estimate updated" : "Estimate created" });
+      toast({ title: isEdit ? t("estimateUpdated") : t("estimateCreated") });
       onClose();
     },
-    onError: () => toast({ title: "Error saving estimate", variant: "destructive" }),
+    onError: () => toast({ title: t("errorSaving"), variant: "destructive" }),
   });
 
   function handleSubmit() {
-    if (!title.trim()) { toast({ title: "Title is required", variant: "destructive" }); return; }
+    if (!title.trim()) { toast({ title: t("titleRequired"), variant: "destructive" }); return; }
     mutation.mutate({
       customer_id: customerId || null,
       property_id: propertyId || null,
@@ -382,7 +384,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
         <DialogHeader className="px-6 pt-6 pb-4 border-b sticky top-0 bg-background z-10">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Calculator className="h-5 w-5 text-primary" />
-            {isEdit ? "Edit Estimate" : "New Estimate"}
+            {isEdit ? t("editEstimate") : t("newEstimate")}
           </DialogTitle>
         </DialogHeader>
 
@@ -390,7 +392,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
           {/* ── Template picker ── */}
           {!isEdit && templates.length > 0 && (
             <div>
-              <Label className="text-xs text-muted-foreground mb-2 block">Start from a template (optional)</Label>
+              <Label className="text-xs text-muted-foreground mb-2 block">{t("startFromTemplate")}</Label>
               <div className="flex flex-wrap gap-2">
                 {templates.map(tpl => (
                   <button
@@ -409,18 +411,18 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
           {/* ── Basic info ── */}
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <Label htmlFor="est-title" className="text-xs">Title *</Label>
+              <Label htmlFor="est-title" className="text-xs">{t("titleField")} *</Label>
               <Input id="est-title" value={title} onChange={e => setTitle(e.target.value)}
                 data-testid="input-estimate-title" className="mt-1" />
             </div>
 
             <div className="relative">
-              <Label className="text-xs">Customer</Label>
+              <Label className="text-xs">{t("customerLabel")}</Label>
               <Input
                 value={customerSearch}
                 onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDrop(true); if (!e.target.value) { setCustomerId(""); setPropertyId(""); } }}
                 onFocus={() => setShowCustomerDrop(true)}
-                placeholder="Search customers..."
+                placeholder={t("searchCustomers")}
                 data-testid="input-customer-search"
                 className="mt-1"
               />
@@ -447,7 +449,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
             </div>
 
             <div className="relative">
-              <Label className="text-xs">Property</Label>
+              <Label className="text-xs">{t("propertyLabel")}</Label>
               <Input
                 value={propertySearch}
                 onChange={e => {
@@ -457,7 +459,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                 }}
                 onFocus={e => { if (customerId) { setShowPropertyDrop(true); e.target.select(); } }}
                 onBlur={() => setTimeout(() => setShowPropertyDrop(false), 150)}
-                placeholder={customerId ? "Search or select property…" : "Select customer first"}
+                placeholder={customerId ? t("searchProperty") : t("selectCustomerFirst")}
                 disabled={!customerId}
                 className="mt-1"
                 data-testid="input-property-search"
@@ -466,13 +468,13 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                 <div className="absolute z-50 w-full bg-popover border rounded-md shadow-md mt-1 max-h-44 overflow-y-auto">
                   {displayLoading ? (
                     <div className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Loading…
+                      <Loader2 className="h-3 w-3 animate-spin" /> {t("loading")}
                     </div>
                   ) : displayProperties.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-muted-foreground">
                       {isTypingSearch
-                        ? `No properties match "${propertySearch}"`
-                        : "No properties on file for this customer."}
+                        ? `${t("noPropertiesMatch")} "${propertySearch}"`
+                        : t("noPropertiesOnFile")}
                     </div>
                   ) : (
                     displayProperties.map((p: PropertyRow) => (
@@ -499,25 +501,25 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
             </div>
 
             <div>
-              <Label className="text-xs">Estimate Type</Label>
+              <Label className="text-xs">{t("estimateType")}</Label>
               <Select value={estimateType} onValueChange={setEstimateType}>
                 <SelectTrigger className="mt-1" data-testid="select-estimate-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ESTIMATE_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  {ESTIMATE_TYPES.map(et => <SelectItem key={et.value} value={et.value}>{et.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label className="text-xs">Salesperson</Label>
+              <Label className="text-xs">{t("salesperson")}</Label>
               <Select value={salespersonId} onValueChange={setSalespersonId}>
                 <SelectTrigger className="mt-1" data-testid="select-salesperson">
-                  <SelectValue placeholder="Assign salesperson" />
+                  <SelectValue placeholder={t("assignSalesperson")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_none">— None —</SelectItem>
+                  <SelectItem value="_none">{t("none")}</SelectItem>
                   {staff.map((u: any) => (
                     <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                   ))}
@@ -526,13 +528,13 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
             </div>
 
             <div>
-              <Label htmlFor="issued-date" className="text-xs">Issued Date</Label>
+              <Label htmlFor="issued-date" className="text-xs">{t("issuedDate")}</Label>
               <Input id="issued-date" type="date" value={issuedDate} onChange={e => setIssuedDate(e.target.value)}
                 className="mt-1" data-testid="input-issued-date" />
             </div>
 
             <div>
-              <Label htmlFor="valid-until" className="text-xs">Valid Until</Label>
+              <Label htmlFor="valid-until" className="text-xs">{t("validUntil")}</Label>
               <Input id="valid-until" type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)}
                 className="mt-1" data-testid="input-valid-until" />
             </div>
@@ -540,15 +542,15 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
 
           {/* ── Customer Message ── */}
           <div>
-            <Label className="text-xs">Customer Message / Introduction</Label>
+            <Label className="text-xs">{t("customerMessage")}</Label>
             <Textarea rows={2} value={customerMessage} onChange={e => setCustomerMessage(e.target.value)}
               className="mt-1 resize-none" data-testid="textarea-customer-message"
-              placeholder="Brief message shown at the top of the estimate for the customer..." />
+              placeholder={t("customerMessagePlaceholder")} />
           </div>
 
           {/* ── Presentation Style ── */}
           <div>
-            <Label className="text-xs">Presentation Style</Label>
+            <Label className="text-xs">{t("presentationStyle")}</Label>
             <div className="flex gap-2 mt-1">
               {(["simple", "booklet"] as const).map(style => (
                 <button
@@ -562,7 +564,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                       : "bg-background text-muted-foreground border-muted hover:border-primary/50"
                   }`}
                 >
-                  {style === "simple" ? "Simple (1-page summary)" : "Booklet (detailed proposal)"}
+                  {style === "simple" ? t("styleSimple") : t("styleBooklet")}
                 </button>
               ))}
             </div>
@@ -573,9 +575,9 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
           {/* ── Work Areas ── */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm">Work Areas &amp; Line Items</h3>
+              <h3 className="font-semibold text-sm">{t("workAreasLineItems")}</h3>
               <Button type="button" size="sm" variant="outline" onClick={addArea} data-testid="btn-add-work-area">
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Work Area
+                <Plus className="h-3.5 w-3.5 mr-1" /> {t("addWorkArea")}
               </Button>
             </div>
 
@@ -596,29 +598,29 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                             updateArea(area._key, { work_area_type_id: "" });
                             return;
                           }
-                          const type = workAreaTypes.find(t => t.id === v);
-                          if (type) {
+                          const wt = workAreaTypes.find(x => x.id === v);
+                          if (wt) {
                             updateArea(area._key, {
-                              work_area_type_id: type.id,
-                              name: type.name,
-                              cost_code: area.cost_code || type.cost_code || "",
+                              work_area_type_id: wt.id,
+                              name: wt.name,
+                              cost_code: area.cost_code || wt.cost_code || "",
                             });
                           }
                         }}
                       >
                         <SelectTrigger className="flex-1 h-7 text-sm font-medium border-0 bg-transparent focus:ring-0 shadow-none px-0" data-testid={`select-area-type-${aIdx}`}>
-                          <SelectValue placeholder="Select work area type…">
+                          <SelectValue placeholder={t("selectWorkAreaType")}>
                             {area.work_area_type_id
-                              ? (workAreaTypes.find(t => t.id === area.work_area_type_id)?.name ?? area.name)
-                              : (area.name || "Select work area type…")}
+                              ? (workAreaTypes.find(x => x.id === area.work_area_type_id)?.name ?? area.name)
+                              : (area.name || t("selectWorkAreaType"))}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {Object.entries(workAreaTypesByDivision).map(([div, types]) => (
                             <SelectGroup key={div}>
                               <SelectLabel className="text-xs text-muted-foreground">{div}</SelectLabel>
-                              {types.map(t => (
-                                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                              {types.map(wt => (
+                                <SelectItem key={wt.id} value={wt.id}>{wt.name}</SelectItem>
                               ))}
                             </SelectGroup>
                           ))}
@@ -637,7 +639,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                         {/* Cost Code + Category + Description row */}
                         <div className="grid grid-cols-[120px_1fr_1fr] gap-2 mb-2">
                           <div>
-                            <Label className="text-[10px] text-muted-foreground">Cost Code</Label>
+                            <Label className="text-[10px] text-muted-foreground">{t("costCode")}</Label>
                             <Input
                               value={area.cost_code}
                               onChange={e => updateArea(area._key, { cost_code: e.target.value })}
@@ -647,7 +649,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                             />
                           </div>
                           <div>
-                            <Label className="text-[10px] text-muted-foreground">Category</Label>
+                            <Label className="text-[10px] text-muted-foreground">{t("category")}</Label>
                             <Select value={area.category || ""} onValueChange={v => updateArea(area._key, { category: v })}>
                               <SelectTrigger className="h-7 text-xs mt-0.5" data-testid={`select-category-${aIdx}`}>
                                 <SelectValue placeholder="Select category..." />
@@ -660,7 +662,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                             </Select>
                           </div>
                           <div>
-                            <Label className="text-[10px] text-muted-foreground">Area Description</Label>
+                            <Label className="text-[10px] text-muted-foreground">{t("areaDescription")}</Label>
                             <Input
                               value={area.area_description}
                               onChange={e => updateArea(area._key, { area_description: e.target.value })}
@@ -672,12 +674,12 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                         </div>
                         {/* Column headers */}
                         <div className="grid grid-cols-[90px_1fr_60px_70px_80px_70px_28px] gap-1 text-[10px] text-muted-foreground font-medium px-1">
-                          <span>Class</span>
-                          <span>Description</span>
-                          <span>Qty</span>
-                          <span>Unit</span>
-                          <span>Unit Price</span>
-                          <span className="text-right">Amount</span>
+                          <span>{t("colClass")}</span>
+                          <span>{t("colDescription")}</span>
+                          <span>{t("colQty")}</span>
+                          <span>{t("colUnit")}</span>
+                          <span>{t("colUnitPrice")}</span>
+                          <span className="text-right">{t("colAmount")}</span>
                           <span />
                         </div>
                         {area.line_items.map((li, iIdx) => (
@@ -694,7 +696,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                               value={li.description}
                               onChange={e => updateLineItem(area._key, li._key, { description: e.target.value })}
                               className="h-7 text-xs"
-                              placeholder="Description..."
+                              placeholder={t("descriptionPlaceholder")}
                               data-testid={`input-desc-${aIdx}-${iIdx}`}
                             />
                             <Input
@@ -708,7 +710,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                               value={li.unit}
                               onChange={e => updateLineItem(area._key, li._key, { unit: e.target.value })}
                               className="h-7 text-xs"
-                              placeholder="ea, hr..."
+                              placeholder={t("unitPlaceholder")}
                               data-testid={`input-unit-${aIdx}-${iIdx}`}
                             />
                             <Input
@@ -728,12 +730,12 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                           </div>
                         ))}
                         <Button type="button" size="sm" variant="outline" onClick={() => setCatalogAreaKey(area._key)}
-                    className="h-7 text-xs gap-1">
-                    <Search className="h-3 w-3" /> Browse Catalog
-                  </Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => addLineItem(area._key)}
+                          className="h-7 text-xs gap-1">
+                          <Search className="h-3 w-3" /> {t("browseCatalog")}
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => addLineItem(area._key)}
                           className="h-7 text-xs" data-testid={`btn-add-item-${aIdx}`}>
-                          <Plus className="h-3 w-3 mr-1" /> Add Line Item
+                          <Plus className="h-3 w-3 mr-1" /> {t("addLineItem")}
                         </Button>
                       </div>
                     )}
@@ -749,19 +751,19 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-3">
               <div>
-                <Label className="text-xs">Tax Rate (%)</Label>
+                <Label className="text-xs">{t("taxRate")}</Label>
                 <Input type="number" min="0" max="100" step="0.01" value={taxRate}
                   onChange={e => setTaxRate(parseFloat(e.target.value) || 0)}
                   className="mt-1" data-testid="input-tax-rate" />
               </div>
               <div>
-                <Label className="text-xs">Discount ($)</Label>
+                <Label className="text-xs">{t("discountField")}</Label>
                 <Input type="number" min="0" step="0.01" value={discountAmount}
                   onChange={e => setDiscountAmount(parseFloat(e.target.value) || 0)}
                   className="mt-1" data-testid="input-discount" />
               </div>
               <div>
-                <Label className="text-xs">Down Payment Required (%)</Label>
+                <Label className="text-xs">{t("downPaymentPct")}</Label>
                 <Input type="number" min="0" max="100" step="1" value={downPaymentPct}
                   onChange={e => setDownPaymentPct(parseFloat(e.target.value) || 0)}
                   className="mt-1" data-testid="input-down-payment-pct" />
@@ -770,29 +772,29 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
 
             <div className="bg-muted/40 rounded-lg p-4 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal</span>
+                <span className="text-muted-foreground">{t("subtotal")}</span>
                 <span className="font-medium tabular-nums">{fmtMoney(subtotal)}</span>
               </div>
               {taxRate > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tax ({taxRate}%)</span>
+                  <span className="text-muted-foreground">{t("tax")} ({taxRate}%)</span>
                   <span className="font-medium tabular-nums">{fmtMoney(taxAmount)}</span>
                 </div>
               )}
               {discountAmount > 0 && (
                 <div className="flex justify-between text-green-600">
-                  <span>Discount</span>
+                  <span>{t("discount")}</span>
                   <span className="font-medium tabular-nums">-{fmtMoney(discountAmount)}</span>
                 </div>
               )}
               <Separator className="my-1" />
               <div className="flex justify-between text-base font-bold">
-                <span>Total</span>
+                <span>{t("total")}</span>
                 <span className="tabular-nums">{fmtMoney(total)}</span>
               </div>
               {downPaymentPct > 0 && (
                 <div className="flex justify-between text-blue-600 text-xs">
-                  <span>Down Payment ({downPaymentPct}%)</span>
+                  <span>{t("downPayment")} ({downPaymentPct}%)</span>
                   <span className="font-medium tabular-nums">{fmtMoney(downPaymentAmount)}</span>
                 </div>
               )}
@@ -802,26 +804,26 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
           {/* ── Notes & Terms ── */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label className="text-xs">Internal Notes</Label>
+              <Label className="text-xs">{t("internalNotes")}</Label>
               <Textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)}
                 className="mt-1 resize-none text-sm" data-testid="textarea-notes"
-                placeholder="Private notes for internal use only..." />
+                placeholder={t("internalNotesPlaceholder")} />
             </div>
             <div>
-              <Label className="text-xs">Terms &amp; Conditions</Label>
+              <Label className="text-xs">{t("termsConditions")}</Label>
               <Textarea rows={3} value={terms} onChange={e => setTerms(e.target.value)}
                 className="mt-1 resize-none text-sm" data-testid="textarea-terms"
-                placeholder="Payment terms, cancellation policy..." />
+                placeholder={t("termsPlaceholder")} />
             </div>
           </div>
         </div>
 
         {/* ── Footer ── */}
         <div className="px-6 py-4 border-t flex justify-end gap-2 sticky bottom-0 bg-background">
-          <Button variant="outline" onClick={onClose} data-testid="btn-cancel-estimate">Cancel</Button>
+          <Button variant="outline" onClick={onClose} data-testid="btn-cancel-estimate">{t("cancel")}</Button>
           <Button onClick={handleSubmit} disabled={mutation.isPending} data-testid="btn-save-estimate">
             {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {isEdit ? "Save Changes" : "Create Estimate"}
+            {isEdit ? t("saveChanges") : t("createEstimate")}
           </Button>
         </div>
       <CatalogBrowser
