@@ -449,8 +449,55 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const NavContent = ({ isMobileSheet = false }: { isMobileSheet?: boolean } = {}) => {
+    const { t: tNav } = useTranslation();
     const { shapeClass, sizeClass } = getLogoClasses();
     const hasLogo = !!companySettings?.logoUrl;
+
+    const navLabels: Record<string, string> = {
+      dashboard: tNav("nav.myWorkspace"),
+      applicant_portal: tNav("nav.myApplication"),
+      sops: tNav("nav.sopLibrary"),
+      testing: tNav("nav.quizzes"),
+      materials: tNav("nav.materials"),
+      equipment: tNav("nav.equipment"),
+      todos: tNav("nav.tasks"),
+      hiring: tNav("nav.hiring"),
+      employees: tNav("nav.employees"),
+      my_profile: tNav("nav.myProfile"),
+      jobs: tNav("nav.jobs"),
+      scheduling: tNav("nav.scheduling"),
+      my_day: tNav("nav.myDay"),
+      my_hours: tNav("nav.myHours"),
+      estimates: tNav("nav.estimates"),
+      invoices: tNav("nav.invoices"),
+      customers: tNav("nav.customers"),
+      daily_worksheet: tNav("nav.dailyWorksheet"),
+      time_tracking: tNav("nav.clockInOut"),
+      consultations: tNav("nav.consultations"),
+      reports: tNav("nav.reports"),
+      mors_budget: tNav("nav.morsBudget"),
+      education: tNav("nav.resourceLibrary"),
+      help: tNav("nav.help"),
+      hq: tNav("nav.companyHQ"),
+      marketing: tNav("nav.marketing"),
+      forms: tNav("nav.forms"),
+      inbox: tNav("nav.messages"),
+      messages: tNav("nav.messages"),
+      admin: tNav("nav.adminPanel"),
+      time_reports: tNav("nav.timeReports"),
+      catalog: tNav("nav.catalog"),
+      budget_settings: tNav("nav.budgetPricing"),
+      tools: tNav("nav.tools"),
+      plow_mapper: tNav("nav.plowMapper"),
+    };
+
+    const navSectionLabels: Record<string, string> = {
+      "MY SPACE": tNav("nav.sections.mySpace"),
+      "SALES": tNav("nav.sections.sales"),
+      "OPERATIONS": tNav("nav.sections.operations"),
+      "RESOURCES": tNav("nav.sections.resources"),
+      "ADMIN": tNav("nav.sections.admin"),
+    };
     
     return (
     <div className="sidebar-themed flex flex-col h-full text-sidebar-foreground">
@@ -514,11 +561,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   {section.label === "ADMIN" ? (
                     <span className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.15em] uppercase text-rose-500" data-testid="section-header-admin">
                       <Shield className="h-3 w-3 flex-shrink-0" />
-                      {sectionLabels[section.label] || section.label}
+                      {navSectionLabels[section.label] || section.label}
                     </span>
                   ) : (
                     <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-sidebar-foreground/40" data-testid={`section-header-${section.label.toLowerCase().replace(/ /g, '-')}`}>
-                      {sectionLabels[section.label] || section.label}
+                      {navSectionLabels[section.label] || section.label}
                     </span>
                   )}
                 </div>
@@ -531,6 +578,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 const helpContent = menuHelpContent[item.id];
                 const showTodoBadge = item.id === "todos" && todoActiveStatus?.isActive && todoActiveStatus.unreadCount > 0;
                 const showMessagesBadge = item.id === "messages" && (dmUnreadData?.count ?? 0) > 0;
+                const itemLabel = navLabels[itemId] || item.label;
                 return (
                   <div key={item.id} className="flex items-center group w-full">
                     <Link href={item.href} className="flex-1 min-w-0 block" style={{ height: 36, overflow: 'hidden' }}>
@@ -565,7 +613,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                             </span>
                           )}
                         </div>
-                        <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0 }}>{item.label}</span>
+                        <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', minWidth: 0 }}>{itemLabel}</span>
                       </div>
                     </Link>
                     {helpContent ? (
