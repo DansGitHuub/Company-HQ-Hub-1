@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Plus, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface Customer { id: string; first_name: string; last_name: string; company_name: string | null; }
 interface Job { id: string; title: string; client: string; }
@@ -55,6 +56,7 @@ function calcTotal(items: LineItem[], taxRate: string, discountAmount: string) {
 }
 
 export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustomerId, lockedJobId, onSuccess }: Props) {
+  const { t } = useTranslation("invoices");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEdit = !!initialData?.id;
@@ -68,7 +70,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
     tax_rate: "0",
     discount_amount: "0",
     notes: "",
-    terms: "Payment due within 30 days.",
+    terms: t("defaultTerms"),
     customer_message: "",
     customer_response: "",
     customer_response_note: "",
@@ -85,7 +87,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
       tax_rate: "0",
       discount_amount: "0",
       notes: "",
-      terms: "Payment due within 30 days.",
+      terms: t("defaultTerms"),
       customer_message: "",
       customer_response: "",
       customer_response_note: "",
@@ -151,7 +153,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
     },
     onSuccess: (inv) => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ title: isEdit ? "Invoice updated" : "Invoice created" });
+      toast({ title: isEdit ? t("invoiceUpdated") : t("invoiceCreated") });
       onOpenChange(false);
       onSuccess?.(inv);
     },
@@ -162,7 +164,7 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Invoice" : "New Invoice"}</DialogTitle>
+          <DialogTitle>{isEdit ? t("editInvoice") : t("newInvoice")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-5 pt-2">
@@ -170,11 +172,11 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
           <div className="grid grid-cols-2 gap-3">
             {!lockedCustomerId && (
               <div className="space-y-1">
-                <Label>Customer</Label>
+                <Label>{t("customer")}</Label>
                 <select value={form.customer_id} onChange={(e) => set("customer_id", e.target.value)}
                   className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
                   data-testid="select-customer">
-                  <option value="">No specific customer</option>
+                  <option value="">{t("noSpecificCustomer")}</option>
                   {customers.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.first_name} {c.last_name}{c.company_name ? ` — ${c.company_name}` : ""}
@@ -185,11 +187,11 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
             )}
             {!lockedJobId && (
               <div className="space-y-1">
-                <Label>Job <span className="text-muted-foreground/60 text-xs">(optional)</span></Label>
+                <Label>{t("jobOptional")}</Label>
                 <select value={form.job_id} onChange={(e) => set("job_id", e.target.value)}
                   className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
                   data-testid="select-job">
-                  <option value="">No linked job</option>
+                  <option value="">{t("noLinkedJob")}</option>
                   {jobs.map((j) => (
                     <option key={j.id} value={j.id}>{j.title || j.client}</option>
                   ))}
@@ -201,23 +203,23 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
           {/* Dates */}
           <div className="grid grid-cols-4 gap-3">
             <div className="space-y-1">
-              <Label>Issue Date</Label>
+              <Label>{t("issueDateLabel")}</Label>
               <Input type="date" value={form.issued_date} onChange={(e) => set("issued_date", e.target.value)}
                 data-testid="input-issue-date" />
             </div>
             <div className="space-y-1">
-              <Label>Due Date</Label>
+              <Label>{t("dueDateLabel")}</Label>
               <Input type="date" value={form.due_date} onChange={(e) => set("due_date", e.target.value)}
                 data-testid="input-due-date" />
             </div>
             <div className="space-y-1">
-              <Label>Tax Rate (%)</Label>
+              <Label>{t("taxRateLabel")}</Label>
               <Input type="number" min="0" max="100" step="0.1" value={form.tax_rate}
                 onChange={(e) => set("tax_rate", e.target.value)}
                 placeholder="0" data-testid="input-tax-rate" />
             </div>
             <div className="space-y-1">
-              <Label>Discount ($)</Label>
+              <Label>{t("discountDollarLabel")}</Label>
               <Input type="number" min="0" step="0.01" value={form.discount_amount}
                 onChange={(e) => set("discount_amount", e.target.value)}
                 placeholder="0.00" data-testid="input-discount" />
@@ -227,25 +229,24 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
           {/* Line Items */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-semibold">Line Items</Label>
+              <Label className="text-sm font-semibold">{t("lineItems")}</Label>
               <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-7 text-xs">
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Line
+                <Plus className="h-3.5 w-3.5 mr-1" /> {t("addLine")}
               </Button>
             </div>
 
             <div className="rounded-lg border overflow-hidden">
               <div className="grid grid-cols-[1fr,80px,100px,36px] gap-0 bg-muted/40 px-3 py-2">
-                <span className="text-xs font-medium text-muted-foreground">Description</span>
-                <span className="text-xs font-medium text-muted-foreground text-center">Qty</span>
-                <span className="text-xs font-medium text-muted-foreground text-right">Unit Price</span>
+                <span className="text-xs font-medium text-muted-foreground">{t("description")}</span>
+                <span className="text-xs font-medium text-muted-foreground text-center">{t("qty")}</span>
+                <span className="text-xs font-medium text-muted-foreground text-right">{t("unitPrice")}</span>
                 <span />
               </div>
               {form.line_items.map((item, idx) => {
-                const lineAmt = parseFloat(item.quantity || "0") * parseFloat(item.unit_price || "0");
                 return (
                   <div key={idx} className="grid grid-cols-[1fr,80px,100px,36px] gap-1 px-2 py-1.5 border-t items-center">
                     <Input value={item.description} onChange={(e) => updateItem(idx, "description", e.target.value)}
-                      placeholder="Description of work or material"
+                      placeholder={t("descPlaceholder")}
                       className="h-8 text-sm border-0 shadow-none focus-visible:ring-0 px-1"
                       data-testid={`input-line-desc-${idx}`} />
                     <Input type="number" min="0" step="0.5" value={item.quantity}
@@ -271,23 +272,23 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
               {/* Totals */}
               <div className="border-t bg-muted/20 px-3 py-2.5 space-y-1">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="text-muted-foreground">{t("subtotal")}</span>
                   <span>${subtotal.toFixed(2)}</span>
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-sm text-emerald-600">
-                    <span>Discount</span>
+                    <span>{t("discount")}</span>
                     <span>−${discount.toFixed(2)}</span>
                   </div>
                 )}
                 {parseFloat(form.tax_rate) > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Tax ({form.tax_rate}%)</span>
+                    <span className="text-muted-foreground">{t("taxWithRate", { rate: form.tax_rate })}</span>
                     <span>${tax.toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm font-bold border-t pt-1.5 mt-1">
-                  <span>Total</span>
+                  <span>{t("total")}</span>
                   <span>${total.toFixed(2)}</span>
                 </div>
               </div>
@@ -297,43 +298,57 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
           {/* Notes + Terms + Customer Message */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label>Internal Notes <span className="text-muted-foreground/60 text-xs">(not shown to customer)</span></Label>
+              <Label>
+                {t("internalNotes")}{" "}
+                <span className="text-muted-foreground/60 text-xs">({t("internalNotesNotShown")})</span>
+              </Label>
               <Textarea value={form.notes} onChange={(e) => set("notes", e.target.value)}
-                rows={3} placeholder="Internal notes for your team…" data-testid="textarea-notes" />
+                rows={3} placeholder={t("internalNotesPlaceholder")} data-testid="textarea-notes" />
             </div>
             <div className="space-y-1">
-              <Label>Terms</Label>
+              <Label>{t("termsLabel")}</Label>
               <Textarea value={form.terms} onChange={(e) => set("terms", e.target.value)}
-                rows={3} placeholder="Payment due within 30 days." data-testid="textarea-terms" />
+                rows={3} placeholder={t("termsPlaceholder")} data-testid="textarea-terms" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label>Customer Message <span className="text-muted-foreground/60 text-xs">(sent to customer)</span></Label>
+              <Label>
+                {t("customerMessageLabel")}{" "}
+                <span className="text-muted-foreground/60 text-xs">({t("customerMessageSent")})</span>
+              </Label>
               <Textarea value={form.customer_message} onChange={(e) => set("customer_message", e.target.value)}
-                rows={2} placeholder="Thank you for your business! We appreciate the opportunity to work with you."
+                rows={2} placeholder={t("customerMessagePlaceholder")}
                 data-testid="textarea-customer-message" />
             </div>
             <div className="space-y-1">
-              <Label>Customer Response <span className="text-muted-foreground/60 text-xs">(their reply)</span></Label>
+              <Label>
+                {t("customerResponseLabel")}{" "}
+                <span className="text-muted-foreground/60 text-xs">({t("theirReply")})</span>
+              </Label>
               <Textarea value={form.customer_response} onChange={(e) => set("customer_response", e.target.value)}
-                rows={2} placeholder="Record customer's phone/email response…"
+                rows={2} placeholder={t("customerResponsePlaceholder")}
                 data-testid="textarea-customer-response" />
             </div>
           </div>
           <div className="space-y-1">
-            <Label>Response Note <span className="text-muted-foreground/60 text-xs">(internal follow-up)</span></Label>
+            <Label>
+              {t("responseNoteLabel")}{" "}
+              <span className="text-muted-foreground/60 text-xs">({t("internalFollowUp")})</span>
+            </Label>
             <Textarea value={form.customer_response_note} onChange={(e) => set("customer_response_note", e.target.value)}
-              rows={2} placeholder="e.g. Called back twice, prefers email, follow up Friday…"
+              rows={2} placeholder={t("responseNotePlaceholder")}
               data-testid="textarea-customer-response-note" />
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("cancel")}</Button>
           <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="bg-primary"
             data-testid="button-save-invoice">
-            {mutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : isEdit ? "Save Changes" : "Create Invoice"}
+            {mutation.isPending
+              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t("saving")}</>
+              : isEdit ? t("saveChanges") : t("createInvoice")}
           </Button>
         </DialogFooter>
       </DialogContent>

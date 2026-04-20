@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   ChevronLeft, ChevronDown, Pencil, User, Briefcase,
-  Calendar, DollarSign, Loader2, Trash2, Plus, CreditCard,
+  Calendar, Loader2, Trash2, Plus, CreditCard,
   Send, CheckCircle2, XCircle, MessageSquare, BadgeDollarSign,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +25,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { format, parseISO } from "date-fns";
+import { useTranslation } from "react-i18next";
 import { StatusBadge, STATUS_MAP } from "./index";
 import { InvoiceFormModal } from "./InvoiceFormModal";
 import { useAuth } from "@/hooks/use-auth";
@@ -53,18 +54,18 @@ interface InvoiceDetail {
   payments: Payment[];
 }
 
-const INVOICE_STATUSES = [
-  { value: "draft",             label: "Draft" },
-  { value: "sent",              label: "Sent" },
-  { value: "viewed",            label: "Viewed" },
-  { value: "accepted",          label: "Accepted" },
-  { value: "declined",          label: "Declined" },
-  { value: "changes_requested", label: "Changes Requested" },
-  { value: "paid",              label: "Paid" },
-  { value: "void",              label: "Void" },
-];
+const STATUS_VALUE_KEYS: Record<string, string> = {
+  draft:             "statusDraft",
+  sent:              "statusSent",
+  viewed:            "statusViewed",
+  accepted:          "statusAccepted",
+  declined:          "statusDeclined",
+  changes_requested: "statusChangesRequested",
+  paid:              "statusPaid",
+  void:              "statusVoid",
+};
 
-const PAYMENT_METHODS = ["cash","check","card","ach","zelle","other"];
+const PAYMENT_METHODS = ["cash", "check", "card", "ach", "zelle", "other"];
 
 function fmtMoney(v: any) {
   const n = parseFloat(v ?? "0");
@@ -93,6 +94,7 @@ function InfoRow({ icon: Icon, label, value, href }: { icon: any; label: string;
 }
 
 export default function InvoiceDetailPage() {
+  const { t } = useTranslation("invoices");
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -108,6 +110,17 @@ export default function InvoiceDetailPage() {
     amount: "", payment_method: "cash", payment_date: new Date().toISOString().split("T")[0],
     reference_number: "", notes: "",
   });
+
+  const INVOICE_STATUSES = [
+    { value: "draft",             label: t("statusDraft") },
+    { value: "sent",              label: t("statusSent") },
+    { value: "viewed",            label: t("statusViewed") },
+    { value: "accepted",          label: t("statusAccepted") },
+    { value: "declined",          label: t("statusDeclined") },
+    { value: "changes_requested", label: t("statusChangesRequested") },
+    { value: "paid",              label: t("statusPaid") },
+    { value: "void",              label: t("statusVoid") },
+  ];
 
   const { data: invoice, isLoading } = useQuery<InvoiceDetail>({
     queryKey: ["/api/invoices", id],
@@ -127,7 +140,7 @@ export default function InvoiceDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/invoices", id] });
       qc.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ title: "Status updated" });
+      toast({ title: t("statusUpdated") });
     },
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
@@ -147,7 +160,7 @@ export default function InvoiceDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/invoices", id] });
       qc.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ title: "Payment recorded" });
+      toast({ title: t("paymentRecorded") });
       setShowPaymentForm(false);
       setPayForm({ amount: "", payment_method: "cash", payment_date: new Date().toISOString().split("T")[0], reference_number: "", notes: "" });
     },
@@ -161,7 +174,7 @@ export default function InvoiceDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/invoices", id] });
       qc.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ title: "Payment removed" });
+      toast({ title: t("paymentRemoved") });
     },
   });
 
@@ -174,7 +187,7 @@ export default function InvoiceDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/invoices", id] });
       qc.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ title: "Invoice marked as sent" });
+      toast({ title: t("invoiceMarkedSent") });
     },
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
@@ -188,7 +201,7 @@ export default function InvoiceDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/invoices", id] });
       qc.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ title: "Invoice marked as paid" });
+      toast({ title: t("invoiceMarkedPaid") });
     },
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
@@ -204,8 +217,12 @@ export default function InvoiceDetailPage() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["/api/invoices", id] });
       qc.invalidateQueries({ queryKey: ["/api/invoices"] });
-      const labels: Record<string, string> = { accepted: "Accepted", declined: "Declined", changes_requested: "Changes requested" };
-      toast({ title: labels[vars.type] ?? "Response recorded" });
+      const labelKeys: Record<string, string> = {
+        accepted: "statusAccepted",
+        declined: "statusDeclined",
+        changes_requested: "statusChangesRequested",
+      };
+      toast({ title: labelKeys[vars.type] ? t(labelKeys[vars.type]) : t("responseRecorded") });
       setResponseDialog(null);
       setResponseText("");
     },
@@ -216,10 +233,11 @@ export default function InvoiceDetailPage() {
     return <div className="p-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
   if (!invoice) {
-    return <div className="p-8 text-center text-muted-foreground">Invoice not found.</div>;
+    return <div className="p-8 text-center text-muted-foreground">{t("invoiceNotFound")}</div>;
   }
 
-  const statusInfo = STATUS_MAP[invoice.status] ?? { label: invoice.status, cls: "bg-muted text-muted-foreground" };
+  const statusInfo = STATUS_MAP[invoice.status] ?? { cls: "bg-muted text-muted-foreground" };
+  const statusLabel = STATUS_VALUE_KEYS[invoice.status] ? t(STATUS_VALUE_KEYS[invoice.status]) : invoice.status;
   const custName = invoice.cust_first
     ? `${invoice.cust_first} ${invoice.cust_last}`
     : invoice.cust_company ?? undefined;
@@ -231,7 +249,7 @@ export default function InvoiceDetailPage() {
       <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="sm" onClick={() => navigate("/invoices")} className="text-muted-foreground"
           data-testid="button-back">
-          <ChevronLeft className="h-4 w-4 mr-1" /> Invoices
+          <ChevronLeft className="h-4 w-4 mr-1" /> {t("backToInvoices")}
         </Button>
         <div className="flex-1">
           <h1 className="text-xl font-bold font-mono">{invoice.invoice_number}</h1>
@@ -242,18 +260,18 @@ export default function InvoiceDetailPage() {
               <Button size="sm" onClick={() => sendMutation.mutate()} disabled={sendMutation.isPending}
                 data-testid="button-send-invoice">
                 {sendMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Send className="h-4 w-4 mr-1.5" />}
-                Send Invoice
+                {t("sendInvoice")}
               </Button>
             )}
-            {["sent","viewed","accepted"].includes(invoice.status) && parseFloat(invoice.balance_due ?? "0") > 0 && (
+            {["sent", "viewed", "accepted"].includes(invoice.status) && parseFloat(invoice.balance_due ?? "0") > 0 && (
               <Button size="sm" variant="outline" onClick={() => paidMutation.mutate()} disabled={paidMutation.isPending}
                 className="border-green-400 text-green-700 hover:bg-green-50" data-testid="button-mark-paid">
                 {paidMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <BadgeDollarSign className="h-4 w-4 mr-1.5" />}
-                Mark Paid
+                {t("markPaid")}
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => setShowEdit(true)} data-testid="button-edit">
-              <Pencil className="h-4 w-4 mr-1.5" /> Edit Invoice
+              <Pencil className="h-4 w-4 mr-1.5" /> {t("editInvoice")}
             </Button>
           </div>
         )}
@@ -266,13 +284,13 @@ export default function InvoiceDetailPage() {
             <CardContent className="pt-5 pb-4">
               {/* Status */}
               <div className="mb-4">
-                <p className="text-xs text-muted-foreground font-medium mb-2">Status</p>
+                <p className="text-xs text-muted-foreground font-medium mb-2">{t("statusLabel")}</p>
                 {isAdminOrManager ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold hover:opacity-90 ${statusInfo.cls}`}
                         data-testid="button-status">
-                        {statusInfo.label}
+                        {statusLabel}
                         <ChevronDown className="h-3.5 w-3.5 opacity-60" />
                       </button>
                     </DropdownMenuTrigger>
@@ -291,24 +309,24 @@ export default function InvoiceDetailPage() {
               </div>
 
               {/* Customer response actions — shown when invoice is sent/viewed */}
-              {isAdminOrManager && ["sent","viewed"].includes(invoice.status) && (
+              {isAdminOrManager && ["sent", "viewed"].includes(invoice.status) && (
                 <div className="mt-3 space-y-2">
-                  <p className="text-xs text-muted-foreground font-medium">Record Customer Response</p>
+                  <p className="text-xs text-muted-foreground font-medium">{t("recordCustomerResponse")}</p>
                   <div className="flex flex-col gap-1.5">
                     <Button size="sm" variant="outline" className="justify-start border-green-400 text-green-700 hover:bg-green-50"
                       onClick={() => responseMutation.mutate({ type: "accepted", text: "" })}
                       disabled={responseMutation.isPending} data-testid="button-accept">
-                      <CheckCircle2 className="h-4 w-4 mr-2" /> Accepted
+                      <CheckCircle2 className="h-4 w-4 mr-2" /> {t("statusAccepted")}
                     </Button>
                     <Button size="sm" variant="outline" className="justify-start border-red-300 text-red-600 hover:bg-red-50"
                       onClick={() => { setResponseDialog({ type: "declined" }); setResponseText(""); }}
                       data-testid="button-decline">
-                      <XCircle className="h-4 w-4 mr-2" /> Declined
+                      <XCircle className="h-4 w-4 mr-2" /> {t("statusDeclined")}
                     </Button>
                     <Button size="sm" variant="outline" className="justify-start"
                       onClick={() => { setResponseDialog({ type: "changes_requested" }); setResponseText(""); }}
                       data-testid="button-request-changes">
-                      <MessageSquare className="h-4 w-4 mr-2" /> Changes Requested
+                      <MessageSquare className="h-4 w-4 mr-2" /> {t("statusChangesRequested")}
                     </Button>
                   </div>
                 </div>
@@ -316,22 +334,22 @@ export default function InvoiceDetailPage() {
 
               <Separator className="mb-3 mt-3" />
 
-              <InfoRow icon={User} label="Customer" value={custName}
+              <InfoRow icon={User} label={t("customer")} value={custName}
                 href={invoice.customer_id ? `/customers/${invoice.customer_id}` : undefined} />
-              <InfoRow icon={Briefcase} label="Job"
+              <InfoRow icon={Briefcase} label={t("job")}
                 value={invoice.job_title || invoice.job_client}
                 href={invoice.job_id ? `/jobs/${invoice.job_id}` : undefined} />
-              <InfoRow icon={Calendar} label="Issued" value={fmtDate(invoice.issued_date)} />
+              <InfoRow icon={Calendar} label={t("issued")} value={fmtDate(invoice.issued_date)} />
               {invoice.sent_at && (
-                <InfoRow icon={Calendar} label="Sent" value={fmtDate(invoice.sent_at)} />
+                <InfoRow icon={Calendar} label={t("statusSent")} value={fmtDate(invoice.sent_at)} />
               )}
               {invoice.viewed_at && (
-                <InfoRow icon={Calendar} label="Viewed" value={fmtDate(invoice.viewed_at)} />
+                <InfoRow icon={Calendar} label={t("statusViewed")} value={fmtDate(invoice.viewed_at)} />
               )}
               {invoice.paid_at && (
-                <InfoRow icon={Calendar} label="Paid" value={fmtDate(invoice.paid_at)} />
+                <InfoRow icon={Calendar} label={t("paid")} value={fmtDate(invoice.paid_at)} />
               )}
-              <InfoRow icon={Calendar} label="Due"
+              <InfoRow icon={Calendar} label={t("due")}
                 value={<span className={balanceDue > 0 && invoice.status === "overdue" ? "text-red-600 font-semibold" : ""}>
                   {fmtDate(invoice.due_date)}
                 </span>} />
@@ -342,33 +360,35 @@ export default function InvoiceDetailPage() {
           <Card>
             <CardContent className="pt-4 pb-4 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
+                <span className="text-muted-foreground">{t("subtotal")}</span>
                 <span>{fmtMoney(invoice.subtotal)}</span>
               </div>
               {parseFloat(invoice.discount_amount) > 0 && (
                 <div className="flex justify-between text-sm text-emerald-600">
-                  <span>Discount</span>
+                  <span>{t("discount")}</span>
                   <span>−{fmtMoney(invoice.discount_amount)}</span>
                 </div>
               )}
               {parseFloat(invoice.tax_rate) > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tax ({(parseFloat(invoice.tax_rate) * 100).toFixed(2)}%)</span>
+                  <span className="text-muted-foreground">
+                    {t("taxWithRate", { rate: (parseFloat(invoice.tax_rate) * 100).toFixed(2) })}
+                  </span>
                   <span>{fmtMoney(invoice.tax_amount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm font-bold border-t pt-2">
-                <span>Total</span>
+                <span>{t("total")}</span>
                 <span>{fmtMoney(invoice.total)}</span>
               </div>
               {parseFloat(invoice.amount_paid) > 0 && (
                 <div className="flex justify-between text-sm text-green-600">
-                  <span>Paid</span>
+                  <span>{t("paid")}</span>
                   <span>−{fmtMoney(invoice.amount_paid)}</span>
                 </div>
               )}
               <div className={`flex justify-between text-base font-bold border-t pt-2 ${balanceDue > 0 ? "text-red-600" : "text-green-600"}`}>
-                <span>Balance Due</span>
+                <span>{t("balanceDue")}</span>
                 <span>{fmtMoney(invoice.balance_due)}</span>
               </div>
             </CardContent>
@@ -378,11 +398,13 @@ export default function InvoiceDetailPage() {
         {/* ── Right ────────────────────────────────────────────────────────── */}
         <Tabs defaultValue="items">
           <TabsList className="mb-4">
-            <TabsTrigger value="items">Line Items</TabsTrigger>
+            <TabsTrigger value="items">{t("tabItems")}</TabsTrigger>
             <TabsTrigger value="payments">
-              Payments {invoice.payments.length > 0 && `(${invoice.payments.length})`}
+              {invoice.payments.length > 0
+                ? `${t("tabPayments")} (${invoice.payments.length})`
+                : t("tabPayments")}
             </TabsTrigger>
-            <TabsTrigger value="notes">Notes & Terms</TabsTrigger>
+            <TabsTrigger value="notes">{t("tabNotes")}</TabsTrigger>
           </TabsList>
 
           {/* Line Items */}
@@ -390,15 +412,15 @@ export default function InvoiceDetailPage() {
             <Card>
               <CardContent className="p-0">
                 {invoice.line_items.length === 0 ? (
-                  <div className="py-10 text-center text-muted-foreground text-sm">No line items.</div>
+                  <div className="py-10 text-center text-muted-foreground text-sm">{t("noLineItemsMsg")}</div>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-center w-20">Qty</TableHead>
-                        <TableHead className="text-right w-28">Unit Price</TableHead>
-                        <TableHead className="text-right w-28">Amount</TableHead>
+                        <TableHead>{t("description")}</TableHead>
+                        <TableHead className="text-center w-20">{t("qty")}</TableHead>
+                        <TableHead className="text-right w-28">{t("unitPrice")}</TableHead>
+                        <TableHead className="text-right w-28">{t("amountHeader")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -416,23 +438,25 @@ export default function InvoiceDetailPage() {
                 <div className="border-t px-4 py-3 flex justify-end">
                   <div className="space-y-1 text-sm min-w-[200px]">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="text-muted-foreground">{t("subtotal")}</span>
                       <span>{fmtMoney(invoice.subtotal)}</span>
                     </div>
                     {parseFloat(invoice.discount_amount) > 0 && (
                       <div className="flex justify-between text-emerald-600">
-                        <span>Discount</span>
+                        <span>{t("discount")}</span>
                         <span>−{fmtMoney(invoice.discount_amount)}</span>
                       </div>
                     )}
                     {parseFloat(invoice.tax_rate) > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tax ({(parseFloat(invoice.tax_rate) * 100).toFixed(2)}%)</span>
+                        <span className="text-muted-foreground">
+                          {t("taxWithRate", { rate: (parseFloat(invoice.tax_rate) * 100).toFixed(2) })}
+                        </span>
                         <span>{fmtMoney(invoice.tax_amount)}</span>
                       </div>
                     )}
                     <div className="flex justify-between font-bold border-t pt-1.5 text-base">
-                      <span>Total</span>
+                      <span>{t("total")}</span>
                       <span>{fmtMoney(invoice.total)}</span>
                     </div>
                   </div>
@@ -445,29 +469,29 @@ export default function InvoiceDetailPage() {
           <TabsContent value="payments">
             <Card>
               <CardHeader className="pb-3 pt-4 flex flex-row items-center justify-between">
-                <CardTitle className="text-base">Payment History</CardTitle>
+                <CardTitle className="text-base">{t("paymentHistory")}</CardTitle>
                 {isAdminOrManager && balanceDue > 0 && (
                   <Button size="sm" variant="outline" onClick={() => {
                     setPayForm((f) => ({ ...f, amount: balanceDue.toFixed(2) }));
                     setShowPaymentForm(true);
                   }} data-testid="button-add-payment">
-                    <Plus className="h-4 w-4 mr-1.5" /> Record Payment
+                    <Plus className="h-4 w-4 mr-1.5" /> {t("recordPayment")}
                   </Button>
                 )}
               </CardHeader>
               <CardContent className="pb-4">
                 {showPaymentForm && (
                   <div className="rounded-lg border p-4 space-y-3 mb-4 bg-muted/20">
-                    <p className="text-sm font-semibold">New Payment</p>
+                    <p className="text-sm font-semibold">{t("newPaymentLabel")}</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-xs">Amount ($)</Label>
+                        <Label className="text-xs">{t("amountDollars")}</Label>
                         <Input type="number" step="0.01" value={payForm.amount}
                           onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))}
                           placeholder="0.00" data-testid="input-pay-amount" />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">Method</Label>
+                        <Label className="text-xs">{t("methodLabel")}</Label>
                         <select value={payForm.payment_method}
                           onChange={(e) => setPayForm((f) => ({ ...f, payment_method: e.target.value }))}
                           className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm capitalize"
@@ -476,25 +500,31 @@ export default function InvoiceDetailPage() {
                         </select>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">Date</Label>
+                        <Label className="text-xs">{t("dateLabel")}</Label>
                         <Input type="date" value={payForm.payment_date}
                           onChange={(e) => setPayForm((f) => ({ ...f, payment_date: e.target.value }))}
                           data-testid="input-pay-date" />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">Reference # <span className="text-muted-foreground/60">(optional)</span></Label>
+                        <Label className="text-xs">{t("referenceOptional")}</Label>
                         <Input value={payForm.reference_number}
                           onChange={(e) => setPayForm((f) => ({ ...f, reference_number: e.target.value }))}
-                          placeholder="Check #, transaction ID…" data-testid="input-pay-ref" />
+                          placeholder={t("refPlaceholder")} data-testid="input-pay-ref" />
                       </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("notesLabel")}</Label>
+                      <Input value={payForm.notes}
+                        onChange={(e) => setPayForm((f) => ({ ...f, notes: e.target.value }))}
+                        placeholder="" data-testid="input-pay-notes" />
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => paymentMutation.mutate()} disabled={paymentMutation.isPending || !payForm.amount}
                         data-testid="button-save-payment">
                         {paymentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-                        Save Payment
+                        {t("savePayment")}
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setShowPaymentForm(false)}>Cancel</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setShowPaymentForm(false)}>{t("cancel")}</Button>
                     </div>
                   </div>
                 )}
@@ -502,16 +532,16 @@ export default function InvoiceDetailPage() {
                 {invoice.payments.length === 0 && !showPaymentForm ? (
                   <div className="py-8 text-center">
                     <CreditCard className="h-8 w-8 mx-auto mb-2 text-muted-foreground/30" />
-                    <p className="text-sm text-muted-foreground">No payments recorded yet.</p>
+                    <p className="text-sm text-muted-foreground">{t("noPaymentsYet")}</p>
                   </div>
                 ) : invoice.payments.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Method</TableHead>
-                        <TableHead>Reference</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>{t("dateLabel")}</TableHead>
+                        <TableHead>{t("methodLabel")}</TableHead>
+                        <TableHead>{t("reference")}</TableHead>
+                        <TableHead className="text-right">{t("amountHeader")}</TableHead>
                         {isAdminOrManager && <TableHead className="w-8" />}
                       </TableRow>
                     </TableHeader>
@@ -548,7 +578,7 @@ export default function InvoiceDetailPage() {
               {invoice.customer_message && (
                 <Card className="border-primary/30 bg-primary/5">
                   <CardHeader className="pb-2 pt-4">
-                    <CardTitle className="text-sm text-primary">Message to Customer</CardTitle>
+                    <CardTitle className="text-sm text-primary">{t("messageToCustomer")}</CardTitle>
                   </CardHeader>
                   <CardContent className="pb-4">
                     <p className="text-sm whitespace-pre-wrap">{invoice.customer_message}</p>
@@ -560,8 +590,8 @@ export default function InvoiceDetailPage() {
                   <CardHeader className="pb-2 pt-4">
                     <CardTitle className="text-sm text-amber-700 dark:text-amber-400 flex items-center justify-between">
                       <span>
-                        Customer Response
-                        {["accepted","declined","changes_requested"].includes(invoice.status) && (
+                        {t("customerResponse")}
+                        {["accepted", "declined", "changes_requested"].includes(invoice.status) && (
                           <span className="ml-2 font-normal text-xs">
                             — <span className="capitalize">{invoice.status.replace(/_/g, " ")}</span>
                           </span>
@@ -578,7 +608,7 @@ export default function InvoiceDetailPage() {
                     <p className="text-sm whitespace-pre-wrap">{invoice.customer_response}</p>
                     {invoice.customer_response_note && (
                       <p className="text-xs text-muted-foreground border-t pt-2 mt-2 whitespace-pre-wrap">
-                        <span className="font-medium">Note:</span> {invoice.customer_response_note}
+                        <span className="font-medium">{t("responseNote")}</span> {invoice.customer_response_note}
                       </p>
                     )}
                   </CardContent>
@@ -586,18 +616,18 @@ export default function InvoiceDetailPage() {
               )}
               <div className="grid grid-cols-2 gap-4">
                 <Card>
-                  <CardHeader className="pb-2 pt-4"><CardTitle className="text-sm">Internal Notes</CardTitle></CardHeader>
+                  <CardHeader className="pb-2 pt-4"><CardTitle className="text-sm">{t("internalNotes")}</CardTitle></CardHeader>
                   <CardContent className="pb-4">
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {invoice.notes || <span className="italic">No internal notes.</span>}
+                      {invoice.notes || <span className="italic">{t("noInternalNotes")}</span>}
                     </p>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardHeader className="pb-2 pt-4"><CardTitle className="text-sm">Terms</CardTitle></CardHeader>
+                  <CardHeader className="pb-2 pt-4"><CardTitle className="text-sm">{t("termsLabel")}</CardTitle></CardHeader>
                   <CardContent className="pb-4">
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {invoice.terms || <span className="italic">No terms.</span>}
+                      {invoice.terms || <span className="italic">{t("noTerms")}</span>}
                     </p>
                   </CardContent>
                 </Card>
@@ -612,17 +642,17 @@ export default function InvoiceDetailPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {responseDialog?.type === "declined" ? "Record Decline" : "Record Change Request"}
+              {responseDialog?.type === "declined" ? t("recordDecline") : t("recordChangeRequest")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <p className="text-sm text-muted-foreground">
               {responseDialog?.type === "declined"
-                ? "Optionally record the reason the customer declined."
-                : "Optionally record what changes the customer is requesting."}
+                ? t("declineReasonDesc")
+                : t("changeRequestDesc")}
             </p>
             <Textarea
-              placeholder="Customer's message (optional)…"
+              placeholder={t("customerMsgOptional")}
               value={responseText}
               onChange={(e) => setResponseText(e.target.value)}
               rows={4}
@@ -630,14 +660,14 @@ export default function InvoiceDetailPage() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setResponseDialog(null); setResponseText(""); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setResponseDialog(null); setResponseText(""); }}>{t("cancel")}</Button>
             <Button
               onClick={() => responseDialog && responseMutation.mutate({ type: responseDialog.type, text: responseText })}
               disabled={responseMutation.isPending}
               variant={responseDialog?.type === "declined" ? "destructive" : "default"}
             >
               {responseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-              {responseDialog?.type === "declined" ? "Mark Declined" : "Mark Changes Requested"}
+              {responseDialog?.type === "declined" ? t("markDeclined") : t("markChangesRequested")}
             </Button>
           </DialogFooter>
         </DialogContent>
