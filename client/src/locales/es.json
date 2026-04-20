@@ -1435,7 +1435,20 @@
     "saving": "Guardando…",
     "cancel": "Cancelar",
     "saveChanges": "Guardar Cambios",
-    "couldNotUpdateStatus": "No se pudo actualizar el estado"
+    "couldNotUpdateStatus": "No se pudo actualizar el estado",
+    "customerAdded": "Cliente agregado exitosamente",
+    "customerUpdated": "Cliente actualizado exitosamente",
+    "nameRequired": "El nombre y apellido son requeridos",
+    "firstName": "Nombre",
+    "lastName": "Apellido",
+    "selectSource": "Seleccionar fuente…",
+    "addPhone": "Agregar Teléfono",
+    "setAsPrimary": "Marcar como principal",
+    "phonePrimaryHint": "Haz clic en ★ para marcar un número como principal.",
+    "addEmail": "Agregar Correo",
+    "emailPrimaryHint": "Haz clic en ★ para marcar una dirección como principal.",
+    "streetAddressPlaceholder": "Dirección",
+    "customerNotesPlaceholder": "Notas adicionales sobre este cliente…"
   },
   "jobDetail": {
     "title": "Trabajos",

@@ -1435,7 +1435,20 @@
     "saving": "Saving…",
     "cancel": "Cancel",
     "saveChanges": "Save Changes",
-    "couldNotUpdateStatus": "Could not update status"
+    "couldNotUpdateStatus": "Could not update status",
+    "customerAdded": "Customer added successfully",
+    "customerUpdated": "Customer updated successfully",
+    "nameRequired": "First name and last name are required",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "selectSource": "Select source…",
+    "addPhone": "Add Phone",
+    "setAsPrimary": "Set as primary",
+    "phonePrimaryHint": "Click ★ to mark a number as primary.",
+    "addEmail": "Add Email",
+    "emailPrimaryHint": "Click ★ to mark an address as primary.",
+    "streetAddressPlaceholder": "Street address",
+    "customerNotesPlaceholder": "Any additional notes about this customer…"
   },
   "jobDetail": {
     "title": "Jobs",
