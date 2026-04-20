@@ -6,12 +6,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, RefreshCw } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 // ─── Pay period + date helpers ────────────────────────────────────────────────
 
 function getPayPeriod(biweekOffset = 0): { start: string; end: string } {
   const now = new Date();
-  const dow = now.getDay(); // 0=Sun … 6=Sat
+  const dow = now.getDay();
   const daysSinceSat = dow === 6 ? 0 : dow + 1;
   const endDate = new Date(now);
   endDate.setDate(now.getDate() - daysSinceSat - biweekOffset * 14);
@@ -57,32 +58,32 @@ function formatDateHeader(isoDate: string): string {
   return d.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Entry type key map (resolved via t() inside component) ───────────────────
 
-const ENTRY_TYPE_LABELS: Record<string, string> = {
-  billable: "Billable",
-  drive_time: "Drive",
-  shop_time: "Shop",
-  break: "Break",
+const ENTRY_TYPE_LABEL_KEYS: Record<string, string> = {
+  billable:   "typeBillable",
+  drive_time: "typeDrive",
+  shop_time:  "typeShop",
+  break:      "typeBreak",
 };
 
 const ENTRY_TYPE_COLORS: Record<string, string> = {
-  billable: "bg-green-100 text-green-700",
+  billable:   "bg-green-100 text-green-700",
   drive_time: "bg-blue-100 text-blue-700",
-  shop_time: "bg-purple-100 text-purple-700",
-  break: "bg-gray-100 text-gray-600",
+  shop_time:  "bg-purple-100 text-purple-700",
+  break:      "bg-gray-100 text-gray-600",
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MyHoursPage() {
+  const { t } = useTranslation("myHours");
   const { pendingCount } = useOfflineSync();
   const thisPP = getPayPeriod(0);
   const [startDate, setStartDate] = useState(thisPP.start);
   const [endDate, setEndDate] = useState(thisPP.end);
   const [page, setPage] = useState(1);
 
-  // Current pay period summary (always fixed to current pay period)
   const { data: ppData, isLoading: ppLoading } = useQuery<any>({
     queryKey: ["/api/time/my-hours/pay-period"],
     queryFn: () =>
@@ -90,7 +91,6 @@ export default function MyHoursPage() {
     staleTime: 60_000,
   });
 
-  // Paginated entries for the selected date range
   const { data: hoursData, isLoading: hoursLoading, refetch } = useQuery<any>({
     queryKey: ["/api/time/my-hours", startDate, endDate, page],
     queryFn: () =>
@@ -106,7 +106,6 @@ export default function MyHoursPage() {
   const summary = hoursData?.summary;
   const totalPages: number = hoursData?.totalPages ?? 1;
 
-  // Group entries by calendar date
   const grouped: Record<string, any[]> = {};
   for (const entry of entries) {
     const day = new Date(entry.clock_in).toISOString().split("T")[0];
@@ -139,14 +138,15 @@ export default function MyHoursPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 data-testid="my-hours-title" className="text-2xl font-bold text-gray-900">
-            My Hours
+            {t("title")}
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Your time history</p>
+          <p className="text-sm text-gray-500 mt-0.5">{t("yourHistory")}</p>
         </div>
         <button
           data-testid="refresh-button"
           onClick={() => refetch()}
           className="hidden sm:flex items-center justify-center w-9 h-9 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          title={t("title")}
         >
           <RefreshCw className="w-4 h-4" />
         </button>
@@ -168,7 +168,7 @@ export default function MyHoursPage() {
             <>
               <div className="flex items-center flex-wrap gap-2 mb-4">
                 <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-                  Current Pay Period
+                  {t("currentPayPeriod")}
                 </p>
                 {ppData?.payPeriodStart && (
                   <span className="text-xs text-gray-400">
@@ -180,7 +180,7 @@ export default function MyHoursPage() {
                     data-testid="pending-sync-badge"
                     className="text-[10px] px-1.5 py-0 bg-yellow-100 text-yellow-800 border border-yellow-300"
                   >
-                    ⚡ {pendingCount} pending sync
+                    ⚡ {t("pendingSync", { count: pendingCount })}
                   </Badge>
                 )}
               </div>
@@ -189,30 +189,30 @@ export default function MyHoursPage() {
                 <div>
                   <p data-testid="pp-total-hours" className="text-4xl font-bold text-gray-900 tabular-nums">
                     {ppData?.summary?.totalHours ?? "0.00"}
-                    <span className="text-lg font-normal text-gray-400 ml-1">hrs</span>
+                    <span className="text-lg font-normal text-gray-400 ml-1">{t("hrs")}</span>
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">Total Worked</p>
+                  <p className="text-xs text-gray-400 mt-1">{t("totalWorked")}</p>
                 </div>
                 <div className="flex gap-6 pb-1">
                   <div>
                     <p data-testid="pp-regular-hours" className="text-xl font-semibold text-gray-700 tabular-nums">
                       {ppData?.summary?.regularHours ?? "0.00"}h
                     </p>
-                    <p className="text-xs text-gray-400">Regular</p>
+                    <p className="text-xs text-gray-400">{t("regular")}</p>
                   </div>
                   {(ppData?.summary?.overtimeHours ?? 0) > 0 && (
                     <div>
                       <p data-testid="pp-ot-hours" className="text-xl font-semibold text-amber-600 tabular-nums">
                         {ppData?.summary?.overtimeHours}h
                       </p>
-                      <p className="text-xs text-amber-500">Overtime</p>
+                      <p className="text-xs text-amber-500">{t("overtime")}</p>
                     </div>
                   )}
                   <div>
                     <p data-testid="pp-days-worked" className="text-xl font-semibold text-gray-700 tabular-nums">
                       {ppData?.summary?.daysWorked ?? 0}
                     </p>
-                    <p className="text-xs text-gray-400">Days</p>
+                    <p className="text-xs text-gray-400">{t("days")}</p>
                   </div>
                 </div>
               </div>
@@ -231,7 +231,7 @@ export default function MyHoursPage() {
               data-testid="quick-this-pp"
               onClick={() => applyQuickSelect("this-pp")}
             >
-              This Pay Period
+              {t("thisPayPeriod")}
             </Button>
             <Button
               size="sm"
@@ -239,7 +239,7 @@ export default function MyHoursPage() {
               data-testid="quick-last-pp"
               onClick={() => applyQuickSelect("last-pp")}
             >
-              Last Pay Period
+              {t("lastPayPeriod")}
             </Button>
             <Button
               size="sm"
@@ -247,13 +247,13 @@ export default function MyHoursPage() {
               data-testid="quick-this-month"
               onClick={() => applyQuickSelect("this-month")}
             >
-              This Month
+              {t("thisMonth")}
             </Button>
           </div>
 
           <div className="flex gap-3 items-end flex-wrap">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">From</label>
+              <label className="text-xs text-gray-500">{t("from")}</label>
               <input
                 type="date"
                 data-testid="input-start-date"
@@ -266,7 +266,7 @@ export default function MyHoursPage() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">To</label>
+              <label className="text-xs text-gray-500">{t("to")}</label>
               <input
                 type="date"
                 data-testid="input-end-date"
@@ -282,9 +282,11 @@ export default function MyHoursPage() {
 
           {summary && !hoursLoading && (
             <p className="text-xs text-gray-400">
-              <span className="font-medium text-gray-600">{summary.totalHours}h</span> logged ·{" "}
-              <span className="font-medium text-gray-600">{summary.daysWorked}</span> days ·{" "}
-              {hoursData?.totalCount ?? 0} entries
+              <span className="font-medium text-gray-600">{summary.totalHours}h</span>{" "}
+              {t("logged")} ·{" "}
+              <span className="font-medium text-gray-600">{summary.daysWorked}</span>{" "}
+              {t("daysLabel")} ·{" "}
+              {hoursData?.totalCount ?? 0} {t("entriesLabel")}
             </p>
           )}
         </CardContent>
@@ -302,8 +304,8 @@ export default function MyHoursPage() {
           <Card className="shadow-sm">
             <CardContent className="py-14 text-center">
               <Clock className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-              <p className="text-gray-400 font-medium">No time entries for this period</p>
-              <p className="text-gray-300 text-sm mt-1">Try a different date range</p>
+              <p className="text-gray-400 font-medium">{t("noTimeForPeriod")}</p>
+              <p className="text-gray-300 text-sm mt-1">{t("tryDifferentRange")}</p>
             </CardContent>
           </Card>
         ) : (
@@ -330,56 +332,60 @@ export default function MyHoursPage() {
                   </div>
 
                   <div className="space-y-2">
-                    {dayEntries.map((entry: any) => (
-                      <div
-                        key={entry.id}
-                        data-testid={`entry-${entry.id}`}
-                        className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium text-sm text-gray-900 truncate">
-                              {entry.work_area_name || entry.job_title || "General"}
-                            </p>
-                            <Badge
-                              className={`text-[10px] px-1.5 py-0 ${
-                                ENTRY_TYPE_COLORS[entry.entry_type] ?? "bg-gray-100 text-gray-600"
-                              }`}
-                            >
-                              {ENTRY_TYPE_LABELS[entry.entry_type] ?? entry.entry_type}
-                            </Badge>
-                          </div>
-                          {entry.job_title && entry.work_area_name && (
-                            <p className="text-xs text-gray-400 truncate mt-0.5">
-                              {entry.job_title}
-                            </p>
-                          )}
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {formatTime(entry.clock_in)}
-                            {entry.clock_out ? ` → ${formatTime(entry.clock_out)}` : ""}
-                          </p>
-                        </div>
-
-                        <div className="ml-3 shrink-0 text-right">
-                          {!entry.clock_out ? (
-                            <div
-                              data-testid={`entry-active-${entry.id}`}
-                              className="flex items-center gap-1.5 text-green-600 text-xs font-semibold"
-                            >
-                              <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                              In progress
+                    {dayEntries.map((entry: any) => {
+                      const labelKey = ENTRY_TYPE_LABEL_KEYS[entry.entry_type];
+                      const label = labelKey ? t(labelKey) : entry.entry_type;
+                      return (
+                        <div
+                          key={entry.id}
+                          data-testid={`entry-${entry.id}`}
+                          className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-sm text-gray-900 truncate">
+                                {entry.work_area_name || entry.job_title || t("general")}
+                              </p>
+                              <Badge
+                                className={`text-[10px] px-1.5 py-0 ${
+                                  ENTRY_TYPE_COLORS[entry.entry_type] ?? "bg-gray-100 text-gray-600"
+                                }`}
+                              >
+                                {label}
+                              </Badge>
                             </div>
-                          ) : (
-                            <span
-                              data-testid={`entry-duration-${entry.id}`}
-                              className="text-sm font-semibold text-gray-700"
-                            >
-                              {formatDuration(entry.duration_minutes)}
-                            </span>
-                          )}
+                            {entry.job_title && entry.work_area_name && (
+                              <p className="text-xs text-gray-400 truncate mt-0.5">
+                                {entry.job_title}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {formatTime(entry.clock_in)}
+                              {entry.clock_out ? ` → ${formatTime(entry.clock_out)}` : ""}
+                            </p>
+                          </div>
+
+                          <div className="ml-3 shrink-0 text-right">
+                            {!entry.clock_out ? (
+                              <div
+                                data-testid={`entry-active-${entry.id}`}
+                                className="flex items-center gap-1.5 text-green-600 text-xs font-semibold"
+                              >
+                                <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                {t("inProgress")}
+                              </div>
+                            ) : (
+                              <span
+                                data-testid={`entry-duration-${entry.id}`}
+                                className="text-sm font-semibold text-gray-700"
+                              >
+                                {formatDuration(entry.duration_minutes)}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -397,10 +403,10 @@ export default function MyHoursPage() {
               onClick={() => setPage((p) => p - 1)}
               data-testid="pagination-prev"
             >
-              Previous
+              {t("previous")}
             </Button>
             <span className="text-sm text-gray-500">
-              Page {page} of {totalPages}
+              {t("pageOf", { page, total: totalPages })}
             </span>
             <Button
               variant="outline"
@@ -409,7 +415,7 @@ export default function MyHoursPage() {
               onClick={() => setPage((p) => p + 1)}
               data-testid="pagination-next"
             >
-              Next
+              {t("next")}
             </Button>
           </div>
         )}

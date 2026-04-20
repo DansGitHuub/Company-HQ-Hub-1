@@ -12,6 +12,7 @@ import { Clock, Briefcase, Timer, ChevronLeft, ChevronRight } from "lucide-react
 import { format, parseISO } from "date-fns";
 import TimeClock from "@/components/TimeClock";
 import OfflineBanner from "@/components/OfflineBanner";
+import { useTranslation } from "react-i18next";
 
 interface TimeEntry {
   id: string;
@@ -26,13 +27,14 @@ interface TimeEntry {
   notes: string | null;
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  billable:     "Billable",
-  non_billable: "Non-Billable",
-  drive_time:   "Drive Time",
-  break:        "Break",
-  shop_time:    "Shop Time",
-  meeting:      "Meeting",
+// Key map — resolved via t() inside the component
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  billable:     "typeBillable",
+  non_billable: "typeNonBillable",
+  drive_time:   "typeDriveTime",
+  break:        "typeBreak",
+  shop_time:    "typeShopTime",
+  meeting:      "typeMeeting",
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -57,6 +59,7 @@ function fmtTime(iso: string) {
 }
 
 export default function TimeTrackingPage() {
+  const { t } = useTranslation("timeTracking");
   const [date, setDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
 
   const { data: entries = [], isLoading, refetch } = useQuery<TimeEntry[]>({
@@ -84,24 +87,24 @@ export default function TimeTrackingPage() {
     setDate(format(d, "yyyy-MM-dd"));
   };
 
-  const isToday = date === format(new Date(), "yyyy-MM-dd");
+  const isTodayDate = date === format(new Date(), "yyyy-MM-dd");
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <OfflineBanner />
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Time Tracking</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Your time entries and clock history
+            {t("subtitle")}
           </p>
         </div>
-        {/* Clock widget (also in header but handy here too) */}
         <div className="flex items-center gap-2">
           <TimeClock />
           <Button variant="outline" size="sm" onClick={() => refetch()} className="text-xs">
-            Refresh
+            {t("refresh")}
           </Button>
         </div>
       </div>
@@ -120,14 +123,14 @@ export default function TimeTrackingPage() {
           data-testid="input-date"
         />
         <Button variant="outline" size="icon" className="h-8 w-8"
-          onClick={() => changeDate(1)} disabled={isToday}
+          onClick={() => changeDate(1)} disabled={isTodayDate}
           data-testid="button-next-day">
           <ChevronRight className="h-4 w-4" />
         </Button>
-        {!isToday && (
+        {!isTodayDate && (
           <Button variant="ghost" size="sm" className="text-xs h-8"
             onClick={() => setDate(format(new Date(), "yyyy-MM-dd"))}>
-            Today
+            {t("today")}
           </Button>
         )}
       </div>
@@ -138,7 +141,7 @@ export default function TimeTrackingPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Timer className="h-4 w-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Total Time</span>
+              <span className="text-xs font-medium uppercase tracking-wide">{t("totalTime")}</span>
             </div>
             <p className="text-2xl font-bold" data-testid="stat-total-time">{fmtMinutes(totalTime || null)}</p>
           </CardContent>
@@ -147,7 +150,7 @@ export default function TimeTrackingPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Briefcase className="h-4 w-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Billable</span>
+              <span className="text-xs font-medium uppercase tracking-wide">{t("billable")}</span>
             </div>
             <p className="text-2xl font-bold" data-testid="stat-billable-time">{fmtMinutes(totalBillable || null)}</p>
           </CardContent>
@@ -156,7 +159,7 @@ export default function TimeTrackingPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Clock className="h-4 w-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Entries</span>
+              <span className="text-xs font-medium uppercase tracking-wide">{t("entries")}</span>
             </div>
             <p className="text-2xl font-bold" data-testid="stat-entries">{entries.length}</p>
           </CardContent>
@@ -165,15 +168,15 @@ export default function TimeTrackingPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Clock className="h-4 w-4 text-green-500" />
-              <span className="text-xs font-medium uppercase tracking-wide">Status</span>
+              <span className="text-xs font-medium uppercase tracking-wide">{t("statusLabel")}</span>
             </div>
             <p className="text-sm font-semibold mt-1" data-testid="stat-status">
               {openEntry
                 ? <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse inline-block" />
-                    Clocked In
+                    {t("clockedIn")}
                   </span>
-                : <span className="text-muted-foreground">Clocked Out</span>}
+                : <span className="text-muted-foreground">{t("clockedOut")}</span>}
             </p>
           </CardContent>
         </Card>
@@ -183,65 +186,71 @@ export default function TimeTrackingPage() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
-            {isToday ? "Today's Entries" : `Entries for ${format(new Date(date + "T12:00:00"), "MMMM d, yyyy")}`}
+            {isTodayDate
+              ? t("todaysEntries")
+              : t("entriesFor", { date: format(new Date(date + "T12:00:00"), "MMMM d, yyyy") })}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="py-12 text-center text-muted-foreground text-sm">Loading entries…</div>
+            <div className="py-12 text-center text-muted-foreground text-sm">{t("loadingEntries")}</div>
           ) : entries.length === 0 ? (
             <div className="py-12 text-center">
               <Clock className="h-8 w-8 mx-auto mb-2 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No time entries for this day.</p>
-              {isToday && (
-                <p className="text-xs text-muted-foreground mt-1">Use the Clock In button to start tracking time.</p>
+              <p className="text-sm text-muted-foreground">{t("noEntriesDay")}</p>
+              {isTodayDate && (
+                <p className="text-xs text-muted-foreground mt-1">{t("useClockInButton")}</p>
               )}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Clock In</TableHead>
-                  <TableHead>Clock Out</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Work Area</TableHead>
-                  <TableHead>Job</TableHead>
-                  <TableHead>Notes</TableHead>
+                  <TableHead>{t("clockIn")}</TableHead>
+                  <TableHead>{t("clockOut")}</TableHead>
+                  <TableHead>{t("duration")}</TableHead>
+                  <TableHead>{t("workArea")}</TableHead>
+                  <TableHead>{t("job")}</TableHead>
+                  <TableHead>{t("notes")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {entries.map((entry) => (
-                  <TableRow key={entry.id} data-testid={`row-entry-${entry.id}`}
-                    className={!entry.clock_out ? "bg-green-50/50 dark:bg-green-900/10" : ""}>
-                    <TableCell className="font-medium text-sm">
-                      {fmtTime(entry.clock_in)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {entry.clock_out
-                        ? fmtTime(entry.clock_out)
-                        : <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
-                            <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                            Active
-                          </span>}
-                    </TableCell>
-                    <TableCell className="text-sm font-medium">
-                      {entry.clock_out
-                        ? fmtMinutes(entry.duration_minutes)
-                        : <RunningTimer clockIn={entry.clock_in} />}
-                    </TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                        {entry.work_area_name || TYPE_LABELS[entry.entry_type] || entry.entry_type}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {entry.job_name || "—"}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">
-                      {entry.notes || "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {entries.map((entry) => {
+                  const labelKey = TYPE_LABEL_KEYS[entry.entry_type];
+                  const typeLabel = labelKey ? t(labelKey) : entry.entry_type;
+                  return (
+                    <TableRow key={entry.id} data-testid={`row-entry-${entry.id}`}
+                      className={!entry.clock_out ? "bg-green-50/50 dark:bg-green-900/10" : ""}>
+                      <TableCell className="font-medium text-sm">
+                        {fmtTime(entry.clock_in)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {entry.clock_out
+                          ? fmtTime(entry.clock_out)
+                          : <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+                              <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                              {t("active")}
+                            </span>}
+                      </TableCell>
+                      <TableCell className="text-sm font-medium">
+                        {entry.clock_out
+                          ? fmtMinutes(entry.duration_minutes)
+                          : <RunningTimer clockIn={entry.clock_in} />}
+                      </TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                          {entry.work_area_name || typeLabel}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {entry.job_name || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">
+                        {entry.notes || "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
