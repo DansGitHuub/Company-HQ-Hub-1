@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,20 +69,21 @@ function fmtMoney(v: any) {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-const STATUS_TABS = [
-  { value: "all",        label: "All" },
-  { value: "lead",       label: "Lead" },
-  { value: "scheduled",  label: "Scheduled" },
-  { value: "in_progress",label: "In Progress" },
-  { value: "completed",  label: "Completed" },
-  { value: "invoiced",   label: "Invoiced" },
-];
-
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function JobsPage() {
+  const { t } = useTranslation("jobDetail");
   const [, navigate] = useLocation();
   const { effectiveRole } = useAuth();
   const isAdminOrManager = ["Admin", "Manager", "Master Admin"].includes(effectiveRole ?? "");
+
+  const STATUS_TABS = [
+    { value: "all",         label: t("allTab") },
+    { value: "lead",        label: "Lead" },
+    { value: "scheduled",   label: "Scheduled" },
+    { value: "in_progress", label: "In Progress" },
+    { value: "completed",   label: "Completed" },
+    { value: "invoiced",    label: "Invoiced" },
+  ];
 
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
@@ -96,7 +98,7 @@ export default function JobsPage() {
   if (dateFrom) params.set("date_from", dateFrom);
   if (dateTo) params.set("date_to", dateTo);
 
-  const { data: jobs = [], isLoading, refetch } = useQuery<JobRow[]>({
+  const { data: jobs = [], isLoading } = useQuery<JobRow[]>({
     queryKey: ["/api/jobs", activeTab, search, dateFrom, dateTo],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/jobs?${params.toString()}`);
@@ -109,15 +111,15 @@ export default function JobsPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Jobs</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {jobs.length} job{jobs.length !== 1 ? "s" : ""}
+            {jobs.length} {jobs.length !== 1 ? t("title").toLowerCase() : t("jobTitle").toLowerCase()}
             {activeTab !== "all" ? ` · ${STATUS_MAP[activeTab]?.label ?? activeTab}` : ""}
           </p>
         </div>
         {isAdminOrManager && (
           <Button onClick={() => setShowModal(true)} className="bg-primary" data-testid="button-new-job">
-            <Plus className="h-4 w-4 mr-1.5" /> New Job
+            <Plus className="h-4 w-4 mr-1.5" /> {t("newJob")}
           </Button>
         )}
       </div>
@@ -145,7 +147,7 @@ export default function JobsPage() {
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search jobs, customers, address…"
+            placeholder={t("searchJobsPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -156,13 +158,13 @@ export default function JobsPage() {
           <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
             className="w-36" data-testid="input-date-from" />
-          <span className="text-muted-foreground text-sm">to</span>
+          <span className="text-muted-foreground text-sm">{t("dateTo")}</span>
           <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
             className="w-36" data-testid="input-date-to" />
           {(dateFrom || dateTo) && (
             <Button variant="ghost" size="sm" className="text-xs h-8"
               onClick={() => { setDateFrom(""); setDateTo(""); }}>
-              Clear
+              {t("clear")}
             </Button>
           )}
         </div>
@@ -172,18 +174,18 @@ export default function JobsPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="py-16 text-center text-muted-foreground text-sm">Loading jobs…</div>
+            <div className="py-16 text-center text-muted-foreground text-sm">{t("loadingJobs")}</div>
           ) : jobs.length === 0 ? (
             <div className="py-16 text-center">
               <Briefcase className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
-              <p className="text-sm font-semibold text-muted-foreground">No jobs found</p>
+              <p className="text-sm font-semibold text-muted-foreground">{t("noJobs")}</p>
               {activeTab === "all" && !search && (
                 <>
-                  <p className="text-xs text-muted-foreground mt-1">Get started by creating your first job.</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("getStarted")}</p>
                   {isAdminOrManager && (
                     <Button onClick={() => setShowModal(true)} className="mt-4 bg-primary" size="sm"
                       data-testid="button-first-job">
-                      <Plus className="h-4 w-4 mr-1.5" /> Create your first job
+                      <Plus className="h-4 w-4 mr-1.5" /> {t("createFirstJob")}
                     </Button>
                   )}
                 </>
@@ -193,13 +195,13 @@ export default function JobsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Job Title</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="hidden lg:table-cell">Property</TableHead>
-                  <TableHead className="hidden md:table-cell">Type</TableHead>
-                  <TableHead className="hidden md:table-cell">Scheduled</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden sm:table-cell text-right">Price</TableHead>
+                  <TableHead>{t("jobTitle")}</TableHead>
+                  <TableHead>{t("customer")}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t("property")}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t("colType")}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t("colScheduled")}</TableHead>
+                  <TableHead>{t("status")}</TableHead>
+                  <TableHead className="hidden sm:table-cell text-right">{t("colPrice")}</TableHead>
                   <TableHead className="w-8" />
                 </TableRow>
               </TableHeader>
@@ -212,7 +214,7 @@ export default function JobsPage() {
                     data-testid={`row-job-${job.id}`}
                   >
                     <TableCell className="font-medium">
-                      {job.title || job.client || "Untitled Job"}
+                      {job.title || job.client || t("untitledJob")}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {custName(job)}
