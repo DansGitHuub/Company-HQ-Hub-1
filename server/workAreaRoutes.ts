@@ -39,6 +39,15 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
   pool.query(`ALTER TABLE estimate_work_areas ADD COLUMN IF NOT EXISTS cost_code TEXT`)
     .catch((err: any) => console.error("[workAreaRoutes] estimate_work_areas cost_code migration:", err.message));
 
+  // ── Seed: ensure "On Site" exists as the first General work area type ─────
+  pool.query(`
+    INSERT INTO work_area_types (name, division, sort_order, is_active)
+    SELECT 'On Site', 'General', 0, true
+    WHERE NOT EXISTS (
+      SELECT 1 FROM work_area_types WHERE name = 'On Site' AND division = 'General'
+    )
+  `).catch((err: any) => console.error("[workAreaRoutes] On Site seed:", err.message));
+
   // ── GET /api/work-area-types ─────────────────────────────────────────────
   // ?all=true returns inactive items too (used by settings page)
   app.get("/api/work-area-types", requireAuth, async (req, res) => {

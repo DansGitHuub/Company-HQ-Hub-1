@@ -33,8 +33,8 @@ interface WorkAreasResponse {
   jobAreas: JobWorkArea[];
 }
 
-// ── General (non-job) options always shown ────────────────────────────────────
-const GENERAL_OPTIONS = ["On Site", "Drive Time", "Shop Time", "Meeting", "Break"];
+// ── Fallback general options if DB returns nothing ────────────────────────────
+const FALLBACK_GENERAL = ["On Site", "Drive Time", "Shop Time", "Meeting", "Break"];
 
 // ── Elapsed time hook ─────────────────────────────────────────────────────────
 function useElapsed(clockIn: string | null) {
@@ -155,17 +155,25 @@ export default function TimeClock() {
   useEffect(() => { setSelectedWorkArea(""); }, [selectedJob]);
 
   // Build the work area options shown in the dropdown
-  // Format: encoded string "job:ID:NAME" or "type:NAME" or "general:NAME"
+  // Format: encoded string "job:ID:NAME" or "type:ID:NAME" or "general:ID:NAME"
   function buildWorkAreaOptions(): Array<{ value: string; label: string; group: string }> {
     const opts: Array<{ value: string; label: string; group: string }> = [];
 
-    // General options always available
-    const generalTypes = allTypes.filter((t) => t.division === "General" && GENERAL_OPTIONS.includes(t.name));
-    // Also include any general options not in DB yet
-    GENERAL_OPTIONS.forEach((name) => {
-      const match = generalTypes.find((t) => t.name === name);
-      opts.push({ value: `general:${match?.id ?? ""}:${name}`, label: name, group: "General" });
-    });
+    // General options: use ALL General-division types from DB, sorted by sort_order
+    const generalFromDb = allTypes
+      .filter((t) => t.division === "General")
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    if (generalFromDb.length > 0) {
+      generalFromDb.forEach((t) => {
+        opts.push({ value: `general:${t.id}:${t.name}`, label: t.name, group: "General" });
+      });
+    } else {
+      // Fallback if DB hasn't loaded yet
+      FALLBACK_GENERAL.forEach((name) => {
+        opts.push({ value: `general::${name}`, label: name, group: "General" });
+      });
+    }
 
     if (selectedJob) {
       if (jobWorkAreas.length > 0) {
@@ -174,7 +182,7 @@ export default function TimeClock() {
           opts.push({ value: `job:${jwa.id}:${jwa.name}`, label: jwa.name, group: "Job Work Areas" });
         });
       } else {
-        // No work areas on this job — show all types grouped by division (excluding General already shown)
+        // No work areas on this job — show all non-General types grouped by division
         const grouped = allTypes.filter((t) => t.division !== "General");
         const divisions = [...new Set(grouped.map((t) => t.division ?? "Other"))];
         divisions.forEach((div) => {
