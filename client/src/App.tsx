@@ -81,6 +81,10 @@ import CatalogDetail from "@/pages/catalog/CatalogDetail";
 import CustomerPortal from "@/pages/CustomerPortal";
 import MessagesPage from "@/pages/Messages";
 import TimeReports from "@/pages/admin/TimeReports";
+import ServiceTypesPage from "@/pages/admin/ServiceTypesPage";
+import InquiryPage from "@/pages/Inquiry";
+import InquirySuccess from "@/pages/InquirySuccess";
+import BookingPage from "@/pages/BookingPage";
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
@@ -111,6 +115,18 @@ function AppRoutes() {
 
   if (window.location.pathname.startsWith("/portal/")) {
     return <CustomerPortal />;
+  }
+
+  if (window.location.pathname === "/inquiry/success") {
+    return <InquirySuccess />;
+  }
+
+  if (window.location.pathname === "/inquiry") {
+    return <InquiryPage />;
+  }
+
+  if (window.location.pathname.startsWith("/book/")) {
+    return <BookingPage />;
   }
 
   if (isLoading) {
@@ -178,6 +194,7 @@ function AppRoutes() {
         <Route path="/admin/qbo-export" component={QBOExportPage} />
         <Route path="/admin/archive" component={ArchivePage} />
         <Route path="/admin/time-reports" component={TimeReports} />
+        <Route path="/admin/service-types" component={ServiceTypesPage} />
         <Route path="/budget-settings" component={BudgetSettings} />
         <Route path="/time" component={TimeTracking} />
         <Route path="/reports" component={ReportsPage} />

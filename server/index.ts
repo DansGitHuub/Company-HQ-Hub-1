@@ -40,6 +40,7 @@ import { runTermsAndConditionsMigration } from "./migrations/termsAndConditions"
 import { runWorksheetTablesMigration } from "./migrations/worksheetTables";
 import { runWorksheetPhase3Migration } from "./migrations/worksheetPhase3";
 import { registerPublicPages } from "./publicPages";
+import { startLeadAlertScheduler } from "./consultationRoutes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -183,7 +184,8 @@ app.use((req, res, next) => {
       startProcessAuditScheduler();
       startApplicationTokenScheduler();
       startQuickBooksScheduler();
-        startNotificationScheduler();
+      startNotificationScheduler();
+      startLeadAlertScheduler();
     },
   );
 })();

@@ -20,6 +20,8 @@ export const JOB_TYPES = [
   "Fertilization", "Planting", "Pruning", "Other",
 ];
 
+interface ServiceType { id: string; name: string; category: string; }
+
 export const JOB_STATUSES = [
   { value: "lead",        label: "Lead" },
   { value: "scheduled",   label: "Scheduled" },
@@ -88,6 +90,13 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
       const res = await apiRequest("GET", "/api/customers");
       return res.json();
     },
+    enabled: open,
+  });
+
+  // Service Types
+  const { data: serviceTypes = [] } = useQuery<ServiceType[]>({
+    queryKey: ["/api/service-types/active"],
+    queryFn: () => fetch("/api/service-types/active").then(r => r.json()),
     enabled: open,
   });
 
@@ -228,7 +237,10 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
                 data-testid="select-job-type"
               >
                 <option value="">{t("selectType")}</option>
-                {JOB_TYPES.map((jt) => <option key={jt} value={jt}>{jt}</option>)}
+                {serviceTypes.length > 0
+                  ? serviceTypes.map(st => <option key={st.id} value={st.name}>{st.name}</option>)
+                  : JOB_TYPES.map(jt => <option key={jt} value={jt}>{jt}</option>)
+                }
               </select>
             </div>
 

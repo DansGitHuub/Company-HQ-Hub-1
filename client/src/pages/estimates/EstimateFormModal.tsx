@@ -156,9 +156,15 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
     return [defaultArea("Work Area 1")];
   });
 
+  const [serviceType, setServiceType] = useState(existing?.service_type ?? "");
+
   // Queries
   const { data: templates = [] } = useQuery<Template[]>({ queryKey: ["/api/estimate-templates"] });
   const { data: allStaff = [] } = useQuery<any[]>({ queryKey: ["/api/users"] });
+  const { data: serviceTypes = [] } = useQuery<{ id: string; name: string; category: string }[]>({
+    queryKey: ["/api/service-types/active"],
+    queryFn: () => fetch("/api/service-types/active").then(r => r.json()),
+  });
   const staff = (allStaff as any[]).filter((u: any) => ["Admin","Manager","Master Admin"].includes(u.role));
   const { data: workAreaTypes = [] } = useQuery<WorkAreaType[]>({ queryKey: ["/api/work-area-types"] });
 
@@ -349,6 +355,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
       customer_id: customerId || null,
       property_id: propertyId || null,
       estimate_type: estimateType,
+      service_type: serviceType || null,
       title,
       salesperson_id: salespersonId || null,
       issued_date: issuedDate,
@@ -508,6 +515,19 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   {ESTIMATE_TYPES.map(et => <SelectItem key={et.value} value={et.value}>{et.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs">Service Type</Label>
+              <Select value={serviceType || "_none"} onValueChange={v => setServiceType(v === "_none" ? "" : v)}>
+                <SelectTrigger className="mt-1" data-testid="select-service-type">
+                  <SelectValue placeholder="Select service type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">— Not specified —</SelectItem>
+                  {serviceTypes.map(st => <SelectItem key={st.id} value={st.name}>{st.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

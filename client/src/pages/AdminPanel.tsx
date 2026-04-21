@@ -68,7 +68,8 @@ import {
   Mail,
   FileSignature,
   Layers,
-  Archive
+  Archive,
+  Tag
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
@@ -164,6 +165,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "process-auditor", label: "Process Auditor", icon: ClipboardCheck },
         { value: "worksheet-review", label: "Worksheet Review", icon: FileText, href: "/worksheet-review" },
         { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
+        { value: "service-types", label: "Service Types", icon: Tag, href: "/admin/service-types" },
         { value: "archive", label: "Archive", icon: Archive, href: "/admin/archive" },
       ],
     },
@@ -660,6 +662,7 @@ export default function AdminPanel() {
         <Select value={activeTab} onValueChange={(v) => {
           if (v === "time-reports") { navigate("/admin/time-reports"); return; }
           if (v === "work-areas") { navigate("/admin/work-areas"); return; }
+          if (v === "service-types") { navigate("/admin/service-types"); return; }
           if (v === "qbo-export") { navigate("/admin/qbo-export"); return; }
           if (v === "archive") { navigate("/admin/archive"); return; }
           if (v === "divisions") { navigate("/settings?tab=divisions"); return; }

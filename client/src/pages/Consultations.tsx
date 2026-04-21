@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Plus, Pencil, Trash2, CalendarClock, DollarSign, CheckCircle, XCircle,
-  Loader2, Search, ExternalLink, Filter,
+  Loader2, Search, ExternalLink, Filter, LayoutGrid, List,
 } from "lucide-react";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -50,6 +50,14 @@ interface Consultation {
   assigned_name: string | null;
   estimated_value: number | null;
   lead_source: string | null;
+  pipeline_stage: string | null;
+  budget_range: string | null;
+  project_description: string | null;
+  best_time_to_reach: string | null;
+  utilities_marked: boolean;
+  permit_required: boolean;
+  permit_status: string | null;
+  service_type: string | null;
   created_at: string;
 }
 
@@ -60,20 +68,9 @@ interface Stats {
   pipeline_value: number;
 }
 
-interface Customer {
-  id: string;
-  first_name: string;
-  last_name: string;
-  company_name: string | null;
-  phone?: string;
-  email?: string;
-}
-
-interface Employee {
-  id: string;
-  first_name: string;
-  last_name: string;
-}
+interface Customer { id: string; first_name: string; last_name: string; company_name: string | null; }
+interface Employee { id: string; first_name: string; last_name: string; }
+interface ServiceType { id: string; name: string; category: string; is_active: boolean; }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 const STATUSES: { value: Status; label: string; cls: string }[] = [
@@ -89,6 +86,40 @@ const LEAD_SOURCES = [
 ];
 
 const DURATIONS = [30, 45, 60, 90, 120];
+
+const BUDGET_RANGES = [
+  "$1k-$5k", "$5k-$15k", "$15k-$30k", "$30k-$60k", "$60k+", "Not Sure",
+];
+
+const BEST_TIMES = ["Morning", "Afternoon", "Evening", "Anytime"];
+
+const PERMIT_STATUSES = ["Not Required", "Pending", "Applied", "Approved", "Denied"];
+
+export const PIPELINE_STAGES: { value: string; label: string; color: string; bg: string; group: string }[] = [
+  { value: "new_lead",            label: "New Lead",            color: "text-orange-700", bg: "bg-orange-50 border-orange-200", group: "new" },
+  { value: "needs_review",        label: "Needs Review",        color: "text-orange-600", bg: "bg-orange-50 border-orange-200", group: "new" },
+  { value: "qualified",           label: "Qualified",           color: "text-blue-700",   bg: "bg-blue-50 border-blue-200",   group: "qualified" },
+  { value: "appointment_scheduled",label: "Appt. Scheduled",   color: "text-blue-600",   bg: "bg-blue-50 border-blue-200",   group: "qualified" },
+  { value: "pre_visit_ready",     label: "Pre-Visit Ready",     color: "text-blue-500",   bg: "bg-blue-50 border-blue-200",   group: "qualified" },
+  { value: "site_visit_complete", label: "Site Visit Done",     color: "text-purple-700", bg: "bg-purple-50 border-purple-200", group: "estimate" },
+  { value: "estimate_in_progress",label: "Estimate In Progress",color: "text-purple-600", bg: "bg-purple-50 border-purple-200", group: "estimate" },
+  { value: "estimate_ready",      label: "Estimate Ready",      color: "text-purple-600", bg: "bg-purple-50 border-purple-200", group: "estimate" },
+  { value: "estimate_sent",       label: "Estimate Sent",       color: "text-purple-500", bg: "bg-purple-50 border-purple-200", group: "estimate" },
+  { value: "follow_up",           label: "Follow Up",           color: "text-purple-500", bg: "bg-purple-50 border-purple-200", group: "estimate" },
+  { value: "sold_approved",       label: "Sold / Approved",     color: "text-green-700",  bg: "bg-green-50 border-green-200",  group: "sold" },
+  { value: "lost_nurture",        label: "Lost / Nurture",      color: "text-red-600",    bg: "bg-red-50 border-red-200",     group: "lost" },
+  { value: "handoff_production",  label: "Handoff to Production",color: "text-green-600", bg: "bg-green-50 border-green-200",  group: "sold" },
+  { value: "job_scheduled",       label: "Job Scheduled",       color: "text-green-600",  bg: "bg-green-50 border-green-200",  group: "sold" },
+  { value: "in_progress",         label: "In Progress",         color: "text-green-600",  bg: "bg-green-50 border-green-200",  group: "sold" },
+  { value: "punch_list",          label: "Punch List",          color: "text-green-600",  bg: "bg-green-50 border-green-200",  group: "sold" },
+  { value: "complete",            label: "Complete",            color: "text-green-700",  bg: "bg-green-50 border-green-200",  group: "complete" },
+  { value: "invoice_review",      label: "Invoice Review",      color: "text-green-700",  bg: "bg-green-50 border-green-200",  group: "complete" },
+  { value: "closed",              label: "Closed",              color: "text-green-800",  bg: "bg-green-50 border-green-200",  group: "complete" },
+];
+
+function getStageMeta(value: string) {
+  return PIPELINE_STAGES.find(s => s.value === value) || PIPELINE_STAGES[0];
+}
 
 function fmt$(n: number | null | undefined) {
   if (n == null) return "—";
@@ -118,38 +149,56 @@ function StatusBadge({ status }: { status: Status }) {
   );
 }
 
+function StageBadge({ stage }: { stage: string | null }) {
+  const s = getStageMeta(stage || "new_lead");
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${s.bg} ${s.color}`}>
+      {s.label}
+    </span>
+  );
+}
+
 // ─── Empty form ────────────────────────────────────────────────────────────────
 function emptyForm() {
   return {
-    customer_id:        "",
-    contact_name:       "",
-    contact_phone:      "",
-    contact_email:      "",
-    scheduled_date:     "",
-    scheduled_time:     "09:00",
-    duration_minutes:   60,
-    status:             "scheduled" as Status,
-    address:            "",
-    notes:              "",
-    follow_up_required: false,
-    follow_up_date:     "",
-    assigned_to:        "",
-    estimated_value:    "",
-    lead_source:        "",
+    customer_id:         "",
+    contact_name:        "",
+    contact_phone:       "",
+    contact_email:       "",
+    scheduled_date:      "",
+    scheduled_time:      "09:00",
+    duration_minutes:    60,
+    status:              "scheduled" as Status,
+    address:             "",
+    notes:               "",
+    follow_up_required:  false,
+    follow_up_date:      "",
+    assigned_to:         "",
+    estimated_value:     "",
+    lead_source:         "",
+    pipeline_stage:      "new_lead",
+    budget_range:        "",
+    project_description: "",
+    best_time_to_reach:  "",
+    utilities_marked:    false,
+    permit_required:     false,
+    permit_status:       "",
+    service_type:        "",
   };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  Consultation Form Modal (shared for create + edit)
+//  Consultation Form Modal
 // ═══════════════════════════════════════════════════════════════════════════════
 function ConsultationModal({
-  open, onClose, editing, customers, employees,
+  open, onClose, editing, customers, employees, serviceTypes,
 }: {
   open: boolean;
   onClose: () => void;
   editing: Consultation | null;
   customers: Customer[];
   employees: Employee[];
+  serviceTypes: ServiceType[];
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -158,28 +207,34 @@ function ConsultationModal({
   const [custSearch, setCustSearch] = useState("");
   const [custDropOpen, setCustDropOpen] = useState(false);
 
-  // Populate form when editing
   useMemo(() => {
     if (open) {
       if (editing) {
         setForm({
-          customer_id:        editing.customer_id ?? "",
-          contact_name:       editing.contact_name ?? "",
-          contact_phone:      editing.contact_phone ?? "",
-          contact_email:      editing.contact_email ?? "",
-          scheduled_date:     editing.scheduled_date ?? "",
-          scheduled_time:     editing.scheduled_time?.slice(0, 5) ?? "09:00",
-          duration_minutes:   editing.duration_minutes ?? 60,
-          status:             editing.status,
-          address:            editing.address ?? "",
-          notes:              editing.notes ?? "",
-          follow_up_required: editing.follow_up_required ?? false,
-          follow_up_date:     editing.follow_up_date ?? "",
-          assigned_to:        editing.assigned_to ?? "",
-          estimated_value:    editing.estimated_value != null ? String(editing.estimated_value) : "",
-          lead_source:        editing.lead_source ?? "",
+          customer_id:         editing.customer_id ?? "",
+          contact_name:        editing.contact_name ?? "",
+          contact_phone:       editing.contact_phone ?? "",
+          contact_email:       editing.contact_email ?? "",
+          scheduled_date:      editing.scheduled_date ?? "",
+          scheduled_time:      editing.scheduled_time?.slice(0, 5) ?? "09:00",
+          duration_minutes:    editing.duration_minutes ?? 60,
+          status:              editing.status,
+          address:             editing.address ?? "",
+          notes:               editing.notes ?? "",
+          follow_up_required:  editing.follow_up_required ?? false,
+          follow_up_date:      editing.follow_up_date ?? "",
+          assigned_to:         editing.assigned_to ?? "",
+          estimated_value:     editing.estimated_value != null ? String(editing.estimated_value) : "",
+          lead_source:         editing.lead_source ?? "",
+          pipeline_stage:      editing.pipeline_stage ?? "new_lead",
+          budget_range:        editing.budget_range ?? "",
+          project_description: editing.project_description ?? "",
+          best_time_to_reach:  editing.best_time_to_reach ?? "",
+          utilities_marked:    editing.utilities_marked ?? false,
+          permit_required:     editing.permit_required ?? false,
+          permit_status:       editing.permit_status ?? "",
+          service_type:        editing.service_type ?? "",
         });
-        // Pre-fill search with existing customer name
         setCustSearch(editing.customer_name ?? "");
       } else {
         setForm(emptyForm());
@@ -198,8 +253,6 @@ function ConsultationModal({
     }).slice(0, 10),
     [customers, custSearch]
   );
-
-  const selectedCustomer = customers.find(c => c.id === form.customer_id);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["/api/consultations"] });
@@ -221,11 +274,15 @@ function ConsultationModal({
   function handleSave() {
     const payload = {
       ...form,
-      customer_id:      form.customer_id || null,
-      assigned_to:      form.assigned_to || null,
-      estimated_value:  form.estimated_value ? parseFloat(form.estimated_value) : null,
-      follow_up_date:   form.follow_up_date || null,
-      lead_source:      form.lead_source || null,
+      customer_id:     form.customer_id || null,
+      assigned_to:     form.assigned_to || null,
+      estimated_value: form.estimated_value ? parseFloat(form.estimated_value) : null,
+      follow_up_date:  form.follow_up_date || null,
+      lead_source:     form.lead_source || null,
+      budget_range:    form.budget_range || null,
+      permit_status:   form.permit_status || null,
+      service_type:    form.service_type || null,
+      best_time_to_reach: form.best_time_to_reach || null,
     };
     if (editing) updateMut.mutate(payload);
     else createMut.mutate(payload);
@@ -244,6 +301,19 @@ function ConsultationModal({
         </DialogHeader>
 
         <div className="space-y-4 py-1">
+          {/* Pipeline Stage */}
+          <div className="space-y-1">
+            <Label>Pipeline Stage</Label>
+            <Select value={form.pipeline_stage} onValueChange={v => f("pipeline_stage", v)}>
+              <SelectTrigger data-testid="select-pipeline-stage"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PIPELINE_STAGES.map(s => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Customer */}
           <div className="space-y-1 relative">
             <Label>Customer</Label>
@@ -295,6 +365,30 @@ function ConsultationModal({
             </div>
           </div>
 
+          {/* Service Type & Budget */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Service Type</Label>
+              <Select value={form.service_type || "_none"} onValueChange={v => f("service_type", v === "_none" ? "" : v)}>
+                <SelectTrigger data-testid="select-service-type"><SelectValue placeholder="Select service type" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">— Not specified —</SelectItem>
+                  {serviceTypes.map(st => <SelectItem key={st.id} value={st.name}>{st.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Budget Range</Label>
+              <Select value={form.budget_range || "_none"} onValueChange={v => f("budget_range", v === "_none" ? "" : v)}>
+                <SelectTrigger data-testid="select-budget-range"><SelectValue placeholder="Select budget" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">— Not specified —</SelectItem>
+                  {BUDGET_RANGES.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           {/* Date / Time / Duration */}
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
@@ -309,8 +403,7 @@ function ConsultationModal({
             </div>
             <div className="space-y-1">
               <Label>Duration</Label>
-              <Select value={String(form.duration_minutes)}
-                onValueChange={v => f("duration_minutes", Number(v))}>
+              <Select value={String(form.duration_minutes)} onValueChange={v => f("duration_minutes", Number(v))}>
                 <SelectTrigger data-testid="select-duration"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {DURATIONS.map(d => <SelectItem key={d} value={String(d)}>{d} min</SelectItem>)}
@@ -354,27 +447,74 @@ function ConsultationModal({
               value={form.address} onChange={e => f("address", e.target.value)} />
           </div>
 
-          {/* Assigned To */}
+          {/* Assigned To & Best Time */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Assigned To</Label>
+              <Select value={form.assigned_to || "_none"} onValueChange={v => f("assigned_to", v === "_none" ? "" : v)}>
+                <SelectTrigger data-testid="select-assigned"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Unassigned</SelectItem>
+                  {employees.map(e => (
+                    <SelectItem key={e.id} value={e.id}>{e.first_name} {e.last_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Best Time to Reach</Label>
+              <Select value={form.best_time_to_reach || "_none"} onValueChange={v => f("best_time_to_reach", v === "_none" ? "" : v)}>
+                <SelectTrigger data-testid="select-best-time"><SelectValue placeholder="Select time" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">— Not specified —</SelectItem>
+                  {BEST_TIMES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Project Description */}
           <div className="space-y-1">
-            <Label>Assigned To</Label>
-            <Select value={form.assigned_to || "_none"}
-              onValueChange={v => f("assigned_to", v === "_none" ? "" : v)}>
-              <SelectTrigger data-testid="select-assigned"><SelectValue placeholder="Unassigned" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_none">Unassigned</SelectItem>
-                {employees.map(e => (
-                  <SelectItem key={e.id} value={e.id}>{e.first_name} {e.last_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Project Description</Label>
+            <Textarea rows={3} placeholder="Describe the project scope…"
+              data-testid="input-project-description"
+              value={form.project_description} onChange={e => f("project_description", e.target.value)} />
           </div>
 
           {/* Notes */}
           <div className="space-y-1">
-            <Label>Notes</Label>
-            <Textarea rows={3} placeholder="Details about the site visit, scope, special requests…"
+            <Label>Internal Notes</Label>
+            <Textarea rows={2} placeholder="Internal notes…"
               data-testid="input-notes"
               value={form.notes} onChange={e => f("notes", e.target.value)} />
+          </div>
+
+          {/* Utilities / Permit */}
+          <div className="grid grid-cols-2 gap-4 p-3 rounded-lg border bg-muted/20">
+            <div className="flex items-center gap-2">
+              <Switch checked={form.utilities_marked}
+                data-testid="switch-utilities"
+                onCheckedChange={v => f("utilities_marked", v)} />
+              <Label className="cursor-pointer text-sm">Utilities Marked (811)</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={form.permit_required}
+                data-testid="switch-permit"
+                onCheckedChange={v => f("permit_required", v)} />
+              <Label className="cursor-pointer text-sm">Permit Required</Label>
+            </div>
+            {form.permit_required && (
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs">Permit Status</Label>
+                <Select value={form.permit_status || "_none"} onValueChange={v => f("permit_status", v === "_none" ? "" : v)}>
+                  <SelectTrigger data-testid="select-permit-status"><SelectValue placeholder="Select status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">— Not set —</SelectItem>
+                    {PERMIT_STATUSES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           {/* Follow-up */}
@@ -419,25 +559,105 @@ function ConsultationModal({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  Kanban View
+// ═══════════════════════════════════════════════════════════════════════════════
+function KanbanView({
+  consultations, onEdit, updateStage,
+}: {
+  consultations: Consultation[];
+  onEdit: (c: Consultation) => void;
+  updateStage: (id: string, stage: string) => void;
+}) {
+  const grouped = useMemo(() => {
+    const map: Record<string, Consultation[]> = {};
+    PIPELINE_STAGES.forEach(s => { map[s.value] = []; });
+    consultations.forEach(c => {
+      const stage = c.pipeline_stage || "new_lead";
+      if (map[stage]) map[stage].push(c);
+    });
+    return map;
+  }, [consultations]);
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-4 min-h-[500px]" data-testid="kanban-view">
+      {PIPELINE_STAGES.map(stage => {
+        const cards = grouped[stage.value] || [];
+        return (
+          <div
+            key={stage.value}
+            className="flex-shrink-0 w-56 flex flex-col"
+          >
+            <div className={`px-3 py-2 rounded-t-lg border border-b-0 ${stage.bg}`}>
+              <div className="flex items-center justify-between">
+                <span className={`text-xs font-semibold ${stage.color}`}>{stage.label}</span>
+                <span className={`text-xs rounded-full px-1.5 py-0.5 font-bold ${stage.bg} ${stage.color} border ${stage.bg.replace("bg-", "border-")}`}>
+                  {cards.length}
+                </span>
+              </div>
+            </div>
+            <div className={`flex-1 rounded-b-lg border ${stage.bg} p-2 space-y-2 min-h-[200px]`}>
+              {cards.map(c => (
+                <div
+                  key={c.id}
+                  className="bg-background rounded-lg border p-3 cursor-pointer hover:shadow-md transition-shadow text-xs"
+                  onClick={() => onEdit(c)}
+                  data-testid={`kanban-card-${c.id}`}
+                >
+                  <div className="font-semibold text-sm truncate">
+                    {c.customer_name || c.contact_name || "Unknown"}
+                  </div>
+                  {c.service_type && (
+                    <div className="text-muted-foreground mt-0.5 truncate">{c.service_type}</div>
+                  )}
+                  {c.budget_range && (
+                    <div className="text-muted-foreground mt-0.5">{c.budget_range}</div>
+                  )}
+                  {c.scheduled_date && (
+                    <div className="text-muted-foreground mt-1">{fmtDate(c.scheduled_date)}</div>
+                  )}
+                  {c.assigned_name && (
+                    <div className="mt-1 pt-1 border-t text-muted-foreground truncate">{c.assigned_name}</div>
+                  )}
+                  <div className="mt-2 flex gap-1 flex-wrap">
+                    {PIPELINE_STAGES.filter(s => s.value !== (c.pipeline_stage || "new_lead")).slice(0, 3).map(s => (
+                      <button
+                        key={s.value}
+                        className={`text-[10px] px-1.5 py-0.5 rounded border ${s.bg} ${s.color} hover:opacity-80`}
+                        onClick={e => { e.stopPropagation(); updateStage(c.id, s.value); }}
+                        data-testid={`move-to-${s.value}-${c.id}`}
+                      >
+                        → {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  Main Page
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function Consultations() {
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  // Filter state
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [statusFilter,    setStatusFilter]    = useState("");
   const [dateFrom,        setDateFrom]        = useState("");
   const [dateTo,          setDateTo]          = useState("");
   const [assignedFilter,  setAssignedFilter]  = useState("");
   const [searchText,      setSearchText]      = useState("");
 
-  // Modal state
-  const [modalOpen,   setModalOpen]   = useState(false);
-  const [editing,     setEditing]     = useState<Consultation | null>(null);
+  const [modalOpen,    setModalOpen]    = useState(false);
+  const [editing,      setEditing]      = useState<Consultation | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Consultation | null>(null);
 
-  // ── Queries ──────────────────────────────────────────────────────────────────
   const listParams = new URLSearchParams();
   if (statusFilter)   listParams.set("status",      statusFilter);
   if (dateFrom)       listParams.set("date_from",   dateFrom);
@@ -464,7 +684,11 @@ export default function Consultations() {
     queryFn: () => fetch("/api/scheduling/employees", { credentials: "include" }).then(r => r.json()),
   });
 
-  // ── Delete ───────────────────────────────────────────────────────────────────
+  const { data: serviceTypes = [] } = useQuery<ServiceType[]>({
+    queryKey: ["/api/service-types/active"],
+    queryFn: () => fetch("/api/service-types/active").then(r => r.json()),
+  });
+
   const deleteMut = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/consultations/${id}`),
     onSuccess: () => {
@@ -474,6 +698,15 @@ export default function Consultations() {
       setDeleteTarget(null);
     },
     onError: () => toast({ title: "Delete failed", variant: "destructive" }),
+  });
+
+  const stageMut = useMutation({
+    mutationFn: ({ id, stage }: { id: string; stage: string }) =>
+      apiRequest("PATCH", `/api/consultations/${id}`, { pipeline_stage: stage }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/consultations"] });
+    },
+    onError: (e: any) => toast({ title: "Stage update failed", description: e.message, variant: "destructive" }),
   });
 
   function openNew() { setEditing(null); setModalOpen(true); }
@@ -487,7 +720,7 @@ export default function Consultations() {
 
   return (
     <div className="flex flex-col h-full" data-testid="consultations-page">
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      {/* ── Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b bg-background shrink-0">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
@@ -497,14 +730,32 @@ export default function Consultations() {
             Track site visits and sales consultations before estimates
           </p>
         </div>
-        <Button onClick={openNew} data-testid="btn-new-consultation">
-          <Plus className="h-4 w-4 mr-2" /> New Consultation
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-md border overflow-hidden">
+            <button
+              className={`px-3 py-1.5 text-sm flex items-center gap-1.5 ${viewMode === "list" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+              onClick={() => setViewMode("list")}
+              data-testid="btn-list-view"
+            >
+              <List className="h-3.5 w-3.5" /> List
+            </button>
+            <button
+              className={`px-3 py-1.5 text-sm flex items-center gap-1.5 ${viewMode === "kanban" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+              onClick={() => setViewMode("kanban")}
+              data-testid="btn-kanban-view"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" /> Pipeline
+            </button>
+          </div>
+          <Button onClick={openNew} data-testid="btn-new-consultation">
+            <Plus className="h-4 w-4 mr-2" /> New Consultation
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         <div className="p-6 space-y-5">
-          {/* ── Summary Cards ──────────────────────────────────────────────── */}
+          {/* ── Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <Card data-testid="stat-card-scheduled">
               <CardContent className="pt-5 pb-4">
@@ -567,17 +818,15 @@ export default function Consultations() {
             </Card>
           </div>
 
-          {/* ── Filter Bar ─────────────────────────────────────────────────── */}
+          {/* ── Filter Bar */}
           <div className="flex flex-wrap gap-2 items-center p-3 rounded-lg border bg-muted/20">
             <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
-
             <div className="relative">
               <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
               <Input className="pl-7 h-8 text-sm w-44" placeholder="Search…"
                 value={searchText} onChange={e => setSearchText(e.target.value)}
                 data-testid="filter-search" />
             </div>
-
             <Select value={statusFilter || "_all"} onValueChange={v => setStatusFilter(v === "_all" ? "" : v)}>
               <SelectTrigger className="h-8 text-sm w-36" data-testid="filter-status">
                 <SelectValue placeholder="All Statuses" />
@@ -587,7 +836,6 @@ export default function Consultations() {
                 {STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
               </SelectContent>
             </Select>
-
             <div className="flex items-center gap-1">
               <Input type="date" className="h-8 text-sm w-36" value={dateFrom}
                 onChange={e => setDateFrom(e.target.value)} data-testid="filter-date-from" />
@@ -595,9 +843,7 @@ export default function Consultations() {
               <Input type="date" className="h-8 text-sm w-36" value={dateTo}
                 onChange={e => setDateTo(e.target.value)} data-testid="filter-date-to" />
             </div>
-
-            <Select value={assignedFilter || "_all"}
-              onValueChange={v => setAssignedFilter(v === "_all" ? "" : v)}>
+            <Select value={assignedFilter || "_all"} onValueChange={v => setAssignedFilter(v === "_all" ? "" : v)}>
               <SelectTrigger className="h-8 text-sm w-40" data-testid="filter-assigned">
                 <SelectValue placeholder="All Assignees" />
               </SelectTrigger>
@@ -608,145 +854,130 @@ export default function Consultations() {
                 ))}
               </SelectContent>
             </Select>
-
             {hasFilters && (
               <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={clearFilters}
-                data-testid="btn-clear-filters">
-                Clear
-              </Button>
+                data-testid="btn-clear-filters">Clear</Button>
             )}
-
             <span className="ml-auto text-xs text-muted-foreground">
               {consultations.length} result{consultations.length !== 1 ? "s" : ""}
             </span>
           </div>
 
-          {/* ── Table ──────────────────────────────────────────────────────── */}
-          <div className="rounded-lg border overflow-hidden">
-            {isLoading ? (
-              <div className="flex justify-center py-16">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : consultations.length === 0 ? (
-              <div className="py-16 text-center text-muted-foreground">
-                <CalendarClock className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                <p className="font-medium text-sm">No consultations found</p>
-                <p className="text-xs mt-1">
-                  {hasFilters ? "Try adjusting your filters" : "Click \"New Consultation\" to schedule one"}
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table data-testid="consultations-table">
-                  <TableHeader>
-                    <TableRow className="bg-muted/30">
-                      <TableHead className="w-36">Date / Time</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Address</TableHead>
-                      <TableHead className="w-28">Status</TableHead>
-                      <TableHead>Assigned To</TableHead>
-                      <TableHead className="w-24 text-right">Est. Value</TableHead>
-                      <TableHead className="w-20 text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {consultations.map(c => (
-                      <TableRow
-                        key={c.id}
-                        className="cursor-pointer hover:bg-muted/30 transition-colors"
-                        onClick={() => openEdit(c)}
-                        data-testid={`consultation-row-${c.id}`}
-                      >
-                        <TableCell className="text-xs">
-                          <div className="font-medium">{fmtDate(c.scheduled_date)}</div>
-                          {c.scheduled_time && (
-                            <div className="text-muted-foreground">{fmtTime(c.scheduled_time)}</div>
-                          )}
-                          {c.duration_minutes && (
-                            <div className="text-muted-foreground">{c.duration_minutes} min</div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium text-sm">{c.customer_name ?? "—"}</div>
-                          {c.lead_source && (
-                            <div className="text-xs text-muted-foreground">{c.lead_source}</div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {c.contact_name && <div className="font-medium">{c.contact_name}</div>}
-                          {c.contact_phone && <div className="text-muted-foreground">{c.contact_phone}</div>}
-                          {c.contact_email && <div className="text-muted-foreground truncate max-w-[160px]">{c.contact_email}</div>}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-[180px] truncate">
-                          {c.address ?? "—"}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={c.status} />
-                          {c.follow_up_required && (
-                            <div className="text-[10px] text-amber-600 mt-0.5">
-                              Follow-up {c.follow_up_date ? fmtDate(c.follow_up_date) : "needed"}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {c.assigned_name ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm font-medium">
-                          {fmt$(c.estimated_value)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div
-                            className="flex justify-end gap-1"
-                            onClick={e => e.stopPropagation()}
-                          >
-                            <Button variant="ghost" size="icon" className="h-7 w-7"
-                              onClick={() => openEdit(c)}
-                              data-testid={`btn-edit-${c.id}`}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
-                              onClick={() => setDeleteTarget(c)}
-                              data-testid={`btn-delete-${c.id}`}>
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
+          {/* ── Views */}
+          {viewMode === "kanban" ? (
+            <KanbanView
+              consultations={consultations}
+              onEdit={openEdit}
+              updateStage={(id, stage) => stageMut.mutate({ id, stage })}
+            />
+          ) : (
+            <div className="rounded-lg border overflow-hidden">
+              {isLoading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : consultations.length === 0 ? (
+                <div className="py-16 text-center text-muted-foreground">
+                  <CalendarClock className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                  <p className="font-medium text-sm">No consultations found</p>
+                  <p className="text-xs mt-1">
+                    {hasFilters ? "Try adjusting your filters" : "Click \"New Consultation\" to schedule one"}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table data-testid="consultations-table">
+                    <TableHeader>
+                      <TableRow className="bg-muted/30">
+                        <TableHead className="w-36">Date / Time</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Service / Budget</TableHead>
+                        <TableHead className="w-28">Pipeline Stage</TableHead>
+                        <TableHead className="w-28">Status</TableHead>
+                        <TableHead className="w-24 text-right">Est. Value</TableHead>
+                        <TableHead className="w-20 text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </div>
+                    </TableHeader>
+                    <TableBody>
+                      {consultations.map(c => (
+                        <TableRow
+                          key={c.id}
+                          className="cursor-pointer hover:bg-muted/30 transition-colors"
+                          onClick={() => openEdit(c)}
+                          data-testid={`consultation-row-${c.id}`}
+                        >
+                          <TableCell className="text-xs">
+                            <div className="font-medium">{fmtDate(c.scheduled_date)}</div>
+                            {c.scheduled_time && <div className="text-muted-foreground">{fmtTime(c.scheduled_time)}</div>}
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium text-sm">{c.customer_name ?? "—"}</div>
+                            {c.lead_source && <div className="text-xs text-muted-foreground">{c.lead_source}</div>}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {c.contact_name && <div className="font-medium">{c.contact_name}</div>}
+                            {c.contact_phone && <div className="text-muted-foreground">{c.contact_phone}</div>}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {c.service_type && <div className="font-medium">{c.service_type}</div>}
+                            {c.budget_range && <div className="text-muted-foreground">{c.budget_range}</div>}
+                          </TableCell>
+                          <TableCell>
+                            <StageBadge stage={c.pipeline_stage} />
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge status={c.status} />
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm font-medium">
+                            {fmt$(c.estimated_value)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon" className="h-7 w-7"
+                                onClick={() => openEdit(c)} data-testid={`btn-edit-${c.id}`}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
+                                onClick={() => setDeleteTarget(c)} data-testid={`btn-delete-${c.id}`}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── Modals ─────────────────────────────────────────────────────────── */}
+      {/* ── Modals */}
       <ConsultationModal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditing(null); }}
         editing={editing}
         customers={customers}
         employees={employees}
+        serviceTypes={serviceTypes}
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={o => { if (!o) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this consultation?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Consultation</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the consultation
-              {deleteTarget?.customer_name ? ` for ${deleteTarget.customer_name}` : ""} on{" "}
-              {deleteTarget ? fmtDate(deleteTarget.scheduled_date) : ""}. This cannot be undone.
+              Are you sure you want to delete this consultation? This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
-              data-testid="btn-confirm-delete"
             >
               Delete
             </AlertDialogAction>

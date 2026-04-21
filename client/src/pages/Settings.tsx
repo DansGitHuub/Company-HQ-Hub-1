@@ -27,9 +27,9 @@ import {
   User, Bell, BellOff, Globe, Shield, Save, Loader2, Lock, Eye, EyeOff, Check,
   Settings as SettingsIcon, Mail, Monitor, Sun, Moon, Layers, Tag, FileText, Building2,
   Plus, Pencil, Trash2, Link2, Link2Off, RefreshCw, CheckCircle, XCircle, AlertCircle,
-  ArrowLeftRight, Info,
+  ArrowLeftRight, Info, Calendar, Clock,
 } from "lucide-react";
-type SettingsSection = "profile" | "notifications" | "language" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks" | "terms";
+type SettingsSection = "profile" | "notifications" | "language" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks" | "terms" | "availability";
 
 function TermsSection() {
   const { toast } = useToast();
@@ -116,6 +116,204 @@ function TermsSection() {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Availability Section
+// ═══════════════════════════════════════════════════════════════════════════════
+const DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+const DAY_LABELS: Record<string, string> = {
+  monday:"Monday",tuesday:"Tuesday",wednesday:"Wednesday",thursday:"Thursday",
+  friday:"Friday",saturday:"Saturday",sunday:"Sunday",
+};
+
+function timeOptions() {
+  const opts = [];
+  for (let h = 6; h <= 20; h++) {
+    for (const m of [0, 30]) {
+      const hh = String(h).padStart(2,"0");
+      const mm = String(m).padStart(2,"0");
+      opts.push(`${hh}:${mm}`);
+    }
+  }
+  return opts;
+}
+
+interface DaySlot { enabled: boolean; start: string; end: string; }
+type WeekSchedule = Record<string, DaySlot>;
+
+function defaultSchedule(): WeekSchedule {
+  return Object.fromEntries(
+    DAYS.map(d => [d, { enabled: d !== "saturday" && d !== "sunday", start: "08:00", end: "17:00" }])
+  );
+}
+
+function AvailabilitySection() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const [schedule, setSchedule] = useState<WeekSchedule>(defaultSchedule());
+  const [timezone, setTimezone] = useState("America/New_York");
+  const [slotDuration, setSlotDuration] = useState(60);
+  const [bufferMinutes, setBufferMinutes] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/user/availability", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.schedule) setSchedule(data.schedule);
+        if (data?.timezone) setTimezone(data.timezone);
+        if (data?.slot_duration) setSlotDuration(data.slot_duration);
+        if (data?.buffer_minutes != null) setBufferMinutes(data.buffer_minutes);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, []);
+
+  function toggleDay(day: string) {
+    setSchedule(s => ({ ...s, [day]: { ...s[day], enabled: !s[day].enabled } }));
+  }
+  function setStart(day: string, val: string) {
+    setSchedule(s => ({ ...s, [day]: { ...s[day], start: val } }));
+  }
+  function setEnd(day: string, val: string) {
+    setSchedule(s => ({ ...s, [day]: { ...s[day], end: val } }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/user/availability", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schedule, timezone, slot_duration: slotDuration, buffer_minutes: bufferMinutes }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast({ title: "Availability saved" });
+    } catch {
+      toast({ title: "Failed to save", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const times = timeOptions();
+
+  return (
+    <div className="space-y-5" data-testid="availability-section">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Calendar className="h-5 w-5 text-primary" /> Consultation Availability
+            </CardTitle>
+            <CardDescription>
+              Set your available hours for the public booking calendar
+            </CardDescription>
+          </div>
+          <Button size="sm" onClick={handleSave} disabled={saving || !loaded} data-testid="btn-save-availability">
+            {saving ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-1" />Save</>}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {!loaded ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />Slot Duration</Label>
+                  <Select value={String(slotDuration)} onValueChange={v => setSlotDuration(Number(v))}>
+                    <SelectTrigger data-testid="select-slot-duration"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[30,45,60,90,120].map(d => <SelectItem key={d} value={String(d)}>{d} minutes</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Buffer Between Appointments</Label>
+                  <Select value={String(bufferMinutes)} onValueChange={v => setBufferMinutes(Number(v))}>
+                    <SelectTrigger data-testid="select-buffer"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[0,15,30,45,60].map(b => <SelectItem key={b} value={String(b)}>{b === 0 ? "None" : `${b} min`}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold">Weekly Schedule</Label>
+                {DAYS.map(day => (
+                  <div key={day} className="flex items-center gap-3" data-testid={`avail-row-${day}`}>
+                    <Switch
+                      checked={schedule[day]?.enabled ?? false}
+                      onCheckedChange={() => toggleDay(day)}
+                      data-testid={`toggle-${day}`}
+                    />
+                    <span className={`w-24 text-sm font-medium ${!schedule[day]?.enabled ? "text-muted-foreground" : ""}`}>
+                      {DAY_LABELS[day]}
+                    </span>
+                    {schedule[day]?.enabled ? (
+                      <>
+                        <Select value={schedule[day]?.start || "08:00"} onValueChange={v => setStart(day, v)}>
+                          <SelectTrigger className="w-28 h-8 text-sm" data-testid={`start-${day}`}><SelectValue /></SelectTrigger>
+                          <SelectContent className="max-h-48">
+                            {times.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <span className="text-muted-foreground text-sm">to</span>
+                        <Select value={schedule[day]?.end || "17:00"} onValueChange={v => setEnd(day, v)}>
+                          <SelectTrigger className="w-28 h-8 text-sm" data-testid={`end-${day}`}><SelectValue /></SelectTrigger>
+                          <SelectContent className="max-h-48">
+                            {times.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    ) : (
+                      <span className="text-sm text-muted-foreground italic">Unavailable</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Your Booking Page
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Share this link with customers to let them book a consultation directly on your calendar.
+                </p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    readOnly
+                    value={`${window.location.origin}/book/${(user as any)?.username || "your-username"}`}
+                    className="font-mono text-xs"
+                    data-testid="input-booking-url"
+                  />
+                  <Button size="sm" variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/book/${(user as any)?.username || ""}`);
+                      toast({ title: "Link copied!" });
+                    }}
+                    data-testid="btn-copy-booking-link"
+                  >
+                    Copy
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function Settings() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
@@ -141,6 +339,7 @@ export default function Settings() {
     { id: "profile" as const, label: "Profile & Account", icon: User },
     { id: "notifications" as const, label: "Notifications", icon: Bell },
     { id: "language" as const, label: "Language & Display", icon: Globe },
+    { id: "availability" as const, label: "Availability", icon: Calendar },
   ];
 
   if (isLoading) {
@@ -185,6 +384,7 @@ export default function Settings() {
           {activeSection === "profile" && <ProfileSection profile={profile} />}
           {activeSection === "notifications" && <NotificationsSection profile={profile} />}
           {activeSection === "language" && <LanguageSection profile={profile} />}
+          {activeSection === "availability" && <AvailabilitySection />}
           {activeSection === "work-areas" && isAdminOrManager && <WorkAreasSection />}
           {activeSection === "company" && isAdminOrManager && <CompanyInfoSection />}
           {(["divisions", "estimate-templates", "quickbooks", "terms"] as const).includes(activeSection as any) && (
