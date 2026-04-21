@@ -161,26 +161,29 @@ export default function TimeClock() {
   function buildWorkAreaOptions(): Array<{ value: string; label: string; group: string }> {
     const opts: Array<{ value: string; label: string; group: string }> = [];
 
-    // Global areas: General-division types from DB (pre-sorted by sort_order from API)
+    // Build the global (General division) options list
+    const generalOpts: Array<{ value: string; label: string; group: string }> = [];
     if (globalAreas.length > 0) {
       globalAreas.forEach((t) => {
-        opts.push({ value: `general:${t.id}:${t.name}`, label: t.name, group: "General" });
+        generalOpts.push({ value: `general:${t.id}:${t.name}`, label: t.name, group: "General" });
       });
     } else {
       // Fallback if DB hasn't loaded yet
       FALLBACK_GENERAL.forEach((name) => {
-        opts.push({ value: `general::${name}`, label: name, group: "General" });
+        generalOpts.push({ value: `general::${name}`, label: name, group: "General" });
       });
     }
 
     if (selectedJob) {
       if (jobWorkAreas.length > 0) {
-        // Show job's specific work areas
+        // Job has specific areas → show job areas FIRST, then global areas
         jobWorkAreas.forEach((jwa) => {
           opts.push({ value: `job:${jwa.id}:${jwa.name}`, label: jwa.name, group: "Job Work Areas" });
         });
+        opts.push(...generalOpts);
       } else {
-        // No work areas on this job — show all non-General types grouped by division
+        // No job-specific areas → show global areas, then fall back to all non-General types
+        opts.push(...generalOpts);
         const grouped = allTypes.filter((t) => t.division !== "General");
         const divisions = [...new Set(grouped.map((t) => t.division ?? "Other"))];
         divisions.forEach((div) => {
@@ -189,6 +192,9 @@ export default function TimeClock() {
           });
         });
       }
+    } else {
+      // No job selected → global areas only
+      opts.push(...generalOpts);
     }
 
     return opts;
