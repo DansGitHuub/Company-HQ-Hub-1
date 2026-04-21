@@ -29,20 +29,21 @@ interface JobRow {
 }
 
 // ── Status display ────────────────────────────────────────────────────────────
-const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  lead:        { label: "Lead",        cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
-  scheduled:   { label: "Scheduled",   cls: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
-  in_progress: { label: "In Progress", cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" },
-  completed:   { label: "Completed",   cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
-  invoiced:    { label: "Invoiced",    cls: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" },
-  cancelled:   { label: "Cancelled",   cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
+const STATUS_MAP: Record<string, { labelKey: string; cls: string }> = {
+  lead:        { labelKey: "lead",        cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
+  scheduled:   { labelKey: "scheduled",   cls: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
+  in_progress: { labelKey: "inProgress",  cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" },
+  completed:   { labelKey: "completed",   cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
+  invoiced:    { labelKey: "invoiced",    cls: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" },
+  cancelled:   { labelKey: "cancelled",   cls: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_MAP[status] ?? { label: status, cls: "bg-muted text-muted-foreground" };
+  const { t } = useTranslation("jobs");
+  const s = STATUS_MAP[status] ?? { labelKey: null, cls: "bg-muted text-muted-foreground" };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${s.cls}`}>
-      {s.label}
+      {s.labelKey ? t(s.labelKey) : status}
     </span>
   );
 }
@@ -72,17 +73,18 @@ function fmtMoney(v: any) {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function JobsPage() {
   const { t } = useTranslation("jobDetail");
+  const { t: tJobs } = useTranslation("jobs");
   const [, navigate] = useLocation();
   const { effectiveRole } = useAuth();
   const isAdminOrManager = ["Admin", "Manager", "Master Admin"].includes(effectiveRole ?? "");
 
   const STATUS_TABS = [
-    { value: "all",         label: t("allTab") },
-    { value: "lead",        label: "Lead" },
-    { value: "scheduled",   label: "Scheduled" },
-    { value: "in_progress", label: "In Progress" },
-    { value: "completed",   label: "Completed" },
-    { value: "invoiced",    label: "Invoiced" },
+    { value: "all",         label: tJobs("all") },
+    { value: "lead",        label: tJobs("lead") },
+    { value: "scheduled",   label: tJobs("scheduled") },
+    { value: "in_progress", label: tJobs("inProgress") },
+    { value: "completed",   label: tJobs("completed") },
+    { value: "invoiced",    label: tJobs("invoiced") },
   ];
 
   const [activeTab, setActiveTab] = useState("all");
@@ -114,7 +116,7 @@ export default function JobsPage() {
           <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {jobs.length} {jobs.length !== 1 ? t("title").toLowerCase() : t("jobTitle").toLowerCase()}
-            {activeTab !== "all" ? ` · ${STATUS_MAP[activeTab]?.label ?? activeTab}` : ""}
+            {activeTab !== "all" ? ` · ${tJobs(STATUS_MAP[activeTab]?.labelKey ?? activeTab)}` : ""}
           </p>
         </div>
         {isAdminOrManager && (

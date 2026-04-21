@@ -505,7 +505,10 @@
     "estimatedValue": "Estimated Value",
     "noJobs": "No jobs found",
     "noEstimates": "No estimates found",
-    "dragToReorder": "Drag to reorder"
+    "dragToReorder": "Drag to reorder",
+    "all": "All",
+    "invoiced": "Invoiced",
+    "cancelled": "Cancelled"
   },
   "calendar": {
     "title": "Calendar",

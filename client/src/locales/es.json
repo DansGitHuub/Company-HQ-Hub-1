@@ -505,7 +505,10 @@
     "estimatedValue": "Valor Estimado",
     "noJobs": "No se encontraron trabajos",
     "noEstimates": "No se encontraron presupuestos",
-    "dragToReorder": "Arrastrar para reordenar"
+    "dragToReorder": "Arrastrar para reordenar",
+    "all": "Todos",
+    "invoiced": "Facturado",
+    "cancelled": "Cancelado"
   },
   "calendar": {
     "title": "Calendario",
