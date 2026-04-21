@@ -4,15 +4,21 @@ import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { clockIn, clockOut, getActiveSession } from "@/lib/timeApi";
+import OfflineBanner from "@/components/OfflineBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
   ClipboardList, Plus, Trash2, Send, Save, Loader2, PackageOpen,
-  Receipt, Users, StickyNote, Clock, Briefcase, ChevronDown, ChevronRight,
-  ImagePlus, X, HardHat,
+  Receipt, Users, StickyNote, Briefcase, ChevronDown, ChevronRight,
+  ImagePlus, X, HardHat, Sun, Coffee, Car, Wrench, LogOut as ClockOutIcon,
+  CheckCircle2, MapPin, Clock,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,11 +60,15 @@ interface Worksheet {
 }
 
 interface ActiveEntry {
-  id: number;
+  id?: number;
+  localId?: string;
+  isOffline?: boolean;
   job_id: string | null;
   job_name: string | null;
+  job_work_area_id?: string | null;
   work_area_name: string | null;
   clock_in: string;
+  clock_out?: string | null;
   entry_type: string;
 }
 
@@ -76,15 +86,90 @@ interface Job {
   status: string;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Mi Día types ─────────────────────────────────────────────────────────────
+
+interface WorkArea {
+  id: string;
+  name: string;
+  status: string | null;
+  estimated_hours: number | null;
+}
+
+interface MyDayJob {
+  id: string;
+  title: string;
+  status: string;
+  division: string | null;
+  color: string | null;
+  client: string | null;
+  scheduled_date: string | null;
+  scheduled_start_time: string | null;
+  scheduled_end_time: string | null;
+  customer_name: string | null;
+  customer_address: string | null;
+  work_areas: WorkArea[];
+}
+
+interface TimeEntry {
+  id: string;
+  user_id: string;
+  job_id: string | null;
+  clock_in: string;
+  clock_out: string | null;
+  duration_minutes: number | null;
+  entry_type: string;
+  work_area_name: string | null;
+  job_work_area_id: string | null;
+  job_title: string | null;
+}
+
+interface PendingClockIn {
+  jobId: string;
+  jobTitle: string;
+  workAreaId: string | null;
+  workAreaName: string;
+  entryType: string;
+}
+
+interface PickerJob {
+  jobId: string;
+  jobTitle: string;
+  preSelectedId: string | null;
+  preSelectedName: string | null;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const DIVISION_COLORS: Record<string, string> = {
+  maintenance: "#22c55e",
+  install: "#3b82f6",
+  snow: "#94a3b8",
+  general: "#f59e0b",
+};
+
+function divisionColor(division: string | null): string {
+  if (!division) return "#e5e7eb";
+  return DIVISION_COLORS[division.toLowerCase()] ?? "#e5e7eb";
+}
+
+function formatTime(isoString: string | null): string {
+  if (!isoString) return "—";
+  return new Date(isoString).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
 
 function formatDate(_dateStr?: string) {
   return new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
+}
+
+function formatDuration(minutes: number | null): string {
+  if (!minutes) return "0m";
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
 }
 
 function formatElapsed(seconds: number) {
@@ -93,6 +178,30 @@ function formatElapsed(seconds: number) {
   const s = seconds % 60;
   return [h, m, s].map((v) => String(v).padStart(2, "0")).join(":");
 }
+
+function useLiveElapsed(clockInTime: string | null): string {
+  const [elapsed, setElapsed] = useState("");
+  useEffect(() => {
+    if (!clockInTime) { setElapsed(""); return; }
+    const tick = () => {
+      const diff = Math.floor((Date.now() - new Date(clockInTime).getTime()) / 1000);
+      const h = Math.floor(diff / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      const s = diff % 60;
+      setElapsed(h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [clockInTime]);
+  return elapsed;
+}
+
+const QUICK_CHIPS = [
+  { labelKey: "chipDriveTime", entryType: "drive_time", icon: Car },
+  { labelKey: "chipShopTime",  entryType: "shop_time",  icon: Wrench },
+  { labelKey: "chipBreak",     entryType: "break",      icon: Coffee },
+];
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
@@ -127,25 +236,346 @@ function Section({
   );
 }
 
+// ─── Time Entry Row ───────────────────────────────────────────────────────────
+
+function TimeEntryRow({ entry }: { entry: TimeEntry }) {
+  const { t } = useTranslation("myDay");
+  const liveElapsed = useLiveElapsed(entry.clock_out ? null : entry.clock_in);
+  const isActive = !entry.clock_out;
+  return (
+    <div
+      data-testid={`time-entry-${entry.id}`}
+      className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm"
+    >
+      <div className="min-w-0">
+        <p className="font-medium text-sm text-gray-900 truncate">
+          {entry.work_area_name || entry.entry_type}
+        </p>
+        {entry.job_title && (
+          <p className="text-xs text-gray-400 truncate">{entry.job_title}</p>
+        )}
+        <p className="text-xs text-gray-400 mt-0.5">
+          {formatTime(entry.clock_in)}
+          {entry.clock_out ? ` → ${formatTime(entry.clock_out)}` : ""}
+        </p>
+      </div>
+      <div className="ml-3 shrink-0 text-right">
+        {isActive ? (
+          <Badge className="bg-green-100 text-green-700 text-xs font-semibold">
+            {liveElapsed || t("active")}
+          </Badge>
+        ) : (
+          <span className="text-sm font-semibold text-gray-700">
+            {formatDuration(entry.duration_minutes)}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Job Card ─────────────────────────────────────────────────────────────────
+
+function JobCard({
+  job, activeEntry, onChipTap, onPickerOpen,
+}: {
+  job: MyDayJob;
+  activeEntry: ActiveEntry | null;
+  onChipTap: (p: PendingClockIn) => void;
+  onPickerOpen: (picker: PickerJob) => void;
+}) {
+  const { t } = useTranslation("myDay");
+  const borderColor = divisionColor(job.division);
+  const timeLabel = job.scheduled_start_time
+    ? `${job.scheduled_start_time.slice(0, 5)}${job.scheduled_end_time ? " – " + job.scheduled_end_time.slice(0, 5) : ""}`
+    : null;
+
+  function handleChip(workAreaId: string | null, workAreaName: string, entryType: string) {
+    if (entryType === "billable") {
+      onPickerOpen({
+        jobId: job.id,
+        jobTitle: job.title || job.client || t("unnamedJob"),
+        preSelectedId: workAreaId,
+        preSelectedName: workAreaName,
+      });
+    } else {
+      onChipTap({
+        jobId: job.id,
+        jobTitle: job.title || job.client || t("unnamedJob"),
+        workAreaId,
+        workAreaName,
+        entryType,
+      });
+    }
+  }
+
+  return (
+    <Card
+      data-testid={`job-card-${job.id}`}
+      className="overflow-hidden shadow-sm border-l-4"
+      style={{ borderLeftColor: borderColor }}
+    >
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <p data-testid={`job-title-${job.id}`} className="font-semibold text-gray-900 leading-snug">
+            {job.title || job.client || t("unnamedJob")}
+          </p>
+          {job.division && (
+            <Badge className="text-white text-xs shrink-0 capitalize" style={{ backgroundColor: borderColor }}>
+              {job.division}
+            </Badge>
+          )}
+        </div>
+
+        {(job.customer_name || job.customer_address) && (
+          <div className="flex items-start gap-1.5 text-sm text-gray-500">
+            <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            <span className="leading-snug">
+              {[job.customer_name, job.customer_address].filter(Boolean).join(" · ")}
+            </span>
+          </div>
+        )}
+
+        {timeLabel && (
+          <div className="flex items-center gap-1.5 text-sm text-gray-500">
+            <Clock className="w-3.5 h-3.5 shrink-0" />
+            <span>{timeLabel}</span>
+          </div>
+        )}
+
+        {job.work_areas.length > 0 && (
+          <div className="space-y-2">
+            {(() => {
+              const openAreas = job.work_areas.filter((wa) => wa.status !== "completed");
+              const doneAreas = job.work_areas.filter((wa) => wa.status === "completed");
+              return (
+                <>
+                  {openAreas.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {openAreas.map((wa) => {
+                        const isActive = activeEntry?.job_work_area_id === wa.id && !activeEntry?.clock_out;
+                        return (
+                          <button
+                            key={wa.id}
+                            data-testid={`work-area-chip-${wa.id}`}
+                            onClick={() => handleChip(wa.id, wa.name, "billable")}
+                            className={[
+                              "px-3 py-1.5 rounded-full text-sm font-medium min-h-[36px] transition-colors",
+                              isActive
+                                ? "bg-green-600 text-white"
+                                : "bg-gray-100 text-gray-700 hover:bg-green-50 hover:text-green-700 active:bg-green-100",
+                            ].join(" ")}
+                          >
+                            {isActive && <CheckCircle2 className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />}
+                            {wa.name}{wa.estimated_hours ? ` (${wa.estimated_hours}h)` : ""}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {doneAreas.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {doneAreas.map((wa) => (
+                        <span
+                          key={wa.id}
+                          data-testid={`work-area-done-${wa.id}`}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-gray-50 text-gray-400 border border-gray-200 line-through cursor-default"
+                        >
+                          <CheckCircle2 className="inline w-3 h-3 text-gray-400" />
+                          <span>{wa.name}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button
+            data-testid={`clock-in-job-${job.id}`}
+            onClick={() => onPickerOpen({
+              jobId: job.id,
+              jobTitle: job.title || job.client || t("unnamedJob"),
+              preSelectedId: null,
+              preSelectedName: null,
+            })}
+            className="flex items-center gap-1 text-sm font-medium text-green-700 hover:text-green-800 active:text-green-900 transition-colors"
+          >
+            <Clock className="w-3.5 h-3.5" />
+            {t("clockIn")}
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-100">
+          {QUICK_CHIPS.map(({ labelKey, entryType, icon: Icon }) => {
+            const label = t(labelKey);
+            const isActive =
+              activeEntry?.entry_type === entryType &&
+              activeEntry?.job_id === job.id &&
+              !activeEntry?.clock_out;
+            return (
+              <button
+                key={entryType}
+                data-testid={`quick-chip-${entryType}-${job.id}`}
+                onClick={() => handleChip(null, label, entryType)}
+                className={[
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm min-h-[36px] transition-colors",
+                  isActive
+                    ? "bg-blue-600 text-white"
+                    : "bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200",
+                ].join(" ")}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Work Area Picker Dialog ──────────────────────────────────────────────────
+
+function WorkAreaPickerDialog({
+  pickerJob, activeEntry, onClose, onConfirm,
+}: {
+  pickerJob: PickerJob;
+  activeEntry: ActiveEntry | null;
+  onClose: () => void;
+  onConfirm: (p: PendingClockIn) => void;
+}) {
+  const { t } = useTranslation("myDay");
+  const { data: areas = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/jobs", pickerJob.jobId, "work-areas"],
+    queryFn: () =>
+      apiRequest("GET", `/api/jobs/${pickerJob.jobId}/work-areas?active=true`).then((r) => r.json()),
+    staleTime: 30_000,
+  });
+
+  const openAreas = areas.filter((wa: any) => wa.is_active !== false && wa.status !== "completed");
+  const initialId = pickerJob.preSelectedId ?? (openAreas[0]?.id ?? "__general__");
+  const [selectedId, setSelectedId] = useState<string>(initialId);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setSelectedId(pickerJob.preSelectedId ?? (openAreas[0]?.id ?? "__general__"));
+    }
+  }, [isLoading, pickerJob.preSelectedId]);
+
+  function getSelectedName(): string {
+    if (selectedId === "__general__") return t("general");
+    const found = openAreas.find((wa: any) => wa.id === selectedId);
+    return found?.name ?? t("general");
+  }
+
+  function handleConfirm() {
+    onConfirm({
+      jobId: pickerJob.jobId,
+      jobTitle: pickerJob.jobTitle,
+      workAreaId: selectedId === "__general__" ? null : selectedId,
+      workAreaName: getSelectedName(),
+      entryType: "billable",
+    });
+  }
+
+  const allOptions = [
+    ...openAreas.map((wa: any) => ({ id: wa.id, name: wa.name, hours: wa.estimated_hours })),
+    { id: "__general__", name: t("general"), hours: null },
+  ];
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-sm mx-auto">
+        <DialogHeader>
+          <DialogTitle>{t("selectWorkArea")}</DialogTitle>
+        </DialogHeader>
+        {activeEntry && (
+          <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            {t("willClockOutOf")}{" "}
+            <span className="font-semibold">{activeEntry.work_area_name || activeEntry.entry_type}</span>{" "}
+            {t("first")}
+          </div>
+        )}
+        <p className="text-xs text-gray-500 -mt-1">{pickerJob.jobTitle}</p>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5">
+            {allOptions.map((opt) => {
+              const isChosen = selectedId === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  data-testid={`picker-area-${opt.id}`}
+                  onClick={() => setSelectedId(opt.id)}
+                  className={[
+                    "w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-colors",
+                    isChosen
+                      ? "bg-green-600 border-green-600 text-white"
+                      : "bg-white border-gray-200 text-gray-800 hover:border-green-300 hover:bg-green-50",
+                  ].join(" ")}
+                >
+                  <span className="font-medium text-sm">
+                    {opt.name}
+                    {opt.hours ? (
+                      <span className={["ml-1.5 text-xs font-normal", isChosen ? "text-green-100" : "text-gray-400"].join(" ")}>
+                        {opt.hours}h est.
+                      </span>
+                    ) : null}
+                  </span>
+                  {isChosen && <CheckCircle2 className="w-4 h-4 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <DialogFooter className="gap-2 pt-1">
+          <Button variant="outline" onClick={onClose} data-testid="picker-cancel">{t("cancel")}</Button>
+          <Button
+            onClick={handleConfirm}
+            disabled={isLoading}
+            data-testid="picker-confirm"
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            {activeEntry ? t("switchArea") : t("clockIn")}
+            <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function DailyWorksheet() {
   const { t } = useTranslation("dailyWorksheet");
+  const { t: tDay } = useTranslation("myDay");
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  // ── Elapsed timer ────────────────────────────────────────────────────────────
+  // ── Elapsed timer (for header display) ───────────────────────────────────────
   const [elapsed, setElapsed] = useState(0);
 
+  // ── Clock-in state ────────────────────────────────────────────────────────────
+  const [pending, setPending] = useState<PendingClockIn | null>(null);
+  const [gpsChecking, setGpsChecking] = useState(false);
+  const [pickerJob, setPickerJob] = useState<PickerJob | null>(null);
+
+  // ── Active entry ──────────────────────────────────────────────────────────────
   const { data: activeEntry } = useQuery<ActiveEntry | null>({
     queryKey: ["/api/time/active"],
-    queryFn: async () => {
-      const res = await fetch("/api/time/active");
-      if (!res.ok) return null;
-      return res.json();
-    },
-    refetchInterval: 30000,
+    queryFn: () => getActiveSession(),
+    refetchInterval: 30_000,
     retry: false,
   });
 
@@ -155,17 +585,29 @@ export default function DailyWorksheet() {
       Math.floor((Date.now() - new Date(activeEntry.clock_in).getTime()) / 1000)
     );
     update();
-    const t = setInterval(update, 1000);
-    return () => clearInterval(t);
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
   }, [activeEntry?.clock_in]);
 
-  // ── Today's worksheet ────────────────────────────────────────────────────────
+  // ── Today's worksheet ─────────────────────────────────────────────────────────
   const { data: ws, isLoading } = useQuery<Worksheet>({
     queryKey: ["/api/worksheets/today"],
     queryFn: () => fetch("/api/worksheets/today").then((r) => r.json()),
   });
 
-  // ── Crew users list (for team member picker) ─────────────────────────────────
+  // ── Today's jobs (from Mi Día) ────────────────────────────────────────────────
+  const { data: myDayJobs = [], isLoading: jobsLoading } = useQuery<MyDayJob[]>({
+    queryKey: ["/api/my-day"],
+    refetchInterval: 60_000,
+  });
+
+  // ── Today's time entries (from Mi Día) ────────────────────────────────────────
+  const { data: timeEntries = [], isLoading: entriesLoading } = useQuery<TimeEntry[]>({
+    queryKey: ["/api/my-day/time-entries"],
+    refetchInterval: 30_000,
+  });
+
+  // ── Crew users list ───────────────────────────────────────────────────────────
   const { data: crewUsers = [] } = useQuery<CrewUser[]>({
     queryKey: ["/api/users"],
     queryFn: () => fetch("/api/users").then((r) => r.json()),
@@ -182,7 +624,7 @@ export default function DailyWorksheet() {
     },
   });
 
-  // ── Selected job state (initialized from ws.job_id or active clock-in) ────────
+  // ── Selected job state ────────────────────────────────────────────────────────
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [isSavingJob, setIsSavingJob] = useState(false);
   const jobInitialized = useRef(false);
@@ -213,7 +655,7 @@ export default function DailyWorksheet() {
     }
   };
 
-  // ── Notes state (local, saved on blur or submit) ─────────────────────────────
+  // ── Notes state ───────────────────────────────────────────────────────────────
   const [notes, setNotes] = useState("");
   const notesInitialized = useRef(false);
   const notesDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -227,7 +669,6 @@ export default function DailyWorksheet() {
     }
   }, [ws]);
 
-  // ── Save notes ───────────────────────────────────────────────────────────────
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [notesSaved, setNotesSaved] = useState(false);
 
@@ -248,7 +689,6 @@ export default function DailyWorksheet() {
     }
   };
 
-  // ── Debounced 1s auto-save for notes ─────────────────────────────────────────
   useEffect(() => {
     if (!notesInitialized.current || !wsIdRef.current) return;
     if (notesDebounce.current) clearTimeout(notesDebounce.current);
@@ -266,7 +706,7 @@ export default function DailyWorksheet() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes]);
 
-  // ── Submit worksheet ─────────────────────────────────────────────────────────
+  // ── Submit worksheet ──────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   const handleSubmit = async () => {
     if (!ws) return;
@@ -285,12 +725,11 @@ export default function DailyWorksheet() {
 
   const isSubmitted = ws?.status === "submitted" || ws?.status === "approved";
 
-  // ─── Materials form state ─────────────────────────────────────────────────────
+  // ── Materials form state ──────────────────────────────────────────────────────
   const [matForm, setMatForm] = useState({ material_name: "", quantity: "", unit: "", unit_cost: "", notes: "" });
   const [addingMat, setAddingMat] = useState(false);
   const [showMatForm, setShowMatForm] = useState(false);
 
-  // Catalog autocomplete
   const [catalogSuggestions, setCatalogSuggestions] = useState<{ id: string; name: string; unit: string | null; unit_cost: string | null }[]>([]);
   const [showCatalogDrop, setShowCatalogDrop] = useState(false);
   const catalogDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -344,7 +783,7 @@ export default function DailyWorksheet() {
     }
   };
 
-  // ─── Expenses form state ──────────────────────────────────────────────────────
+  // ── Expenses form state ───────────────────────────────────────────────────────
   const EXPENSE_CATEGORIES = ["Fuel", "Materials", "Equipment Rental", "Dump Fee", "Food", "Other"];
   const receiptInputRef = useRef<HTMLInputElement>(null);
   const [expForm, setExpForm] = useState({ description: "", amount: "", category: "", receipt_url: "" });
@@ -388,7 +827,7 @@ export default function DailyWorksheet() {
     }
   };
 
-  // ─── Team members ─────────────────────────────────────────────────────────────
+  // ── Team members ──────────────────────────────────────────────────────────────
   const [selectedUserId, setSelectedUserId] = useState("");
   const [addingMember, setAddingMember] = useState(false);
 
@@ -416,7 +855,91 @@ export default function DailyWorksheet() {
     }
   };
 
-  // ─── Loading ──────────────────────────────────────────────────────────────────
+  // ── Clock-in / Clock-out mutations ────────────────────────────────────────────
+  const clockInMutation = useMutation({
+    mutationFn: async (p: PendingClockIn) => {
+      if (activeEntry) {
+        const coPayload = (activeEntry as any).isOffline
+          ? { local_clock_in_id: (activeEntry as any).localId }
+          : { time_entry_id: activeEntry.id };
+        await clockOut(coPayload);
+      }
+      const result = await clockIn({
+        job_id: p.jobId || undefined,
+        job_work_area_id: p.workAreaId || undefined,
+        work_area_name: p.workAreaName,
+        entry_type: p.entryType,
+      });
+      if (!result.success) throw new Error(result.error ?? "Clock-in failed");
+      return result;
+    },
+    onSuccess: (result: any) => {
+      const title = result?.offline ? tDay("clockedInOffline") : tDay("clockedInMsg");
+      toast({ title, description: tDay("nowWorkingOn", { name: pending?.workAreaName }) });
+      setPending(null);
+      qc.invalidateQueries({ queryKey: ["/api/time/active"] });
+      qc.invalidateQueries({ queryKey: ["/api/my-day/time-entries"] });
+    },
+    onError: (err: any) => {
+      toast({ title: tDay("error"), description: err.message, variant: "destructive" });
+    },
+  });
+
+  const clockOutMutation = useMutation({
+    mutationFn: async () => {
+      if (!activeEntry) return;
+      const payload = (activeEntry as any).isOffline
+        ? { local_clock_in_id: (activeEntry as any).localId }
+        : { time_entry_id: activeEntry.id };
+      const result = await clockOut(payload);
+      if (!result.success) throw new Error(result.error ?? "Clock-out failed");
+      return result;
+    },
+    onSuccess: (result: any) => {
+      const title = result?.offline ? tDay("clockedOutOffline") : tDay("clockedOutMsg");
+      toast({ title });
+      qc.invalidateQueries({ queryKey: ["/api/time/active"] });
+      qc.invalidateQueries({ queryKey: ["/api/my-day/time-entries"] });
+    },
+    onError: (err: any) => {
+      toast({ title: tDay("error"), description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleClockIn = () => {
+    if (!pending) return;
+    if (!navigator.geolocation) {
+      toast({ title: tDay("gpsRequired"), description: tDay("gpsNotSupported"), variant: "destructive" });
+      return;
+    }
+    setGpsChecking(true);
+    navigator.geolocation.getCurrentPosition(
+      () => { setGpsChecking(false); clockInMutation.mutate(pending); },
+      () => { setGpsChecking(false); toast({ title: tDay("gpsRequired"), description: tDay("gpsAccessDenied"), variant: "destructive" }); },
+      { enableHighAccuracy: false, timeout: 10000 }
+    );
+  };
+
+  const handlePickerConfirm = (p: PendingClockIn) => {
+    setPickerJob(null);
+    if (!navigator.geolocation) {
+      toast({ title: tDay("gpsRequired"), description: tDay("gpsNotSupported"), variant: "destructive" });
+      return;
+    }
+    setGpsChecking(true);
+    navigator.geolocation.getCurrentPosition(
+      () => { setGpsChecking(false); clockInMutation.mutate(p); },
+      () => { setGpsChecking(false); toast({ title: tDay("gpsRequired"), description: tDay("gpsAccessDenied"), variant: "destructive" }); },
+      { enableHighAccuracy: false, timeout: 10000 }
+    );
+  };
+
+  // ── Greeting ──────────────────────────────────────────────────────────────────
+  const firstName = (user as any)?.firstName || user?.username || "there";
+  const hour = new Date().getHours();
+  const greetingKey = hour < 12 ? "goodMorning" : hour < 17 ? "goodAfternoon" : "goodEvening";
+
+  // ── Loading ───────────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -430,59 +953,112 @@ export default function DailyWorksheet() {
   const addedMemberIds = new Set(ws.teamMembers.map((m) => m.user_id));
   const availableUsers = crewUsers.filter((u) => u.id !== user?.id && !addedMemberIds.has(u.id));
 
-  // ─── Render ────────────────────────────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 pb-28">
+      <OfflineBanner />
 
       {/* ── HEADER ── */}
       <div className="bg-green-700 text-white px-4 pt-5 pb-4">
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-center gap-2 mb-1">
-            <ClipboardList className="h-5 w-5 opacity-80" />
-            <span className="text-xs font-semibold uppercase tracking-wider opacity-80">{t("title")}</span>
-            {isSubmitted && (
-              <Badge className="ml-2 bg-white/20 text-white border-white/30 text-xs">Submitted</Badge>
-            )}
-          </div>
-          <h1 className="text-2xl font-bold">{formatDate(ws.date)}</h1>
+          {/* Greeting */}
+          <h1 data-testid="my-day-greeting" className="text-2xl font-bold">
+            {tDay(greetingKey, { name: firstName })}
+          </h1>
+          <p className="text-sm opacity-70 mt-0.5">{formatDate(ws.date)}</p>
 
+          {/* Active entry / clock status */}
           {activeEntry ? (
-            <div className="mt-3 space-y-1.5">
-              {(activeEntry.job_name || activeEntry.work_area_name) && (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm opacity-90">
-                  {activeEntry.job_name && (
-                    <div className="flex items-center gap-1.5">
-                      <Briefcase className="h-3.5 w-3.5" />
-                      <span className="font-semibold">{activeEntry.job_name}</span>
-                    </div>
-                  )}
-                  {activeEntry.work_area_name && (
-                    <div className="flex items-center gap-1 opacity-80">
-                      <span className="text-white/50">·</span>
-                      <span>{activeEntry.work_area_name}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1.5 opacity-90">
-                  <Clock className="h-3.5 w-3.5" />
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <div className="min-w-0 space-y-0.5">
+                {(activeEntry.job_name || activeEntry.work_area_name) && (
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm opacity-90">
+                    {activeEntry.job_name && (
+                      <div className="flex items-center gap-1.5">
+                        <Briefcase className="h-3.5 w-3.5" />
+                        <span className="font-semibold">{activeEntry.job_name}</span>
+                      </div>
+                    )}
+                    {activeEntry.work_area_name && (
+                      <span className="opacity-75">· {activeEntry.work_area_name}</span>
+                    )}
+                  </div>
+                )}
+                <div className="flex items-center gap-3 text-sm">
                   <span className="font-mono font-bold text-base">{formatElapsed(elapsed)}</span>
-                </div>
-                <div className="flex items-center gap-1.5 opacity-75 text-xs">
-                  <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                  Clocked In
+                  <span className="flex items-center gap-1 opacity-75 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                    Clocked In
+                  </span>
+                  {(activeEntry as any).isOffline && (
+                    <Badge className="text-[10px] px-1.5 py-0 bg-yellow-100 text-yellow-800 border border-yellow-300">
+                      ⚡ {tDay("offline")}
+                    </Badge>
+                  )}
                 </div>
               </div>
+              <Button
+                data-testid="clock-out-button"
+                size="sm"
+                variant="outline"
+                className="border-white/40 text-white hover:bg-white/20 bg-white/10 shrink-0"
+                onClick={() => clockOutMutation.mutate()}
+                disabled={clockOutMutation.isPending}
+              >
+                <ClockOutIcon className="w-3.5 h-3.5 mr-1" />
+                {tDay("clockOut")}
+              </Button>
             </div>
           ) : (
-            <p className="mt-2 text-sm opacity-70">{t("notClockedIn")}</p>
+            <div className="mt-3 flex items-center gap-2 text-sm opacity-70">
+              <ClipboardList className="h-4 w-4" />
+              <span>{t("notClockedIn")}</span>
+              {isSubmitted && (
+                <Badge className="ml-2 bg-white/20 text-white border-white/30 text-xs">Submitted</Badge>
+              )}
+            </div>
+          )}
+          {activeEntry && isSubmitted && (
+            <Badge className="mt-1 bg-white/20 text-white border-white/30 text-xs">Submitted</Badge>
           )}
         </div>
       </div>
 
       {/* ── SECTIONS ── */}
       <div className="max-w-2xl mx-auto px-4 pt-5 space-y-4">
+
+        {/* Today's Jobs */}
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
+            {tDay("todaysJobs")}{myDayJobs.length > 0 ? ` · ${myDayJobs.length}` : ""}
+          </h2>
+          {jobsLoading ? (
+            <div className="space-y-3">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-36 rounded-xl bg-gray-100 animate-pulse" />
+              ))}
+            </div>
+          ) : myDayJobs.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-gray-400">
+                <Sun className="w-7 h-7 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">{tDay("noJobsScheduledToday")}</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {myDayJobs.map((job) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  activeEntry={activeEntry ?? null}
+                  onChipTap={(p) => setPending(p)}
+                  onPickerOpen={(picker) => setPickerJob(picker)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Job Selector Card */}
         <Card className="overflow-hidden">
@@ -494,7 +1070,7 @@ export default function DailyWorksheet() {
               <HardHat className="h-3.5 w-3.5 text-white" />
             </div>
             <CardTitle className="text-sm font-semibold" style={{ color: "#16a34a" }}>
-              Job
+              {t("job") || "Job"}
             </CardTitle>
             {activeEntry?.job_id && activeEntry.job_id === selectedJobId && (
               <span className="text-xs text-green-600 font-normal ml-1">(from clock-in)</span>
@@ -533,11 +1109,7 @@ export default function DailyWorksheet() {
                     </span>
                   </div>
                   {!isSubmitted && (
-                    <button
-                      onClick={() => deleteMaterial(m.id)}
-                      className="ml-3 p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors shrink-0"
-                      data-testid={`btn-delete-material-${m.id}`}
-                    >
+                    <button onClick={() => deleteMaterial(m.id)} className="ml-3 p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors shrink-0" data-testid={`btn-delete-material-${m.id}`}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   )}
@@ -545,7 +1117,6 @@ export default function DailyWorksheet() {
               ))}
             </div>
           )}
-
           {!isSubmitted && (
             showMatForm ? (
               <div className="space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
@@ -567,12 +1138,7 @@ export default function DailyWorksheet() {
                             type="button"
                             className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex justify-between items-center gap-2"
                             onMouseDown={() => {
-                              setMatForm((f) => ({
-                                ...f,
-                                material_name: s.name,
-                                unit: s.unit ?? f.unit,
-                                unit_cost: s.unit_cost ?? f.unit_cost,
-                              }));
+                              setMatForm((f) => ({ ...f, material_name: s.name, unit: s.unit ?? f.unit, unit_cost: s.unit_cost ?? f.unit_cost }));
                               setShowCatalogDrop(false);
                             }}
                           >
@@ -626,7 +1192,6 @@ export default function DailyWorksheet() {
               ))}
             </div>
           )}
-
           {!isSubmitted && (
             showExpForm ? (
               <div className="space-y-2 p-3 bg-purple-50 rounded-lg border border-purple-100">
@@ -638,38 +1203,19 @@ export default function DailyWorksheet() {
                     {EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
-
-                {/* Receipt upload */}
-                <input
-                  ref={receiptInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  data-testid="input-receipt-file"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleReceiptFile(f); }}
-                />
+                <input ref={receiptInputRef} type="file" accept="image/*" className="hidden" data-testid="input-receipt-file" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleReceiptFile(f); }} />
                 {expForm.receipt_url ? (
                   <div className="relative w-24 h-20 rounded-md overflow-hidden border border-purple-200">
                     <img src={expForm.receipt_url} alt="Receipt" className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => { setExpForm((f) => ({ ...f, receipt_url: "" })); if (receiptInputRef.current) receiptInputRef.current.value = ""; }}
-                      className="absolute top-0.5 right-0.5 bg-black/50 text-white rounded-full p-0.5 hover:bg-black/70"
-                    >
+                    <button type="button" onClick={() => { setExpForm((f) => ({ ...f, receipt_url: "" })); if (receiptInputRef.current) receiptInputRef.current.value = ""; }} className="absolute top-0.5 right-0.5 bg-black/50 text-white rounded-full p-0.5 hover:bg-black/70">
                       <X className="h-3 w-3" />
                     </button>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => receiptInputRef.current?.click()}
-                    className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 py-1"
-                    data-testid="btn-upload-receipt"
-                  >
+                  <button type="button" onClick={() => receiptInputRef.current?.click()} className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 py-1" data-testid="btn-upload-receipt">
                     <ImagePlus className="h-3.5 w-3.5" /> Attach receipt photo
                   </button>
                 )}
-
                 <div className="flex gap-2 pt-1">
                   <Button size="sm" onClick={addExpense} disabled={!expForm.description || addingExp} className="h-7 text-xs bg-purple-600 hover:bg-purple-700" data-testid="btn-add-expense">
                     {addingExp ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3 mr-1" />} Add
@@ -688,12 +1234,10 @@ export default function DailyWorksheet() {
         {/* Section 3 — Team Members */}
         <Section icon={Users} title={t("crewOnSite")} count={ws.teamMembers.length + 1} color="#059669">
           <div className="mb-3 flex flex-wrap gap-2">
-            {/* Logged-in user — always shown, no remove button */}
             <div className="flex items-center gap-1.5 bg-green-100 border border-green-300 text-green-900 text-sm px-3 py-1.5 rounded-full" data-testid="member-chip-self">
-              <span className="font-medium">{user?.name || user?.username}</span>
+              <span className="font-medium">{(user as any)?.name || user?.username}</span>
               <span className="text-xs text-green-600 font-normal">({t("you")})</span>
             </div>
-            {/* Other crew members */}
             {ws.teamMembers.map((m) => (
               <div key={m.id} className="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-800 text-sm px-3 py-1.5 rounded-full" data-testid={`member-chip-${m.id}`}>
                 <span className="font-medium">{m.user_name || m.username}</span>
@@ -705,15 +1249,9 @@ export default function DailyWorksheet() {
               </div>
             ))}
           </div>
-
           {!isSubmitted && availableUsers.length > 0 && (
             <div className="flex gap-2">
-              <select
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                className="flex-1 h-8 text-sm rounded-md border border-input bg-background px-3"
-                data-testid="select-team-member"
-              >
+              <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} className="flex-1 h-8 text-sm rounded-md border border-input bg-background px-3" data-testid="select-team-member">
                 <option value="">{t("addCrewMember")}</option>
                 {availableUsers.map((u) => (
                   <option key={u.id} value={u.id}>{u.name || u.username}</option>
@@ -747,34 +1285,43 @@ export default function DailyWorksheet() {
                   <span>✓</span> Saved
                 </span>
               )}
-              {isSavingNotes && !notesSaved && (
-                <span className="text-xs text-gray-400">Saving…</span>
-              )}
+              {isSavingNotes && !notesSaved && <span className="text-xs text-gray-400">Saving…</span>}
             </div>
           )}
         </Section>
+
+        {/* My Time Log */}
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
+            {tDay("myTimeLogToday")}
+          </h2>
+          {entriesLoading ? (
+            <div className="h-24 rounded-xl bg-gray-100 animate-pulse" />
+          ) : timeEntries.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-gray-400 text-sm">
+                {tDay("noTimeLoggedToday")}
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {timeEntries.map((entry) => (
+                <TimeEntryRow key={entry.id} entry={entry} />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
 
       {/* ── STICKY FOOTER ── */}
       {!isSubmitted && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 z-30">
           <div className="max-w-2xl mx-auto flex gap-3">
-            <Button
-              variant="outline"
-              onClick={saveNotes}
-              disabled={isSavingNotes}
-              className="flex-1 h-10"
-              data-testid="btn-save-draft"
-            >
+            <Button variant="outline" onClick={saveNotes} disabled={isSavingNotes} className="flex-1 h-10" data-testid="btn-save-draft">
               {isSavingNotes ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
               {t("saveDraft")}
             </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex-1 h-10 bg-green-700 hover:bg-green-800"
-              data-testid="btn-submit-worksheet"
-            >
+            <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-1 h-10 bg-green-700 hover:bg-green-800" data-testid="btn-submit-worksheet">
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
               {t("submitWorksheet")}
             </Button>
@@ -789,6 +1336,57 @@ export default function DailyWorksheet() {
           </p>
         </div>
       )}
+
+      {/* ── Work Area Picker Dialog ── */}
+      {pickerJob && (
+        <WorkAreaPickerDialog
+          pickerJob={pickerJob}
+          activeEntry={activeEntry ?? null}
+          onClose={() => setPickerJob(null)}
+          onConfirm={handlePickerConfirm}
+        />
+      )}
+
+      {/* ── Clock-In Confirmation Dialog ── */}
+      <Dialog open={!!pending} onOpenChange={(o) => { if (!o) setPending(null); }}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {activeEntry ? tDay("switchWorkArea") : tDay("clockIn")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 text-sm text-gray-700 space-y-1">
+            {activeEntry && (
+              <p>
+                {tDay("clockOutOfPrefix")}{" "}
+                <span className="font-semibold">{activeEntry.work_area_name || activeEntry.entry_type}</span>{" "}
+                {tDay("andClockInto")}{" "}
+                <span className="font-semibold">{pending?.workAreaName}</span>?
+              </p>
+            )}
+            {!activeEntry && (
+              <p>
+                {tDay("clockIntoPrefix")}{" "}
+                <span className="font-semibold">{pending?.workAreaName}</span>
+                {pending?.jobTitle && <> {tDay("atJob")} <span className="font-semibold">{pending.jobTitle}</span></>}?
+              </p>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPending(null)} data-testid="clock-in-cancel">
+              {tDay("cancel")}
+            </Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={handleClockIn}
+              disabled={clockInMutation.isPending || gpsChecking}
+              data-testid="clock-in-confirm"
+            >
+              {gpsChecking ? tDay("gettingGps") : clockInMutation.isPending ? tDay("clockingIn") : tDay("confirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

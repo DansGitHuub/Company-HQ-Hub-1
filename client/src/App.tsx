@@ -177,7 +177,7 @@ function AppRoutes() {
         <Route path="/estimates/:id/preview" component={EstimatePreview} />
         <Route path="/estimates/:id" component={EstimateDetail} />
         <Route path="/scheduling" component={SchedulingCalendar} />
-        <Route path="/my-day" component={MyDayPage} />
+        <Route path="/my-day"><Redirect to="/daily-worksheet" /></Route>
         <Route path="/my-hours" component={MyHoursPage} />
         <Route path="/pipeline" component={JobPipeline} />
         <Route path="/help" component={Help} />
