@@ -13,7 +13,7 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
     )
     .catch((err) => console.error("[timeRoutes] local_id migration:", err.message));
 
-  // ── Clock In ────────────────────────────────────────────────────────────────
+  // ── Clock In ─────────────────────────work-areas───────────────────────────────────────
   app.post("/api/time/clock-in", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     const { job_id, entry_type, job_work_area_id, work_area_name, localId } = req.body;
