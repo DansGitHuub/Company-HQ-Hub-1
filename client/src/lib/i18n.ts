@@ -56,6 +56,7 @@ function nsMap(locale: typeof en) {
     myHours:        locale.myHours,
     scheduling:     locale.scheduling,
     timeTracking:   locale.timeTracking,
+    dailyWorksheet: locale.dailyWorksheet,
   };
 }
 

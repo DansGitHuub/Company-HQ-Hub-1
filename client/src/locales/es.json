@@ -2053,5 +2053,21 @@
     "typeBreak": "Descanso",
     "typeShopTime": "Tiempo en Taller",
     "typeMeeting": "Reunión"
+  },
+  "dailyWorksheet": {
+    "title": "Hoja de Trabajo Diaria",
+    "notClockedIn": "Actualmente no registrado",
+    "materialsUsed": "Materiales Utilizados",
+    "addMaterial": "Agregar Material",
+    "expenses": "Gastos",
+    "addExpense": "Agregar Gasto",
+    "crewOnSite": "Equipo en Sitio",
+    "you": "Tú",
+    "addCrewMember": "Agregar miembro del equipo...",
+    "notes": "Notas",
+    "notesPlaceholder": "Agregar notas sobre el trabajo de hoy...",
+    "saveNotes": "Guardar Notas",
+    "saveDraft": "Guardar Borrador",
+    "submitWorksheet": "Enviar Hoja de Trabajo"
   }
 }

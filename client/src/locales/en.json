@@ -2053,5 +2053,21 @@
     "typeBreak": "Break",
     "typeShopTime": "Shop Time",
     "typeMeeting": "Meeting"
+  },
+  "dailyWorksheet": {
+    "title": "Daily Worksheet",
+    "notClockedIn": "Not currently clocked in",
+    "materialsUsed": "Materials Used",
+    "addMaterial": "Add Material",
+    "expenses": "Expenses",
+    "addExpense": "Add Expense",
+    "crewOnSite": "Crew on Site",
+    "you": "You",
+    "addCrewMember": "Add crew member...",
+    "notes": "Notes",
+    "notesPlaceholder": "Add any notes about today's work...",
+    "saveNotes": "Save Notes",
+    "saveDraft": "Save Draft",
+    "submitWorksheet": "Submit Worksheet"
   }
 }

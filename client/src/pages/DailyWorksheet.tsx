@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -122,6 +123,7 @@ function Section({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function DailyWorksheet() {
+  const { t } = useTranslation("dailyWorksheet");
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -389,7 +391,7 @@ export default function DailyWorksheet() {
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-2 mb-1">
             <ClipboardList className="h-5 w-5 opacity-80" />
-            <span className="text-xs font-semibold uppercase tracking-wider opacity-80">Daily Worksheet</span>
+            <span className="text-xs font-semibold uppercase tracking-wider opacity-80">{t("title")}</span>
             {isSubmitted && (
               <Badge className="ml-2 bg-white/20 text-white border-white/30 text-xs">Submitted</Badge>
             )}
@@ -426,7 +428,7 @@ export default function DailyWorksheet() {
               </div>
             </div>
           ) : (
-            <p className="mt-2 text-sm opacity-70">Not currently clocked in</p>
+            <p className="mt-2 text-sm opacity-70">{t("notClockedIn")}</p>
           )}
         </div>
       </div>
@@ -435,7 +437,7 @@ export default function DailyWorksheet() {
       <div className="max-w-2xl mx-auto px-4 pt-5 space-y-4">
 
         {/* Section 1 — Materials Used */}
-        <Section icon={PackageOpen} title="Materials Used" count={ws.materials.length} color="#2563eb">
+        <Section icon={PackageOpen} title={t("materialsUsed")} count={ws.materials.length} color="#2563eb">
           {ws.materials.length > 0 && (
             <div className="mb-3 divide-y divide-gray-100 rounded-lg border border-gray-100 overflow-hidden">
               {ws.materials.map((m) => (
@@ -514,14 +516,14 @@ export default function DailyWorksheet() {
               </div>
             ) : (
               <Button size="sm" variant="outline" onClick={() => setShowMatForm(true)} className="h-8 text-xs border-dashed" data-testid="btn-show-material-form">
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Material
+                <Plus className="h-3.5 w-3.5 mr-1" /> {t("addMaterial")}
               </Button>
             )
           )}
         </Section>
 
         {/* Section 2 — Expenses */}
-        <Section icon={Receipt} title="Expenses" count={ws.expenses.length} color="#7c3aed">
+        <Section icon={Receipt} title={t("expenses")} count={ws.expenses.length} color="#7c3aed">
           {ws.expenses.length > 0 && (
             <div className="mb-3 divide-y divide-gray-100 rounded-lg border border-gray-100 overflow-hidden">
               {ws.expenses.map((e) => (
@@ -594,19 +596,19 @@ export default function DailyWorksheet() {
               </div>
             ) : (
               <Button size="sm" variant="outline" onClick={() => setShowExpForm(true)} className="h-8 text-xs border-dashed" data-testid="btn-show-expense-form">
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Expense
+                <Plus className="h-3.5 w-3.5 mr-1" /> {t("addExpense")}
               </Button>
             )
           )}
         </Section>
 
         {/* Section 3 — Team Members */}
-        <Section icon={Users} title="Crew on Site" count={ws.teamMembers.length + 1} color="#059669">
+        <Section icon={Users} title={t("crewOnSite")} count={ws.teamMembers.length + 1} color="#059669">
           <div className="mb-3 flex flex-wrap gap-2">
             {/* Logged-in user — always shown, no remove button */}
             <div className="flex items-center gap-1.5 bg-green-100 border border-green-300 text-green-900 text-sm px-3 py-1.5 rounded-full" data-testid="member-chip-self">
               <span className="font-medium">{user?.name || user?.username}</span>
-              <span className="text-xs text-green-600 font-normal">(You)</span>
+              <span className="text-xs text-green-600 font-normal">({t("you")})</span>
             </div>
             {/* Other crew members */}
             {ws.teamMembers.map((m) => (
@@ -629,7 +631,7 @@ export default function DailyWorksheet() {
                 className="flex-1 h-8 text-sm rounded-md border border-input bg-background px-3"
                 data-testid="select-team-member"
               >
-                <option value="">Add crew member…</option>
+                <option value="">{t("addCrewMember")}</option>
                 {availableUsers.map((u) => (
                   <option key={u.id} value={u.id}>{u.name || u.username}</option>
                 ))}
@@ -642,9 +644,9 @@ export default function DailyWorksheet() {
         </Section>
 
         {/* Section 4 — Notes */}
-        <Section icon={StickyNote} title="Notes" color="#d97706">
+        <Section icon={StickyNote} title={t("notes")} color="#d97706">
           <Textarea
-            placeholder="Add any notes about today's work…"
+            placeholder={t("notesPlaceholder")}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={4}
@@ -655,7 +657,7 @@ export default function DailyWorksheet() {
           {!isSubmitted && (
             <div className="flex items-center gap-3 mt-2">
               <Button size="sm" variant="outline" onClick={saveNotes} disabled={isSavingNotes} className="h-7 text-xs" data-testid="btn-save-notes">
-                {isSavingNotes ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />} Save Notes
+                {isSavingNotes ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />} {t("saveNotes")}
               </Button>
               {notesSaved && (
                 <span className="text-xs text-green-600 font-medium flex items-center gap-1" data-testid="text-notes-saved">
@@ -682,7 +684,7 @@ export default function DailyWorksheet() {
               data-testid="btn-save-draft"
             >
               {isSavingNotes ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-              Save Draft
+              {t("saveDraft")}
             </Button>
             <Button
               onClick={handleSubmit}
@@ -691,7 +693,7 @@ export default function DailyWorksheet() {
               data-testid="btn-submit-worksheet"
             >
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-              Submit Worksheet
+              {t("submitWorksheet")}
             </Button>
           </div>
         </div>
