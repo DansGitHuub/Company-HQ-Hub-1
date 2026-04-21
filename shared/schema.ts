@@ -2942,6 +2942,9 @@ export const dailyWorksheets = pgTable("daily_worksheets", {
 
   // Link to structured worksheet session
   worksheetSessionId: integer("worksheet_session_id"),
+
+  // Linked job (optional)
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
 });
 
 export const insertDailyWorksheetSchema = createInsertSchema(dailyWorksheets).omit({ id: true, createdAt: true, updatedAt: true, submittedAt: true });

@@ -239,6 +239,7 @@ export function registerDailyWorksheetRoutes(app: Express, requireAuth: RequestH
           foreman_name, foreman_arrival_time, foreman_departure_time, foreman_total_hours, foreman_notes,
           team_members, work_items, punch_items, chemical_log, equipment_log,
           additional_notes, signature_name, date_signed,
+          job_id,
           created_at, updated_at
         ) VALUES (
           gen_random_uuid(), $1, 'draft', $2,
@@ -246,6 +247,7 @@ export function registerDailyWorksheetRoutes(app: Express, requireAuth: RequestH
           $10, $11, $12, $13, $14,
           $15, $16, $17, $18, $19,
           $20, $21, $22,
+          $23,
           NOW(), NOW()
         ) RETURNING *`,
         [
@@ -262,6 +264,7 @@ export function registerDailyWorksheetRoutes(app: Express, requireAuth: RequestH
           JSON.stringify(body.chemicalLog || {}),
           JSON.stringify(body.equipmentLog || {}),
           body.additionalNotes || null, body.signatureName || null, body.dateSigned || null,
+          body.jobId || null,
         ]
       );
       res.json(result.rows[0]);
@@ -296,8 +299,9 @@ export function registerDailyWorksheetRoutes(app: Express, requireAuth: RequestH
           team_members = $14, work_items = $15, punch_items = $16,
           chemical_log = $17, equipment_log = $18,
           additional_notes = $19, signature_name = $20, date_signed = $21,
+          job_id = $22,
           updated_at = NOW()
-        WHERE id = $22 RETURNING *`,
+        WHERE id = $23 RETURNING *`,
         [
           body.weatherConditions || [],
           body.customerName || "", body.date || "", body.dayOfWeek || null,
@@ -311,6 +315,7 @@ export function registerDailyWorksheetRoutes(app: Express, requireAuth: RequestH
           JSON.stringify(body.chemicalLog || {}),
           JSON.stringify(body.equipmentLog || {}),
           body.additionalNotes || null, body.signatureName || null, body.dateSigned || null,
+          body.jobId || null,
           id,
         ]
       );
