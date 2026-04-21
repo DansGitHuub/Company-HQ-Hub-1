@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ClipboardList, Plus, Trash2, Send, Save, Loader2, PackageOpen,
   Receipt, Users, StickyNote, Clock, Briefcase, ChevronDown, ChevronRight,
-  ImagePlus, X,
+  ImagePlus, X, HardHat,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -67,6 +67,13 @@ interface CrewUser {
   name: string;
   username: string;
   role: string;
+}
+
+interface Job {
+  id: string;
+  title: string | null;
+  client: string;
+  status: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -164,6 +171,47 @@ export default function DailyWorksheet() {
     queryFn: () => fetch("/api/users").then((r) => r.json()),
     select: (data) => data.filter((u) => u.role !== "Customer"),
   });
+
+  // ── Jobs list for job selector ────────────────────────────────────────────────
+  const { data: jobs = [] } = useQuery<Job[]>({
+    queryKey: ["/api/jobs", "active-worksheet"],
+    queryFn: async () => {
+      const res = await fetch("/api/jobs?status=scheduled,in_progress", { credentials: "include" });
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+  });
+
+  // ── Selected job state (initialized from ws.job_id or active clock-in) ────────
+  const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [isSavingJob, setIsSavingJob] = useState(false);
+  const jobInitialized = useRef(false);
+
+  useEffect(() => {
+    if (ws && !jobInitialized.current) {
+      jobInitialized.current = true;
+      if (ws.job_id) {
+        setSelectedJobId(ws.job_id);
+      } else if (activeEntry?.job_id) {
+        setSelectedJobId(activeEntry.job_id);
+        apiRequest("PATCH", `/api/worksheets/${ws.id}`, { job_id: activeEntry.job_id }).catch(() => {});
+      }
+    }
+  }, [ws, activeEntry]);
+
+  const handleJobChange = async (jobId: string) => {
+    if (!ws) return;
+    setSelectedJobId(jobId);
+    setIsSavingJob(true);
+    try {
+      await apiRequest("PATCH", `/api/worksheets/${ws.id}`, { job_id: jobId || null });
+      qc.invalidateQueries({ queryKey: ["/api/worksheets/today"] });
+    } catch (err: any) {
+      toast({ title: "Error saving job", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSavingJob(false);
+    }
+  };
 
   // ── Notes state (local, saved on blur or submit) ─────────────────────────────
   const [notes, setNotes] = useState("");
@@ -435,6 +483,41 @@ export default function DailyWorksheet() {
 
       {/* ── SECTIONS ── */}
       <div className="max-w-2xl mx-auto px-4 pt-5 space-y-4">
+
+        {/* Job Selector Card */}
+        <Card className="overflow-hidden">
+          <CardHeader
+            className="py-3 px-4 flex flex-row items-center gap-2"
+            style={{ background: "#16a34a18", borderBottom: "2px solid #16a34a30" }}
+          >
+            <div className="p-1.5 rounded-md" style={{ background: "#16a34a" }}>
+              <HardHat className="h-3.5 w-3.5 text-white" />
+            </div>
+            <CardTitle className="text-sm font-semibold" style={{ color: "#16a34a" }}>
+              Job
+            </CardTitle>
+            {activeEntry?.job_id && activeEntry.job_id === selectedJobId && (
+              <span className="text-xs text-green-600 font-normal ml-1">(from clock-in)</span>
+            )}
+            {isSavingJob && <Loader2 className="h-3.5 w-3.5 animate-spin text-green-600 ml-auto" />}
+          </CardHeader>
+          <CardContent className="p-4">
+            <select
+              value={selectedJobId}
+              onChange={(e) => handleJobChange(e.target.value)}
+              disabled={isSubmitted || isSavingJob}
+              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+              data-testid="select-worksheet-job"
+            >
+              <option value="">No specific job</option>
+              {jobs.map((j) => (
+                <option key={j.id} value={j.id}>
+                  {j.title ? `${j.client} — ${j.title}` : j.client}
+                </option>
+              ))}
+            </select>
+          </CardContent>
+        </Card>
 
         {/* Section 1 — Materials Used */}
         <Section icon={PackageOpen} title={t("materialsUsed")} count={ws.materials.length} color="#2563eb">

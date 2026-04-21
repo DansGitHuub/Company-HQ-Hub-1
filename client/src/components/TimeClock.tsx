@@ -28,8 +28,13 @@ interface JobWorkArea {
   id: string; name: string; estimated_hours: string | null; status: string;
 }
 
+interface WorkAreasResponse {
+  globalTypes: WorkAreaType[];
+  jobAreas: JobWorkArea[];
+}
+
 // ── General (non-job) options always shown ────────────────────────────────────
-const GENERAL_OPTIONS = ["Drive Time", "Shop Time", "Meeting", "Break"];
+const GENERAL_OPTIONS = ["On Site", "Drive Time", "Shop Time", "Meeting", "Break"];
 
 // ── Elapsed time hook ─────────────────────────────────────────────────────────
 function useElapsed(clockIn: string | null) {
@@ -127,25 +132,21 @@ export default function TimeClock() {
     enabled: open && !activeEntry,
   });
 
-  // Work areas for the selected job
-  const { data: jobWorkAreas = [] } = useQuery<JobWorkArea[]>({
-    queryKey: ["/api/jobs", selectedJob, "work-areas"],
+  // Unified work areas — fetched whenever the popover is open (re-fetches when job changes)
+  const { data: workAreasData } = useQuery<WorkAreasResponse>({
+    queryKey: ["/api/work-areas", selectedJob],
     queryFn: async () => {
-      const res = await fetch(`/api/jobs/${selectedJob}/work-areas`, { credentials: "include" });
-      return res.json();
-    },
-    enabled: open && !!selectedJob,
-  });
-
-  // All work area types (for fallback when no job selected or job has no areas)
-  const { data: allTypes = [] } = useQuery<WorkAreaType[]>({
-    queryKey: ["/api/work-area-types"],
-    queryFn: async () => {
-      const res = await fetch("/api/work-area-types", { credentials: "include" });
+      const url = selectedJob
+        ? `/api/work-areas?jobId=${selectedJob}`
+        : "/api/work-areas";
+      const res = await fetch(url, { credentials: "include" });
       return res.json();
     },
     enabled: open && !activeEntry,
   });
+
+  const allTypes = workAreasData?.globalTypes ?? [];
+  const jobWorkAreas = workAreasData?.jobAreas ?? [];
 
   const elapsed = useElapsed(activeEntry?.clock_in ?? null);
   useGpsPinger(activeEntry, setGpsLost);

@@ -207,17 +207,20 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
 
   // ── PATCH /api/worksheets/:id ─────────────────────────────────────────────────
   app.patch("/api/worksheets/:id", requireAuth, async (req, res) => {
-    const { notes, job_id, status, signature_url } = req.body;
+    const { notes, status, signature_url } = req.body;
+    // job_id: if key is present in body (even as null/empty), update it; otherwise keep existing
+    const hasJobId = "job_id" in req.body;
+    const jobIdValue = req.body.job_id || null;
     try {
       await pool.query(
         `UPDATE worksheets SET
           notes          = COALESCE($1, notes),
-          job_id         = COALESCE($2, job_id),
+          job_id         = ${hasJobId ? "$2" : "job_id"},
           status         = COALESCE($3, status),
           signature_url  = COALESCE($5, signature_url),
           updated_at     = NOW()
          WHERE id = $4`,
-        [notes ?? null, job_id ?? null, status ?? null, req.params.id, signature_url ?? null]
+        [notes ?? null, jobIdValue, status ?? null, req.params.id, signature_url ?? null]
       );
       const full = await fetchWorksheetFull(req.params.id);
       return res.json(full);

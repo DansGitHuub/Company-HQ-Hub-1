@@ -107,6 +107,30 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
     }
   });
 
+  // ── GET /api/work-areas?jobId=X ─────────────────────────────────────────
+  // Unified endpoint: returns { globalTypes, jobAreas }
+  // globalTypes: all active work_area_types
+  // jobAreas: job-specific areas when jobId is provided, else []
+  app.get("/api/work-areas", requireAuth, async (req, res) => {
+    const jobId = req.query.jobId as string | undefined;
+    try {
+      const [globalRes, jobRes] = await Promise.all([
+        pool.query(
+          `SELECT id, name, division, sort_order FROM work_area_types WHERE is_active = true ORDER BY division, sort_order, name`
+        ),
+        jobId
+          ? pool.query(
+              `SELECT id, name, estimated_hours, status FROM job_work_areas WHERE job_id = $1 AND is_active = true ORDER BY sort_order, name`,
+              [jobId]
+            )
+          : Promise.resolve({ rows: [] as any[] }),
+      ]);
+      return res.json({ globalTypes: globalRes.rows, jobAreas: jobRes.rows });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── GET /api/jobs/:id/work-areas ─────────────────────────────────────────
   // Soft-deleted rows (is_active=false) are always excluded.
   // ?active=true        → also exclude completed areas
