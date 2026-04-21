@@ -8,6 +8,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -2244,8 +2245,8 @@ function CustomerSuggestionsPanel() {
                     {editingNote?.id === s.id ? (
                       <div className="space-y-2">
                         <Textarea
-                          value={editingNote.note}
-                          onChange={e => setEditingNote({ ...editingNote, note: e.target.value })}
+                          value={editingNote!.note}
+                          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditingNote({ ...editingNote!, note: e.target.value })}
                           placeholder="Add a note for the customer..."
                           rows={2}
                           data-testid={`note-input-${s.id}`}
@@ -2254,7 +2255,7 @@ function CustomerSuggestionsPanel() {
                           <Button
                             size="sm"
                             onClick={() => {
-                              updateMutation.mutate({ id: s.id, adminNote: editingNote.note });
+                              updateMutation.mutate({ id: s.id, adminNote: editingNote!.note });
                               setEditingNote(null);
                             }}
                             data-testid={`save-note-${s.id}`}

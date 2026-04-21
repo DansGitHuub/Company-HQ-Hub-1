@@ -1,5 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import OpenAI from "openai";
+
+type AuthRequest = Request & { user?: any };
 import { pool } from "./db";
 import { allToolDefinitions, executeTool, shouldRequireConfirmation, getToolNames } from "./assistantTools";
 import { speechToText, textToSpeech } from "./replit_integrations/audio/client";
@@ -348,9 +350,9 @@ export function registerAssistantRoutes(app: Express) {
 
       let tools = allToolDefinitions;
       if (user.role === "Customer") {
-        tools = allToolDefinitions.filter(t => CUSTOMER_TOOLS.includes(t.function.name));
+        tools = allToolDefinitions.filter(t => CUSTOMER_TOOLS.includes((t as any).function.name));
       } else if (agentContext.allowedTools.length > 0) {
-        tools = allToolDefinitions.filter(t => agentContext.allowedTools.includes(t.function.name));
+        tools = allToolDefinitions.filter(t => agentContext.allowedTools.includes((t as any).function.name));
         if (tools.length === 0) tools = allToolDefinitions;
       }
 
@@ -371,12 +373,12 @@ export function registerAssistantRoutes(app: Express) {
 
       if (choice.finish_reason === "tool_calls" && choice.message.tool_calls) {
         const toolCall = choice.message.tool_calls[0];
-        const toolName = toolCall.function.name;
+        const toolName = (toolCall as any).function.name;
         let toolArgs: any;
         try {
-          toolArgs = JSON.parse(toolCall.function.arguments);
+          toolArgs = JSON.parse((toolCall as any).function.arguments);
         } catch {
-          console.error("[assistant] Failed to parse tool arguments:", toolCall.function.arguments);
+          console.error("[assistant] Failed to parse tool arguments:", (toolCall as any).function.arguments);
           return res.json({ response: "I tried to perform an action but encountered an issue. Could you rephrase your request?", type: "text" });
         }
 

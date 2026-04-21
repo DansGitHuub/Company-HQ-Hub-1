@@ -67,9 +67,9 @@ export async function queueEvent(
     serverId: null,
     error: null,
   };
-  return idbReq<number>((db) =>
+  return idbReq<IDBValidKey>((db) =>
     db.transaction("timeEvents", "readwrite").objectStore("timeEvents").add(event)
-  );
+  ) as Promise<number>;
 }
 
 export async function getPendingEvents(): Promise<TimeEvent[]> {

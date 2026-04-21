@@ -47,7 +47,7 @@ export function registerNotificationPreferenceRoutes(app: Express): void {
       const normalized = From.replace(/\s+/g, "");
       const keyword = (Body || "").trim().toUpperCase();
       if (["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"].includes(keyword)) {
-        const allUsers = await storage.getUsers();
+        const allUsers = await storage.getAllUsers();
         const matching = allUsers.filter((u: any) => {
           if (!u.phone) return false;
           const d = u.phone.replace(/\D/g, ""); const fd = normalized.replace(/\D/g, "");
@@ -66,7 +66,7 @@ export function registerNotificationPreferenceRoutes(app: Express): void {
       const normalized = From.replace(/\s+/g, "");
       const keyword = (Body || "").trim().toUpperCase();
       if (["START", "UNSTOP", "YES"].includes(keyword)) {
-        const allUsers = await storage.getUsers();
+        const allUsers = await storage.getAllUsers();
         const matching = allUsers.filter((u: any) => {
           if (!u.phone) return false;
           const d = u.phone.replace(/\D/g, ""); const fd = normalized.replace(/\D/g, "");

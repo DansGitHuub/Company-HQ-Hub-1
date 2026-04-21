@@ -838,5 +838,5 @@ function checkTaskAssignment(creatorRole: string, assigneeRole: string): { allow
 }
 
 export function getToolNames(): string[] {
-  return allToolDefinitions.map(t => t.function.name);
+  return allToolDefinitions.map(t => (t as any).function.name);
 }

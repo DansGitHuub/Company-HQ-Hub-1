@@ -62,11 +62,11 @@ function FormList() {
   const { data: assignments = [] } = useQuery({
     queryKey: ["/api/onboarding-forms", user?.id],
     queryFn: async () => {
-      if (!user?.employeeId) return [];
-      const res = await apiRequest("GET", `/api/onboarding-forms?employeeId=${user.employeeId}`);
+      if (!(user as any)?.employeeId) return [];
+      const res = await apiRequest("GET", `/api/onboarding-forms?employeeId=${(user as any).employeeId}`);
       return res.json();
     },
-    enabled: !!user?.employeeId,
+    enabled: !!(user as any)?.employeeId,
   });
 
   const pendingForms = assignments.filter((a: any) => ["draft", "pending_review"].includes(a.status));
@@ -235,7 +235,7 @@ function FormRenderer({ formType, submissionId }: { formType: string; submission
         <React.Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
           <FormComponent
             submissionId={submissionId !== "new" ? submissionId : undefined}
-            employeeId={user?.employeeId || submission?.employeeId || ""}
+            employeeId={(user as any)?.employeeId || (submission as any)?.employeeId || ""}
             onComplete={() => navigate("/onboarding-forms")}
             readOnly={submission?.status === "approved"}
           />

@@ -96,7 +96,7 @@ export async function registerRoutes(
   // Global search endpoint - searches everything based on user role
   app.get("/api/search", requireAuth, async (req, res) => {
     try {
-      const query = (req.query.q as string || "").toLowerCase().trim();
+      const query = (String(req.query.q) as string || "").toLowerCase().trim();
       if (!query) {
         return res.json([]);
       }
@@ -1194,7 +1194,7 @@ Respond with a JSON object:
   // Get current user's quiz attempts
   app.get("/api/quiz-attempts/me", requireAuth, async (req, res) => {
     try {
-      const quizId = req.query.quizId as string | undefined;
+      const quizId = String(req.query.quizId) as string | undefined;
       const attempts = await storage.getUserQuizAttempts((req.user as any).id, quizId);
       res.json(attempts);
     } catch (err) {
@@ -3390,8 +3390,8 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
   app.delete("/api/material-categories/:id", requireAdmin, async (req, res) => {
     try {
       const id = req.params.id as string;
-      const moveTo = req.query.moveTo as string | undefined;
-      const deleteWithMaterials = req.query.deleteWithMaterials as string | undefined;
+      const moveTo = String(req.query.moveTo) as string | undefined;
+      const deleteWithMaterials = String(req.query.deleteWithMaterials) as string | undefined;
       
       // Check if category has materials
       const materials = await storage.getMaterialsByCategory(id);
@@ -3502,7 +3502,7 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
   app.delete("/api/category-fields/:id", requireAdmin, async (req, res) => {
     try {
       const id = req.params.id as string;
-      const hideOnly = req.query.hideOnly as string | undefined;
+      const hideOnly = String(req.query.hideOnly) as string | undefined;
       
       if (hideOnly === "true") {
         // Just hide the field, keep existing data
@@ -3694,7 +3694,7 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
   // ── Class Pricing Defaults ──────────────────────────────────────────────────
   app.get("/api/class-pricing-defaults", requireAuth, async (req, res) => {
     try {
-      const year = parseInt(req.query.year as string || String(new Date().getFullYear()), 10);
+      const year = parseInt(String(req.query.year) as string || String(new Date().getFullYear()), 10);
       const { rows } = await pool.query(
         `SELECT * FROM class_pricing_defaults WHERE year = $1 ORDER BY class_id`,
         [year]
@@ -3707,7 +3707,7 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
 
   app.get("/api/class-pricing-defaults/:classId", requireAuth, async (req, res) => {
     try {
-      const year = parseInt(req.query.year as string || String(new Date().getFullYear()), 10);
+      const year = parseInt(String(req.query.year) as string || String(new Date().getFullYear()), 10);
       const { rows } = await pool.query(
         `SELECT * FROM class_pricing_defaults WHERE class_id = $1 AND year = $2`,
         [req.params.classId, year]
@@ -3907,8 +3907,8 @@ Generate detailed information for this landscaping material.`;
   // Product image web search (DuckDuckGo + AI fallback)
   app.get("/api/image-search", requireAuth, async (req, res) => {
     try {
-      const query = req.query.q as string;
-      const category = req.query.category as string | undefined;
+      const query = String(req.query.q) as string;
+      const category = String(req.query.category) as string | undefined;
       if (!query) return res.status(400).json({ message: "Query required" });
       const result = await searchProductImages(query, category);
       if (result.needsReview && result.source === "none") {
@@ -3932,7 +3932,7 @@ Generate detailed information for this landscaping material.`;
       res.json(result);
     } catch (err: any) {
       console.error("[image-search]", err.message);
-      res.json({ images: [], source: "none", needsReview: true, searchQuery: req.query.q || "" });
+      res.json({ images: [], source: "none", needsReview: true, searchQuery: String(req.query.q) || "" });
     }
   });
 
@@ -5719,7 +5719,7 @@ SECTION GENERATION RULES:
   // Builder Forms (Form Builder 1)
   app.get("/api/builder-forms", requireAuth, async (req, res) => {
     try {
-      const archived = req.query.archived === "true";
+      const archived = String(req.query.archived) === "true";
       const forms = await storage.getBuilderForms(archived);
       res.json(forms);
     } catch (err) {
@@ -6353,7 +6353,7 @@ SECTION GENERATION RULES:
   // Maintenance Schedule routes
   app.get("/api/maintenance-schedules", requireAuth, async (req, res) => {
     try {
-      const equipmentId = req.query.equipmentId as string | undefined;
+      const equipmentId = String(req.query.equipmentId) as string | undefined;
       const schedules = await storage.getMaintenanceSchedules(equipmentId);
       res.json(schedules);
     } catch (err) {
@@ -6407,7 +6407,7 @@ SECTION GENERATION RULES:
   // Maintenance Log routes
   app.get("/api/maintenance-logs", requireAuth, async (req, res) => {
     try {
-      const equipmentId = req.query.equipmentId as string | undefined;
+      const equipmentId = String(req.query.equipmentId) as string | undefined;
       const logs = await storage.getMaintenanceLogs(equipmentId);
       res.json(logs);
     } catch (err) {
@@ -6574,7 +6574,7 @@ SECTION GENERATION RULES:
   // Customer Resources routes
   app.get("/api/resources", requireAuth, async (req, res) => {
     try {
-      const type = req.query.type as string | undefined;
+      const type = String(req.query.type) as string | undefined;
       const resources = await storage.getCustomerResources(type);
       const isAdmin = req.user!.role === "Admin" || req.user!.role === "Manager";
       const filteredResources = isAdmin ? resources : resources.filter(r => r.isPublished);
@@ -8260,7 +8260,7 @@ Provide accurate information based on publicly available documentation.`;
   // Search help articles
   app.get("/api/help/articles/search", requireAuth, async (req, res) => {
     try {
-      const query = req.query.q as string || "";
+      const query = String(req.query.q) as string || "";
       if (!query.trim()) return res.json([]);
       const articles = await storage.searchHelpArticles(query, req.user!.role);
       res.json(articles);
@@ -8384,7 +8384,7 @@ Provide accurate information based on publicly available documentation.`;
   // Admin: Get all article reports
   app.get("/api/help/reports", requireAuth, requireRole(["Admin"]), async (req, res) => {
     try {
-      const status = req.query.status as string | undefined;
+      const status = String(req.query.status) as string | undefined;
       const reports = await storage.getArticleReports(status);
       res.json(reports);
     } catch (err) {
@@ -8493,8 +8493,8 @@ Provide accurate information based on publicly available documentation.`;
   // This matches the GOOGLE_REDIRECT_URI for production (companyhq.app/auth/google/callback)
   app.get("/auth/google/callback", async (req, res) => {
     try {
-      const code = req.query.code as string;
-      const userId = req.query.state as string;
+      const code = String(req.query.code) as string;
+      const userId = String(req.query.state) as string;
 
       if (!code || !userId) {
         return res.redirect("/calendar?google_error=missing_params");
@@ -8906,10 +8906,10 @@ Provide accurate information based on publicly available documentation.`;
   app.get("/api/admin/diagnostics/errors", requireAuth, requireMasterAdmin, async (req, res) => {
     try {
       const filters: any = {};
-      if (req.query.severity) filters.severity = req.query.severity as string;
-      if (req.query.feature) filters.feature = req.query.feature as string;
-      if (req.query.isResolved !== undefined) filters.isResolved = req.query.isResolved === "true";
-      if (req.query.limit) filters.limit = parseInt(req.query.limit as string);
+      if (String(req.query.severity)) filters.severity = String(req.query.severity) as string;
+      if (String(req.query.feature)) filters.feature = String(req.query.feature) as string;
+      if (String(req.query.isResolved) !== undefined) filters.isResolved = String(req.query.isResolved) === "true";
+      if (String(req.query.limit)) filters.limit = parseInt(String(req.query.limit) as string);
       
       const errors = await storage.getErrorLogs(filters);
       res.json(errors);
@@ -9610,7 +9610,7 @@ Provide accurate information based on publicly available documentation.`;
       if (user.role !== "Admin" && user.role !== "Manager") {
         return res.status(403).json({ message: "Insufficient permissions" });
       }
-      const role = req.query.role as string | undefined;
+      const role = String(req.query.role) as string | undefined;
       const conditions = [];
       if (role) conditions.push(eq(users.role, role));
       const result = await db.select({ id: users.id, name: users.name, username: users.username, role: users.role })

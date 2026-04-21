@@ -1063,7 +1063,7 @@ function ApplicationLinksPanel() {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.message || "Failed to send");
-      setSentIds(prev => new Set([...prev, linkId]));
+      setSentIds(prev => new Set([...Array.from(prev), linkId]));
       setEmailOpenId(null);
       setEmailInputs(prev => ({ ...prev, [linkId]: "" }));
       toast({ title: "Email sent!", description: `Application link sent to ${email}` });

@@ -245,7 +245,7 @@ export function registerCalendarRoutes(app: Express, requireAuth: any) {
       const user = req.user!;
       const eventId = req.params.id;
 
-      const existing = await db.select().from(calendarEvents).where(eq(calendarEvents.id, eventId));
+      const existing = await db.select().from(calendarEvents).where(eq(calendarEvents.id, String(eventId)));
       if (!existing.length) return res.status(404).json({ message: "Event not found" });
 
       const event = existing[0];
@@ -271,10 +271,10 @@ export function registerCalendarRoutes(app: Express, requireAuth: any) {
 
       updates.updatedAt = new Date();
 
-      const [updated] = await db.update(calendarEvents).set(updates).where(eq(calendarEvents.id, eventId)).returning();
+      const [updated] = await db.update(calendarEvents).set(updates).where(eq(calendarEvents.id, String(eventId))).returning();
 
       const targetUser = updated.assignedTo
-        ? (await db.select().from(users).where(eq(users.id, updated.assignedTo)))[0]
+        ? (await db.select().from(users).where(eq(users.id, updated.assignedTo!)))[0]
         : (await db.select().from(users).where(eq(users.id, updated.createdBy)))[0];
 
       if (targetUser) {
@@ -294,7 +294,7 @@ export function registerCalendarRoutes(app: Express, requireAuth: any) {
       const user = req.user!;
       const eventId = req.params.id;
 
-      const existing = await db.select().from(calendarEvents).where(eq(calendarEvents.id, eventId));
+      const existing = await db.select().from(calendarEvents).where(eq(calendarEvents.id, String(eventId)));
       if (!existing.length) return res.status(404).json({ message: "Event not found" });
 
       const event = existing[0];
@@ -303,14 +303,14 @@ export function registerCalendarRoutes(app: Express, requireAuth: any) {
       }
 
       const targetUser = event.assignedTo
-        ? (await db.select().from(users).where(eq(users.id, event.assignedTo)))[0]
+        ? (await db.select().from(users).where(eq(users.id, event.assignedTo!)))[0]
         : (await db.select().from(users).where(eq(users.id, event.createdBy)))[0];
 
       if (targetUser) {
         await pushToGoogle(targetUser, event, "delete");
       }
 
-      await db.delete(calendarEvents).where(eq(calendarEvents.id, eventId));
+      await db.delete(calendarEvents).where(eq(calendarEvents.id, String(eventId)));
       res.json({ message: "Event deleted" });
     } catch (err) {
       console.error("[calendar] Error deleting event:", err);

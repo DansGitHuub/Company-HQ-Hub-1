@@ -195,6 +195,7 @@ export default function SharedDocument() {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
       <header className="bg-[#1E3A2F] text-white py-4 px-6 shadow-lg">

@@ -386,7 +386,6 @@ async function executeHireFlow(candidateId: string, startDate?: string, sendEmai
         email: candidate.email || `${username}@chapinlandscapes.com`,
         name: candidate.name,
         role: "Crew",
-        storedPassword: tempPassword,
       });
       await storage.updateCandidate(candidateId, { userId: newUser.id });
       await storage.updateEmployee(employee.id, { userId: newUser.id });
@@ -547,7 +546,7 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
       const emp = result.rows[0];
       res.json({
         id: emp.id,
-        userId: emp.user_id,
+        userId: emp.userId,
         firstName: emp.first_name,
         lastName: emp.last_name,
         jobTitle: emp.job_title,
@@ -593,7 +592,7 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
       const emp = await storage.getEmployee(req.params.id);
       if (!emp) return res.status(404).json({ message: "Employee not found" });
       const isAdmin = ["Admin", "Manager"].includes(role) || isMasterAdmin;
-      const isOwn = emp.user_id === req.user?.id;
+      const isOwn = emp.userId === req.user?.id;
       if (!isAdmin && !isOwn) return res.status(403).json({ message: "Access denied" });
       res.json(emp);
     } catch (err: any) {
@@ -619,7 +618,7 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
       const emp = await storage.getEmployee(req.params.id);
       if (!emp) return res.status(404).json({ message: "Employee not found" });
       const isAdmin = ["Admin", "Manager"].includes(role) || isMasterAdmin;
-      const isOwn = emp.user_id === req.user?.id;
+      const isOwn = emp.userId === req.user?.id;
       if (!isAdmin && !isOwn) return res.status(403).json({ message: "Access denied" });
       const updated = await storage.updateEmployee(req.params.id, req.body);
       res.json(updated);
@@ -887,7 +886,6 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
         email: candidate.email || `${username}@chapinlandscapes.com`,
         name: candidate.name,
         role: "Crew",
-        storedPassword: tempPassword,
       });
 
       // Link user to candidate

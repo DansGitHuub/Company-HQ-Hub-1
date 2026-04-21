@@ -714,7 +714,7 @@ function TaskDetail({ taskId, onClose, currentUser }: { taskId: string; onClose:
                   <div>
                     <span className="text-gray-500">Due</span>
                     <p className={`font-medium ${task.isOverdue ? "text-red-600" : "text-gray-900 dark:text-white"}`} data-testid="task-detail-due">
-                      {formatDate(task.dueDate)} {task.dueTime || ""}
+                      {formatDate(task.dueDate, t)} {task.dueTime || ""}
                     </p>
                   </div>
                 )}

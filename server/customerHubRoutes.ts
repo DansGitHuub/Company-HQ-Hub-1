@@ -145,9 +145,8 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
       const thread = await storage.createMessagingThread({
         customerId: req.user.id,
         subject: `Document Request: ${documentType || "General"}`,
-        status: "open",
         priority: "normal",
-      });
+      } as any);
       await storage.createThreadMessage({
         threadId: thread.id,
         senderId: req.user.id,
@@ -217,9 +216,8 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
       const thread = await storage.createMessagingThread({
         customerId: req.user.id,
         subject: topic || "General Inquiry",
-        status: "open",
         priority: "normal",
-      });
+      } as any);
       await storage.createThreadMessage({
         threadId: thread.id,
         senderId: req.user.id,

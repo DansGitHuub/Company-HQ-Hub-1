@@ -182,25 +182,11 @@ export function registerAgreementRoutes(app: Express, requireAuth: any, requireA
       const signingUrl = `${getAppUrl()}/agreement/${token}`;
 
       if (emp.email) {
-        await sendEmail({
-          to: emp.email,
-          subject: `Your ${tmpl.year} Employment Agreement – Chapin Landscapes`,
-          html: `
-            <div style="font-family:sans-serif; max-width:600px; margin:0 auto; padding:24px;">
-              <h2 style="color:#1a472a;">Employment Agreement Ready to Sign</h2>
-              <p>Hi ${employeeName},</p>
-              <p>Your <strong>${tmpl.year} ${tmpl.position_title} Employment Agreement</strong> with Chapin Landscapes is ready for your review and signature.</p>
-              <p>Please click the button below to read the full agreement and sign digitally. This link is valid for 30 days.</p>
-              <div style="text-align:center; margin:32px 0;">
-                <a href="${signingUrl}" style="background:#1a472a; color:#fff; padding:14px 32px; border-radius:6px; text-decoration:none; font-weight:600;">
-                  Review &amp; Sign Agreement
-                </a>
-              </div>
-              <p style="color:#666; font-size:0.875rem;">If you have any questions, please reach out to your manager or HR.</p>
-              <p style="color:#666; font-size:0.875rem;">— Chapin Landscapes Team</p>
-            </div>
-          `,
-        });
+        await sendEmail(
+          emp.email,
+          `Your ${tmpl.year} Employment Agreement – Chapin Landscapes`,
+          `<div style="font-family:sans-serif; max-width:600px; margin:0 auto; padding:24px;"><h2 style="color:#1a472a;">Employment Agreement Ready to Sign</h2><p>Hi ${employeeName},</p><p>Your <strong>${tmpl.year} ${tmpl.position_title} Employment Agreement</strong> with Chapin Landscapes is ready for your review and signature.</p><p>Please click the button below to read the full agreement and sign digitally. This link is valid for 30 days.</p><div style="text-align:center; margin:32px 0;"><a href="${signingUrl}" style="background:#1a472a; color:#fff; padding:14px 32px; border-radius:6px; text-decoration:none; font-weight:600;">Review &amp; Sign Agreement</a></div><p style="color:#666; font-size:0.875rem;">If you have any questions, please reach out to your manager or HR.</p><p style="color:#666; font-size:0.875rem;">— Chapin Landscapes Team</p></div>`
+        );
       }
 
       res.status(201).json({ id: row.rows[0].id, signingUrl });
@@ -287,11 +273,11 @@ export function registerAgreementRoutes(app: Express, requireAuth: any, requireA
       const admins = await db.execute(sql`SELECT email, name FROM users WHERE role IN ('Admin','Manager') AND is_active = true`);
       for (const admin of admins.rows as any[]) {
         if (admin.email) {
-          await sendEmail({
-            to: admin.email,
-            subject: `Agreement Signed – ${empName}`,
-            html: `<div style="font-family:sans-serif;padding:20px;"><p><strong>${empName}</strong> has signed their ${empData?.year} ${empData?.position_title} Employment Agreement. You can view the signed copy in their employee file.</p></div>`,
-          });
+          await sendEmail(
+            admin.email,
+            `Agreement Signed – ${empName}`,
+            `<div style="font-family:sans-serif;padding:20px;"><p><strong>${empName}</strong> has signed their ${empData?.year} ${empData?.position_title} Employment Agreement. You can view the signed copy in their employee file.</p></div>`
+          );
         }
       }
 

@@ -14,7 +14,7 @@ export function registerTaskRoutes(app: Express) {
       const users = await storage.getAllUsers();
       const assignable = users
         .filter(u => u.isActive && u.role !== "Customer")
-        .map(u => ({ id: u.id, name: u.name, role: u.role, username: u.username, profilePictureUrl: u.profilePictureUrl }));
+        .map(u => ({ id: u.id, name: u.name, role: u.role, username: u.username, profilePictureUrl: u.profilePicture }));
       res.json(assignable);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -131,7 +131,7 @@ export function registerTaskRoutes(app: Express) {
       const commentUsers = await Promise.all(
         comments.map(async c => {
           const user = await storage.getUser(c.userId);
-          return { ...c, userName: user?.name || "Unknown", userProfilePicture: user?.profilePictureUrl };
+          return { ...c, userName: user?.name || "Unknown", userProfilePicture: user?.profilePicture };
         })
       );
 
@@ -291,7 +291,7 @@ export function registerTaskRoutes(app: Express) {
       });
 
       const user = await storage.getUser(req.user.id);
-      res.status(201).json({ ...comment, userName: user?.name || "Unknown", userProfilePicture: user?.profilePictureUrl });
+      res.status(201).json({ ...comment, userName: user?.name || "Unknown", userProfilePicture: user?.profilePicture });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

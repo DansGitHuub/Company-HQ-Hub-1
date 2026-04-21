@@ -823,7 +823,7 @@ function EstimatesBoard() {
   });
 
   useEffect(() => {
-    localStorage.setItem("estimateAlwaysNotify", JSON.stringify([...alwaysNotifyIds]));
+    localStorage.setItem("estimateAlwaysNotify", JSON.stringify(Array.from(alwaysNotifyIds)));
   }, [alwaysNotifyIds]);
 
   const { data: allEstimates = [] } = useQuery<Estimate[]>({
@@ -916,7 +916,7 @@ function EstimatesBoard() {
   const confirmStageChange = (notify: boolean, alwaysNotify = false) => {
     if (!pendingStageChange) return;
     if (alwaysNotify) {
-      setAlwaysNotifyIds(prev => new Set([...prev, pendingStageChange.estimateId]));
+      setAlwaysNotifyIds(prev => new Set([...Array.from(prev), pendingStageChange.estimateId]));
     }
     updateMutation.mutate({ id: pendingStageChange.estimateId, data: { stage: pendingStageChange.newStage, notifyCustomer: notify || alwaysNotify } });
     setPendingStageChange(null);
@@ -1338,7 +1338,7 @@ function EstimatesBoard() {
                 <Label className="text-xs text-muted-foreground">Valid Until</Label>
                 <Input
                   type="date"
-                  value={editForm.validUntil ? new Date(editForm.validUntil as string).toISOString().split("T")[0] : ""}
+                  value={editForm.validUntil ? new Date(editForm.validUntil as unknown as string).toISOString().split("T")[0] : ""}
                   onChange={e => setEditForm({ ...editForm, validUntil: e.target.value ? new Date(e.target.value) : undefined })}
                   className="h-8 text-sm"
                 />

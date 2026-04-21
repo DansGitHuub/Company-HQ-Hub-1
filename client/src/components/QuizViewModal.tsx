@@ -133,7 +133,7 @@ function QuizContent({ quizId }: { quizId: string }) {
   }
 
   const questions = quiz.questions || [];
-  const levels = [...new Set(questions.map((q) => q.difficultyLevel))].sort((a, b) => a - b);
+  const levels = Array.from(new Set(questions.map((q) => q.difficultyLevel))).sort((a, b) => a - b);
   const isAdaptive = quiz.skillLevel === "adaptive";
 
   const filtered = levelFilter === "all"

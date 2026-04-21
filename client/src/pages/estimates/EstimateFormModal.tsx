@@ -248,6 +248,9 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
         _key: key(),
         name: wa.name,
         work_area_type_id: "",
+        cost_code: "",
+        category: "",
+        area_description: "",
         collapsed: false,
         line_items: (wa.line_items ?? []).map((li: any) => ({
           _key: key(),

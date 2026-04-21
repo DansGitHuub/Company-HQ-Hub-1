@@ -833,13 +833,13 @@ export default function SOPs() {
             d.title.toLowerCase().includes(q) ||
             (searchContentToo && typeof d.data === "object" && d.data && JSON.stringify(d.data).toLowerCase().includes(q))
           );
-          const templateResults = templates.filter(t =>
-            t.name.toLowerCase().includes(q) ||
-            (searchContentToo && t.content.toLowerCase().includes(q))
+          const templateResults = templates.filter(tmpl =>
+            tmpl.name.toLowerCase().includes(q) ||
+            (searchContentToo && ((tmpl as any).content || "").toLowerCase().includes(q))
           );
           const exampleResults = examples.filter(ex =>
             ex.title.toLowerCase().includes(q) ||
-            (searchContentToo && (ex.content || "").toLowerCase().includes(q))
+            (searchContentToo && ((ex as any).content || "").toLowerCase().includes(q))
           );
           const totalCount = sopResults.length + draftResults.length + templateResults.length + exampleResults.length;
           return (

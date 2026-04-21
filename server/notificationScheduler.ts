@@ -31,7 +31,7 @@ async function checkInterviewReminders(): Promise<void> {
     const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const in1h = new Date(now.getTime() + 60 * 60 * 1000);
 
-    const applications = await storage.getApplicationsWithUpcomingInterviews?.() || [];
+    const applications = await (storage as any).getApplicationsWithUpcomingInterviews?.() || [];
 
     for (const app of applications) {
       if (!app.interviewDate) continue;
@@ -48,10 +48,10 @@ async function checkInterviewReminders(): Promise<void> {
           log(`[notif-scheduler] 24h SMS reminder sent to ${app.applicantName}`, "scheduler");
         }
         if (app.email) {
-          await sendEmail({ to: app.email, subject: `Interview Reminder — Tomorrow at ${timeStr}`, html: `<p>Hi ${app.applicantName.split(" ")[0]},</p><p>Reminder: your interview with Chapin Landscapes is ${dateStr} at ${timeStr}.</p>` });
+          await sendEmail(app.email, `Interview Reminder — Tomorrow at ${timeStr}`, `<p>Hi ${app.applicantName.split(" ")[0]},</p><p>Reminder: your interview with Chapin Landscapes is ${dateStr} at ${timeStr}.</p>`);
           log(`[notif-scheduler] 24h email reminder sent to ${app.applicantName}`, "scheduler");
         }
-        await storage.updateApplication?.(app.id, { reminder24hSent: true });
+        await storage.updateJobApplication?.(app.id, { reminder24hSent: true });
       }
 
       if (hoursUntil >= 0.916 && hoursUntil <= 1.083 && !app.reminder1hSent) {
@@ -61,7 +61,7 @@ async function checkInterviewReminders(): Promise<void> {
           await sendInterviewSms(app.phone, app.applicantName, dateStr, timeStr, app.interviewType || "in-person", app.zoomUrl || undefined, app.interviewLocation || undefined);
           log(`[notif-scheduler] 1h SMS reminder sent to ${app.applicantName}`, "scheduler");
         }
-        await storage.updateApplication?.(app.id, { reminder1hSent: true });
+        await storage.updateJobApplication?.(app.id, { reminder1hSent: true });
       }
     }
   } catch (err: any) {
@@ -71,7 +71,7 @@ async function checkInterviewReminders(): Promise<void> {
 
 async function checkPendingApplicationFollowups(): Promise<void> {
   try {
-    const allApps = await storage.getApplications?.() || [];
+    const allApps = await storage.getJobApplications?.() || [];
     const now = new Date();
     const staleThresholdMs = 3 * 24 * 60 * 60 * 1000;
     const stale = allApps.filter((app: any) => {
@@ -80,7 +80,7 @@ async function checkPendingApplicationFollowups(): Promise<void> {
       return age >= staleThresholdMs && !app.followupReminderSent;
     });
     if (stale.length === 0) return;
-    const users = await storage.getUsers();
+    const users = await storage.getAllUsers();
     const admins = users.filter((u: any) => ["admin", "super_admin"].includes(u.role));
     for (const app of stale) {
       for (const admin of admins) {
@@ -88,7 +88,7 @@ async function checkPendingApplicationFollowups(): Promise<void> {
           await storage.createStaffNotification({ userId: admin.id, type: "application_followup", title: "Application Awaiting Review", message: `${app.applicantName}'s application for ${app.position} has been waiting ${Math.floor((now.getTime() - new Date(app.createdAt || app.submittedAt).getTime()) / (1000 * 60 * 60 * 24))} days without action.`, link: `/hiring/${app.id}`, metadata: { applicationId: app.id } });
         } catch {}
       }
-      await storage.updateApplication?.(app.id, { followupReminderSent: true });
+      await storage.updateJobApplication?.(app.id, { followupReminderSent: true });
       log(`[notif-scheduler] Follow-up reminder sent for application ${app.id} (${app.applicantName})`, "scheduler");
     }
   } catch (err: any) {

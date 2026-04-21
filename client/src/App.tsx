@@ -202,11 +202,11 @@ function AppRoutes() {
         <Route path="/mors-budget" component={MorsBudget} />
         <Route path="/customers" component={CustomerList} />
         <Route path="/customers/:id" component={CustomerDetail} />
-        <Route path="/tools/plow-mapper" component={PlowSiteMapper} />
+        <Route path="/tools/plow-mapper" component={() => <PlowSiteMapper />} />
         <Route path="/tools/process-auditor" component={ProcessAuditor} />
         <Route path="/tools/integration-wizard" component={IntegrationWizard} />
-        <Route path="/tools/calculator" component={CalculatorPage} />
-        <Route path="/tools/lead-qualifier" component={LeadQualifier} />
+        <Route path="/tools/calculator" component={() => <CalculatorPage />} />
+        <Route path="/tools/lead-qualifier" component={() => <LeadQualifier />} />
         <Route path="/care-guides" component={CareGuideManager} />
         <Route path="/tools" component={Tools} />
         <Route path="/calendar" component={CalendarPage} />

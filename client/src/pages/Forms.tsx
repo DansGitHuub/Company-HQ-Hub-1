@@ -2317,7 +2317,7 @@ function FormLibrary({ onOpenForm }: { onOpenForm: (id: string) => void }) {
     return matchSearch && matchCategory;
   });
 
-  const categories = [...new Set(forms.map((f: any) => f.category).filter(Boolean))];
+  const categories = Array.from(new Set(forms.map((f: any) => f.category).filter(Boolean)));
 
   return (
     <div data-testid="view-form-library">

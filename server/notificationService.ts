@@ -165,7 +165,7 @@ export async function notifyCustomer(payload: CustomerNotificationPayload): Prom
   // Fetch customer for prefs
   let customer: any;
   try {
-    customer = await storage.getCustomer(customerId);
+    customer = await (storage as any).getCustomer(customerId);
   } catch {
     log(`[notify] Could not fetch customer ${customerId}`, "notify");
   }
@@ -174,7 +174,7 @@ export async function notifyCustomer(payload: CustomerNotificationPayload): Prom
   if (channels.includes("inApp")) {
     try {
       await storage.createCustomerNotification({
-        customerId,
+        customerId: String(customerId),
         type,
         title,
         message,
@@ -239,7 +239,7 @@ export async function notifyStageChange(
   applicantName: string,
   position: string,
   newStage: string,
-  applicationId: number
+  applicationId: string | number
 ): Promise<void> {
   for (const uid of adminUserIds) {
     await notifyStaff({

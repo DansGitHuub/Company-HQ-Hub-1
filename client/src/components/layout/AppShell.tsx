@@ -925,7 +925,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <NotificationBell userId={user?.id} />
+            <NotificationBell />
 
           </div>
         </header>

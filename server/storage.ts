@@ -13,7 +13,6 @@ import {
   materialFieldValues, type MaterialFieldValue, type InsertMaterialFieldValue,
   candidates, type Candidate, type InsertCandidate,
   candidateDocuments, type CandidateDocument, type InsertCandidateDocument,
-  campaigns, type Campaign, type InsertCampaign,
   jobs, type Job, type InsertJob,
   jobDocuments, type JobDocument, type InsertJobDocument,
   jobPipelineTabs, type JobPipelineTab, type InsertJobPipelineTab,
@@ -2043,7 +2042,7 @@ export class DatabaseStorage implements IStorage {
     let query = db.select().from(threadMessages).where(eq(threadMessages.threadId, threadId));
     
     if (!includeInternalNotes) {
-      query = query.where(and(
+      query = (query as any).where(and(
         eq(threadMessages.threadId, threadId),
         eq(threadMessages.isInternalNote, false)
       )) as any;
@@ -2844,7 +2843,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEmployee(emp: InsertEmployee): Promise<Employee> {
-    const [created] = await db.insert(employees).values(emp).returning();
+    const [created] = await db.insert(employees).values(emp as any).returning();
     return created;
   }
 
@@ -3460,12 +3459,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEstimate(data: InsertEstimate): Promise<Estimate> {
-    const [est] = await db.insert(estimates).values(data).returning();
+    const [est] = await db.insert(estimates).values(data as any).returning();
     return est;
   }
 
   async updateEstimate(id: string, data: Partial<InsertEstimate>): Promise<Estimate | undefined> {
-    const [est] = await db.update(estimates).set({ ...data, updatedAt: new Date() }).where(eq(estimates.id, id)).returning();
+    const [est] = await db.update(estimates).set({ ...data, updatedAt: new Date() } as any).where(eq(estimates.id, id)).returning();
     return est;
   }
 

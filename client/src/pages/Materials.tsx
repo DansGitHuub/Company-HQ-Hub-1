@@ -247,7 +247,10 @@ export default function Materials() {
       vendor: "",
       unitOfMeasure: "",
       primaryImage: "",
-      fieldValues: {},
+      fieldValues: {} as Record<string, string>,
+      class: "",
+      cost: "",
+      taxable: false,
     });
     setIsAiLoading(false);
     setImageSearchResults([]);

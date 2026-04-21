@@ -185,7 +185,7 @@ export default function TimeClock() {
         // No job-specific areas → show global areas, then fall back to all non-General types
         opts.push(...generalOpts);
         const grouped = allTypes.filter((t) => t.division !== "General");
-        const divisions = [...new Set(grouped.map((t) => t.division ?? "Other"))];
+        const divisions = Array.from(new Set(grouped.map((t) => t.division ?? "Other")));
         divisions.forEach((div) => {
           grouped.filter((t) => (t.division ?? "Other") === div).forEach((t) => {
             opts.push({ value: `type:${t.id}:${t.name}`, label: t.name, group: div });

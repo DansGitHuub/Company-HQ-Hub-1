@@ -623,7 +623,7 @@ function ServiceHistoryTab({ assetId }: { assetId: string }) {
                       {log.vendor && ` · ${log.vendor}`}
                     </p>
                     {log.notes && <p className="text-xs text-muted-foreground mt-1">{log.notes}</p>}
-                    {log.partsUsed && Array.isArray(log.partsUsed) && (log.partsUsed as any[]).length > 0 && (
+                    {Array.isArray(log.partsUsed) && (log.partsUsed as any[]).length > 0 && (
                       <div className="mt-1">
                         <p className="text-xs font-medium">Parts:</p>
                         {(log.partsUsed as any[]).map((p: any, i: number) => (

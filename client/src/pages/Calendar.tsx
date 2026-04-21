@@ -1513,6 +1513,7 @@ function CalendarSettingsDialog({
   categorySettings: CategorySetting[];
 }) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [categories, setCategories] = useState<CategorySetting[]>([]);

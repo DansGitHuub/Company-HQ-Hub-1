@@ -747,10 +747,7 @@ export async function sendEstimateSignedEmail(
     timeZoneName: "short",
   });
 
-  await sendEmail({
-    to: toEmail,
-    subject: "Your Estimate Has Been Signed – Thank You!",
-    html: `
+  await sendEmail(toEmail, "Your Estimate Has Been Signed – Thank You!", `
       <!DOCTYPE html>
       <html>
       <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -829,6 +826,5 @@ export async function sendEstimateSignedEmail(
         </table>
       </body>
       </html>
-    `,
-  });
+  `);
 }
