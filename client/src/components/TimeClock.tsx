@@ -29,8 +29,9 @@ interface JobWorkArea {
 }
 
 interface WorkAreasResponse {
-  globalTypes: WorkAreaType[];
+  globalAreas: WorkAreaType[];
   jobAreas: JobWorkArea[];
+  allTypes: WorkAreaType[];
 }
 
 // ── Fallback general options if DB returns nothing ────────────────────────────
@@ -145,8 +146,9 @@ export default function TimeClock() {
     enabled: open && !activeEntry,
   });
 
-  const allTypes = workAreasData?.globalTypes ?? [];
+  const globalAreas = workAreasData?.globalAreas ?? [];
   const jobWorkAreas = workAreasData?.jobAreas ?? [];
+  const allTypes = workAreasData?.allTypes ?? [];
 
   const elapsed = useElapsed(activeEntry?.clock_in ?? null);
   useGpsPinger(activeEntry, setGpsLost);
@@ -159,13 +161,9 @@ export default function TimeClock() {
   function buildWorkAreaOptions(): Array<{ value: string; label: string; group: string }> {
     const opts: Array<{ value: string; label: string; group: string }> = [];
 
-    // General options: use ALL General-division types from DB, sorted by sort_order
-    const generalFromDb = allTypes
-      .filter((t) => t.division === "General")
-      .sort((a, b) => a.sort_order - b.sort_order);
-
-    if (generalFromDb.length > 0) {
-      generalFromDb.forEach((t) => {
+    // Global areas: General-division types from DB (pre-sorted by sort_order from API)
+    if (globalAreas.length > 0) {
+      globalAreas.forEach((t) => {
         opts.push({ value: `general:${t.id}:${t.name}`, label: t.name, group: "General" });
       });
     } else {

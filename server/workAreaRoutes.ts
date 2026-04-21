@@ -117,13 +117,14 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
   });
 
   // ── GET /api/work-areas?jobId=X ─────────────────────────────────────────
-  // Unified endpoint: returns { globalTypes, jobAreas }
-  // globalTypes: all active work_area_types
-  // jobAreas: job-specific areas when jobId is provided, else []
+  // Unified endpoint returns three fields:
+  //   globalAreas  – General-division types only (On Site, Drive Time, etc.), sorted by sort_order
+  //   jobAreas     – job-specific work areas when jobId is provided, else []
+  //   allTypes     – all active work_area_types (used as fallback when job has no areas)
   app.get("/api/work-areas", requireAuth, async (req, res) => {
     const jobId = req.query.jobId as string | undefined;
     try {
-      const [globalRes, jobRes] = await Promise.all([
+      const [allTypesRes, jobRes] = await Promise.all([
         pool.query(
           `SELECT id, name, division, sort_order FROM work_area_types WHERE is_active = true ORDER BY division, sort_order, name`
         ),
@@ -134,7 +135,16 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
             )
           : Promise.resolve({ rows: [] as any[] }),
       ]);
-      return res.json({ globalTypes: globalRes.rows, jobAreas: jobRes.rows });
+
+      const globalAreas = allTypesRes.rows
+        .filter((r: any) => r.division === "General")
+        .sort((a: any, b: any) => a.sort_order - b.sort_order);
+
+      return res.json({
+        globalAreas,
+        jobAreas: jobRes.rows,
+        allTypes: allTypesRes.rows,
+      });
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
     }
