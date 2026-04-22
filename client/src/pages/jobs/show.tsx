@@ -157,6 +157,266 @@ function JobMessagesTab({ jobId }: { jobId: string }) {
   );
 }
 
+// ── Daily Logs Tab ────────────────────────────────────────────────────────────
+interface DailyLog {
+  id: number;
+  job_id: string;
+  employee_id: string;
+  employee_name: string | null;
+  employee_username: string | null;
+  log_date: string;
+  work_description: string;
+  hours_worked: string | number;
+  notes: string | null;
+  created_at: string;
+}
+
+function DailyLogsTab({ jobId }: { jobId: string }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    employee_id: "",
+    log_date: new Date().toISOString().split("T")[0],
+    work_description: "",
+    hours_worked: "",
+    notes: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const { data: logs = [], isLoading } = useQuery<DailyLog[]>({
+    queryKey: ["/api/jobs/daily-logs", jobId],
+    queryFn: () =>
+      fetch(`/api/jobs/${jobId}/daily-logs`, { credentials: "include" }).then((r) => r.json()),
+  });
+
+  const { data: employees = [] } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+    queryFn: () =>
+      fetch("/api/users", { credentials: "include" }).then((r) => r.json()),
+  });
+
+  const resetForm = () =>
+    setForm({
+      employee_id: "",
+      log_date: new Date().toISOString().split("T")[0],
+      work_description: "",
+      hours_worked: "",
+      notes: "",
+    });
+
+  async function handleSave() {
+    if (!form.employee_id || !form.log_date || !form.work_description) {
+      toast({ title: "Campos requeridos", description: "Empleado, fecha y descripción son obligatorios.", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await apiRequest("POST", `/api/jobs/${jobId}/daily-logs`, form);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message ?? "Error al guardar.");
+      }
+      await qc.invalidateQueries({ queryKey: ["/api/jobs/daily-logs", jobId] });
+      toast({ title: "Registro guardado", description: "La entrada del diario fue añadida." });
+      resetForm();
+      setShowForm(false);
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    setDeletingId(id);
+    try {
+      await apiRequest("DELETE", `/api/daily-logs/${id}`);
+      await qc.invalidateQueries({ queryKey: ["/api/jobs/daily-logs", jobId] });
+      toast({ title: "Eliminado", description: "Registro eliminado correctamente." });
+    } catch {
+      toast({ title: "Error", description: "No se pudo eliminar el registro.", variant: "destructive" });
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function fmtLogDate(d: string) {
+    try { return format(parseISO(d), "d MMM yyyy"); } catch { return d; }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-700">Diario de trabajo</h3>
+        <Button size="sm" onClick={() => setShowForm(true)} data-testid="button-add-log">
+          <Plus className="h-4 w-4 mr-1.5" />
+          Añadir entrada
+        </Button>
+      </div>
+
+      {/* Log list */}
+      {isLoading ? (
+        <div className="flex justify-center py-10">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : logs.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No hay entradas de diario para este trabajo aún.</p>
+            <p className="text-xs mt-1 text-gray-400">Usa el botón "Añadir entrada" para registrar el trabajo del día.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="pb-2 px-0 pt-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="pl-5">Fecha</TableHead>
+                    <TableHead>Empleado</TableHead>
+                    <TableHead>Horas</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead>Notas</TableHead>
+                    <TableHead className="pr-4 w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {logs.map((log) => (
+                    <TableRow key={log.id} data-testid={`row-log-${log.id}`}>
+                      <TableCell className="pl-5 whitespace-nowrap text-sm font-medium text-gray-800">
+                        {fmtLogDate(log.log_date)}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-700">
+                        {log.employee_name || log.employee_username || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm font-semibold text-gray-800">
+                        {Number(log.hours_worked).toFixed(1)}h
+                      </TableCell>
+                      <TableCell className="max-w-[220px]">
+                        <p className="text-sm text-gray-700 truncate" title={log.work_description}>
+                          {log.work_description}
+                        </p>
+                      </TableCell>
+                      <TableCell className="max-w-[180px]">
+                        <p className="text-sm text-gray-500 truncate">{log.notes || "—"}</p>
+                      </TableCell>
+                      <TableCell className="pr-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                          onClick={() => handleDelete(log.id)}
+                          disabled={deletingId === log.id}
+                          data-testid={`button-delete-log-${log.id}`}
+                        >
+                          {deletingId === log.id
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Trash2 className="h-3.5 w-3.5" />}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Add Log Dialog */}
+      <Dialog open={showForm} onOpenChange={(o) => { if (!o) { resetForm(); setShowForm(false); } }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HardHat className="h-5 w-5 text-green-600" />
+              Nueva entrada de diario
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="log-employee">Empleado <span className="text-red-500">*</span></Label>
+                <select
+                  id="log-employee"
+                  value={form.employee_id}
+                  onChange={(e) => setForm((f) => ({ ...f, employee_id: e.target.value }))}
+                  className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  data-testid="select-log-employee"
+                >
+                  <option value="">Seleccionar empleado…</option>
+                  {employees.map((emp: any) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name || emp.username}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="log-date">Fecha <span className="text-red-500">*</span></Label>
+                <Input
+                  id="log-date"
+                  type="date"
+                  value={form.log_date}
+                  onChange={(e) => setForm((f) => ({ ...f, log_date: e.target.value }))}
+                  data-testid="input-log-date"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="log-hours">Horas trabajadas</Label>
+              <Input
+                id="log-hours"
+                type="number"
+                step="0.5"
+                min="0"
+                placeholder="ej. 7.5"
+                value={form.hours_worked}
+                onChange={(e) => setForm((f) => ({ ...f, hours_worked: e.target.value }))}
+                data-testid="input-log-hours"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="log-desc">Descripción del trabajo <span className="text-red-500">*</span></Label>
+              <Textarea
+                id="log-desc"
+                placeholder="¿Qué se realizó hoy en este trabajo?…"
+                value={form.work_description}
+                onChange={(e) => setForm((f) => ({ ...f, work_description: e.target.value }))}
+                rows={3}
+                data-testid="input-log-description"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="log-notes">Notas / incidencias (opcional)</Label>
+              <Textarea
+                id="log-notes"
+                placeholder="Problemas encontrados, materiales usados, observaciones…"
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                rows={2}
+                data-testid="input-log-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { resetForm(); setShowForm(false); }}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving} data-testid="button-save-log">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Plus className="h-4 w-4 mr-1.5" />}
+              Guardar entrada
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function JobInvoicesTab({ jobId }: { jobId: string }) {
   const { t } = useTranslation("jobDetail");
   const [, nav] = useLocation();
@@ -512,6 +772,7 @@ export default function JobDetailPage() {
             <TabsTrigger value="invoices">{t("tabInvoices")}</TabsTrigger>
             <TabsTrigger value="messages" data-testid="tab-messages">{t("tabMessages")}</TabsTrigger>
             <TabsTrigger value="activity">{t("tabActivity")}</TabsTrigger>
+            <TabsTrigger value="daily-logs" data-testid="tab-daily-logs">Diario</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -709,6 +970,11 @@ export default function JobDetailPage() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Daily Logs Tab */}
+          <TabsContent value="daily-logs">
+            <DailyLogsTab jobId={jobId} />
           </TabsContent>
         </Tabs>
       </div>
