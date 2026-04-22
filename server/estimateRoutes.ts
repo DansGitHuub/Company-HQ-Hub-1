@@ -343,9 +343,17 @@ export function registerEstimateRoutes(app: Express) {
       if (!est) { await client.query("ROLLBACK"); return res.status(404).json({ message: "Not found" }); }
 
       const { rows: jobRows } = await client.query(
-        `INSERT INTO jobs (title, customer_id, property_id, status, price, description, created_at, updated_at)
-         VALUES ($1, $2, $3, 'Lead', $4, $5, NOW(), NOW()) RETURNING id`,
-        [est.title, est.customer_id || null, est.property_id || null, est.total, `Converted from estimate ${est.estimate_number}`]
+        `INSERT INTO jobs (title, client, type, customer_id, property_id, status, stage, price, description, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, 'lead', 'Lead', $6, $7, NOW(), NOW()) RETURNING id`,
+        [
+          est.title || `Estimate ${est.estimate_number}`,
+          est.customer_name || est.title || 'Unknown',
+          est.estimate_type || 'Other',
+          est.customer_id || null,
+          est.property_id || null,
+          est.total,
+          `Converted from estimate ${est.estimate_number}`,
+        ]
       );
       const jobId = jobRows[0].id;
 
