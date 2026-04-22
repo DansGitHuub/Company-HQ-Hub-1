@@ -373,6 +373,56 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── Admin: Approve / Reject single time entry ────────────────────────────────
+  app.patch("/api/admin/time-entries/:id/approval", requireAuth, async (req: any, res) => {
+    const user = req.user;
+    const isAdmin = user?.role === "Admin" || user?.role === "Manager" || user?.isMasterAdmin;
+    if (!isAdmin) return res.status(403).json({ message: "Forbidden" });
+
+    const { id } = req.params;
+    const { status } = req.body;
+    if (!["approved", "rejected", "pending"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status. Must be approved, rejected, or pending." });
+    }
+
+    try {
+      const result = await pool.query(
+        `UPDATE time_entries SET approval_status = $1 WHERE id = $2 RETURNING id, approval_status`,
+        [status, id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ message: "Entry not found" });
+      return res.json(result.rows[0]);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Admin: Bulk approve / reject time entries ─────────────────────────────────
+  app.post("/api/admin/time-entries/bulk-approval", requireAuth, async (req: any, res) => {
+    const user = req.user;
+    const isAdmin = user?.role === "Admin" || user?.role === "Manager" || user?.isMasterAdmin;
+    if (!isAdmin) return res.status(403).json({ message: "Forbidden" });
+
+    const { ids, status } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "ids must be a non-empty array" });
+    }
+    if (!["approved", "rejected", "pending"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status." });
+    }
+
+    try {
+      const placeholders = ids.map((_: any, i: number) => `$${i + 2}`).join(", ");
+      const result = await pool.query(
+        `UPDATE time_entries SET approval_status = $1 WHERE id IN (${placeholders}) RETURNING id, approval_status`,
+        [status, ...ids]
+      );
+      return res.json({ updated: result.rowCount, rows: result.rows });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Admin: Worksheet Review ──────────────────────────────────────────────────
   app.get("/api/admin/worksheet-review", requireAuth, async (req: any, res) => {
     const user = req.user;
