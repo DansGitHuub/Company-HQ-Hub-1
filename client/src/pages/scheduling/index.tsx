@@ -145,19 +145,52 @@ export default function SchedulingCalendar() {
       return res.json();
     },
     onSuccess: (newJob, variables) => {
+      // Normalise the returned scheduled_date to "YYYY-MM-DD" so that
+      // getJobsForDay's string comparison always works, regardless of
+      // whether Postgres returns a plain date or an ISO timestamp.
+      const normalisedJob: ScheduledJob | null = newJob && newJob.id
+        ? { ...newJob, scheduled_date: (newJob.scheduled_date ?? "").slice(0, 10) }
+        : null;
+
       // Immediately write the returned job into the calendar cache so the
       // event block appears without waiting for a background refetch.
-      // (staleTime: Infinity means invalidateQueries alone may not refetch
-      // synchronously enough for the user to see the block right away.)
-      queryClient.setQueryData<ScheduledJob[]>(
-        ["/api/scheduling/calendar", rangeStart, rangeEnd],
-        (old = []) => {
-          const without = (old ?? []).filter(j => j.id !== variables.jobId);
-          return newJob && newJob.id ? [...without, newJob] : without;
+      // We do NOT call invalidateQueries for the calendar here because
+      // invalidating while the query has an active observer triggers an
+      // immediate background refetch that can race with (and overwrite)
+      // this setQueryData write before React has a chance to render —
+      // causing the green block to never appear.
+      //
+      // We scan ALL cached calendar queries (the user may have navigated
+      // weeks while the mutation was in-flight) and update the one(s)
+      // whose week range contains the job's scheduled date.
+      const jobDate = normalisedJob?.scheduled_date ?? variables.scheduled_date;
+      const allCalendarQueries = queryClient.getQueriesData<ScheduledJob[]>({
+        queryKey: ["/api/scheduling/calendar"],
+      });
+      let updatedAny = false;
+      for (const [queryKey, cachedData] of allCalendarQueries) {
+        const [, qStart, qEnd] = queryKey as [string, string, string];
+        if (!qStart || !qEnd || !jobDate) continue;
+        if (jobDate >= qStart && jobDate <= qEnd) {
+          queryClient.setQueryData<ScheduledJob[]>(queryKey, (old = cachedData ?? []) => {
+            const without = (old ?? []).filter(j => j.id !== variables.jobId);
+            return normalisedJob ? [...without, normalisedJob] : without;
+          });
+          updatedAny = true;
         }
-      );
-      // Background-sync to keep other consumers of this data up to date
-      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/calendar"] });
+      }
+      // Fall back to the current week's key when no cached query matched the job date
+      // (e.g. first time viewing this week, or scheduled_date outside all cached ranges).
+      if (!updatedAny) {
+        queryClient.setQueryData<ScheduledJob[]>(
+          ["/api/scheduling/calendar", rangeStart, rangeEnd],
+          (old = []) => {
+            const without = (old ?? []).filter(j => j.id !== variables.jobId);
+            return normalisedJob ? [...without, normalisedJob] : without;
+          }
+        );
+      }
+      // Remove the job from the unscheduled panel immediately.
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/unscheduled"] });
       toast({ title: t("jobScheduled") });
       if (previousStateRef.current) {
