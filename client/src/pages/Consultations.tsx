@@ -128,7 +128,7 @@ function fmt$(n: number | null | undefined) {
 
 function fmtDate(d: string | null) {
   if (!d) return "—";
-  return new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return new Date(d.slice(0, 10) + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function fmtTime(t: string | null) {
