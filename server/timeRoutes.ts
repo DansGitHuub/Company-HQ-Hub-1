@@ -13,6 +13,11 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
     )
     .catch((err) => console.error("[timeRoutes] local_id migration:", err.message));
 
+  // ── Migrate: add approval_status column ──────────────────────────────────────
+  pool.query(
+    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) NOT NULL DEFAULT 'pending'`
+  ).catch((err) => console.error("[timeRoutes] approval_status migration:", err.message));
+
   // ── Clock In ─────────────────────────work-areas───────────────────────────────────────
   app.post("/api/time/clock-in", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
@@ -259,6 +264,109 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
         totalMinutes,
         employees: empResult.rows,
         jobs: jobResult.rows,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── My Hours: Pay Period Summary ────────────────────────────────────────────
+  app.get("/api/time/my-hours/pay-period", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    try {
+      // Current biweekly pay period ending last Saturday
+      const now = new Date();
+      const dow = now.getDay(); // 0=Sun … 6=Sat
+      const daysSinceSat = dow === 6 ? 0 : dow + 1;
+      const periodEnd = new Date(now);
+      periodEnd.setDate(now.getDate() - daysSinceSat);
+      const periodStart = new Date(periodEnd);
+      periodStart.setDate(periodEnd.getDate() - 13);
+
+      const startStr = periodStart.toISOString().split("T")[0];
+      const endStr   = periodEnd.toISOString().split("T")[0];
+
+      const result = await pool.query(
+        `SELECT duration_minutes, clock_in
+         FROM time_entries
+         WHERE user_id = $1
+           AND clock_in::date >= $2
+           AND clock_in::date <= $3
+           AND clock_out IS NOT NULL`,
+        [userId, startStr, endStr]
+      );
+
+      const rows = result.rows;
+      const totalMinutes = rows.reduce((s: number, r: any) => s + (Number(r.duration_minutes) || 0), 0);
+      const regularMinutes = Math.min(totalMinutes, 80 * 60); // 80h per 2-week period
+      const overtimeMinutes = Math.max(0, totalMinutes - 80 * 60);
+      const uniqueDays = new Set(rows.map((r: any) => new Date(r.clock_in).toISOString().split("T")[0]));
+
+      return res.json({
+        payPeriodStart: startStr,
+        payPeriodEnd: endStr,
+        summary: {
+          totalHours: (totalMinutes / 60).toFixed(2),
+          regularHours: (regularMinutes / 60).toFixed(2),
+          overtimeHours: overtimeMinutes > 0 ? (overtimeMinutes / 60).toFixed(2) : null,
+          daysWorked: uniqueDays.size,
+        },
+      });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── My Hours: Paginated Entry List ──────────────────────────────────────────
+  app.get("/api/time/my-hours", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const { startDate, endDate, page = "1", limit = "50" } = req.query as Record<string, string>;
+    const pageNum  = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit) || 50));
+    const offset   = (pageNum - 1) * limitNum;
+
+    try {
+      const params: any[] = [userId];
+      let where = `WHERE te.user_id = $1`;
+
+      if (startDate) { params.push(startDate); where += ` AND te.clock_in::date >= $${params.length}`; }
+      if (endDate)   { params.push(endDate);   where += ` AND te.clock_in::date <= $${params.length}`; }
+
+      const countResult = await pool.query(
+        `SELECT COUNT(*) FROM time_entries te ${where}`,
+        params
+      );
+      const totalCount = parseInt(countResult.rows[0].count) || 0;
+
+      params.push(limitNum, offset);
+      const result = await pool.query(
+        `SELECT
+           te.id, te.clock_in, te.clock_out, te.duration_minutes,
+           te.entry_type, te.work_area_name, te.notes, te.approval_status,
+           j.client AS job_title
+         FROM time_entries te
+         LEFT JOIN jobs j ON j.id = te.job_id
+         ${where}
+         ORDER BY te.clock_in DESC
+         LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        params
+      );
+
+      const allForSummary = await pool.query(
+        `SELECT duration_minutes, clock_in FROM time_entries te ${where} AND te.clock_out IS NOT NULL`,
+        params.slice(0, params.length - 2)
+      );
+      const totalMinutes = allForSummary.rows.reduce((s: number, r: any) => s + (Number(r.duration_minutes) || 0), 0);
+      const uniqueDays = new Set(allForSummary.rows.map((r: any) => new Date(r.clock_in).toISOString().split("T")[0]));
+
+      return res.json({
+        entries: result.rows,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limitNum),
+        summary: {
+          totalHours: (totalMinutes / 60).toFixed(2),
+          daysWorked: uniqueDays.size,
+        },
       });
     } catch (err: any) {
       return res.status(500).json({ message: err.message });

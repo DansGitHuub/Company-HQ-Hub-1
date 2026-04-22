@@ -74,6 +74,12 @@ const ENTRY_TYPE_COLORS: Record<string, string> = {
   break:      "bg-gray-100 text-gray-600",
 };
 
+const APPROVAL_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  pending:  { label: "Pendiente", className: "bg-yellow-100 text-yellow-700 border border-yellow-300" },
+  approved: { label: "Aprobado",  className: "bg-green-100 text-green-700 border border-green-300" },
+  rejected: { label: "Rechazado", className: "bg-red-100 text-red-700 border border-red-300" },
+};
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MyHoursPage() {
@@ -353,6 +359,18 @@ export default function MyHoursPage() {
                               >
                                 {label}
                               </Badge>
+                              {(() => {
+                                const statusKey = entry.approval_status ?? "pending";
+                                const cfg = APPROVAL_STATUS_CONFIG[statusKey] ?? APPROVAL_STATUS_CONFIG.pending;
+                                return (
+                                  <span
+                                    data-testid={`status-pill-${entry.id}`}
+                                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${cfg.className}`}
+                                  >
+                                    {cfg.label}
+                                  </span>
+                                );
+                              })()}
                             </div>
                             {entry.job_title && entry.work_area_name && (
                               <p className="text-xs text-gray-400 truncate mt-0.5">
