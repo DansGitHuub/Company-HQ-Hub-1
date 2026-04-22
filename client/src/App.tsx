@@ -82,6 +82,7 @@ import CustomerPortal from "@/pages/CustomerPortal";
 import MessagesPage from "@/pages/Messages";
 import TimeReports from "@/pages/admin/TimeReports";
 import ServiceTypesPage from "@/pages/admin/ServiceTypesPage";
+import WorksheetReview from "@/pages/admin/WorksheetReview";
 import InquiryPage from "@/pages/Inquiry";
 import InquirySuccess from "@/pages/InquirySuccess";
 import BookingPage from "@/pages/BookingPage";
@@ -194,6 +195,7 @@ function AppRoutes() {
         <Route path="/admin/qbo-export" component={QBOExportPage} />
         <Route path="/admin/archive" component={ArchivePage} />
         <Route path="/admin/time-reports" component={TimeReports} />
+        <Route path="/admin/worksheet-review" component={WorksheetReview} />
         <Route path="/admin/service-types" component={ServiceTypesPage} />
         <Route path="/budget-settings" component={BudgetSettings} />
         <Route path="/time" component={TimeTracking} />

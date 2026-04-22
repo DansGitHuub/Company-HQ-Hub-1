@@ -373,6 +373,74 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── Admin: Worksheet Review ──────────────────────────────────────────────────
+  app.get("/api/admin/worksheet-review", requireAuth, async (req: any, res) => {
+    const user = req.user;
+    const isAdmin = user?.role === "Admin" || user?.role === "Manager" || user?.isMasterAdmin;
+    if (!isAdmin) return res.status(403).json({ message: "Forbidden" });
+
+    const { startDate, endDate, employeeId } = req.query as Record<string, string>;
+
+    try {
+      const params: any[] = [];
+      let where = `WHERE te.clock_out IS NOT NULL`;
+
+      if (startDate) { params.push(startDate); where += ` AND te.clock_in::date >= $${params.length}`; }
+      if (endDate)   { params.push(endDate);   where += ` AND te.clock_in::date <= $${params.length}`; }
+      if (employeeId && employeeId !== "all") { params.push(employeeId); where += ` AND te.user_id = $${params.length}`; }
+
+      const result = await pool.query(
+        `SELECT
+           te.id,
+           te.user_id,
+           u.name   AS employee_name,
+           u.username,
+           te.job_id,
+           j.client AS job_title,
+           j.address AS job_address,
+           te.clock_in,
+           te.clock_out,
+           te.duration_minutes,
+           te.entry_type,
+           te.work_area_name,
+           te.notes,
+           te.approval_status
+         FROM time_entries te
+         LEFT JOIN users u ON u.id = te.user_id
+         LEFT JOIN jobs  j ON j.id = te.job_id
+         ${where}
+         ORDER BY te.clock_in DESC`,
+        params
+      );
+
+      const employeesResult = await pool.query(
+        `SELECT DISTINCT te.user_id AS id, u.name, u.username
+         FROM time_entries te
+         JOIN users u ON u.id = te.user_id
+         WHERE te.clock_out IS NOT NULL
+         ORDER BY u.name`
+      );
+
+      const entries = result.rows;
+      const totalMinutes = entries.reduce((s: number, r: any) => s + (Number(r.duration_minutes) || 0), 0);
+      const uniqueEmployees = new Set(entries.map((r: any) => r.user_id)).size;
+      const uniqueDays = new Set(entries.map((r: any) => new Date(r.clock_in).toISOString().split("T")[0])).size;
+
+      return res.json({
+        entries,
+        employees: employeesResult.rows,
+        summary: {
+          totalEntries: entries.length,
+          totalHours: (totalMinutes / 60).toFixed(2),
+          uniqueEmployees,
+          uniqueDays,
+        },
+      });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── GPS Ping ────────────────────────────────────────────────────────────────
   app.post("/api/gps/ping", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
