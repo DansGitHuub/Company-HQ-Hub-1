@@ -193,9 +193,9 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
   });
 
   const { data: employees = [] } = useQuery<any[]>({
-    queryKey: ["/api/users"],
+    queryKey: ["/api/admin/users"],
     queryFn: () =>
-      fetch("/api/users", { credentials: "include" }).then((r) => r.json()),
+      fetch("/api/admin/users", { credentials: "include" }).then((r) => r.json()),
   });
 
   const resetForm = () =>
