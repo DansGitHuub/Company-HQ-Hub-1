@@ -212,16 +212,31 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
     const hasJobId = "job_id" in req.body;
     const jobIdValue = req.body.job_id || null;
     try {
-      await pool.query(
-        `UPDATE worksheets SET
-          notes          = COALESCE($1, notes),
-          job_id         = ${hasJobId ? "$2" : "job_id"},
-          status         = COALESCE($3, status),
-          signature_url  = COALESCE($5, signature_url),
-          updated_at     = NOW()
-         WHERE id = $4`,
-        [notes ?? null, jobIdValue, status ?? null, req.params.id, signature_url ?? null]
-      );
+      if (hasJobId) {
+        // Include job_id with explicit cast so PostgreSQL knows the type even when null
+        await pool.query(
+          `UPDATE worksheets SET
+            notes         = COALESCE($1::text, notes),
+            job_id        = $2::text,
+            status        = COALESCE($3::text, status),
+            signature_url = COALESCE($5::text, signature_url),
+            updated_at    = NOW()
+           WHERE id = $4`,
+          [notes ?? null, jobIdValue, status ?? null, req.params.id, signature_url ?? null]
+        );
+      } else {
+        // job_id not present in request body — leave it unchanged
+        // Only 4 params so no untyped null gaps
+        await pool.query(
+          `UPDATE worksheets SET
+            notes         = COALESCE($1::text, notes),
+            status        = COALESCE($2::text, status),
+            signature_url = COALESCE($4::text, signature_url),
+            updated_at    = NOW()
+           WHERE id = $3`,
+          [notes ?? null, status ?? null, req.params.id, signature_url ?? null]
+        );
+      }
       const full = await fetchWorksheetFull(req.params.id);
       return res.json(full);
     } catch (err: any) {
