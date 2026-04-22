@@ -60,22 +60,11 @@ async function migrateConsultations() {
   await pool.query(`ALTER TABLE consultations ADD COLUMN IF NOT EXISTS additional_notes TEXT`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultations_pipeline_stage ON consultations(pipeline_stage)`);
 
-  // Fix assigned_to FK: must reference employees(id), not users(id)
+  // Fix assigned_to FK: drop any existing constraint (old or new) then re-add pointing to employees
   await pool.query(`ALTER TABLE consultations DROP CONSTRAINT IF EXISTS consultations_assigned_to_fkey`);
-  await pool.query(`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.table_constraints
-        WHERE constraint_name = 'consultations_assigned_to_employees_fkey'
-          AND table_name = 'consultations'
-      ) THEN
-        ALTER TABLE consultations
-          ADD CONSTRAINT consultations_assigned_to_employees_fkey
-          FOREIGN KEY (assigned_to) REFERENCES employees(id) ON DELETE SET NULL;
-      END IF;
-    END $$
-  `);
+  await pool.query(`ALTER TABLE consultations DROP CONSTRAINT IF EXISTS consultations_assigned_to_employees_fkey`);
+  await pool.query(`ALTER TABLE consultations ADD CONSTRAINT consultations_assigned_to_employees_fkey FOREIGN KEY (assigned_to) REFERENCES employees(id) ON DELETE SET NULL`);
+  console.log("[migration] consultations assigned_to FK fixed -> employees(id)");
 
   console.log("[migration] consultations table ready");
 }
