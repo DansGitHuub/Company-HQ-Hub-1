@@ -204,6 +204,8 @@ function AppRoutes() {
         <Route path="/reports" component={ReportsPage} />
         <Route path="/consultations" component={ConsultationsPage} />
         <Route path="/mors-budget" component={MorsBudget} />
+        <Route path="/clients"><Redirect to="/customers" /></Route>
+        <Route path="/admin/employees"><Redirect to="/employees" /></Route>
         <Route path="/customers" component={CustomerList} />
         <Route path="/customers/:id" component={CustomerDetail} />
         <Route path="/tools/plow-mapper" component={() => <PlowSiteMapper />} />

@@ -974,7 +974,7 @@ export default function JobDetailPage() {
 
           {/* Daily Logs Tab */}
           <TabsContent value="daily-logs">
-            <DailyLogsTab jobId={jobId} />
+            <DailyLogsTab jobId={id} />
           </TabsContent>
         </Tabs>
       </div>
