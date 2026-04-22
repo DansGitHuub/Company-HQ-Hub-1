@@ -242,7 +242,7 @@ export function registerDailyWorksheetRoutes(app: Express, requireAuth: RequestH
           job_id,
           created_at, updated_at
         ) VALUES (
-          gen_random_uuid(), $1, 'draft', $2,
+          gen_random_uuid(), $1, 'draft', $2::text[],
           $3, $4, $5, $6, $7, $8, $9,
           $10, $11, $12, $13, $14,
           $15, $16, $17, $18, $19,
@@ -292,7 +292,7 @@ export function registerDailyWorksheetRoutes(app: Express, requireAuth: RequestH
 
       const result = await pool.query(
         `UPDATE daily_worksheets SET
-          weather_conditions = $1, customer_name = $2, date = $3, day_of_week = $4,
+          weather_conditions = $1::text[], customer_name = $2, date = $3, day_of_week = $4,
           address_line_1 = $5, address_line_2 = $6, estimate_number = $7, contact_phone = $8,
           foreman_name = $9, foreman_arrival_time = $10, foreman_departure_time = $11,
           foreman_total_hours = $12, foreman_notes = $13,
