@@ -42,6 +42,8 @@
     "reports": "Reports",
     "morsBudget": "MORS Budget",
     "timeReports": "Time Reports",
+    "worksheetReview": "Worksheet Review",
+    "timeCardApproval": "Time Card Approval",
     "catalog": "Item Catalog",
     "budgetPricing": "Budget & Pricing",
     "sections": {
