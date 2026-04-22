@@ -29,6 +29,24 @@ export async function runTimeTrackingMigration() {
       CREATE INDEX IF NOT EXISTS idx_gps_pings_time_entry_id ON gps_pings(time_entry_id);
       CREATE INDEX IF NOT EXISTS idx_gps_pings_user_id       ON gps_pings(user_id);
     `);
+    // Ensure clock_in / clock_out are TIMESTAMPTZ even if the table was created
+    // previously with TIMESTAMP WITHOUT TIME ZONE.
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'time_entries'
+            AND column_name = 'clock_in'
+            AND data_type = 'timestamp without time zone'
+        ) THEN
+          ALTER TABLE time_entries
+            ALTER COLUMN clock_in   TYPE TIMESTAMPTZ USING clock_in   AT TIME ZONE 'UTC',
+            ALTER COLUMN clock_out  TYPE TIMESTAMPTZ USING clock_out  AT TIME ZONE 'UTC',
+            ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
+        END IF;
+      END $$;
+    `);
     console.log("[migration] Time tracking tables ready");
   } catch (err: any) {
     console.error("[migration] Time tracking migration error:", err.message);

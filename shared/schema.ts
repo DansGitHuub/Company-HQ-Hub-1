@@ -2974,11 +2974,11 @@ export const worksheetTimeEntries = pgTable("worksheet_time_entries", {
   sessionId: integer("session_id").notNull().references(() => worksheetSessions.id),
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
   workAreaId: varchar("work_area_id", { length: 36 }), // no FK — table may not exist
-  startTime: timestamp("start_time").notNull(),
-  endTime: timestamp("end_time"),
+  startTime: timestamp("start_time", { withTimezone: true }).notNull(),
+  endTime: timestamp("end_time", { withTimezone: true }),
   durationMinutes: integer("duration_minutes"),
   notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 export const insertWorksheetTimeEntrySchema = createInsertSchema(worksheetTimeEntries).omit({ id: true, createdAt: true });
@@ -3023,12 +3023,12 @@ export const timeCards = pgTable("time_cards", {
   employeeId: varchar("employee_id", { length: 36 }).notNull().references(() => users.id),
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
   date: date("date").notNull(),
-  clockInTime: timestamp("clock_in_time").notNull(),
-  clockOutTime: timestamp("clock_out_time"),
+  clockInTime: timestamp("clock_in_time", { withTimezone: true }).notNull(),
+  clockOutTime: timestamp("clock_out_time", { withTimezone: true }),
   totalMinutes: integer("total_minutes"),
   status: text("status").notNull().default("draft"), // draft | submitted | approved
   signatureName: text("signature_name"),
-  signedAt: timestamp("signed_at"),
+  signedAt: timestamp("signed_at", { withTimezone: true }),
   submittedAt: timestamp("submitted_at"),
   qboExportedAt: timestamp("qbo_exported_at"),
   createdAt: timestamp("created_at").defaultNow(),

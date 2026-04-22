@@ -111,12 +111,20 @@ function formatDuration(minutes: number | null): string {
   return `${h}h ${m}m`;
 }
 
+// Browsers treat bare ISO strings without a timezone suffix as LOCAL time.
+// Appending 'Z' forces UTC parsing and prevents negative elapsed times.
+function toUTC(ts: string): string {
+  if (ts.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(ts)) return ts;
+  return ts + "Z";
+}
+
 function useLiveElapsed(clockInTime: string | null): string {
   const [elapsed, setElapsed] = useState("");
   useEffect(() => {
     if (!clockInTime) { setElapsed(""); return; }
+    const utc = toUTC(clockInTime);
     const tick = () => {
-      const diff = Math.floor((Date.now() - new Date(clockInTime).getTime()) / 1000);
+      const diff = Math.floor((Date.now() - new Date(utc).getTime()) / 1000);
       const h = Math.floor(diff / 3600);
       const m = Math.floor((diff % 3600) / 60);
       const s = diff % 60;

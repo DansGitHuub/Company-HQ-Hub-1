@@ -37,13 +37,22 @@ interface WorkAreasResponse {
 // ── Fallback general options if DB returns nothing ────────────────────────────
 const FALLBACK_GENERAL = ["On Site", "Drive Time", "Shop Time", "Meeting", "Break"];
 
+// ── Ensure a timestamp string is always parsed as UTC ─────────────────────────
+// Browsers treat bare ISO strings without a timezone suffix as LOCAL time,
+// which makes Date.now() - timestamp negative for users behind UTC.
+function ensureUTC(ts: string): string {
+  if (ts.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(ts)) return ts;
+  return ts + "Z";
+}
+
 // ── Elapsed time hook ─────────────────────────────────────────────────────────
 function useElapsed(clockIn: string | null) {
   const [elapsed, setElapsed] = useState("");
   useEffect(() => {
     if (!clockIn) { setElapsed(""); return; }
+    const clockInUTC = ensureUTC(clockIn);
     const tick = () => {
-      const ms = Date.now() - new Date(clockIn).getTime();
+      const ms = Date.now() - new Date(clockInUTC).getTime();
       const h = Math.floor(ms / 3600000);
       const m = Math.floor((ms % 3600000) / 60000);
       const s = Math.floor((ms % 60000) / 1000);
