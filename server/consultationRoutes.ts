@@ -33,7 +33,7 @@ async function migrateConsultations() {
       notes            TEXT,
       follow_up_required BOOLEAN DEFAULT FALSE,
       follow_up_date   DATE,
-      assigned_to      VARCHAR(36) REFERENCES users(id) ON DELETE SET NULL,
+      assigned_to      VARCHAR(36) REFERENCES employees(id) ON DELETE SET NULL,
       estimated_value  NUMERIC(12,2),
       lead_source      VARCHAR(100),
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -59,6 +59,23 @@ async function migrateConsultations() {
   await pool.query(`ALTER TABLE consultations ADD COLUMN IF NOT EXISTS desired_timeline VARCHAR(100)`);
   await pool.query(`ALTER TABLE consultations ADD COLUMN IF NOT EXISTS additional_notes TEXT`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultations_pipeline_stage ON consultations(pipeline_stage)`);
+
+  // Fix assigned_to FK: must reference employees(id), not users(id)
+  await pool.query(`ALTER TABLE consultations DROP CONSTRAINT IF EXISTS consultations_assigned_to_fkey`);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'consultations_assigned_to_employees_fkey'
+          AND table_name = 'consultations'
+      ) THEN
+        ALTER TABLE consultations
+          ADD CONSTRAINT consultations_assigned_to_employees_fkey
+          FOREIGN KEY (assigned_to) REFERENCES employees(id) ON DELETE SET NULL;
+      END IF;
+    END $$
+  `);
 
   console.log("[migration] consultations table ready");
 }
