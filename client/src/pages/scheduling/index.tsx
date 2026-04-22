@@ -144,7 +144,19 @@ export default function SchedulingCalendar() {
       });
       return res.json();
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: (newJob, variables) => {
+      // Immediately write the returned job into the calendar cache so the
+      // event block appears without waiting for a background refetch.
+      // (staleTime: Infinity means invalidateQueries alone may not refetch
+      // synchronously enough for the user to see the block right away.)
+      queryClient.setQueryData<ScheduledJob[]>(
+        ["/api/scheduling/calendar", rangeStart, rangeEnd],
+        (old = []) => {
+          const without = (old ?? []).filter(j => j.id !== variables.jobId);
+          return newJob && newJob.id ? [...without, newJob] : without;
+        }
+      );
+      // Background-sync to keep other consumers of this data up to date
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/calendar"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/unscheduled"] });
       toast({ title: t("jobScheduled") });
@@ -153,7 +165,7 @@ export default function SchedulingCalendar() {
           ?? unscheduled.find(j => j.id === variables.jobId);
         setUndoAction({
           jobId:         variables.jobId,
-          jobTitle:      job?.title ?? "Job",
+          jobTitle:      job?.title ?? newJob?.title ?? "Job",
           previousState: previousStateRef.current,
           timestamp:     Date.now(),
         });
@@ -315,7 +327,8 @@ export default function SchedulingCalendar() {
 
   function getJobsForDay(day: Date): ScheduledJob[] {
     const dayStr = format(day, "yyyy-MM-dd");
-    return calJobs.filter(j => j.scheduled_date === dayStr);
+    // Slice to 10 chars to handle both "YYYY-MM-DD" and "YYYY-MM-DDTHH:mm:ss.sssZ" formats
+    return calJobs.filter(j => (j.scheduled_date ?? "").slice(0, 10) === dayStr);
   }
 
   function jobCountForDay(day: Date) {
