@@ -266,7 +266,7 @@ export default function IntegrationWizard() {
                     <SelectValue placeholder={t("common.category")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">{t("common.allCategories")}</SelectItem>
+                    <SelectItem value="all">{t("materials.allCategories")}</SelectItem>
                     {categories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         {cat.name}
