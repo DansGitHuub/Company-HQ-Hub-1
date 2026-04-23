@@ -8,8 +8,10 @@
  */
 
 import { storage } from "./storage";
+import { pool } from "./db";
 import { sendInterviewSms } from "./smsService";
 import { sendEmail as _sendEmailRaw } from "./emailService";
+import { notifyStaff } from "./notificationService";
 import { log } from "./index";
 
 const sendEmail = ({ to, subject, html }: { to: string; subject: string; html: string }) =>
@@ -69,6 +71,113 @@ async function checkInterviewReminders(): Promise<void> {
   }
 }
 
+const CLOCKOUT_REMINDER_THRESHOLD_MS  = 8  * 60 * 60 * 1000; // 8 hours → first reminder
+const CLOCKOUT_REREMINDER_INTERVAL_MS = 2  * 60 * 60 * 1000; // every 2h thereafter
+const CLOCKOUT_AUTO_TIMEOUT_MS        = 30 * 60 * 1000;       // 30 min unanswered → auto-clockout
+
+async function checkAutoClockout(): Promise<void> {
+  try {
+    const now = new Date();
+
+    // ── Step 1: Auto-clockout entries whose last reminder was >30 min ago ──────
+    const overdueRes = await pool.query<{
+      id: string; user_id: string; last_reminder_at: Date;
+    }>(`
+      SELECT id, user_id, last_reminder_at
+      FROM time_entries
+      WHERE clock_out IS NULL
+        AND last_reminder_at IS NOT NULL
+        AND last_reminder_at <= NOW() - INTERVAL '30 minutes'
+    `);
+
+    for (const entry of overdueRes.rows) {
+      const autoClockOut = new Date(entry.last_reminder_at.getTime() + CLOCKOUT_AUTO_TIMEOUT_MS);
+      const durationMins = Math.round(
+        (autoClockOut.getTime() - 0) / 60000 // will be recalculated properly below
+      );
+      // Fetch clock_in to compute real duration
+      const teRes = await pool.query<{ clock_in: Date }>(
+        `SELECT clock_in FROM time_entries WHERE id=$1`, [entry.id]
+      );
+      const clockIn = teRes.rows[0]?.clock_in;
+      const realDuration = clockIn
+        ? Math.round((autoClockOut.getTime() - clockIn.getTime()) / 60000)
+        : null;
+
+      await pool.query(
+        `UPDATE time_entries
+         SET clock_out=$1, duration_minutes=$2, auto_clocked_out=true
+         WHERE id=$3`,
+        [autoClockOut, realDuration, entry.id]
+      );
+
+      // Notify the employee
+      try {
+        const userRes = await pool.query<{ name: string }>(
+          `SELECT name FROM users WHERE id=$1`, [entry.user_id]
+        );
+        const name = userRes.rows[0]?.name ?? "Employee";
+        const hrs = realDuration ? (realDuration / 60).toFixed(1) : "?";
+        await notifyStaff({
+          userId: entry.user_id,
+          type: "auto_clocked_out",
+          title: "Auto Clock-Out",
+          message: `You were automatically clocked out after ${hrs}h because no response was received to the reminder.`,
+          link: "/time",
+          channels: ["inApp", "email"],
+          emailSubject: "Chapin Landscapes — You were automatically clocked out",
+          emailHtml: `<p>Hi ${name},</p><p>You were automatically clocked out after <strong>${hrs} hours</strong> because your clock-out reminder went unanswered for 30 minutes.</p><p>Please review your time entry at <a href="https://chapinhq.com/time">chapinhq.com/time</a> and contact your manager if an adjustment is needed.</p>`,
+        });
+        log(`[clockout-scheduler] Auto clocked out entry ${entry.id} for user ${entry.user_id} (${hrs}h)`, "scheduler");
+      } catch {}
+    }
+
+    // ── Step 2: Send reminders for entries ≥8h with no recent ping ────────────
+    const openRes = await pool.query<{
+      id: string; user_id: string; clock_in: Date; last_reminder_at: Date | null;
+    }>(`
+      SELECT id, user_id, clock_in, last_reminder_at
+      FROM time_entries
+      WHERE clock_out IS NULL
+        AND auto_clocked_out = false
+        AND NOW() - clock_in >= INTERVAL '8 hours'
+        AND (
+          last_reminder_at IS NULL
+          OR last_reminder_at <= NOW() - INTERVAL '2 hours'
+        )
+    `);
+
+    for (const entry of openRes.rows) {
+      const hoursIn = ((now.getTime() - new Date(entry.clock_in).getTime()) / 3_600_000).toFixed(1);
+
+      await pool.query(
+        `UPDATE time_entries SET last_reminder_at=NOW() WHERE id=$1`,
+        [entry.id]
+      );
+
+      try {
+        const userRes = await pool.query<{ name: string }>(
+          `SELECT name FROM users WHERE id=$1`, [entry.user_id]
+        );
+        const name = userRes.rows[0]?.name ?? "Employee";
+        await notifyStaff({
+          userId: entry.user_id,
+          type: "clockout_reminder",
+          title: "Still working?",
+          message: `You've been clocked in for ${hoursIn} hours. Please clock out when done — you'll be auto clocked out in 30 minutes if no action is taken.`,
+          link: "/time",
+          channels: ["inApp", "email"],
+          emailSubject: "Chapin Landscapes — Clock-out reminder",
+          emailHtml: `<p>Hi ${name},</p><p>You've been clocked in for <strong>${hoursIn} hours</strong>.</p><p>Please <a href="https://chapinhq.com/time">clock out</a> when you're done. If we don't hear back in 30 minutes, you'll be automatically clocked out.</p>`,
+        });
+        log(`[clockout-scheduler] Sent reminder for entry ${entry.id} (${hoursIn}h)`, "scheduler");
+      } catch {}
+    }
+  } catch (err: any) {
+    log(`[clockout-scheduler] Auto-clockout check error: ${err.message}`, "scheduler");
+  }
+}
+
 async function checkPendingApplicationFollowups(): Promise<void> {
   try {
     const allApps = await storage.getJobApplications?.() || [];
@@ -101,8 +210,16 @@ let schedulerInterval: ReturnType<typeof setInterval> | null = null;
 export function startNotificationScheduler(): void {
   if (schedulerInterval) clearInterval(schedulerInterval);
   log("Notification scheduler started (checking every 15 minutes)", "scheduler");
-  setTimeout(async () => { await checkInterviewReminders(); await checkPendingApplicationFollowups(); }, 30_000);
-  schedulerInterval = setInterval(async () => { await checkInterviewReminders(); await checkPendingApplicationFollowups(); }, CHECK_INTERVAL_MS);
+  setTimeout(async () => {
+    await checkInterviewReminders();
+    await checkPendingApplicationFollowups();
+    await checkAutoClockout();
+  }, 30_000);
+  schedulerInterval = setInterval(async () => {
+    await checkInterviewReminders();
+    await checkPendingApplicationFollowups();
+    await checkAutoClockout();
+  }, CHECK_INTERVAL_MS);
 }
 
 export function stopNotificationScheduler(): void {

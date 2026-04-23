@@ -582,6 +582,51 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── Admin: Edit any time entry ───────────────────────────────────────────────
+  app.patch("/api/admin/time-entries/:id", requireAuth, async (req, res) => {
+    const callerRole = (req.user as any)?.role;
+    const isMaster   = (req.user as any)?.isMasterAdmin;
+    if (!["Admin", "Manager"].includes(callerRole) && !isMaster) {
+      return res.status(403).json({ message: "Admins only" });
+    }
+
+    const { id } = req.params;
+    const { clock_in, clock_out, job_id, work_area_name, notes, entry_type } = req.body;
+
+    if (!clock_in) return res.status(400).json({ message: "clock_in is required" });
+
+    const cin  = new Date(clock_in);
+    const cout = clock_out ? new Date(clock_out) : null;
+
+    if (cout && cout <= cin) {
+      return res.status(400).json({ message: "clock_out must be after clock_in" });
+    }
+
+    const durationMinutes = cout
+      ? Math.round((cout.getTime() - cin.getTime()) / 60000)
+      : null;
+
+    try {
+      const result = await pool.query(
+        `UPDATE time_entries
+         SET clock_in         = $1,
+             clock_out        = $2,
+             duration_minutes = $3,
+             job_id           = $4,
+             work_area_name   = $5,
+             notes            = $6,
+             entry_type       = COALESCE($7, entry_type)
+         WHERE id = $8
+         RETURNING *`,
+        [cin, cout, durationMinutes, job_id ?? null, work_area_name ?? null, notes ?? null, entry_type ?? null, id]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ message: "Entry not found" });
+      return res.status(200).json(result.rows[0]);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── GPS Ping ────────────────────────────────────────────────────────────────
   app.post("/api/gps/ping", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;

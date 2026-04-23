@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { seedUsers, seedSampleData, seedDevelopmentTracker } from "./seed";
+import { seedUsers, seedSampleData, seedDevelopmentTracker, cleanupGibberishRecords } from "./seed";
 import { startMaintenanceScheduler } from "./maintenanceScheduler";
 import { runEquipmentMigration } from "./equipmentMigration";
 import { runTaskMigration } from "./taskMigration";
@@ -134,6 +134,7 @@ app.use((req, res, next) => {
   await registerRoutes(httpServer, app);
   
   await seedUsers();
+  await cleanupGibberishRecords();
   await seedSampleData();
   await seedOemTemplates();
   await seedDevelopmentTracker();

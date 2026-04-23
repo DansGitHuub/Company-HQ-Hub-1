@@ -1,4 +1,5 @@
 import { storage } from "./storage";
+import { pool } from "./db";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 
@@ -18,7 +19,7 @@ interface SeedUser {
   isMasterAdmin?: boolean;
 }
 
-const CHAPIN_LOCKED_PASSWORD = "PassW0rd123";
+const CHAPIN_LOCKED_PASSWORD = "Chapin123";
 
 export async function seedUsers(): Promise<void> {
   console.log("[seed] Startup check - running account maintenance...");
@@ -473,5 +474,57 @@ export async function seedSampleData(): Promise<void> {
     }
   } catch (error) {
     console.error("[seed] Error seeding sample data:", error);
+  }
+}
+
+/**
+ * One-time cleanup: strip random suffix tokens from test records that were
+ * accidentally persisted across all tables.  Safe to run on every boot —
+ * uses exact or pattern matching so it only touches the known bad rows.
+ */
+export async function cleanupGibberishRecords(): Promise<void> {
+  try {
+    // ── Jobs: exact-match known titles, replace with clean names ─────────────
+    const jobFixes: Array<{ from: string; to: string }> = [
+      { from: "Job Update Test sEx8di",                                        to: "Test Job Update" },
+      { from: "Maintenance Job Test b_Q0knMaintenance Job Test dJ01RP",        to: "Test Maintenance Job" },
+    ];
+    for (const fix of jobFixes) {
+      const r = await pool.query(
+        `UPDATE jobs SET title=$1 WHERE title=$2`,
+        [fix.to, fix.from]
+      );
+      if (r.rowCount && r.rowCount > 0)
+        console.log(`[seed] Renamed job: "${fix.from}" → "${fix.to}"`);
+    }
+
+    // ── Customers: strip " - EST<digits>" suffix from any name field ──────────
+    // Covers the production record "Suzie Tester-Bed Planting Side Yard - EST4922257"
+    // and any future EST+digits test records.
+    const customerFields = ["first_name", "last_name", "company_name"] as const;
+    for (const col of customerFields) {
+      const r = await pool.query(
+        `UPDATE customers
+         SET ${col} = TRIM(REGEXP_REPLACE(${col}, ' - EST[0-9]+$', '', 'g'))
+         WHERE ${col} ~ ' - EST[0-9]+$'`
+      );
+      if (r.rowCount && r.rowCount > 0)
+        console.log(`[seed] Stripped EST+digits suffix from ${r.rowCount} customer.${col} row(s)`);
+    }
+
+    // ── Jobs: strip " - EST<digits>" or trailing random 6+ char suffix ────────
+    const jobRes = await pool.query(
+      `UPDATE jobs
+       SET title = TRIM(REGEXP_REPLACE(
+                     REGEXP_REPLACE(title, ' - EST[0-9]+$', '', 'g'),
+                     '[_-][A-Za-z0-9]{6,}$', '', 'g'
+                   ))
+       WHERE title ~ ' - EST[0-9]+$' OR title ~ '[_-][A-Za-z0-9]{6,}$'`
+    );
+    if (jobRes.rowCount && jobRes.rowCount > 0)
+      console.log(`[seed] Stripped gibberish suffix from ${jobRes.rowCount} job title(s)`);
+
+  } catch (err: any) {
+    console.error("[seed] cleanupGibberishRecords error:", err.message);
   }
 }

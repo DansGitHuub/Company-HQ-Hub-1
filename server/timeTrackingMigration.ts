@@ -47,6 +47,13 @@ export async function runTimeTrackingMigration() {
         END IF;
       END $$;
     `);
+    // ── Auto-clockout reminder columns ────────────────────────────────────────
+    await pool.query(`
+      ALTER TABLE time_entries
+        ADD COLUMN IF NOT EXISTS auto_clocked_out BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS last_reminder_at TIMESTAMPTZ;
+    `);
+
     console.log("[migration] Time tracking tables ready");
   } catch (err: any) {
     console.error("[migration] Time tracking migration error:", err.message);

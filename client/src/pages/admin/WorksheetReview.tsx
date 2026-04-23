@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -16,6 +17,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,8 +31,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, ClipboardList, Users, Clock, Calendar, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Loader2,
+  ClipboardList,
+  Clock,
+  RotateCcw,
+  ChevronDown,
+  ChevronRight,
+  Pencil,
+} from "lucide-react";
 import { format, parseISO, startOfWeek, endOfWeek } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 interface WorksheetEntry {
   id: string;
@@ -41,6 +58,7 @@ interface WorksheetEntry {
   work_area_name: string | null;
   notes: string | null;
   approval_status: string;
+  auto_clocked_out: boolean;
 }
 
 interface Employee { id: string; name: string | null; username: string; }
@@ -55,6 +73,8 @@ interface ReviewData {
     uniqueDays: number;
   };
 }
+
+interface Job { id: string; title: string; }
 
 const ENTRY_TYPE_LABELS: Record<string, string> = {
   billable:   "Billable",
@@ -94,6 +114,14 @@ function fmtTime(iso: string) {
   try { return format(parseISO(iso), "h:mm a"); } catch { return iso; }
 }
 
+function toLocalDatetimeValue(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch { return ""; }
+}
+
 function defaultRange() {
   const now = new Date();
   const start = startOfWeek(now, { weekStartsOn: 1 });
@@ -106,9 +134,21 @@ function defaultRange() {
 
 type GroupMode = "employee" | "date";
 
+interface EditState {
+  id: string;
+  clock_in: string;
+  clock_out: string;
+  job_id: string;
+  work_area_name: string;
+  notes: string;
+  entry_type: string;
+}
+
 export default function WorksheetReview() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const isAdmin = (user as any)?.role === "Admin" || (user as any)?.role === "Manager" || (user as any)?.isMasterAdmin;
 
@@ -118,6 +158,7 @@ export default function WorksheetReview() {
   const [employeeId, setEmployeeId] = useState("all");
   const [groupMode,  setGroupMode]  = useState<GroupMode>("employee");
   const [collapsed,  setCollapsed]  = useState<Record<string, boolean>>({});
+  const [editEntry,  setEditEntry]  = useState<EditState | null>(null);
 
   const queryParams = new URLSearchParams({
     startDate,
@@ -130,6 +171,35 @@ export default function WorksheetReview() {
     queryFn: () =>
       apiRequest("GET", `/api/admin/worksheet-review?${queryParams}`).then((r) => r.json()),
     enabled: isAdmin,
+  });
+
+  const { data: jobsData } = useQuery<Job[]>({
+    queryKey: ["/api/jobs"],
+    queryFn: () => apiRequest("GET", "/api/jobs").then((r) => r.json()),
+    enabled: isAdmin,
+  });
+
+  const editMutation = useMutation({
+    mutationFn: (payload: EditState) =>
+      apiRequest("PATCH", `/api/admin/time-entries/${payload.id}`, {
+        clock_in:       payload.clock_in,
+        clock_out:      payload.clock_out || null,
+        job_id:         payload.job_id === "__none__" ? null : payload.job_id || null,
+        work_area_name: payload.work_area_name || null,
+        notes:          payload.notes || null,
+        entry_type:     payload.entry_type || null,
+      }).then((r) => {
+        if (!r.ok) return r.json().then((e: any) => Promise.reject(new Error(e.message)));
+        return r.json();
+      }),
+    onSuccess: () => {
+      toast({ title: "Entry updated", description: "Time entry saved successfully." });
+      setEditEntry(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/worksheet-review"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    },
   });
 
   const grouped = useMemo(() => {
@@ -154,6 +224,18 @@ export default function WorksheetReview() {
 
   const toggleGroup = (key: string) =>
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  function openEdit(entry: WorksheetEntry) {
+    setEditEntry({
+      id:             entry.id,
+      clock_in:       toLocalDatetimeValue(entry.clock_in),
+      clock_out:      entry.clock_out ? toLocalDatetimeValue(entry.clock_out) : "",
+      job_id:         entry.job_id ?? "__none__",
+      work_area_name: entry.work_area_name ?? "",
+      notes:          entry.notes ?? "",
+      entry_type:     entry.entry_type ?? "billable",
+    });
+  }
 
   if (!isAdmin) {
     return (
@@ -345,7 +427,8 @@ export default function WorksheetReview() {
                             <TableHead>Duración</TableHead>
                             <TableHead>Tipo</TableHead>
                             <TableHead>Estado</TableHead>
-                            <TableHead className="pr-5">Notas</TableHead>
+                            <TableHead className="pr-2">Notas</TableHead>
+                            <TableHead className="pr-5 w-10" />
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -381,7 +464,16 @@ export default function WorksheetReview() {
                                   {entry.clock_out ? fmtTime(entry.clock_out) : "—"}
                                 </TableCell>
                                 <TableCell className="whitespace-nowrap text-sm font-semibold text-gray-800">
-                                  {formatDuration(entry.duration_minutes, entry.clock_in, entry.clock_out)}
+                                  <span>{formatDuration(entry.duration_minutes, entry.clock_in, entry.clock_out)}</span>
+                                  {entry.auto_clocked_out && (
+                                    <span
+                                      className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium align-middle"
+                                      data-testid={`badge-auto-${entry.id}`}
+                                      title="Auto clocked out"
+                                    >
+                                      Auto
+                                    </span>
+                                  )}
                                 </TableCell>
                                 <TableCell>
                                   <span
@@ -401,8 +493,20 @@ export default function WorksheetReview() {
                                     {statusCfg.label}
                                   </span>
                                 </TableCell>
-                                <TableCell className="pr-5 max-w-[200px]">
+                                <TableCell className="pr-2 max-w-[180px]">
                                   <p className="truncate text-sm text-gray-500">{entry.notes || "—"}</p>
+                                </TableCell>
+                                <TableCell className="pr-5">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 text-gray-400 hover:text-gray-700"
+                                    onClick={(e) => { e.stopPropagation(); openEdit(entry); }}
+                                    data-testid={`button-edit-entry-${entry.id}`}
+                                    title="Edit entry"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </Button>
                                 </TableCell>
                               </TableRow>
                             );
@@ -417,6 +521,123 @@ export default function WorksheetReview() {
           })}
         </div>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editEntry} onOpenChange={(open) => { if (!open) setEditEntry(null); }}>
+        <DialogContent className="sm:max-w-lg" data-testid="dialog-edit-entry">
+          <DialogHeader>
+            <DialogTitle>Edit Time Entry</DialogTitle>
+          </DialogHeader>
+
+          {editEntry && (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-clock-in">Clock In</Label>
+                  <Input
+                    id="edit-clock-in"
+                    type="datetime-local"
+                    value={editEntry.clock_in}
+                    onChange={(e) => setEditEntry((s) => s && { ...s, clock_in: e.target.value })}
+                    data-testid="input-edit-clock-in"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-clock-out">Clock Out</Label>
+                  <Input
+                    id="edit-clock-out"
+                    type="datetime-local"
+                    value={editEntry.clock_out}
+                    onChange={(e) => setEditEntry((s) => s && { ...s, clock_out: e.target.value })}
+                    data-testid="input-edit-clock-out"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Job</Label>
+                <Select
+                  value={editEntry.job_id}
+                  onValueChange={(v) => setEditEntry((s) => s && { ...s, job_id: v })}
+                >
+                  <SelectTrigger data-testid="select-edit-job">
+                    <SelectValue placeholder="No job" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— No job —</SelectItem>
+                    {(jobsData ?? []).map((j) => (
+                      <SelectItem key={j.id} value={j.id} data-testid={`option-job-${j.id}`}>
+                        {j.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Entry Type</Label>
+                  <Select
+                    value={editEntry.entry_type}
+                    onValueChange={(v) => setEditEntry((s) => s && { ...s, entry_type: v })}
+                  >
+                    <SelectTrigger data-testid="select-edit-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="billable">Billable</SelectItem>
+                      <SelectItem value="drive_time">Drive Time</SelectItem>
+                      <SelectItem value="shop_time">Shop Time</SelectItem>
+                      <SelectItem value="break">Break</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-area">Work Area</Label>
+                  <Input
+                    id="edit-area"
+                    value={editEntry.work_area_name}
+                    onChange={(e) => setEditEntry((s) => s && { ...s, work_area_name: e.target.value })}
+                    placeholder="e.g. Front yard"
+                    data-testid="input-edit-area"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-notes">Notes</Label>
+                <Textarea
+                  id="edit-notes"
+                  rows={3}
+                  value={editEntry.notes}
+                  onChange={(e) => setEditEntry((s) => s && { ...s, notes: e.target.value })}
+                  placeholder="Optional notes…"
+                  data-testid="input-edit-notes"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditEntry(null)}
+              data-testid="button-edit-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => editEntry && editMutation.mutate(editEntry)}
+              disabled={editMutation.isPending || !editEntry?.clock_in}
+              data-testid="button-edit-save"
+            >
+              {editMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
+              ) : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

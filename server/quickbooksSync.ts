@@ -131,6 +131,10 @@ async function syncCustomers(tok: any) {
         .filter((c: any) => c.PrimaryEmailAddr?.Address)
         .map((c: any) => [c.PrimaryEmailAddr.Address.toLowerCase(), c])
     );
+    // Build lookup: DisplayName → QB customer (proactive duplicate prevention)
+    const qbByDisplayName = new Map(
+      qbCustomers.map((c: any) => [c.DisplayName?.toLowerCase().trim(), c])
+    );
 
     // ── PUSH: Local customers without qb_customer_id ──────────────────────────
     const { rows: localCustomers } = await pool.query(
@@ -139,9 +143,14 @@ async function syncCustomers(tok: any) {
 
     for (const lc of localCustomers) {
       try {
-        // Try to match by email
+        // Try to match by email first, then by DisplayName (proactive — avoids 6240 errors)
         const email = (lc.email ?? "").toLowerCase();
-        let matched = email ? qbByEmail.get(email) : null;
+        const displayNameKey = (
+          lc.company_name ||
+          `${lc.first_name ?? ""} ${lc.last_name ?? ""}`.trim() ||
+          "Unknown"
+        ).toLowerCase().trim();
+        let matched = (email ? qbByEmail.get(email) : null) ?? qbByDisplayName.get(displayNameKey) ?? null;
 
         if (matched) {
           // Link existing QB customer
