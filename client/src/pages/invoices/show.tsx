@@ -237,7 +237,7 @@ export default function InvoiceDetailPage() {
   }
 
   const statusInfo = STATUS_MAP[invoice.status] ?? { cls: "bg-muted text-muted-foreground" };
-  const statusLabel = STATUS_VALUE_KEYS[invoice.status] ? t(STATUS_VALUE_KEYS[invoice.status]) : invoice.status;
+  const statusLabel = STATUS_VALUE_KEYS[invoice.status] ? t(STATUS_VALUE_KEYS[invoice.status]) : "—";
   const custName = invoice.cust_first
     ? `${invoice.cust_first} ${invoice.cust_last}`
     : invoice.cust_company ?? undefined;

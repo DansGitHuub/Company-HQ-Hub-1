@@ -50,7 +50,7 @@ const STATUS_LABEL_KEY: Record<string, string> = {
 export function StatusBadge({ status }: { status: string }) {
   const { t } = useTranslation("invoices");
   const s = STATUS_MAP[status] ?? { cls: "bg-muted text-muted-foreground" };
-  const label = STATUS_LABEL_KEY[status] ? t(STATUS_LABEL_KEY[status]) : status;
+  const label = STATUS_LABEL_KEY[status] ? t(STATUS_LABEL_KEY[status]) : "—";
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${s.cls}`}>
       {label}
