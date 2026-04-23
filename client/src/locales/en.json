@@ -355,7 +355,29 @@
     "notificationsEnabled": "Email notifications enabled",
     "notificationsDisabled": "Email notifications disabled",
     "on": "On",
-    "off": "Off"
+    "off": "Off",
+    "themeUpdated": "Theme updated",
+    "themeUpdateFailed": "Failed to save theme",
+    "themeUpdateFailedDesc": "Your theme preference couldn't be saved. Please try again.",
+    "passwordChangedDesc": "Your password has been updated successfully",
+    "passwordTooShort": "Password too short",
+    "passwordTooShortDesc": "Password must be at least 6 characters",
+    "invalidImageType": "Please select an image file",
+    "imageTooLarge": "Image must be less than 5MB",
+    "voiceSettings": {
+      "title": "Voice Settings",
+      "subtitle": "Configure speech-to-text and text-to-speech for the AI Assistant",
+      "featuresLabel": "Voice Features",
+      "featuresDesc": "Enable voice input and spoken responses",
+      "autoSpeak": "Auto-speak responses",
+      "autoSpeakDesc": "AI responses are read aloud automatically",
+      "voiceLabel": "AI Voice",
+      "preview": "Preview",
+      "voiceDesc": "Choose the voice your AI assistant uses when speaking responses",
+      "updated": "Voice settings updated",
+      "updateFailed": "Failed to update voice settings",
+      "previewFailed": "Failed to preview voice"
+    }
   },
   "voice": {
     "title": "AI Voice Settings",

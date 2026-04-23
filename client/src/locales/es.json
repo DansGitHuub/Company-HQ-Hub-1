@@ -355,7 +355,29 @@
     "notificationsEnabled": "Notificaciones por correo activadas",
     "notificationsDisabled": "Notificaciones por correo desactivadas",
     "on": "Activado",
-    "off": "Desactivado"
+    "off": "Desactivado",
+    "themeUpdated": "Tema actualizado",
+    "themeUpdateFailed": "Error al guardar el tema",
+    "themeUpdateFailedDesc": "No se pudo guardar su preferencia de tema. Por favor, inténtelo de nuevo.",
+    "passwordChangedDesc": "Su contraseña ha sido actualizada exitosamente",
+    "passwordTooShort": "Contraseña demasiado corta",
+    "passwordTooShortDesc": "La contraseña debe tener al menos 6 caracteres",
+    "invalidImageType": "Por favor, seleccione un archivo de imagen",
+    "imageTooLarge": "La imagen debe ser menor a 5 MB",
+    "voiceSettings": {
+      "title": "Configuración de Voz",
+      "subtitle": "Configure el reconocimiento de voz y la síntesis de texto para el Asistente IA",
+      "featuresLabel": "Funciones de Voz",
+      "featuresDesc": "Activar entrada de voz y respuestas habladas",
+      "autoSpeak": "Responder automáticamente en voz",
+      "autoSpeakDesc": "Las respuestas del asistente IA se leen en voz alta automáticamente",
+      "voiceLabel": "Voz del Asistente IA",
+      "preview": "Vista previa",
+      "voiceDesc": "Elija la voz que usará su asistente IA al hablar las respuestas",
+      "updated": "Configuración de voz actualizada",
+      "updateFailed": "Error al actualizar la configuración de voz",
+      "previewFailed": "Error al previsualizar la voz"
+    }
   },
   "voice": {
     "title": "Configuración de Voz del Asistente IA",

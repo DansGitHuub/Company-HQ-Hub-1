@@ -72,6 +72,7 @@ const VOICE_OPTIONS = [
 
 function VoiceSettingsSection() {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [isPreviewing, setIsPreviewing] = useState(false);
 
   const { data: voiceSettings, isLoading } = useQuery({
@@ -91,10 +92,10 @@ function VoiceSettingsSection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/voice-settings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      toast({ title: "Voice settings updated" });
+      toast({ title: t("profile.voiceSettings.updated") });
     },
     onError: () => {
-      toast({ title: "Failed to update voice settings", variant: "destructive" });
+      toast({ title: t("profile.voiceSettings.updateFailed"), variant: "destructive" });
     },
   });
 
@@ -139,7 +140,7 @@ function VoiceSettingsSection() {
       source.start(0);
     } catch (err) {
       setIsPreviewing(false);
-      toast({ title: "Failed to preview voice", variant: "destructive" });
+      toast({ title: t("profile.voiceSettings.previewFailed"), variant: "destructive" });
     }
   };
 
@@ -150,17 +151,17 @@ function VoiceSettingsSection() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Volume2 className="h-5 w-5" />
-          Voice Settings
+          {t("profile.voiceSettings.title")}
         </CardTitle>
-        <CardDescription>Configure speech-to-text and text-to-speech for the AI Assistant</CardDescription>
+        <CardDescription>{t("profile.voiceSettings.subtitle")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label className="flex items-center gap-2">
-              <Mic className="h-4 w-4" /> Voice Features
+              <Mic className="h-4 w-4" /> {t("profile.voiceSettings.featuresLabel")}
             </Label>
-            <p className="text-sm text-muted-foreground">Enable voice input and spoken responses</p>
+            <p className="text-sm text-muted-foreground">{t("profile.voiceSettings.featuresDesc")}</p>
           </div>
           <Switch
             checked={voiceSettings?.voiceEnabled ?? false}
@@ -174,9 +175,9 @@ function VoiceSettingsSection() {
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label className="flex items-center gap-2">
-                  <Volume2 className="h-4 w-4" /> Auto-speak responses
+                  <Volume2 className="h-4 w-4" /> {t("profile.voiceSettings.autoSpeak")}
                 </Label>
-                <p className="text-sm text-muted-foreground">AI responses are read aloud automatically</p>
+                <p className="text-sm text-muted-foreground">{t("profile.voiceSettings.autoSpeakDesc")}</p>
               </div>
               <Switch
                 checked={voiceSettings?.voiceAutoSpeak ?? false}
@@ -186,7 +187,7 @@ function VoiceSettingsSection() {
             </div>
 
             <div className="space-y-2">
-              <Label>AI Voice</Label>
+              <Label>{t("profile.voiceSettings.voiceLabel")}</Label>
               <div className="flex items-center gap-2">
                 <Select
                   value={voiceSettings?.voiceSelection || "alloy"}
@@ -218,11 +219,11 @@ function VoiceSettingsSection() {
                   ) : (
                     <Play className="h-4 w-4 mr-1" />
                   )}
-                  Preview
+                  {t("profile.voiceSettings.preview")}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Choose the voice your AI assistant uses when speaking responses
+                {t("profile.voiceSettings.voiceDesc")}
               </p>
             </div>
           </>
@@ -287,15 +288,15 @@ export default function Profile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      toast({ title: "Theme updated" });
+      toast({ title: t("profile.themeUpdated") });
     },
     onError: (error: Error, themeId: ThemeId) => {
       const previousTheme = profile?.theme as ThemeId || "forest";
       setSelectedTheme(previousTheme);
       applyTheme(getTheme(previousTheme));
       toast({ 
-        title: "Failed to save theme", 
-        description: "Your theme preference couldn't be saved. Please try again.",
+        title: t("profile.themeUpdateFailed"), 
+        description: t("profile.themeUpdateFailedDesc"),
         variant: "destructive" 
       });
     },
@@ -321,7 +322,7 @@ export default function Profile() {
       setHasChanges(false);
     },
     onError: () => {
-      toast({ title: "Failed to update profile", variant: "destructive" });
+      toast({ title: t("profile.profileUpdateFailed"), variant: "destructive" });
     },
   });
 
@@ -335,24 +336,24 @@ export default function Profile() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Password changed", description: "Your password has been updated successfully" });
+      toast({ title: t("profile.passwordChanged"), description: t("profile.passwordChangedDesc") });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to change password", description: error.message, variant: "destructive" });
+      toast({ title: t("profile.passwordChangeFailed"), description: error.message, variant: "destructive" });
     },
   });
 
   const handlePasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      toast({ title: "Passwords don't match", description: "New password and confirmation must match", variant: "destructive" });
+      toast({ title: t("profile.passwordMismatch"), variant: "destructive" });
       return;
     }
     if (newPassword.length < 6) {
-      toast({ title: "Password too short", description: "Password must be at least 6 characters", variant: "destructive" });
+      toast({ title: t("profile.passwordTooShort"), description: t("profile.passwordTooShortDesc"), variant: "destructive" });
       return;
     }
     passwordMutation.mutate({ currentPassword, newPassword });
@@ -373,12 +374,12 @@ export default function Profile() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      toast({ title: "Please select an image file", variant: "destructive" });
+      toast({ title: t("profile.invalidImageType"), variant: "destructive" });
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "Image must be less than 5MB", variant: "destructive" });
+      toast({ title: t("profile.imageTooLarge"), variant: "destructive" });
       return;
     }
 
@@ -407,9 +408,9 @@ export default function Profile() {
       if (!uploadRes.ok) throw new Error("Failed to upload image");
 
       await updateMutation.mutateAsync({ profilePicture: objectPath });
-      toast({ title: "Profile picture updated" });
+      toast({ title: t("profile.photoUpdated") });
     } catch (error) {
-      toast({ title: "Failed to upload image", variant: "destructive" });
+      toast({ title: t("profile.photoUploadFailed"), variant: "destructive" });
     } finally {
       setIsUploading(false);
     }
