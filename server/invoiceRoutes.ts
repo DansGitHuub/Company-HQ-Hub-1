@@ -235,8 +235,8 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
     if (!status) return res.status(400).json({ message: "status required" });
     try {
       const { rows } = await pool.query(
-        `UPDATE invoices SET status=$1, updated_at=NOW(), amount_paid=CASE WHEN $1='paid' THEN total ELSE amount_paid END, balance_due=CASE WHEN $1='paid' THEN 0 ELSE balance_due END, paid_at=CASE WHEN $1='paid' AND paid_at IS NULL THEN NOW() ELSE paid_at END WHERE id=$2 RETURNING *`,
-        [status, req.params.id]
+        `UPDATE invoices SET status=$1, updated_at=NOW(), amount_paid=CASE WHEN $2='paid' THEN total ELSE amount_paid END, balance_due=CASE WHEN $2='paid' THEN 0 ELSE balance_due END, paid_at=CASE WHEN $2='paid' AND paid_at IS NULL THEN NOW() ELSE paid_at END WHERE id=$3 RETURNING *`,
+        [status, status, req.params.id]
       );
       if (rows.length === 0) return res.status(404).json({ message: "Not found" });
       return res.json(rows[0]);
