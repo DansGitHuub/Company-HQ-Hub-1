@@ -64,6 +64,8 @@ import {
 } from "lucide-react";
 import {
   AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -73,7 +75,7 @@ import {
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import StepTemplate from "@/components/StepTemplate";
 import FormTemplate, { FORM_THEMES } from "@/components/FormTemplate";
 
@@ -957,11 +959,11 @@ export default function Forms() {
         />
       )}
       {view === "form-library" && <FormLibrary onOpenForm={(id: string) => { setSelectedFormId(id); setView("form-detail"); }} />}
-      {view === "form-detail" && selectedFormId && <FormDetail formId={selectedFormId} onFillForm={() => setView("form-fill")} />}
+      {view === "form-detail" && selectedFormId && <FormDetail formId={selectedFormId} onFillForm={() => setView("form-fill")} onArchived={() => { setSelectedFormId(null); setView("form-library"); }} />}
       {view === "form-fill" && selectedFormId && <FormFill formId={selectedFormId} onSubmitted={() => { setView("home"); setSelectedFormId(null); }} />}
-      {view === "update-existing" && <UpdateExisting />}
+      {view === "update-existing" && <UpdateExisting onOpenForm={(id: string) => { setSelectedFormId(id); setView("form-detail"); }} />}
       {view === "form-drafts" && <FormDrafts />}
-      {view === "share-forms" && <ShareForms />}
+      {view === "share-forms" && <ShareForms onOpenForm={(id: string) => { setSelectedFormId(id); setView("form-detail"); }} />}
       {view === "build-packet" && <BuildPacket />}
       {view === "discontinued" && <DiscontinuedForms />}
       {view === "pdf-forms" && <PdfFormsLibrary onFillForm={(id: string) => { setSelectedPdfFormId(id); setView("pdf-fill"); }} />}
@@ -2401,13 +2403,32 @@ function FormLibrary({ onOpenForm }: { onOpenForm: (id: string) => void }) {
   );
 }
 
-function FormDetail({ formId, onFillForm }: { formId: string; onFillForm: () => void }) {
+function FormDetail({ formId, onFillForm, onArchived }: { formId: string; onFillForm: () => void; onArchived: () => void }) {
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
+  const { toast } = useToast();
+
   const { data: form, isLoading } = useQuery<any>({
     queryKey: ["/api/builder-forms", formId],
     queryFn: async () => {
       const res = await fetch(`/api/builder-forms/${formId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load form");
       return res.json();
+    },
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/builder-forms/${formId}/archive`, {});
+      if (!res.ok) throw new Error("Failed to archive form");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/builder-forms"] });
+      toast({ title: "Form Archived", description: `"${form?.name}" has been removed from the library.` });
+      onArchived();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Could not archive the form. Please try again.", variant: "destructive" });
     },
   });
 
@@ -2445,9 +2466,40 @@ function FormDetail({ formId, onFillForm }: { formId: string; onFillForm: () => 
         {form.createdAt && (
           <p className="text-sm text-muted-foreground mt-2">Created {new Date(form.createdAt).toLocaleDateString()}</p>
         )}
-        <Button onClick={onFillForm} className="mt-4 gap-2" data-testid="button-fill-form">
-          <FileEdit className="h-4 w-4" /> Test / Fill Out This Form
-        </Button>
+        <div className="flex flex-wrap gap-2 mt-4">
+          <Button onClick={onFillForm} className="gap-2" data-testid="button-fill-form">
+            <FileEdit className="h-4 w-4" /> Test / Fill Out This Form
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2 border-red-200 text-red-600 hover:bg-red-50"
+            onClick={() => setShowArchiveDialog(true)}
+            disabled={archiveMutation.isPending}
+            data-testid="button-archive-form"
+          >
+            {archiveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
+            Archive
+          </Button>
+        </div>
+        <AlertDialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Archive this form?</AlertDialogTitle>
+              <AlertDialogDescription>
+                "{form?.name}" will be removed from the Form Library. This can be undone by an admin via the database if needed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={() => archiveMutation.mutate()}
+              >
+                Archive
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {form.outcome && (
@@ -2829,17 +2881,69 @@ function FormFill({ formId, onSubmitted }: { formId: string; onSubmitted: () => 
 }
 
 
-function UpdateExisting() {
+function UpdateExisting({ onOpenForm }: { onOpenForm: (id: string) => void }) {
+  const [search, setSearch] = useState("");
+
+  const { data: forms = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/builder-forms"],
+    queryFn: async () => {
+      const res = await fetch("/api/builder-forms?archived=false", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load forms");
+      return res.json();
+    },
+  });
+
+  const filtered = forms.filter((f: any) =>
+    !search || f.name?.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div data-testid="view-update-existing">
       <SectionHeader icon={RefreshCw} title="Update an Existing Form" description="Select a published form to edit its fields, settings, or layout." />
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search for a form to update..." className="pl-9" data-testid="input-search-update" />
+          <Input
+            placeholder="Search for a form to update..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            data-testid="input-search-update"
+          />
         </div>
       </div>
-      <EmptyState icon={RefreshCw} message="No forms available to update" submessage="Published forms will appear here so you can make changes." />
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={RefreshCw} message="No forms available to update" submessage="Published forms will appear here so you can make changes." />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filtered.map((form: any) => (
+            <Card key={form.id} className="transition-all hover:shadow-md hover:border-primary/40" data-testid={`card-update-form-${form.id}`}>
+              <CardContent className="p-5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold truncate">{form.name}</p>
+                  <div className="flex gap-1.5 mt-1 flex-wrap">
+                    {form.category && <Badge variant="secondary" className="text-xs">{form.category}</Badge>}
+                    {form.purpose && <Badge variant="outline" className="text-xs">{form.purpose}</Badge>}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 flex-shrink-0"
+                  onClick={() => onOpenForm(form.id)}
+                  data-testid={`button-edit-form-${form.id}`}
+                >
+                  <FileEdit className="h-3.5 w-3.5" /> Edit
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -2859,34 +2963,79 @@ function FormDrafts() {
   );
 }
 
-function ShareForms() {
+function ShareForms({ onOpenForm }: { onOpenForm: (id: string) => void }) {
+  const [search, setSearch] = useState("");
+
+  const { data: forms = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/builder-forms"],
+    queryFn: async () => {
+      const res = await fetch("/api/builder-forms?archived=false", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load forms");
+      return res.json();
+    },
+  });
+
+  const filtered = forms.filter((f: any) =>
+    !search || f.name?.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div data-testid="view-share-forms">
       <SectionHeader icon={Share2} title="Share Forms" description="Send forms to employees, customers, or anyone who needs to fill them out." />
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search forms to share..." className="pl-9" data-testid="input-search-share" />
+          <Input
+            placeholder="Search forms to share..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            data-testid="input-search-share"
+          />
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        {[
-          { label: "Copy Link", desc: "Get a shareable link to the form", icon: Link2 },
-          { label: "Email Form", desc: "Send directly via email", icon: Mail },
-          { label: "Duplicate & Share", desc: "Make a copy and share it separately", icon: Copy },
-        ].map((item) => (
-          <Card key={item.label} className="cursor-pointer transition-all hover:border-primary hover:shadow-md hover:scale-[1.02]" data-testid={`card-share-${item.label.toLowerCase().replace(/\s+/g, "-")}`}>
-            <CardContent className="p-5 flex items-start gap-3">
-              <div className="rounded-lg bg-cyan-100 p-2 mt-0.5"><item.icon className="h-5 w-5 text-cyan-700" /></div>
-              <div>
-                <div className="font-semibold">{item.label}</div>
-                <div className="text-sm text-muted-foreground mt-0.5">{item.desc}</div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      <EmptyState icon={Send} message="No forms to share yet" submessage="Build and publish a form first, then you can share it from here." />
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={Send} message="No forms to share yet" submessage="Build and publish a form first, then you can share it from here." />
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((form: any) => (
+            <Card key={form.id} className="transition-all hover:shadow-md hover:border-primary/40" data-testid={`card-share-form-${form.id}`}>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold truncate">{form.name}</p>
+                    <div className="flex gap-1.5 mt-1 flex-wrap">
+                      {form.category && <Badge variant="secondary" className="text-xs">{form.category}</Badge>}
+                      {form.purpose && <Badge variant="outline" className="text-xs">{form.purpose}</Badge>}
+                    </div>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => onOpenForm(form.id)} data-testid={`button-view-form-${form.id}`}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs" data-testid={`button-copy-link-${form.id}`}
+                    onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/forms/${form.id}/fill`); }}>
+                    <Link2 className="h-3.5 w-3.5" /> Copy Link
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs" data-testid={`button-email-form-${form.id}`}
+                    onClick={() => { window.open(`mailto:?subject=${encodeURIComponent(form.name)}&body=${encodeURIComponent(`${window.location.origin}/forms/${form.id}/fill`)}`); }}>
+                    <Mail className="h-3.5 w-3.5" /> Email
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs" data-testid={`button-duplicate-form-${form.id}`}
+                    onClick={() => onOpenForm(form.id)}>
+                    <Copy className="h-3.5 w-3.5" /> Duplicate &amp; Share
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

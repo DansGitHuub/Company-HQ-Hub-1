@@ -452,6 +452,22 @@ export default function DiagnosticReport() {
   const [isAdvanced, setIsAdvanced] = useState(false);
   const { toast } = useToast();
 
+  const resolveAllMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/diagnostics/errors/resolve-all", {});
+      if (!res.ok) throw new Error("Failed to resolve errors");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/diagnostics/report/simple"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/diagnostics/report/advanced"] });
+      toast({ title: "All Errors Resolved", description: `${data.resolved} error${data.resolved !== 1 ? "s" : ""} marked as resolved.` });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to resolve errors. Please try again.", variant: "destructive" });
+    },
+  });
+
   const { data: simpleReport, isLoading: isLoadingSimple, refetch: refetchSimple } = useQuery<SimpleReport>({
     queryKey: ["/api/admin/diagnostics/report/simple"],
     enabled: !isAdvanced,
@@ -545,6 +561,23 @@ export default function DiagnosticReport() {
                 <Download className="h-4 w-4 mr-2" />
                 Download
               </Button>
+              {((simpleReport?.systemHealth.unresolvedIssues ?? 0) > 0 || (advancedReport?.systemHealth.unresolvedErrors ?? 0) > 0) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => resolveAllMutation.mutate()}
+                  disabled={resolveAllMutation.isPending}
+                  data-testid="button-resolve-all-errors"
+                  className="border-green-300 text-green-700 hover:bg-green-50"
+                >
+                  {resolveAllMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Mark All Resolved
+                </Button>
+              )}
             </div>
 
             {isLoading ? (

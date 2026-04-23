@@ -8929,6 +8929,16 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
   
+  // Bulk-resolve all unresolved errors
+  app.post("/api/admin/diagnostics/errors/resolve-all", requireAuth, requireMasterAdmin, async (req, res) => {
+    try {
+      const count = await storage.resolveAllErrorLogs(req.user!.id);
+      res.json({ resolved: count });
+    } catch (err) {
+      res.status(500).json({ message: "Error resolving error logs" });
+    }
+  });
+
   // Update error (mark as resolved, etc.)
   app.patch("/api/admin/diagnostics/errors/:id", requireAuth, requireMasterAdmin, async (req, res) => {
     try {

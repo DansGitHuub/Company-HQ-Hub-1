@@ -532,6 +532,7 @@ export interface IStorage {
   getErrorLogs(filters?: { severity?: string; feature?: string; isResolved?: boolean; limit?: number }): Promise<ErrorLog[]>;
   createErrorLog(log: InsertErrorLog): Promise<ErrorLog>;
   updateErrorLog(id: string, updates: Partial<ErrorLog>): Promise<ErrorLog | undefined>;
+  resolveAllErrorLogs(resolvedById: string): Promise<number>;
   getErrorStats(): Promise<{ total: number; unresolved: number; bySeverity: Record<string, number>; byFeature: Record<string, number> }>;
   
   // Marketing Campaigns
@@ -2550,6 +2551,14 @@ export class DatabaseStorage implements IStorage {
   async updateErrorLog(id: string, updates: Partial<ErrorLog>): Promise<ErrorLog | undefined> {
     const [updated] = await db.update(errorLogs).set(updates).where(eq(errorLogs.id, id)).returning();
     return updated || undefined;
+  }
+
+  async resolveAllErrorLogs(resolvedById: string): Promise<number> {
+    const result = await db.update(errorLogs)
+      .set({ isResolved: true, resolvedAt: new Date(), resolvedBy: resolvedById })
+      .where(eq(errorLogs.isResolved, false))
+      .returning();
+    return result.length;
   }
 
   async getErrorStats(): Promise<{ total: number; unresolved: number; bySeverity: Record<string, number>; byFeature: Record<string, number> }> {
