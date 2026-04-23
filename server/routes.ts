@@ -6683,6 +6683,19 @@ SECTION GENERATION RULES:
     }
   });
 
+  app.patch("/api/admin/hq-content", requireAuth, async (req, res) => {
+    try {
+      const u = req.user as any;
+      if (!(u?.isMasterAdmin || u?.role === "Admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      const settings = await storage.updateCompanySettings({ hqContent: req.body });
+      res.json(settings);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating HQ content" });
+    }
+  });
+
   async function syncTodoCalendarEvent(todoId: string, todoTitle: string, dueDate: Date | null, createdBy: string, status?: string) {
     try {
       const existing = await db.select().from(calendarEvents)

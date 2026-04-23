@@ -1209,6 +1209,7 @@ export const companySettings = pgTable("company_settings", {
   aiImagesMonthlyLimit: integer("ai_images_monthly_limit").default(200),
   aiImagesWatermarkDefault: boolean("ai_images_watermark_default").default(true),
   companySignature: text("company_signature"),
+  hqContent: jsonb("hq_content").$type<{ vision?: string; mission?: string; goals?: Array<{ text: string; target: string; status: string }> }>(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -1224,6 +1225,7 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).p
   aiImagesMonthlyLimit: true,
   aiImagesWatermarkDefault: true,
   companySignature: true,
+  hqContent: true,
 });
 
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
