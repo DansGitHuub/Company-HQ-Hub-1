@@ -3,7 +3,7 @@ import SignaturePad from "@/components/forms/SignaturePad";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   Plus, 
   MoreHorizontal, 
@@ -70,7 +74,11 @@ import {
   FileSignature,
   Layers,
   Archive,
-  Tag
+  Tag,
+  ArrowLeftRight,
+  Link2Off,
+  Pencil,
+  Save,
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
@@ -105,6 +113,527 @@ import { Switch } from "@/components/ui/switch";
 import ArticleReportsCenter from "@/components/ArticleReportsCenter";
 import DiagnosticReport from "@/components/DiagnosticReport";
 import AdminDocumentLibrary from "@/components/AdminDocumentLibrary";
+
+// ─── Constants & types for Company Settings in-panel sections ─────────────────
+const DIVISIONS_LIST = ["Maintenance", "Install", "Snow", "General"] as const;
+const TEMPLATE_TYPES = [
+  "Maintenance Contract", "Landscape Project", "Snow & Ice Contract", "Custom",
+];
+const DIV_COLORS_DEFAULT: Record<string, string> = {
+  Maintenance: "#22c55e", Install: "#3b82f6", Snow: "#94a3b8", General: "#f59e0b",
+};
+
+interface EstimateTemplate {
+  id: string; name: string; estimate_type: string | null;
+  default_customer_message: string | null; default_terms: string | null; is_active: boolean;
+}
+
+function TermsSection() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [activeTab, setActiveTab] = useState<"install" | "maintenance" | "snow">("install");
+  const [editContent, setEditContent] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const { data: termsList = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/settings/terms"],
+    queryFn: () => apiRequest("GET", "/api/settings/terms").then(r => r.json()),
+  });
+
+  const activeRecord = termsList.find(t => t.type === activeTab);
+  const content = editContent[activeTab] ?? activeRecord?.content ?? "";
+
+  async function handleSave() {
+    if (!activeRecord) return;
+    setSaving(activeTab);
+    try {
+      await apiRequest("PUT", `/api/settings/terms/${activeRecord.id}`, { content });
+      qc.invalidateQueries({ queryKey: ["/api/settings/terms"] });
+      toast({ title: "Terms & Conditions saved" });
+    } catch {
+      toast({ title: "Failed to save", variant: "destructive" });
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  if (isLoading) return <div className="py-8 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin inline mr-2" />Loading…</div>;
+
+  const tabs: { key: "install" | "maintenance" | "snow"; label: string }[] = [
+    { key: "install", label: "Install" },
+    { key: "maintenance", label: "Maintenance" },
+    { key: "snow", label: "Snow Removal" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">Terms &amp; Conditions</h2>
+        <p className="text-sm text-muted-foreground mt-1">Manage the legal terms that appear on customer proposals and the portal acceptance page.</p>
+      </div>
+      <div className="flex gap-2 border-b pb-2">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === tab.key ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+            data-testid={`tc-tab-${tab.key}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">{activeRecord?.title ?? "Terms & Conditions"}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Textarea
+            value={content}
+            onChange={e => setEditContent(prev => ({ ...prev, [activeTab]: e.target.value }))}
+            className="min-h-[420px] font-mono text-xs"
+            placeholder="Enter terms and conditions text…"
+            data-testid={`tc-textarea-${activeTab}`}
+          />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" onClick={handleSave} disabled={saving === activeTab} data-testid="btn-save-terms">
+              {saving === activeTab ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />Save Terms</>}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function DivisionsSection() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const { data: setting } = useQuery<{ key: string; value: string }>({
+    queryKey: ["/api/settings/division_colors"],
+  });
+
+  const parsed: Record<string, string> = setting?.value
+    ? (() => { try { return JSON.parse(setting.value); } catch { return DIV_COLORS_DEFAULT; } })()
+    : DIV_COLORS_DEFAULT;
+
+  const [colors, setColors] = useState<Record<string, string>>(parsed);
+
+  useEffect(() => {
+    if (setting?.value) {
+      try { setColors(JSON.parse(setting.value)); } catch {}
+    }
+  }, [setting?.value]);
+
+  const saveMut = useMutation({
+    mutationFn: () => apiRequest("PUT", "/api/settings/division_colors", { value: JSON.stringify(colors) }),
+    onSuccess: () => {
+      toast({ title: "Division colors saved" });
+      qc.invalidateQueries({ queryKey: ["/api/settings/division_colors"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between py-4">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-base"><Tag className="h-5 w-5" /> Division Colors</CardTitle>
+          <CardDescription>Color coding used across jobs, scheduling, and estimates</CardDescription>
+        </div>
+        <Button size="sm" data-testid="btn-save-divisions" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+          {saveMut.isPending ? "Saving…" : "Save Changes"}
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {DIVISIONS_LIST.map(div => (
+          <div key={div} className="flex items-center gap-4" data-testid={`division-row-${div}`}>
+            <div className="w-8 h-8 rounded-full border border-border shrink-0" style={{ backgroundColor: colors[div] || "#e5e7eb" }} />
+            <span className="w-32 font-medium">{div}</span>
+            <Input type="color" className="w-14 h-9 p-1 cursor-pointer" value={colors[div] || "#000000"} data-testid={`color-input-${div}`}
+              onChange={e => setColors(c => ({ ...c, [div]: e.target.value }))} />
+            <Input className="w-28 font-mono text-sm" value={colors[div] || ""} data-testid={`color-hex-${div}`}
+              onChange={e => setColors(c => ({ ...c, [div]: e.target.value }))} placeholder="#000000" />
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function EstimateTemplatesSection() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<EstimateTemplate | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EstimateTemplate | null>(null);
+  const emptyForm = { name: "", estimate_type: "Custom", default_customer_message: "", default_terms: "", is_active: true };
+  const [form, setForm] = useState(emptyForm);
+
+  const { data: templates = [], isLoading } = useQuery<EstimateTemplate[]>({
+    queryKey: ["/api/estimate-templates?all=true"],
+    queryFn: () => fetch("/api/estimate-templates?all=true", { credentials: "include" }).then(r => r.json()),
+  });
+
+  const createMut = useMutation({
+    mutationFn: (d: typeof form) => apiRequest("POST", "/api/estimate-templates", d),
+    onSuccess: () => { toast({ title: "Template created" }); invalidateT(); closeModal(); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+  const updateMut = useMutation({
+    mutationFn: ({ id, d }: { id: string; d: typeof form }) => apiRequest("PUT", `/api/estimate-templates/${id}`, d),
+    onSuccess: () => { toast({ title: "Template updated" }); invalidateT(); closeModal(); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/estimate-templates/${id}`),
+    onSuccess: () => { toast({ title: "Deleted" }); invalidateT(); setDeleteTarget(null); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  function invalidateT() {
+    qc.invalidateQueries({ queryKey: ["/api/estimate-templates?all=true"] });
+    qc.invalidateQueries({ queryKey: ["/api/estimate-templates"] });
+  }
+  function closeModal() { setModalOpen(false); setEditing(null); }
+  function openAdd() { setEditing(null); setForm(emptyForm); setModalOpen(true); }
+  function openEdit(t: EstimateTemplate) {
+    setEditing(t);
+    setForm({ name: t.name, estimate_type: t.estimate_type || "Custom",
+      default_customer_message: t.default_customer_message || "",
+      default_terms: t.default_terms || "", is_active: t.is_active });
+    setModalOpen(true);
+  }
+  function handleSave() {
+    if (!form.name.trim()) return;
+    if (editing) updateMut.mutate({ id: editing.id, d: form });
+    else createMut.mutate(form);
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between py-4">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base"><FileText className="h-5 w-5" /> Estimate Templates</CardTitle>
+            <CardDescription>Pre-built templates for the estimate form</CardDescription>
+          </div>
+          <Button size="sm" onClick={openAdd} data-testid="btn-add-template">
+            <Plus className="h-4 w-4 mr-1" /> New Template
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>
+          ) : templates.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground text-sm">No templates yet</div>
+          ) : (
+            <Table data-testid="templates-table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="w-24">Status</TableHead>
+                  <TableHead className="w-20 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {templates.map(t => (
+                  <TableRow key={t.id} data-testid={`template-row-${t.id}`}>
+                    <TableCell className="font-medium">{t.name}</TableCell>
+                    <TableCell><Badge variant="secondary" className="text-xs">{t.estimate_type || "—"}</Badge></TableCell>
+                    <TableCell>
+                      {t.is_active
+                        ? <Badge className="bg-green-100 text-green-700 text-xs">Active</Badge>
+                        : <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(t)} data-testid={`btn-edit-template-${t.id}`}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(t)} data-testid={`btn-delete-template-${t.id}`}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={modalOpen} onOpenChange={o => { if (!o) closeModal(); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{editing ? "Edit Template" : "New Estimate Template"}</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label>Template Name</Label>
+              <Input data-testid="input-template-name" value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Spring Cleanup" />
+            </div>
+            <div className="space-y-1">
+              <Label>Type</Label>
+              <Select value={form.estimate_type ?? ""} onValueChange={v => setForm(f => ({ ...f, estimate_type: v }))}>
+                <SelectTrigger data-testid="select-template-type"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TEMPLATE_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Default Customer Message</Label>
+              <Textarea rows={3} data-testid="input-template-message" value={form.default_customer_message}
+                onChange={e => setForm(f => ({ ...f, default_customer_message: e.target.value }))}
+                placeholder="Thank you for the opportunity…" />
+            </div>
+            <div className="space-y-1">
+              <Label>Default Terms</Label>
+              <Textarea rows={3} data-testid="input-template-terms" value={form.default_terms}
+                onChange={e => setForm(f => ({ ...f, default_terms: e.target.value }))}
+                placeholder="Payment due upon completion…" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={form.is_active} data-testid="switch-template-active"
+                onCheckedChange={v => setForm(f => ({ ...f, is_active: v }))} />
+              <Label>Active</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeModal}>Cancel</Button>
+            <Button data-testid="btn-save-template" onClick={handleSave} disabled={createMut.isPending || updateMut.isPending}>
+              {createMut.isPending || updateMut.isPending ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={o => { if (!o) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{deleteTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive hover:bg-destructive/90"
+              onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    if (qbParam === "connected") toast({ title: "QuickBooks connected successfully!" });
+    if (qbParam === "error") toast({ title: "QuickBooks connection failed", description: "Please try again.", variant: "destructive" });
+    if (qbParam === "not-configured") toast({ title: "QuickBooks not configured", description: "QB_CLIENT_ID and QB_CLIENT_SECRET must be set in environment variables.", variant: "destructive" });
+  }, [qbParam]);
+
+  const { data: qbConfig } = useQuery<{ configured: boolean }>({
+    queryKey: ["/api/quickbooks/config"],
+    queryFn: () => apiRequest("GET", "/api/quickbooks/config").then(r => r.json()),
+  });
+
+  const { data: status, isLoading: statusLoading } = useQuery<any>({
+    queryKey: ["/api/quickbooks/status"],
+    refetchInterval: 30000,
+    enabled: qbConfig?.configured === true,
+  });
+
+  const { data: logs = [], isLoading: logsLoading } = useQuery<any[]>({
+    queryKey: ["/api/quickbooks/sync/logs"],
+    enabled: status?.connected === true,
+  });
+
+  const disconnectMut = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/quickbooks/disconnect"),
+    onSuccess: () => {
+      toast({ title: "QuickBooks disconnected" });
+      qc.invalidateQueries({ queryKey: ["/api/quickbooks/status"] });
+      qc.invalidateQueries({ queryKey: ["/api/quickbooks/sync/logs"] });
+    },
+    onError: () => toast({ title: "Disconnect failed", variant: "destructive" }),
+  });
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<any>(null);
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await apiRequest("POST", "/api/quickbooks/sync");
+      const data = await res.json();
+      setSyncResult(data);
+      qc.invalidateQueries({ queryKey: ["/api/quickbooks/status"] });
+      qc.invalidateQueries({ queryKey: ["/api/quickbooks/sync/logs"] });
+      toast({ title: "Sync complete" });
+    } catch (e: any) {
+      toast({ title: "Sync failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  function fmtQbDate(d: string | null) {
+    if (!d) return "Never";
+    return new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+
+  function logStatusBadge(s: string) {
+    if (s === "success") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700"><CheckCircle className="h-3 w-3" />Success</span>;
+    if (s === "partial")  return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700"><AlertCircle className="h-3 w-3" />Partial</span>;
+    if (s === "error")    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-600"><XCircle className="h-3 w-3" />Error</span>;
+    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700"><RefreshCw className="h-3 w-3 animate-spin" />Running</span>;
+  }
+
+  return (
+    <div className="space-y-5" data-testid="quickbooks-section">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ArrowLeftRight className="h-5 w-5 text-[#2CA01C]" />
+            QuickBooks Online
+          </CardTitle>
+          <CardDescription>Bidirectional sync of customers, invoices, and payments with QuickBooks Online.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {qbConfig?.configured === false ? (
+            <div className="flex items-center gap-3 p-4 rounded-lg border bg-amber-50">
+              <div className="p-2 rounded-full bg-amber-100 text-amber-700"><AlertCircle className="h-5 w-5" /></div>
+              <div>
+                <p className="font-medium text-sm text-amber-700">QuickBooks credentials not configured</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Set <code className="bg-muted px-1 rounded text-xs">QB_CLIENT_ID</code> and{" "}
+                  <code className="bg-muted px-1 rounded text-xs">QB_CLIENT_SECRET</code> environment variables, then restart the server.
+                </p>
+              </div>
+            </div>
+          ) : statusLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Checking connection…</div>
+          ) : status?.connected ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 rounded-lg border bg-green-50">
+                <div className="p-2 rounded-full bg-green-100 text-green-700"><Link2 className="h-5 w-5" /></div>
+                <div className="flex-1">
+                  <p className="font-medium text-sm text-green-700">Connected to QuickBooks Online</p>
+                  <p className="text-xs text-muted-foreground">Realm: {status.realm_id} · Last sync: {fmtQbDate(status.last_sync)}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={handleSync} disabled={syncing} data-testid="btn-qb-sync">
+                  {syncing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing…</> : <><RefreshCw className="h-4 w-4 mr-2" />Sync Now</>}
+                </Button>
+                <Button variant="outline" onClick={() => disconnectMut.mutate()} disabled={disconnectMut.isPending} data-testid="btn-qb-disconnect">
+                  <Link2Off className="h-4 w-4 mr-2" />Disconnect
+                </Button>
+              </div>
+              {syncResult?.results && (
+                <div className="grid grid-cols-3 gap-3 pt-1">
+                  {Object.entries(syncResult.results).map(([entity, r]: [string, any]) => (
+                    <div key={entity} className="p-3 rounded-lg border bg-muted/30 text-center">
+                      <p className="text-xs font-medium capitalize text-muted-foreground">{entity}</p>
+                      <p className="text-xl font-bold mt-1">{r.synced}</p>
+                      <p className="text-[10px] text-muted-foreground">synced</p>
+                      {r.errors?.length > 0 && <p className="text-[10px] text-destructive mt-0.5">{r.errors.length} error{r.errors.length !== 1 ? "s" : ""}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30">
+                <div className="p-2 rounded-full bg-muted text-muted-foreground"><Link2Off className="h-5 w-5" /></div>
+                <div>
+                  <p className="font-medium text-sm">Not connected</p>
+                  <p className="text-xs text-muted-foreground">Connect to sync customers, invoices, and payments with QuickBooks Online.</p>
+                </div>
+              </div>
+              <Button onClick={() => { window.location.href = "/api/quickbooks/auth"; }}
+                className="bg-[#2CA01C] hover:bg-[#238016] text-white" data-testid="btn-qb-connect">
+                <Link2 className="h-4 w-4 mr-2" />Connect to QuickBooks
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">What Gets Synced</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { name: "Customers", push: "New local customers → QB", pull: "New QB customers → local", icon: "👤" },
+              { name: "Invoices",  push: "Sent invoices → QB",       pull: "QB invoice statuses → local", icon: "📄" },
+              { name: "Payments",  push: "—",                         pull: "QB payments mark invoices paid", icon: "💳" },
+            ].map(item => (
+              <div key={item.name} className="p-3 rounded-lg border space-y-2">
+                <div className="flex items-center gap-2 font-medium text-sm"><span>{item.icon}</span> {item.name}</div>
+                <div className="text-xs space-y-1">
+                  <div className="flex items-start gap-1.5 text-muted-foreground"><span className="text-green-600 font-bold mt-0.5">↑</span> {item.push}</div>
+                  <div className="flex items-start gap-1.5 text-muted-foreground"><span className="text-blue-600 font-bold mt-0.5">↓</span> {item.pull}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {status?.connected && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Sync History</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {logsLoading ? (
+              <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : logs.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">No sync history yet. Run your first sync above.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table data-testid="qb-sync-log-table">
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead>Entity</TableHead><TableHead>Direction</TableHead><TableHead>Records</TableHead>
+                      <TableHead>Status</TableHead><TableHead>Started</TableHead><TableHead>Duration</TableHead><TableHead>Errors</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {logs.map((log: any) => {
+                      const duration = log.completed_at
+                        ? `${Math.round((new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 1000)}s`
+                        : "—";
+                      return (
+                        <TableRow key={log.id} data-testid={`qb-log-row-${log.id}`}>
+                          <TableCell className="capitalize text-sm font-medium">{log.entity_type}</TableCell>
+                          <TableCell className="text-sm capitalize text-muted-foreground">{log.direction}</TableCell>
+                          <TableCell className="text-sm font-mono">{log.records_synced}</TableCell>
+                          <TableCell>{logStatusBadge(log.status)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{fmtQbDate(log.started_at)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{duration}</TableCell>
+                          <TableCell className="text-xs text-destructive max-w-[200px] truncate" title={log.errors ?? ""}>{log.errors ?? "—"}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
 
 function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin, t }: {
   activeTab: string;
@@ -143,10 +672,10 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
     {
       label: "Company Settings",
       items: [
-        { value: "divisions", label: "Divisions", icon: Layers, href: "/settings?tab=divisions" },
-        { value: "estimate-templates", label: "Estimate Templates", icon: FileText, href: "/settings?tab=estimate-templates" },
-        { value: "quickbooks", label: "QuickBooks", icon: DollarSign, href: "/settings?tab=quickbooks" },
-        { value: "terms", label: "Terms & Conditions", icon: FileSignature, href: "/settings?tab=terms" },
+        { value: "divisions", label: "Divisions", icon: Layers },
+        { value: "estimate-templates", label: "Estimate Templates", icon: FileText },
+        { value: "quickbooks", label: "QuickBooks", icon: DollarSign },
+        { value: "terms", label: "Terms & Conditions", icon: FileSignature },
         { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle },
         { value: "qbo-export-cs", label: "QB Export", icon: Upload, href: "/admin/qbo-export" },
       ],
@@ -666,10 +1195,6 @@ export default function AdminPanel() {
           if (v === "service-types") { navigate("/admin/service-types"); return; }
           if (v === "qbo-export") { navigate("/admin/qbo-export"); return; }
           if (v === "archive") { navigate("/admin/archive"); return; }
-          if (v === "divisions") { navigate("/settings?tab=divisions"); return; }
-          if (v === "estimate-templates") { navigate("/settings?tab=estimate-templates"); return; }
-          if (v === "quickbooks") { navigate("/settings?tab=quickbooks"); return; }
-          if (v === "terms") { navigate("/settings?tab=terms"); return; }
           if (v === "qbo-export-cs") { navigate("/admin/qbo-export"); return; }
           setActiveTab(v);
         }}>
@@ -1409,6 +1934,22 @@ export default function AdminPanel() {
 
         <TabsContent value="integration-wizard" className="mt-6">
           <IntegrationWizard />
+        </TabsContent>
+
+        <TabsContent value="divisions" className="mt-6">
+          <DivisionsSection />
+        </TabsContent>
+
+        <TabsContent value="estimate-templates" className="mt-6">
+          <EstimateTemplatesSection />
+        </TabsContent>
+
+        <TabsContent value="quickbooks" className="mt-6">
+          <QuickBooksSection qbParam={new URLSearchParams(window.location.search).get("qb")} />
+        </TabsContent>
+
+        <TabsContent value="terms" className="mt-6">
+          <TermsSection />
         </TabsContent>
 
         <TabsContent value="agreements" className="mt-6">
