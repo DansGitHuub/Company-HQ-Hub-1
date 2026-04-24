@@ -5109,6 +5109,25 @@ Generate detailed information for this landscaping material.`;
         notes: estimate.notes || undefined,
       });
 
+      // Copy estimate work areas → job work areas so clock-in dropdown is populated immediately
+      await pool.query(`
+        INSERT INTO job_work_areas
+          (id, job_id, work_area_type_id, name, sort_order, notes, status, is_active, estimated_hours, actual_hours)
+        SELECT
+          gen_random_uuid()::text,
+          $1,
+          work_area_type_id,
+          name,
+          sort_order,
+          area_description,
+          'pending',
+          true,
+          0,
+          0
+        FROM estimate_work_areas
+        WHERE estimate_id = $2
+      `, [job.id, req.params.id]);
+
       await storage.updateEstimate(req.params.id, { stage: "Won" });
 
       logActivity("estimate_converted", `Estimate for ${estimate.clientName} converted to a Sold job`, "/jobs", req.user?.id);
