@@ -119,21 +119,34 @@ async function syncCustomers(tok: any) {
   const errs: string[] = [];
 
   try {
-    // Fetch all QB customers
-    const data = await qbQuery(tok, "SELECT * FROM Customer WHERE Active = true MAXRESULTS 1000");
-    const qbCustomers: any[] = data?.QueryResponse?.Customer ?? [];
+    // Fetch active QB customers (used for PULL: importing QB→local)
+    const activeData    = await qbQuery(tok, "SELECT * FROM Customer WHERE Active = true MAXRESULTS 1000");
+    const qbActive: any[] = activeData?.QueryResponse?.Customer ?? [];
 
-    // Build lookup: QB Id → QB customer
-    const qbById = new Map(qbCustomers.map((c: any) => [c.Id, c]));
-    // Build lookup: email → QB customer
+    // Also fetch inactive/archived QB customers — needed so our lookup maps can
+    // match local customers whose QB counterpart was archived (e.g. Matt Hollingsworth).
+    // These are NOT imported into our local DB (PULL only uses active records).
+    const inactiveData    = await qbQuery(tok, "SELECT * FROM Customer WHERE Active = false MAXRESULTS 1000");
+    const qbInactive: any[] = inactiveData?.QueryResponse?.Customer ?? [];
+
+    // All QB customers (active + inactive) — for lookup only
+    const qbAll = [...qbActive, ...qbInactive];
+
+    // Keep the active-only list for the PULL section below
+    const qbCustomers = qbActive;
+
+    // Build lookup: QB Id → QB customer (all, for linking inactive matches)
+    const qbById = new Map(qbAll.map((c: any) => [c.Id, c]));
+    // Build lookup: email → QB customer (active takes precedence over inactive)
     const qbByEmail = new Map(
-      qbCustomers
+      [...qbInactive, ...qbActive]               // active overwrites inactive on same email
         .filter((c: any) => c.PrimaryEmailAddr?.Address)
         .map((c: any) => [c.PrimaryEmailAddr.Address.toLowerCase(), c])
     );
-    // Build lookup: DisplayName → QB customer (proactive duplicate prevention)
+    // Build lookup: DisplayName → QB customer (active takes precedence over inactive)
     const qbByDisplayName = new Map(
-      qbCustomers.map((c: any) => [c.DisplayName?.toLowerCase().trim(), c])
+      [...qbInactive, ...qbActive]               // active overwrites inactive on same name
+        .map((c: any) => [c.DisplayName?.toLowerCase().trim(), c])
     );
 
     // ── PUSH: Local customers without qb_customer_id ──────────────────────────
@@ -205,19 +218,41 @@ async function syncCustomers(tok: any) {
             const faultCode = errBody?.Fault?.Error?.[0]?.code;
 
             if (String(faultCode) === "6240") {
-              // Duplicate name — look up the existing QB customer by DisplayName
-              console.log(`[QB sync] Duplicate customer '${displayName}' — querying QB to link by name`);
+              // Duplicate name — check in-memory maps first (includes inactive),
+              // then fall back to live QB queries (active then inactive) as a safety net.
+              console.log(`[QB sync] Duplicate customer '${displayName}' — attempting name lookup (active + inactive)`);
               try {
-                const safeDisplayName = displayName.replace(/'/g, "\\'");
-                const lookupData = await qbQuery(
-                  tok,
-                  `SELECT * FROM Customer WHERE DisplayName = '${safeDisplayName}'`
-                );
-                const existing = lookupData?.QueryResponse?.Customer?.[0];
-                if (existing?.Id) {
-                  qbId = existing.Id;
+                const nameKey = displayName.toLowerCase().trim();
+                const inMemory = qbByDisplayName.get(nameKey);
+                if (inMemory?.Id) {
+                  // Already have the record from our initial fetch — use it directly
+                  qbId = inMemory.Id;
+                  console.log(`[QB sync] Linked '${displayName}' via in-memory ${inMemory.Active === false ? "inactive" : "active"} record`);
                 } else {
-                  errs.push(`push customer '${displayName}': duplicate in QB but name lookup returned nothing`);
+                  // Not in the initial 1000-record pages; query QB directly for both states
+                  const safeDisplayName = displayName.replace(/'/g, "\\'");
+                  // Try active customers first
+                  const activeLookup = await qbQuery(
+                    tok,
+                    `SELECT * FROM Customer WHERE DisplayName = '${safeDisplayName}' AND Active = true`
+                  );
+                  const activeMatch = activeLookup?.QueryResponse?.Customer?.[0];
+                  if (activeMatch?.Id) {
+                    qbId = activeMatch.Id;
+                  } else {
+                    // Try inactive/archived customers
+                    const inactiveLookup = await qbQuery(
+                      tok,
+                      `SELECT * FROM Customer WHERE DisplayName = '${safeDisplayName}' AND Active = false`
+                    );
+                    const inactiveMatch = inactiveLookup?.QueryResponse?.Customer?.[0];
+                    if (inactiveMatch?.Id) {
+                      qbId = inactiveMatch.Id;
+                      console.log(`[QB sync] Linked '${displayName}' to archived QB customer ${inactiveMatch.Id} (not reactivating)`);
+                    } else {
+                      errs.push(`push customer '${displayName}': duplicate in QB but name lookup returned nothing (active + inactive checked)`);
+                    }
+                  }
                 }
               } catch (lookupErr: any) {
                 errs.push(`push customer '${displayName}': duplicate lookup failed — ${lookupErr.message}`);
