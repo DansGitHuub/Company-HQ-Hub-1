@@ -70,6 +70,22 @@ export function registerTaskRoutes(app: Express) {
     }
   });
 
+  app.get("/api/tasks/my", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const [myTasks, myCreated, openPool] = await Promise.all([
+        storage.getTasksByAssignee(userId),
+        storage.getTasksByCreator(userId),
+        storage.getOpenPoolTasks(),
+      ]);
+      const taskMap = new Map();
+      [...myTasks, ...myCreated, ...openPool].forEach(t => taskMap.set(t.id, t));
+      res.json(Array.from(taskMap.values()));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/tasks/my-upcoming", requireAuth, async (req: any, res) => {
     try {
       const myTasks = await storage.getTasksByAssignee(req.user.id);
