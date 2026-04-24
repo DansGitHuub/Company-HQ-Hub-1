@@ -62,6 +62,18 @@ export async function runInvoicesMigration() {
       CREATE INDEX IF NOT EXISTS idx_payments_invoice_id   ON payments(invoice_id);
     `);
 
+    // One-time heal: paid invoices whose balance_due was incorrectly resurrected
+    // by syncInvoiceTotals() after a payment was deleted (the INV-1002 class of bug).
+    // Safe to re-run on every boot — the WHERE clause is a no-op once rows are clean.
+    await pool.query(`
+      UPDATE invoices
+      SET balance_due = 0,
+          amount_paid = total,
+          updated_at  = NOW()
+      WHERE status = 'paid'
+        AND balance_due > 0
+    `);
+
     console.log("[migration] Invoices tables ready");
   } catch (err: any) {
     console.error("[migration] Invoices migration error:", err.message);

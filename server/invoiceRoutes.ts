@@ -10,6 +10,15 @@ async function generateInvoiceNumber(): Promise<string> {
 
 /** Recalculate totals for an invoice from its line items + payments */
 async function syncInvoiceTotals(invoiceId: string) {
+  // Guard: paid and void invoices have immutable balances — skip recalculation
+  // to prevent a deleted-payment or line-item edit from resurrecting a non-zero
+  // balance_due on an already-finalized invoice (the bug that produced INV-1002).
+  const { rows: check } = await pool.query(
+    `SELECT status FROM invoices WHERE id = $1`,
+    [invoiceId]
+  );
+  if (check.length > 0 && ["paid", "void"].includes(check[0].status)) return;
+
   await pool.query(`
     UPDATE invoices SET
       subtotal    = COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0),
