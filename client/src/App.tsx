@@ -203,6 +203,7 @@ function AppRoutes() {
         <Route path="/time" component={TimeTracking} />
         <Route path="/reports" component={ReportsPage} />
         <Route path="/consultations" component={ConsultationsPage} />
+        <Route path="/consultas"><Redirect to="/consultations" /></Route>
         <Route path="/mors-budget" component={MorsBudget} />
         <Route path="/clients"><Redirect to="/customers" /></Route>
         <Route path="/admin/employees"><Redirect to="/employees" /></Route>
