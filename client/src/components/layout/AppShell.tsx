@@ -10,6 +10,7 @@ import GlobalMicButton from "@/components/GlobalMicButton";
 import TimeClock from "@/components/TimeClock";
 import CalendarPage from "@/pages/Calendar";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -78,6 +79,7 @@ import WorksheetWidget from "@/components/WorksheetWidget";
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation, effectiveRole, previewRole } = useAuth();
   const { t, i18n } = useTranslation();
+  const { toast } = useToast();
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = React.useState(false);
   const [, navigate] = useLocation();
@@ -917,13 +919,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   className={cn("cursor-pointer justify-between", i18n.language === "en" && "bg-muted font-bold")}
-                  onClick={() => i18n.changeLanguage("en")}
+                  onClick={async () => {
+                    i18n.changeLanguage("en");
+                    try {
+                      await apiRequest("PATCH", "/api/profile", { language: "en" });
+                      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+                    } catch {
+                      toast({ variant: "destructive", description: "Could not save language preference." });
+                    }
+                  }}
                 >
                   English {i18n.language === "en" && <CheckSquare className="h-3 w-3" />}
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   className={cn("cursor-pointer justify-between", i18n.language === "es" && "bg-muted font-bold")}
-                  onClick={() => i18n.changeLanguage("es")}
+                  onClick={async () => {
+                    i18n.changeLanguage("es");
+                    try {
+                      await apiRequest("PATCH", "/api/profile", { language: "es" });
+                      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+                    } catch {
+                      toast({ variant: "destructive", description: "Could not save language preference." });
+                    }
+                  }}
                 >
                   Español {i18n.language === "es" && <CheckSquare className="h-3 w-3" />}
                 </DropdownMenuItem>
