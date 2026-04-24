@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { format, parseISO } from "date-fns";
 import { JobFormModal, JOB_STATUSES } from "./JobFormModal";
+import { InvoiceFormModal } from "@/pages/invoices/InvoiceFormModal";
 import { useAuth } from "@/hooks/use-auth";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -497,6 +498,7 @@ export default function JobDetailPage() {
   const isAdminOrManager = ["Admin", "Manager", "Master Admin"].includes(effectiveRole ?? "");
 
   const [showEdit, setShowEdit] = useState(false);
+  const [showGenerateInvoice, setShowGenerateInvoice] = useState(false);
   const [crewNotes, setCrewNotes] = useState<string | null>(null);
   const [savingNotes, setSavingNotes] = useState(false);
 
@@ -621,6 +623,12 @@ export default function JobDetailPage() {
         <div className="flex-1">
           <h1 className="text-xl font-bold">{job.title || job.client}</h1>
         </div>
+        {isAdminOrManager && job.status === "completed" && (
+          <Button size="sm" onClick={() => setShowGenerateInvoice(true)} data-testid="button-generate-invoice"
+            className="bg-green-600 hover:bg-green-700 text-white">
+            <FileText className="h-4 w-4 mr-1.5" /> Generar Factura
+          </Button>
+        )}
         {isAdminOrManager && (
           <Button variant="outline" size="sm" onClick={() => setShowEdit(true)} data-testid="button-edit-job">
             <Pencil className="h-4 w-4 mr-1.5" /> {t("editJob")}
@@ -1053,6 +1061,17 @@ export default function JobDetailPage() {
             description: job.description ?? "",
             crew_notes: job.crew_notes ?? job.notes ?? "",
           }}
+        />
+      )}
+
+      {/* Generate Invoice Modal — pre-filled with this job and its customer */}
+      {job && (
+        <InvoiceFormModal
+          open={showGenerateInvoice}
+          onOpenChange={setShowGenerateInvoice}
+          lockedJobId={job.id}
+          lockedCustomerId={job.customer_id ?? undefined}
+          onSuccess={() => setShowGenerateInvoice(false)}
         />
       )}
     </div>
