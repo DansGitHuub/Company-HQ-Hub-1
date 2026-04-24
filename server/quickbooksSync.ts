@@ -47,13 +47,18 @@ async function refreshAccessToken(tok: any): Promise<any> {
   const resp = await client.refresh();
   const newTok = resp.getJson();
   const expiry = new Date(Date.now() + (newTok.expires_in ?? 3600) * 1000);
+  const newRefreshToken = newTok.refresh_token ?? tok.refresh_token;
+  // Persist BOTH the new access_token and the rotated refresh_token to DB
+  // before returning — Intuit revokes the old refresh_token within hours.
   await saveTokens({
     realm_id: tok.realm_id,
     access_token: newTok.access_token,
-    refresh_token: newTok.refresh_token ?? tok.refresh_token,
+    refresh_token: newRefreshToken,
     token_expiry: expiry,
   });
-  return { ...tok, access_token: newTok.access_token, token_expiry: expiry };
+  // Return the fully updated token including the new refresh_token so callers
+  // that hold a reference to this object don't use the revoked one.
+  return { ...tok, access_token: newTok.access_token, refresh_token: newRefreshToken, token_expiry: expiry };
 }
 
 async function getValidToken() {
@@ -68,24 +73,35 @@ async function getValidToken() {
 // ── QB API helper ─────────────────────────────────────────────────────────────
 async function qbGet(tok: any, path: string) {
   const url = `${QB_BASE_URL}/${tok.realm_id}/${path}&${QB_MINOR_VER}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${tok.access_token}`, Accept: "application/json" },
-  });
+  const doGet = (t: any) =>
+    fetch(url, { headers: { Authorization: `Bearer ${t.access_token}`, Accept: "application/json" } });
+  let res = await doGet(tok);
+  if (res.status === 401) {
+    // Access token expired mid-step — refresh once and retry immediately
+    const fresh = await refreshAccessToken(tok);
+    res = await doGet(fresh);
+  }
   if (!res.ok) throw new Error(`QB GET ${path}: ${res.status} ${await res.text()}`);
   return res.json();
 }
 
 async function qbPost(tok: any, path: string, body: any) {
   const url = `${QB_BASE_URL}/${tok.realm_id}/${path}?${QB_MINOR_VER}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${tok.access_token}`,
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  const doPost = (t: any) =>
+    fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${t.access_token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  let res = await doPost(tok);
+  if (res.status === 401) {
+    const fresh = await refreshAccessToken(tok);
+    res = await doPost(fresh);
+  }
   if (!res.ok) throw new Error(`QB POST ${path}: ${res.status} ${await res.text()}`);
   return res.json();
 }
@@ -196,17 +212,26 @@ async function syncCustomers(tok: any) {
             };
           }
 
-          // Use raw fetch so we can inspect the response body before throwing
+          // Use raw fetch so we can inspect the response body before throwing.
+          // This path bypasses qbPost intentionally (we need to read the error body
+          // before deciding whether it is a 6240 duplicate vs a real failure).
           const createUrl = `${QB_BASE_URL}/${tok.realm_id}/customer?${QB_MINOR_VER}`;
-          const createRes = await fetch(createUrl, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${tok.access_token}`,
-              Accept: "application/json",
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(qbBody),
-          });
+          const doCreateFetch = (t: any) =>
+            fetch(createUrl, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${t.access_token}`,
+                Accept: "application/json",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(qbBody),
+            });
+          let createRes = await doCreateFetch(tok);
+          // 401 mid-loop: refresh once and retry before any other response handling
+          if (createRes.status === 401) {
+            tok = await refreshAccessToken(tok);
+            createRes = await doCreateFetch(tok);
+          }
 
           let qbId: string | null = null;
 
@@ -713,12 +738,14 @@ export async function exportTimeEntriesToQBO(entryIds: number[]): Promise<{
 
 // ── Master sync entry ─────────────────────────────────────────────────────────
 export async function runFullSync() {
-  const tok = await getValidToken();
   const results = { items: { synced: 0, errors: [] as string[] }, customers: { synced: 0, errors: [] as string[] }, invoices: { synced: 0, errors: [] as string[] }, payments: { synced: 0, errors: [] as string[] } };
-  results.items     = await syncItemsFromQB(tok);
-  results.customers = await syncCustomers(tok);
-  results.invoices  = await syncInvoices(tok);
-  results.payments  = await syncPayments(tok);
+  // Re-fetch the latest token from DB before every step so that a refresh_token
+  // rotation that happened during a prior step is picked up rather than using
+  // a stale in-memory token with a revoked refresh_token.
+  results.items     = await syncItemsFromQB(await getValidToken());
+  results.customers = await syncCustomers(await getValidToken());
+  results.invoices  = await syncInvoices(await getValidToken());
+  results.payments  = await syncPayments(await getValidToken());
   return results;
 }
 
