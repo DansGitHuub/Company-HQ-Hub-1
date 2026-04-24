@@ -87,15 +87,23 @@ function WidgetShell({ children, loading, href, emptyText }: { children: React.R
 }
 
 export function MessagesWidget({ size }: WidgetProps) {
+  // Use the same endpoint as the /messages page — /api/dm/conversations?folder=inbox
   const { data: threads = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/messages/threads"],
+    queryKey: ["/api/dm/conversations"],
+    queryFn: async () => {
+      const res = await fetch("/api/dm/conversations?folder=inbox", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 30000,
+    staleTime: 0,
   });
 
-  const unreadCount = threads.filter((t: any) => t.unreadCount > 0).length;
+  const unreadCount = threads.filter((t: any) => t.unread_count > 0).length;
   const recentThreads = threads.slice(0, size === "small" ? 3 : size === "medium" ? 5 : 8);
 
   return (
-    <WidgetShell loading={isLoading} href="/inbox">
+    <WidgetShell loading={isLoading} href="/messages">
       {unreadCount > 0 && (
         <div className="flex items-center gap-2 mb-2">
           <Badge variant="destructive" className="text-xs">{unreadCount} unread</Badge>
@@ -106,10 +114,13 @@ export function MessagesWidget({ size }: WidgetProps) {
       ) : (
         <div className="space-y-2">
           {recentThreads.map((thread: any) => (
-            <div key={thread.id} className="flex items-start gap-2 text-sm">
-              <Mail className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${thread.unreadCount > 0 ? "text-primary" : "text-muted-foreground"}`} />
+            <div key={thread.other_user_id} className="flex items-start gap-2 text-sm">
+              <Mail className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${thread.unread_count > 0 ? "text-primary" : "text-muted-foreground"}`} />
               <div className="min-w-0">
-                <p className={`truncate text-xs ${thread.unreadCount > 0 ? "font-semibold" : ""}`}>{thread.subject || "No subject"}</p>
+                <p className={`truncate text-xs font-medium ${thread.unread_count > 0 ? "font-semibold" : ""}`}>
+                  {thread.other_user_name}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">{thread.last_message || "—"}</p>
               </div>
             </div>
           ))}
