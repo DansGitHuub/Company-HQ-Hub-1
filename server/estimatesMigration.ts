@@ -58,6 +58,19 @@ export async function runEstimatesMigration() {
       ADD COLUMN IF NOT EXISTS valid_until TIMESTAMP
   `);
 
+  // Add signature columns to estimates (added to Drizzle schema but never migrated to DB)
+  // Without these columns Drizzle's SELECT * generates an invalid query → 500 on /api/pipeline-estimates
+  await pool.query(`
+    ALTER TABLE estimates
+      ADD COLUMN IF NOT EXISTS signature_data    TEXT,
+      ADD COLUMN IF NOT EXISTS signature_type    TEXT,
+      ADD COLUMN IF NOT EXISTS signer_name       TEXT,
+      ADD COLUMN IF NOT EXISTS signer_initials   TEXT,
+      ADD COLUMN IF NOT EXISTS signer_ip         TEXT,
+      ADD COLUMN IF NOT EXISTS signed_at         TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS signed_document_url TEXT
+  `);
+
   // Create estimate_items table if not exists
   await pool.query(`
     CREATE TABLE IF NOT EXISTS estimate_items (
