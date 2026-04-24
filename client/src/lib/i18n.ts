@@ -61,12 +61,48 @@ function nsMap(locale: typeof en) {
 }
 
 const SUPPORTED = ['en', 'es'] as const;
+type SupportedLng = typeof SUPPORTED[number];
 
-function detectLanguage(): string {
-  const stored = localStorage.getItem('i18n-language');
-  if (stored && (SUPPORTED as readonly string[]).includes(stored)) return stored;
-  const browser = (navigator.language || navigator.languages?.[0] || '').split('-')[0].toLowerCase();
-  return (SUPPORTED as readonly string[]).includes(browser) ? browser : 'en';
+// In-memory slot for the server-sourced user preference.
+// Populated by setUserPreferenceLanguage() (Step B) once /api/user resolves.
+// Never persisted here — server is the source of truth for this tier.
+let _userPreference: SupportedLng | null = null;
+
+/** Normalise any raw locale string to a supported code, or return null. */
+function toSupported(raw: string | null | undefined): SupportedLng | null {
+  if (!raw) return null;
+  const norm = raw.split('-')[0].toLowerCase();
+  return (SUPPORTED as readonly string[]).includes(norm) ? (norm as SupportedLng) : null;
+}
+
+/**
+ * Priority chain (highest → lowest):
+ *   1. userPreference  — server-stored value injected via setUserPreferenceLanguage()
+ *   2. localStorage    — explicit in-app selection persisted by languageChanged handler
+ *   3. navigator       — browser / OS language setting
+ *   4. htmlTag         — <html lang="…"> set by server-side rendering or CDN
+ *   5. 'en'            — hardcoded fallback
+ */
+function detectLanguage(): SupportedLng {
+  return (
+    _userPreference
+    ?? toSupported(localStorage.getItem('i18n-language'))
+    ?? toSupported(navigator.language || navigator.languages?.[0])
+    ?? toSupported(document.documentElement.lang)
+    ?? 'en'
+  );
+}
+
+/**
+ * Called by Step B after the /api/user query resolves.
+ * Sets the top-priority user-preference tier and switches i18n if needed.
+ * No-ops when the value is unsupported or already active.
+ */
+export function setUserPreferenceLanguage(lng: string): void {
+  const normalized = toSupported(lng);
+  if (!normalized || normalized === _userPreference) return;
+  _userPreference = normalized;
+  if (i18n.language !== normalized) i18n.changeLanguage(normalized);
 }
 
 i18n
