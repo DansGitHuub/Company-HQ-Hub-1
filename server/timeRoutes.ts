@@ -276,17 +276,19 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
   app.get("/api/time/my-hours/pay-period", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     try {
-      // Current biweekly pay period ending last Saturday
-      const now = new Date();
-      const dow = now.getDay(); // 0=Sun … 6=Sat
-      const daysSinceSat = dow === 6 ? 0 : dow + 1;
-      const periodEnd = new Date(now);
-      periodEnd.setDate(now.getDate() - daysSinceSat);
-      const periodStart = new Date(periodEnd);
-      periodStart.setDate(periodEnd.getDate() - 13);
+      // Current biweekly pay period — anchor-based so the result always CONTAINS today.
+      // Old "last Saturday" approach showed the *previous* period on Sun–Fri because it
+      // always rolled back to the most-recently-passed Saturday (the prior period's end).
+      // Anchor: Apr 18 2026 (confirmed period-end Saturday from production data).
+      const MS_PER_DAY    = 24 * 60 * 60 * 1000;
+      const ANCHOR_MS     = Date.UTC(2026, 3, 18); // 0-indexed: 3 = April
+      const daysSinceAnchor = (Date.now() - ANCHOR_MS) / MS_PER_DAY;
+      const n             = Math.ceil(daysSinceAnchor / 14); // periods elapsed (ceiling = current period)
+      const periodEndMs   = ANCHOR_MS + n * 14 * MS_PER_DAY;
+      const periodStartMs = periodEndMs - 13 * MS_PER_DAY;
 
-      const startStr = periodStart.toISOString().split("T")[0];
-      const endStr   = periodEnd.toISOString().split("T")[0];
+      const startStr = new Date(periodStartMs).toISOString().split("T")[0];
+      const endStr   = new Date(periodEndMs).toISOString().split("T")[0];
 
       const result = await pool.query(
         `SELECT duration_minutes, clock_in

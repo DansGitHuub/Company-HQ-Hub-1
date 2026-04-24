@@ -61,7 +61,9 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
   const queryClient = useQueryClient();
   const isEdit = !!initialData?.id;
 
-  const today = new Date().toISOString().split("T")[0];
+  // Build today's date from local parts — toISOString() returns UTC which can be tomorrow
+  const _d = new Date();
+  const today = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, "0")}-${String(_d.getDate()).padStart(2, "0")}`;
   const [form, setForm] = useState<InvoiceFormData>({
     customer_id: lockedCustomerId ?? "",
     job_id: lockedJobId ?? "",

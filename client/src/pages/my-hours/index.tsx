@@ -10,17 +10,22 @@ import { useTranslation } from "react-i18next";
 
 // ─── Pay period + date helpers ────────────────────────────────────────────────
 
+// Anchor-based biweekly pay period. The old "last Saturday" approach always
+// returned the *previous* period on Sun–Fri because it rolled back to the
+// most-recently-passed Saturday (the end of the prior period).
+// Anchor: Apr 18 2026 = confirmed period-end Saturday.
+// offset 0 = current period (contains today), offset 1 = one period back, etc.
+const _PP_ANCHOR_MS  = Date.UTC(2026, 3, 18); // month is 0-indexed: 3 = April
+const _PP_MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 function getPayPeriod(biweekOffset = 0): { start: string; end: string } {
-  const now = new Date();
-  const dow = now.getDay();
-  const daysSinceSat = dow === 6 ? 0 : dow + 1;
-  const endDate = new Date(now);
-  endDate.setDate(now.getDate() - daysSinceSat - biweekOffset * 14);
-  const startDate = new Date(endDate);
-  startDate.setDate(endDate.getDate() - 13);
+  const daysSince = (Date.now() - _PP_ANCHOR_MS) / _PP_MS_PER_DAY;
+  const n         = Math.ceil(daysSince / 14) - biweekOffset;
+  const endMs     = _PP_ANCHOR_MS + n * 14 * _PP_MS_PER_DAY;
+  const startMs   = endMs - 13 * _PP_MS_PER_DAY;
   return {
-    start: startDate.toISOString().split("T")[0],
-    end: endDate.toISOString().split("T")[0],
+    start: new Date(startMs).toISOString().split("T")[0],
+    end:   new Date(endMs).toISOString().split("T")[0],
   };
 }
 
