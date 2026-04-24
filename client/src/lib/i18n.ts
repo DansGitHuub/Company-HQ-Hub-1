@@ -60,6 +60,15 @@ function nsMap(locale: typeof en) {
   };
 }
 
+const SUPPORTED = ['en', 'es'] as const;
+
+function detectLanguage(): string {
+  const stored = localStorage.getItem('i18n-language');
+  if (stored && (SUPPORTED as readonly string[]).includes(stored)) return stored;
+  const browser = (navigator.language || navigator.languages?.[0] || '').split('-')[0].toLowerCase();
+  return (SUPPORTED as readonly string[]).includes(browser) ? browser : 'en';
+}
+
 i18n
   .use(initReactI18next)
   .init({
@@ -67,7 +76,7 @@ i18n
       en: nsMap(en),
       es: nsMap(es),
     },
-    lng: localStorage.getItem('i18n-language') || 'en',
+    lng: detectLanguage(),
     fallbackLng: 'en',
     interpolation: {
       escapeValue: false,
