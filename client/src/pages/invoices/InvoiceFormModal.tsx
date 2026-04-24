@@ -96,6 +96,23 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
     });
   }, [open]);
 
+  // When a job is selected on a new invoice, auto-populate line items from
+  // the estimate that originated the job (if any). Only fires when all current
+  // lines are blank so user-entered content is never overwritten.
+  useEffect(() => {
+    if (!form.job_id || isEdit) return;
+    const allBlank = form.line_items.every(li => !li.description.trim());
+    if (!allBlank) return;
+    fetch(`/api/jobs/${form.job_id}/suggested-line-items`, { credentials: "include" })
+      .then(r => (r.ok ? r.json() : []))
+      .then((items: Array<{ description: string; quantity: string; unit_price: string }>) => {
+        if (items.length > 0) {
+          setForm(f => ({ ...f, line_items: items }));
+        }
+      })
+      .catch(() => {}); // silent failure — user can always enter lines manually
+  }, [form.job_id]);
+
   const set = (k: keyof Omit<InvoiceFormData, "line_items">, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
 

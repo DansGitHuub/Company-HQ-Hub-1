@@ -13,6 +13,7 @@ export async function runJobsMigration() {
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS crew_notes  TEXT;
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS customer_id VARCHAR(36) REFERENCES customers(id) ON DELETE SET NULL;
       ALTER TABLE jobs ADD COLUMN IF NOT EXISTS property_id VARCHAR(36);
+      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS estimate_id VARCHAR(36);
     `);
 
     // Back-fill title from client for rows that haven't been given a title yet

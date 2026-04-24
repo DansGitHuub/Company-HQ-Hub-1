@@ -4377,6 +4377,27 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
+  // Suggested invoice line items: pull from the estimate that originated this job
+  app.get("/api/jobs/:id/suggested-line-items", requireAuth, async (req, res) => {
+    try {
+      const { rows } = await pool.query<{
+        description: string; quantity: string; unit_price: string;
+      }>(`
+        SELECT ei.description,
+               ei.quantity::text,
+               ei.unit_price::text
+        FROM   jobs j
+        JOIN   estimate_items ei ON ei.estimate_id = j.estimate_id
+        WHERE  j.id = $1
+          AND  j.estimate_id IS NOT NULL
+        ORDER  BY ei.sort_order, ei.created_at
+      `, [req.params.id]);
+      res.json(rows);   // empty array [] if no estimate linked — frontend handles gracefully
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching suggested line items" });
+    }
+  });
+
   app.post("/api/jobs/:id/documents", requireAuth, async (req, res) => {
     try {
       const doc = await storage.createJobDocument({
@@ -5127,6 +5148,9 @@ Generate detailed information for this landscaping material.`;
         FROM estimate_work_areas
         WHERE estimate_id = $2
       `, [job.id, req.params.id]);
+
+      // Store the originating estimate id on the job so invoice line-item autofill can trace back
+      await pool.query(`UPDATE jobs SET estimate_id = $1 WHERE id = $2`, [req.params.id, job.id]);
 
       await storage.updateEstimate(req.params.id, { stage: "Won" });
 
