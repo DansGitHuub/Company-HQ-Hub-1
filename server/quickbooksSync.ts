@@ -218,44 +218,68 @@ async function syncCustomers(tok: any) {
             const faultCode = errBody?.Fault?.Error?.[0]?.code;
 
             if (String(faultCode) === "6240") {
-              // Duplicate name — check in-memory maps first (includes inactive),
-              // then fall back to live QB queries (active then inactive) as a safety net.
-              console.log(`[QB sync] Duplicate customer '${displayName}' — attempting name lookup (active + inactive)`);
+              // QB rejected creation as a duplicate.  Resolution order:
+              //   1. Check in-memory DisplayName map (active + inactive from initial fetch)
+              //   2. Live QB query by DisplayName — active, then inactive
+              //   3. Live QB query by PrimaryEmailAddr.Address — active, then inactive
+              //   4. Give up: log the full QB error JSON so the admin can investigate
+              // Link-only in all cases — do NOT reactivate inactive QB customers.
+              console.log(`[QB sync] 6240 duplicate for '${displayName}' — running name + email lookups`);
               try {
+                // ── Step 1: in-memory DisplayName map ──────────────────────────
                 const nameKey = displayName.toLowerCase().trim();
                 const inMemory = qbByDisplayName.get(nameKey);
                 if (inMemory?.Id) {
-                  // Already have the record from our initial fetch — use it directly
                   qbId = inMemory.Id;
-                  console.log(`[QB sync] Linked '${displayName}' via in-memory ${inMemory.Active === false ? "inactive" : "active"} record`);
+                  console.log(`[QB sync] Linked '${displayName}' via in-memory ${inMemory.Active === false ? "inactive" : "active"} map`);
                 } else {
-                  // Not in the initial 1000-record pages; query QB directly for both states
-                  const safeDisplayName = displayName.replace(/'/g, "\\'");
-                  // Try active customers first
-                  const activeLookup = await qbQuery(
-                    tok,
-                    `SELECT * FROM Customer WHERE DisplayName = '${safeDisplayName}' AND Active = true`
-                  );
-                  const activeMatch = activeLookup?.QueryResponse?.Customer?.[0];
-                  if (activeMatch?.Id) {
-                    qbId = activeMatch.Id;
+                  // ── Step 2: live DisplayName query (active then inactive) ───
+                  const safeName = displayName.replace(/'/g, "\\'");
+                  const activeNameRes  = await qbQuery(tok, `SELECT * FROM Customer WHERE DisplayName = '${safeName}' AND Active = true`);
+                  const activeNameHit  = activeNameRes?.QueryResponse?.Customer?.[0];
+                  if (activeNameHit?.Id) {
+                    qbId = activeNameHit.Id;
+                    console.log(`[QB sync] Linked '${displayName}' via active DisplayName live query`);
                   } else {
-                    // Try inactive/archived customers
-                    const inactiveLookup = await qbQuery(
-                      tok,
-                      `SELECT * FROM Customer WHERE DisplayName = '${safeDisplayName}' AND Active = false`
-                    );
-                    const inactiveMatch = inactiveLookup?.QueryResponse?.Customer?.[0];
-                    if (inactiveMatch?.Id) {
-                      qbId = inactiveMatch.Id;
-                      console.log(`[QB sync] Linked '${displayName}' to archived QB customer ${inactiveMatch.Id} (not reactivating)`);
+                    const inactiveNameRes = await qbQuery(tok, `SELECT * FROM Customer WHERE DisplayName = '${safeName}' AND Active = false`);
+                    const inactiveNameHit = inactiveNameRes?.QueryResponse?.Customer?.[0];
+                    if (inactiveNameHit?.Id) {
+                      qbId = inactiveNameHit.Id;
+                      console.log(`[QB sync] Linked '${displayName}' to archived QB customer ${inactiveNameHit.Id} via DisplayName (not reactivating)`);
                     } else {
-                      errs.push(`push customer '${displayName}': duplicate in QB but name lookup returned nothing (active + inactive checked)`);
+                      // ── Step 3: live email query (active then inactive) ─────
+                      const email = (lc.email ?? "").trim();
+                      if (email) {
+                        const safeEmail = email.replace(/'/g, "\\'");
+                        const activeEmailRes  = await qbQuery(tok, `SELECT * FROM Customer WHERE PrimaryEmailAddr = '${safeEmail}' AND Active = true`);
+                        const activeEmailHit  = activeEmailRes?.QueryResponse?.Customer?.[0];
+                        if (activeEmailHit?.Id) {
+                          qbId = activeEmailHit.Id;
+                          console.log(`[QB sync] Linked '${displayName}' to QB customer ${activeEmailHit.Id} (DisplayName='${activeEmailHit.DisplayName}') via active email match`);
+                        } else {
+                          const inactiveEmailRes = await qbQuery(tok, `SELECT * FROM Customer WHERE PrimaryEmailAddr = '${safeEmail}' AND Active = false`);
+                          const inactiveEmailHit = inactiveEmailRes?.QueryResponse?.Customer?.[0];
+                          if (inactiveEmailHit?.Id) {
+                            qbId = inactiveEmailHit.Id;
+                            console.log(`[QB sync] Linked '${displayName}' to archived QB customer ${inactiveEmailHit.Id} (DisplayName='${inactiveEmailHit.DisplayName}') via inactive email match (not reactivating)`);
+                          } else {
+                            // ── Step 4: give up — log full QB error payload ───
+                            const detail = `push customer '${displayName}' (email=${email || "none"}): 6240 duplicate — name+email lookups all missed. Full QB error: ${JSON.stringify(errBody)}`;
+                            errs.push(detail);
+                            console.error(`[QB sync] ${detail}`);
+                          }
+                        }
+                      } else {
+                        // No email on local record — can't do email lookup
+                        const detail = `push customer '${displayName}' (no email): 6240 duplicate — DisplayName lookups all missed. Full QB error: ${JSON.stringify(errBody)}`;
+                        errs.push(detail);
+                        console.error(`[QB sync] ${detail}`);
+                      }
                     }
                   }
                 }
               } catch (lookupErr: any) {
-                errs.push(`push customer '${displayName}': duplicate lookup failed — ${lookupErr.message}`);
+                errs.push(`push customer '${displayName}': 6240 lookup chain failed — ${lookupErr.message}`);
               }
             } else {
               throw new Error(`QB POST customer: ${createRes.status} ${JSON.stringify(errBody)}`);
