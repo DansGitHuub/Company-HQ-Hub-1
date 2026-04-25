@@ -210,7 +210,7 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
 
   async function handleSave() {
     if (!form.employee_id || !form.log_date || !form.work_description) {
-      toast({ title: "Campos requeridos", description: "Empleado, fecha y descripción son obligatorios.", variant: "destructive" });
+      toast({ title: "Required fields", description: "Employee, date, and description are required.", variant: "destructive" });
       return;
     }
     setSaving(true);
@@ -218,10 +218,10 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
       const res = await apiRequest("POST", `/api/jobs/${jobId}/daily-logs`, form);
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.message ?? "Error al guardar.");
+        throw new Error(err.message ?? "Save failed.");
       }
       await qc.invalidateQueries({ queryKey: ["/api/jobs/daily-logs", jobId] });
-      toast({ title: "Registro guardado", description: "La entrada del diario fue añadida." });
+      toast({ title: "Entry saved", description: "The journal entry was added." });
       resetForm();
       setShowForm(false);
     } catch (e: any) {
@@ -238,7 +238,7 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
       await qc.invalidateQueries({ queryKey: ["/api/jobs/daily-logs", jobId] });
       toast({ title: "Eliminado", description: "Registro eliminado correctamente." });
     } catch {
-      toast({ title: "Error", description: "No se pudo eliminar el registro.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not delete the entry.", variant: "destructive" });
     } finally {
       setDeletingId(null);
     }
@@ -252,10 +252,10 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700">Diario de trabajo</h3>
+        <h3 className="text-sm font-semibold text-gray-700">Work Journal</h3>
         <Button size="sm" onClick={() => setShowForm(true)} data-testid="button-add-log">
           <Plus className="h-4 w-4 mr-1.5" />
-          Añadir entrada
+          Add Entry
         </Button>
       </div>
 
@@ -268,8 +268,8 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            <p className="text-sm">No hay entradas de diario para este trabajo aún.</p>
-            <p className="text-xs mt-1 text-gray-400">Usa el botón "Añadir entrada" para registrar el trabajo del día.</p>
+            <p className="text-sm">No journal entries for this job yet.</p>
+            <p className="text-xs mt-1 text-gray-400">Use the "Add Entry" button to log the day's work.</p>
           </CardContent>
         </Card>
       ) : (
@@ -279,11 +279,11 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50">
-                    <TableHead className="pl-5">Fecha</TableHead>
-                    <TableHead>Empleado</TableHead>
-                    <TableHead>Horas</TableHead>
-                    <TableHead>Descripción</TableHead>
-                    <TableHead>Notas</TableHead>
+                    <TableHead className="pl-5">Date</TableHead>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Hours</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Notes</TableHead>
                     <TableHead className="pr-4 w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -336,13 +336,13 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <HardHat className="h-5 w-5 text-green-600" />
-              Nueva entrada de diario
+              New journal entry
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="log-employee">Empleado <span className="text-red-500">*</span></Label>
+                <Label htmlFor="log-employee">Employee <span className="text-red-500">*</span></Label>
                 <select
                   id="log-employee"
                   value={form.employee_id}
@@ -359,7 +359,7 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="log-date">Fecha <span className="text-red-500">*</span></Label>
+                <Label htmlFor="log-date">Date <span className="text-red-500">*</span></Label>
                 <Input
                   id="log-date"
                   type="date"
@@ -370,7 +370,7 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="log-hours">Horas trabajadas</Label>
+              <Label htmlFor="log-hours">Hours worked</Label>
               <Input
                 id="log-hours"
                 type="number"
@@ -383,10 +383,10 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="log-desc">Descripción del trabajo <span className="text-red-500">*</span></Label>
+              <Label htmlFor="log-desc">Work description <span className="text-red-500">*</span></Label>
               <Textarea
                 id="log-desc"
-                placeholder="¿Qué se realizó hoy en este trabajo?…"
+                placeholder="What was done on this job today?…"
                 value={form.work_description}
                 onChange={(e) => setForm((f) => ({ ...f, work_description: e.target.value }))}
                 rows={3}
@@ -394,7 +394,7 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="log-notes">Notas / incidencias (opcional)</Label>
+              <Label htmlFor="log-notes">Notes / issues (optional)</Label>
               <Textarea
                 id="log-notes"
                 placeholder="Problemas encontrados, materiales usados, observaciones…"
@@ -406,10 +406,10 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { resetForm(); setShowForm(false); }}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { resetForm(); setShowForm(false); }}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving} data-testid="button-save-log">
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Plus className="h-4 w-4 mr-1.5" />}
-              Guardar entrada
+              Save Entry
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -780,7 +780,7 @@ export default function JobDetailPage() {
             <TabsTrigger value="invoices">{t("tabInvoices")}</TabsTrigger>
             <TabsTrigger value="messages" data-testid="tab-messages">{t("tabMessages")}</TabsTrigger>
             <TabsTrigger value="activity">{t("tabActivity")}</TabsTrigger>
-            <TabsTrigger value="daily-logs" data-testid="tab-daily-logs">Diario</TabsTrigger>
+            <TabsTrigger value="daily-logs" data-testid="tab-daily-logs">Journal</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}

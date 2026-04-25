@@ -63,9 +63,9 @@ const ENTRY_TYPE_COLORS: Record<string, string> = {
   shop_time: "bg-purple-100 text-purple-700", break: "bg-gray-100 text-gray-600",
 };
 const STATUS_CFG: Record<string, { label: string; pill: string }> = {
-  pending:  { label: "Pendiente", pill: "bg-yellow-100 text-yellow-700 border border-yellow-300" },
-  approved: { label: "Aprobado",  pill: "bg-green-100 text-green-700 border border-green-300" },
-  rejected: { label: "Rechazado", pill: "bg-red-100 text-red-700 border border-red-300" },
+  pending:  { label: "Pending", pill: "bg-yellow-100 text-yellow-700 border border-yellow-300" },
+  approved: { label: "Approved",  pill: "bg-green-100 text-green-700 border border-green-300" },
+  rejected: { label: "Rejected", pill: "bg-red-100 text-red-700 border border-red-300" },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -164,7 +164,7 @@ export default function TimeCardApproval() {
       qc.invalidateQueries({ queryKey: ["/api/admin/time-card-approval"] });
       setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
     } catch {
-      toast({ title: "Error", description: "No se pudo actualizar el estado.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not update status.", variant: "destructive" });
     } finally {
       setLoading([id], false);
     }
@@ -179,9 +179,9 @@ export default function TimeCardApproval() {
       });
       qc.invalidateQueries({ queryKey: ["/api/admin/time-card-approval"] });
       setSelected((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n; });
-      toast({ title: status === "approved" ? "Aprobado" : "Rechazado", description: `${ids.length} entrada(s) actualizadas.` });
+      toast({ title: status === "approved" ? "Approved" : "Rejected", description: `${ids.length} entry(ies) updated.` });
     } catch {
-      toast({ title: "Error", description: "No se pudo actualizar.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not update.", variant: "destructive" });
     } finally {
       setLoading(ids, false);
     }
@@ -226,10 +226,10 @@ export default function TimeCardApproval() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <CheckCircle2 className="w-6 h-6 text-green-600" />
-            Aprobación de Tarjetas de Tiempo
+            Time Card Approval
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Aprueba o rechaza las entradas de tiempo de los empleados
+            Approve or reject employee time entries
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-refresh">
@@ -243,20 +243,20 @@ export default function TimeCardApproval() {
         <CardContent className="pt-5 pb-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="start">Desde</Label>
+              <Label htmlFor="start">From</Label>
               <Input id="start" type="date" value={startDate}
                 onChange={(e) => setStartDate(e.target.value)} data-testid="input-start-date" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="end">Hasta</Label>
+              <Label htmlFor="end">To</Label>
               <Input id="end" type="date" value={endDate}
                 onChange={(e) => setEndDate(e.target.value)} data-testid="input-end-date" />
             </div>
             <div className="space-y-1.5">
-              <Label>Empleado</Label>
+              <Label>Employee</Label>
               <Select value={employeeId} onValueChange={setEmployeeId}>
                 <SelectTrigger data-testid="select-employee">
-                  <SelectValue placeholder="Todos" />
+                  <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
@@ -269,15 +269,15 @@ export default function TimeCardApproval() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Estado</Label>
+              <Label>Status</Label>
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
                 <SelectTrigger data-testid="select-status-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pending">Pendientes ({counts.pending})</SelectItem>
-                  <SelectItem value="approved">Aprobados ({counts.approved})</SelectItem>
-                  <SelectItem value="rejected">Rechazados ({counts.rejected})</SelectItem>
+                  <SelectItem value="pending">Pending ({counts.pending})</SelectItem>
+                  <SelectItem value="approved">Approved ({counts.approved})</SelectItem>
+                  <SelectItem value="rejected">Rejected ({counts.rejected})</SelectItem>
                   <SelectItem value="all">Todos</SelectItem>
                 </SelectContent>
               </Select>
@@ -291,19 +291,19 @@ export default function TimeCardApproval() {
         <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2">
           <Clock className="w-4 h-4 text-yellow-600" />
           <span className="text-sm font-semibold text-yellow-700" data-testid="count-pending">
-            {counts.pending} pendientes
+            {counts.pending} pending
           </span>
         </div>
         <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
           <CheckCircle2 className="w-4 h-4 text-green-600" />
           <span className="text-sm font-semibold text-green-700" data-testid="count-approved">
-            {counts.approved} aprobados
+            {counts.approved} approved
           </span>
         </div>
         <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
           <XCircle className="w-4 h-4 text-red-500" />
           <span className="text-sm font-semibold text-red-600" data-testid="count-rejected">
-            {counts.rejected} rechazados
+            {counts.rejected} rejected
           </span>
         </div>
       </div>
@@ -312,20 +312,20 @@ export default function TimeCardApproval() {
       {selectedArr.length > 0 && (
         <div className="sticky top-4 z-10 flex items-center justify-between bg-white border border-gray-200 rounded-xl shadow-md px-4 py-3">
           <span className="text-sm font-semibold text-gray-700">
-            {selectedArr.length} entrada(s) seleccionada(s)
+            {selectedArr.length} entry(ies) seleccionada(s)
           </span>
           <div className="flex items-center gap-2">
             <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white"
               onClick={() => bulkUpdate(selectedArr, "approved")}
               data-testid="button-bulk-approve">
               <CheckCircle2 className="w-4 h-4 mr-1.5" />
-              Aprobar todas
+              Approve all
             </Button>
             <Button size="sm" variant="destructive"
               onClick={() => openRejectDialog(selectedArr, true)}
               data-testid="button-bulk-reject">
               <XCircle className="w-4 h-4 mr-1.5" />
-              Rechazar todas
+              Reject all
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}
               data-testid="button-clear-selection">
@@ -350,8 +350,8 @@ export default function TimeCardApproval() {
             <CheckCircle2 className="w-10 h-10 mx-auto mb-3 opacity-25" />
             <p className="font-medium">
               {statusFilter === "pending"
-                ? "No hay entradas pendientes para este período."
-                : "No hay entradas para los filtros seleccionados."}
+                ? "No pending entries for this period."
+                : "No entries match the selected filters."}
             </p>
           </CardContent>
         </Card>
@@ -387,7 +387,7 @@ export default function TimeCardApproval() {
                         </span>
                       </button>
                       <Badge variant="secondary" className="text-xs shrink-0">
-                        {group.entries.length} {group.entries.length === 1 ? "entrada" : "entradas"}
+                        {group.entries.length} {group.entries.length === 1 ? "entry" : "entries"}
                       </Badge>
                       {pendingIds.length > 0 && (
                         <span className="text-[11px] px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 border border-yellow-300 font-semibold shrink-0">
@@ -405,7 +405,7 @@ export default function TimeCardApproval() {
                         onClick={() => bulkUpdate(pendingIds, "approved")}
                         data-testid={`button-approve-group-${group.key}`}>
                         <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                        Aprobar grupo
+                        Approve group
                       </Button>
                     </div>
                   </div>
@@ -418,16 +418,16 @@ export default function TimeCardApproval() {
                         <TableHeader>
                           <TableRow className="bg-gray-50">
                             <TableHead className="pl-5 w-10"></TableHead>
-                            <TableHead>Fecha</TableHead>
-                            <TableHead>Trabajo</TableHead>
-                            <TableHead>Área</TableHead>
-                            <TableHead>Entrada</TableHead>
-                            <TableHead>Salida</TableHead>
-                            <TableHead>Duración</TableHead>
-                            <TableHead>Tipo</TableHead>
-                            <TableHead>Estado</TableHead>
-                            <TableHead>Notas / Rechazo</TableHead>
-                            <TableHead className="pr-4 text-right">Acciones</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Job</TableHead>
+                            <TableHead>Area</TableHead>
+                            <TableHead>Clock In</TableHead>
+                            <TableHead>Clock Out</TableHead>
+                            <TableHead>Duration</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Notes / Rejection</TableHead>
+                            <TableHead className="pr-4 text-right">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -499,7 +499,7 @@ export default function TimeCardApproval() {
                                             onClick={() => updateOne(entry.id, "approved")}
                                             data-testid={`button-approve-${entry.id}`}>
                                             <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                                            Aprobar
+                                            Approve
                                           </Button>
                                         )}
                                         {entry.approval_status !== "rejected" && (
@@ -508,7 +508,7 @@ export default function TimeCardApproval() {
                                             onClick={() => openRejectDialog([entry.id], false)}
                                             data-testid={`button-reject-${entry.id}`}>
                                             <XCircle className="w-3.5 h-3.5 mr-1" />
-                                            Rechazar
+                                            Reject
                                           </Button>
                                         )}
                                         {entry.approval_status !== "pending" && (
@@ -544,12 +544,12 @@ export default function TimeCardApproval() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <XCircle className="w-5 h-5" />
-              Rechazar {rejectDialog.isBulk ? `${rejectDialog.ids.length} entradas` : "entrada"}
+              Reject {rejectDialog.isBulk ? `${rejectDialog.ids.length} entries` : "entry"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <p className="text-sm text-gray-600">
-              Puedes añadir una nota de rechazo opcional para informar al empleado.
+              You can add an optional rejection note to inform the employee.
             </p>
             <Textarea
               placeholder="Motivo del rechazo (opcional)…"

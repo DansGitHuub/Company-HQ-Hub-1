@@ -185,7 +185,7 @@
     "saved": "Saved successfully",
     "changesSaved": "Changes saved",
     "copiedToClipboard": "Copied to clipboard",
-    "linkCopied": "Link copied",
+    "linkCopied": "Link copied!",
     "errorSaving": "Error saving",
     "failedToLoad": "Failed to load",
     "noRecordsYet": "No records yet",
@@ -227,7 +227,18 @@
     "cancelled": "Cancelled",
     "previous": "Previous",
     "rename": "Rename",
-    "restore": "Restore"
+    "restore": "Restore",
+    "searching": "Searching...",
+    "submitting": "Submitting...",
+    "failedToSave": "Failed to save",
+    "failedToUpdate": "Failed to update",
+    "failedToDelete": "Failed to delete",
+    "failedToCreate": "Failed to create",
+    "savedSuccessfully": "Saved successfully",
+    "createdSuccessfully": "Created successfully",
+    "updatedSuccessfully": "Updated successfully",
+    "deletedSuccessfully": "Deleted successfully",
+    "cannotDelete": "Cannot delete"
   },
   "status": {
     "active": "Active",
@@ -420,7 +431,23 @@
     "adminSettingsDesc": "Administrative configuration options",
     "adminSettingsManaged": "Admin settings are managed from the Admin Panel",
     "adminSettingsManagedDesc": "Company branding, user management, and system configuration are available in the Admin Panel.",
-    "goToAdminPanel": "Go to Admin Panel"
+    "goToAdminPanel": "Go to Admin Panel",
+    "toast": {
+      "termsSaved": "Terms & Conditions saved",
+      "availabilitySaved": "Availability saved",
+      "profileUpdated": "Profile updated",
+      "failedToUpdateProfile": "Failed to update profile",
+      "passwordChanged": "Password changed successfully",
+      "failedToChangePassword": "Failed to change password",
+      "workAreaCreated": "Work area created",
+      "workAreaUpdated": "Work area updated",
+      "divisionColorsSaved": "Division colors saved",
+      "templateCreated": "Template created",
+      "templateUpdated": "Template updated",
+      "companyInfoSaved": "Company info saved",
+      "qboConnected": "QuickBooks connected successfully!",
+      "qboConnectionFailed": "QuickBooks connection failed"
+    }
   },
   "employees": {
     "title": "Employees",
@@ -533,7 +560,23 @@
     "dragToReorder": "Drag to reorder",
     "all": "All",
     "invoiced": "Invoiced",
-    "cancelled": "Cancelled"
+    "cancelled": "Cancelled",
+    "selectService": "Select service",
+    "selectCategory": "Select category",
+    "jobTitle": "Job",
+    "newJob": "New Job",
+    "searchJobsPlaceholder": "Search jobs...",
+    "dateTo": "To",
+    "clear": "Clear",
+    "loadingJobs": "Loading jobs...",
+    "getStarted": "Get started by creating your first job.",
+    "createFirstJob": "Create First Job",
+    "property": "Property",
+    "colType": "Type",
+    "colScheduled": "Scheduled",
+    "status": "Status",
+    "colPrice": "Price",
+    "untitledJob": "Untitled Job"
   },
   "calendar": {
     "title": "Calendar",
@@ -1478,7 +1521,9 @@
     "addEmail": "Add Email",
     "emailPrimaryHint": "Click ★ to mark an address as primary.",
     "streetAddressPlaceholder": "Street address",
-    "customerNotesPlaceholder": "Any additional notes about this customer…"
+    "customerNotesPlaceholder": "Any additional notes about this customer…",
+    "noInvoices": "No invoices",
+    "noEstimates": "No estimates"
   },
   "jobDetail": {
     "title": "Jobs",
@@ -1921,7 +1966,8 @@
     "saving": "Saving…",
     "invoiceUpdated": "Invoice updated",
     "invoiceCreated": "Invoice created",
-    "defaultTerms": "Payment due within 30 days."
+    "defaultTerms": "Payment due within 30 days.",
+    "invoiceCount": "{{count}} invoice"
   },
   "myDay": {
     "title": "My Day",
@@ -1974,7 +2020,21 @@
     "chipBreak": "Break",
     "switchArea": "Switch Area",
     "offline": "Offline",
-    "active": "Active"
+    "active": "Active",
+    "notClockedIn": "Not Clocked In",
+    "job": "Job",
+    "materialsUsed": "Materials Used",
+    "addMaterial": "Add Material",
+    "expenses": "Expenses",
+    "addExpense": "Add Expense",
+    "crewOnSite": "Crew On Site",
+    "you": "you",
+    "addCrewMember": "Add Crew Member",
+    "notes": "Notes",
+    "notesPlaceholder": "Add notes...",
+    "saveNotes": "Save Notes",
+    "saveDraft": "Save Draft",
+    "submitWorksheet": "Submit Worksheet"
   },
   "myHours": {
     "title": "My Hours",
@@ -2011,7 +2071,8 @@
     "typeBillable": "Billable",
     "typeDrive": "Drive",
     "typeShop": "Shop",
-    "typeBreak": "Break"
+    "typeBreak": "Break",
+    "general": "General"
   },
   "scheduling": {
     "title": "Scheduling",
@@ -2040,7 +2101,8 @@
     "removeFromSchedule": "Remove from schedule",
     "dismiss": "Dismiss",
     "jobCount_one": "{{count}} job",
-    "jobCount_other": "{{count}} jobs"
+    "jobCount_other": "{{count}} jobs",
+    "jobCount": "{{count}} job"
   },
   "timeTracking": {
     "title": "Time Tracking",

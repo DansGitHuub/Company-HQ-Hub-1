@@ -185,7 +185,7 @@
     "saved": "Guardado exitosamente",
     "changesSaved": "Cambios guardados",
     "copiedToClipboard": "Copiado al portapapeles",
-    "linkCopied": "Enlace copiado",
+    "linkCopied": "¡Enlace copiado!",
     "errorSaving": "Error al guardar",
     "failedToLoad": "Error al cargar",
     "noRecordsYet": "No hay registros aún",
@@ -227,7 +227,18 @@
     "cancelled": "Cancelado",
     "previous": "Anterior",
     "rename": "Renombrar",
-    "restore": "Restaurar"
+    "restore": "Restaurar",
+    "searching": "Buscando...",
+    "submitting": "Enviando...",
+    "failedToSave": "No se pudo guardar",
+    "failedToUpdate": "No se pudo actualizar",
+    "failedToDelete": "No se pudo eliminar",
+    "failedToCreate": "No se pudo crear",
+    "savedSuccessfully": "Guardado correctamente",
+    "createdSuccessfully": "Creado correctamente",
+    "updatedSuccessfully": "Actualizado correctamente",
+    "deletedSuccessfully": "Eliminado correctamente",
+    "cannotDelete": "No se puede eliminar"
   },
   "status": {
     "active": "Activo",
@@ -420,7 +431,23 @@
     "adminSettingsDesc": "Opciones de configuración administrativa",
     "adminSettingsManaged": "La configuración de admin se gestiona desde el Panel de Administración",
     "adminSettingsManagedDesc": "La marca de la empresa, gestión de usuarios y configuración del sistema están disponibles en el Panel de Administración.",
-    "goToAdminPanel": "Ir al Panel de Administración"
+    "goToAdminPanel": "Ir al Panel de Administración",
+    "toast": {
+      "termsSaved": "Términos y condiciones guardados",
+      "availabilitySaved": "Disponibilidad guardada",
+      "profileUpdated": "Perfil actualizado",
+      "failedToUpdateProfile": "No se pudo actualizar el perfil",
+      "passwordChanged": "Contraseña cambiada correctamente",
+      "failedToChangePassword": "No se pudo cambiar la contraseña",
+      "workAreaCreated": "Área de trabajo creada",
+      "workAreaUpdated": "Área de trabajo actualizada",
+      "divisionColorsSaved": "Colores de división guardados",
+      "templateCreated": "Plantilla creada",
+      "templateUpdated": "Plantilla actualizada",
+      "companyInfoSaved": "Información de la empresa guardada",
+      "qboConnected": "¡QuickBooks conectado correctamente!",
+      "qboConnectionFailed": "Error de conexión con QuickBooks"
+    }
   },
   "employees": {
     "title": "Empleados",
@@ -533,7 +560,23 @@
     "dragToReorder": "Arrastrar para reordenar",
     "all": "Todos",
     "invoiced": "Facturado",
-    "cancelled": "Cancelado"
+    "cancelled": "Cancelado",
+    "selectService": "Seleccionar servicio",
+    "selectCategory": "Seleccionar categoría",
+    "jobTitle": "Trabajo",
+    "newJob": "Nuevo trabajo",
+    "searchJobsPlaceholder": "Buscar trabajos...",
+    "dateTo": "Hasta",
+    "clear": "Limpiar",
+    "loadingJobs": "Cargando trabajos...",
+    "getStarted": "Empieza creando tu primer trabajo.",
+    "createFirstJob": "Crear primer trabajo",
+    "property": "Propiedad",
+    "colType": "Tipo",
+    "colScheduled": "Programado",
+    "status": "Estado",
+    "colPrice": "Precio",
+    "untitledJob": "Trabajo sin título"
   },
   "calendar": {
     "title": "Calendario",
@@ -1478,7 +1521,9 @@
     "addEmail": "Agregar Correo",
     "emailPrimaryHint": "Haz clic en ★ para marcar una dirección como principal.",
     "streetAddressPlaceholder": "Dirección",
-    "customerNotesPlaceholder": "Notas adicionales sobre este cliente…"
+    "customerNotesPlaceholder": "Notas adicionales sobre este cliente…",
+    "noInvoices": "Sin facturas",
+    "noEstimates": "Sin presupuestos"
   },
   "jobDetail": {
     "title": "Trabajos",
@@ -1921,7 +1966,8 @@
     "saving": "Guardando…",
     "invoiceUpdated": "Factura actualizada",
     "invoiceCreated": "Factura creada",
-    "defaultTerms": "Pago pendiente dentro de 30 días."
+    "defaultTerms": "Pago pendiente dentro de 30 días.",
+    "invoiceCount": "{{count}} factura"
   },
   "myDay": {
     "title": "Mi Día",
@@ -1974,7 +2020,21 @@
     "chipBreak": "Descanso",
     "switchArea": "Cambiar Área",
     "offline": "Sin conexión",
-    "active": "Activo"
+    "active": "Activo",
+    "notClockedIn": "Sin fichar",
+    "job": "Trabajo",
+    "materialsUsed": "Materiales utilizados",
+    "addMaterial": "Añadir material",
+    "expenses": "Gastos",
+    "addExpense": "Añadir gasto",
+    "crewOnSite": "Equipo en el sitio",
+    "you": "tú",
+    "addCrewMember": "Añadir miembro del equipo",
+    "notes": "Notas",
+    "notesPlaceholder": "Añadir notas...",
+    "saveNotes": "Guardar notas",
+    "saveDraft": "Guardar borrador",
+    "submitWorksheet": "Enviar hoja"
   },
   "myHours": {
     "title": "Mis Horas",
@@ -2011,7 +2071,8 @@
     "typeBillable": "Facturable",
     "typeDrive": "Conducción",
     "typeShop": "Taller",
-    "typeBreak": "Descanso"
+    "typeBreak": "Descanso",
+    "general": "General"
   },
   "scheduling": {
     "title": "Programación",
@@ -2040,7 +2101,8 @@
     "removeFromSchedule": "Quitar del programa",
     "dismiss": "Descartar",
     "jobCount_one": "{{count}} trabajo",
-    "jobCount_other": "{{count}} trabajos"
+    "jobCount_other": "{{count}} trabajos",
+    "jobCount": "{{count}} trabajo"
   },
   "timeTracking": {
     "title": "Seguimiento de Tiempo",
