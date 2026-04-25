@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Mail,
   CheckSquare,
@@ -262,14 +263,16 @@ function TasksBoardPanel() {
 
 export function TodosWidget({ size }: WidgetProps) {
   const [boardOpen, setBoardOpen] = useState(false);
+  const { user } = useAuth();
 
   const { data: myTasks = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/tasks/my"] });
 
+  const filteredMine = myTasks.filter((t: any) => t.assignedToUserId === user?.id);
   const now = new Date();
-  const active    = myTasks.filter((t: any) => !["completed", "cancelled"].includes(t.status));
-  const inProgress = myTasks.filter((t: any) => t.status === "in_progress");
-  const overdue    = myTasks.filter((t: any) => t.dueDate && !["completed", "cancelled"].includes(t.status) && new Date(t.dueDate) < now);
-  const dueToday   = myTasks.filter((t: any) => {
+  const active    = filteredMine.filter((t: any) => !["completed", "cancelled"].includes(t.status));
+  const inProgress = filteredMine.filter((t: any) => t.status === "in_progress");
+  const overdue    = filteredMine.filter((t: any) => t.dueDate && !["completed", "cancelled"].includes(t.status) && new Date(t.dueDate) < now);
+  const dueToday   = filteredMine.filter((t: any) => {
     if (!t.dueDate || ["completed", "cancelled"].includes(t.status)) return false;
     const d = new Date(t.dueDate);
     return d.toDateString() === now.toDateString();
