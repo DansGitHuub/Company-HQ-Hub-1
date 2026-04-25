@@ -55,7 +55,8 @@
       "sales": "Ventas",
       "operations": "Operaciones",
       "resources": "Recursos"
-    }
+    },
+    "timeAdmin": "Administración de Tiempo"
   },
   "common": {
     "save": "Guardar",

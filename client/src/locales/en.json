@@ -55,7 +55,8 @@
       "sales": "Sales",
       "operations": "Operations",
       "resources": "Resources"
-    }
+    },
+    "timeAdmin": "Time Admin"
   },
   "common": {
     "save": "Save",

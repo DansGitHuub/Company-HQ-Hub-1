@@ -396,6 +396,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   time_reports: { icon: ClipboardList, label: t("nav.timeReports"), href: "/admin/time-reports" },
   worksheet_review: { icon: ClipboardList, label: t("nav.worksheetReview"), href: "/admin/worksheet-review" },
   time_card_approval: { icon: CheckSquare, label: t("nav.timeCardApproval"), href: "/admin/time-card-approval" },
+    time_admin: { icon: Clock, label: t("nav.timeAdmin"), href: "/admin/time" },
     catalog: { icon: BookMarked, label: t("nav.catalog"), href: "/catalog" },
     budget_settings: { icon: DollarSign, label: t("nav.budgetPricing"), href: "/budget-settings" },
     tools: { icon: Snowflake, label: t("nav.tools"), href: "/tools" },
@@ -417,7 +418,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["todos", "scheduling", "time_tracking", "equipment", "forms"] },
     { label: "RESOURCES", items: ["sops", "education", "testing"] },
-    { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "time_reports", "worksheet_review", "time_card_approval", "mors_budget", "catalog", "budget_settings", "tools"] },
+    { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "time_admin", "mors_budget", "catalog", "budget_settings", "tools"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {

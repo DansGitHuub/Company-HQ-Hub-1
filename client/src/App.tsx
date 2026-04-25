@@ -84,6 +84,7 @@ import TimeReports from "@/pages/admin/TimeReports";
 import ServiceTypesPage from "@/pages/admin/ServiceTypesPage";
 import WorksheetReview from "@/pages/admin/WorksheetReview";
 import TimeCardApproval from "@/pages/admin/TimeCardApproval";
+import TimeAdminPage from "@/pages/admin/TimeAdminPage";
 import InquiryPage from "@/pages/Inquiry";
 import InquirySuccess from "@/pages/InquirySuccess";
 import BookingPage from "@/pages/BookingPage";
@@ -195,9 +196,10 @@ function AppRoutes() {
         <Route path="/admin/work-areas" component={WorkAreasPage} />
         <Route path="/admin/qbo-export" component={QBOExportPage} />
         <Route path="/admin/archive" component={ArchivePage} />
-        <Route path="/admin/time-reports" component={TimeReports} />
-        <Route path="/admin/worksheet-review" component={WorksheetReview} />
-        <Route path="/admin/time-card-approval" component={TimeCardApproval} />
+        <Route path="/admin/time" component={TimeAdminPage} />
+      <Route path="/admin/time-reports"><Redirect to="/admin/time?tab=reports" /></Route>
+        <Route path="/admin/worksheet-review"><Redirect to="/admin/time?tab=worksheet" /></Route>
+        <Route path="/admin/time-card-approval"><Redirect to="/admin/time?tab=approval" /></Route>
         <Route path="/admin/service-types" component={ServiceTypesPage} />
         <Route path="/budget-settings" component={BudgetSettings} />
         <Route path="/time" component={TimeTracking} />
