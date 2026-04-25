@@ -189,15 +189,17 @@ function TaskCard({ task }: { task: any }) {
 function TasksBoardPanel() {
   const { data: myTasks = [], isLoading: loadingMy } = useQuery<any[]>({ queryKey: ["/api/tasks/my"] });
   const { data: assignedTasks = [], isLoading: loadingAssigned } = useQuery<any[]>({ queryKey: ["/api/tasks/assigned"] });
+  const { user } = useAuth();
 
   const allTasks = React.useMemo(() => {
     const seen = new Set<string>();
     return [...myTasks, ...assignedTasks].filter(t => {
+      if (t.assignedToUserId !== user?.id) return false;
       if (seen.has(t.id)) return false;
       seen.add(t.id);
       return true;
     });
-  }, [myTasks, assignedTasks]);
+  }, [myTasks, assignedTasks, user?.id]);
 
   const isLoading = loadingMy || loadingAssigned;
 
