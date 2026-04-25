@@ -644,7 +644,9 @@
       "completed": "Completed",
       "confirmed": "Confirmed",
       "cancelled": "Cancelled",
-      "overdue": "Overdue"
+      "overdue": "Overdue",
+      "todo": "To Do",
+      "on_hold": "On Hold"
     },
     "location": "Location",
     "jobSiteAddress": "Job site address or description",
