@@ -329,7 +329,7 @@ export default function TimeCardApproval() {
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}
               data-testid="button-clear-selection">
-              Cancelar
+              Cancel
             </Button>
           </div>
         </div>
@@ -561,7 +561,7 @@ export default function TimeCardApproval() {
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setRejectDialog((d) => ({ ...d, open: false }))}>
-              Cancelar
+              Cancel
             </Button>
             <Button variant="destructive" onClick={confirmReject} data-testid="button-confirm-reject">
               <XCircle className="w-4 h-4 mr-1.5" />

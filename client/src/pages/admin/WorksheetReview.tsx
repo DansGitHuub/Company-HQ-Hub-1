@@ -252,7 +252,7 @@ export default function WorksheetReview() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <ClipboardList className="w-6 h-6 text-green-600" />
-            Revisión de Hojas de Trabajo
+            Worksheet Review
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Vista admin de entradas por empleado y fecha
@@ -260,7 +260,7 @@ export default function WorksheetReview() {
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-refresh">
           <RotateCcw className="w-4 h-4 mr-1.5" />
-          Actualizar
+          Refresh
         </Button>
       </div>
 
@@ -289,7 +289,7 @@ export default function WorksheetReview() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Empleado</Label>
+              <Label>Employee</Label>
               <Select value={employeeId} onValueChange={setEmployeeId}>
                 <SelectTrigger data-testid="select-employee">
                   <SelectValue placeholder="Todos" />
@@ -311,7 +311,7 @@ export default function WorksheetReview() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="employee">Empleado</SelectItem>
+                  <SelectItem value="employee">Employee</SelectItem>
                   <SelectItem value="date">Fecha</SelectItem>
                 </SelectContent>
               </Select>
@@ -349,7 +349,7 @@ export default function WorksheetReview() {
           </Card>
           <Card>
             <CardContent className="pt-4 pb-3">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Días</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Days</p>
               <p className="text-2xl font-bold text-gray-900 mt-0.5" data-testid="stat-days">
                 {data.summary.uniqueDays}
               </p>
@@ -415,7 +415,7 @@ export default function WorksheetReview() {
                         <TableHeader>
                           <TableRow className="bg-gray-50">
                             {groupMode === "date" && (
-                              <TableHead className="pl-5">Empleado</TableHead>
+                              <TableHead className="pl-5">Employee</TableHead>
                             )}
                             {groupMode === "employee" && (
                               <TableHead className="pl-5">Fecha</TableHead>
@@ -424,7 +424,7 @@ export default function WorksheetReview() {
                             <TableHead>Área</TableHead>
                             <TableHead>Entrada</TableHead>
                             <TableHead>Salida</TableHead>
-                            <TableHead>Duración</TableHead>
+                            <TableHead>Duration</TableHead>
                             <TableHead>Tipo</TableHead>
                             <TableHead>Estado</TableHead>
                             <TableHead className="pr-2">Notas</TableHead>
