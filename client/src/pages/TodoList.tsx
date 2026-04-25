@@ -53,6 +53,7 @@ const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string
 };
 
 const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
+  todo: { label: "To Do", icon: Circle, color: "text-slate-500" },
   assigned: { label: "Assigned", icon: Bell, color: "text-blue-500" },
   acknowledged: { label: "Acknowledged", icon: Eye, color: "text-indigo-500" },
   in_progress: { label: "In Progress", icon: Play, color: "text-yellow-500" },

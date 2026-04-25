@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
 import {
+  Circle,
   Mail,
   CheckSquare,
   Calendar,
@@ -146,6 +147,7 @@ const PRIORITY_LABELS: Record<string, string> = {
 };
 
 const KANBAN_COLUMNS = [
+  { id: "todo",         label: "To Do",        icon: Circle,       color: "border-slate-400",  bg: "bg-slate-50 dark:bg-slate-800/30" },
   { id: "assigned",    label: "Assigned",    icon: Bell,         color: "border-blue-400",   bg: "bg-blue-50 dark:bg-blue-950/30" },
   { id: "acknowledged",label: "Acknowledged",icon: Eye,          color: "border-indigo-400",  bg: "bg-indigo-50 dark:bg-indigo-950/30" },
   { id: "in_progress", label: "In Progress", icon: Play,         color: "border-yellow-400",  bg: "bg-yellow-50 dark:bg-yellow-950/30" },
