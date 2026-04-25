@@ -207,10 +207,10 @@ function AvailabilitySection() {
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Calendar className="h-5 w-5 text-primary" /> Consultation Availability
+              <Calendar className="h-5 w-5 text-primary" /> {t("settings.consultationAvailability")}
             </CardTitle>
             <CardDescription>
-              Set your available hours for the public booking calendar
+              {t("settings.consultationAvailabilitySubtext")}
             </CardDescription>
           </div>
           <Button size="sm" onClick={handleSave} disabled={saving || !loaded} data-testid="btn-save-availability">
@@ -224,7 +224,7 @@ function AvailabilitySection() {
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />Slot Duration</Label>
+                  <Label className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />{t("settings.slotDuration")}</Label>
                   <Select value={String(slotDuration)} onValueChange={v => setSlotDuration(Number(v))}>
                     <SelectTrigger data-testid="select-slot-duration"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -233,7 +233,7 @@ function AvailabilitySection() {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label>Buffer Between Appointments</Label>
+                  <Label>{t("settings.bufferBetweenAppointments")}</Label>
                   <Select value={String(bufferMinutes)} onValueChange={v => setBufferMinutes(Number(v))}>
                     <SelectTrigger data-testid="select-buffer"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -246,7 +246,7 @@ function AvailabilitySection() {
               <Separator />
 
               <div className="space-y-3">
-                <Label className="text-sm font-semibold">Weekly Schedule</Label>
+                <Label className="text-sm font-semibold">{t("settings.weeklySchedule")}</Label>
                 {DAYS.map(day => (
                   <div key={day} className="flex items-center gap-3" data-testid={`avail-row-${day}`}>
                     <Switch
@@ -356,7 +356,7 @@ export default function Settings() {
     <div className="container max-w-5xl mx-auto py-6 px-4" data-testid="settings-page">
       <div className="mb-6">
         <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-settings-title">
-          <SettingsIcon className="h-6 w-6" /> Settings
+          <SettingsIcon className="h-6 w-6" /> {t("settings.title")}
         </h1>
         <p className="text-muted-foreground mt-1">{t("settings.subtitle")}</p>
       </div>
@@ -591,14 +591,14 @@ function NotificationsSection({ profile }: { profile: any }) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" /> Notification Preferences</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" /> {t("settings.notificationPreferences")}</CardTitle>
           <CardDescription>{t("settings.chooseNotifications")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between p-3 rounded-lg border">
             <div className="space-y-0.5">
               <div className="flex items-center gap-2 font-medium text-sm">
-                <Mail className="h-4 w-4" /> Email Notifications
+                <Mail className="h-4 w-4" /> {t("settings.emailNotifications")}
               </div>
               <p className="text-xs text-muted-foreground">{t("settings.emailAlerts")}</p>
             </div>

@@ -499,7 +499,13 @@
     "changePassword": "Change Password",
     "savingDots": "Saving…",
     "qboSubtext": "Bidirectional sync of customers, invoices, and payments with QuickBooks Online.",
-    "qboConnectSubtext": "Connect to sync customers, invoices, and payments with QuickBooks Online."
+    "qboConnectSubtext": "Connect to sync customers, invoices, and payments with QuickBooks Online.",
+    "consultationAvailability": "Consultation Availability",
+    "consultationAvailabilitySubtext": "Set your available hours for the public booking calendar",
+    "emailNotifications": "Email Notifications",
+    "slotDuration": "Slot Duration",
+    "bufferBetweenAppointments": "Buffer Between Appointments",
+    "weeklySchedule": "Weekly Schedule"
   },
   "employees": {
     "title": "Employees",

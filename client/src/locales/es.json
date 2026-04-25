@@ -436,7 +436,7 @@
     "changeAccountPassword": "Cambie la contraseña de su cuenta",
     "updatePassword": "Actualizar Contraseña",
     "passwordsDontMatch": "Las contraseñas no coinciden",
-    "notificationPreferences": "Preferencias de Notificación",
+    "notificationPreferences": "Preferencias de notificación",
     "chooseNotifications": "Elija cómo desea ser notificado",
     "emailAlerts": "Recibir alertas por correo sobre mensajes y actualizaciones",
     "displayLanguage": "Idioma de la Interfaz",
@@ -499,7 +499,13 @@
     "changePassword": "Cambiar contraseña",
     "savingDots": "Guardando…",
     "qboSubtext": "Sincronización bidireccional de clientes, facturas y pagos con QuickBooks Online.",
-    "qboConnectSubtext": "Conecte para sincronizar clientes, facturas y pagos con QuickBooks Online."
+    "qboConnectSubtext": "Conecte para sincronizar clientes, facturas y pagos con QuickBooks Online.",
+    "consultationAvailability": "Disponibilidad para consultas",
+    "consultationAvailabilitySubtext": "Configure sus horas disponibles para el calendario público de reservas",
+    "emailNotifications": "Notificaciones por correo",
+    "slotDuration": "Duración del intervalo",
+    "bufferBetweenAppointments": "Tiempo entre citas",
+    "weeklySchedule": "Horario semanal"
   },
   "employees": {
     "title": "Empleados",
