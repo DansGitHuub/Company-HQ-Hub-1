@@ -274,7 +274,7 @@ function AvailabilitySection() {
                         </Select>
                       </>
                     ) : (
-                      <span className="text-sm text-muted-foreground italic">Unavailable</span>
+                      <span className="text-sm text-muted-foreground italic">{t("common.unavailable")}</span>
                     )}
                   </div>
                 ))}
@@ -393,7 +393,7 @@ export default function Settings() {
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 flex gap-3 items-start">
               <Info className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
               <div>
-                <p className="font-semibold text-blue-900 mb-1">Moved to Admin Panel</p>
+                <p className="font-semibold text-blue-900 mb-1">{t("settings.movedToAdminPanel")}</p>
                 <p className="text-sm text-blue-700">
                   Company-wide settings — <span className="font-medium">Divisions, Estimate Templates, QuickBooks,</span> and <span className="font-medium">Terms &amp; Conditions</span> — are now managed in <span className="font-medium">Admin Panel → Company Settings</span>.
                 </p>
@@ -461,7 +461,7 @@ function ProfileSection({ profile }: { profile: any }) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><User className="h-5 w-5" /> Profile Information</CardTitle>
+          <CardTitle className="flex items-center gap-2"><User className="h-5 w-5" /> {t("settings.profileInformation")}</CardTitle>
           <CardDescription>{t("settings.updatePersonalDetails")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -491,7 +491,7 @@ function ProfileSection({ profile }: { profile: any }) {
             data-testid="button-save-profile"
           >
             {updateProfileMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Save Changes
+            {t("settings.saveChanges")}
           </Button>
         </CardContent>
       </Card>
@@ -504,12 +504,12 @@ function ProfileSection({ profile }: { profile: any }) {
         <CardContent>
           {!showPasswordForm ? (
             <Button variant="outline" onClick={() => setShowPasswordForm(true)} data-testid="button-change-password">
-              <Lock className="h-4 w-4 mr-2" /> Change Password
+              <Lock className="h-4 w-4 mr-2" /> {t("settings.changePassword")}
             </Button>
           ) : (
             <div className="space-y-4 max-w-sm">
               <div className="space-y-2">
-                <Label>Current Password</Label>
+                <Label>{t("settings.currentPassword")}</Label>
                 <div className="relative">
                   <Input
                     type={showCurrent ? "text" : "password"}
@@ -523,7 +523,7 @@ function ProfileSection({ profile }: { profile: any }) {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>New Password</Label>
+                <Label>{t("settings.newPassword")}</Label>
                 <div className="relative">
                   <Input
                     type={showNew ? "text" : "password"}
@@ -537,7 +537,7 @@ function ProfileSection({ profile }: { profile: any }) {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Confirm New Password</Label>
+                <Label>{t("settings.confirmNewPassword")}</Label>
                 <Input
                   type="password"
                   value={confirmPassword}
@@ -641,7 +641,7 @@ function LanguageSection({ profile }: { profile: any }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Globe className="h-5 w-5" /> Language</CardTitle>
-          <CardDescription>Choose your preferred language</CardDescription>
+          <CardDescription>{t("settings.choosePreferredLanguage")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="max-w-xs space-y-2">
@@ -743,7 +743,7 @@ function WorkAreasSection() {
         <CardHeader className="flex flex-row items-center justify-between py-4">
           <div>
             <CardTitle className="flex items-center gap-2 text-base"><Layers className="h-5 w-5" /> Work Area Types</CardTitle>
-            <CardDescription>Manage the catalog of work area types for job tracking</CardDescription>
+            <CardDescription>{t("settings.workAreasSubtext")}</CardDescription>
           </div>
           <Button size="sm" onClick={openAdd} data-testid="btn-add-work-area">
             <Plus className="h-4 w-4 mr-1" /> Add Work Area
@@ -842,7 +842,7 @@ function WorkAreasSection() {
             <Button variant="outline" onClick={closeModal}>{t("common.cancel")}</Button>
             <Button data-testid="btn-save-wa" onClick={handleSave}
               disabled={createMut.isPending || updateMut.isPending}>
-              {createMut.isPending || updateMut.isPending ? "Saving…" : "Save"}
+              {createMut.isPending || updateMut.isPending ? t("settings.savingDots") : t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -907,7 +907,7 @@ function DivisionsSection() {
         </div>
         <Button size="sm" data-testid="btn-save-divisions" onClick={() => saveMut.mutate()}
           disabled={saveMut.isPending}>
-          {saveMut.isPending ? "Saving…" : "Save Changes"}
+          {saveMut.isPending ? t("settings.savingDots") : t("settings.saveChanges")}
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -993,8 +993,8 @@ function EstimateTemplatesSection() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between py-4">
           <div>
-            <CardTitle className="flex items-center gap-2 text-base"><FileText className="h-5 w-5" /> Estimate Templates</CardTitle>
-            <CardDescription>Pre-built templates for the estimate form</CardDescription>
+            <CardTitle className="flex items-center gap-2 text-base"><FileText className="h-5 w-5" /> {t("settings.estimateTemplatesHeader")}</CardTitle>
+            <CardDescription>{t("settings.estimateTemplatesSubtext")}</CardDescription>
           </div>
           <Button size="sm" onClick={openAdd} data-testid="btn-add-template">
             <Plus className="h-4 w-4 mr-1" /> New Template
@@ -1004,14 +1004,14 @@ function EstimateTemplatesSection() {
           {isLoading ? (
             <div className="p-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>
           ) : templates.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground text-sm">No templates yet</div>
+            <div className="p-8 text-center text-muted-foreground text-sm">{t("settings.noTemplatesYet")}</div>
           ) : (
             <Table data-testid="templates-table">
               <TableHeader>
                 <TableRow>
                   <TableHead>{t("common.name")}</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="w-24">Status</TableHead>
+                  <TableHead>{t("common.type")}</TableHead>
+                  <TableHead className="w-24">{t("common.status")}</TableHead>
                   <TableHead className="w-20 text-right">{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1047,12 +1047,12 @@ function EstimateTemplatesSection() {
           <DialogHeader><DialogTitle>{editing ? "Edit Template" : "New Estimate Template"}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
-              <Label>Template Name</Label>
+              <Label>{t("settings.templateName")}</Label>
               <Input data-testid="input-template-name" value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Spring Cleanup" />
             </div>
             <div className="space-y-1">
-              <Label>Type</Label>
+              <Label>{t("common.type")}</Label>
               <Select value={form.estimate_type} onValueChange={v => setForm(f => ({ ...f, estimate_type: v }))}>
                 <SelectTrigger data-testid="select-template-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -1061,13 +1061,13 @@ function EstimateTemplatesSection() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Default Customer Message</Label>
+              <Label>{t("settings.defaultCustomerMessage")}</Label>
               <Textarea rows={3} data-testid="input-template-message" value={form.default_customer_message}
                 onChange={e => setForm(f => ({ ...f, default_customer_message: e.target.value }))}
                 placeholder="Thank you for the opportunity…" />
             </div>
             <div className="space-y-1">
-              <Label>Default Terms</Label>
+              <Label>{t("settings.defaultTerms")}</Label>
               <Textarea rows={3} data-testid="input-template-terms" value={form.default_terms}
                 onChange={e => setForm(f => ({ ...f, default_terms: e.target.value }))}
                 placeholder="Payment due upon completion…" />
@@ -1082,7 +1082,7 @@ function EstimateTemplatesSection() {
             <Button variant="outline" onClick={closeModal}>{t("common.cancel")}</Button>
             <Button data-testid="btn-save-template" onClick={handleSave}
               disabled={createMut.isPending || updateMut.isPending}>
-              {createMut.isPending || updateMut.isPending ? "Saving…" : "Save"}
+              {createMut.isPending || updateMut.isPending ? t("settings.savingDots") : t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1145,12 +1145,12 @@ function CompanyInfoSection() {
   return (
     <Card className="max-w-2xl">
       <CardHeader className="py-4">
-        <CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-5 w-5" /> Company Information</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-5 w-5" /> {t("settings.companyInfoHeader")}</CardTitle>
         <CardDescription>Defaults used across estimates, invoices, and communications</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1">
-          <Label htmlFor="ci-name">Company Name</Label>
+          <Label htmlFor="ci-name">{t("settings.companyName")}</Label>
           <Input id="ci-name" data-testid="input-ci-name" value={form.name}
             placeholder="Chapin Landscapes" onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
         </div>
@@ -1167,12 +1167,12 @@ function CompanyInfoSection() {
           </div>
         </div>
         <div className="space-y-1">
-          <Label htmlFor="ci-address">Address</Label>
+          <Label htmlFor="ci-address">{t("common.address")}</Label>
           <Input id="ci-address" data-testid="input-ci-address" value={form.address}
             placeholder="123 Main St, City, State 00000" onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="ci-website">Website</Label>
+          <Label htmlFor="ci-website">{t("common.website")}</Label>
           <Input id="ci-website" type="url" data-testid="input-ci-website" value={form.website}
             placeholder="https://company.com" onChange={e => setForm(f => ({ ...f, website: e.target.value }))} />
         </div>
@@ -1184,14 +1184,14 @@ function CompanyInfoSection() {
               onChange={e => setForm(f => ({ ...f, tax_rate: e.target.value }))} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="ci-terms">Default Payment Terms</Label>
+            <Label htmlFor="ci-terms">{t("settings.defaultPaymentTerms")}</Label>
             <Input id="ci-terms" data-testid="input-ci-payment_terms" value={form.payment_terms}
               placeholder="Net 30" onChange={e => setForm(f => ({ ...f, payment_terms: e.target.value }))} />
           </div>
         </div>
         <div className="pt-2">
           <Button data-testid="btn-save-company" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
-            {saveMut.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />Save Company Info</>}
+            {saveMut.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />{t("settings.saveCompanyInfo")}</>}
           </Button>
         </div>
       </CardContent>
@@ -1264,10 +1264,10 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
   }
 
   function logStatusBadge(s: string) {
-    if (s === "success") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700"><CheckCircle className="h-3 w-3" />Success</span>;
-    if (s === "partial") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700"><AlertCircle className="h-3 w-3" />Partial</span>;
-    if (s === "error")   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-600"><XCircle className="h-3 w-3" />Error</span>;
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700"><RefreshCw className="h-3 w-3 animate-spin" />Running</span>;
+    if (s === "success") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700"><CheckCircle className="h-3 w-3" />{t("common.success")}</span>;
+    if (s === "partial") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700"><AlertCircle className="h-3 w-3" />{t("common.partial")}</span>;
+    if (s === "error")   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-600"><XCircle className="h-3 w-3" />{t("common.error")}</span>;
+    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700"><RefreshCw className="h-3 w-3 animate-spin" />{t("common.running")}</span>;
   }
 
   return (
@@ -1277,10 +1277,10 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <ArrowLeftRight className="h-5 w-5 text-[#2CA01C]" />
-            QuickBooks Online
+            {t("settings.qboHeader")}
           </CardTitle>
           <CardDescription>
-            Bidirectional sync of customers, invoices, and payments with QuickBooks Online.
+            {t("settings.qboSubtext")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1291,7 +1291,7 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
                   <AlertCircle className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="font-medium text-sm text-amber-700">QuickBooks credentials not configured</p>
+                  <p className="font-medium text-sm text-amber-700">{t("settings.qboCredentialsNotConfigured")}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Set <code className="bg-muted px-1 rounded text-xs">QB_CLIENT_ID</code> and{" "}
                     <code className="bg-muted px-1 rounded text-xs">QB_CLIENT_SECRET</code> environment variables,
@@ -1312,7 +1312,7 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
                   <Link2 className="h-5 w-5" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-sm text-green-700">Connected to QuickBooks Online</p>
+                  <p className="font-medium text-sm text-green-700">{t("settings.connectedToQbo")}</p>
                   <p className="text-xs text-muted-foreground">
                     Realm: {status.realm_id} · Last sync: {fmtDate(status.last_sync)}
                   </p>
@@ -1327,7 +1327,7 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
                 >
                   {syncing
                     ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing…</>
-                    : <><RefreshCw className="h-4 w-4 mr-2" />Sync Now</>}
+                    : <><RefreshCw className="h-4 w-4 mr-2" />{t("settings.syncNow")}</>}
                 </Button>
                 <Button
                   variant="outline"
@@ -1363,8 +1363,8 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
                   <Link2Off className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="font-medium text-sm">Not connected</p>
-                  <p className="text-xs text-muted-foreground">Connect to sync customers, invoices, and payments with QuickBooks Online.</p>
+                  <p className="font-medium text-sm">{t("settings.notConnected")}</p>
+                  <p className="text-xs text-muted-foreground">{t("settings.qboConnectSubtext")}</p>
                 </div>
               </div>
               <Button
@@ -1383,7 +1383,7 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
       {/* Sync Capabilities */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">What Gets Synced</CardTitle>
+          <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t("settings.whatGetsSynced")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1414,7 +1414,7 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
       {status?.connected && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Sync History</CardTitle>
+            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t("settings.syncHistory")}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {logsLoading ? (
@@ -1422,19 +1422,19 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             ) : logs.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">No sync history yet. Run your first sync above.</div>
+              <div className="py-8 text-center text-sm text-muted-foreground">{t("settings.noSyncHistoryYet")}</div>
             ) : (
               <div className="overflow-x-auto">
                 <Table data-testid="qb-sync-log-table">
                   <TableHeader>
                     <TableRow className="bg-muted/30">
-                      <TableHead>Entity</TableHead>
-                      <TableHead>Direction</TableHead>
-                      <TableHead>Records</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Started</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>Errors</TableHead>
+                      <TableHead>{t("common.entity")}</TableHead>
+                      <TableHead>{t("common.direction")}</TableHead>
+                      <TableHead>{t("common.records")}</TableHead>
+                      <TableHead>{t("common.status")}</TableHead>
+                      <TableHead>{t("common.started")}</TableHead>
+                      <TableHead>{t("common.duration")}</TableHead>
+                      <TableHead>{t("common.errors")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
