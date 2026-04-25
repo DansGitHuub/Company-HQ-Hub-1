@@ -407,7 +407,7 @@ export default function Settings() {
 function ProfileSection({ profile }: { profile: any }) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [fullName, setFullName] = useState(profile?.fullName || "");
+  const [fullName, setFullName] = useState(profile?.name || "");
   const [email, setEmail] = useState(profile?.email || "");
   const [phone, setPhone] = useState(profile?.phone || "");
 
@@ -420,7 +420,7 @@ function ProfileSection({ profile }: { profile: any }) {
 
   useEffect(() => {
     if (profile) {
-      setFullName(profile.fullName || "");
+      setFullName(profile.name || "");
       setEmail(profile.email || "");
       setPhone(profile.phone || "");
     }
@@ -478,12 +478,12 @@ function ProfileSection({ profile }: { profile: any }) {
             <div className="space-y-2">
               <Label>Role</Label>
               <div className="flex items-center h-10">
-                <Badge variant="outline">{user?.role}</Badge>
+                <Badge variant="outline">{user?.isMasterAdmin ? "Master Admin" : (user?.role || "")}</Badge>
               </div>
             </div>
           </div>
           <Button
-            onClick={() => updateProfileMutation.mutate({ fullName, email, phone })}
+            onClick={() => updateProfileMutation.mutate({ name: fullName, email, phone })}
             disabled={updateProfileMutation.isPending}
             data-testid="button-save-profile"
           >
