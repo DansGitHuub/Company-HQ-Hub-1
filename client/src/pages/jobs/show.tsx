@@ -626,7 +626,7 @@ export default function JobDetailPage() {
         {isAdminOrManager && job.status === "completed" && (
           <Button size="sm" onClick={() => setShowGenerateInvoice(true)} data-testid="button-generate-invoice"
             className="bg-green-600 hover:bg-green-700 text-white">
-            <FileText className="h-4 w-4 mr-1.5" /> Generar Factura
+            <FileText className="h-4 w-4 mr-1.5" /> Generate Invoice
           </Button>
         )}
         {isAdminOrManager && (

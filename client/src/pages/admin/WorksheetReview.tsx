@@ -91,9 +91,9 @@ const ENTRY_TYPE_COLORS: Record<string, string> = {
 };
 
 const APPROVAL_CONFIG: Record<string, { label: string; className: string }> = {
-  pending:  { label: "Pendiente", className: "bg-yellow-100 text-yellow-700 border border-yellow-300" },
-  approved: { label: "Aprobado",  className: "bg-green-100 text-green-700 border border-green-300" },
-  rejected: { label: "Rechazado", className: "bg-red-100 text-red-700 border border-red-300" },
+  pending:  { label: "Pending", className: "bg-yellow-100 text-yellow-700 border border-yellow-300" },
+  approved: { label: "Approved",  className: "bg-green-100 text-green-700 border border-green-300" },
+  rejected: { label: "Rejected", className: "bg-red-100 text-red-700 border border-red-300" },
 };
 
 function formatDuration(minutes: number | null, clockIn: string, clockOut: string | null): string {
