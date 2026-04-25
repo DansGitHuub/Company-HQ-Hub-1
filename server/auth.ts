@@ -143,7 +143,7 @@ export function setupAuth(app: Express) {
 
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const { password: _, ...safeUser } = req.user!;
+    const { password: _p, storedPassword: _sp, googleAccessToken: _ga, googleRefreshToken: _gr, googleTokenExpiry: _ge, recoveryToken: _rt, recoveryExpires: _re, ...safeUser } = req.user!;
     res.json(safeUser);
   });
 
