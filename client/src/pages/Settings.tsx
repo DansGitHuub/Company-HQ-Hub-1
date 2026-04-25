@@ -498,7 +498,7 @@ function ProfileSection({ profile }: { profile: any }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Lock className="h-5 w-5" /> Password</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Lock className="h-5 w-5" /> {t("settings.passwordHeader")}</CardTitle>
           <CardDescription>{t("settings.changeAccountPassword")}</CardDescription>
         </CardHeader>
         <CardContent>
