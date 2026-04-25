@@ -255,7 +255,7 @@ function AvailabilitySection() {
                       data-testid={`toggle-${day}`}
                     />
                     <span className={`w-24 text-sm font-medium ${!schedule[day]?.enabled ? "text-muted-foreground" : ""}`}>
-                      {DAY_LABELS[day]}
+                      {t(`common.daysOfWeek.${day}`)}
                     </span>
                     {schedule[day]?.enabled ? (
                       <>
@@ -338,10 +338,10 @@ export default function Settings() {
   });
 
   const sections = [
-    { id: "profile" as const, label: "Profile & Account", icon: User },
-    { id: "notifications" as const, label: "Notifications", icon: Bell },
-    { id: "language" as const, label: "Language & Display", icon: Globe },
-    { id: "availability" as const, label: "Availability", icon: Calendar },
+    { id: "profile" as const, label: t("settings.sectionTabs.profile"), icon: User },
+    { id: "notifications" as const, label: t("settings.sectionTabs.notifications"), icon: Bell },
+    { id: "language" as const, label: t("settings.sectionTabs.language"), icon: Globe },
+    { id: "availability" as const, label: t("settings.sectionTabs.availability"), icon: Calendar },
   ];
 
   if (isLoading) {

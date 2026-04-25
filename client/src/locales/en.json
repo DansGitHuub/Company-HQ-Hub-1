@@ -256,7 +256,16 @@
     "errors": "Errors",
     "records": "Records",
     "direction": "Direction",
-    "entity": "Entity"
+    "entity": "Entity",
+    "daysOfWeek": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    }
   },
   "status": {
     "active": "Active",
@@ -505,7 +514,13 @@
     "emailNotifications": "Email Notifications",
     "slotDuration": "Slot Duration",
     "bufferBetweenAppointments": "Buffer Between Appointments",
-    "weeklySchedule": "Weekly Schedule"
+    "weeklySchedule": "Weekly Schedule",
+    "sectionTabs": {
+      "profile": "Profile & Account",
+      "notifications": "Notifications",
+      "language": "Language & Display",
+      "availability": "Availability"
+    }
   },
   "employees": {
     "title": "Employees",

@@ -256,7 +256,16 @@
     "errors": "Errores",
     "records": "Registros",
     "direction": "Dirección",
-    "entity": "Entidad"
+    "entity": "Entidad",
+    "daysOfWeek": {
+      "monday": "Lunes",
+      "tuesday": "Martes",
+      "wednesday": "Miércoles",
+      "thursday": "Jueves",
+      "friday": "Viernes",
+      "saturday": "Sábado",
+      "sunday": "Domingo"
+    }
   },
   "status": {
     "active": "Activo",
@@ -505,7 +514,13 @@
     "emailNotifications": "Notificaciones por correo",
     "slotDuration": "Duración del intervalo",
     "bufferBetweenAppointments": "Tiempo entre citas",
-    "weeklySchedule": "Horario semanal"
+    "weeklySchedule": "Horario semanal",
+    "sectionTabs": {
+      "profile": "Perfil y cuenta",
+      "notifications": "Notificaciones",
+      "language": "Idioma y pantalla",
+      "availability": "Disponibilidad"
+    }
   },
   "employees": {
     "title": "Empleados",
