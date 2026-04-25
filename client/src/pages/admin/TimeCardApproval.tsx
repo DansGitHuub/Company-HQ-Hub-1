@@ -234,7 +234,7 @@ export default function TimeCardApproval() {
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-refresh">
           <RotateCcw className="w-4 h-4 mr-1.5" />
-          Actualizar
+          Refresh
         </Button>
       </div>
 
@@ -259,7 +259,7 @@ export default function TimeCardApproval() {
                   <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
                   {data?.employees.map((emp) => (
                     <SelectItem key={emp.id} value={emp.id} data-testid={`option-emp-${emp.id}`}>
                       {emp.name || emp.username}
@@ -278,7 +278,7 @@ export default function TimeCardApproval() {
                   <SelectItem value="pending">Pending ({counts.pending})</SelectItem>
                   <SelectItem value="approved">Approved ({counts.approved})</SelectItem>
                   <SelectItem value="rejected">Rejected ({counts.rejected})</SelectItem>
-                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -391,7 +391,7 @@ export default function TimeCardApproval() {
                       </Badge>
                       {pendingIds.length > 0 && (
                         <span className="text-[11px] px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 border border-yellow-300 font-semibold shrink-0">
-                          {pendingIds.length} pendiente{pendingIds.length > 1 ? "s" : ""}
+                          {pendingIds.length} pending
                         </span>
                       )}
                     </div>
