@@ -238,7 +238,16 @@
     "createdSuccessfully": "Creado correctamente",
     "updatedSuccessfully": "Actualizado correctamente",
     "deletedSuccessfully": "Eliminado correctamente",
-    "cannotDelete": "No se puede eliminar"
+    "cannotDelete": "No se puede eliminar",
+    "pleaseTryAgain": "Por favor inténtelo de nuevo.",
+    "qboConfigMissing": "QB_CLIENT_ID y QB_CLIENT_SECRET deben configurarse como variables de entorno.",
+    "active": "Activo",
+    "sort": "Orden",
+    "sortOrder": "Orden de clasificación",
+    "fullName": "Nombre completo",
+    "division": "División",
+    "thisCannotBeUndone": "Esta acción no se puede deshacer.",
+    "inactive": "Inactivo"
   },
   "status": {
     "active": "Activo",

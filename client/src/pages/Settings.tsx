@@ -33,6 +33,7 @@ type SettingsSection = "profile" | "notifications" | "language" | "work-areas" |
 
 function TermsSection() {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"install" | "maintenance" | "snow">("install");
   const [editContent, setEditContent] = useState<Record<string, string>>({});
@@ -52,9 +53,9 @@ function TermsSection() {
     try {
       await apiRequest("PUT", `/api/settings/terms/${activeRecord.id}`, { content });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/terms"] });
-      toast({ title: "Terms & Conditions saved" });
+      toast({ title: t("settings.toast.termsSaved") });
     } catch {
-      toast({ title: "Failed to save", variant: "destructive" });
+      toast({ title: t("common.failedToSave"), variant: "destructive" });
     } finally {
       setSaving(null);
     }
@@ -149,6 +150,7 @@ function defaultSchedule(): WeekSchedule {
 function AvailabilitySection() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   const [schedule, setSchedule] = useState<WeekSchedule>(defaultSchedule());
   const [timezone, setTimezone] = useState("America/New_York");
@@ -189,9 +191,9 @@ function AvailabilitySection() {
         body: JSON.stringify({ schedule, timezone, slot_duration: slotDuration, buffer_minutes: bufferMinutes }),
       });
       if (!res.ok) throw new Error("Failed");
-      toast({ title: "Availability saved" });
+      toast({ title: t("settings.toast.availabilitySaved") });
     } catch {
-      toast({ title: "Failed to save", variant: "destructive" });
+      toast({ title: t("common.failedToSave"), variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -212,7 +214,7 @@ function AvailabilitySection() {
             </CardDescription>
           </div>
           <Button size="sm" onClick={handleSave} disabled={saving || !loaded} data-testid="btn-save-availability">
-            {saving ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-1" />Save</>}
+            {saving ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-1" />{t("common.save")}</>}
           </Button>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -298,7 +300,7 @@ function AvailabilitySection() {
                   <Button size="sm" variant="outline"
                     onClick={() => {
                       navigator.clipboard.writeText(`${window.location.origin}/book/${(user as any)?.username || ""}`);
-                      toast({ title: "Link copied!" });
+                      toast({ title: t("common.linkCopied") });
                     }}
                     data-testid="btn-copy-booking-link"
                   >
@@ -356,7 +358,7 @@ export default function Settings() {
         <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-settings-title">
           <SettingsIcon className="h-6 w-6" /> Settings
         </h1>
-        <p className="text-muted-foreground mt-1">Manage your account preferences and application settings</p>
+        <p className="text-muted-foreground mt-1">{t("settings.subtitle")}</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-6">
@@ -406,6 +408,7 @@ export default function Settings() {
 
 function ProfileSection({ profile }: { profile: any }) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [fullName, setFullName] = useState(profile?.name || "");
   const [email, setEmail] = useState(profile?.email || "");
@@ -434,9 +437,9 @@ function ProfileSection({ profile }: { profile: any }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      toast({ title: "Profile updated" });
+      toast({ title: t("settings.toast.profileUpdated") });
     },
-    onError: () => toast({ title: "Failed to update profile", variant: "destructive" }),
+    onError: () => toast({ title: t("settings.toast.failedToUpdateProfile"), variant: "destructive" }),
   });
 
   const changePasswordMutation = useMutation({
@@ -445,13 +448,13 @@ function ProfileSection({ profile }: { profile: any }) {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Password changed successfully" });
+      toast({ title: t("settings.toast.passwordChanged") });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       setShowPasswordForm(false);
     },
-    onError: () => toast({ title: "Failed to change password", variant: "destructive" }),
+    onError: () => toast({ title: t("settings.toast.failedToChangePassword"), variant: "destructive" }),
   });
 
   return (
@@ -459,24 +462,24 @@ function ProfileSection({ profile }: { profile: any }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><User className="h-5 w-5" /> Profile Information</CardTitle>
-          <CardDescription>Update your personal details</CardDescription>
+          <CardDescription>{t("settings.updatePersonalDetails")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
+              <Label htmlFor="fullName">{t("common.fullName")}</Label>
               <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} data-testid="input-settings-fullname" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("common.email")}</Label>
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="input-settings-email" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">{t("common.phone")}</Label>
               <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} data-testid="input-settings-phone" />
             </div>
             <div className="space-y-2">
-              <Label>Role</Label>
+              <Label>{t("common.role")}</Label>
               <div className="flex items-center h-10">
                 <Badge variant="outline">{user?.isMasterAdmin ? "Master Admin" : (user?.role || "")}</Badge>
               </div>
@@ -496,7 +499,7 @@ function ProfileSection({ profile }: { profile: any }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Lock className="h-5 w-5" /> Password</CardTitle>
-          <CardDescription>Change your account password</CardDescription>
+          <CardDescription>{t("settings.changeAccountPassword")}</CardDescription>
         </CardHeader>
         <CardContent>
           {!showPasswordForm ? (
@@ -546,7 +549,7 @@ function ProfileSection({ profile }: { profile: any }) {
                 <Button
                   onClick={() => {
                     if (newPassword !== confirmPassword) {
-                      toast({ title: "Passwords don't match", variant: "destructive" });
+                      toast({ title: t("common.passwordsDontMatch"), variant: "destructive" });
                       return;
                     }
                     changePasswordMutation.mutate({ currentPassword, newPassword });
@@ -557,7 +560,7 @@ function ProfileSection({ profile }: { profile: any }) {
                   {changePasswordMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
                   Update Password
                 </Button>
-                <Button variant="ghost" onClick={() => setShowPasswordForm(false)}>Cancel</Button>
+                <Button variant="ghost" onClick={() => setShowPasswordForm(false)}>{t("common.cancel")}</Button>
               </div>
             </div>
           )}
@@ -569,6 +572,7 @@ function ProfileSection({ profile }: { profile: any }) {
 
 function NotificationsSection({ profile }: { profile: any }) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [emailNotifs, setEmailNotifs] = useState(profile?.emailNotifications !== false);
 
   useEffect(() => {
@@ -588,7 +592,7 @@ function NotificationsSection({ profile }: { profile: any }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" /> Notification Preferences</CardTitle>
-          <CardDescription>Choose how you want to be notified</CardDescription>
+          <CardDescription>{t("settings.chooseNotifications")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between p-3 rounded-lg border">
@@ -596,7 +600,7 @@ function NotificationsSection({ profile }: { profile: any }) {
               <div className="flex items-center gap-2 font-medium text-sm">
                 <Mail className="h-4 w-4" /> Email Notifications
               </div>
-              <p className="text-xs text-muted-foreground">Receive email alerts for messages and updates</p>
+              <p className="text-xs text-muted-foreground">{t("settings.emailAlerts")}</p>
             </div>
             <Switch
               checked={emailNotifs}
@@ -641,7 +645,7 @@ function LanguageSection({ profile }: { profile: any }) {
         </CardHeader>
         <CardContent>
           <div className="max-w-xs space-y-2">
-            <Label>Display Language</Label>
+            <Label>{t("settings.displayLanguage")}</Label>
             <Select value={language} onValueChange={handleLanguageChange}>
               <SelectTrigger data-testid="select-language">
                 <SelectValue />
@@ -676,6 +680,7 @@ interface WorkAreaType {
 
 function WorkAreasSection() {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<WorkAreaType | null>(null);
@@ -690,19 +695,19 @@ function WorkAreasSection() {
 
   const createMut = useMutation({
     mutationFn: (d: typeof form) => apiRequest("POST", "/api/work-area-types", d),
-    onSuccess: () => { toast({ title: "Work area created" }); invalidateWA(); closeModal(); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: () => { toast({ title: t("settings.toast.workAreaCreated") }); invalidateWA(); closeModal(); },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
   const updateMut = useMutation({
     mutationFn: ({ id, d }: { id: string; d: typeof form }) =>
       apiRequest("PUT", `/api/work-area-types/${id}`, d),
-    onSuccess: () => { toast({ title: "Work area updated" }); invalidateWA(); closeModal(); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: () => { toast({ title: t("settings.toast.workAreaUpdated") }); invalidateWA(); closeModal(); },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
   const deleteMut = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/work-area-types/${id}`),
-    onSuccess: () => { toast({ title: "Deleted" }); invalidateWA(); setDeleteTarget(null); },
-    onError: (e: any) => toast({ title: "Cannot delete", description: e.message, variant: "destructive" }),
+    onSuccess: () => { toast({ title: t("common.deletedSuccessfully") }); invalidateWA(); setDeleteTarget(null); },
+    onError: (e: any) => toast({ title: t("common.cannotDelete"), description: e.message, variant: "destructive" }),
   });
   const toggleMut = useMutation({
     mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
@@ -751,11 +756,11 @@ function WorkAreasSection() {
             <Table data-testid="work-areas-table">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Division</TableHead>
-                  <TableHead className="w-20">Active</TableHead>
-                  <TableHead className="w-20">Sort</TableHead>
-                  <TableHead className="w-20 text-right">Actions</TableHead>
+                  <TableHead>{t("common.name")}</TableHead>
+                  <TableHead>{t("common.division")}</TableHead>
+                  <TableHead className="w-20">{t("common.active")}</TableHead>
+                  <TableHead className="w-20">{t("common.sort")}</TableHead>
+                  <TableHead className="w-20 text-right">{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -809,12 +814,12 @@ function WorkAreasSection() {
           <DialogHeader><DialogTitle>{editing ? "Edit Work Area" : "Add Work Area"}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
-              <Label>Name</Label>
+              <Label>{t("common.name")}</Label>
               <Input data-testid="input-wa-name" value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Mulch Beds" />
             </div>
             <div className="space-y-1">
-              <Label>Division</Label>
+              <Label>{t("common.division")}</Label>
               <Select value={form.division} onValueChange={v => setForm(f => ({ ...f, division: v }))}>
                 <SelectTrigger data-testid="select-wa-division"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -823,18 +828,18 @@ function WorkAreasSection() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Sort Order</Label>
+              <Label>{t("common.sortOrder")}</Label>
               <Input type="number" data-testid="input-wa-sort" value={form.sort_order}
                 onChange={e => setForm(f => ({ ...f, sort_order: Number(e.target.value) }))} />
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={form.is_active} data-testid="switch-wa-active"
                 onCheckedChange={v => setForm(f => ({ ...f, is_active: v }))} />
-              <Label>Active</Label>
+              <Label>{t("common.active")}</Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={closeModal}>Cancel</Button>
+            <Button variant="outline" onClick={closeModal}>{t("common.cancel")}</Button>
             <Button data-testid="btn-save-wa" onClick={handleSave}
               disabled={createMut.isPending || updateMut.isPending}>
               {createMut.isPending || updateMut.isPending ? "Saving…" : "Save"}
@@ -847,12 +852,12 @@ function WorkAreasSection() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{deleteTarget?.name}"?</AlertDialogTitle>
-            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+            <AlertDialogDescription>{t("common.thisCannotBeUndone")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive hover:bg-destructive/90"
-              onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}>Delete</AlertDialogAction>
+              onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}>{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -865,6 +870,7 @@ function WorkAreasSection() {
 // ═══════════════════════════════════════════════════════════════════════════════
 function DivisionsSection() {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const qc = useQueryClient();
 
   const { data: setting } = useQuery<{ key: string; value: string }>({
@@ -886,10 +892,10 @@ function DivisionsSection() {
   const saveMut = useMutation({
     mutationFn: () => apiRequest("PUT", "/api/settings/division_colors", { value: JSON.stringify(colors) }),
     onSuccess: () => {
-      toast({ title: "Division colors saved" });
+      toast({ title: t("settings.toast.divisionColorsSaved") });
       qc.invalidateQueries({ queryKey: ["/api/settings/division_colors"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -933,6 +939,7 @@ interface EstimateTemplate {
 
 function EstimateTemplatesSection() {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<EstimateTemplate | null>(null);
@@ -947,19 +954,19 @@ function EstimateTemplatesSection() {
 
   const createMut = useMutation({
     mutationFn: (d: typeof form) => apiRequest("POST", "/api/estimate-templates", d),
-    onSuccess: () => { toast({ title: "Template created" }); invalidateT(); closeModal(); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: () => { toast({ title: t("settings.toast.templateCreated") }); invalidateT(); closeModal(); },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
   const updateMut = useMutation({
     mutationFn: ({ id, d }: { id: string; d: typeof form }) =>
       apiRequest("PUT", `/api/estimate-templates/${id}`, d),
-    onSuccess: () => { toast({ title: "Template updated" }); invalidateT(); closeModal(); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: () => { toast({ title: t("settings.toast.templateUpdated") }); invalidateT(); closeModal(); },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
   const deleteMut = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/estimate-templates/${id}`),
-    onSuccess: () => { toast({ title: "Deleted" }); invalidateT(); setDeleteTarget(null); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: () => { toast({ title: t("common.deletedSuccessfully") }); invalidateT(); setDeleteTarget(null); },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   function invalidateT() {
@@ -1002,29 +1009,29 @@ function EstimateTemplatesSection() {
             <Table data-testid="templates-table">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
+                  <TableHead>{t("common.name")}</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead className="w-24">Status</TableHead>
-                  <TableHead className="w-20 text-right">Actions</TableHead>
+                  <TableHead className="w-20 text-right">{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {templates.map(t => (
-                  <TableRow key={t.id} data-testid={`template-row-${t.id}`}>
-                    <TableCell className="font-medium">{t.name}</TableCell>
-                    <TableCell><Badge variant="secondary" className="text-xs">{t.estimate_type || "—"}</Badge></TableCell>
+                {templates.map(tpl => (
+                  <TableRow key={tpl.id} data-testid={`template-row-${tpl.id}`}>
+                    <TableCell className="font-medium">{tpl.name}</TableCell>
+                    <TableCell><Badge variant="secondary" className="text-xs">{tpl.estimate_type || "—"}</Badge></TableCell>
                     <TableCell>
-                      {t.is_active
-                        ? <Badge className="bg-green-100 text-green-700 text-xs">Active</Badge>
-                        : <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+                      {tpl.is_active
+                        ? <Badge className="bg-green-100 text-green-700 text-xs">{t("common.active")}</Badge>
+                        : <Badge variant="secondary" className="text-xs">{t("common.inactive")}</Badge>}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(t)}
-                          data-testid={`btn-edit-template-${t.id}`}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(tpl)}
+                          data-testid={`btn-edit-template-${tpl.id}`}><Pencil className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"
-                          onClick={() => setDeleteTarget(t)}
-                          data-testid={`btn-delete-template-${t.id}`}><Trash2 className="h-4 w-4" /></Button>
+                          onClick={() => setDeleteTarget(tpl)}
+                          data-testid={`btn-delete-template-${tpl.id}`}><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1068,11 +1075,11 @@ function EstimateTemplatesSection() {
             <div className="flex items-center gap-2">
               <Switch checked={form.is_active} data-testid="switch-template-active"
                 onCheckedChange={v => setForm(f => ({ ...f, is_active: v }))} />
-              <Label>Active</Label>
+              <Label>{t("common.active")}</Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={closeModal}>Cancel</Button>
+            <Button variant="outline" onClick={closeModal}>{t("common.cancel")}</Button>
             <Button data-testid="btn-save-template" onClick={handleSave}
               disabled={createMut.isPending || updateMut.isPending}>
               {createMut.isPending || updateMut.isPending ? "Saving…" : "Save"}
@@ -1085,12 +1092,12 @@ function EstimateTemplatesSection() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{deleteTarget?.name}"?</AlertDialogTitle>
-            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+            <AlertDialogDescription>{t("common.thisCannotBeUndone")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive hover:bg-destructive/90"
-              onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}>Delete</AlertDialogAction>
+              onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}>{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1108,6 +1115,7 @@ interface CompanyInfo {
 
 function CompanyInfoSection() {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const qc = useQueryClient();
 
   const { data: setting } = useQuery<{ key: string; value: string }>({
@@ -1128,10 +1136,10 @@ function CompanyInfoSection() {
   const saveMut = useMutation({
     mutationFn: () => apiRequest("PUT", "/api/settings/company_info", { value: JSON.stringify(form) }),
     onSuccess: () => {
-      toast({ title: "Company info saved" });
+      toast({ title: t("settings.toast.companyInfoSaved") });
       qc.invalidateQueries({ queryKey: ["/api/settings/company_info"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -1148,12 +1156,12 @@ function CompanyInfoSection() {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <Label htmlFor="ci-phone">Phone</Label>
+            <Label htmlFor="ci-phone">{t("common.phone")}</Label>
             <Input id="ci-phone" type="tel" data-testid="input-ci-phone" value={form.phone}
               placeholder="(555) 000-0000" onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="ci-email">Email</Label>
+            <Label htmlFor="ci-email">{t("common.email")}</Label>
             <Input id="ci-email" type="email" data-testid="input-ci-email" value={form.email}
               placeholder="info@company.com" onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
           </div>
@@ -1195,12 +1203,13 @@ function CompanyInfoSection() {
 // ═══════════════════════════════════════════════════════════════════════════════
 function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const qc = useQueryClient();
 
   useEffect(() => {
-    if (qbParam === "connected") toast({ title: "QuickBooks connected successfully!" });
-    if (qbParam === "error") toast({ title: "QuickBooks connection failed", description: "Please try again.", variant: "destructive" });
-    if (qbParam === "not-configured") toast({ title: "QuickBooks not configured", description: "QB_CLIENT_ID and QB_CLIENT_SECRET must be set in environment variables.", variant: "destructive" });
+    if (qbParam === "connected") toast({ title: t("settings.toast.qboConnected") });
+    if (qbParam === "error") toast({ title: t("settings.toast.qboConnectionFailed"), description: t("common.pleaseTryAgain"), variant: "destructive" });
+    if (qbParam === "not-configured") toast({ title: "QuickBooks not configured", description: t("common.qboConfigMissing"), variant: "destructive" });
   }, [qbParam]);
 
   const { data: qbConfig } = useQuery<{ configured: boolean }>({

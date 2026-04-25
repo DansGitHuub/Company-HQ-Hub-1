@@ -238,7 +238,16 @@
     "createdSuccessfully": "Created successfully",
     "updatedSuccessfully": "Updated successfully",
     "deletedSuccessfully": "Deleted successfully",
-    "cannotDelete": "Cannot delete"
+    "cannotDelete": "Cannot delete",
+    "pleaseTryAgain": "Please try again.",
+    "qboConfigMissing": "QB_CLIENT_ID and QB_CLIENT_SECRET must be set in environment variables.",
+    "active": "Active",
+    "sort": "Sort",
+    "sortOrder": "Sort Order",
+    "fullName": "Full Name",
+    "division": "Division",
+    "thisCannotBeUndone": "This cannot be undone.",
+    "inactive": "Inactive"
   },
   "status": {
     "active": "Active",
