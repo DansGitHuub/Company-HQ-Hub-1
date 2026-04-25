@@ -255,7 +255,7 @@ export default function WorksheetReview() {
             Worksheet Review
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Vista admin de entradas por empleado y fecha
+            Admin view of entries by employee and date
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-refresh">
@@ -269,7 +269,7 @@ export default function WorksheetReview() {
         <CardContent className="pt-5 pb-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="filter-start">Desde</Label>
+              <Label htmlFor="filter-start">From</Label>
               <Input
                 id="filter-start"
                 type="date"
@@ -279,7 +279,7 @@ export default function WorksheetReview() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="filter-end">Hasta</Label>
+              <Label htmlFor="filter-end">To</Label>
               <Input
                 id="filter-end"
                 type="date"
@@ -295,7 +295,7 @@ export default function WorksheetReview() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos los empleados</SelectItem>
+                  <SelectItem value="all">All employees</SelectItem>
                   {data?.employees.map((emp) => (
                     <SelectItem key={emp.id} value={emp.id} data-testid={`option-employee-${emp.id}`}>
                       {emp.name || emp.username}
@@ -305,14 +305,14 @@ export default function WorksheetReview() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Agrupar por</Label>
+              <Label>Group by</Label>
               <Select value={groupMode} onValueChange={(v) => setGroupMode(v as GroupMode)}>
                 <SelectTrigger data-testid="select-group-mode">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="employee">Employee</SelectItem>
-                  <SelectItem value="date">Fecha</SelectItem>
+                  <SelectItem value="date">Date</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -325,7 +325,7 @@ export default function WorksheetReview() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card>
             <CardContent className="pt-4 pb-3">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Entradas</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Entries</p>
               <p className="text-2xl font-bold text-gray-900 mt-0.5" data-testid="stat-total-entries">
                 {data.summary.totalEntries}
               </p>
@@ -333,7 +333,7 @@ export default function WorksheetReview() {
           </Card>
           <Card>
             <CardContent className="pt-4 pb-3">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Horas totales</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Total Hours</p>
               <p className="text-2xl font-bold text-gray-900 mt-0.5" data-testid="stat-total-hours">
                 {data.summary.totalHours}h
               </p>
@@ -341,7 +341,7 @@ export default function WorksheetReview() {
           </Card>
           <Card>
             <CardContent className="pt-4 pb-3">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Empleados</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Employees</p>
               <p className="text-2xl font-bold text-gray-900 mt-0.5" data-testid="stat-employees">
                 {data.summary.uniqueEmployees}
               </p>
@@ -373,7 +373,7 @@ export default function WorksheetReview() {
         <Card>
           <CardContent className="py-12 text-center text-gray-400">
             <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p>No hay entradas para el rango seleccionado.</p>
+            <p>No entries for the selected range.</p>
           </CardContent>
         </Card>
       ) : (
@@ -398,7 +398,7 @@ export default function WorksheetReview() {
                         {group.label}
                       </span>
                       <Badge variant="secondary" className="text-xs">
-                        {group.entries.length} {group.entries.length === 1 ? "entrada" : "entradas"}
+                        {group.entries.length} {group.entries.length === 1 ? "entry" : "entries"}
                       </Badge>
                     </div>
                     <span className="text-sm font-semibold text-green-700 flex items-center gap-1">
@@ -418,16 +418,16 @@ export default function WorksheetReview() {
                               <TableHead className="pl-5">Employee</TableHead>
                             )}
                             {groupMode === "employee" && (
-                              <TableHead className="pl-5">Fecha</TableHead>
+                              <TableHead className="pl-5">Date</TableHead>
                             )}
-                            <TableHead>Trabajo</TableHead>
-                            <TableHead>Área</TableHead>
-                            <TableHead>Entrada</TableHead>
-                            <TableHead>Salida</TableHead>
+                            <TableHead>Job</TableHead>
+                            <TableHead>Area</TableHead>
+                            <TableHead>Clock In</TableHead>
+                            <TableHead>Clock Out</TableHead>
                             <TableHead>Duration</TableHead>
-                            <TableHead>Tipo</TableHead>
-                            <TableHead>Estado</TableHead>
-                            <TableHead className="pr-2">Notas</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="pr-2">Notes</TableHead>
                             <TableHead className="pr-5 w-10" />
                           </TableRow>
                         </TableHeader>
