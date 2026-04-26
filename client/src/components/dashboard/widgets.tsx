@@ -189,21 +189,13 @@ function TaskCard({ task }: { task: any }) {
 }
 
 function TasksBoardPanel() {
-  const { data: myTasks = [], isLoading: loadingMy } = useQuery<any[]>({ queryKey: ["/api/tasks/my"] });
+  // /api/tasks/assigned returns only tasks assigned to the current user (server-side filtered).
   const { data: assignedTasks = [], isLoading: loadingAssigned } = useQuery<any[]>({ queryKey: ["/api/tasks/assigned"] });
   const { user } = useAuth();
 
-  const allTasks = React.useMemo(() => {
-    const seen = new Set<string>();
-    return [...myTasks, ...assignedTasks].filter(t => {
-      if (t.assignedToUserId !== user?.id) return false;
-      if (seen.has(t.id)) return false;
-      seen.add(t.id);
-      return true;
-    });
-  }, [myTasks, assignedTasks, user?.id]);
+  const allTasks = assignedTasks;
 
-  const isLoading = loadingMy || loadingAssigned;
+  const isLoading = loadingAssigned;
 
   const overdueTasks = allTasks.filter(t =>
     t.dueDate && !["completed", "cancelled"].includes(t.status) && new Date(t.dueDate) < new Date()
@@ -269,9 +261,10 @@ export function TodosWidget({ size }: WidgetProps) {
   const [boardOpen, setBoardOpen] = useState(false);
   const { user } = useAuth();
 
-  const { data: myTasks = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/tasks/my"] });
+  // /api/tasks/assigned returns only tasks assigned to the current user (server-side filtered).
+  const { data: myTasks = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/tasks/assigned"] });
 
-  const filteredMine = myTasks.filter((t: any) => t.assignedToUserId === user?.id);
+  const filteredMine = myTasks;
   const now = new Date();
   const active    = filteredMine.filter((t: any) => !["completed", "cancelled"].includes(t.status));
   const inProgress = filteredMine.filter((t: any) => t.status === "in_progress");
