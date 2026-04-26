@@ -10,36 +10,53 @@ async function generateInvoiceNumber(): Promise<string> {
 
 /** Recalculate totals for an invoice from its line items + payments */
 async function syncInvoiceTotals(invoiceId: string) {
-  // Guard: paid and void invoices have immutable balances — skip recalculation
-  // to prevent a deleted-payment or line-item edit from resurrecting a non-zero
-  // balance_due on an already-finalized invoice (the bug that produced INV-1002).
-  const { rows: check } = await pool.query(
-    `SELECT status FROM invoices WHERE id = $1`,
-    [invoiceId]
-  );
-  if (check.length > 0 && ["paid", "void"].includes(check[0].status)) return;
-
+  // NULL-safe recompute. Wrapping discount_amount and tax_rate in COALESCE prevents
+  // a single missing field from propagating NULL through the math (the bug that left
+  // INV-1005 and the INV-1002 class with status=paid but balance_due > 0).
   await pool.query(`
     UPDATE invoices SET
-      subtotal    = COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0),
-      tax_amount  = ROUND((COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0) - discount_amount) * tax_rate, 2),
-      total       = ROUND((COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0) - discount_amount)
-                    * (1 + tax_rate), 2),
-      amount_paid = COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=$1), 0),
-      balance_due = ROUND((COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0) - discount_amount)
-                    * (1 + tax_rate), 2)
-                    - COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=$1), 0),
-      updated_at  = NOW()
+      subtotal     = COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0),
+      tax_amount   = ROUND(
+                       (COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0)
+                        - COALESCE(discount_amount, 0)
+                       ) * COALESCE(tax_rate, 0), 2),
+      total        = ROUND(
+                       (COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0)
+                        - COALESCE(discount_amount, 0)
+                       ) * (1 + COALESCE(tax_rate, 0)), 2),
+      amount_paid  = COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=$1), 0),
+      balance_due  = GREATEST(
+                       0,
+                       ROUND(
+                         (COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=$1), 0)
+                          - COALESCE(discount_amount, 0)
+                         ) * (1 + COALESCE(tax_rate, 0)), 2)
+                       - COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=$1), 0)
+                     ),
+      updated_at   = NOW()
     WHERE id = $1
   `, [invoiceId]);
 
-  // Auto-mark as paid if balance_due <= 0 and invoice was accepted/sent/viewed
+  // Auto-mark as paid if balance is now zero and there's at least one real payment.
+  // Don't auto-mark drafts.
   await pool.query(`
     UPDATE invoices
-    SET status = 'paid', updated_at = NOW()
+    SET status = 'paid', updated_at = NOW(),
+        paid_at = COALESCE(paid_at, NOW())
     WHERE id = $1
       AND balance_due <= 0
+      AND amount_paid > 0
       AND status IN ('accepted','sent','viewed')
+  `, [invoiceId]);
+
+  // Inverse: if status is 'paid' but the books no longer agree (e.g. payment deleted),
+  // step back to 'sent' so the user can decide what to do.
+  await pool.query(`
+    UPDATE invoices
+    SET status = 'sent', updated_at = NOW(), paid_at = NULL
+    WHERE id = $1
+      AND status = 'paid'
+      AND balance_due > 0
   `, [invoiceId]);
 }
 
@@ -248,7 +265,9 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
         [status, status, req.params.id]
       );
       if (rows.length === 0) return res.status(404).json({ message: "Not found" });
-      return res.json(rows[0]);
+      await syncInvoiceTotals(req.params.id);
+      const refreshed = await pool.query(`SELECT * FROM invoices WHERE id=$1`, [req.params.id]);
+      return res.json(refreshed.rows[0]);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
     }

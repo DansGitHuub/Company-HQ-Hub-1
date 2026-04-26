@@ -62,16 +62,37 @@ export async function runInvoicesMigration() {
       CREATE INDEX IF NOT EXISTS idx_payments_invoice_id   ON payments(invoice_id);
     `);
 
-    // One-time heal: paid invoices whose balance_due was incorrectly resurrected
-    // by syncInvoiceTotals() after a payment was deleted (the INV-1002 class of bug).
-    // Safe to re-run on every boot — the WHERE clause is a no-op once rows are clean.
+    // Idempotent heal: recompute amount_paid and balance_due for every invoice from
+    // its actual line_items + payments. Catches the INV-1002 / INV-1005 class of bug
+    // where balance_due drifted out of sync. Safe to run on every boot — the math
+    // is deterministic.
     await pool.query(`
-      UPDATE invoices
-      SET balance_due = 0,
-          amount_paid = total,
-          updated_at  = NOW()
-      WHERE status = 'paid'
-        AND balance_due > 0
+      UPDATE invoices i SET
+        amount_paid = COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=i.id), 0),
+        balance_due = GREATEST(
+                        0,
+                        ROUND(
+                          (COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=i.id), 0)
+                           - COALESCE(i.discount_amount, 0)
+                          ) * (1 + COALESCE(i.tax_rate, 0)), 2)
+                        - COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=i.id), 0)
+                      ),
+        updated_at  = NOW()
+      WHERE i.status NOT IN ('void')
+    `);
+
+    // Reconcile status with the real numbers.
+    // (a) status='paid' but balance_due > 0 — walk back to 'sent'.
+    await pool.query(`
+      UPDATE invoices SET status='sent', updated_at=NOW(), paid_at=NULL
+      WHERE status='paid' AND balance_due > 0
+    `);
+    // (b) status in (accepted/sent/viewed) but fully paid — promote to 'paid'.
+    await pool.query(`
+      UPDATE invoices SET status='paid', updated_at=NOW(), paid_at=COALESCE(paid_at, NOW())
+      WHERE status IN ('accepted','sent','viewed')
+        AND balance_due <= 0
+        AND amount_paid > 0
     `);
 
     console.log("[migration] Invoices tables ready");
