@@ -229,6 +229,61 @@ export function registerEstimateRoutes(app: Express) {
     }
   });
 
+    // A20: Convert a consultation into a draft estimate. Replaces the previous client-side
+  // "navigate to /estimates?customer_id=…" no-op with an actual record creation.
+  app.post("/api/consultations/:id/convert-to-estimate", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows: cRows } = await client.query(
+        `SELECT id, customer_id, contact_name, contact_email, contact_phone,
+                address, project_description, service_type, estimated_value, notes
+         FROM consultations WHERE id = $1`,
+        [req.params.id]
+      );
+      if (cRows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Consultation not found" });
+      }
+      const c = cRows[0];
+      if (!c.customer_id) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ message: "Link a customer to this consultation before converting to an estimate." });
+      }
+
+      const estNum = await nextEstimateNumber();
+      const titleSrc = (c.project_description || c.service_type || "New Estimate").toString();
+      const title = titleSrc.length > 100 ? titleSrc.slice(0, 97) + "..." : titleSrc;
+      const notes = c.notes || c.project_description || null;
+
+      const { rows } = await client.query(
+        `INSERT INTO sales_estimates
+         (estimate_number, customer_id, property_id, estimate_type, template_name,
+          title, status, salesperson_id, valid_until, issued_date,
+          subtotal, tax_rate, tax_amount, discount_amount, total,
+          down_payment_percent, down_payment_amount, notes, customer_message, terms,
+          presentation_style)
+         VALUES ($1,$2,$3,$4,$5,$6,'draft',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+         RETURNING id`,
+        [estNum, c.customer_id, null, "project", null,
+         title, null, null, new Date().toISOString().slice(0, 10),
+         0, 0, 0, 0, 0,
+         0, 0, notes, null, null,
+         "simple"]
+      );
+      const estimateId = rows[0].id;
+      await client.query("COMMIT");
+      const full = await getEstimateFull(estimateId);
+      return res.status(201).json(full);
+    } catch (err: any) {
+      await client.query("ROLLBACK");
+      console.error("[convert-to-estimate]", err.message);
+      return res.status(500).json({ message: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
   // ------ Update estimate header ------
   app.put("/api/estimates/:id", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     const client = await pool.connect();

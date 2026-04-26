@@ -271,6 +271,18 @@ function ConsultationModal({
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  // A20: actually create a draft estimate from this consultation, then navigate to it.
+  const convertMut = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/consultations/${editing?.id}/convert-to-estimate`, {}).then(r => r.json()),
+    onSuccess: (newEstimate: any) => {
+      toast({ title: "Estimate created", description: newEstimate?.estimate_number ? `Created ${newEstimate.estimate_number}` : undefined });
+      invalidate();
+      onClose();
+      navigate(`/estimates/${newEstimate.id}`);
+    },
+    onError: (e: any) => toast({ title: "Could not convert", description: e.message, variant: "destructive" }),
+  });
+
   function handleSave() {
     const payload = {
       ...form,
@@ -539,11 +551,15 @@ function ConsultationModal({
           {editing && (
             <Button variant="outline" className="mr-auto"
               data-testid="btn-convert-estimate"
+              disabled={convertMut.isPending}
               onClick={() => {
-                onClose();
-                navigate(`/estimates?customer_id=${editing.customer_id ?? ""}`);
+                if (!editing?.customer_id) {
+                  toast({ title: "Link a customer first", description: "Pick a customer in the Customer field, save, then convert.", variant: "destructive" });
+                  return;
+                }
+                convertMut.mutate();
               }}>
-              <ExternalLink className="h-4 w-4 mr-2" />
+              {convertMut.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ExternalLink className="h-4 w-4 mr-2" />}
               Convert to Estimate
             </Button>
           )}
