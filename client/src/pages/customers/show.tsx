@@ -375,6 +375,17 @@ export default function CustomerDetailPage() {
     enabled: !!id,
   });
 
+  // A22: load this customer's invoices so the summary tiles can aggregate real numbers.
+  const { data: customerInvoices = [] } = useQuery<any[]>({
+    queryKey: ["/api/invoices", "customer", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/invoices?customer_id=${id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load invoices");
+      return res.json();
+    },
+    enabled: !!id,
+  });
+
   // ── Active toggle ──
   const activeMutation = useMutation({
     mutationFn: async (is_active: boolean) => {
@@ -421,7 +432,10 @@ export default function CustomerDetailPage() {
   }, [customer]);
 
   // ── Stats ──
-  const totalBilled = jobs.reduce((sum, j) => sum + (j.value ?? 0), 0);
+  // A22: real billed/outstanding sourced from invoices. Excludes voided.
+  const billableInvoices = customerInvoices.filter((inv: any) => inv.status !== "void");
+  const totalBilled = billableInvoices.reduce((sum: number, inv: any) => sum + Number(inv.total ?? 0), 0);
+  const totalOutstanding = billableInvoices.reduce((sum: number, inv: any) => sum + Math.max(0, Number(inv.balance_due ?? 0)), 0);
   const lastVisit = useMemo(() => {
     const dates = jobs
       .map((j) => j.completion_date || j.scheduled_date)
@@ -627,8 +641,7 @@ export default function CustomerDetailPage() {
                   icon={Briefcase} />
                 <StatCard title={t("totalBilled")} value={`$${totalBilled.toLocaleString()}`}
                   sub="across all jobs" icon={DollarSign} color="text-blue-600" />
-                <StatCard title={t("outstanding")} value="$0"
-                  sub="invoices coming soon" icon={FileText} color="text-orange-500" />
+                <StatCard title={t("outstanding")} value={`$${totalOutstanding.toLocaleString()}`} sub={totalOutstanding > 0 ? "invoices outstanding" : "all paid"} icon={FileText} color={totalOutstanding > 0 ? "text-orange-500" : "text-green-600"} />
                 <StatCard title={t("lastVisit")} value={lastVisit}
                   sub="most recent job date" icon={CalendarDays} color="text-purple-600" />
               </div>
