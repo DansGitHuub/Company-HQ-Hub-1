@@ -465,7 +465,7 @@ export async function checkStaleLeads() {
 
 export function startLeadAlertScheduler() {
   const INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours
-  console.log("[LeadAlertScheduler] Starting lead alert scheduler (checking every hour)...");
+  console.log("[LeadAlertScheduler] Starting lead alert scheduler (checking every 12 hours)...");
   setInterval(() => {
     checkStaleLeads().catch(e => console.error("[lead-alert-scheduler]", e.message));
   }, INTERVAL_MS);
