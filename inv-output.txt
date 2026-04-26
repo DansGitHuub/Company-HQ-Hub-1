@@ -1,0 +1,47 @@
+========== server/migrations/appSettings.ts ==========
+8:      CREATE TABLE IF NOT EXISTS app_settings (
+========== server/migrations/catalogExtended.ts ==========
+6:    ALTER TABLE materials
+17:    CREATE TABLE IF NOT EXISTS class_pricing_defaults (
+========== server/migrations/invoices.ts ==========
+8:      CREATE TABLE IF NOT EXISTS invoices (
+36:      CREATE TABLE IF NOT EXISTS invoice_line_items (
+46:      CREATE TABLE IF NOT EXISTS payments (
+58:      CREATE INDEX IF NOT EXISTS idx_invoices_customer_id  ON invoices(customer_id);
+59:      CREATE INDEX IF NOT EXISTS idx_invoices_job_id       ON invoices(job_id);
+60:      CREATE INDEX IF NOT EXISTS idx_invoices_status       ON invoices(status);
+61:      CREATE INDEX IF NOT EXISTS idx_line_items_invoice_id ON invoice_line_items(invoice_id);
+62:      CREATE INDEX IF NOT EXISTS idx_payments_invoice_id   ON payments(invoice_id);
+========== server/migrations/materialsCatalogColumns.ts ==========
+5:    ALTER TABLE materials
+========== server/migrations/newEstimates.ts ==========
+12:    CREATE TABLE IF NOT EXISTS sales_estimates (
+48:    CREATE TABLE IF NOT EXISTS estimate_work_areas (
+59:    CREATE TABLE IF NOT EXISTS estimate_line_items (
+75:    CREATE TABLE IF NOT EXISTS estimate_templates (
+========== server/migrations/scheduling.ts ==========
+10:      ALTER TABLE jobs
+17:      CREATE TABLE IF NOT EXISTS job_assignments (
+========== server/migrations/smsOptIns.ts ==========
+5:    CREATE TABLE IF NOT EXISTS sms_opt_ins (
+========== server/migrations/termsAndConditions.ts ==========
+39:      CREATE TABLE IF NOT EXISTS terms_and_conditions (
+71:      ALTER TABLE sales_estimates
+80:      ALTER TABLE invoices
+========== server/migrations/workAreas.ts ==========
+45:    CREATE TABLE IF NOT EXISTS work_area_types (
+57:    CREATE TABLE IF NOT EXISTS job_work_areas (
+73:    ALTER TABLE time_entries
+========== server/migrations/worksheetPhase3.ts ==========
+10:      CREATE TABLE IF NOT EXISTS worksheets (
+23:      CREATE UNIQUE INDEX IF NOT EXISTS worksheets_user_date_uidx
+29:      CREATE TABLE IF NOT EXISTS worksheet_materials (
+43:      CREATE TABLE IF NOT EXISTS worksheet_expenses (
+56:      CREATE TABLE IF NOT EXISTS worksheet_team_members (
+========== server/migrations/worksheetTables.ts ==========
+10:      CREATE TABLE IF NOT EXISTS worksheet_sessions (
+25:      CREATE TABLE IF NOT EXISTS worksheet_time_entries (
+40:      CREATE TABLE IF NOT EXISTS worksheet_materials_used (
+55:      CREATE TABLE IF NOT EXISTS worksheet_photos (
+67:      CREATE TABLE IF NOT EXISTS time_cards (
+87:      ALTER TABLE daily_worksheets
