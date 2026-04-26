@@ -175,6 +175,30 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
       }
 
       const final = await pool.query(`SELECT * FROM invoices WHERE id=$1`, [invoice.id]);
+
+      // A23: if this invoice is tied to a job, advance the job to "invoiced" and reflect
+      // the linked-invoice total into job.price so the summary tile stops showing $0.
+      if (invoice.job_id) {
+        try {
+          await pool.query(
+            `UPDATE jobs
+             SET status = CASE
+                            WHEN status IN ('completed','in_progress','scheduled','lead') THEN 'invoiced'
+                            ELSE status
+                          END,
+                 price  = (
+                   SELECT COALESCE(SUM(total), 0)::text FROM invoices
+                   WHERE job_id = $1 AND status NOT IN ('void')
+                 )::text,
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [invoice.job_id]
+          );
+        } catch (e: any) {
+          console.error("[A23 job-status sync]", e.message);
+        }
+      }
+
       return res.status(201).json(final.rows[0]);
     } catch (err: any) {
       console.error("[invoices] POST /api/invoices:", err.message);
