@@ -511,7 +511,7 @@ export default function CustomerDetailPage() {
 
   // ── Stats ──
   // A22: real billed/outstanding sourced from invoices. Excludes voided.
-  const hasEmail = (customer.emails?.length ?? 0) > 0;
+  const hasEmail = (customer?.emails?.length ?? 0) > 0;
   const isAdminOrManager =
     user?.role === "Admin" || user?.role === "Manager" || !!(user as any)?.isMasterAdmin;
 
