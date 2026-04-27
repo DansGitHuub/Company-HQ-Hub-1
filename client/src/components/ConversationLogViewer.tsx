@@ -43,9 +43,10 @@ export default function ConversationLogViewer() {
   });
 
   const { data: users = [] } = useQuery<any[]>({
-    queryKey: ["/api/users"],
+    queryKey: ["/api/admin/users"],
     queryFn: async () => {
-      const res = await fetch("/api/users", { credentials: "include" });
+      const res = await fetch("/api/admin/users", { credentials: "include" });
+      if (!res.ok) return [];
       return res.json();
     },
   });

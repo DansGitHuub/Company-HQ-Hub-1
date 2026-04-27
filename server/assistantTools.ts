@@ -455,7 +455,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
         const [tasks, equip, users, sops] = await Promise.all([
           pool.query(`SELECT id, task_id, title, status, priority FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 LIMIT 5`, [query]),
           pool.query(`SELECT id, name, asset_id, make, model, status FROM equipment WHERE name ILIKE $1 OR make ILIKE $1 OR model ILIKE $1 OR asset_id ILIKE $1 LIMIT 5`, [query]),
-          pool.query(`SELECT id, name, username, role FROM users WHERE name ILIKE $1 OR username ILIKE $1 OR role ILIKE $1 LIMIT 5`, [query]),
+          pool.query(`SELECT id, name, username, role FROM users WHERE (name ILIKE $1 OR username ILIKE $1 OR role ILIKE $1) AND role != 'Customer' AND (is_active IS NULL OR is_active = true) LIMIT 5`, [query]),
           pool.query(`SELECT id, title, category FROM sops WHERE title ILIKE $1 OR category ILIKE $1 LIMIT 5`, [query]),
         ]);
 
@@ -518,7 +518,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
       case "searchEmployees": {
         const query = `%${toolArgs.query}%`;
         const res = await pool.query(
-          `SELECT id, name, username, role, email FROM users WHERE (name ILIKE $1 OR username ILIKE $1 OR role ILIKE $1) AND role != 'Customer' LIMIT 10`,
+          `SELECT id, name, username, role, email FROM users WHERE (name ILIKE $1 OR username ILIKE $1 OR role ILIKE $1) AND role != 'Customer' AND (is_active IS NULL OR is_active = true) LIMIT 10`,
           [query]
         );
         return { result: { employees: res.rows, count: res.rows.length } };
