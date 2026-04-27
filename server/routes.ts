@@ -240,7 +240,12 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
       const users = await storage.getAllUsers();
-      const safeUsers = users.map(({ password, ...u }) => u);
+      const safeUsers = users.map(({
+        password, storedPassword,
+        recoveryToken, recoveryExpires,
+        googleAccessToken, googleRefreshToken, googleTokenExpiry,
+        ...u
+      }) => u);
       res.json(safeUsers);
     } catch (err) {
       res.status(500).json({ message: "Error fetching users" });
