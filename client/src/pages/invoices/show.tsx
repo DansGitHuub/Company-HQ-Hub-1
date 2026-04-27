@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { fmtDateOnly } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,13 +74,7 @@ function fmtMoney(v: any) {
 }
 function fmtDate(d: string | null) {
   if (!d) return "—";
-  try {
-    if (d.length === 10) {
-      const [y, m, day] = d.split("-").map(Number);
-      return format(new Date(y, m - 1, day), "MMMM d, yyyy");
-    }
-    return format(parseISO(d), "MMMM d, yyyy");
-  } catch { return d; }
+  try { return format(parseISO(d), "MMMM d, yyyy"); } catch { return d; }
 }
 
 function InfoRow({ icon: Icon, label, value, href }: { icon: any; label: string; value?: React.ReactNode; href?: string }) {
@@ -345,7 +340,7 @@ export default function InvoiceDetailPage() {
               <InfoRow icon={Briefcase} label={t("job")}
                 value={invoice.job_title || invoice.job_client}
                 href={invoice.job_id ? `/jobs/${invoice.job_id}` : undefined} />
-              <InfoRow icon={Calendar} label={t("issued")} value={fmtDate(invoice.issued_date)} />
+              <InfoRow icon={Calendar} label={t("issued")} value={fmtDateOnly(invoice.issued_date)} />
               {invoice.sent_at && (
                 <InfoRow icon={Calendar} label={t("statusSent")} value={fmtDate(invoice.sent_at)} />
               )}
@@ -357,7 +352,7 @@ export default function InvoiceDetailPage() {
               )}
               <InfoRow icon={Calendar} label={t("due")}
                 value={<span className={balanceDue > 0 && invoice.status === "overdue" ? "text-red-600 font-semibold" : ""}>
-                  {fmtDate(invoice.due_date)}
+                  {fmtDateOnly(invoice.due_date)}
                 </span>} />
             </CardContent>
           </Card>
@@ -554,7 +549,7 @@ export default function InvoiceDetailPage() {
                     <TableBody>
                       {invoice.payments.map((p) => (
                         <TableRow key={p.id} data-testid={`row-pay-${p.id}`}>
-                          <TableCell className="text-sm">{fmtDate(p.payment_date)}</TableCell>
+                          <TableCell className="text-sm">{fmtDateOnly(p.payment_date)}</TableCell>
                           <TableCell className="text-sm text-muted-foreground capitalize">{p.payment_method}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{p.reference_number || "—"}</TableCell>
                           <TableCell className="text-right text-sm font-medium text-green-600">

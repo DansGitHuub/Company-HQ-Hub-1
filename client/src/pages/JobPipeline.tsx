@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { fmtDateOnly } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -1108,9 +1109,7 @@ function EstimatesBoard() {
 
                                 {estimate.followUpDate && (() => {
                                   const status = getFollowUpStatus(estimate.followUpDate);
-                                  const _fud = String(estimate.followUpDate);
-                                  const [_fy, _fm, _fd] = _fud.slice(0, 10).split("-").map(Number);
-                                  const dateStr = new Date(_fy, _fm - 1, _fd).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                                  const dateStr = new Date(String(estimate.followUpDate)).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
                                   return (
                                     <div className={`flex items-center gap-1 text-[10px] pt-1 border-t font-medium ${
                                       status === "overdue" ? "text-red-600 dark:text-red-400" :
@@ -1334,7 +1333,7 @@ function EstimatesBoard() {
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Issue Date</Label>
-                <p className="text-sm">{selectedEstimate?.issueDate ? (([_y,_m,_d]) => new Date(+_y,+_m-1,+_d).toLocaleDateString())(String(selectedEstimate.issueDate).slice(0,10).split("-")) : selectedEstimate?.createdAt ? new Date(selectedEstimate.createdAt).toLocaleDateString() : "—"}</p>
+                <p className="text-sm">{selectedEstimate?.issueDate ? fmtDateOnly(String(selectedEstimate.issueDate)) : selectedEstimate?.createdAt ? new Date(selectedEstimate.createdAt).toLocaleDateString() : "—"}</p>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Valid Until</Label>
@@ -1347,7 +1346,7 @@ function EstimatesBoard() {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Sent Date</Label>
-                <p className="text-sm">{(selectedEstimate as any)?.sentDate ? ((_s) => { const [_y,_m,_d] = _s.slice(0,10).split("-").map(Number); return new Date(_y,_m-1,_d).toLocaleDateString(); })(String((selectedEstimate as any).sentDate)) : <span className="text-muted-foreground">Not sent</span>}</p>
+                <p className="text-sm">{(selectedEstimate as any)?.sentDate ? fmtDateOnly(String((selectedEstimate as any).sentDate)) : <span className="text-muted-foreground">Not sent</span>}</p>
               </div>
             </div>
           </div>
