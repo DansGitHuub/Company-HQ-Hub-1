@@ -318,6 +318,50 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ─── ARCHIVE / UNARCHIVE ─────────────────────────────────────────────────────
+  // Admin, Manager, or Master Admin only. Sets is_active and bumps updated_at.
+  function requireAdminOrManager(req: any, res: any): boolean {
+    const role: string = req.user?.role ?? "";
+    const isMaster: boolean = !!req.user?.isMasterAdmin;
+    if (!["Admin", "Manager"].includes(role) && !isMaster) {
+      res.status(403).json({ message: "Admin or Manager access required" });
+      return false;
+    }
+    return true;
+  }
+
+  app.patch("/api/customers/:id/archive", requireAuth, async (req, res) => {
+    if (!requireAdminOrManager(req, res)) return;
+    try {
+      const result = await pool.query(
+        `UPDATE customers SET is_active = false, updated_at = now() WHERE id = $1 RETURNING id`,
+        [req.params.id],
+      );
+      if (result.rows.length === 0)
+        return res.status(404).json({ message: "Customer not found" });
+      return res.json({ id: result.rows[0].id, is_active: false });
+    } catch (err: any) {
+      console.error("[customers] PATCH /archive error:", err.message);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.patch("/api/customers/:id/unarchive", requireAuth, async (req, res) => {
+    if (!requireAdminOrManager(req, res)) return;
+    try {
+      const result = await pool.query(
+        `UPDATE customers SET is_active = true, updated_at = now() WHERE id = $1 RETURNING id`,
+        [req.params.id],
+      );
+      if (result.rows.length === 0)
+        return res.status(404).json({ message: "Customer not found" });
+      return res.json({ id: result.rows[0].id, is_active: true });
+    } catch (err: any) {
+      console.error("[customers] PATCH /unarchive error:", err.message);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // ─── PROPERTY LIST ───────────────────────────────────────────────────────────
   // GET /api/properties?customer_id=&search=
   app.get("/api/properties", requireAuth, async (req, res) => {
