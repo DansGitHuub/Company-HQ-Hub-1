@@ -1,18 +1,66 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search as SearchIcon, FileText, Users, Hammer, BookOpen, Briefcase, User, Truck, Megaphone, GraduationCap } from "lucide-react";
+import {
+  Loader2, Search as SearchIcon, FileText, Users, Hammer,
+  BookOpen, Briefcase, User, Truck, Megaphone, GraduationCap,
+  Receipt, ClipboardList,
+} from "lucide-react";
 import { Link } from "wouter";
 
 type SearchResult = {
-  type: "sop" | "material" | "candidate" | "job" | "user" | "form" | "equipment" | "campaign" | "resource";
+  type:
+    | "sop" | "material" | "candidate" | "job" | "user"
+    | "form" | "equipment" | "campaign" | "resource"
+    | "customer" | "estimate" | "invoice";
   id: string;
   title: string;
   description?: string;
   category?: string;
+  href?: string;
 };
+
+type GroupDef = {
+  type: SearchResult["type"];
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+};
+
+const GROUPS: GroupDef[] = [
+  { type: "customer",  label: "Customers",  Icon: Users },
+  { type: "job",       label: "Jobs",       Icon: Briefcase },
+  { type: "estimate",  label: "Estimates",  Icon: ClipboardList },
+  { type: "invoice",   label: "Invoices",   Icon: Receipt },
+  { type: "material",  label: "Materials",  Icon: Hammer },
+  { type: "sop",       label: "SOPs",       Icon: BookOpen },
+  { type: "equipment", label: "Equipment",  Icon: Truck },
+  { type: "candidate", label: "Candidates", Icon: Users },
+  { type: "campaign",  label: "Campaigns",  Icon: Megaphone },
+  { type: "resource",  label: "Resources",  Icon: GraduationCap },
+  { type: "user",      label: "Users",      Icon: User },
+  { type: "form",      label: "Forms",      Icon: FileText },
+];
+
+function getLink(result: SearchResult): string {
+  if (result.href) return result.href;
+  switch (result.type) {
+    case "customer":  return `/customers/${result.id}`;
+    case "job":       return `/jobs/${result.id}`;
+    case "estimate":  return `/estimates/${result.id}`;
+    case "invoice":   return `/invoices/${result.id}`;
+    case "sop":       return "/sops";
+    case "material":  return "/materials";
+    case "candidate": return "/hiring";
+    case "user":      return "/admin";
+    case "form":      return "/forms";
+    case "equipment": return "/equipment";
+    case "campaign":  return "/marketing";
+    case "resource":  return "/education";
+    default:          return "/";
+  }
+}
 
 export default function SearchPage() {
   const { t } = useTranslation();
@@ -20,24 +68,16 @@ export default function SearchPage() {
     const params = new URLSearchParams(window.location.search);
     return params.get("q") || "";
   });
-  
-  // Update query when URL changes - use polling to catch navigation
+
   useEffect(() => {
     const checkUrl = () => {
       const params = new URLSearchParams(window.location.search);
       const urlQuery = params.get("q") || "";
-      if (urlQuery !== query) {
-        setQuery(urlQuery);
-      }
+      if (urlQuery !== query) setQuery(urlQuery);
     };
-    
-    // Check immediately and on popstate
     checkUrl();
     window.addEventListener("popstate", checkUrl);
-    
-    // Also poll for changes (catches programmatic navigation)
     const interval = setInterval(checkUrl, 200);
-    
     return () => {
       window.removeEventListener("popstate", checkUrl);
       clearInterval(interval);
@@ -48,57 +88,19 @@ export default function SearchPage() {
     queryKey: ["/api/search", query],
     queryFn: async () => {
       if (!query) return [];
-      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { credentials: "include" });
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+        credentials: "include",
+      });
       if (!res.ok) return [];
       return res.json();
     },
     enabled: !!query,
   });
 
-  const getIcon = (type: string) => {
-    switch (type) {
-      case "sop": return BookOpen;
-      case "material": return Hammer;
-      case "candidate": return Users;
-      case "job": return Briefcase;
-      case "user": return User;
-      case "form": return FileText;
-      case "equipment": return Truck;
-      case "campaign": return Megaphone;
-      case "resource": return GraduationCap;
-      default: return FileText;
-    }
-  };
-
-  const getLink = (result: SearchResult) => {
-    switch (result.type) {
-      case "sop": return `/sops`;
-      case "material": return `/materials`;
-      case "candidate": return `/hiring`;
-      case "job": return `/jobs`;
-      case "user": return `/admin`;
-      case "form": return `/forms`;
-      case "equipment": return `/equipment`;
-      case "campaign": return `/marketing`;
-      case "resource": return `/education`;
-      default: return "/";
-    }
-  };
-
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case "sop": return "SOP";
-      case "material": return "Material";
-      case "candidate": return "Candidate";
-      case "job": return "Job";
-      case "user": return "User";
-      case "form": return "Form";
-      case "equipment": return "Equipment";
-      case "campaign": return "Campaign";
-      case "resource": return "Resource";
-      default: return type;
-    }
-  };
+  const groupedResults = GROUPS.map((g) => ({
+    ...g,
+    items: (results ?? []).filter((r) => r.type === g.type),
+  })).filter((g) => g.items.length > 0);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -123,36 +125,64 @@ export default function SearchPage() {
             <p className="text-muted-foreground">{t("search.placeholder")}</p>
           </CardContent>
         </Card>
-      ) : results && results.length > 0 ? (
-        <div className="space-y-3">
-          {results.map((result) => {
-            const Icon = getIcon(result.type);
-            return (
-              <Link key={`${result.type}-${result.id}`} href={getLink(result)}>
-                <Card className="card-interactive cursor-pointer hover:border-primary/50 transition-colors">
-                  <CardContent className="py-4">
-                    <div className="flex items-start gap-4">
-                      <div className="p-2 bg-primary/10 rounded-lg shrink-0">
-                        <Icon className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold truncate">{result.title}</h3>
-                          <Badge variant="outline" className="shrink-0">{getTypeLabel(result.type)}</Badge>
+      ) : groupedResults.length > 0 ? (
+        <div
+          className="space-y-8"
+          data-testid="search-results"
+        >
+          {groupedResults.map(({ type, label, Icon, items }) => (
+            <section key={type} data-testid={`search-group-${type}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <Icon className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  {label}
+                </h2>
+                <Badge variant="secondary" data-testid={`search-count-${type}`}>
+                  {items.length}
+                </Badge>
+              </div>
+
+              <div className="space-y-2">
+                {items.map((result) => (
+                  <Link
+                    key={`${result.type}-${result.id}`}
+                    href={getLink(result)}
+                  >
+                    <Card
+                      className="card-interactive cursor-pointer hover:border-primary/50 transition-colors"
+                      data-testid={`search-result-${result.type}-${result.id}`}
+                    >
+                      <CardContent className="py-4">
+                        <div className="flex items-start gap-4">
+                          <div className="p-2 bg-primary/10 rounded-lg shrink-0">
+                            <Icon className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3
+                              className="font-semibold truncate"
+                              data-testid={`search-title-${result.id}`}
+                            >
+                              {result.title}
+                            </h3>
+                            {result.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">
+                                {result.description}
+                              </p>
+                            )}
+                            {result.category && !result.description && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {result.category}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        {result.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2">{result.description}</p>
-                        )}
-                        {result.category && (
-                          <p className="text-xs text-muted-foreground mt-1">{t("common.category")}: {result.category}</p>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
       ) : (
         <Card>

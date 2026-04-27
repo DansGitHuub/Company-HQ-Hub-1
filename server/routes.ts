@@ -148,17 +148,106 @@ export async function registerRoutes(
         });
       }
 
-      // Search Jobs (accessible to all internal roles) - expanded fields
+      // Search Customers — SQL ILIKE on name, email, phone; exclude archived
       if (userRole !== "Customer") {
-        const jobs = await storage.getJobs();
-        jobs.filter((j: any) => 
-          j.client.toLowerCase().includes(query) ||
-          (j.notes && j.notes.toLowerCase().includes(query)) ||
-          (j.address && j.address.toLowerCase().includes(query)) ||
-          (j.stage && j.stage.toLowerCase().includes(query)) ||
-          (j.jobType && j.jobType.toLowerCase().includes(query))
-        ).slice(0, 5).forEach((j: any) => {
-          results.push({ type: "job", id: j.id, title: j.client, description: j.address || j.notes || undefined, category: j.jobType });
+        const likeParam = `%${query}%`;
+        const { rows: custRows } = await pool.query<{
+          id: string; first_name: string; last_name: string;
+          company_name: string | null; primary_email: string | null; primary_phone: string | null;
+        }>(
+          `SELECT DISTINCT ON (c.id) c.id, c.first_name, c.last_name, c.company_name,
+                  ce.email AS primary_email, cp.phone AS primary_phone
+           FROM customers c
+           LEFT JOIN customer_emails ce ON ce.customer_id = c.id AND ce.is_primary = true
+           LEFT JOIN customer_phones cp ON cp.customer_id = c.id AND cp.is_primary = true
+           WHERE c.is_active = true
+             AND (c.first_name ILIKE $1 OR c.last_name ILIKE $1 OR c.company_name ILIKE $1
+               OR (c.first_name || ' ' || c.last_name) ILIKE $1
+               OR ce.email ILIKE $1 OR cp.phone ILIKE $1)
+           ORDER BY c.id LIMIT 10`,
+          [likeParam]
+        );
+        custRows.forEach((r) => {
+          const nameParts = [r.first_name, r.last_name].filter(Boolean).join(" ");
+          const label = r.company_name ? `${r.company_name} — ${nameParts}` : nameParts;
+          const desc = r.primary_email || r.primary_phone || undefined;
+          results.push({ type: "customer", id: r.id, title: label, description: desc, href: `/customers/${r.id}` });
+        });
+      }
+
+      // Search Jobs — SQL ILIKE on title/client, include customer name
+      if (userRole !== "Customer") {
+        const likeParam = `%${query}%`;
+        const { rows: jobRows } = await pool.query<{
+          id: string; title: string | null; client: string; customer_name: string | null;
+        }>(
+          `SELECT j.id, j.title, j.client,
+                  COALESCE(c.company_name, c.first_name || ' ' || c.last_name) AS customer_name
+           FROM jobs j
+           LEFT JOIN customers c ON c.id = j.customer_id
+           WHERE j.title ILIKE $1 OR j.client ILIKE $1
+           LIMIT 10`,
+          [likeParam]
+        );
+        jobRows.forEach((r) => {
+          results.push({
+            type: "job", id: r.id,
+            title: r.title || r.client,
+            description: r.customer_name || undefined,
+            href: `/jobs/${r.id}`,
+          });
+        });
+      }
+
+      // Search Estimates — SQL ILIKE on title / estimate_number (sales_estimates table)
+      if (userRole !== "Customer") {
+        const likeParam = `%${query}%`;
+        const { rows: estRows } = await pool.query<{
+          id: string; estimate_number: string; title: string | null; customer_name: string | null;
+        }>(
+          `SELECT e.id, e.estimate_number, e.title,
+                  COALESCE(c.company_name, c.first_name || ' ' || c.last_name) AS customer_name
+           FROM sales_estimates e
+           LEFT JOIN customers c ON c.id = e.customer_id
+           WHERE e.title ILIKE $1 OR e.estimate_number ILIKE $1
+           LIMIT 10`,
+          [likeParam]
+        );
+        estRows.forEach((r) => {
+          results.push({
+            type: "estimate", id: r.id,
+            title: r.title || r.estimate_number,
+            description: r.customer_name || undefined,
+            href: `/estimates/${r.id}`,
+          });
+        });
+      }
+
+      // Search Invoices — SQL ILIKE on invoice_number, show job title + customer name
+      if (userRole !== "Customer") {
+        const likeParam = `%${query}%`;
+        const { rows: invRows } = await pool.query<{
+          id: string; invoice_number: string;
+          job_title: string | null; customer_name: string | null;
+        }>(
+          `SELECT i.id, i.invoice_number,
+                  COALESCE(j.title, j.client) AS job_title,
+                  COALESCE(c.company_name, c.first_name || ' ' || c.last_name) AS customer_name
+           FROM invoices i
+           LEFT JOIN customers c ON c.id = i.customer_id
+           LEFT JOIN jobs j ON j.id = i.job_id
+           WHERE i.invoice_number ILIKE $1
+           LIMIT 10`,
+          [likeParam]
+        );
+        invRows.forEach((r) => {
+          const desc = [r.job_title, r.customer_name].filter(Boolean).join(" · ");
+          results.push({
+            type: "invoice", id: r.id,
+            title: r.invoice_number,
+            description: desc || undefined,
+            href: `/invoices/${r.id}`,
+          });
         });
       }
 
@@ -227,7 +316,7 @@ export async function registerRoutes(
         });
       }
 
-      res.json(results.slice(0, 30));
+      res.json(results);
     } catch (err) {
       console.error("Search error:", err);
       res.status(500).json({ message: "Search failed" });
