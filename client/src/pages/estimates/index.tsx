@@ -10,7 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Plus, Search, Calculator, ChevronRight } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { fmtDateOnly } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { EstimateFormModal } from "./EstimateFormModal";
 
@@ -72,11 +72,6 @@ export function EstimateStatusBadge({ status }: { status: string }) {
 function fmtMoney(v: any) {
   const n = parseFloat(v ?? "0");
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtDate(d: string | null) {
-  if (!d) return "—";
-  try { return format(parseISO(d), "MMM d, yyyy"); } catch { return d; }
 }
 
 const STATUS_TABS = ["all", "draft", "sent", "viewed", "approved", "declined", "converted"];
@@ -214,8 +209,8 @@ export default function EstimateList() {
                         {TYPE_LABEL_KEY[est.estimate_type] ? t(TYPE_LABEL_KEY[est.estimate_type]) : est.estimate_type}
                       </TableCell>
                       <TableCell><EstimateStatusBadge status={est.status} /></TableCell>
-                      <TableCell className="text-sm">{fmtDate(est.issued_date)}</TableCell>
-                      <TableCell className="text-sm">{est.valid_until ? fmtDate(est.valid_until) : "—"}</TableCell>
+                      <TableCell className="text-sm">{fmtDateOnly(est.issued_date)}</TableCell>
+                      <TableCell className="text-sm">{est.valid_until ? fmtDateOnly(est.valid_until) : "—"}</TableCell>
                       <TableCell className="text-right pr-4 font-semibold tabular-nums text-sm">
                         {fmtMoney(est.total)}
                       </TableCell>

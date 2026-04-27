@@ -25,6 +25,7 @@ import {
   ChevronDown, ChevronRight, Pencil, RotateCcw, Upload
 } from "lucide-react";
 import { format, parseISO, isAfter } from "date-fns";
+import { fmtDateOnly } from "@/lib/utils";
 import { Link } from "wouter";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -587,12 +588,12 @@ export default function EstimateDetail() {
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t("issued")}</span>
-                  <span>{fmtDate(estimate.issued_date)}</span>
+                  <span>{fmtDateOnly(estimate.issued_date)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t("validUntil")}</span>
                   <span className={isExpired && !["approved","converted"].includes(estimate.status) ? "text-red-500" : ""}>
-                    {fmtDate(estimate.valid_until)}
+                    {fmtDateOnly(estimate.valid_until)}
                   </span>
                 </div>
                 {estimate.sent_at && (

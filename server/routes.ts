@@ -4375,7 +4375,7 @@ Generate detailed information for this landscaping material.`;
       if (!job) return res.status(404).json({ message: "Job not found" });
       // Attach first linked invoice so the client can replace "Generate Invoice" button with "View Invoice" link
       const { rows: invRows } = await pool.query(
-        `SELECT id, invoice_number FROM invoices WHERE job_id = $1 ORDER BY created_at LIMIT 1`,
+        `SELECT id, invoice_number FROM invoices WHERE job_id = $1 ORDER BY created_at DESC LIMIT 1`,
         [req.params.id]
       );
       res.json({
@@ -4409,9 +4409,15 @@ Generate detailed information for this landscaping material.`;
   });
 
   // Suggested invoice line items: pull from the estimate that originated this job
+  // Fallback tier 1: estimate_items via estimate_id
+  // Fallback tier 2: job_work_areas (description only, qty=1, price from job value)
+  // Fallback tier 3: single line item from job type + value
   app.get("/api/jobs/:id/suggested-line-items", requireAuth, async (req, res) => {
     try {
-      const { rows } = await pool.query<{
+      const jobId = req.params.id;
+
+      // Tier 1: estimate_items linked through the job's estimate_id
+      const { rows: eiRows } = await pool.query<{
         description: string; quantity: string; unit_price: string;
       }>(`
         SELECT ei.description,
@@ -4422,8 +4428,37 @@ Generate detailed information for this landscaping material.`;
         WHERE  j.id = $1
           AND  j.estimate_id IS NOT NULL
         ORDER  BY ei.sort_order, ei.created_at
-      `, [req.params.id]);
-      res.json(rows);   // empty array [] if no estimate linked — frontend handles gracefully
+      `, [jobId]);
+
+      if (eiRows.length > 0) return res.json(eiRows);
+
+      // Tier 2: job_work_areas for this job (filled in after convert-to-job)
+      const { rows: waRows } = await pool.query<{
+        description: string; quantity: string; unit_price: string;
+      }>(`
+        SELECT jwa.name AS description,
+               '1'     AS quantity,
+               '0'     AS unit_price
+        FROM   job_work_areas jwa
+        WHERE  jwa.job_id = $1
+          AND  jwa.is_active = true
+        ORDER  BY jwa.sort_order, jwa.id
+      `, [jobId]);
+
+      if (waRows.length > 0) return res.json(waRows);
+
+      // Tier 3: single line from job.type + job.value / job.price
+      const { rows: jobRows } = await pool.query<{
+        type: string; value: number; price: string | null;
+      }>(`SELECT type, value, price FROM jobs WHERE id = $1`, [jobId]);
+
+      if (jobRows.length > 0) {
+        const j = jobRows[0];
+        const unitPrice = j.price ?? (j.value > 0 ? String(j.value) : "0");
+        return res.json([{ description: j.type, quantity: "1", unit_price: unitPrice }]);
+      }
+
+      res.json([]);
     } catch (err) {
       res.status(500).json({ message: "Error fetching suggested line items" });
     }
@@ -5161,35 +5196,49 @@ Generate detailed information for this landscaping material.`;
         notes: estimate.notes || undefined,
       });
 
-      // Copy estimate line items → job work areas so scope is visible on the new job card
-      await pool.query(`
-        INSERT INTO job_work_areas
-          (id, job_id, name, sort_order, notes, status, is_active, estimated_hours, actual_hours)
-        SELECT
-          gen_random_uuid()::text,
-          $1,
-          description,
-          COALESCE(sort_order, 0),
-          '$' || COALESCE(unit_price, 0)::text || ' × ' || COALESCE(quantity, 1)::text,
-          'pending',
-          true,
-          0,
-          0
-        FROM estimate_items
-        WHERE estimate_id = $2
-      `, [job.id, req.params.id]);
+      // Wrap the post-creation writes in a transaction so a partial failure rolls back cleanly
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
 
-      // Store the originating estimate id on the job so invoice line-item autofill can trace back;
-      // also set job.price from the estimate's total value if not already set
-      await pool.query(
-        `UPDATE jobs
-         SET estimate_id = $1,
-             price = COALESCE(price, (SELECT estimated_value::text FROM estimates WHERE id = $1))
-         WHERE id = $2`,
-        [req.params.id, job.id]
-      );
+        // Copy estimate line items → job work areas (actual_hours is computed, not a stored column)
+        await client.query(`
+          INSERT INTO job_work_areas
+            (job_id, name, sort_order, notes, status, is_active, estimated_hours)
+          SELECT
+            $1,
+            description,
+            COALESCE(sort_order, 0),
+            '$' || COALESCE(unit_price, 0)::text || ' × ' || COALESCE(quantity, 1)::text,
+            'pending',
+            true,
+            0
+          FROM estimate_items
+          WHERE estimate_id = $2
+        `, [job.id, req.params.id]);
 
-      await storage.updateEstimate(req.params.id, { stage: "Won" });
+        // Store the originating estimate id + copy price
+        await client.query(
+          `UPDATE jobs
+           SET estimate_id = $1,
+               price = COALESCE(price, (SELECT estimated_value::text FROM estimates WHERE id = $1))
+           WHERE id = $2`,
+          [req.params.id, job.id]
+        );
+
+        // Mark estimate as Won
+        await client.query(
+          `UPDATE estimates SET stage = 'Won' WHERE id = $1`,
+          [req.params.id]
+        );
+
+        await client.query("COMMIT");
+      } catch (txErr) {
+        await client.query("ROLLBACK");
+        throw txErr;
+      } finally {
+        client.release();
+      }
 
       logActivity("estimate_converted", `Estimate for ${estimate.clientName} converted to a Sold job`, "/jobs", req.user?.id);
       res.json({ job, estimate });

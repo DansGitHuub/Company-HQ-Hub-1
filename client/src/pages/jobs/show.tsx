@@ -3,6 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
+import { fmtDateOnly } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -433,7 +434,6 @@ function JobInvoicesTab({ jobId }: { jobId: string }) {
   });
 
   const fmtMoneyLocal = (v: any) => `$${parseFloat(v ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-  const fmtDateLocal = (d: string | null) => { if (!d) return "—"; try { return format(parseISO(d), "MMM d, yyyy"); } catch { return d; } };
 
   if (isLoading) return <div className="py-12 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
@@ -473,8 +473,8 @@ function JobInvoicesTab({ jobId }: { jobId: string }) {
                       {inv.status.replace(/_/g, " ")}
                     </span>
                   </TableCell>
-                  <TableCell className="text-sm">{fmtDateLocal(inv.issued_date)}</TableCell>
-                  <TableCell className="text-sm">{fmtDateLocal(inv.due_date)}</TableCell>
+                  <TableCell className="text-sm">{fmtDateOnly(inv.issued_date)}</TableCell>
+                  <TableCell className="text-sm">{fmtDateOnly(inv.due_date)}</TableCell>
                   <TableCell className="text-right text-sm">{fmtMoneyLocal(inv.total)}</TableCell>
                   <TableCell className={`text-right text-sm font-medium pr-6 ${parseFloat(inv.balance_due) > 0 ? "text-red-600" : "text-green-600"}`}>
                     {fmtMoneyLocal(inv.balance_due)}

@@ -1,0 +1,64 @@
+Replit Agent prompt — finish A17 + A18 + A19
+Republish DID actually ship this time (revision 7d619d06 is live). The verifications below are post-fresh-build, so these are real bugs in the code, not deploy artifacts.
+This cycle is 3 themes, not 6 separate items. Bundle them.
+
+Theme 1 — A17 surface coverage (small)
+d11cab5 added fmtDateOnly() to client/src/lib/utils.ts with timeZone: "UTC". Good. But it was only wired into client/src/pages/JobPipeline.tsx and client/src/pages/invoices/show.tsx. Estimate surfaces and the embedded invoice tab on the Job detail page still render with the old timezone-shifty logic.
+Reproducer:
+
+Estimates list (/estimates): EST-0004 has Issued Date stored as 04/22/2026 (visible in Edit modal); list and detail show Apr 21, 2026.
+Job detail page → Invoices tab: INV-1008 has Issue Date 2026-04-27 (visible on the standalone invoice page where it correctly shows April 27, 2026); the Job's Invoices tab shows Apr 26, 2026.
+
+Fix: import fmtDateOnly from @/lib/utils and use it for every Issued/Due/Valid Until/Sent/Viewed/Converted/Issue Date render in:
+
+client/src/pages/estimates/show.tsx (the Dates card on the right side)
+client/src/pages/estimates/EstimateFormModal.tsx if it renders any read-only date back to the user
+client/src/pages/estimates/index.tsx or whatever powers the Estimates list (/estimates) — Issued and Valid Until columns
+client/src/pages/estimates/EstimatePreview.tsx if it renders dates
+The component that renders the Job detail page's "Invoices" tab table (client/src/pages/jobs/show.tsx or a child like JobInvoicesTab.tsx) — the Issued column
+Any other place a date-only field is rendered with new Date(d).toLocaleDateString() or format(parseISO(d), ...) — git grep -n "new Date\\(.*\\.toLocaleDateString\\|parseISO\\|format(.*date" client/src will find them.
+
+Do not touch fields that genuinely need wall-clock + timezone (e.g., the Job page's "Created Apr 26, 2026 11:27 AM" — that's a timestamp, not a date-only). Only date-only fields.
+Theme 2 — A18 work area copy on Estimate→Job (medium)
+Reproducer: Approve EST-0007 → click Convert to Job → resulting Job has price = $150 (estimate total copied) but the Work Areas section says "No work areas yet."
+Fix location: the server-side handler for "convert estimate to job." Find it via git grep -nE "convert.*estimate|estimate.*to.*job|convertEstimateToJob" server/. Read it. Today it copies the estimate header fields and total but doesn't iterate estimate.workAreas to insert matching job.workAreas rows (with their nested line items).
+What "copy" means here: for each work area on the estimate, insert a corresponding work area on the new job with the same cost_code, category, area_description, and the same line items (class, description, qty, unit, unit_price). Do NOT copy estimate-only fields (status, customer_response, signature). The job work area's id must be a fresh UUID; everything else is a structural clone.
+Tx semantics: the whole convert action must be one transaction. If work-area insertion fails partway, roll back the job creation too. Don't leave a partial.
+Theme 3 — A19a/b/c invoice generation chain (medium)
+Three behaviors are all server-side around a single mutation: "generate invoice from job."
+A19a — line items prefill. When the New Invoice modal opens for a Completed job, the response that powers the modal's initial state should include line items derived from the job. Today it returns nothing useful. Two cases to handle:
+
+Job has work areas with line items → invoice line items mirror them (description, qty, unit_price → preserved).
+Job has no work areas but has a non-zero price → produce a single line item: description = job title (or "Project work — <job title>"), qty = 1, unit_price = job.price.
+
+The decision for which case can be made client-side in the modal's initialization or server-side in the prefill response. Pick one and keep it consistent.
+A19b — job status flip on invoice save. When POST /api/invoices (or whatever the route is named) succeeds with a job_id set, update that job's status to Invoiced in the same transaction. Reproducer: created INV-1008 from the Job above; Job stayed at Completed. Spec says "after invoice save, job status flips Completed → Invoiced" — apply this for any Completed job, not only when the invoice is Sent.
+A19c — Job header CTA swap. On the Job detail page header, when the Job has at least one associated invoice (regardless of invoice status), replace the "Generate Invoice" button with a "View Invoice INV-####" link to the most recent invoice. Reproducer: INV-1008 exists for Job 9953ab76-...; header still shows Generate Invoice. The Job detail page's existing invoice query already fetches job.invoices (the Invoices tab uses it); reuse that — don't re-fetch.
+If a Job has multiple invoices, show "View Invoice INV-####" for the most recent and put the others one click deep. Don't render the Generate Invoice button when invoices.length > 0.
+Working protocol per the doc
+
+One read pass first across: the convert-estimate-to-job server route, the create-invoice server route, the Job detail page header component, the New Invoice modal initial-state code. Identify the canonical query/mutation hooks and mirror them — do not invent new ones.
+Per-theme cycle: read → edit → ts-check.
+Surface diffs to Dan before asking for Republish + Approve.
+Confirm the migration diff that surfaces during Publish is the recurring known set (DROP/CREATE idx_activity_log_created_at + SET DEFAULT gen_random_uuid() on 10 id columns). Anything else — STOP and surface it.
+233 pre-existing TS errors in server/ are unrelated; ignore them in TS-check output and report only errors in files you changed.
+
+Verification plan after Republish
+Cowork-Claude (me) walks this on companyhq.app:
+
+A17 estimates: open EST-0004 → Edit → Issued Date input is 04/22/2026 → close → detail page Dates card now shows Apr 22, 2026. List view also shows Apr 22, 2026.
+A17 job invoice tab: Job 9953ab76-... → Invoices tab → INV-1008 row's Issued column shows Apr 27, 2026.
+A18: create a fresh ZZZ-customer estimate with 2 work areas, each with 2 line items → Approve → Convert → new Job's Work Areas section renders both areas with all 4 line items intact, descriptions and prices preserved.
+A19a: Mark that new Job Completed → click Generate Invoice → modal opens with line items prefilled from the Job's work areas.
+A19b: save the invoice → Job status flips to Invoiced (no manual reload needed; if reload is needed that's still a pass).
+A19c: reload Job → header now shows "View Invoice INV-####" instead of Generate Invoice.
+
+Cleanup pending from this verification cycle
+The following test artifacts were created on companyhq.app during this walk and can be deleted whenever convenient — all on the "ZZZ E2E Audit Customer" record so they're safe to remove:
+
+New Job from EST-0007 conversion: ID 9953ab76-2dbb-44a0-a10a-aaf4bff2bb95, $150, Completed status
+Invoice INV-1008 ($150 Draft, attached to that Job)
+EST-0007 itself is now in Converted to Job status
+
+After Theme 1+2+3 land, the path to Scope 1 is
+A26+A29 portal admin onboarding (already drafted in A26-A29-replit-agent-prompt.md), gated on A27 customer dedupe. That closes Scope 1 per the doc.

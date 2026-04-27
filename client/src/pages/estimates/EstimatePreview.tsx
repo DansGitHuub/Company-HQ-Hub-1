@@ -2,18 +2,14 @@ import React from "react";
 import { useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { format, parseISO } from "date-fns";
 import { Loader2, Printer, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { fmtDateOnly } from "@/lib/utils";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtMoney(v: any) {
   const n = parseFloat(v ?? "0");
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-function fmtDate(d: string | null | undefined) {
-  if (!d) return "—";
-  try { return format(parseISO(d), "MMMM d, yyyy"); } catch { return d; }
 }
 function num(v: any) { return parseFloat(v ?? "0"); }
 
@@ -47,9 +43,9 @@ function SimpleTemplate({ est }: { est: any }) {
         </div>
         <div className="text-right space-y-1">
           <div><span className="text-xs text-gray-400 uppercase tracking-wide">{t("date")}&nbsp;</span>
-            <span className="text-sm font-medium">{fmtDate(est.issued_date)}</span></div>
+            <span className="text-sm font-medium">{fmtDateOnly(est.issued_date)}</span></div>
           {est.valid_until && <div><span className="text-xs text-gray-400 uppercase tracking-wide">{t("validUntil")}:&nbsp;</span>
-            <span className="text-sm font-medium">{fmtDate(est.valid_until)}</span></div>}
+            <span className="text-sm font-medium">{fmtDateOnly(est.valid_until)}</span></div>}
           {est.salesperson_name && <div><span className="text-xs text-gray-400 uppercase tracking-wide">{t("salesperson")}:&nbsp;</span>
             <span className="text-sm font-medium">{est.salesperson_name}</span></div>}
         </div>
@@ -145,7 +141,7 @@ function BookletTemplate({ est }: { est: any }) {
         </div>
         <div className="text-sm text-green-200 space-y-0.5">
           <div>{t("preparedForColon")} <span className="text-white font-semibold">{est.customer_name ?? "—"}</span></div>
-          <div>{t("date")} <span className="text-white">{fmtDate(est.issued_date)}</span></div>
+          <div>{t("date")} <span className="text-white">{fmtDateOnly(est.issued_date)}</span></div>
           {est.salesperson_name && <div>{t("advisor")} <span className="text-white">{est.salesperson_name}</span></div>}
         </div>
       </div>
@@ -173,7 +169,7 @@ function BookletTemplate({ est }: { est: any }) {
               <div className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">{t("propertyLabel")}</div>
               <div className="text-gray-700">{est.property_address ?? "—"}</div>
               <div className="mt-2 text-[10px] uppercase tracking-widest text-gray-400 font-semibold">{t("validUntil")}</div>
-              <div className="text-gray-700">{fmtDate(est.valid_until)}</div>
+              <div className="text-gray-700">{fmtDateOnly(est.valid_until)}</div>
             </div>
           </div>
         </section>
