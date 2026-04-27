@@ -47,6 +47,8 @@ interface JobDetail {
   prop_address: string | null; prop_city: string | null; prop_state: string | null; prop_zip: string | null;
   created_at: string; updated_at: string;
   time_entries: TimeEntry[];
+  linked_invoice_id: string | null;
+  linked_invoice_number: string | null;
 }
 
 // ── Status helpers ────────────────────────────────────────────────────────────
@@ -623,7 +625,13 @@ export default function JobDetailPage() {
         <div className="flex-1">
           <h1 className="text-xl font-bold">{job.title || job.client}</h1>
         </div>
-        {isAdminOrManager && job.status === "completed" && (
+        {isAdminOrManager && job.linked_invoice_id && (
+          <Button size="sm" variant="outline" onClick={() => navigate(`/invoices/${job.linked_invoice_id}`)}
+            data-testid="link-view-invoice">
+            <FileText className="h-4 w-4 mr-1.5" /> View Invoice {job.linked_invoice_number}
+          </Button>
+        )}
+        {isAdminOrManager && job.status === "completed" && !job.linked_invoice_id && (
           <Button size="sm" onClick={() => setShowGenerateInvoice(true)} data-testid="button-generate-invoice"
             className="bg-green-600 hover:bg-green-700 text-white">
             <FileText className="h-4 w-4 mr-1.5" /> Generate Invoice

@@ -73,7 +73,13 @@ function fmtMoney(v: any) {
 }
 function fmtDate(d: string | null) {
   if (!d) return "—";
-  try { return format(parseISO(d), "MMMM d, yyyy"); } catch { return d; }
+  try {
+    if (d.length === 10) {
+      const [y, m, day] = d.split("-").map(Number);
+      return format(new Date(y, m - 1, day), "MMMM d, yyyy");
+    }
+    return format(parseISO(d), "MMMM d, yyyy");
+  } catch { return d; }
 }
 
 function InfoRow({ icon: Icon, label, value, href }: { icon: any; label: string; value?: React.ReactNode; href?: string }) {

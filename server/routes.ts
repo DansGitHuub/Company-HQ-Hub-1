@@ -4351,7 +4351,16 @@ Generate detailed information for this landscaping material.`;
     try {
       const job = await storage.getJob(req.params.id as string);
       if (!job) return res.status(404).json({ message: "Job not found" });
-      res.json(job);
+      // Attach first linked invoice so the client can replace "Generate Invoice" button with "View Invoice" link
+      const { rows: invRows } = await pool.query(
+        `SELECT id, invoice_number FROM invoices WHERE job_id = $1 ORDER BY created_at LIMIT 1`,
+        [req.params.id]
+      );
+      res.json({
+        ...job,
+        linked_invoice_id: invRows[0]?.id ?? null,
+        linked_invoice_number: invRows[0]?.invoice_number ?? null,
+      });
     } catch (err) {
       res.status(500).json({ message: "Error fetching job" });
     }
@@ -5130,27 +5139,33 @@ Generate detailed information for this landscaping material.`;
         notes: estimate.notes || undefined,
       });
 
-      // Copy estimate work areas → job work areas so clock-in dropdown is populated immediately
+      // Copy estimate line items → job work areas so scope is visible on the new job card
       await pool.query(`
         INSERT INTO job_work_areas
-          (id, job_id, work_area_type_id, name, sort_order, notes, status, is_active, estimated_hours, actual_hours)
+          (id, job_id, name, sort_order, notes, status, is_active, estimated_hours, actual_hours)
         SELECT
           gen_random_uuid()::text,
           $1,
-          work_area_type_id,
-          name,
-          sort_order,
-          area_description,
+          description,
+          COALESCE(sort_order, 0),
+          '$' || COALESCE(unit_price, 0)::text || ' × ' || COALESCE(quantity, 1)::text,
           'pending',
           true,
           0,
           0
-        FROM estimate_work_areas
+        FROM estimate_items
         WHERE estimate_id = $2
       `, [job.id, req.params.id]);
 
-      // Store the originating estimate id on the job so invoice line-item autofill can trace back
-      await pool.query(`UPDATE jobs SET estimate_id = $1 WHERE id = $2`, [req.params.id, job.id]);
+      // Store the originating estimate id on the job so invoice line-item autofill can trace back;
+      // also set job.price from the estimate's total value if not already set
+      await pool.query(
+        `UPDATE jobs
+         SET estimate_id = $1,
+             price = COALESCE(price, (SELECT estimated_value::text FROM estimates WHERE id = $1))
+         WHERE id = $2`,
+        [req.params.id, job.id]
+      );
 
       await storage.updateEstimate(req.params.id, { stage: "Won" });
 

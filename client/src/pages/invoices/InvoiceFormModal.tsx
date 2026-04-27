@@ -81,7 +81,8 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
   });
 
   useEffect(() => {
-    if (open) setForm({
+    if (!open) return;
+    setForm({
       customer_id: lockedCustomerId ?? "",
       job_id: lockedJobId ?? "",
       issued_date: today,
@@ -96,6 +97,15 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
       line_items: [EMPTY_ITEM()],
       ...initialData,
     });
+    // Pre-fill line items from the locked job's linked estimate whenever the modal opens
+    if (lockedJobId && !isEdit) {
+      fetch(`/api/jobs/${lockedJobId}/suggested-line-items`, { credentials: "include" })
+        .then(r => (r.ok ? r.json() : []))
+        .then((items: Array<{ description: string; quantity: string; unit_price: string }>) => {
+          if (items.length > 0) setForm(f => ({ ...f, line_items: items }));
+        })
+        .catch(() => {});
+    }
   }, [open]);
 
   // When a job is selected on a new invoice, auto-populate line items from
@@ -172,6 +182,10 @@ export function InvoiceFormModal({ open, onOpenChange, initialData, lockedCustom
     },
     onSuccess: (inv) => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      // Refresh the job detail page so status advances to "Invoiced" and the button swaps
+      if (lockedJobId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/jobs", lockedJobId] });
+      }
       toast({ title: isEdit ? t("invoiceUpdated") : t("invoiceCreated") });
       onOpenChange(false);
       onSuccess?.(inv);
