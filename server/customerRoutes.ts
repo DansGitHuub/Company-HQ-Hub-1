@@ -1,6 +1,7 @@
 import { Express } from "express";
 import { syncCustomersPublic } from "./quickbooksSync";
 import { pool } from "./db";
+import { findCustomerDuplicates } from "./lib/customerDuplicates";
 
 export function registerCustomerRoutes(app: Express, requireAuth: any) {
   // ─── Schema migration: ensure is_active column exists ───────────────────────
@@ -303,6 +304,17 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
       return res.json(result.rows);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ─── DUPLICATE DETECTION ─────────────────────────────────────────────────────
+  app.get("/api/customers/:id/duplicates", requireAuth, async (req, res) => {
+    try {
+      const dupes = await findCustomerDuplicates(req.params.id);
+      return res.json(dupes);
+    } catch (err: any) {
+      console.error("[customers] GET /api/customers/:id/duplicates error:", err.message);
+      return res.status(500).json({ message: "Server error" });
     }
   });
 

@@ -20,6 +20,7 @@ import {
   ChevronLeft, Phone, Mail, MapPin, Building2, FileText, Star,
   Loader2, Pencil, Plus, Trash2, CheckCircle2, XCircle,
   Briefcase, DollarSign, CalendarDays, Clock, Home, LayoutGrid, Calculator,
+  AlertTriangle,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -386,6 +387,18 @@ export default function CustomerDetailPage() {
     enabled: !!id,
   });
 
+  // A27: duplicate detection — runs once per page load, results cached 5 min
+  const { data: duplicates = [] } = useQuery<Array<{ id: string; label: string; matched_on: ("email" | "phone")[] }>>({
+    queryKey: ["/api/customers", id, "duplicates"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/customers/${id}/duplicates`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!id && !!customer,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // ── Active toggle ──
   const activeMutation = useMutation({
     mutationFn: async (is_active: boolean) => {
@@ -476,6 +489,34 @@ export default function CustomerDetailPage() {
         className="-ml-2" data-testid="button-back-customers">
         <ChevronLeft className="h-4 w-4 mr-1" /> {t("backToCustomers")}
       </Button>
+
+      {/* A27: Duplicate-customer warning banner */}
+      {duplicates.length > 0 && (
+        <div
+          className="flex items-start gap-3 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-900"
+          data-testid="banner-duplicate-customers"
+        >
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-yellow-600" />
+          <div className="flex-1">
+            <span className="font-semibold">Possible duplicate {duplicates.length === 1 ? "record" : "records"} detected.&nbsp;</span>
+            {duplicates.map((d, i) => (
+              <span key={d.id}>
+                {i > 0 && ", "}
+                <a
+                  href={`/customers/${d.id}`}
+                  className="underline underline-offset-2 font-medium hover:text-yellow-700"
+                  data-testid={`link-duplicate-customer-${d.id}`}
+                >
+                  {d.label}
+                </a>
+                <span className="text-yellow-700 text-xs ml-1">
+                  ({d.matched_on.join(" & ")})
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Two-column layout */}
       <div className="flex flex-col xl:flex-row gap-6 items-start">
