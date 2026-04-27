@@ -20,7 +20,7 @@ import {
   ChevronLeft, Phone, Mail, MapPin, Building2, FileText, Star,
   Loader2, Pencil, Plus, Trash2, CheckCircle2, XCircle,
   Briefcase, DollarSign, CalendarDays, Clock, Home, LayoutGrid, Calculator,
-  AlertTriangle,
+  AlertTriangle, Archive, ArchiveRestore,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -355,6 +355,7 @@ export default function CustomerDetailPage() {
 
   const [showEdit, setShowEdit] = useState(false);
   const [propModal, setPropModal] = useState<{ open: boolean; editing: Property | null }>({ open: false, editing: null });
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
   // ── Queries ──
   const { data: customer, isLoading, isError } = useQuery<CustomerDetail>({
@@ -408,6 +409,35 @@ export default function CustomerDetailPage() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/customers"] }),
     onError: () => toast({ title: t("couldNotUpdateStatus"), variant: "destructive" }),
+  });
+
+  // ── Archive / Unarchive ──
+  const archiveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/customers/${id}/archive`);
+      if (!res.ok) throw new Error("Failed to archive");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      toast({ title: "Customer archived" });
+    },
+    onError: () => toast({ title: "Could not archive customer", variant: "destructive" }),
+  });
+
+  const unarchiveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/customers/${id}/unarchive`);
+      if (!res.ok) throw new Error("Failed to unarchive");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      toast({ title: "Customer unarchived" });
+    },
+    onError: () => toast({ title: "Could not unarchive customer", variant: "destructive" }),
   });
 
   // ── Delete property ──
@@ -531,8 +561,16 @@ export default function CustomerDetailPage() {
                   {initials(customer.first_name, customer.last_name)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-lg font-bold leading-tight" data-testid="text-customer-name">
+                  <h1 className="text-lg font-bold leading-tight flex items-center gap-2 flex-wrap" data-testid="text-customer-name">
                     {customer.first_name} {customer.last_name}
+                    {!customer.is_active && (
+                      <span
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-500/40 text-white/80 shrink-0"
+                        data-testid="pill-archived"
+                      >
+                        Archived
+                      </span>
+                    )}
                   </h1>
                   {customer.company_name && (
                     <div className="flex items-center gap-1 mt-0.5 opacity-80">
@@ -564,11 +602,30 @@ export default function CustomerDetailPage() {
                 </button>
               </div>
 
-              <Button size="sm" variant="secondary"
-                className="mt-3 w-full bg-white/20 hover:bg-white/30 text-white border-0"
-                onClick={() => setShowEdit(true)} data-testid="button-edit-customer">
-                <Pencil className="h-3.5 w-3.5 mr-1.5" /> {t("editCustomer")}
-              </Button>
+              <div className="mt-3 flex gap-2">
+                <Button size="sm" variant="secondary"
+                  className="flex-1 bg-white/20 hover:bg-white/30 text-white border-0"
+                  onClick={() => setShowEdit(true)} data-testid="button-edit-customer">
+                  <Pencil className="h-3.5 w-3.5 mr-1.5" /> {t("editCustomer")}
+                </Button>
+                {customer.is_active ? (
+                  <Button size="sm" variant="secondary"
+                    className="flex-1 bg-white/20 hover:bg-white/30 text-white border-0"
+                    onClick={() => setShowArchiveConfirm(true)}
+                    disabled={archiveMutation.isPending}
+                    data-testid="button-archive-customer">
+                    <Archive className="h-3.5 w-3.5 mr-1.5" /> Archive
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="secondary"
+                    className="flex-1 bg-white/20 hover:bg-white/30 text-white border-0"
+                    onClick={() => unarchiveMutation.mutate()}
+                    disabled={unarchiveMutation.isPending}
+                    data-testid="button-unarchive-customer">
+                    <ArchiveRestore className="h-3.5 w-3.5 mr-1.5" /> Unarchive
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Details */}
@@ -929,6 +986,32 @@ export default function CustomerDetailPage() {
           </Tabs>
         </div>
       </div>
+
+      {/* Archive confirm dialog */}
+      <Dialog open={showArchiveConfirm} onOpenChange={setShowArchiveConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Archive {customer?.first_name} {customer?.last_name}?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This hides them from the active list. You can unarchive later.
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowArchiveConfirm(false)}
+              data-testid="button-cancel-archive">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={archiveMutation.isPending}
+              data-testid="button-confirm-archive"
+              onClick={() => { setShowArchiveConfirm(false); archiveMutation.mutate(); }}
+            >
+              <Archive className="h-3.5 w-3.5 mr-1.5" /> Archive
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modals */}
       <CustomerFormModal

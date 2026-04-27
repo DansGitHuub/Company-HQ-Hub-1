@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Plus, Search, Users, Pencil } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { CustomerFormModal } from "./CustomerFormModal";
 
@@ -25,17 +26,26 @@ interface Customer {
   primary_email: string | null;
 }
 
+type StatusFilter = "active" | "archived" | "all";
+
+const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [
+  { value: "active",   label: "Active" },
+  { value: "archived", label: "Archived" },
+  { value: "all",      label: "All" },
+];
+
 export default function CustomerList() {
   const { t } = useTranslation("customers");
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("active");
   const [showForm, setShowForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [, setLocation] = useLocation();
 
   const { data: customers = [], isLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/customers"],
+    queryKey: ["/api/customers", { status }],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/customers");
+      const res = await apiRequest("GET", `/api/customers?status=${status}`);
       return res.json();
     },
   });
@@ -65,13 +75,32 @@ export default function CustomerList() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {customers.length} {t("customer")}{customers.length !== 1 ? "s" : ""} total
+            {customers.length} {t("customer")}{customers.length !== 1 ? "s" : ""} {status === "all" ? "total" : status}
           </p>
         </div>
         <Button className="bg-green-600 hover:bg-green-700 text-white"
           onClick={openAdd} data-testid="button-add-customer">
           <Plus className="h-4 w-4 mr-2" /> {t("addCustomer")}
         </Button>
+      </div>
+
+      {/* Status filter chips */}
+      <div className="flex items-center gap-2" data-testid="filter-status-chips">
+        {STATUS_CHIPS.map((chip) => (
+          <button
+            key={chip.value}
+            onClick={() => setStatus(chip.value)}
+            data-testid={`chip-status-${chip.value}`}
+            className={cn(
+              "px-3 py-1 rounded-full text-sm font-medium border transition-colors",
+              status === chip.value
+                ? "bg-green-700 text-white border-green-700"
+                : "bg-white text-gray-600 border-gray-300 hover:border-green-600 hover:text-green-700 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-600",
+            )}
+          >
+            {chip.label}
+          </button>
+        ))}
       </div>
 
       <div className="relative max-w-sm">
@@ -91,7 +120,7 @@ export default function CustomerList() {
             <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
               <Users className="h-10 w-10 text-muted-foreground/40" />
               <p className="text-sm font-medium text-muted-foreground">
-                {t("noCustomersYet")}
+                {status === "archived" ? "No archived customers." : t("noCustomersYet")}
               </p>
             </div>
           ) : filtered.length === 0 ? (
@@ -119,6 +148,11 @@ export default function CustomerList() {
                     onClick={() => setLocation(`/customers/${customer.id}`)}>
                     <TableCell className="font-medium">
                       {customer.first_name} {customer.last_name}
+                      {!customer.is_active && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                          Archived
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {customer.company_name || "—"}

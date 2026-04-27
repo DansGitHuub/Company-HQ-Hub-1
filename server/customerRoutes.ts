@@ -25,20 +25,29 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
       const limit = search ? Math.min(limitRequested ?? 20, 50) : null; // no limit for full list
 
       const params: any[] = [];
-      let whereClause = "";
+      const conditions: string[] = [];
+
+      // status filter — default to "active" so existing callers without the param
+      // continue to see only active customers
+      const status = ((req.query.status as string | undefined) ?? "active").toLowerCase();
+      if (status === "active")   conditions.push("c.is_active = true");
+      else if (status === "archived") conditions.push("c.is_active = false");
+      // "all" → no is_active filter
 
       if (search) {
         params.push(`%${search}%`);
-        whereClause = `
-          WHERE (
-            c.first_name ILIKE $1
-            OR c.last_name  ILIKE $1
-            OR c.company_name ILIKE $1
-            OR (c.first_name || ' ' || c.last_name) ILIKE $1
-            OR ce.email ILIKE $1
-            OR cp.phone ILIKE $1
-          )`;
+        const n = params.length; // $n — first positional param
+        conditions.push(`(
+            c.first_name ILIKE $${n}
+            OR c.last_name  ILIKE $${n}
+            OR c.company_name ILIKE $${n}
+            OR (c.first_name || ' ' || c.last_name) ILIKE $${n}
+            OR ce.email ILIKE $${n}
+            OR cp.phone ILIKE $${n}
+          )`);
       }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
       let limitClause = "";
       if (limit !== null) {
