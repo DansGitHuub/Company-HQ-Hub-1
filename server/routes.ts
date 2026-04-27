@@ -10366,9 +10366,22 @@ Provide accurate information based on publicly available documentation.`;
     try {
       const app = await storage.getJobApplicationByToken(req.params.token);
       if (!app) return res.status(404).json({ message: "Application link not found" });
-      if (new Date() > new Date(app.expiresAt)) return res.status(410).json({ message: "This application link has expired" });
-      if (app.status === "submitted") return res.status(409).json({ message: "This application has already been submitted" });
-      return res.json(app);
+
+      // Derive safe, lean status — never expose raw "draft" or any other internal value
+      const isExpired    = new Date() > new Date(app.expiresAt);
+      const hasSubmitted = app.submittedAt != null;
+      const status: "open" | "submitted" | "expired" =
+        hasSubmitted ? "submitted" : isExpired ? "expired" : "open";
+
+      // Return ONLY the six fields needed by the public form — no PII, no form-data blob
+      return res.json({
+        id:           app.id,
+        position:     app.position,
+        status,
+        expiresAt:    app.expiresAt,
+        hasSubmitted,
+        company:      { name: "Chapin Landscapes" },
+      });
     } catch (err) {
       console.error("[apply] Error fetching application:", err);
       return res.status(500).json({ message: "Server error" });

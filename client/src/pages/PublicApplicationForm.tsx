@@ -7,10 +7,11 @@ type AppData = Record<string, string>;
 
 interface JobApplication {
   id: string;
-  token: string;
-  status: string;
-  data: AppData;
+  position: string;
+  status: "open" | "submitted" | "expired";
   expiresAt: string;
+  hasSubmitted: boolean;
+  company: { name: string };
 }
 
 // Required fields for submit lock
@@ -153,7 +154,7 @@ export default function PublicApplicationForm() {
       })
       .then((app: JobApplication) => {
         setApplication(app);
-        setData((app.data as AppData) || {});
+        // Form always starts empty — prior data is NOT echoed back from the server
         setLoading(false);
       })
       .catch(err => {
@@ -266,7 +267,52 @@ export default function PublicApplicationForm() {
     );
   }
 
-  const isDisabled = application?.status === "submitted";
+  // Application was already submitted on a previous visit
+  if (application?.hasSubmitted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white rounded-xl shadow-md border border-green-200 p-10 max-w-lg w-full text-center">
+          <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-5" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-3">Application Already Submitted</h2>
+          <p className="text-gray-600 mb-5 leading-relaxed">
+            Your application has been submitted. We will be in touch soon.
+          </p>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-gray-700">
+            <p className="font-semibold text-green-800 mb-1">Need to follow up?</p>
+            <p>If you don't receive a phone call or text within <strong>48 hours</strong>, please reach out:</p>
+            <p className="mt-2">
+              <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline font-medium">office@chapinlandscapes.com</a>
+              <span className="mx-2 text-gray-400">or</span>
+              <a href="tel:4402260518" className="text-green-700 underline font-medium">440.226.0518</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Link has expired
+  if (application?.status === "expired") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white rounded-xl shadow-md border border-amber-200 p-10 max-w-lg w-full text-center">
+          <Clock className="h-16 w-16 text-amber-500 mx-auto mb-5" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-3">Application Link Expired</h2>
+          <p className="text-gray-600 mb-5 leading-relaxed">
+            This application link is no longer active. Please contact us to request a new one.
+          </p>
+          <p className="text-gray-500 text-sm">
+            <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline font-medium">office@chapinlandscapes.com</a>
+            <span className="mx-2 text-gray-400">or</span>
+            <a href="tel:4402260518" className="text-green-700 underline font-medium">440.226.0518</a>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Form is only rendered for status === "open" and !hasSubmitted
+  const isDisabled = false;
 
   // ─── Main Form ──────────────────────────────────────────────────────────
   return (
@@ -275,8 +321,8 @@ export default function PublicApplicationForm() {
       <div className="bg-green-800 text-white py-6 px-4 shadow-md">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold">Chapin Landscapes</h1>
-            <p className="text-green-200 text-sm mt-0.5">Employment Application</p>
+            <h1 className="text-xl font-bold">{application?.company.name ?? "Chapin Landscapes"}</h1>
+            <p className="text-green-200 text-sm mt-0.5">{application?.position ? `Application — ${application.position}` : "Employment Application"}</p>
           </div>
           <div className="flex items-center gap-2 text-green-200 text-xs">
             {saveStatus === "saving" && (
