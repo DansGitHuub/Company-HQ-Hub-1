@@ -5202,7 +5202,7 @@ Generate detailed information for this landscaping material.`;
         await client.query("BEGIN");
 
         // Copy estimate line items → job work areas (actual_hours is computed, not a stored column)
-        await client.query(`
+        const waInsert = await client.query(`
           INSERT INTO job_work_areas
             (job_id, name, sort_order, notes, status, is_active, estimated_hours)
           SELECT
@@ -5216,6 +5216,20 @@ Generate detailed information for this landscaping material.`;
           FROM estimate_items
           WHERE estimate_id = $2
         `, [job.id, req.params.id]);
+
+        // If the estimate had no line items, create one synthetic work area from the estimate totals
+        if ((waInsert.rowCount ?? 0) === 0) {
+          await client.query(`
+            INSERT INTO job_work_areas
+              (job_id, name, sort_order, notes, status, is_active, estimated_hours)
+            VALUES
+              ($1, $2, 0, $3, 'pending', true, 0)
+          `, [
+            job.id,
+            estimate.serviceType || estimate.clientName || "Work",
+            estimate.estimatedValue ? `$${estimate.estimatedValue} × 1` : "",
+          ]);
+        }
 
         // Store the originating estimate id + copy price
         await client.query(

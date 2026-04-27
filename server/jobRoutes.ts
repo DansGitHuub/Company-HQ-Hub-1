@@ -104,7 +104,18 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
         ORDER BY te.clock_in DESC
       `, [req.params.id]);
 
-      return res.json({ ...rows[0], time_entries: timeRows.rows });
+      // Most recent linked invoice (so the client can swap "Generate Invoice" → "View Invoice")
+      const { rows: invRows } = await pool.query(
+        `SELECT id, invoice_number FROM invoices WHERE job_id = $1 ORDER BY created_at DESC LIMIT 1`,
+        [req.params.id]
+      );
+
+      return res.json({
+        ...rows[0],
+        time_entries: timeRows.rows,
+        linked_invoice_id: invRows[0]?.id ?? null,
+        linked_invoice_number: invRows[0]?.invoice_number ?? null,
+      });
     } catch (err: any) {
       console.error("[jobs] GET /api/jobs/:id error:", err.message);
       return res.status(500).json({ message: err.message });

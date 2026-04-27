@@ -187,9 +187,9 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
                             ELSE status
                           END,
                  price  = (
-                   SELECT COALESCE(SUM(total), 0)::text FROM invoices
+                   SELECT COALESCE(SUM(total), 0) FROM invoices
                    WHERE job_id = $1 AND status NOT IN ('void')
-                 )::text,
+                 ),
                  updated_at = NOW()
              WHERE id = $1`,
             [invoice.job_id]
