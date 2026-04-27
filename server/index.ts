@@ -39,6 +39,7 @@ import { runCatalogExtendedMigration } from "./migrations/catalogExtended";
 import { runTermsAndConditionsMigration } from "./migrations/termsAndConditions";
 import { runWorksheetTablesMigration } from "./migrations/worksheetTables";
 import { runWorksheetPhase3Migration } from "./migrations/worksheetPhase3";
+import { runPortalInviteMigration } from "./migrations/portalInvite";
 import { registerPublicPages } from "./publicPages";
 import { startLeadAlertScheduler } from "./consultationRoutes";
 
@@ -126,6 +127,7 @@ app.use((req, res, next) => {
   await runTermsAndConditionsMigration();
   await runWorksheetTablesMigration();
   await runWorksheetPhase3Migration();
+  await runPortalInviteMigration();
 
   // Public pages must be registered BEFORE registerRoutes (which sets up the React catch-all)
   registerPublicPages(app);

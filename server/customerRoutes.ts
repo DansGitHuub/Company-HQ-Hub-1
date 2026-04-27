@@ -2,6 +2,8 @@ import { Express } from "express";
 import { syncCustomersPublic } from "./quickbooksSync";
 import { pool } from "./db";
 import { findCustomerDuplicates } from "./lib/customerDuplicates";
+import crypto from "crypto";
+import { getAppUrl } from "./emailService";
 
 export function registerCustomerRoutes(app: Express, requireAuth: any) {
   // ─── Schema migration: ensure is_active column exists ───────────────────────
@@ -482,6 +484,83 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
       return res.json({ success: true });
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Portal Invite: mint a single-use token for a customer ────────────────────
+  app.post("/api/customers/:id/portal-invite", requireAuth, async (req, res) => {
+    if (!requireAdminOrManager(req, res)) return;
+    const { id } = req.params;
+    try {
+      // Verify customer exists and has at least one email
+      const { rows: custRows } = await pool.query(
+        `SELECT c.id, ce.email AS primary_email
+         FROM customers c
+         LEFT JOIN customer_emails ce ON ce.customer_id = c.id AND ce.is_primary = true
+         WHERE c.id = $1`,
+        [id]
+      );
+      if (!custRows.length) return res.status(404).json({ message: "Customer not found" });
+      if (!custRows[0].primary_email) {
+        // Fall back: any email
+        const { rows: anyEmail } = await pool.query(
+          `SELECT email FROM customer_emails WHERE customer_id=$1 LIMIT 1`,
+          [id]
+        );
+        if (!anyEmail.length) {
+          return res.status(422).json({ message: "Customer has no email address. Add one first." });
+        }
+      }
+
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+      await pool.query(
+        `INSERT INTO job_applications
+           (token, status, expires_at, expiry_days, created_by, customer_id, data)
+         VALUES ($1, 'portal_invite', $2, 1, $3, $4, '{}')`,
+        [token, expiresAt.toISOString(), (req as any).user?.id ?? null, id]
+      );
+
+      const url = `${getAppUrl()}/portal/customer/${token}`;
+      return res.json({ url, expires_at: expiresAt.toISOString() });
+    } catch (err: any) {
+      console.error("[portal-invite] Error:", err.message);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // ── Portal Invite: redeem a token (public, no auth) ──────────────────────────
+  app.get("/api/portal/customer/:token", async (req, res) => {
+    const { token } = req.params;
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, customer_id, status, expires_at
+         FROM job_applications
+         WHERE token = $1 AND customer_id IS NOT NULL`,
+        [token]
+      );
+      if (!rows.length) return res.status(404).json({ message: "Invite link not found." });
+
+      const row = rows[0];
+      if (row.status === "used") {
+        return res.status(410).json({ message: "This invite link has already been used." });
+      }
+      if (new Date(row.expires_at) < new Date()) {
+        return res.status(410).json({ message: "This invite link has expired." });
+      }
+
+      // Mark as used (single-use)
+      await pool.query(
+        `UPDATE job_applications SET status='used', submitted_at=NOW() WHERE id=$1`,
+        [row.id]
+      );
+
+      // Return redirect target — intentionally excludes sensitive credential fields
+      return res.json({ redirect: "/customer-hub", customer_id: row.customer_id });
+    } catch (err: any) {
+      console.error("[portal-invite] Redeem error:", err.message);
+      return res.status(500).json({ message: "Server error" });
     }
   });
 }

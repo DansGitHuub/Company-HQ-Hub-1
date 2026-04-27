@@ -80,6 +80,7 @@ import CatalogPage from "@/pages/catalog/index";
 import CatalogImport from "@/pages/catalog/CatalogImport";
 import CatalogDetail from "@/pages/catalog/CatalogDetail";
 import CustomerPortal from "@/pages/CustomerPortal";
+import PortalCustomerRedeem from "@/pages/PortalCustomerRedeem";
 import MessagesPage from "@/pages/Messages";
 import TimeReports from "@/pages/admin/TimeReports";
 import ServiceTypesPage from "@/pages/admin/ServiceTypesPage";
@@ -115,6 +116,10 @@ function AppRoutes() {
 
   if (window.location.pathname === "/privacy") {
     return <PrivacyPolicy />;
+  }
+
+  if (window.location.pathname.startsWith("/portal/customer/")) {
+    return <PortalCustomerRedeem />;
   }
 
   if (window.location.pathname.startsWith("/portal/")) {

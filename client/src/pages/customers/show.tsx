@@ -11,8 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Tooltip, TooltipContent, TooltipTrigger, TooltipProvider,
+} from "@/components/ui/tooltip";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -20,10 +23,11 @@ import {
   ChevronLeft, Phone, Mail, MapPin, Building2, FileText, Star,
   Loader2, Pencil, Plus, Trash2, CheckCircle2, XCircle,
   Briefcase, DollarSign, CalendarDays, Clock, Home, LayoutGrid, Calculator,
-  AlertTriangle, Archive, ArchiveRestore,
+  AlertTriangle, Archive, ArchiveRestore, Link2,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { format, parseISO } from "date-fns";
 import { CustomerFormModal, CustomerFormData, EMPTY_FORM } from "./CustomerFormModal";
 
@@ -352,10 +356,12 @@ export default function CustomerDetailPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const [showEdit, setShowEdit] = useState(false);
   const [propModal, setPropModal] = useState<{ open: boolean; editing: Property | null }>({ open: false, editing: null });
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [showInviteConfirm, setShowInviteConfirm] = useState(false);
 
   // ── Queries ──
   const { data: customer, isLoading, isError } = useQuery<CustomerDetail>({
@@ -440,6 +446,35 @@ export default function CustomerDetailPage() {
     onError: () => toast({ title: "Could not unarchive customer", variant: "destructive" }),
   });
 
+  // ── Portal Invite ──
+  const inviteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/customers/${id}/portal-invite`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to generate invite link");
+      }
+      return res.json() as Promise<{ url: string; expires_at: string }>;
+    },
+    onSuccess: async (data) => {
+      try {
+        await navigator.clipboard.writeText(data.url);
+        toast({ title: "Invite link copied to clipboard. Expires in 24h." });
+      } catch {
+        toast({ title: `Invite link: ${data.url}`, description: "Copy it manually." });
+      }
+    },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
+  const handleInviteClick = () => {
+    if (duplicates.length > 0) {
+      setShowInviteConfirm(true);
+    } else {
+      inviteMutation.mutate();
+    }
+  };
+
   // ── Delete property ──
   const deleteProp = async (propId: string) => {
     if (!confirm(t("removePropertyConfirm"))) return;
@@ -476,6 +511,10 @@ export default function CustomerDetailPage() {
 
   // ── Stats ──
   // A22: real billed/outstanding sourced from invoices. Excludes voided.
+  const hasEmail = (customer.emails?.length ?? 0) > 0;
+  const isAdminOrManager =
+    user?.role === "Admin" || user?.role === "Manager" || !!(user as any)?.isMasterAdmin;
+
   const billableInvoices = customerInvoices.filter((inv: any) => inv.status !== "void");
   const totalBilled = billableInvoices.reduce((sum: number, inv: any) => sum + Number(inv.total ?? 0), 0);
   const totalOutstanding = billableInvoices.reduce((sum: number, inv: any) => sum + Math.max(0, Number(inv.balance_due ?? 0)), 0);
@@ -602,28 +641,56 @@ export default function CustomerDetailPage() {
                 </button>
               </div>
 
-              <div className="mt-3 flex gap-2">
-                <Button size="sm" variant="secondary"
-                  className="flex-1 bg-white/20 hover:bg-white/30 text-white border-0"
-                  onClick={() => setShowEdit(true)} data-testid="button-edit-customer">
-                  <Pencil className="h-3.5 w-3.5 mr-1.5" /> {t("editCustomer")}
-                </Button>
-                {customer.is_active ? (
+              <div className="mt-3 flex flex-col gap-2">
+                <div className="flex gap-2">
                   <Button size="sm" variant="secondary"
                     className="flex-1 bg-white/20 hover:bg-white/30 text-white border-0"
-                    onClick={() => setShowArchiveConfirm(true)}
-                    disabled={archiveMutation.isPending}
-                    data-testid="button-archive-customer">
-                    <Archive className="h-3.5 w-3.5 mr-1.5" /> Archive
+                    onClick={() => setShowEdit(true)} data-testid="button-edit-customer">
+                    <Pencil className="h-3.5 w-3.5 mr-1.5" /> {t("editCustomer")}
                   </Button>
-                ) : (
-                  <Button size="sm" variant="secondary"
-                    className="flex-1 bg-white/20 hover:bg-white/30 text-white border-0"
-                    onClick={() => unarchiveMutation.mutate()}
-                    disabled={unarchiveMutation.isPending}
-                    data-testid="button-unarchive-customer">
-                    <ArchiveRestore className="h-3.5 w-3.5 mr-1.5" /> Unarchive
-                  </Button>
+                  {customer.is_active ? (
+                    <Button size="sm" variant="secondary"
+                      className="flex-1 bg-white/20 hover:bg-white/30 text-white border-0"
+                      onClick={() => setShowArchiveConfirm(true)}
+                      disabled={archiveMutation.isPending}
+                      data-testid="button-archive-customer">
+                      <Archive className="h-3.5 w-3.5 mr-1.5" /> Archive
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="secondary"
+                      className="flex-1 bg-white/20 hover:bg-white/30 text-white border-0"
+                      onClick={() => unarchiveMutation.mutate()}
+                      disabled={unarchiveMutation.isPending}
+                      data-testid="button-unarchive-customer">
+                      <ArchiveRestore className="h-3.5 w-3.5 mr-1.5" /> Unarchive
+                    </Button>
+                  )}
+                </div>
+                {isAdminOrManager && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="w-full">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="w-full bg-white/20 hover:bg-white/30 text-white border-0"
+                            disabled={!hasEmail || inviteMutation.isPending}
+                            onClick={handleInviteClick}
+                            data-testid="button-portal-invite"
+                          >
+                            <Link2 className="h-3.5 w-3.5 mr-1.5" />
+                            {inviteMutation.isPending ? "Generating…" : "Send Portal Invite"}
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {!hasEmail && (
+                        <TooltipContent>
+                          <p>Add an email first.</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
               </div>
             </div>
@@ -1008,6 +1075,40 @@ export default function CustomerDetailPage() {
               onClick={() => { setShowArchiveConfirm(false); archiveMutation.mutate(); }}
             >
               <Archive className="h-3.5 w-3.5 mr-1.5" /> Archive
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Portal invite — duplicate-gate confirmation dialog */}
+      <Dialog open={showInviteConfirm} onOpenChange={setShowInviteConfirm}>
+        <DialogContent className="max-w-sm" data-testid="dialog-invite-confirm">
+          <DialogHeader>
+            <DialogTitle>Send Portal Invite?</DialogTitle>
+            <DialogDescription>
+              This customer shares email or phone with{" "}
+              {duplicates.length} other record{duplicates.length === 1 ? "" : "s"}:
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="text-sm space-y-1 my-1 list-disc list-inside text-muted-foreground">
+            {duplicates.map((d) => (
+              <li key={d.id} data-testid={`invite-dupe-label-${d.id}`}>{d.label}</li>
+            ))}
+          </ul>
+          <p className="text-sm text-muted-foreground">
+            The invite link binds to <span className="font-semibold text-foreground">this record only</span>.
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowInviteConfirm(false)}
+              data-testid="button-cancel-invite">
+              Cancel
+            </Button>
+            <Button
+              disabled={inviteMutation.isPending}
+              data-testid="button-confirm-invite"
+              onClick={() => { setShowInviteConfirm(false); inviteMutation.mutate(); }}
+            >
+              <Link2 className="h-3.5 w-3.5 mr-1.5" /> Send to this customer
             </Button>
           </DialogFooter>
         </DialogContent>
