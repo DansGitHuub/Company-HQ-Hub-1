@@ -1098,6 +1098,26 @@ export default function AdminPanel() {
     viewPasswordMutation.mutate(targetUser.id);
   };
 
+  const crewInviteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await apiRequest("POST", `/api/admin/employees/${userId}/portal-invite`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).message || "Failed to generate invite link");
+      }
+      return res.json() as Promise<{ url: string; expires_at: string }>;
+    },
+    onSuccess: async (data) => {
+      try {
+        await navigator.clipboard.writeText(data?.url ?? "");
+        toast({ title: "Crew portal invite copied to clipboard expires in 24h" });
+      } catch {
+        toast({ title: `Crew invite link: ${data?.url}`, description: "Copy it manually." });
+      }
+    },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
   const handleAccessRequest = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const res = await apiRequest("PATCH", `/api/access-requests/${id}`, { status });
@@ -1390,6 +1410,16 @@ export default function AdminPanel() {
                                 {u.role === "Customer" && (
                                   <DropdownMenuItem disabled className="text-muted-foreground">
                                     <Key className="w-4 h-4 mr-2" /> Customer uses recovery
+                                  </DropdownMenuItem>
+                                )}
+                                {/* Send Crew Portal Invite — staff (non-Customer, non-MasterAdmin) */}
+                                {u.role !== "Customer" && !u.isMasterAdmin && (
+                                  <DropdownMenuItem
+                                    data-testid={`button-crew-portal-invite-${u.id}`}
+                                    onClick={() => crewInviteMutation.mutate(u.id)}
+                                    disabled={crewInviteMutation.isPending}
+                                  >
+                                    <Link2 className="w-4 h-4 mr-2" /> Send Crew Portal Invite
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />

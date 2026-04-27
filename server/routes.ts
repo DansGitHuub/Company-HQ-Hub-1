@@ -463,6 +463,89 @@ export async function registerRoutes(
     }
   });
 
+  // ── Crew Portal Invite: mint a single-use token bound to a user ─────────────
+  app.post("/api/admin/employees/:id/portal-invite", requireAdmin, async (req, res) => {
+    // requireAdmin already rejects non-Admin roles; also allow isMasterAdmin
+    const reqUser = req.user as any;
+    if (!reqUser) return res.status(401).json({ message: "Authentication required" });
+
+    const id = req.params.id as string;
+    try {
+      const targetUser = await storage.getUser(id);
+      if (!targetUser) return res.status(404).json({ message: "User not found" });
+      if (targetUser.isMasterAdmin) {
+        return res.status(403).json({ message: "Cannot send portal invite to Master Admin" });
+      }
+
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await pool.query(
+        `INSERT INTO job_applications
+           (token, status, expires_at, expiry_days, created_by, user_id, data)
+         VALUES ($1, 'portal_invite', $2, 1, $3, $4, '{}')`,
+        [token, expiresAt.toISOString(), reqUser.id ?? null, id]
+      );
+
+      const { getAppUrl } = await import("./emailService");
+      const url = `${getAppUrl()}/portal/crew/${token}`;
+      return res.json({ url, expires_at: expiresAt.toISOString() });
+    } catch (err: any) {
+      console.error("[crew-portal-invite] Error:", err.message);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // ── Crew Portal Invite: redeem token (public) ─────────────────────────────
+  app.get("/api/portal/crew/:token", async (req, res) => {
+    const { token } = req.params;
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, user_id, status, expires_at
+         FROM job_applications
+         WHERE token = $1 AND user_id IS NOT NULL`,
+        [token]
+      );
+      if (!rows.length) return res.status(404).json({ message: "Invite link not found." });
+
+      const row = rows[0];
+      if (row.status === "used") {
+        return res.status(410).json({ message: "This invite link has already been used." });
+      }
+      if (new Date(row.expires_at) < new Date()) {
+        return res.status(410).json({ message: "This invite link has expired." });
+      }
+
+      // Mark as used (single-use)
+      await pool.query(
+        `UPDATE job_applications SET status='used', submitted_at=NOW() WHERE id=$1`,
+        [row.id]
+      );
+
+      // Fetch user and create session, stripping sensitive fields (A30b allowlist)
+      const targetUser = await storage.getUser(row.user_id);
+      if (!targetUser) return res.status(404).json({ message: "User account not found." });
+
+      await new Promise<void>((resolve, reject) => {
+        req.login(targetUser, (err) => (err ? reject(err) : resolve()));
+      });
+
+      const {
+        storedPassword: _sp,
+        recoveryToken: _rt,
+        googleAccessToken: _gat,
+        googleRefreshToken: _grt,
+        password: _pw,
+        ...safeUser
+      } = targetUser as any;
+
+      return res.json({ redirect: "/employee-portal", user: safeUser });
+    } catch (err: any) {
+      console.error("[crew-portal-invite] Redeem error:", err.message);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // Master Admin view stored password for staff users
   app.get("/api/admin/users/:id/password", requireAuth, async (req, res) => {
     try {
