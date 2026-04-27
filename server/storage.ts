@@ -3125,7 +3125,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async markAllStaffNotificationsRead(userId: string): Promise<void> {
-    await db.update(staffNotifications).set({ isRead: true }).where(and(eq(staffNotifications.userId, userId), eq(staffNotifications.isRead, false)));
+    // Use raw SQL — Drizzle's eq(col, false) can silently mismatch boolean literals
+    await pool.query(
+      `UPDATE staff_notifications SET is_read = true WHERE user_id = $1 AND is_read = false`,
+      [userId],
+    );
   }
 
   // Task Management System

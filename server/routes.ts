@@ -9576,10 +9576,65 @@ Provide accurate information based on publicly available documentation.`;
   // Staff Notifications API
   app.get("/api/staff-notifications", requireAuth, async (req, res) => {
     try {
-      const notifications = await storage.getStaffNotifications(req.user!.id);
+      const userId = req.user!.id;
+      const pageParam = req.query.page as string | undefined;
+
+      if (pageParam !== undefined) {
+        // ── Paginated mode (used by /notifications page) ──────────────────────
+        const page = Math.max(1, parseInt(pageParam, 10) || 1);
+        const pageSize = Math.min(50, Math.max(1, parseInt((req.query.pageSize as string) || "25", 10)));
+        const typeFilter = (req.query.type as string | undefined)?.trim() || null;
+        const offset = (page - 1) * pageSize;
+
+        const params: unknown[] = [userId];
+        let typeClause = "";
+        if (typeFilter) {
+          params.push(typeFilter);
+          typeClause = ` AND type = $${params.length}`;
+        }
+
+        const countRes = await pool.query(
+          `SELECT count(*)::int AS total FROM staff_notifications WHERE user_id = $1${typeClause}`,
+          params,
+        );
+        const total: number = countRes.rows[0].total;
+
+        params.push(pageSize);
+        const limitParam = params.length;
+        params.push(offset);
+        const offsetParam = params.length;
+
+        const rows = await pool.query(
+          `SELECT id, user_id AS "userId", type, title, message, link, metadata,
+                  is_read AS "isRead", created_at AS "createdAt"
+           FROM staff_notifications
+           WHERE user_id = $1${typeClause}
+           ORDER BY created_at DESC
+           LIMIT $${limitParam} OFFSET $${offsetParam}`,
+          params,
+        );
+
+        return res.json({ items: rows.rows, total, page, pageSize });
+      }
+
+      // ── Non-paginated mode (bell panel — backward compat) ─────────────────
+      const notifications = await storage.getStaffNotifications(userId);
       res.json(notifications);
     } catch (err) {
       res.status(500).json({ message: "Error fetching notifications" });
+    }
+  });
+
+  // Returns the distinct notification types for the current user (used for filter chips)
+  app.get("/api/staff-notifications/types", requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT DISTINCT type FROM staff_notifications WHERE user_id = $1 ORDER BY type`,
+        [req.user!.id],
+      );
+      res.json(result.rows.map((r: { type: string }) => r.type));
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching notification types" });
     }
   });
 

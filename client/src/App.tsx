@@ -75,6 +75,7 @@ import OfferAcceptancePage from "@/pages/OfferAcceptancePage";
 import AgreementSigningPage from "@/pages/AgreementSigningPage";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import NotFound from "@/pages/not-found";
+import NotificationsPage from "@/pages/Notifications";
 import CatalogPage from "@/pages/catalog/index";
 import CatalogImport from "@/pages/catalog/CatalogImport";
 import CatalogDetail from "@/pages/catalog/CatalogDetail";
@@ -209,6 +210,7 @@ function AppRoutes() {
         <Route path="/mors-budget" component={MorsBudget} />
         <Route path="/clients"><Redirect to="/customers" /></Route>
         <Route path="/admin/employees"><Redirect to="/employees" /></Route>
+        <Route path="/notifications" component={NotificationsPage} />
         <Route path="/customers" component={CustomerList} />
         <Route path="/customers/:id" component={CustomerDetail} />
         <Route path="/tools/plow-mapper" component={() => <PlowSiteMapper />} />

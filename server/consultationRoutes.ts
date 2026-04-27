@@ -70,12 +70,19 @@ async function migrateConsultations() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-async function sendStaffNotification(userId: string, type: string, title: string, message: string, link: string) {
+async function sendStaffNotification(
+  userId: string,
+  type: string,
+  title: string,
+  message: string,
+  link: string,
+  metadata: Record<string, unknown> = {},
+) {
   try {
     await pool.query(
-      `INSERT INTO staff_notifications (id, user_id, type, title, message, link, is_read, created_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, FALSE, NOW())`,
-      [userId, type, title, message, link]
+      `INSERT INTO staff_notifications (id, user_id, type, title, message, link, metadata, is_read, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, FALSE, NOW())`,
+      [userId, type, title, message, link, JSON.stringify(metadata)],
     );
   } catch (err: any) {
     console.error("[consultations] notification error:", err.message);
@@ -440,7 +447,23 @@ export async function checkStaleLeads() {
       const customerName = lead.customer_name || lead.contact_name || "Unknown";
       const msg = `Lead ${customerName} has been waiting 4+ hours without review.`;
 
-      await sendStaffNotification(dan.id, "stale_lead", "Stale Lead Alert", msg, `/consultations`);
+      // Dedupe: skip if an unread stale_lead alert for this lead already exists in the last 24 h
+      const { rows: dupe } = await pool.query(
+        `SELECT id FROM staff_notifications
+         WHERE user_id = $1
+           AND type = 'stale_lead'
+           AND is_read = false
+           AND metadata->>'leadId' = $2
+           AND created_at > NOW() - INTERVAL '24 hours'
+         LIMIT 1`,
+        [dan.id, String(lead.id)],
+      );
+      if (dupe.length > 0) {
+        console.log(`[lead-alert] Skipping duplicate stale_lead notification for lead ${lead.id}`);
+        continue;
+      }
+
+      await sendStaffNotification(dan.id, "stale_lead", "Stale Lead Alert", msg, `/consultations`, { leadId: String(lead.id) });
       await sendEmail(dan.email, "Stale Lead Alert — Chapin Landscapes", `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background-color: #dc2626; padding: 20px; text-align: center;">
