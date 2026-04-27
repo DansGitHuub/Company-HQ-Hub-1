@@ -240,12 +240,29 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
       const users = await storage.getAllUsers();
-      const safeUsers = users.map(({
-        password, storedPassword,
-        recoveryToken, recoveryExpires,
-        googleAccessToken, googleRefreshToken, googleTokenExpiry,
-        ...u
-      }) => u);
+      const safeUsers = users.map((u) => ({
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        isActive: u.isActive,
+        isMasterAdmin: u.isMasterAdmin,
+        isApplicant: u.isApplicant,
+        bio: u.bio,
+        phone: u.phone,
+        profilePicture: u.profilePicture,
+        theme: u.theme,
+        emailNotifications: u.emailNotifications,
+        voiceEnabled: u.voiceEnabled,
+        voiceAutoSpeak: u.voiceAutoSpeak,
+        voiceSelection: u.voiceSelection,
+        language: u.language,
+        dashboardWidgets: u.dashboardWidgets,
+        googleCalendarId: u.googleCalendarId,
+        createdAt: u.createdAt,
+        updatedAt: u.updatedAt,
+      }));
       res.json(safeUsers);
     } catch (err) {
       res.status(500).json({ message: "Error fetching users" });
