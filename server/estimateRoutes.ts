@@ -412,6 +412,28 @@ export function registerEstimateRoutes(app: Express) {
       );
       const jobId = jobRows[0].id;
 
+      // Copy estimate work areas → job work areas
+      const waInsert = await client.query(`
+        INSERT INTO job_work_areas
+          (job_id, name, sort_order, status, is_active, estimated_hours)
+        SELECT $1, name, sort_order, 'pending', true, 0
+        FROM estimate_work_areas
+        WHERE estimate_id = $2
+      `, [jobId, req.params.id]);
+
+      // Fallback: if no work areas on the estimate, create one synthetic row from the totals
+      if ((waInsert.rowCount ?? 0) === 0) {
+        await client.query(`
+          INSERT INTO job_work_areas
+            (job_id, name, sort_order, notes, status, is_active, estimated_hours)
+          VALUES ($1, $2, 0, $3, 'pending', true, 0)
+        `, [
+          jobId,
+          est.estimate_type || est.title || 'Work',
+          est.total ? `$${est.total} × 1` : '',
+        ]);
+      }
+
       await client.query(
         `UPDATE sales_estimates SET status='converted', converted_at=NOW(), converted_job_id=$2, updated_at=NOW() WHERE id=$1`,
         [req.params.id, jobId]
