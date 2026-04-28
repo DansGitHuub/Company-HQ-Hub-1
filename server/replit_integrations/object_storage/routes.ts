@@ -68,10 +68,10 @@ export function registerObjectStorageRoutes(app: Express, requireAuth?: RequestH
    *
    * GET /objects/:objectPath(*)
    *
-   * This serves files from object storage. For public files, no auth needed.
-   * For protected files, add authentication middleware and ACL checks.
+   * Auth-gated: requires an active CompanyHQ session.
+   * Per-document ACL checks are intentionally deferred to a later security pass.
    */
-  app.get(/^\/objects\/(.+)$/, async (req, res) => {
+  app.get(/^\/objects\/(.+)$/, authMiddleware, async (req, res) => {
     try {
       const objectPath = `/objects/${req.params[0]}`;
       const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
