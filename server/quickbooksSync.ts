@@ -534,8 +534,14 @@ async function syncPayments(tok: any) {
           const linkedTxns = line.LinkedTxn ?? [];
           for (const txn of linkedTxns) {
             if (txn.TxnType !== "Invoice") continue;
+            // Defensive is_active guard: skip updating invoices whose customer
+            // has been archived — avoids applying QB payment data to records
+            // that belong to a soft-deleted customer.
             const { rows } = await pool.query(
-              "SELECT id, status, total FROM invoices WHERE qb_invoice_id=$1",
+              `SELECT inv.id, inv.status, inv.total
+               FROM invoices inv
+               INNER JOIN customers c ON c.id = inv.customer_id AND c.is_active = true
+               WHERE inv.qb_invoice_id = $1`,
               [txn.TxnId]
             );
             if (!rows[0]) continue;
