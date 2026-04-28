@@ -96,7 +96,7 @@ export default function NotificationsPage() {
     mutationFn: () => apiRequest("POST", "/api/staff-notifications/read-all"),
     onSuccess: () => {
       invalidate();
-      toast({ title: "All notifications marked read" });
+      toast({ title: "All notifications marked as read" });
     },
   });
 

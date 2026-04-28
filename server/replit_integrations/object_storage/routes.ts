@@ -76,6 +76,13 @@ export function registerObjectStorageRoutes(app: Express, requireAuth?: RequestH
       const objectPath = `/objects/${req.params[0]}`;
       const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
       await objectStorageService.downloadObject(objectFile, res);
+      // Override cache headers after downloadObject sets its own values but
+      // before the stream flushes them — ensures Chrome never stores auth'd
+      // file responses in its HTTP cache across sign-out.
+      if (!res.headersSent) {
+        res.set("Cache-Control", "private, no-store");
+        res.set("Pragma", "no-cache");
+      }
     } catch (error) {
       console.error("Error serving object:", error);
       if (error instanceof ObjectNotFoundError) {

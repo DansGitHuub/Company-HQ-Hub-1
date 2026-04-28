@@ -11076,5 +11076,11 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  // Catch-all for unmatched /api/* routes — must be registered AFTER all other
+  // API handlers and BEFORE the SPA static-file / Vite fallback.
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ message: "Not found" });
+  });
+
   return httpServer;
 }
