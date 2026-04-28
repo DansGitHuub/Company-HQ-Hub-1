@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
 
 interface StaffNotification {
   id: string;
@@ -20,6 +21,7 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: countData } = useQuery<{ count: number }>({
     queryKey: ["/api/staff-notifications/unread-count"],
@@ -31,7 +33,7 @@ export function NotificationBell() {
     enabled: open,
   });
 
-  const unreadCount = countData?.count ?? 0;
+  const unreadCount = Number(countData?.count ?? 0);
 
   const markRead = useMutation({
     mutationFn: (id: string) => apiRequest("POST", `/api/staff-notifications/${id}/read`),
@@ -46,6 +48,7 @@ export function NotificationBell() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/staff-notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/staff-notifications/unread-count"] });
+      toast({ title: "All notifications marked as read" });
     },
   });
 

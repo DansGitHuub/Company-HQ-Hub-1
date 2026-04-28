@@ -3110,8 +3110,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUnreadStaffNotificationCount(userId: string): Promise<number> {
-    const result = await db.select({ count: sql<number>`count(*)` }).from(staffNotifications).where(and(eq(staffNotifications.userId, userId), eq(staffNotifications.isRead, false)));
-    return result[0]?.count || 0;
+    const result = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM staff_notifications WHERE user_id = $1 AND is_read = false`,
+      [userId],
+    );
+    return result.rows[0]?.count ?? 0;
   }
 
   async createStaffNotification(data: InsertStaffNotification): Promise<StaffNotification> {
