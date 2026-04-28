@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bell } from "lucide-react";
+import { Bell, Check, CheckCheck } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface StaffNotification {
   id: string;
@@ -90,9 +91,28 @@ export function NotificationBell() {
                 </span>
               )}
             </h3>
-            {unreadCount > 0 && (
-              <button onClick={() => markAllRead.mutate()} className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 font-medium">Mark all read</button>
-            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-block">
+                  <button
+                    onClick={() => markAllRead.mutate()}
+                    disabled={markAllRead.isPending || unreadCount === 0}
+                    className={cn(
+                      "flex items-center gap-1 text-xs font-medium transition-colors",
+                      unreadCount === 0
+                        ? "text-gray-300 dark:text-gray-600 cursor-default"
+                        : "text-blue-600 hover:text-blue-800 dark:text-blue-400",
+                    )}
+                    data-testid="bell-mark-all-read"
+                  >
+                    <CheckCheck className="h-3.5 w-3.5" /> Mark all read
+                  </button>
+                </span>
+              </TooltipTrigger>
+              {unreadCount === 0 && (
+                <TooltipContent>You are all caught up</TooltipContent>
+              )}
+            </Tooltip>
           </div>
 
           <div className="overflow-y-auto flex-1">
@@ -106,17 +126,34 @@ export function NotificationBell() {
             ) : (
               notifications.map((n) => (
                 <div
-                  key={n.id}
+                  key={n?.id}
                   onClick={() => handleNotificationClick(n)}
-                  className={cn("px-4 py-3 cursor-pointer border-b border-gray-50 dark:border-gray-800 last:border-0 hover:`bg-gray-50 dark:hover:bg-gray-800 transition-colors", !n.isRead && "bg-blue-50/50 dark:bg-blue-900/20")}
+                  className={cn("px-4 py-3 cursor-pointer border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors", !n?.isRead && "bg-blue-50/50 dark:bg-blue-900/20")}
                 >
                   <div className="flex items-start gap-2">
-                    {!n.isRead && (<span className="mt-1.5 w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />)}
-                    <div className={cn("flex-1 min-w-0", n.isRead && "pl-4")}>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{n.title}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{n.message}</p>
-                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}</p>
+                    {!n?.isRead && (<span className="mt-1.5 w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />)}
+                    <div className={cn("flex-1 min-w-0", n?.isRead && "pl-4")}>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{n?.title}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{n?.message}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                        {formatDistanceToNow(new Date(n?.createdAt ?? Date.now()), { addSuffix: true })}
+                      </p>
                     </div>
+                    {/* Mark as read — right edge, unread rows only */}
+                    {!n?.isRead && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); markRead.mutate(n.id); }}
+                            className="flex-shrink-0 p-1 rounded-md text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                            data-testid={`bell-mark-read-${n?.id}`}
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Mark as read</TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
               ))

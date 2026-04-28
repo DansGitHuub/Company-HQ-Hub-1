@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Bell, ChevronLeft, ChevronRight, CheckCheck } from "lucide-react";
+import { Bell, ChevronLeft, ChevronRight, CheckCheck, Check } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface StaffNotification {
   id: string;
@@ -44,6 +46,7 @@ const PAGE_SIZE = 25;
 export default function NotificationsPage() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
@@ -91,7 +94,10 @@ export default function NotificationsPage() {
   // ── Mark all read ────────────────────────────────────────────────────────
   const markAllRead = useMutation({
     mutationFn: () => apiRequest("POST", "/api/staff-notifications/read-all"),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast({ title: "All notifications marked read" });
+    },
   });
 
   function handleClick(n: StaffNotification) {
@@ -124,14 +130,22 @@ export default function NotificationsPage() {
             )}
           </div>
         </div>
-        {unreadCount > 0 && (
-          <Button variant="outline" size="sm"
-            onClick={() => markAllRead.mutate()}
-            disabled={markAllRead.isPending}
-            data-testid="button-mark-all-read">
-            <CheckCheck className="h-3.5 w-3.5 mr-1.5" /> Mark all read
-          </Button>
-        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {/* span wrapper lets the tooltip fire even when the button is disabled */}
+            <span className="inline-block">
+              <Button variant="outline" size="sm"
+                onClick={() => markAllRead.mutate()}
+                disabled={markAllRead.isPending || unreadCount === 0}
+                data-testid="button-mark-all-read">
+                <CheckCheck className="h-3.5 w-3.5 mr-1.5" /> Mark all read
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {unreadCount === 0 && (
+            <TooltipContent>You are all caught up</TooltipContent>
+          )}
+        </Tooltip>
       </div>
 
       {/* Type filter chips */}
@@ -199,28 +213,32 @@ export default function NotificationsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-medium text-gray-900 dark:text-white leading-tight">
-                      {n.title}
+                      {n?.title}
                     </p>
                     <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
-                      {typeLabel(n.type)}
+                      {typeLabel(n?.type ?? "")}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{n.message}</p>
-                  <div className="flex items-center gap-3 mt-1">
-                    <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                      {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
-                    </p>
-                    {!n.isRead && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{n?.message}</p>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                    {formatDistanceToNow(new Date(n?.createdAt ?? Date.now()), { addSuffix: true })}
+                  </p>
+                </div>
+                {/* Mark as read — right edge, only for unread rows */}
+                {!n.isRead && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
                       <button
                         onClick={(e) => { e.stopPropagation(); markRead.mutate(n.id); }}
-                        className="text-[10px] text-blue-600 hover:underline dark:text-blue-400"
+                        className="flex-shrink-0 p-1.5 rounded-md text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
                         data-testid={`button-mark-read-${n.id}`}
                       >
-                        Mark read
+                        <Check className="h-4 w-4" />
                       </button>
-                    )}
-                  </div>
-                </div>
+                    </TooltipTrigger>
+                    <TooltipContent>Mark as read</TooltipContent>
+                  </Tooltip>
+                )}
               </div>
             </div>
           ))
