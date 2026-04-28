@@ -97,7 +97,7 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
   app.get("/api/quickbooks/auth", requireAuth, async (req, res) => {
     if (!qbClientId() || !qbClientSecret()) {
       console.error("[QB auth] QB_CLIENT_ID / QB_CLIENT_SECRET not set");
-      return res.redirect("/settings?qb=not-configured&tab=quickbooks");
+      return res.redirect("/admin?tab=quickbooks&qb=not-configured");
     }
     try {
       const { default: OAuthClient } = await import("intuit-oauth");
@@ -114,14 +114,14 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
       res.redirect(authUri);
     } catch (err: any) {
       console.error("[QB auth]", err.message);
-      res.redirect("/settings?qb=error&tab=quickbooks");
+      res.redirect("/admin?tab=quickbooks&qb=error");
     }
   });
 
   // ── GET /api/auth/quickbooks/callback — OAuth callback ────────────────────
   app.get("/api/auth/quickbooks/callback", async (req, res) => {
     if (!qbClientId() || !qbClientSecret()) {
-      return res.redirect("/settings?qb=not-configured&tab=quickbooks");
+      return res.redirect("/admin?tab=quickbooks&qb=not-configured");
     }
     try {
       const { default: OAuthClient } = await import("intuit-oauth");
@@ -152,10 +152,10 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
       );
 
       console.log(`[QB] Connected realm ${realmId}`);
-      res.redirect("/settings?qb=connected&tab=quickbooks");
+      res.redirect("/admin?tab=quickbooks&qb=connected");
     } catch (err: any) {
       console.error("[QB callback]", err.message);
-      res.redirect("/settings?qb=error&tab=quickbooks");
+      res.redirect("/admin?tab=quickbooks&qb=error");
     }
   });
 

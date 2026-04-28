@@ -884,6 +884,14 @@ export default function AdminPanel() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("users");
+
+  // On mount: honour ?tab= param so OAuth callbacks (e.g. QuickBooks) land on
+  // the correct section rather than defaulting to "users".
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab) setActiveTab(tab);
+  }, []);
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [resetPasswordUser, setResetPasswordUser] = useState<SafeUser | null>(null);
   const [newPassword, setNewPassword] = useState("");
