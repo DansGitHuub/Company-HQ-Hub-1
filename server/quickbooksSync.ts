@@ -393,10 +393,13 @@ async function syncInvoices(tok: any) {
     );
 
     // ── PUSH: Local invoices with status='sent' not yet in QB ─────────────────
+    // INNER JOIN + is_active guard: skip invoices whose customer has been
+    // archived — they have no active QB counterpart and cause the sync to
+    // iterate endlessly without ever succeeding.
     const { rows: localInvoices } = await pool.query(`
       SELECT inv.*, c.qb_customer_id
       FROM invoices inv
-      LEFT JOIN customers c ON c.id = inv.customer_id
+      INNER JOIN customers c ON c.id = inv.customer_id AND c.is_active = true
       WHERE inv.qb_invoice_id IS NULL
         AND inv.status = 'sent'
       LIMIT 200
