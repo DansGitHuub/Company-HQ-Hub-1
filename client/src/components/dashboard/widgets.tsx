@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
@@ -417,31 +417,57 @@ export function EstimatesWidget({ size }: WidgetProps) {
   );
 }
 
+// Approach B: call the same /api/google-calendar/events endpoint the calendar
+// drawer uses; filter + limit client-side.  Falls back to empty silently when
+// Google Calendar is not connected (HTTP 401).
 export function CalendarWidget({ size }: WidgetProps) {
   const limit = size === "small" ? 3 : size === "medium" ? 5 : 8;
-  const { data: events = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/calendar/events/upcoming", limit],
+
+  // Stable day-granularity key so the query doesn't re-fire on every render.
+  const todayKey = useMemo(() => new Date().toDateString(), []);
+  const startIso = useMemo(() => new Date().toISOString(), [todayKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const endIso = useMemo(
+    () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    [todayKey], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const { data: gcEvents = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/google-calendar/events", todayKey],
     queryFn: async () => {
-      const res = await fetch(`/api/calendar/events/upcoming?days=30&limit=${limit}`, { credentials: "include" });
+      const res = await fetch(
+        `/api/google-calendar/events?start=${startIso}&end=${endIso}`,
+        { credentials: "include" },
+      );
+      // 401 = not connected; return empty rather than throw
+      if (!res.ok) return [];
       return res.json();
     },
   });
 
+  // Server already returns events ordered by start, but be defensive.
+  const upcoming = gcEvents
+    .filter((e: any) => e?.start)
+    .sort((a: any, b: any) => new Date(a?.start ?? 0).getTime() - new Date(b?.start ?? 0).getTime())
+    .slice(0, limit);
+
   return (
     <WidgetShell loading={isLoading} href="/calendar">
-      {events.length === 0 ? (
+      {upcoming.length === 0 ? (
         <p className="text-sm text-muted-foreground">No upcoming events</p>
       ) : (
         <div className="space-y-2">
-          {events.map((event: any) => {
-            const start = new Date(event.startDatetime);
+          {upcoming.map((event: any) => {
+            const start = new Date(event?.start ?? "");
+            const valid = !isNaN(start.getTime());
             return (
-              <div key={event.id} className="flex items-start gap-2 text-sm">
+              <div key={event?.id} className="flex items-start gap-2 text-sm">
                 <Calendar className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-medium">{event.title}</p>
+                  <p className="truncate text-xs font-medium">{event?.title ?? "Event"}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    {start.toLocaleDateString()} {start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    {valid
+                      ? `${start.toLocaleDateString()} ${start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                      : "All day"}
                   </p>
                 </div>
               </div>
