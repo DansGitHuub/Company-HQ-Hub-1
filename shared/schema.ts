@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, boolean, timestamp, integer, jsonb, serial, numeric, primaryKey, date, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, timestamp, integer, jsonb, serial, numeric, primaryKey, date, unique, index, doublePrecision, real, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -2705,7 +2705,9 @@ export const activityLog = pgTable("activity_log", {
   link: varchar("link", { length: 500 }),
   seenBy: jsonb("seen_by").default([]),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => [
+  index("idx_activity_log_created_at").on(t.createdAt),
+]);
 
 export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
   id: true,
@@ -2774,6 +2776,8 @@ export const jobApplications = pgTable("job_applications", {
   expiryDays: integer("expiry_days").notNull().default(30),
   createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
   expiryNotificationSentAt: timestamp("expiry_notification_sent_at"),
+  customerId: varchar("customer_id", { length: 36 }),
+  userId: varchar("user_id", { length: 36 }),
 });
 
 export const insertJobApplicationSchema = createInsertSchema(jobApplications).omit({
@@ -3142,3 +3146,133 @@ export const catalogItemTags = pgTable("catalog_item_tags", {
 }, (t) => ({
   pk: primaryKey({ columns: [t.itemId, t.tagId] }),
 }));
+
+// ── Server-managed tables (reconciled into Drizzle tracking) ─────────────────
+
+export const workAreaTypes = pgTable("work_area_types", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 100 }).notNull(),
+  division: varchar("division", { length: 50 }),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  costCode: text("cost_code"),
+  qbServiceName: text("qb_service_name"),
+});
+
+export const jobWorkAreas = pgTable("job_work_areas", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "cascade" }),
+  workAreaTypeId: varchar("work_area_type_id", { length: 36 }).references(() => workAreaTypes.id),
+  name: varchar("name", { length: 100 }).notNull(),
+  estimatedHours: numeric("estimated_hours", { precision: 6, scale: 2 }),
+  actualHours: numeric("actual_hours", { precision: 6, scale: 2 }).notNull().default("0"),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+export const timeEntries = pgTable("time_entries", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "set null" }),
+  clockIn: timestamp("clock_in", { withTimezone: true }).notNull().defaultNow(),
+  clockOut: timestamp("clock_out", { withTimezone: true }),
+  durationMinutes: integer("duration_minutes"),
+  entryType: varchar("entry_type", { length: 20 }).notNull().default("billable"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  jobWorkAreaId: varchar("job_work_area_id", { length: 36 }).references(() => jobWorkAreas.id, { onDelete: "set null" }),
+  workAreaName: varchar("work_area_name", { length: 100 }),
+  localId: text("local_id"),
+  qboExportedAt: timestamp("qbo_exported_at", { withTimezone: true }),
+  qboTimeActivityId: text("qbo_time_activity_id"),
+  qboExportError: text("qbo_export_error"),
+  approvalStatus: varchar("approval_status", { length: 20 }).notNull().default("pending"),
+  rejectionNote: text("rejection_note"),
+  autoClockedOut: boolean("auto_clocked_out").notNull().default(false),
+  lastReminderAt: timestamp("last_reminder_at", { withTimezone: true }),
+});
+
+export const gpsPings = pgTable("gps_pings", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  timeEntryId: varchar("time_entry_id", { length: 36 }).references(() => timeEntries.id, { onDelete: "cascade" }),
+  lat: doublePrecision("lat").notNull(),
+  lng: doublePrecision("lng").notNull(),
+  accuracy: real("accuracy"),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const jobAssignments = pgTable("job_assignments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  employeeId: varchar("employee_id", { length: 36 }).notNull().references(() => employees.id, { onDelete: "cascade" }),
+  scheduledDate: date("scheduled_date").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const termsAndConditions = pgTable("terms_and_conditions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull().default(""),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+export const invoices = pgTable("invoices", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  invoiceNumber: varchar("invoice_number", { length: 50 }).notNull().unique(),
+  customerId: uuid("customer_id"),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "set null" }),
+  status: varchar("status", { length: 30 }).notNull().default("draft"),
+  issuedDate: date("issued_date").notNull().default(sql`CURRENT_DATE`),
+  dueDate: date("due_date"),
+  subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull().default("0"),
+  taxRate: numeric("tax_rate", { precision: 5, scale: 4 }).default("0"),
+  taxAmount: numeric("tax_amount", { precision: 10, scale: 2 }).default("0"),
+  discountAmount: numeric("discount_amount", { precision: 10, scale: 2 }).default("0"),
+  total: numeric("total", { precision: 10, scale: 2 }).notNull().default("0"),
+  amountPaid: numeric("amount_paid", { precision: 10, scale: 2 }).default("0"),
+  balanceDue: numeric("balance_due", { precision: 10, scale: 2 }).default("0"),
+  notes: text("notes"),
+  terms: text("terms"),
+  customerMessage: text("customer_message"),
+  customerResponse: text("customer_response"),
+  customerResponseAt: timestamp("customer_response_at", { withTimezone: true }),
+  customerResponseNote: text("customer_response_note"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  viewedAt: timestamp("viewed_at", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  qbInvoiceId: varchar("qb_invoice_id", { length: 50 }),
+  qbSyncedAt: timestamp("qb_synced_at", { withTimezone: true }),
+  estimateId: text("estimate_id"),
+  invoiceType: varchar("invoice_type", { length: 50 }).default("standard"),
+});
+
+export const invoiceLineItems = pgTable("invoice_line_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id", { length: 36 }).notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  description: text("description").notNull().default(""),
+  quantity: numeric("quantity", { precision: 10, scale: 2 }).default("1"),
+  unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).default("0"),
+  amount: numeric("amount", { precision: 10, scale: 2 }).default("0"),
+  sortOrder: integer("sort_order").default(0),
+});
+
+export const payments = pgTable("payments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id", { length: 36 }).notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  customerId: uuid("customer_id"),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: varchar("payment_method", { length: 30 }).default("cash"),
+  paymentDate: date("payment_date").notNull().default(sql`CURRENT_DATE`),
+  referenceNumber: varchar("reference_number", { length: 100 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
