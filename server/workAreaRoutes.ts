@@ -187,7 +187,15 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
                   (SELECT SUM(duration_minutes)::decimal / 60
                    FROM time_entries
                    WHERE job_work_area_id = jwa.id AND clock_out IS NOT NULL), 0
-                ) AS actual_hours_computed
+                ) AS actual_hours_computed,
+                (SELECT ewa.area_description
+                 FROM   sales_estimates se
+                 JOIN   estimate_work_areas ewa
+                        ON  ewa.estimate_id = se.id
+                        AND ewa.name = jwa.name
+                 WHERE  se.converted_job_id = jwa.job_id
+                 LIMIT 1
+                ) AS area_description
          FROM job_work_areas jwa
          WHERE jwa.job_id = $1
          ${whereExtra}

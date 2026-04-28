@@ -386,25 +386,30 @@ export function PipelineWidget({ size }: WidgetProps) {
 
 export function EstimatesWidget({ size }: WidgetProps) {
   const { data: estimates = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/pipeline-estimates"],
+    queryKey: ["/api/estimates"],
   });
 
-  const stages = ["New Lead", "Contact Made", "Site Visit", "Proposal Sent", "Follow Up", "Won", "Lost"];
-  const stageCounts = stages.map(stage => ({
-    stage,
-    count: estimates.filter((e: any) => e.stage === stage).length,
+  const statuses = ["draft", "sent", "viewed", "approved", "declined", "converted"];
+  const statusLabels: Record<string, string> = {
+    draft: "Draft", sent: "Sent", viewed: "Viewed",
+    approved: "Approved", declined: "Declined", converted: "Converted",
+  };
+  const statusCounts = statuses.map(status => ({
+    status,
+    label: statusLabels[status] ?? status,
+    count: estimates.filter((e: any) => e.status === status).length,
   }));
 
   return (
-    <WidgetShell loading={isLoading} href="/jobs">
+    <WidgetShell loading={isLoading} href="/estimates">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-xs text-muted-foreground">{estimates.length} estimates</span>
       </div>
       <div className="space-y-1.5">
-        {stageCounts.filter(s => s.count > 0 || size !== "small").slice(0, size === "small" ? 4 : 7).map((s) => (
-          <div key={s.stage} className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground truncate">{s.stage}</span>
-            <Badge variant={s.stage === "Won" ? "default" : "secondary"} className="text-xs px-1.5 min-w-[24px] justify-center">{s.count}</Badge>
+        {statusCounts.filter(s => s.count > 0 || size !== "small").slice(0, size === "small" ? 4 : 6).map((s) => (
+          <div key={s.status} className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground truncate">{s.label}</span>
+            <Badge variant={s.status === "approved" ? "default" : "secondary"} className="text-xs px-1.5 min-w-[24px] justify-center">{s.count}</Badge>
           </div>
         ))}
       </div>
@@ -413,24 +418,23 @@ export function EstimatesWidget({ size }: WidgetProps) {
 }
 
 export function CalendarWidget({ size }: WidgetProps) {
+  const limit = size === "small" ? 3 : size === "medium" ? 5 : 8;
   const { data: events = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/calendar/events"],
+    queryKey: ["/api/calendar/events/upcoming", limit],
+    queryFn: async () => {
+      const res = await fetch(`/api/calendar/events/upcoming?days=30&limit=${limit}`, { credentials: "include" });
+      return res.json();
+    },
   });
-
-  const now = new Date();
-  const upcoming = events
-    .filter((e: any) => new Date(e.startDate || e.start) >= now)
-    .sort((a: any, b: any) => new Date(a.startDate || a.start).getTime() - new Date(b.startDate || b.start).getTime())
-    .slice(0, size === "small" ? 3 : size === "medium" ? 5 : 8);
 
   return (
     <WidgetShell loading={isLoading} href="/calendar">
-      {upcoming.length === 0 ? (
+      {events.length === 0 ? (
         <p className="text-sm text-muted-foreground">No upcoming events</p>
       ) : (
         <div className="space-y-2">
-          {upcoming.map((event: any) => {
-            const start = new Date(event.startDate || event.start);
+          {events.map((event: any) => {
+            const start = new Date(event.startDatetime);
             return (
               <div key={event.id} className="flex items-start gap-2 text-sm">
                 <Calendar className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />

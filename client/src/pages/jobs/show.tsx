@@ -532,7 +532,7 @@ export default function JobDetailPage() {
 
   // Job work areas
   const { data: jobWorkAreas = [], refetch: refetchAreas } = useQuery<Array<{
-    id: string; name: string; estimated_hours: string | null; actual_hours_computed: string; status: string;
+    id: string; name: string; estimated_hours: string | null; actual_hours_computed: string; status: string; area_description: string | null;
   }>>({
     queryKey: ["/api/jobs", id, "work-areas"],
     queryFn: async () => {
@@ -749,7 +749,10 @@ export default function JobDetailPage() {
                       <div key={area.id} className="flex items-center justify-between gap-2 py-1.5 border-b last:border-b-0"
                         data-testid={`row-work-area-${area.id}`}>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{area.name}</p>
+                          <p className="text-sm font-medium truncate">{area.area_description || area.name}</p>
+                          {area.area_description && area.area_description !== area.name && (
+                            <p className="text-[11px] text-muted-foreground truncate">{area.name}</p>
+                          )}
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${statusCls}`}>
                               {area.status.replace("_", " ")}

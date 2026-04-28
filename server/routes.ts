@@ -4604,20 +4604,81 @@ Generate detailed information for this landscaping material.`;
 
       if (eiRows.length > 0) return res.json(eiRows);
 
-      // Tier 2: job_work_areas for this job (filled in after convert-to-job)
+      // Tier 2: job_work_areas for this job – allocate job.price weighted by
+      // each work area's source estimate line-item subtotals.
       const { rows: waRows } = await pool.query<{
-        description: string; quantity: string; unit_price: string;
+        id: string; description: string; area_total: string;
       }>(`
-        SELECT jwa.name AS description,
-               '1'     AS quantity,
-               '0'     AS unit_price
+        SELECT jwa.id,
+               jwa.name                                                   AS description,
+               COALESCE(
+                 (SELECT SUM(eli.amount::numeric)
+                  FROM   sales_estimates se
+                  JOIN   estimate_work_areas ewa
+                         ON  ewa.estimate_id = se.id
+                         AND ewa.name = jwa.name
+                  JOIN   estimate_line_items eli
+                         ON  eli.estimate_work_area_id = ewa.id
+                  WHERE  se.converted_job_id = jwa.job_id
+                 ), 0
+               )                                                           AS area_total
         FROM   job_work_areas jwa
         WHERE  jwa.job_id = $1
           AND  jwa.is_active = true
         ORDER  BY jwa.sort_order, jwa.id
       `, [jobId]);
 
-      if (waRows.length > 0) return res.json(waRows);
+      if (waRows.length > 0) {
+        // Fetch the job price to distribute
+        const { rows: priceRows } = await pool.query<{ price: string | null; value: number }>(
+          `SELECT price, value FROM jobs WHERE id = $1`, [jobId]
+        );
+        const jobPrice = priceRows.length > 0
+          ? parseFloat(priceRows[0].price ?? String(priceRows[0].value ?? 0))
+          : 0;
+
+        const grandTotal = waRows.reduce((s, r) => s + parseFloat(r.area_total), 0);
+        const areasWithSubtotal = waRows.filter(r => parseFloat(r.area_total) > 0);
+        const areasEmpty = waRows.filter(r => parseFloat(r.area_total) === 0);
+
+        // First pass: proportional allocation for areas with known subtotals
+        let allocated = 0;
+        const prices: Record<string, number> = {};
+        if (grandTotal > 0) {
+          for (const row of areasWithSubtotal) {
+            const share = Math.round((parseFloat(row.area_total) / grandTotal) * jobPrice * 100) / 100;
+            prices[row.id] = share;
+            allocated += share;
+          }
+        }
+
+        // Second pass: distribute residual evenly across empty areas
+        const residual = Math.round((jobPrice - allocated) * 100) / 100;
+        if (areasEmpty.length > 0 && residual !== 0) {
+          const perEmpty = Math.round((residual / areasEmpty.length) * 100) / 100;
+          let emptyAllocated = 0;
+          for (let i = 0; i < areasEmpty.length; i++) {
+            const isLast = i === areasEmpty.length - 1;
+            const amt = isLast
+              ? Math.round((residual - emptyAllocated) * 100) / 100
+              : perEmpty;
+            prices[areasEmpty[i].id] = amt;
+            emptyAllocated += perEmpty;
+          }
+        } else if (areasEmpty.length === 0 && areasWithSubtotal.length > 0 && residual !== 0) {
+          // Fix rounding remainder on the last weighted area
+          const lastId = areasWithSubtotal[areasWithSubtotal.length - 1].id;
+          prices[lastId] = Math.round(((prices[lastId] ?? 0) + residual) * 100) / 100;
+        }
+
+        return res.json(
+          waRows.map(r => ({
+            description: r.description,
+            quantity: "1",
+            unit_price: String(prices[r.id] ?? 0),
+          }))
+        );
+      }
 
       // Tier 3: single line from job.type + job.value / job.price
       const { rows: jobRows } = await pool.query<{
