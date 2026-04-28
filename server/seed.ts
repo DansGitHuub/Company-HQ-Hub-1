@@ -19,7 +19,7 @@ interface SeedUser {
   isMasterAdmin?: boolean;
 }
 
-const CHAPIN_LOCKED_PASSWORD = "Chapin123";
+const CHAPIN_LOCKED_PASSWORD = "PassW0rd123";
 
 export async function seedUsers(): Promise<void> {
   console.log("[seed] Startup check - running account maintenance...");
