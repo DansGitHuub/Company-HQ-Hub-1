@@ -584,7 +584,11 @@ async function syncInvoices(tok: any) {
             });
             if (!sendRes.ok) {
               const txt = await sendRes.text();
+              if (txt.includes('"code":"2380"')) {
+              console.log(`[Phase 1l] Invoice ${li.invoice_number} (QB id ${newId}) synced to QB but not emailed via QB — no customer email on file. Use SendGrid for delivery.`);
+            } else {
               errs.push(`send invoice ${li.invoice_number} (QB id ${newId}): ${sendRes.status} ${txt}`);
+            }
             } else {
               console.log(`[QB sync] Invoice ${li.invoice_number} created and sent via QB (id ${newId})`);
             }
