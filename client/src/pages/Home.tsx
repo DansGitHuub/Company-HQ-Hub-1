@@ -11,6 +11,7 @@ import {
   Maximize2,
   Minimize2,
   Check,
+  AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -51,6 +52,13 @@ export default function Home() {
 
   const { data: config, isLoading } = useQuery<{ widgets: WidgetConfig[] | null }>({
     queryKey: ["/api/dashboard-config"],
+  });
+
+  const isAdmin = userRole === "Admin" || user?.isMasterAdmin === true;
+  const { data: qbStatus } = useQuery<{ connected: boolean; needs_reauth?: boolean }>({
+    queryKey: ["/api/quickbooks/status"],
+    enabled: isAdmin,
+    refetchInterval: isAdmin ? 60000 : false,
   });
 
   useEffect(() => {
@@ -172,6 +180,16 @@ export default function Home() {
 
   return (
     <div className="space-y-4">
+      {isAdmin && qbStatus?.needs_reauth && (
+        <a
+          href="/admin?tab=quickbooks"
+          className="flex items-center gap-3 px-4 py-3 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors no-underline"
+          data-testid="banner-qb-reauth"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span className="text-sm font-medium">QuickBooks needs to be reauthorized — click here to reconnect</span>
+        </a>
+      )}
       <div className="flex items-center justify-between">
         <div className="flex items-baseline gap-3">
           <h1

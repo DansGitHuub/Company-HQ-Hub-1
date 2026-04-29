@@ -547,6 +547,32 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
                 </div>
               )}
             </div>
+          ) : status?.needs_reauth ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 rounded-lg border bg-red-50" data-testid="qb-reauth-banner">
+                <div className="p-2 rounded-full bg-red-100 text-red-700"><AlertCircle className="h-5 w-5" /></div>
+                <div className="flex-1">
+                  <p className="font-medium text-sm text-red-700">Reauthorize required</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    The QuickBooks refresh token is invalid. Reconnect to restore sync.
+                    {status.realm_id && <> · Realm: {status.realm_id}</>}
+                    {status.last_sync && <> · Last sync: {fmtQbDate(status.last_sync)}</>}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => { window.location.href = "/api/quickbooks/auth"; }}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  data-testid="btn-qb-reconnect"
+                >
+                  <Link2 className="h-4 w-4 mr-2" />Reconnect QuickBooks
+                </Button>
+                <Button variant="outline" onClick={() => disconnectMut.mutate()} disabled={disconnectMut.isPending} data-testid="btn-qb-disconnect">
+                  <Link2Off className="h-4 w-4 mr-2" />Disconnect
+                </Button>
+              </div>
+            </div>
           ) : (
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30">

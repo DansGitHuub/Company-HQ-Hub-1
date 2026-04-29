@@ -3,6 +3,12 @@ import { pool } from "./db";
 const QB_BASE_URL = "https://quickbooks.api.intuit.com/v3/company";
 const QB_MINOR_VER = "minorversion=65";
 
+// ── In-process auth-failure flag (Finding 18 / approach 1c) ──────────────────
+// Set when refresh returns invalid_grant; cleared on successful OAuth callback.
+let qbAuthFailed = false;
+export function getQbAuthFailed(): boolean { return qbAuthFailed; }
+export function clearQbAuthFailed(): void { qbAuthFailed = false; }
+
 // ── Token helpers ─────────────────────────────────────────────────────────────
 export async function getTokens() {
   const { rows } = await pool.query(
@@ -31,34 +37,45 @@ async function saveTokens(tokens: {
 }
 
 async function refreshAccessToken(tok: any): Promise<any> {
-  const { default: OAuthClient } = await import("intuit-oauth");
-  const client = new OAuthClient({
-    clientId: process.env.QUICKBOOKS_CLIENT_ID!,
-    clientSecret: process.env.QUICKBOOKS_CLIENT_SECRET!,
-    environment: "production",
-    redirectUri: "https://companyhq.app/api/auth/quickbooks/callback",
-  });
-  client.setToken({
-    access_token: tok.access_token,
-    refresh_token: tok.refresh_token,
-    token_type: "bearer",
-    realmId: tok.realm_id,
-  });
-  const resp = await client.refresh();
-  const newTok = resp.getJson();
-  const expiry = new Date(Date.now() + (newTok.expires_in ?? 3600) * 1000);
-  const newRefreshToken = newTok.refresh_token ?? tok.refresh_token;
-  // Persist BOTH the new access_token and the rotated refresh_token to DB
-  // before returning — Intuit revokes the old refresh_token within hours.
-  await saveTokens({
-    realm_id: tok.realm_id,
-    access_token: newTok.access_token,
-    refresh_token: newRefreshToken,
-    token_expiry: expiry,
-  });
-  // Return the fully updated token including the new refresh_token so callers
-  // that hold a reference to this object don't use the revoked one.
-  return { ...tok, access_token: newTok.access_token, refresh_token: newRefreshToken, token_expiry: expiry };
+  try {
+    const { default: OAuthClient } = await import("intuit-oauth");
+    const client = new OAuthClient({
+      clientId: process.env.QUICKBOOKS_CLIENT_ID!,
+      clientSecret: process.env.QUICKBOOKS_CLIENT_SECRET!,
+      environment: "production",
+      redirectUri: "https://companyhq.app/api/auth/quickbooks/callback",
+    });
+    client.setToken({
+      access_token: tok.access_token,
+      refresh_token: tok.refresh_token,
+      token_type: "bearer",
+      realmId: tok.realm_id,
+    });
+    const resp = await client.refresh();
+    const newTok = resp.getJson();
+    const expiry = new Date(Date.now() + (newTok.expires_in ?? 3600) * 1000);
+    const newRefreshToken = newTok.refresh_token ?? tok.refresh_token;
+    // Persist BOTH the new access_token and the rotated refresh_token to DB
+    // before returning — Intuit revokes the old refresh_token within hours.
+    await saveTokens({
+      realm_id: tok.realm_id,
+      access_token: newTok.access_token,
+      refresh_token: newRefreshToken,
+      token_expiry: expiry,
+    });
+    // Successful refresh — clear any prior auth-failure flag
+    qbAuthFailed = false;
+    // Return the fully updated token including the new refresh_token so callers
+    // that hold a reference to this object don't use the revoked one.
+    return { ...tok, access_token: newTok.access_token, refresh_token: newRefreshToken, token_expiry: expiry };
+  } catch (err: any) {
+    const msg: string = err?.message ?? String(err);
+    if (/invalid_grant|refresh token is invalid|unauthorized_client|token_revoked/i.test(msg)) {
+      qbAuthFailed = true;
+      console.error("[QB] Refresh token invalid — reauthorization required:", msg);
+    }
+    throw err;
+  }
 }
 
 async function getValidToken() {

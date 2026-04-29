@@ -10,6 +10,8 @@ import {
   syncPaymentsPublic,
   syncItemsPublic,
   exportTimeEntriesToQBO,
+  getQbAuthFailed,
+  clearQbAuthFailed,
 } from "./quickbooksSync";
 
 async function migrate() {
@@ -151,6 +153,7 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
         [realmId, token.access_token, token.refresh_token, expiry],
       );
 
+      clearQbAuthFailed();
       console.log(`[QB] Connected realm ${realmId}`);
       res.redirect("/admin?tab=quickbooks&qb=connected");
     } catch (err: any) {
@@ -161,6 +164,7 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
 
   // ── GET /api/quickbooks/status ─────────────────────────────────────────────
   app.get("/api/quickbooks/status", requireAuth, async (req, res) => {
+    console.log('[QB status v3 LIVE] handler entered at', new Date().toISOString());
     try {
       const tok = await getTokens();
       if (!tok) return res.json({ connected: false });
@@ -171,6 +175,17 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
          WHERE status IN ('success','partial')
          ORDER BY completed_at DESC NULLS LAST LIMIT 1`,
       );
+
+      // Check in-process auth-failure flag (set when refresh returns invalid_grant)
+      if (getQbAuthFailed()) {
+        return res.json({
+          connected: false,
+          needs_reauth: true,
+          realm_id: tok.realm_id,
+          token_expiry: tok.token_expiry,
+          last_sync: logs[0]?.completed_at ?? null,
+        });
+      }
 
       res.json({
         connected: true,
