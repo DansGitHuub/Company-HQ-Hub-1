@@ -154,13 +154,15 @@ async function syncCustomers(tok: any) {
 
   try {
     // Fetch active QB customers (used for PULL: importing QB→local)
-    const activeData    = await qbQuery(tok, "SELECT * FROM Customer WHERE Active = true MAXRESULTS 1000");
+    console.log('[Phase 1f] qbAll fetch limit=5000');
+    const activeData    = await qbQuery(tok, "SELECT * FROM Customer WHERE Active = true MAXRESULTS 5000");
     const qbActive: any[] = activeData?.QueryResponse?.Customer ?? [];
 
     // Also fetch inactive/archived QB customers — needed so our lookup maps can
     // match local customers whose QB counterpart was archived (e.g. Matt Hollingsworth).
     // These are NOT imported into our local DB (PULL only uses active records).
-    const inactiveData    = await qbQuery(tok, "SELECT * FROM Customer WHERE Active = false MAXRESULTS 1000");
+    console.log('[Phase 1f] qbAll fetch limit=5000');
+    const inactiveData    = await qbQuery(tok, "SELECT * FROM Customer WHERE Active = false MAXRESULTS 5000");
     const qbInactive: any[] = inactiveData?.QueryResponse?.Customer ?? [];
 
     // All QB customers (active + inactive) — for lookup only
@@ -329,17 +331,53 @@ async function syncCustomers(tok: any) {
                             qbId = inactiveEmailHit.Id;
                             console.log(`[QB sync] Linked '${displayName}' to archived QB customer ${inactiveEmailHit.Id} (DisplayName='${inactiveEmailHit.DisplayName}') via inactive email match (not reactivating)`);
                           } else {
-                            // ── Step 4: give up — log full QB error payload ───
-                            const detail = `push customer '${displayName}' (email=${email || "none"}): 6240 duplicate — name+email lookups all missed. Full QB error: ${JSON.stringify(errBody)}`;
-                            errs.push(detail);
-                            console.error(`[QB sync] ${detail}`);
+                            // ── Step 5: GivenName+FamilyName direct-QB fallback ──
+                            const nameParts5 = displayName.trim().split(/\s+/);
+                            if (nameParts5.length >= 2 && !qbId) {
+                              const givenName5  = nameParts5[0];
+                              const familyName5 = nameParts5.slice(1).join(" ");
+                              const safeGiven5  = givenName5.replace(/'/g, "\\'");
+                              const safeFamily5 = familyName5.replace(/'/g, "\\'");
+                              const step5Res = await qbQuery(tok, `SELECT * FROM Customer WHERE GivenName = '${safeGiven5}' AND FamilyName = '${safeFamily5}' MAXRESULTS 50`);
+                              const step5Hits: any[] = step5Res?.QueryResponse?.Customer ?? [];
+                              if (step5Hits.length === 1) {
+                                qbId = step5Hits[0].Id;
+                                console.log(`[Phase 1f Step 5] Linked '${displayName}' to QB customer ${qbId} via GivenName='${givenName5}' FamilyName='${familyName5}'`);
+                              } else {
+                                console.log(`[Phase 1f Step 5] miss: ${givenName5} ${familyName5} (${step5Hits.length} results)`);
+                              }
+                            }
+                            if (!qbId) {
+                              // ── Step 4: give up — log full QB error payload ───
+                              const detail = `push customer '${displayName}' (email=${email || "none"}): 6240 duplicate — name+email+givenFamily lookups all missed. Full QB error: ${JSON.stringify(errBody)}`;
+                              errs.push(detail);
+                              console.error(`[QB sync] ${detail}`);
+                            }
                           }
                         }
                       } else {
-                        // No email on local record — can't do email lookup
-                        const detail = `push customer '${displayName}' (no email): 6240 duplicate — DisplayName lookups all missed. Full QB error: ${JSON.stringify(errBody)}`;
-                        errs.push(detail);
-                        console.error(`[QB sync] ${detail}`);
+                        // No email on local record — try Step 5 GivenName+FamilyName fallback
+                        const nameParts5 = displayName.trim().split(/\s+/);
+                        if (nameParts5.length >= 2 && !qbId) {
+                          const givenName5  = nameParts5[0];
+                          const familyName5 = nameParts5.slice(1).join(" ");
+                          const safeGiven5  = givenName5.replace(/'/g, "\\'");
+                          const safeFamily5 = familyName5.replace(/'/g, "\\'");
+                          const step5Res = await qbQuery(tok, `SELECT * FROM Customer WHERE GivenName = '${safeGiven5}' AND FamilyName = '${safeFamily5}' MAXRESULTS 50`);
+                          const step5Hits: any[] = step5Res?.QueryResponse?.Customer ?? [];
+                          if (step5Hits.length === 1) {
+                            qbId = step5Hits[0].Id;
+                            console.log(`[Phase 1f Step 5] Linked '${displayName}' to QB customer ${qbId} via GivenName='${givenName5}' FamilyName='${familyName5}' (no-email path)`);
+                          } else {
+                            console.log(`[Phase 1f Step 5] miss: ${givenName5} ${familyName5} (${step5Hits.length} results)`);
+                          }
+                        }
+                        if (!qbId) {
+                          // No email and Step 5 missed — give up
+                          const detail = `push customer '${displayName}' (no email): 6240 duplicate — DisplayName+givenFamily lookups all missed. Full QB error: ${JSON.stringify(errBody)}`;
+                          errs.push(detail);
+                          console.error(`[QB sync] ${detail}`);
+                        }
                       }
                       } // end if (!qbId) — Step 3 complete
                     }
@@ -519,6 +557,10 @@ async function syncInvoices(tok: any) {
           }
         }
       } catch (e: any) {
+        if (/2010/.test(e.message)) {
+          console.error('[Phase 1f F23 2010 payload]', JSON.stringify(qbBody, null, 2));
+          console.error('[Phase 1f F23 2010 qb-error]', JSON.stringify({ message: e.message }, null, 2));
+        }
         errs.push(`push invoice ${li.invoice_number}: ${e.message}`);
       }
     }
@@ -788,6 +830,7 @@ export async function exportTimeEntriesToQBO(entryIds: number[]): Promise<{
 
 // ── Master sync entry ─────────────────────────────────────────────────────────
 export async function runFullSync() {
+  console.log('[Phase 1f LIVE]');
   const results = { items: { synced: 0, errors: [] as string[] }, customers: { synced: 0, errors: [] as string[] }, invoices: { synced: 0, errors: [] as string[] }, payments: { synced: 0, errors: [] as string[] } };
   // Re-fetch the latest token from DB before every step so that a refresh_token
   // rotation that happened during a prior step is picked up rather than using
