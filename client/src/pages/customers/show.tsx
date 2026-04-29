@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { format, parseISO } from "date-fns";
 import { CustomerFormModal, CustomerFormData, EMPTY_FORM } from "./CustomerFormModal";
+import { CannotArchiveDialog, type Blocker } from "@/components/CannotArchiveDialog";
 
 // ── Invoice status badge helper ─────────────────────────────────────────────
 const INV_STATUS_CLS: Record<string, string> = {
@@ -362,6 +363,8 @@ export default function CustomerDetailPage() {
   const [propModal, setPropModal] = useState<{ open: boolean; editing: Property | null }>({ open: false, editing: null });
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [showInviteConfirm, setShowInviteConfirm] = useState(false);
+  const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
+  const [cannotArchiveBlockers, setCannotArchiveBlockers] = useState<Blocker[] | null>(null);
 
   // ── Queries ──
   const { data: customer, isLoading, isError } = useQuery<CustomerDetail>({
@@ -431,6 +434,25 @@ export default function CustomerDetailPage() {
     },
     onError: () => toast({ title: "Could not archive customer", variant: "destructive" }),
   });
+
+  // Checks eligibility before showing the archive confirm dialog.
+  async function handleArchiveClick() {
+    setIsCheckingEligibility(true);
+    try {
+      const res = await apiRequest("GET", `/api/customers/${id}/archive-eligibility`);
+      const data = await res.json();
+      if (data.canArchive) {
+        setShowArchiveConfirm(true);
+      } else {
+        setCannotArchiveBlockers(data.blockers ?? []);
+      }
+    } catch {
+      // Network or unexpected error — fall through to the standard confirm dialog.
+      setShowArchiveConfirm(true);
+    } finally {
+      setIsCheckingEligibility(false);
+    }
+  }
 
   const unarchiveMutation = useMutation({
     mutationFn: async () => {
@@ -651,10 +673,13 @@ export default function CustomerDetailPage() {
                   {customer.is_active ? (
                     <Button size="sm" variant="secondary"
                       className="flex-1 bg-white/20 hover:bg-white/30 text-white border-0"
-                      onClick={() => setShowArchiveConfirm(true)}
-                      disabled={archiveMutation.isPending}
+                      onClick={handleArchiveClick}
+                      disabled={archiveMutation.isPending || isCheckingEligibility}
                       data-testid="button-archive-customer">
-                      <Archive className="h-3.5 w-3.5 mr-1.5" /> Archive
+                      {isCheckingEligibility
+                        ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        : <Archive className="h-3.5 w-3.5 mr-1.5" />}
+                      Archive
                     </Button>
                   ) : (
                     <Button size="sm" variant="secondary"
@@ -1079,6 +1104,17 @@ export default function CustomerDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cannot-archive blocker dialog */}
+      {cannotArchiveBlockers !== null && (
+        <CannotArchiveDialog
+          open={cannotArchiveBlockers !== null}
+          onOpenChange={(open) => { if (!open) setCannotArchiveBlockers(null); }}
+          customerName={`${customer?.first_name ?? ""} ${customer?.last_name ?? ""}`.trim()}
+          customerId={id ?? ""}
+          blockers={cannotArchiveBlockers}
+        />
+      )}
 
       {/* Portal invite — duplicate-gate confirmation dialog */}
       <Dialog open={showInviteConfirm} onOpenChange={setShowInviteConfirm}>

@@ -4,6 +4,7 @@ import { pool } from "./db";
 import { findCustomerDuplicates } from "./lib/customerDuplicates";
 import crypto from "crypto";
 import { getAppUrl } from "./emailService";
+import { customerArchiveEligibility } from "./services/archiveEligibility";
 
 export function registerCustomerRoutes(app: Express, requireAuth: any) {
   // ─── Schema migration: ensure is_active column exists ───────────────────────
@@ -341,9 +342,33 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
     return true;
   }
 
+  // GET /api/customers/:id/archive-eligibility
+  // Returns whether the customer can be safely archived and, if not, the list
+  // of entity blockers that must be resolved first.
+  app.get("/api/customers/:id/archive-eligibility", requireAuth, async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT id FROM customers WHERE id = $1`,
+        [req.params.id],
+      );
+      if (rows.length === 0)
+        return res.status(404).json({ message: "Customer not found" });
+      const eligibility = await customerArchiveEligibility(req.params.id);
+      return res.json(eligibility);
+    } catch (err: any) {
+      console.error("[customers] GET /archive-eligibility error:", err.message);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
   app.patch("/api/customers/:id/archive", requireAuth, async (req, res) => {
     if (!requireAdminOrManager(req, res)) return;
     try {
+      // Server-side enforcement: reject archiving if blockers exist.
+      const eligibility = await customerArchiveEligibility(req.params.id);
+      if (!eligibility.canArchive) {
+        return res.status(409).json({ blockers: eligibility.blockers });
+      }
       const result = await pool.query(
         `UPDATE customers SET is_active = false, updated_at = now() WHERE id = $1 RETURNING id`,
         [req.params.id],
