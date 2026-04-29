@@ -557,10 +557,6 @@ async function syncInvoices(tok: any) {
           }
         }
       } catch (e: any) {
-        if (/2010/.test(e.message)) {
-          console.error('[Phase 1f F23 2010 payload]', JSON.stringify(qbBody, null, 2));
-          console.error('[Phase 1f F23 2010 qb-error]', JSON.stringify({ message: e.message }, null, 2));
-        }
         errs.push(`push invoice ${li.invoice_number}: ${e.message}`);
       }
     }
