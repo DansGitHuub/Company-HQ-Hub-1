@@ -258,20 +258,18 @@ async function syncCustomers(tok: any) {
                   qbId = inMemory.Id;
                   console.log(`[QB sync] Linked '${displayName}' via in-memory ${inMemory.Active === false ? "inactive" : "active"} map`);
                 } else {
-                  // ── Step 2: live DisplayName query (active then inactive) ───
+                  // ── Step 2: live DisplayName query (no Active filter — catches any state) ──
+                  // A single unrestricted query is more reliable than two separate
+                  // Active=true / Active=false queries which can miss when QB's combined-
+                  // condition logic returns unexpected empty results.
                   const safeName = displayName.replace(/'/g, "\\'");
-                  const activeNameRes  = await qbQuery(tok, `SELECT * FROM Customer WHERE DisplayName = '${safeName}' AND Active = true`);
-                  const activeNameHit  = activeNameRes?.QueryResponse?.Customer?.[0];
-                  if (activeNameHit?.Id) {
-                    qbId = activeNameHit.Id;
-                    console.log(`[QB sync] Linked '${displayName}' via active DisplayName live query`);
+                  const nameRes = await qbQuery(tok, `SELECT * FROM Customer WHERE DisplayName = '${safeName}' MAXRESULTS 1`);
+                  const nameHit = nameRes?.QueryResponse?.Customer?.[0];
+                  if (nameHit?.Id) {
+                    qbId = nameHit.Id;
+                    const stateLabel = nameHit.Active === false ? "inactive" : "active";
+                    console.log(`[QB sync] Linked '${displayName}' to ${stateLabel} QB customer ${nameHit.Id} via DisplayName live query (not reactivating)`);
                   } else {
-                    const inactiveNameRes = await qbQuery(tok, `SELECT * FROM Customer WHERE DisplayName = '${safeName}' AND Active = false`);
-                    const inactiveNameHit = inactiveNameRes?.QueryResponse?.Customer?.[0];
-                    if (inactiveNameHit?.Id) {
-                      qbId = inactiveNameHit.Id;
-                      console.log(`[QB sync] Linked '${displayName}' to archived QB customer ${inactiveNameHit.Id} via DisplayName (not reactivating)`);
-                    } else {
                       // ── Step 3: live email query (active then inactive) ─────
                       const email = (lc.email ?? "").trim();
                       if (email) {
@@ -302,7 +300,6 @@ async function syncCustomers(tok: any) {
                       }
                     }
                   }
-                }
               } catch (lookupErr: any) {
                 errs.push(`push customer '${displayName}': 6240 lookup chain failed — ${lookupErr.message}`);
               }
@@ -427,7 +424,6 @@ async function syncInvoices(tok: any) {
           DocNumber: li.invoice_number,
           CustomerRef: { value: li.qb_customer_id },
           TxnDate: li.issued_date ?? new Date().toISOString().slice(0, 10),
-          DueDate: li.due_date ?? undefined,
           Line: [
             {
               Amount: parseFloat(li.subtotal ?? li.total ?? 0),
@@ -444,6 +440,7 @@ async function syncInvoices(tok: any) {
             TotalTax: parseFloat(li.tax_amount ?? 0),
           },
         };
+        if (li.due_date) qbBody.DueDate = li.due_date;
         if (li.notes) qbBody.CustomerMemo = { value: li.notes };
 
         const created = await qbPost(tok, "invoice", qbBody);
