@@ -544,6 +544,20 @@ async function syncInvoices(tok: any) {
         if (li.due_date) qbBody.DueDate = new Date(li.due_date).toISOString().slice(0, 10);
         if (li.notes) qbBody.CustomerMemo = { value: li.notes };
 
+        // Strip QB read-only fields that cause 'invalid or unsupported property' rejections
+        for (const k of ["TotalTax", "Balance", "TotalAmt", "MetaData", "SyncToken", "Id",
+                          "HomeBalance", "HomeTotalAmt", "EmailStatus", "PrintStatus", "BillEmail"]) {
+          delete qbBody[k];
+        }
+        if (Array.isArray(qbBody.Line)) {
+          for (const line of qbBody.Line) {
+            for (const k of ["Id", "SyncToken", "MetaData", "LinkedTxn"]) {
+              delete line[k];
+            }
+          }
+        }
+        console.log('[Phase 1h] stripped read-only fields before QB POST');
+
         lastQbPayload = qbBody;
         const created = await qbPost(tok, "invoice", qbBody);
         const newId = created?.Invoice?.Id;
