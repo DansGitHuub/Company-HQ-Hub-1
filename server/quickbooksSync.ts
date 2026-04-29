@@ -592,7 +592,7 @@ async function syncInvoices(tok: any) {
         }
       } catch (e: any) {
         if (/2010|ValidationFault|"code":"2010"/.test(e.message)) {
-          console.error('[Phase 1g F23 2010 payload]', JSON.stringify(lastQbPayload, (k, v) => typeof v === 'bigint' ? v.toString() : v, 2));
+          console.error('[Phase 1h F23 2010 payload]', JSON.stringify(lastQbPayload, (k, v) => typeof v === 'bigint' ? v.toString() : v));
           console.error('[Phase 1g F23 2010 qb-error]', e?.message ?? String(e));
         }
         errs.push(`push invoice ${li.invoice_number}: ${e.message}`);
