@@ -251,6 +251,7 @@ async function syncCustomers(tok: any) {
               // Link-only in all cases — do NOT reactivate inactive QB customers.
               console.log(`[QB sync] 6240 duplicate for '${displayName}' — running name + email lookups`);
               try {
+                console.log(`[QB sync] 6240 recovery start: nameKey='${displayName.toLowerCase().trim()}', qbAll.length=${qbAll.length}`);
                 // ── Step 1: in-memory DisplayName map ──────────────────────────
                 const nameKey = displayName.toLowerCase().trim();
                 const inMemory = qbByDisplayName.get(nameKey);
@@ -270,6 +271,20 @@ async function syncCustomers(tok: any) {
                     const stateLabel = nameHit.Active === false ? "inactive" : "active";
                     console.log(`[QB sync] Linked '${displayName}' to ${stateLabel} QB customer ${nameHit.Id} via DisplayName live query (not reactivating)`);
                   } else {
+                      // ── Step 2b: case-insensitive scan of in-memory qbAll ──
+                      // Catches pagination misses (beyond MAXRESULTS 1000) and case
+                      // mismatches that fool the exact-string live query.
+                      const lcKey = displayName.toLowerCase().trim();
+                      const ciMatches = qbAll.filter((c: any) => (c.DisplayName ?? "").toLowerCase().trim() === lcKey);
+                      if (ciMatches.length === 1) {
+                        qbId = ciMatches[0].Id;
+                        const stateLabel = ciMatches[0].Active === false ? "inactive" : "active";
+                        console.log(`[QB sync] Linked '${displayName}' to ${stateLabel} QB customer ${qbId} via case-insensitive qbAll scan (qbAll size=${qbAll.length})`);
+                      } else if (ciMatches.length > 1) {
+                        console.warn(`[QB sync] Ambiguous: ${ciMatches.length} QB customers match nameKey='${lcKey}' — skipping auto-link, falling through to email lookup`);
+                      }
+
+                      if (!qbId) {
                       // ── Step 3: live email query (active then inactive) ─────
                       const email = (lc.email ?? "").trim();
                       if (email) {
@@ -298,6 +313,7 @@ async function syncCustomers(tok: any) {
                         errs.push(detail);
                         console.error(`[QB sync] ${detail}`);
                       }
+                      } // end if (!qbId) — Step 3 complete
                     }
                   }
               } catch (lookupErr: any) {
@@ -423,7 +439,7 @@ async function syncInvoices(tok: any) {
         const qbBody: any = {
           DocNumber: li.invoice_number,
           CustomerRef: { value: li.qb_customer_id },
-          TxnDate: li.issued_date ?? new Date().toISOString().slice(0, 10),
+          TxnDate: new Date(li.issued_date ?? Date.now()).toISOString().slice(0, 10),
           Line: [
             {
               Amount: parseFloat(li.subtotal ?? li.total ?? 0),
@@ -440,7 +456,7 @@ async function syncInvoices(tok: any) {
             TotalTax: parseFloat(li.tax_amount ?? 0),
           },
         };
-        if (li.due_date) qbBody.DueDate = li.due_date;
+        if (li.due_date) qbBody.DueDate = new Date(li.due_date).toISOString().slice(0, 10);
         if (li.notes) qbBody.CustomerMemo = { value: li.notes };
 
         const created = await qbPost(tok, "invoice", qbBody);
