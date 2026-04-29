@@ -130,6 +130,7 @@ async function finishLog(id: number, synced: number, status: string, errors?: st
 
 // ── Customer sync ─────────────────────────────────────────────────────────────
 async function syncCustomers(tok: any) {
+  console.log(`[QB sync v2 LIVE] syncCustomers entered at ${new Date().toISOString()}`);
   const logId = await startLog("customers", "bidirectional");
   let synced = 0;
   const errs: string[] = [];
@@ -166,9 +167,19 @@ async function syncCustomers(tok: any) {
     );
 
     // ── PUSH: Local customers without qb_customer_id ──────────────────────────
-    const { rows: localCustomers } = await pool.query(
-      "SELECT * FROM customers WHERE qb_customer_id IS NULL AND is_active = true LIMIT 500"
-    );
+    const { rows: localCustomers } = await pool.query(`
+      SELECT c.*, ce.email
+      FROM customers c
+      LEFT JOIN LATERAL (
+        SELECT email
+        FROM customer_emails
+        WHERE customer_id = c.id
+        ORDER BY is_primary DESC NULLS LAST, created_at ASC
+        LIMIT 1
+      ) ce ON true
+      WHERE c.qb_customer_id IS NULL AND c.is_active = true
+      LIMIT 500
+    `);
 
     for (const lc of localCustomers) {
       try {
