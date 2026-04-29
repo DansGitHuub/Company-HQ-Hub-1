@@ -341,8 +341,17 @@ async function syncCustomers(tok: any) {
                               const step5Res = await qbQuery(tok, `SELECT * FROM Customer WHERE GivenName = '${safeGiven5}' AND FamilyName = '${safeFamily5}' MAXRESULTS 50`);
                               const step5Hits: any[] = step5Res?.QueryResponse?.Customer ?? [];
                               if (step5Hits.length === 1) {
-                                qbId = step5Hits[0].Id;
-                                console.log(`[Phase 1f Step 5] Linked '${displayName}' to QB customer ${qbId} via GivenName='${givenName5}' FamilyName='${familyName5}'`);
+                                const candidate5 = step5Hits[0].Id;
+                                const { rows: dup5 } = await pool.query(
+                                  "SELECT id FROM customers WHERE qb_customer_id = $1 AND id != $2 LIMIT 1",
+                                  [candidate5, lc.id]
+                                );
+                                if (dup5.length > 0) {
+                                  console.log(`[Phase 1g Step 5] dup-link skipped: local ${lc.id} would link to QB ${candidate5} but local ${dup5[0].id} already owns it`);
+                                } else {
+                                  qbId = candidate5;
+                                  console.log(`[Phase 1f Step 5] Linked '${displayName}' to QB customer ${qbId} via GivenName='${givenName5}' FamilyName='${familyName5}'`);
+                                }
                               } else {
                                 console.log(`[Phase 1f Step 5] miss: ${givenName5} ${familyName5} (${step5Hits.length} results)`);
                               }
@@ -366,8 +375,17 @@ async function syncCustomers(tok: any) {
                           const step5Res = await qbQuery(tok, `SELECT * FROM Customer WHERE GivenName = '${safeGiven5}' AND FamilyName = '${safeFamily5}' MAXRESULTS 50`);
                           const step5Hits: any[] = step5Res?.QueryResponse?.Customer ?? [];
                           if (step5Hits.length === 1) {
-                            qbId = step5Hits[0].Id;
-                            console.log(`[Phase 1f Step 5] Linked '${displayName}' to QB customer ${qbId} via GivenName='${givenName5}' FamilyName='${familyName5}' (no-email path)`);
+                            const candidate5 = step5Hits[0].Id;
+                            const { rows: dup5 } = await pool.query(
+                              "SELECT id FROM customers WHERE qb_customer_id = $1 AND id != $2 LIMIT 1",
+                              [candidate5, lc.id]
+                            );
+                            if (dup5.length > 0) {
+                              console.log(`[Phase 1g Step 5] dup-link skipped: local ${lc.id} would link to QB ${candidate5} but local ${dup5[0].id} already owns it`);
+                            } else {
+                              qbId = candidate5;
+                              console.log(`[Phase 1f Step 5] Linked '${displayName}' to QB customer ${qbId} via GivenName='${givenName5}' FamilyName='${familyName5}' (no-email path)`);
+                            }
                           } else {
                             console.log(`[Phase 1f Step 5] miss: ${givenName5} ${familyName5} (${step5Hits.length} results)`);
                           }
@@ -485,6 +503,7 @@ async function syncInvoices(tok: any) {
     `);
 
     for (const li of localInvoices) {
+      let lastQbPayload: any = null;
       try {
         // Try to match by invoice number
         const matched = qbByDocNum.get(li.invoice_number);
@@ -525,6 +544,7 @@ async function syncInvoices(tok: any) {
         if (li.due_date) qbBody.DueDate = new Date(li.due_date).toISOString().slice(0, 10);
         if (li.notes) qbBody.CustomerMemo = { value: li.notes };
 
+        lastQbPayload = qbBody;
         const created = await qbPost(tok, "invoice", qbBody);
         const newId = created?.Invoice?.Id;
         if (newId) {
@@ -557,6 +577,10 @@ async function syncInvoices(tok: any) {
           }
         }
       } catch (e: any) {
+        if (/2010|ValidationFault|"code":"2010"/.test(e.message)) {
+          console.error('[Phase 1g F23 2010 payload]', JSON.stringify(lastQbPayload, (k, v) => typeof v === 'bigint' ? v.toString() : v, 2));
+          console.error('[Phase 1g F23 2010 qb-error]', e?.message ?? String(e));
+        }
         errs.push(`push invoice ${li.invoice_number}: ${e.message}`);
       }
     }
