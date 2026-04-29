@@ -154,15 +154,15 @@ async function syncCustomers(tok: any) {
 
   try {
     // Fetch active QB customers (used for PULL: importing QB→local)
-    console.log('[Phase 1f] qbAll fetch limit=5000');
-    const activeData    = await qbQuery(tok, "SELECT * FROM Customer WHERE Active = true MAXRESULTS 5000");
+    console.log('[Phase 1f] qbAll fetch limit=1000');
+    const activeData    = await qbQuery(tok, "SELECT * FROM Customer WHERE Active = true MAXRESULTS 1000");
     const qbActive: any[] = activeData?.QueryResponse?.Customer ?? [];
 
     // Also fetch inactive/archived QB customers — needed so our lookup maps can
     // match local customers whose QB counterpart was archived (e.g. Matt Hollingsworth).
     // These are NOT imported into our local DB (PULL only uses active records).
-    console.log('[Phase 1f] qbAll fetch limit=5000');
-    const inactiveData    = await qbQuery(tok, "SELECT * FROM Customer WHERE Active = false MAXRESULTS 5000");
+    console.log('[Phase 1f] qbAll fetch limit=1000');
+    const inactiveData    = await qbQuery(tok, "SELECT * FROM Customer WHERE Active = false MAXRESULTS 1000");
     const qbInactive: any[] = inactiveData?.QueryResponse?.Customer ?? [];
 
     // All QB customers (active + inactive) — for lookup only
