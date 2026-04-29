@@ -536,7 +536,7 @@ export default function TestingKnowledge() {
         <div>
           <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-2">
             <GraduationCap className="h-8 w-8" />
-            Testing & Knowledge
+            Training & Knowledge
           </h1>
           <p className="text-muted-foreground mt-1">Take adaptive quizzes to test your knowledge of company procedures</p>
         </div>

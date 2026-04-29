@@ -430,6 +430,10 @@ export default function SchedulingCalendar() {
 
       {/* ── Right: Calendar ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Page title */}
+        <div className="px-4 pt-3 pb-0 shrink-0">
+          <h1 className="text-2xl font-heading font-bold text-foreground" data-testid="text-page-title">Scheduling</h1>
+        </div>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-background shrink-0">
           <div className="flex items-center gap-2">

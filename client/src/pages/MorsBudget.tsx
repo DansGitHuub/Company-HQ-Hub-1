@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import BudgetSettings from "@/pages/BudgetSettings";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
@@ -23,7 +24,7 @@ import {
 } from "lucide-react";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
-type Tab = "overview" | "labor" | "materials" | "equipment" | "subcontractors" | "overhead" | "sales";
+type Tab = "overview" | "labor" | "materials" | "equipment" | "subcontractors" | "overhead" | "sales" | "mark-up";
 
 interface Budget {
   id: number; name: string; year: number; status: string;
@@ -800,6 +801,7 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "subcontractors", label: "Subcontractors",  icon: Building2 },
   { id: "overhead",       label: "Overhead",        icon: DollarSign },
   { id: "sales",          label: "Sales",           icon: Target },
+  { id: "mark-up",        label: "Mark Up",         icon: ChevronRight },
 ];
 
 export default function MorsBudget() {
@@ -808,7 +810,11 @@ export default function MorsBudget() {
   const { user } = useAuth();
   const [, nav] = useLocation();
   const [budgetId, setBudgetId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const p = new URLSearchParams(window.location.search);
+    const t = p.get("tab") as Tab | null;
+    return t && ["overview","labor","materials","equipment","subcontractors","overhead","sales","mark-up"].includes(t) ? t : "overview";
+  });
 
   // Admin-only guard
   useEffect(() => {
@@ -913,7 +919,7 @@ export default function MorsBudget() {
         <div className="px-6 py-4 border-b bg-background flex items-center justify-between">
           <div>
             <h1 className="text-lg font-bold">
-              {budget?.name ?? "MORS Budget"} — {TABS.find(t => t.id === activeTab)?.label}
+              MORS Budget
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
               Labor Rate, Overhead Recovery &amp; Sales Planning
@@ -928,7 +934,9 @@ export default function MorsBudget() {
         </div>
 
         <div className="p-6">
-          {dataLoading || !budgetId ? (
+          {activeTab === "mark-up" ? (
+            <BudgetSettings />
+          ) : dataLoading || !budgetId ? (
             <div className="flex justify-center py-16">
               <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
             </div>

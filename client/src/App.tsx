@@ -1,4 +1,4 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,6 +8,58 @@ import { VoiceProvider } from "@/hooks/use-voice";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppShell from "@/components/layout/AppShell";
 import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
+
+const ROUTE_TITLES: Record<string, string> = {
+  "/": "Home",
+  "/hq": "HQ Overview",
+  "/my-hours": "My Hours",
+  "/daily-worksheet": "Daily Worksheet",
+  "/messages": "Messages",
+  "/customers": "Customers",
+  "/consultations": "Consultations",
+  "/estimates": "Estimates",
+  "/jobs": "Jobs",
+  "/todos": "Tasks",
+  "/scheduling": "Scheduling",
+  "/time": "Time Tracking",
+  "/equipment": "Equipment",
+  "/forms": "Forms",
+  "/sops": "SOP Library",
+  "/education": "Customer Resources",
+  "/testing": "Training & Knowledge",
+  "/admin": "Admin Panel",
+  "/employees": "Employees",
+  "/hiring": "Hiring",
+  "/invoices": "Invoices",
+  "/reports": "Reports",
+  "/mors-budget": "MORS Budget",
+  "/catalog": "Catalog",
+  "/tools/plow-mapper": "Plow Site Mapper",
+  "/tools": "Tools",
+  "/settings": "Settings",
+  "/profile": "Profile",
+  "/calendar": "Calendar",
+  "/notifications": "Notifications",
+  "/customers": "Customers",
+};
+
+function DocumentTitleSetter() {
+  const [location] = useLocation();
+  useEffect(() => {
+    const base = location.split("?")[0].replace(/\/$/, "") || "/";
+    const exact = ROUTE_TITLES[base];
+    if (exact) {
+      document.title = `${exact} — CompanyHQ`;
+      return;
+    }
+    const prefix = Object.keys(ROUTE_TITLES)
+      .filter(k => k !== "/" && base.startsWith(k + "/"))
+      .sort((a, b) => b.length - a.length)[0];
+    document.title = prefix ? `${ROUTE_TITLES[prefix]} — CompanyHQ` : "CompanyHQ";
+  }, [location]);
+  return null;
+}
 
 import Home from "@/pages/Home";
 import AuthPage from "@/pages/auth-page";
@@ -160,6 +212,7 @@ function AppRoutes() {
 
   return (
     <AppShell>
+      <DocumentTitleSetter />
       <Switch>
         <Route path="/">
           {isCustomer ? <Redirect to="/customer-hub" /> : <Home />}
@@ -212,7 +265,7 @@ function AppRoutes() {
         <Route path="/admin/worksheet-review"><Redirect to="/admin/time?tab=worksheet" /></Route>
         <Route path="/admin/time-card-approval"><Redirect to="/admin/time?tab=approval" /></Route>
         <Route path="/admin/service-types" component={ServiceTypesPage} />
-        <Route path="/budget-settings" component={BudgetSettings} />
+        <Route path="/budget-settings"><Redirect to="/mors-budget?tab=mark-up" /></Route>
         <Route path="/time" component={TimeTracking} />
         <Route path="/reports" component={ReportsPage} />
         <Route path="/consultations" component={ConsultationsPage} />

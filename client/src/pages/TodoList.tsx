@@ -1262,7 +1262,7 @@ export default function TodoList() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="page-title">Task Management</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="page-title">Tasks</h1>
             <p className="text-sm text-gray-500">Manage and track team tasks</p>
           </div>
           <button

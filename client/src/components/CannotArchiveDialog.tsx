@@ -74,7 +74,7 @@ export function CannotArchiveDialog({
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium">
-                    {b.count} {b.reason}
+                    {b.count} {b.count === 1 ? b.reason.replace(/s$/, "") : b.reason}
                   </span>
                   <a
                     href={viewHref}

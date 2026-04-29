@@ -74,7 +74,10 @@ function fmtMoney(v: any) {
 }
 function fmtDate(d: string | null) {
   if (!d) return "—";
-  try { return format(parseISO(d), "MMMM d, yyyy"); } catch { return d; }
+  try {
+    const [y, m, day] = d.slice(0, 10).split("-").map(Number);
+    return format(new Date(y, m - 1, day), "MMM d, yyyy");
+  } catch { return d; }
 }
 
 function InfoRow({ icon: Icon, label, value, href }: { icon: any; label: string; value?: React.ReactNode; href?: string }) {

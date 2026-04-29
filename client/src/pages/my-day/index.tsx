@@ -267,7 +267,7 @@ export default function MyDayPage() {
     );
   };
 
-  const firstName = user?.firstName || user?.username || "there";
+  const firstName = user?.firstName || "there";
 
   // greeting helper using t()
   const h = new Date().getHours();

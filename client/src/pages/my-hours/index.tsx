@@ -45,8 +45,9 @@ function formatTime(iso: string | null): string {
 
 function formatDuration(mins: number | null): string {
   if (!mins || mins <= 0) return "0m";
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
+  const rounded = Math.round(mins);
+  const h = Math.floor(rounded / 60);
+  const m = rounded % 60;
   if (h === 0) return `${m}m`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
@@ -296,8 +297,8 @@ export default function MyHoursPage() {
               <span className="font-medium text-gray-600">{summary.totalHours}h</span>{" "}
               {t("logged")} ·{" "}
               <span className="font-medium text-gray-600">{summary.daysWorked}</span>{" "}
-              {t("daysLabel")} ·{" "}
-              {hoursData?.totalCount ?? 0} {t("entriesLabel")}
+              {summary.daysWorked === 1 ? "day" : t("daysLabel")} ·{" "}
+              {hoursData?.totalCount ?? 0} {(hoursData?.totalCount ?? 0) === 1 ? "entry" : t("entriesLabel")}
             </p>
           )}
         </CardContent>

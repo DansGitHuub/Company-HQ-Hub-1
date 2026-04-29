@@ -49,6 +49,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function custName(j: JobRow) {
+  if (!j.customer_id) return "—";
   if (j.cust_first && j.cust_last) return `${j.cust_first} ${j.cust_last}`;
   if (j.cust_company) return j.cust_company;
   return j.client || "—";
