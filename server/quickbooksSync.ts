@@ -554,9 +554,11 @@ async function syncInvoices(tok: any) {
             for (const k of ["Id", "SyncToken", "MetaData", "LinkedTxn"]) {
               delete line[k];
             }
+            delete line.Taxable;
           }
         }
-        console.log('[Phase 1h] stripped read-only fields before QB POST');
+        delete qbBody.TxnTaxDetail;
+        console.log('[Phase 1i] stripped read-only fields + Line.Taxable + TxnTaxDetail before QB POST');
 
         lastQbPayload = qbBody;
         const created = await qbPost(tok, "invoice", qbBody);
@@ -592,7 +594,7 @@ async function syncInvoices(tok: any) {
         }
       } catch (e: any) {
         if (/2010|ValidationFault|"code":"2010"/.test(e.message)) {
-          console.error('[Phase 1h F23 2010 payload]', JSON.stringify(lastQbPayload, (k, v) => typeof v === 'bigint' ? v.toString() : v));
+          console.error('[Phase 1i F23 2010 payload]', JSON.stringify(lastQbPayload, (k, v) => typeof v === 'bigint' ? v.toString() : v));
           console.error('[Phase 1g F23 2010 qb-error]', e?.message ?? String(e));
         }
         errs.push(`push invoice ${li.invoice_number}: ${e.message}`);
