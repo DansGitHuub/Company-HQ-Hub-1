@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { pgTable, text, varchar, boolean, timestamp, integer, jsonb, serial, numeric, primaryKey, date, unique, index, doublePrecision, real, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1758,7 +1759,7 @@ export type InsertProcessAuditResult = z.infer<typeof insertProcessAuditResultSc
 export type ProcessAuditResult = typeof processAuditResults.$inferSelect;
 
 export const processAuditSchedules = pgTable("process_audit_schedules", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   processId: varchar("process_id", { length: 36 }).references(() => businessProcesses.id, { onDelete: "cascade" }).notNull(),
   frequency: text("frequency").notNull().default("weekly"), // daily, weekly, monthly, custom
   customIntervalDays: integer("custom_interval_days").default(7),
@@ -2706,7 +2707,7 @@ export const activityLog = pgTable("activity_log", {
   seenBy: jsonb("seen_by").default([]),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
-  index("idx_activity_log_created_at").on(t.createdAt),
+  index("idx_activity_log_created_at").on(t.createdAt.desc()),
 ]);
 
 export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
@@ -3150,7 +3151,7 @@ export const catalogItemTags = pgTable("catalog_item_tags", {
 // ── Server-managed tables (reconciled into Drizzle tracking) ─────────────────
 
 export const workAreaTypes = pgTable("work_area_types", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   name: varchar("name", { length: 100 }).notNull(),
   division: varchar("division", { length: 50 }),
   isActive: boolean("is_active").notNull().default(true),
@@ -3161,7 +3162,7 @@ export const workAreaTypes = pgTable("work_area_types", {
 });
 
 export const jobWorkAreas = pgTable("job_work_areas", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "cascade" }),
   workAreaTypeId: varchar("work_area_type_id", { length: 36 }).references(() => workAreaTypes.id),
   name: varchar("name", { length: 100 }).notNull(),
@@ -3174,7 +3175,7 @@ export const jobWorkAreas = pgTable("job_work_areas", {
 });
 
 export const timeEntries = pgTable("time_entries", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "set null" }),
   clockIn: timestamp("clock_in", { withTimezone: true }).notNull().defaultNow(),
@@ -3196,7 +3197,7 @@ export const timeEntries = pgTable("time_entries", {
 });
 
 export const gpsPings = pgTable("gps_pings", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   timeEntryId: varchar("time_entry_id", { length: 36 }).references(() => timeEntries.id, { onDelete: "cascade" }),
   lat: doublePrecision("lat").notNull(),
@@ -3206,7 +3207,7 @@ export const gpsPings = pgTable("gps_pings", {
 });
 
 export const jobAssignments = pgTable("job_assignments", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
   employeeId: varchar("employee_id", { length: 36 }).notNull().references(() => employees.id, { onDelete: "cascade" }),
   scheduledDate: date("scheduled_date").notNull(),
@@ -3214,7 +3215,7 @@ export const jobAssignments = pgTable("job_assignments", {
 });
 
 export const termsAndConditions = pgTable("terms_and_conditions", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   type: text("type").notNull(),
   title: text("title").notNull(),
   content: text("content").notNull().default(""),
@@ -3224,7 +3225,7 @@ export const termsAndConditions = pgTable("terms_and_conditions", {
 });
 
 export const invoices = pgTable("invoices", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   invoiceNumber: varchar("invoice_number", { length: 50 }).notNull().unique(),
   customerId: uuid("customer_id"),
   jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "set null" }),
@@ -3256,7 +3257,7 @@ export const invoices = pgTable("invoices", {
 });
 
 export const invoiceLineItems = pgTable("invoice_line_items", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   invoiceId: varchar("invoice_id", { length: 36 }).notNull().references(() => invoices.id, { onDelete: "cascade" }),
   description: text("description").notNull().default(""),
   quantity: numeric("quantity", { precision: 10, scale: 2 }).default("1"),
@@ -3266,7 +3267,7 @@ export const invoiceLineItems = pgTable("invoice_line_items", {
 });
 
 export const payments = pgTable("payments", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   invoiceId: varchar("invoice_id", { length: 36 }).notNull().references(() => invoices.id, { onDelete: "cascade" }),
   customerId: uuid("customer_id"),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),

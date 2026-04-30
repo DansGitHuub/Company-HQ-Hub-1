@@ -15,6 +15,13 @@
       "when": 1777335967837,
       "tag": "0001_reconcile_server_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777567397111,
+      "tag": "0002_schema_drift_fix",
+      "breakpoints": true
     }
   ]
 }
