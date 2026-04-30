@@ -98,6 +98,7 @@ import SearchPage from "@/pages/Search";
 import TodoList from "@/pages/TodoList";
 
 import DailyWorksheet from "@/pages/DailyWorksheet";
+import RoutePage from "@/pages/Route/index";
 import ClockOutReviewPage from "@/pages/ClockOutReviewPage";
 import WorksheetReviewList from "@/pages/WorksheetReviewList";
 import WorksheetReviewDetail from "@/pages/WorksheetReviewDetail";
@@ -290,6 +291,7 @@ function AppRoutes() {
         <Route path="/catalog/import" component={CatalogImport} />
         <Route path="/catalog/:id" component={CatalogDetail} />
         <Route path="/catalog" component={CatalogPage} />
+        <Route path="/route" component={RoutePage} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>

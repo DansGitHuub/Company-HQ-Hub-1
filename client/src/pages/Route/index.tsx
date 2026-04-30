@@ -1,0 +1,370 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2, MapPin, Navigation } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+// ─── Types ─────────────────────────────────────────────────────────────────────
+
+interface Stop {
+  id: string;
+  sort_order: number;
+  title: string;
+  status: string;
+  customer_name: string | null;
+  customer_address: string | null;
+  address: string | null;
+  scheduled_start_time: string | null;
+  scheduled_end_time: string | null;
+  work_areas: any[];
+  session_id: number | null;
+  session_status: string | null;
+  skip_reason: string | null;
+  skipped_at: string | null;
+  time_entry_id: string | null;
+  time_entry_clock_in: string | null;
+}
+
+interface RouteDay {
+  id: string;
+  employee_id: string;
+  date: string;
+  weather: string[];
+  started_at: string | null;
+  completed_at: string | null;
+  status: string;
+}
+
+interface RouteData {
+  route_day: RouteDay;
+  stops: Stop[];
+}
+
+// ─── Constants ─────────────────────────────────────────────────────────────────
+
+type Phase = "pre" | "stop" | "summary";
+
+const WEATHER_OPTIONS = [
+  { value: "sunny",  label: "☀️ Sunny" },
+  { value: "cloudy", label: "☁️ Cloudy" },
+  { value: "rain",   label: "🌧️ Rain" },
+  { value: "snow",   label: "❄️ Snow" },
+  { value: "windy",  label: "💨 Windy" },
+  { value: "hot",    label: "🥵 Hot" },
+  { value: "cold",   label: "🥶 Cold" },
+];
+
+// ─── Helpers ────────────────────────────────────────────────────────────────────
+
+function formatDate(d: Date): string {
+  return d.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function mapsHref(address: string | null | undefined): string {
+  if (!address) return "#";
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+}
+
+function uniqueCustomers(stops: Stop[]): number {
+  const names = stops
+    .map((s) => s.customer_name)
+    .filter((n): n is string => Boolean(n));
+  return new Set(names).size;
+}
+
+// ─── Sub-views ─────────────────────────────────────────────────────────────────
+
+function PreView({
+  data,
+  weather,
+  setWeather,
+  onStart,
+  starting,
+}: {
+  data: RouteData;
+  weather: string[];
+  setWeather: (w: string[]) => void;
+  onStart: () => void;
+  starting: boolean;
+}) {
+  const { stops } = data;
+  const customers = uniqueCustomers(stops);
+
+  function toggleWeather(value: string) {
+    setWeather(
+      weather.includes(value)
+        ? weather.filter((w) => w !== value)
+        : [...weather, value]
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Date */}
+      <div>
+        <p data-testid="text-route-date" className="text-sm text-muted-foreground uppercase tracking-wide font-medium">
+          {formatDate(new Date())}
+        </p>
+        <h1 className="text-2xl font-bold mt-1">Today's Route</h1>
+      </div>
+
+      {/* Stops summary */}
+      <Card>
+        <CardContent className="pt-4 pb-4">
+          <div className="flex gap-6">
+            <div className="text-center">
+              <p data-testid="text-stop-count" className="text-3xl font-bold">{stops.length}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Stop{stops.length !== 1 ? "s" : ""}</p>
+            </div>
+            <div className="w-px bg-border" />
+            <div className="text-center">
+              <p data-testid="text-customer-count" className="text-3xl font-bold">{customers}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Customer{customers !== 1 ? "s" : ""}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Weather multi-select */}
+      <div>
+        <p className="text-sm font-medium text-muted-foreground mb-2">Weather conditions</p>
+        <div className="flex flex-wrap gap-2">
+          {WEATHER_OPTIONS.map((opt) => {
+            const active = weather.includes(opt.value);
+            return (
+              <button
+                key={opt.value}
+                data-testid={`chip-weather-${opt.value}`}
+                onClick={() => toggleWeather(opt.value)}
+                className={[
+                  "px-3 py-1.5 rounded-full text-sm font-medium border transition-colors select-none",
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-foreground border-border hover:bg-muted",
+                ].join(" ")}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Start Route CTA */}
+      <Button
+        data-testid="button-start-route"
+        size="lg"
+        className="w-full text-base h-14"
+        disabled={starting || stops.length === 0}
+        onClick={onStart}
+      >
+        {starting ? (
+          <><Loader2 className="animate-spin mr-2 h-5 w-5" /> Starting…</>
+        ) : (
+          "Start Route"
+        )}
+      </Button>
+
+      {stops.length === 0 && (
+        <p data-testid="text-no-stops" className="text-center text-muted-foreground text-sm">
+          No stops scheduled for today.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function StopView({
+  stops,
+  index,
+  onNext,
+}: {
+  stops: Stop[];
+  index: number;
+  onNext: () => void;
+}) {
+  const stop = stops[index];
+  const total = stops.length;
+  const progress = Math.round(((index) / total) * 100);
+  const address = stop?.customer_address ?? stop?.address ?? null;
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Progress header */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <p data-testid="text-stop-progress" className="text-sm font-medium text-muted-foreground">
+            Stop {index + 1} of {total}
+            {stop?.customer_name ? ` · ${stop.customer_name}` : ""}
+          </p>
+          <span className="text-xs text-muted-foreground">{progress}%</span>
+        </div>
+        {/* Progress bar */}
+        <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+          <div
+            data-testid="progress-bar-route"
+            className="h-full bg-primary rounded-full transition-all"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Job title */}
+      <div>
+        <h2 data-testid="text-stop-title" className="text-xl font-bold leading-snug">
+          {stop?.title ?? "Untitled Stop"}
+        </h2>
+        {stop?.customer_name && (
+          <p data-testid="text-stop-customer" className="text-muted-foreground text-sm mt-0.5">
+            {stop.customer_name}
+          </p>
+        )}
+      </div>
+
+      {/* Address card — tap to navigate */}
+      <Card>
+        <CardContent className="pt-4 pb-4">
+          <div className="flex items-start gap-3">
+            <MapPin className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p data-testid="text-stop-address" className="text-sm text-foreground break-words">
+                {address ?? "No address available"}
+              </p>
+              {address && (
+                <a
+                  data-testid="link-navigate-stop"
+                  href={mapsHref(address)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-primary hover:underline"
+                >
+                  <Navigation className="h-4 w-4" />
+                  Navigate
+                </a>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Placeholder: Phase C will add clock-in, checklist, notes, photo, skip */}
+
+      {/* Next stop / finish */}
+      <Button
+        data-testid="button-next-stop"
+        size="lg"
+        className="w-full text-base h-14"
+        onClick={onNext}
+      >
+        {index + 1 < total ? `Next Stop (${index + 2} of ${total})` : "Finish Route"}
+      </Button>
+    </div>
+  );
+}
+
+function SummaryView({ stops }: { stops: Stop[] }) {
+  return (
+    <div className="flex flex-col items-center gap-4 py-10 text-center">
+      <div className="text-5xl">🎉</div>
+      <h2 data-testid="text-summary-heading" className="text-2xl font-bold">Route Complete</h2>
+      <p className="text-muted-foreground text-sm">
+        You finished {stops.length} stop{stops.length !== 1 ? "s" : ""} today. Great work!
+      </p>
+    </div>
+  );
+}
+
+// ─── Main Page ──────────────────────────────────────────────────────────────────
+
+export default function RoutePage() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const [phase, setPhase] = useState<Phase>("pre");
+  const [stopIndex, setStopIndex] = useState(0);
+  const [weather, setWeather] = useState<string[]>([]);
+
+  // ── Fetch today's route data ──────────────────────────────────────────────────
+  const { data, isLoading, isError } = useQuery<RouteData>({
+    queryKey: ["/api/route/today"],
+    queryFn: () =>
+      fetch("/api/route/today", { credentials: "include" }).then((r) => {
+        if (!r.ok) throw new Error("Failed to load route");
+        return r.json();
+      }),
+    retry: 1,
+  });
+
+  // ── Start route mutation ──────────────────────────────────────────────────────
+  const startMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/route/start").then((r) => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/route/today"] });
+      setStopIndex(0);
+      setPhase("stop");
+    },
+    onError: () => {
+      toast({ title: "Couldn't start route", description: "Please try again.", variant: "destructive" });
+    },
+  });
+
+  // ── Derived ───────────────────────────────────────────────────────────────────
+  function handleNext() {
+    const stops = data?.stops ?? [];
+    if (stopIndex + 1 < stops.length) {
+      setStopIndex((i) => i + 1);
+    } else {
+      setPhase("summary");
+    }
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-10 flex justify-center">
+        <Loader2 data-testid="loader-route" className="animate-spin h-8 w-8 text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-10 text-center">
+        <p data-testid="text-route-error" className="text-destructive text-sm">
+          Unable to load today's route. Please refresh.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-md mx-auto px-4 py-6 min-h-screen">
+      {phase === "pre" && (
+        <PreView
+          data={data}
+          weather={weather}
+          setWeather={setWeather}
+          onStart={() => startMutation.mutate()}
+          starting={startMutation.isPending}
+        />
+      )}
+
+      {phase === "stop" && (
+        <StopView
+          stops={data.stops}
+          index={stopIndex}
+          onNext={handleNext}
+        />
+      )}
+
+      {phase === "summary" && <SummaryView stops={data.stops} />}
+    </div>
+  );
+}
