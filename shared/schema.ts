@@ -2707,7 +2707,7 @@ export const activityLog = pgTable("activity_log", {
   seenBy: jsonb("seen_by").default([]),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
-  index("idx_activity_log_created_at").on(t.createdAt.desc()),
+  index("idx_activity_log_created_at").on(t.createdAt),
 ]);
 
 export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
