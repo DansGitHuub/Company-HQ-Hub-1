@@ -308,7 +308,7 @@ export default function RichTextEditor({
         <Highlighter className="h-3.5 w-3.5" />
       </button>
       {showHighlight && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg p-2 flex gap-1.5 flex-wrap w-[120px]">
+        <div className="absolute top-full right-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg p-2 flex gap-1.5">
           {HIGHLIGHT_COLORS.map(({ label, color }) => (
             <button
               key={color}
