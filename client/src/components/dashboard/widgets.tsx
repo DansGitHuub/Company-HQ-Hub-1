@@ -1,10 +1,10 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import RichTextEditor from "@/components/RichTextEditor";
 import {
   Dialog,
   DialogContent,
@@ -1000,9 +1000,6 @@ function NoteEditor({ note, onSave, onDelete, onBack }: {
   const [tags, setTags]       = useState<string[]>(note?.tags || []);
   const [tagInput, setTagInput] = useState("");
   const [reminderAt, setReminderAt] = useState(toLocalDatetimeInput(note?.reminderAt || null));
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => { bodyRef.current?.focus(); }, []);
 
   const handleSave = () => {
     onSave({ title: title || null, body, color, isPinned, tags,
@@ -1053,19 +1050,18 @@ function NoteEditor({ note, onSave, onDelete, onBack }: {
         <input
           value={title}
           onChange={e => setTitle(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") bodyRef.current?.focus(); }}
           placeholder="Title"
           className="w-full bg-transparent text-lg font-semibold border-none outline-none placeholder:text-muted-foreground/60"
           data-testid="note-title-input"
         />
-        <Textarea
-          ref={bodyRef}
-          value={body}
-          onChange={e => setBody(e.target.value)}
-          placeholder="Write your note…"
-          className="w-full min-h-[200px] bg-transparent border-none outline-none resize-none text-sm placeholder:text-muted-foreground/60 p-0 focus-visible:ring-0 shadow-none"
-          data-testid="note-body-input"
-        />
+        <div data-testid="note-body-input">
+          <RichTextEditor
+            value={body}
+            onChange={setBody}
+            placeholder="Write your note…"
+            minHeight="200px"
+          />
+        </div>
 
         <div className="border-t pt-3 space-y-3">
           <div className="flex items-center gap-2">
@@ -1132,9 +1128,11 @@ function NoteCard({ note, onClick, onPin, onArchive, onDelete }: {
         <div className="flex-1 min-w-0">
           {note.title && <p className="text-sm font-semibold truncate">{note.title}</p>}
           {note.body && (
-            <p className={`text-xs text-muted-foreground line-clamp-3 mt-0.5 ${!note.title ? "font-medium text-foreground/80" : ""}`}>
-              {note.body}
-            </p>
+            <div
+              className="prose max-w-none text-xs text-muted-foreground mt-0.5 overflow-hidden"
+              style={{ maxHeight: "4rem" }}
+              dangerouslySetInnerHTML={{ __html: note.body }}
+            />
           )}
         </div>
         {note.isPinned && <Pin className="h-3 w-3 text-primary shrink-0 mt-0.5" />}
