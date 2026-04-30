@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import RichTextEditor from "@/components/RichTextEditor";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -825,12 +826,18 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
           </div>
 
           {/* ── Notes & Terms ── */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
             <div>
               <Label className="text-xs">{t("internalNotes")}</Label>
-              <Textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)}
-                className="mt-1 resize-none text-sm" data-testid="textarea-notes"
-                placeholder={t("internalNotesPlaceholder")} />
+              <div className="mt-1">
+                <RichTextEditor
+                  value={notes}
+                  onChange={(html) => setNotes(html)}
+                  placeholder={t("internalNotesPlaceholder")}
+                  minHeight="120px"
+                  data-testid="textarea-notes"
+                />
+              </div>
             </div>
             <div>
               <Label className="text-xs">{t("termsConditions")}</Label>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import RichTextEditor from "@/components/RichTextEditor";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -254,8 +255,13 @@ export function CustomerFormModal({ open, onClose, editing, initialData, onAfter
           {/* Notes */}
           <div className="space-y-1.5">
             <Label>{t("notes")}</Label>
-            <Textarea placeholder={t("customerNotesPlaceholder")} value={form.notes}
-              onChange={(e) => setField("notes", e.target.value)} rows={3} data-testid="textarea-notes" />
+            <RichTextEditor
+              value={form.notes}
+              onChange={(html) => setField("notes", html)}
+              placeholder={t("customerNotesPlaceholder")}
+              minHeight="120px"
+              data-testid="textarea-notes"
+            />
           </div>
 
           <DialogFooter>

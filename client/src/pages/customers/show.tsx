@@ -773,7 +773,7 @@ export default function CustomerDetailPage() {
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("notes")}</p>
                     <div className="flex items-start gap-2 text-sm">
                       <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                      <p className="text-muted-foreground text-xs leading-relaxed">{customer.notes}</p>
+                      <div className="prose max-w-none text-xs leading-relaxed text-muted-foreground" dangerouslySetInnerHTML={{ __html: customer.notes || '' }} />
                     </div>
                   </div>
                 </>

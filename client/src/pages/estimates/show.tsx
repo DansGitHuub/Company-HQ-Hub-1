@@ -541,7 +541,7 @@ export default function EstimateDetail() {
                 <CardTitle className="text-sm">{t("internalNotes")}</CardTitle>
               </CardHeader>
               <CardContent className="px-5 pb-5">
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{estimate.notes}</p>
+                <div className="prose max-w-none text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: estimate.notes || '' }} />
               </CardContent>
             </Card>
           )}

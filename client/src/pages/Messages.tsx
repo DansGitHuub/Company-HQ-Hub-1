@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import RichTextEditor from "@/components/RichTextEditor";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -378,8 +379,13 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
                 <Paperclip className="h-3.5 w-3.5" /> Attach file
               </button>
             </div>
-            <Textarea placeholder="Write your message…" value={body}
-              onChange={(e) => setBody(e.target.value)} rows={4} data-testid="textarea-body" />
+            <RichTextEditor
+              value={body}
+              onChange={(html) => setBody(html)}
+              placeholder="Write your message…"
+              minHeight="120px"
+              data-testid="textarea-body"
+            />
             <input ref={fileInputRef} type="file" multiple className="hidden"
               data-testid="input-file-compose"
               onChange={(e) => {
@@ -410,7 +416,7 @@ function ComposeDialog({ open, onClose, initialRecipientId }: {
             Cancel
           </Button>
           <Button onClick={() => sendMutation.mutate()}
-            disabled={!recipientId || !body.trim() || sendMutation.isPending}
+            disabled={!recipientId || !body.replace(/<[^>]*>/g, "").trim() || sendMutation.isPending}
             data-testid="button-send-message">
             <Send className="h-4 w-4 mr-1.5" />
             {sendMutation.isPending ? "Sending…" : "Send"}
@@ -759,11 +765,11 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
   });
 
   async function sendReply() {
-    if (!reply.trim() || isSending) return;
+    if (!reply.replace(/<[^>]*>/g, "").trim() || isSending) return;
     setIsSending(true);
     const filesToSend = [...pendingFiles];
     try {
-      const res = await apiRequest("POST", "/api/dm", { recipientId: userId, body: reply.trim() });
+      const res = await apiRequest("POST", "/api/dm", { recipientId: userId, body: reply });
       const msg = await res.json();
       setReply("");
       setPendingFiles([]);
@@ -947,9 +953,11 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
                           ? "bg-blue-500 text-white rounded-br-sm"
                           : "bg-gray-100 text-gray-900 rounded-bl-sm"
                       )}>
-                        <p className="whitespace-pre-wrap break-words" data-testid={`text-body-${msg.id}`}>
-                          {msg.body}
-                        </p>
+                        <div
+                          className={isMine ? "break-words" : "prose prose-sm max-w-none break-words"}
+                          data-testid={`text-body-${msg.id}`}
+                          dangerouslySetInnerHTML={{ __html: msg.body || '' }}
+                        />
                         {msg.attachments && msg.attachments.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-white/20">
                             {msg.attachments.map((att) => (
@@ -1017,17 +1025,15 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
           </div>
         )}
         <div className="flex gap-2 items-end">
-          <Textarea
-            placeholder="Reply…"
-            value={reply}
-            onChange={(e) => setReply(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); }
-            }}
-            rows={2}
-            className="resize-none text-sm flex-1"
-            data-testid="textarea-reply"
-          />
+          <div className="flex-1">
+            <RichTextEditor
+              value={reply}
+              onChange={(html) => setReply(html)}
+              placeholder="Reply…"
+              minHeight="72px"
+              data-testid="textarea-reply"
+            />
+          </div>
           <input ref={fileInputRef} type="file" multiple className="hidden"
             data-testid="input-file-reply"
             onChange={(e) => {
@@ -1040,12 +1046,11 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
             title="Attach file" type="button" data-testid="button-attach-reply">
             <Paperclip className="h-4 w-4" />
           </Button>
-          <Button onClick={sendReply} disabled={!reply.trim() || isSending}
+          <Button onClick={sendReply} disabled={!reply.replace(/<[^>]*>/g, "").trim() || isSending}
             size="icon" className="h-9 w-9 flex-shrink-0" data-testid="button-reply-send">
             <Send className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1">Enter to send · Shift+Enter for new line</p>
       </div>
     </div>
   );
