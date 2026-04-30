@@ -935,7 +935,7 @@ export default function DailyWorksheet() {
   };
 
   // ── Greeting ──────────────────────────────────────────────────────────────────
-  const firstName = (user as any)?.firstName || user?.name?.split(" ")[0] || user?.username || "there";
+  const firstName = user?.name?.split(" ")[0] || user?.username || "there";
   const hour = new Date().getHours();
   const greetingKey = hour < 12 ? "goodMorning" : hour < 17 ? "goodAfternoon" : "goodEvening";
 
