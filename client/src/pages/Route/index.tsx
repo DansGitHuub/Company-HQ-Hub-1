@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,6 +44,12 @@ interface RouteData {
   stops: Stop[];
 }
 
+interface PersistedState {
+  currentStopIndex: number;
+  draftNotes: Record<string, string>;
+  draftPhotos: Record<string, string[]>;
+}
+
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 type Phase = "pre" | "stop" | "summary";
@@ -56,6 +63,71 @@ const WEATHER_OPTIONS = [
   { value: "hot",    label: "🥵 Hot" },
   { value: "cold",   label: "🥶 Cold" },
 ];
+
+// ─── localStorage helpers ───────────────────────────────────────────────────────
+
+function lsKey(userId: string, date: string): string {
+  return `route:${userId}:${date}`;
+}
+
+function lsRead(key: string): PersistedState | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PersistedState>;
+    return {
+      currentStopIndex: typeof parsed.currentStopIndex === "number" ? parsed.currentStopIndex : 0,
+      draftNotes: parsed.draftNotes && typeof parsed.draftNotes === "object" ? parsed.draftNotes : {},
+      draftPhotos: parsed.draftPhotos && typeof parsed.draftPhotos === "object" ? parsed.draftPhotos : {},
+    };
+  } catch {
+    return null;
+  }
+}
+
+function lsWrite(key: string, value: PersistedState): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Silently degrade — private mode or quota exceeded.
+  }
+}
+
+function lsRemove(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Silently degrade.
+  }
+}
+
+/** Delete all route: keys whose date part is strictly before todayDate (YYYY-MM-DD). */
+function lsSweepStale(todayDate: string): void {
+  try {
+    const toDelete: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith("route:")) continue;
+      // Key format: route:<userId>:<YYYY-MM-DD>
+      // userId is a UUID (no colons), so the last segment is always the date.
+      const datePart = key.slice(key.lastIndexOf(":") + 1);
+      if (datePart.match(/^\d{4}-\d{2}-\d{2}$/) && datePart < todayDate) {
+        toDelete.push(key);
+      }
+    }
+    toDelete.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // Silently degrade.
+  }
+}
+
+function todayISODate(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -286,10 +358,39 @@ function SummaryView({ stops }: { stops: Stop[] }) {
 export default function RoutePage() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { user } = useAuth();
+
+  // Stable date string for today — computed once per render cycle; never changes
+  // within a single day.
+  const today = todayISODate();
+
+  // The localStorage key scoped to this user + day.
+  // Null when user is not yet resolved (edge case; auth guard means user is
+  // always present by the time this component mounts).
+  const storageKey = user?.id ? lsKey(user.id, today) : null;
+
+  // ── Hydrate persisted state synchronously (lazy useState initialisers) ────────
+
+  const [stopIndex, setStopIndex] = useState<number>(() => {
+    if (!storageKey) return 0;
+    return lsRead(storageKey)?.currentStopIndex ?? 0;
+  });
+
+  const [draftNotes, setDraftNotes] = useState<Record<string, string>>(() => {
+    if (!storageKey) return {};
+    return lsRead(storageKey)?.draftNotes ?? {};
+  });
+
+  const [draftPhotos, setDraftPhotos] = useState<Record<string, string[]>>(() => {
+    if (!storageKey) return {};
+    return lsRead(storageKey)?.draftPhotos ?? {};
+  });
 
   const [phase, setPhase] = useState<Phase>("pre");
-  const [stopIndex, setStopIndex] = useState(0);
   const [weather, setWeather] = useState<string[]>([]);
+
+  // Guard so the phase-hydration effect runs only once after data first loads.
+  const hasHydratedPhase = useRef(false);
 
   // ── Fetch today's route data ──────────────────────────────────────────────────
   const { data, isLoading, isError } = useQuery<RouteData>({
@@ -301,6 +402,41 @@ export default function RoutePage() {
       }),
     retry: 1,
   });
+
+  // ── Mount: sweep stale localStorage entries ───────────────────────────────────
+  useEffect(() => {
+    lsSweepStale(today);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── After data loads: resume phase from localStorage ─────────────────────────
+  // If the route was already started server-side AND we have a persisted
+  // stopIndex, jump straight to the stop view at that index.
+  useEffect(() => {
+    if (!data || hasHydratedPhase.current) return;
+    hasHydratedPhase.current = true;
+
+    if (!storageKey) return;
+    const saved = lsRead(storageKey);
+    if (!saved) return;
+
+    const alreadyStarted = Boolean(data.route_day?.started_at);
+    const validIndex = saved.currentStopIndex < data.stops.length;
+
+    if (alreadyStarted && data.stops.length > 0 && validIndex) {
+      setPhase("stop");
+      // stopIndex is already initialised from localStorage via lazy init above.
+    }
+  }, [data, storageKey]);
+
+  // ── Persist state changes to localStorage ────────────────────────────────────
+  useEffect(() => {
+    if (!storageKey) return;
+    lsWrite(storageKey, {
+      currentStopIndex: stopIndex,
+      draftNotes,
+      draftPhotos,
+    });
+  }, [storageKey, stopIndex, draftNotes, draftPhotos]);
 
   // ── Start route mutation ──────────────────────────────────────────────────────
   const startMutation = useMutation({
@@ -315,7 +451,12 @@ export default function RoutePage() {
     },
   });
 
-  // ── Derived ───────────────────────────────────────────────────────────────────
+  // ── Phase D: route/submit success will call lsRemove(storageKey) ─────────────
+  // Reserved — no endpoint yet. When POST /api/route/submit is wired in Phase D,
+  // its onSuccess should call:
+  //   if (storageKey) lsRemove(storageKey);
+
+  // ── Navigation ────────────────────────────────────────────────────────────────
   function handleNext() {
     const stops = data?.stops ?? [];
     if (stopIndex + 1 < stops.length) {
