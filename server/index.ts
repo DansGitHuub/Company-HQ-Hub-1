@@ -33,6 +33,7 @@ import { runSmsOptInsMigration } from "./migrations/smsOptIns";
 import { runWorkAreasMigration } from "./migrations/workAreas";
 import { runNewEstimatesMigration } from "./migrations/newEstimates";
 import { runSchedulingMigration } from "./migrations/scheduling";
+import { runRouteModeMigration } from "./migrations/routeMode";
 import { runAppSettingsMigration } from "./migrations/appSettings";
 import { runMaterialsCatalogColumnsMigration } from "./migrations/materialsCatalogColumns";
 import { runCatalogExtendedMigration } from "./migrations/catalogExtended";
@@ -122,6 +123,7 @@ app.use((req, res, next) => {
   await runWorkAreasMigration();
   await runNewEstimatesMigration();
   await runSchedulingMigration();
+  await runRouteModeMigration();
   await runAppSettingsMigration();
   await runMaterialsCatalogColumnsMigration();
   await runCatalogExtendedMigration();
