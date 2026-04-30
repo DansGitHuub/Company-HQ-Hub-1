@@ -9,6 +9,11 @@ let qbAuthFailed = false;
 export function getQbAuthFailed(): boolean { return qbAuthFailed; }
 export function clearQbAuthFailed(): void { qbAuthFailed = false; }
 
+// ── In-flight refresh deduplication ──────────────────────────────────────────
+// Two concurrent callers share one refresh promise so the rotated
+// refresh_token is never raced and overwritten by a stale one.
+let refreshInFlight: Promise<any> | null = null;
+
 // ── Token helpers ─────────────────────────────────────────────────────────────
 export async function getTokens() {
   const { rows } = await pool.query(
@@ -23,16 +28,19 @@ async function saveTokens(tokens: {
   refresh_token: string;
   token_expiry: Date;
 }) {
+  // Single atomic upsert — also clears needs_reauth and last_error on every
+  // successful save so a re-authorized connection immediately reflects healthy.
   await pool.query(
     `INSERT INTO quickbooks_tokens (realm_id, access_token, refresh_token, token_expiry)
      VALUES ($1, $2, $3, $4)
-     ON CONFLICT DO NOTHING`,
+     ON CONFLICT (realm_id) DO UPDATE
+       SET access_token   = EXCLUDED.access_token,
+           refresh_token  = EXCLUDED.refresh_token,
+           token_expiry   = EXCLUDED.token_expiry,
+           updated_at     = NOW(),
+           needs_reauth   = false,
+           last_error     = NULL`,
     [tokens.realm_id, tokens.access_token, tokens.refresh_token, tokens.token_expiry]
-  );
-  await pool.query(
-    `UPDATE quickbooks_tokens SET access_token=$1, refresh_token=$2, token_expiry=$3, updated_at=NOW()
-     WHERE realm_id=$4`,
-    [tokens.access_token, tokens.refresh_token, tokens.token_expiry, tokens.realm_id]
   );
 }
 
@@ -40,8 +48,8 @@ async function refreshAccessToken(tok: any): Promise<any> {
   try {
     const { default: OAuthClient } = await import("intuit-oauth");
     const client = new OAuthClient({
-      clientId: process.env.QUICKBOOKS_CLIENT_ID!,
-      clientSecret: process.env.QUICKBOOKS_CLIENT_SECRET!,
+      clientId: process.env.QB_CLIENT_ID || process.env.QUICKBOOKS_CLIENT_ID!,
+      clientSecret: process.env.QB_CLIENT_SECRET || process.env.QUICKBOOKS_CLIENT_SECRET!,
       environment: "production",
       redirectUri: "https://companyhq.app/api/auth/quickbooks/callback",
     });
@@ -53,36 +61,61 @@ async function refreshAccessToken(tok: any): Promise<any> {
     });
     const resp = await client.refresh();
     const newTok = resp.getJson();
+
+    // Bail immediately if Intuit's response is missing either token —
+    // persisting a null refresh_token would sever the connection permanently.
+    if (!newTok.access_token || !newTok.refresh_token) {
+      const errMsg = "Refresh response missing access_token or refresh_token";
+      qbAuthFailed = true;
+      await pool.query(
+        `UPDATE quickbooks_tokens SET needs_reauth=true, last_error=$1 WHERE realm_id=$2`,
+        [errMsg, tok.realm_id]
+      ).catch(() => {});
+      throw new Error(errMsg);
+    }
+
     const expiry = new Date(Date.now() + (newTok.expires_in ?? 3600) * 1000);
-    const newRefreshToken = newTok.refresh_token ?? tok.refresh_token;
     // Persist BOTH the new access_token and the rotated refresh_token to DB
     // before returning — Intuit revokes the old refresh_token within hours.
+    // saveTokens() also clears needs_reauth and last_error on success.
     await saveTokens({
       realm_id: tok.realm_id,
       access_token: newTok.access_token,
-      refresh_token: newRefreshToken,
+      refresh_token: newTok.refresh_token,
       token_expiry: expiry,
     });
-    // Successful refresh — clear any prior auth-failure flag
     qbAuthFailed = false;
-    // Return the fully updated token including the new refresh_token so callers
-    // that hold a reference to this object don't use the revoked one.
-    return { ...tok, access_token: newTok.access_token, refresh_token: newRefreshToken, token_expiry: expiry };
+    return { ...tok, access_token: newTok.access_token, refresh_token: newTok.refresh_token, token_expiry: expiry };
   } catch (err: any) {
     const msg: string = err?.message ?? String(err);
     if (/invalid_grant|refresh token is invalid|unauthorized_client|token_revoked/i.test(msg)) {
       qbAuthFailed = true;
+      // Persist the failure to the DB so /api/quickbooks/status reflects it
+      // even after a server restart (when in-memory qbAuthFailed is reset).
+      await pool.query(
+        `UPDATE quickbooks_tokens SET needs_reauth=true, last_error=$1 WHERE realm_id=$2`,
+        [msg, tok.realm_id]
+      ).catch(() => {});
       console.error("[QB] Refresh token invalid — reauthorization required:", msg);
     }
     throw err;
   }
 }
 
-async function getValidToken() {
+export async function getValidToken() {
   let tok = await getTokens();
   if (!tok) throw new Error("QuickBooks not connected");
-  if (new Date(tok.token_expiry) <= new Date(Date.now() + 60000)) {
-    tok = await refreshAccessToken(tok);
+  // 5-minute staleness window — refresh before the access_token actually expires
+  // so callers always receive a token with meaningful remaining lifetime.
+  if (new Date(tok.token_expiry) <= new Date(Date.now() + 5 * 60 * 1000)) {
+    // Deduplicate: concurrent callers share one refresh promise so the rotated
+    // refresh_token is never raced.
+    if (!refreshInFlight) {
+      refreshInFlight = refreshAccessToken(tok).finally(() => {
+        refreshInFlight = null;
+      });
+    }
+    tok = await refreshInFlight;
   }
   return tok;
 }

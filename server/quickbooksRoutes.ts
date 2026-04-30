@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { pool } from "./db";
 import {
   getTokens,
+  getValidToken,
   runFullSync,
   syncCustomersPublic,
   syncInvoicesPublic,
@@ -71,6 +72,14 @@ async function migrate() {
 
   // QB employee mapping on users
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS qbo_employee_id TEXT`);
+
+  // Persistent reauth / error state on the token row (added for connection-drop fix)
+  await pool.query(
+    `ALTER TABLE quickbooks_tokens ADD COLUMN IF NOT EXISTS needs_reauth BOOLEAN NOT NULL DEFAULT false`
+  );
+  await pool.query(
+    `ALTER TABLE quickbooks_tokens ADD COLUMN IF NOT EXISTS last_error TEXT`
+  );
 
   console.log("[migration] quickbooks tables ready");
 }
@@ -149,7 +158,12 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
         `INSERT INTO quickbooks_tokens (realm_id, access_token, refresh_token, token_expiry)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (realm_id) DO UPDATE
-           SET access_token=$2, refresh_token=$3, token_expiry=$4, updated_at=NOW()`,
+           SET access_token  = EXCLUDED.access_token,
+               refresh_token = EXCLUDED.refresh_token,
+               token_expiry  = EXCLUDED.token_expiry,
+               updated_at    = NOW(),
+               needs_reauth  = false,
+               last_error    = NULL`,
         [realmId, token.access_token, token.refresh_token, expiry],
       );
 
@@ -176,19 +190,14 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
          ORDER BY completed_at DESC NULLS LAST LIMIT 1`,
       );
 
-      // Check in-process auth-failure flag (set when refresh returns invalid_grant)
-      if (getQbAuthFailed()) {
-        return res.json({
-          connected: false,
-          needs_reauth: true,
-          realm_id: tok.realm_id,
-          token_expiry: tok.token_expiry,
-          last_sync: logs[0]?.completed_at ?? null,
-        });
-      }
+      // Ground-truth: combine the DB-persisted flag (survives server restarts)
+      // with the in-memory flag (set immediately on refresh failure this session).
+      const needsReauth = !!tok.needs_reauth || getQbAuthFailed();
 
       res.json({
-        connected: true,
+        connected: !needsReauth,
+        needs_reauth: needsReauth,
+        last_error: tok.last_error ?? null,
         realm_id: tok.realm_id,
         token_expiry: tok.token_expiry,
         last_sync: logs[0]?.completed_at ?? null,
@@ -470,28 +479,16 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
       // QB Employees (best-effort — return empty if not connected)
       let qbEmployees: any[] = [];
       try {
-        const tok = await getTokens();
-        if (tok) {
-          const { default: OAuthClient } = await import("intuit-oauth");
-          const client = new OAuthClient({
-            clientId: process.env.QB_CLIENT_ID || process.env.QUICKBOOKS_CLIENT_ID || "",
-            clientSecret: process.env.QB_CLIENT_SECRET || process.env.QUICKBOOKS_CLIENT_SECRET || "",
-            environment: "production",
-            redirectUri: QB_REDIRECT_URI,
-          });
-          client.setToken({ access_token: tok.access_token, refresh_token: tok.refresh_token, realmId: tok.realm_id });
-          const isExpired = new Date(tok.token_expiry) <= new Date(Date.now() + 60000);
-          const validTok = isExpired ? (await client.refresh()).getJson() : tok;
-          const qbAccessToken = isExpired ? validTok.access_token : tok.access_token;
-
-          const empUrl = `https://quickbooks.api.intuit.com/v3/company/${tok.realm_id}/query?query=${encodeURIComponent("SELECT * FROM Employee WHERE Active = true MAXRESULTS 200")}&minorversion=65`;
-          const empRes = await fetch(empUrl, {
-            headers: { Authorization: `Bearer ${qbAccessToken}`, Accept: "application/json" },
-          });
-          if (empRes.ok) {
-            const data = await empRes.json();
-            qbEmployees = data?.QueryResponse?.Employee ?? [];
-          }
+        // getValidToken() handles refresh + in-flight deduplication via the
+        // centralised path — no inline OAuthClient needed here.
+        const tok = await getValidToken();
+        const empUrl = `https://quickbooks.api.intuit.com/v3/company/${tok.realm_id}/query?query=${encodeURIComponent("SELECT * FROM Employee WHERE Active = true MAXRESULTS 200")}&minorversion=65`;
+        const empRes = await fetch(empUrl, {
+          headers: { Authorization: `Bearer ${tok.access_token}`, Accept: "application/json" },
+        });
+        if (empRes.ok) {
+          const data = await empRes.json();
+          qbEmployees = data?.QueryResponse?.Employee ?? [];
         }
       } catch (qbErr: any) {
         console.warn("[QB employees] Could not fetch QB employees:", qbErr.message);
