@@ -645,12 +645,6 @@ function JobDetail({ jobId, onBack }: { jobId: string; onBack: () => void }) {
         </Card>
       )}
 
-      {job.crewNotesCustomerVisible && (
-        <Card>
-          <CardHeader><CardTitle className="text-sm">Crew Notes</CardTitle></CardHeader>
-          <CardContent><p className="text-sm text-gray-600 whitespace-pre-wrap">{job.crewNotesCustomerVisible}</p></CardContent>
-        </Card>
-      )}
 
       {(job.documents?.length > 0 || job.customerDocuments?.length > 0) && (
         <Card>

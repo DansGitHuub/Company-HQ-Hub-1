@@ -110,7 +110,12 @@ function SimpleTemplate({ est }: { est: any }) {
       {(est.terms || est.notes) && (
         <div className="border-t border-gray-200 pt-4 text-xs text-gray-500 space-y-2">
           {est.terms && <div><span className="font-semibold">{t("termsConditionsLabel")} </span>{est.terms}</div>}
-          {est.notes && <div><span className="font-semibold">{t("notesLabel")} </span>{est.notes}</div>}
+          {est.notes && (
+            <div>
+              <span className="font-semibold">{t("notesLabel")} </span>
+              <div className="prose prose-xs max-w-none mt-0.5" dangerouslySetInnerHTML={{ __html: est.notes || '' }} />
+            </div>
+          )}
         </div>
       )}
 
@@ -256,7 +261,12 @@ function BookletTemplate({ est }: { est: any }) {
             <h2 className="text-lg font-bold text-green-800 border-b border-green-200 pb-1 mb-3">{t("termsNotes")}</h2>
             <div className="space-y-3 text-sm text-gray-700">
               {est.terms && <div><span className="font-semibold">{t("termsConditionsLabel")} </span>{est.terms}</div>}
-              {est.notes && <div><span className="font-semibold">{t("additionalNotesLabel")} </span>{est.notes}</div>}
+              {est.notes && (
+                <div>
+                  <span className="font-semibold">{t("additionalNotesLabel")} </span>
+                  <div className="prose prose-sm max-w-none mt-0.5" dangerouslySetInnerHTML={{ __html: est.notes || '' }} />
+                </div>
+              )}
             </div>
           </section>
         )}
