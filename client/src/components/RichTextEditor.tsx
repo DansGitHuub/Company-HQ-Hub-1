@@ -468,84 +468,91 @@ export default function RichTextEditor({
 
       <div className="rte-wrap border border-border rounded-lg overflow-hidden bg-background">
         <div className="sticky top-0 z-10 bg-background border-b border-border">
-          <div className="flex items-center gap-0.5 px-2 py-1 overflow-x-auto">
-            <span className="hidden md:flex items-center gap-0.5">
-              {fontFamilySelect}
-              {fontSizeSelect}
-              {sep}
-            </span>
+          <div className="flex items-center">
+            {/* Scrollable button strip — overflow-x:auto creates implicit overflow-y:auto
+                so NO popover-trigger buttons live here */}
+            <div className="flex items-center gap-0.5 px-2 py-1 overflow-x-auto flex-1 min-w-0">
+              <span className="hidden md:flex items-center gap-0.5">
+                {fontFamilySelect}
+                {fontSizeSelect}
+                {sep}
+              </span>
 
-            {tbBtn(
-              () => editor.chain().focus().toggleBold().run(),
-              <Bold className="h-3.5 w-3.5" />,
-              "Bold",
-              editor.isActive("bold")
-            )}
-            {tbBtn(
-              () => editor.chain().focus().toggleItalic().run(),
-              <Italic className="h-3.5 w-3.5" />,
-              "Italic",
-              editor.isActive("italic")
-            )}
-            {tbBtn(
-              () => editor.chain().focus().toggleUnderline().run(),
-              <UnderlineIcon className="h-3.5 w-3.5" />,
-              "Underline",
-              editor.isActive("underline")
-            )}
-            {tbBtn(
-              () => editor.chain().focus().toggleStrike().run(),
-              <Strikethrough className="h-3.5 w-3.5" />,
-              "Strikethrough",
-              editor.isActive("strike"),
-              "hidden md:flex"
-            )}
-
-            {sep}
-            {highlightPopover}
-            {sep}
-
-            {tbBtn(
-              () => editor.chain().focus().toggleBulletList().run(),
-              <List className="h-3.5 w-3.5" />,
-              "Bullet list",
-              editor.isActive("bulletList") && !isInDashList
-            )}
-            {tbBtn(
-              toggleDashList,
-              <Minus className="h-3.5 w-3.5" />,
-              "Dash list",
-              isInDashList,
-              "hidden md:flex"
-            )}
-            {tbBtn(
-              () => editor.chain().focus().toggleOrderedList().run(),
-              <ListOrdered className="h-3.5 w-3.5" />,
-              "Numbered list",
-              editor.isActive("orderedList")
-            )}
-            {tbBtn(
-              () => editor.chain().focus().toggleTaskList().run(),
-              <ListChecks className="h-3.5 w-3.5" />,
-              "Checklist",
-              editor.isActive("taskList")
-            )}
-
-            <span className="hidden md:flex items-center gap-0.5">
-              {sep}
-              {tbBtn(indent, <Indent className="h-3.5 w-3.5" />, "Indent")}
-              {tbBtn(outdent, <Outdent className="h-3.5 w-3.5" />, "Outdent")}
-              {sep}
               {tbBtn(
-                () =>
-                  editor.chain().focus().unsetAllMarks().clearNodes().run(),
-                <RemoveFormatting className="h-3.5 w-3.5" />,
-                "Clear formatting"
+                () => editor.chain().focus().toggleBold().run(),
+                <Bold className="h-3.5 w-3.5" />,
+                "Bold",
+                editor.isActive("bold")
               )}
-            </span>
+              {tbBtn(
+                () => editor.chain().focus().toggleItalic().run(),
+                <Italic className="h-3.5 w-3.5" />,
+                "Italic",
+                editor.isActive("italic")
+              )}
+              {tbBtn(
+                () => editor.chain().focus().toggleUnderline().run(),
+                <UnderlineIcon className="h-3.5 w-3.5" />,
+                "Underline",
+                editor.isActive("underline")
+              )}
+              {tbBtn(
+                () => editor.chain().focus().toggleStrike().run(),
+                <Strikethrough className="h-3.5 w-3.5" />,
+                "Strikethrough",
+                editor.isActive("strike"),
+                "hidden md:flex"
+              )}
 
-            <span className="flex-1" />
-            {overflowMenu}
+              {sep}
+
+              {tbBtn(
+                () => editor.chain().focus().toggleBulletList().run(),
+                <List className="h-3.5 w-3.5" />,
+                "Bullet list",
+                editor.isActive("bulletList") && !isInDashList
+              )}
+              {tbBtn(
+                toggleDashList,
+                <Minus className="h-3.5 w-3.5" />,
+                "Dash list",
+                isInDashList,
+                "hidden md:flex"
+              )}
+              {tbBtn(
+                () => editor.chain().focus().toggleOrderedList().run(),
+                <ListOrdered className="h-3.5 w-3.5" />,
+                "Numbered list",
+                editor.isActive("orderedList")
+              )}
+              {tbBtn(
+                () => editor.chain().focus().toggleTaskList().run(),
+                <ListChecks className="h-3.5 w-3.5" />,
+                "Checklist",
+                editor.isActive("taskList")
+              )}
+
+              <span className="hidden md:flex items-center gap-0.5">
+                {sep}
+                {tbBtn(indent, <Indent className="h-3.5 w-3.5" />, "Indent")}
+                {tbBtn(outdent, <Outdent className="h-3.5 w-3.5" />, "Outdent")}
+                {sep}
+                {tbBtn(
+                  () =>
+                    editor.chain().focus().unsetAllMarks().clearNodes().run(),
+                  <RemoveFormatting className="h-3.5 w-3.5" />,
+                  "Clear formatting"
+                )}
+              </span>
+            </div>
+
+            {/* Pinned right section — outside the overflow-x:auto container so
+                absolutely-positioned popovers are never clipped */}
+            <div className="flex items-center gap-0.5 px-1 py-1 shrink-0">
+              {sep}
+              {highlightPopover}
+              {overflowMenu}
+            </div>
           </div>
         </div>
 
