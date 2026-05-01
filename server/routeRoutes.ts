@@ -126,6 +126,55 @@ export function registerRouteRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── PATCH /api/route/stops/:jobId/skip ───────────────────────────────────
+  // Finds-or-creates the worksheet_session for (jobId, today, current user) and
+  // marks it as skipped.  Body: { reason: string }.
+  app.patch("/api/route/stops/:jobId/skip", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const { jobId } = req.params;
+    const reason: string | undefined = req.body?.reason;
+    if (!reason || typeof reason !== "string" || !reason.trim()) {
+      return res.status(400).json({ error: "reason is required" });
+    }
+
+    try {
+      // Find-or-create worksheet_session for (jobId, today, userId).
+      // employee_id on worksheet_sessions stores users.id (same as userId).
+      const existing = await pool.query(
+        `SELECT id FROM worksheet_sessions
+         WHERE job_id = $1 AND date = CURRENT_DATE AND employee_id = $2
+         ORDER BY created_at DESC LIMIT 1`,
+        [jobId, userId]
+      );
+
+      let sessionId: number;
+      if (existing.rows.length > 0) {
+        sessionId = existing.rows[0].id;
+        await pool.query(
+          `UPDATE worksheet_sessions
+           SET status      = 'skipped',
+               skip_reason = $1,
+               skipped_at  = NOW()
+           WHERE id = $2`,
+          [reason.trim(), sessionId]
+        );
+      } else {
+        const inserted = await pool.query(
+          `INSERT INTO worksheet_sessions (job_id, date, employee_id, status, skip_reason, skipped_at)
+           VALUES ($1, CURRENT_DATE, $2, 'skipped', $3, NOW())
+           RETURNING id`,
+          [jobId, userId, reason.trim()]
+        );
+        sessionId = inserted.rows[0].id;
+      }
+
+      res.json({ ok: true, session_id: sessionId });
+    } catch (err: any) {
+      console.error("[route/skip]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── POST /api/route/start ─────────────────────────────────────────────────
   // Marks the current user's today route as started (idempotent — only sets
   // started_at once; subsequent calls are no-ops).

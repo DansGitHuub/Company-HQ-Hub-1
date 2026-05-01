@@ -10,6 +10,16 @@ import { Loader2, MapPin, Navigation, Clock, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import RichTextEditor from "@/components/RichTextEditor";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -490,6 +500,52 @@ function StopView({
     }
   }
 
+  // ── Skip / Reschedule ────────────────────────────────────────────────────────
+  const SKIP_REASONS = [
+    "Locked Gate",
+    "Customer Not Ready",
+    "Equipment Issue",
+    "Weather",
+    "Property Inaccessible",
+    "Other",
+  ];
+
+  const [showSkipModal, setShowSkipModal] = useState(false);
+  const [skipReason, setSkipReason] = useState(SKIP_REASONS[0]);
+  const [skipNotes, setSkipNotes] = useState("");
+  const [skipping, setSkipping] = useState(false);
+
+  async function handleSkip() {
+    if (!stop) return;
+    const reason = skipNotes.trim()
+      ? `${skipReason} — ${skipNotes.trim()}`
+      : skipReason;
+    setSkipping(true);
+    try {
+      const res = await apiRequest("PATCH", `/api/route/stops/${stop.id}/skip`, { reason });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast({
+          title: "Couldn't skip stop",
+          description: body.error ?? "Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setShowSkipModal(false);
+      qc.invalidateQueries({ queryKey: ["/api/route/today"] });
+      onNext();
+    } catch {
+      toast({
+        title: "Couldn't skip stop",
+        description: "Network error — please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSkipping(false);
+    }
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-5">
@@ -737,6 +793,86 @@ function StopView({
           Clock In
         </Button>
       )}
+
+      {/* Skip / Reschedule — only shown while the stop is not yet completed */}
+      {!isCompletedStop && (
+        <Button
+          data-testid="button-skip-stop"
+          variant="ghost"
+          className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={() => {
+            setSkipReason(SKIP_REASONS[0]);
+            setSkipNotes("");
+            setShowSkipModal(true);
+          }}
+        >
+          Skip / Reschedule
+        </Button>
+      )}
+
+      {/* Skip modal */}
+      <Dialog open={showSkipModal} onOpenChange={setShowSkipModal}>
+        <DialogContent data-testid="dialog-skip-stop">
+          <DialogHeader>
+            <DialogTitle>Skip this stop?</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 py-2">
+            <RadioGroup
+              value={skipReason}
+              onValueChange={setSkipReason}
+              className="flex flex-col gap-2"
+            >
+              {SKIP_REASONS.map((reason) => (
+                <div key={reason} className="flex items-center gap-2">
+                  <RadioGroupItem
+                    id={`skip-reason-${reason}`}
+                    value={reason}
+                    data-testid={`radio-skip-reason-${reason.replace(/\s+/g, "-").toLowerCase()}`}
+                  />
+                  <Label htmlFor={`skip-reason-${reason}`} className="cursor-pointer">
+                    {reason}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="skip-notes" className="text-sm text-muted-foreground">
+                Notes (optional)
+              </Label>
+              <Textarea
+                id="skip-notes"
+                data-testid="textarea-skip-notes"
+                placeholder="Add any additional details…"
+                value={skipNotes}
+                onChange={(e) => setSkipNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              data-testid="button-skip-cancel"
+              variant="outline"
+              onClick={() => setShowSkipModal(false)}
+              disabled={skipping}
+            >
+              Cancel
+            </Button>
+            <Button
+              data-testid="button-skip-confirm"
+              variant="destructive"
+              onClick={handleSkip}
+              disabled={skipping}
+            >
+              {skipping && <Loader2 className="animate-spin h-4 w-4 mr-2" />}
+              Confirm Skip
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
