@@ -688,7 +688,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
 
-      <div className="mt-auto p-4 border-t-2 border-primary/20 bg-gradient-to-t from-primary/5 to-transparent">
+      <div className="mt-auto flex-shrink-0 p-3 border-t-2 border-primary/20 bg-gradient-to-t from-primary/5 to-transparent">
         {isMobileSheet ? (
           /* Mobile sheet: direct links — avoids Radix portal z-index issues on Android */
           <div className="space-y-0.5">
@@ -776,7 +776,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 title="CompanyHQ"
                 data-testid="link-hq"
               >
-                <Building2 className="h-8 w-8 opacity-40 shrink-0" />
+                <Building2 className="h-5 w-5 opacity-40 shrink-0" />
               </button>
             </Link>
             <Link href="/settings">
@@ -784,7 +784,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 className="p-1 rounded-lg hover:bg-white/10 text-sidebar-foreground transition-colors shrink-0"
                 data-testid="link-settings"
               >
-                <Settings className="h-8 w-8 opacity-40 shrink-0" />
+                <Settings className="h-5 w-5 opacity-40 shrink-0" />
               </button>
             </Link>
             <button
@@ -793,7 +793,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               disabled={logoutMutation.isPending}
               data-testid="button-logout"
             >
-              <LogOut className="h-8 w-8 shrink-0" />
+              <LogOut className="h-5 w-5 shrink-0" />
             </button>
           </div>
         )}

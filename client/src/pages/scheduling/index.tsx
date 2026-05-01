@@ -373,7 +373,7 @@ export default function SchedulingCalendar() {
     <div className="flex h-full overflow-hidden" data-testid="scheduling-page">
 
       {/* ── Left: Unscheduled jobs panel ── */}
-      <div className="w-64 flex-shrink-0 border-r flex flex-col bg-muted/20">
+      <div className="hidden md:flex md:w-64 md:flex-shrink-0 border-r flex-col bg-muted/20">
         <div className="px-3 py-3 border-b bg-background">
           <div className="flex items-center gap-2">
             <Briefcase className="h-4 w-4 text-muted-foreground" />
@@ -463,8 +463,8 @@ export default function SchedulingCalendar() {
             </span>
           </div>
 
-          {/* Division legend */}
-          <div className="flex items-center gap-4">
+          {/* Division legend — hidden on small screens */}
+          <div className="hidden sm:flex items-center gap-4">
             {DIVISIONS.map(d => (
               <div key={d.value} className="flex items-center gap-1.5 text-xs">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
@@ -474,9 +474,12 @@ export default function SchedulingCalendar() {
           </div>
         </div>
 
+        {/* Horizontal-scroll wrapper: day headers + time grid scroll together on mobile */}
+        <div className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden min-w-0">
+
         {/* Day headers */}
         <div
-          className="grid border-b bg-muted/20 shrink-0"
+          className="grid border-b bg-muted/20 shrink-0 min-w-[560px]"
           style={{ gridTemplateColumns: "56px repeat(7, 1fr)" }}
         >
           <div className="border-r" />
@@ -500,7 +503,7 @@ export default function SchedulingCalendar() {
         </div>
 
         {/* Scrollable time grid */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-w-[560px]">
           {calLoading && (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -589,6 +592,7 @@ export default function SchedulingCalendar() {
             </div>
           )}
         </div>
+        </div>{/* end horizontal-scroll wrapper */}
       </div>
 
       {/* ── Floating Undo Button ── */}
