@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation, Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Loader2, ClipboardList, Download } from "lucide-react";
+import { Loader2, ClipboardList, Download, MapPin } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -21,6 +23,24 @@ interface WorksheetSummary {
   job_name: string | null;
   materials_total: string | number;
   expenses_total: string | number;
+}
+
+interface SkippedStop {
+  title: string;
+  skip_reason: string | null;
+  customer_name: string | null;
+}
+
+interface RouteDayReview {
+  id: string;
+  date: string;
+  weather: string[];
+  summary_notes: string | null;
+  status: string;
+  employee_name: string;
+  total_minutes: number;
+  completed_count: number;
+  skipped_stops: SkippedStop[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -46,12 +66,33 @@ function fmtDate(dateStr: string) {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 }
 
+const WEATHER_ICON: Record<string, string> = {
+  sunny: "☀️", cloudy: "☁️", rainy: "🌧️", stormy: "⛈️",
+  windy: "💨", snowy: "❄️", foggy: "🌫️", hail: "🌨️",
+};
+
+function formatMinutes(mins: number): string {
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function WorksheetReviewList() {
   const [, navigate] = useLocation();
   const [exporting, setExporting] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
+  const isAdmin =
+    (user as any)?.role === "Admin" ||
+    (user as any)?.role === "Manager" ||
+    (user as any)?.isMasterAdmin;
+
+  // ── Daily worksheets query ─────────────────────────────────────────────────
   const { data: worksheets = [], isLoading, error } = useQuery<WorksheetSummary[]>({
     queryKey: ["/api/worksheets"],
     queryFn: () => apiRequest("GET", "/api/worksheets").then((r) => r.json()),
@@ -61,6 +102,46 @@ export default function WorksheetReviewList() {
   const others    = worksheets.filter((w) => w.status !== "submitted");
   const sorted    = [...submitted, ...others];
 
+  // ── Route-day review state & queries ──────────────────────────────────────
+  const [routeDayStatus, setRouteDayStatus] = useState<"submitted" | "approved" | "rejected">("submitted");
+
+  const { data: routeDays = [], isLoading: routeDaysLoading } = useQuery<RouteDayReview[]>({
+    queryKey: ["/api/admin/route-days", routeDayStatus],
+    queryFn: () => apiRequest("GET", `/api/admin/route-days?status=${routeDayStatus}`).then((r) => r.json()),
+    enabled: isAdmin,
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("PATCH", `/api/admin/route-days/${id}/approve`).then((r) => {
+        if (!r.ok) return r.json().then((e: any) => Promise.reject(new Error(e.error)));
+        return r.json();
+      }),
+    onSuccess: () => {
+      toast({ title: "Route day approved" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/route-days"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to approve", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("PATCH", `/api/admin/route-days/${id}/reject`).then((r) => {
+        if (!r.ok) return r.json().then((e: any) => Promise.reject(new Error(e.error)));
+        return r.json();
+      }),
+    onSuccess: () => {
+      toast({ title: "Route day rejected" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/route-days"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to reject", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // ── Export ─────────────────────────────────────────────────────────────────
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -112,6 +193,157 @@ export default function WorksheetReviewList() {
           Export CSV
         </Button>
       </div>
+
+      {/* ── Route Day Submissions (admin/manager only) ────────────────────── */}
+      {isAdmin && (
+        <Card>
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-green-600" />
+                Route Day Submissions
+              </h2>
+              <div className="flex gap-1.5">
+                {(["submitted", "approved", "rejected"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setRouteDayStatus(s)}
+                    data-testid={`btn-route-status-${s}`}
+                    className={[
+                      "px-2.5 py-1 rounded text-xs font-medium capitalize transition-colors",
+                      routeDayStatus === s
+                        ? "bg-green-600 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200",
+                    ].join(" ")}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {routeDaysLoading && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            )}
+
+            {!routeDaysLoading && routeDays.length === 0 && (
+              <p
+                className="text-sm text-gray-500 text-center py-6"
+                data-testid="text-route-days-empty"
+              >
+                No route days yet.
+              </p>
+            )}
+
+            {!routeDaysLoading && routeDays.length > 0 && (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {routeDays.map((rd) => (
+                  <div
+                    key={rd.id}
+                    data-testid={`card-route-day-${rd.id}`}
+                    className="border rounded-lg p-4 bg-white shadow-sm flex flex-col gap-2"
+                  >
+                    {/* Header row */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-gray-900 text-sm" data-testid={`text-rd-employee-${rd.id}`}>
+                          {rd.employee_name}
+                        </p>
+                        <p className="text-xs text-gray-500" data-testid={`text-rd-date-${rd.id}`}>
+                          {fmtDate(rd.date)}
+                        </p>
+                      </div>
+                      {/* Weather chips */}
+                      {rd.weather.length > 0 && (
+                        <div className="flex flex-wrap gap-1 justify-end">
+                          {rd.weather.map((w) => (
+                            <span key={w} className="text-xs bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">
+                              {WEATHER_ICON[w] ?? ""} {w}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Stats row */}
+                    <div className="flex gap-3 text-xs text-gray-600">
+                      <span data-testid={`text-rd-minutes-${rd.id}`}>
+                        🕐 {formatMinutes(rd.total_minutes)}
+                      </span>
+                      <span data-testid={`text-rd-completed-${rd.id}`}>
+                        ✅ {rd.completed_count} completed
+                      </span>
+                      {rd.skipped_stops.length > 0 && (
+                        <span className="text-amber-600" data-testid={`text-rd-skipped-${rd.id}`}>
+                          ⏭️ {rd.skipped_stops.length} skipped
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Skipped stops detail */}
+                    {rd.skipped_stops.length > 0 && (
+                      <div className="bg-amber-50 rounded p-2 space-y-1">
+                        {rd.skipped_stops.map((s, i) => (
+                          <div key={i} className="text-xs text-amber-800">
+                            <span className="font-medium">{s.title}</span>
+                            {s.customer_name && <span className="text-amber-600"> · {s.customer_name}</span>}
+                            {s.skip_reason && <span className="block text-amber-600 pl-2">— {s.skip_reason}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Summary notes */}
+                    {rd.summary_notes && (
+                      <div
+                        className="text-xs text-gray-600 border-t pt-2 prose prose-xs max-w-none line-clamp-3"
+                        dangerouslySetInnerHTML={{ __html: rd.summary_notes }}
+                        data-testid={`text-rd-notes-${rd.id}`}
+                      />
+                    )}
+
+                    {/* Detail link + Actions */}
+                    <div className="mt-1 border-t pt-2 flex flex-col gap-2">
+                      <Link
+                        href={`/admin/route-days/${rd.id}`}
+                        className="text-xs text-green-700 hover:underline self-start"
+                        data-testid={`link-rd-detail-${rd.id}`}
+                      >
+                        View details →
+                      </Link>
+                      {routeDayStatus === "submitted" && (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white h-7 text-xs"
+                            onClick={() => approveMutation.mutate(rd.id)}
+                            disabled={approveMutation.isPending}
+                            data-testid={`btn-approve-rd-${rd.id}`}
+                          >
+                            {approveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Approve"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 border-red-300 text-red-600 hover:bg-red-50 h-7 text-xs"
+                            onClick={() => rejectMutation.mutate(rd.id)}
+                            disabled={rejectMutation.isPending}
+                            data-testid={`btn-reject-rd-${rd.id}`}
+                          >
+                            {rejectMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Reject"}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary counts */}
       <div className="flex gap-3 flex-wrap">
