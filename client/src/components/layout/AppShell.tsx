@@ -532,7 +532,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div 
         ref={sidebarNavRef}
         onScroll={handleSidebarScroll}
-        className="flex-1 py-4 px-3 overflow-y-auto"
+        className="flex-1 min-h-0 py-4 px-3 overflow-y-auto"
       >
         {applicantItem && (
           <div className="mb-2">
@@ -688,63 +688,51 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
 
-      <div className="mt-auto flex-shrink-0 p-3 border-t-2 border-primary/20 bg-gradient-to-t from-primary/5 to-transparent">
+      <div className="mt-auto flex-shrink-0 p-2 sm:p-3 border-t-2 border-primary/20 bg-gradient-to-t from-primary/5 to-transparent">
         {isMobileSheet ? (
-          /* Mobile sheet: direct links — avoids Radix portal z-index issues on Android */
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-3 px-2 py-2 mb-1">
-              <Avatar className="h-8 w-8 border border-white/20 shrink-0">
+          /* Mobile sheet: single compact row — avatar + name + 3 icon actions */
+          <div className="flex items-center gap-2">
+            <Link href="/profile" className="shrink-0" onClick={() => setIsMobileOpen(false)}>
+              <Avatar className="h-8 w-8 border border-white/20" data-testid="link-profile-mobile">
                 <AvatarFallback className="bg-primary/20 text-xs font-bold">
                   {user?.name?.split(" ").map((n: string) => n[0]).join("") || "U"}
                 </AvatarFallback>
               </Avatar>
-              <div className="text-left min-w-0">
-                <p className="text-sm font-bold truncate leading-none mb-1 text-sidebar-foreground">
-                  {user?.name || user?.username}
-                </p>
-                <p className="text-[10px] font-medium opacity-60 uppercase tracking-wider truncate text-sidebar-foreground">
-                  {previewRole || effectiveRole || user?.role}
-                </p>
-              </div>
-            </div>
-            <Link href="/profile">
-              <button
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-white/10 text-sidebar-foreground transition-colors"
-                onClick={() => setIsMobileOpen(false)}
-                data-testid="link-profile-mobile"
-              >
-                <User className="h-4 w-4 opacity-70 shrink-0" />
-                {t("nav.myProfile")}
-              </button>
             </Link>
-            <Link href="/hq">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold truncate leading-tight text-sidebar-foreground">
+                {user?.name || user?.username}
+              </p>
+              <p className="hidden sm:block text-[10px] font-medium opacity-60 uppercase tracking-wider truncate text-sidebar-foreground">
+                {previewRole || effectiveRole || user?.role}
+              </p>
+            </div>
+            <Link href="/hq" className="shrink-0">
               <button
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-white/10 text-sidebar-foreground transition-colors"
+                className="p-1 rounded-lg hover:bg-white/10 text-sidebar-foreground transition-colors"
                 onClick={() => setIsMobileOpen(false)}
+                title="CompanyHQ"
                 data-testid="link-hq-mobile"
               >
-                <Building2 className="h-4 w-4 opacity-70 shrink-0" />
-                CompanyHQ
+                <Building2 className="h-5 w-5 opacity-70" />
               </button>
             </Link>
-            <Link href="/settings">
+            <Link href="/settings" className="shrink-0">
               <button
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-white/10 text-sidebar-foreground transition-colors"
+                className="p-1 rounded-lg hover:bg-white/10 text-sidebar-foreground transition-colors"
                 onClick={() => setIsMobileOpen(false)}
                 data-testid="link-settings-mobile"
               >
-                <Settings className="h-4 w-4 opacity-70 shrink-0" />
-                {t("nav.settings")}
+                <Settings className="h-5 w-5 opacity-70" />
               </button>
             </Link>
             <button
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-white/10 text-red-400 transition-colors"
+              className="shrink-0 p-1 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"
               onClick={() => { setIsMobileOpen(false); logoutMutation.mutate(); }}
               disabled={logoutMutation.isPending}
               data-testid="button-logout-mobile"
             >
-              <LogOut className="h-4 w-4 shrink-0" />
-              {t("nav.logOut")}
+              <LogOut className="h-5 w-5" />
             </button>
           </div>
         ) : (
