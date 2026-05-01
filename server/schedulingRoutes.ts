@@ -21,6 +21,7 @@ export function registerSchedulingRoutes(app: Express) {
            j.scheduled_start_time, j.scheduled_end_time,
            c.first_name || ' ' || c.last_name AS customer_name,
            p.address AS property_address,
+           COALESCE(MIN(ja.sort_order), 0) AS sort_order,
            COALESCE(
              json_agg(
                DISTINCT jsonb_build_object('id', e.id, 'first_name', e.first_name, 'last_name', e.last_name)
@@ -35,7 +36,7 @@ export function registerSchedulingRoutes(app: Express) {
          WHERE j.scheduled_date IS NOT NULL
            AND j.scheduled_date::date BETWEEN $1 AND $2
          GROUP BY j.id, c.first_name, c.last_name, p.address
-         ORDER BY j.scheduled_date, j.scheduled_start_time NULLS LAST`,
+         ORDER BY j.scheduled_date, COALESCE(MIN(ja.sort_order), 0), j.scheduled_start_time NULLS LAST`,
         [start, end]
       );
       res.json(rows);
@@ -172,6 +173,36 @@ export function registerSchedulingRoutes(app: Express) {
       res.status(500).json({ message: "Error unscheduling job" });
     } finally {
       client.release();
+    }
+  });
+
+  // ── PATCH /api/scheduling/jobs/:jobId/sort-order ─────────────────────────────
+  // Updates the sort_order of a job_assignment row for a specific employee+date.
+  // Requires Admin or Manager role.
+  app.patch("/api/scheduling/jobs/:jobId/sort-order", requireAuth, async (req: any, res) => {
+    const user = req.user;
+    if (user?.role !== "Admin" && user?.role !== "Manager" && !user?.isMasterAdmin) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const { jobId } = req.params;
+    const { employee_id, scheduled_date, sort_order } = req.body ?? {};
+    if (!employee_id || !scheduled_date || typeof sort_order !== "number") {
+      return res.status(400).json({ message: "employee_id, scheduled_date, and sort_order are required" });
+    }
+    try {
+      const result = await pool.query(
+        `UPDATE job_assignments
+         SET sort_order = $1
+         WHERE job_id = $2 AND employee_id = $3 AND scheduled_date = $4`,
+        [sort_order, jobId, employee_id, scheduled_date]
+      );
+      if (result.rowCount === 0) {
+        return res.status(404).json({ message: "No matching job assignment found" });
+      }
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[scheduling/sort-order]", err.message);
+      res.status(500).json({ message: "Error updating sort order" });
     }
   });
 

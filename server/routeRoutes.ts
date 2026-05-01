@@ -369,4 +369,118 @@ export function registerRouteRoutes(app: Express, requireAuth: any) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // ── GET /api/admin/route-days ─────────────────────────────────────────────
+  // Returns route_days with status = 'submitted' (or optional ?status= filter)
+  // enriched with employee name, total minutes, completed count, skipped stops.
+  // Admin / Manager only.
+  app.get("/api/admin/route-days", requireAuth, async (req: any, res) => {
+    const user = req.user;
+    if (user?.role !== "Admin" && user?.role !== "Manager" && !user?.isMasterAdmin) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const status = (req.query.status as string) || "submitted";
+    try {
+      const { rows } = await pool.query(
+        `SELECT
+           rd.id,
+           rd.date::text                          AS date,
+           rd.weather,
+           rd.summary_notes,
+           rd.status,
+           COALESCE(u.name, u.username)           AS employee_name,
+           -- total minutes clocked in for this user on this date
+           (
+             SELECT COALESCE(SUM(te.duration_minutes), 0)::int
+             FROM   time_entries te
+             WHERE  te.user_id = rd.employee_id
+               AND  DATE(te.clock_in AT TIME ZONE 'UTC') = rd.date
+           ) AS total_minutes,
+           -- completed stop count (worksheet_sessions status in approved set)
+           (
+             SELECT COUNT(*)::int
+             FROM   job_assignments ja
+             JOIN   employees emp ON emp.id = ja.employee_id AND emp.user_id = rd.employee_id
+             JOIN   jobs j         ON j.id = ja.job_id
+             LEFT JOIN worksheet_sessions ws
+               ON  ws.job_id = j.id
+               AND ws.date = rd.date
+               AND ws.employee_id = rd.employee_id
+             WHERE  ja.scheduled_date = rd.date
+               AND  ws.status IN ('pending_review', 'submitted', 'approved')
+           ) AS completed_count,
+           -- skipped stops as JSON array
+           (
+             SELECT COALESCE(
+               json_agg(json_build_object(
+                 'title',         j.title,
+                 'skip_reason',   ws.skip_reason,
+                 'customer_name', COALESCE(c.company_name,
+                                    TRIM(COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,'')))
+               )),
+               '[]'::json
+             )
+             FROM   job_assignments ja
+             JOIN   employees emp ON emp.id = ja.employee_id AND emp.user_id = rd.employee_id
+             JOIN   jobs j         ON j.id = ja.job_id
+             LEFT JOIN customers c ON c.id = j.customer_id
+             LEFT JOIN worksheet_sessions ws
+               ON  ws.job_id = j.id
+               AND ws.date = rd.date
+               AND ws.employee_id = rd.employee_id
+             WHERE  ja.scheduled_date = rd.date
+               AND  ws.status = 'skipped'
+           ) AS skipped_stops
+         FROM  route_days rd
+         JOIN  users u ON u.id = rd.employee_id
+         WHERE rd.status = $1
+         ORDER BY rd.date DESC, COALESCE(u.name, u.username)`,
+        [status]
+      );
+      res.json(rows);
+    } catch (err: any) {
+      console.error("[admin/route-days]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PATCH /api/admin/route-days/:id/approve ───────────────────────────────
+  app.patch("/api/admin/route-days/:id/approve", requireAuth, async (req: any, res) => {
+    const user = req.user;
+    if (user?.role !== "Admin" && user?.role !== "Manager" && !user?.isMasterAdmin) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    try {
+      const result = await pool.query(
+        `UPDATE route_days SET status = 'approved', updated_at = NOW()
+         WHERE id = $1 RETURNING id`,
+        [req.params.id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: "Route day not found" });
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[admin/route-days/approve]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PATCH /api/admin/route-days/:id/reject ────────────────────────────────
+  app.patch("/api/admin/route-days/:id/reject", requireAuth, async (req: any, res) => {
+    const user = req.user;
+    if (user?.role !== "Admin" && user?.role !== "Manager" && !user?.isMasterAdmin) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    try {
+      const result = await pool.query(
+        `UPDATE route_days SET status = 'rejected', updated_at = NOW()
+         WHERE id = $1 RETURNING id`,
+        [req.params.id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: "Route day not found" });
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[admin/route-days/reject]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
 }

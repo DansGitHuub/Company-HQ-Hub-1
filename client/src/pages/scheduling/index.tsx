@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ interface ScheduledJob {
   customer_name: string | null;
   property_address: string | null;
   assigned_crew: CrewMember[];
+  sort_order?: number;
 }
 interface UnscheduledJob {
   id: string; title: string; status: string;
@@ -358,14 +360,69 @@ export default function SchedulingCalendar() {
     });
   }
 
+  // ── Local sort-order state (optimistic reorder within day columns) ──────────
+  const [localDayOrder, setLocalDayOrder] = useState<Record<string, string[]>>({});
+
   function getJobsForDay(day: Date): ScheduledJob[] {
     const dayStr = format(day, "yyyy-MM-dd");
     // Slice to 10 chars to handle both "YYYY-MM-DD" and "YYYY-MM-DDTHH:mm:ss.sssZ" formats
     return calJobs.filter(j => (j.scheduled_date ?? "").slice(0, 10) === dayStr);
   }
 
+  function getOrderedDayJobs(day: Date): ScheduledJob[] {
+    const dayStr = format(day, "yyyy-MM-dd");
+    const jobs = getJobsForDay(day);
+    const localOrder = localDayOrder[dayStr];
+    if (localOrder && localOrder.length === jobs.length) {
+      const idToJob = new Map(jobs.map(j => [j.id, j]));
+      return localOrder.map(id => idToJob.get(id)).filter(Boolean) as ScheduledJob[];
+    }
+    return [...jobs].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  }
+
   function jobCountForDay(day: Date) {
     return getJobsForDay(day).length;
+  }
+
+  async function handleDayDragEnd(result: DropResult) {
+    const { draggableId, source, destination } = result;
+    if (!destination) return;
+    if (source.droppableId !== destination.droppableId) return;
+    if (source.index === destination.index) return;
+
+    const dayStr = destination.droppableId;
+    const dayJobs = getOrderedDayJobs(parseISO(dayStr));
+
+    // Reorder
+    const reordered = [...dayJobs];
+    const [moved] = reordered.splice(source.index, 1);
+    reordered.splice(destination.index, 0, moved);
+
+    // Optimistic update
+    setLocalDayOrder(prev => ({ ...prev, [dayStr]: reordered.map(j => j.id) }));
+
+    // Persist each changed job for all of its crew members
+    const patches: Promise<any>[] = [];
+    reordered.forEach((job, idx) => {
+      const newOrder = (idx + 1) * 10;
+      const crewIds = job.assigned_crew.map(c => c.id);
+      for (const empId of crewIds) {
+        patches.push(
+          apiRequest("PATCH", `/api/scheduling/jobs/${job.id}/sort-order`, {
+            employee_id: empId,
+            scheduled_date: dayStr,
+            sort_order: newOrder,
+          }).catch(() => {})
+        );
+      }
+    });
+
+    try {
+      await Promise.all(patches);
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/calendar"] });
+    } catch {
+      toast({ title: t("errorSchedulingJob"), variant: "destructive" });
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -502,7 +559,8 @@ export default function SchedulingCalendar() {
           })}
         </div>
 
-        {/* Scrollable time grid */}
+        {/* Scrollable time grid — wrapped in DragDropContext for within-column sort-order reorder */}
+        <DragDropContext onDragEnd={handleDayDragEnd}>
         <div className="flex-1 overflow-y-auto min-w-[560px]">
           {calLoading && (
             <div className="flex items-center justify-center py-16">
@@ -529,13 +587,17 @@ export default function SchedulingCalendar() {
 
               {/* Day columns */}
               {weekDays.map(day => {
-                const dayJobs = getJobsForDay(day);
+                const dayStr  = format(day, "yyyy-MM-dd");
+                const dayJobs = getOrderedDayJobs(day);
+                const isMulti = dayJobs.length >= 2;
+
                 return (
                   <div
                     key={day.toISOString()}
                     className="relative border-r last:border-r-0"
                     style={{ minHeight: HOURS.length * CELL_H }}
                   >
+                    {/* Hour drop-cells: always present so new jobs can be dragged in */}
                     {HOURS.map(h => (
                       <div
                         key={h}
@@ -543,55 +605,113 @@ export default function SchedulingCalendar() {
                         style={{ height: CELL_H }}
                         onDragOver={handleDragOver}
                         onDrop={e => handleDrop(e, day, h)}
-                        data-testid={`cell-${format(day, "yyyy-MM-dd")}-${h}`}
+                        data-testid={`cell-${dayStr}-${h}`}
                       />
                     ))}
 
-                    {dayJobs.map(job => {
-                      const startH = parseHour(job.scheduled_start_time) ?? 8;
-                      const endH   = parseHour(job.scheduled_end_time)   ?? startH + 2;
-                      const clampedStart = Math.max(startH, HOURS[0]);
-                      const clampedEnd   = Math.min(endH,   HOURS[HOURS.length - 1] + 1);
-                      const top    = (clampedStart - HOURS[0]) * CELL_H;
-                      const height = Math.max((clampedEnd - clampedStart) * CELL_H, 28);
-                      const bg     = job.color ?? getDivisionColor(job.division);
-
-                      return (
-                        <div
-                          key={job.id}
-                          draggable
-                          onDragStart={e => handleDragStart(e, job.id)}
-                          className="absolute left-0.5 right-0.5 rounded text-white text-[10px] px-1.5 py-0.5 overflow-hidden cursor-grab active:cursor-grabbing hover:brightness-90 transition-all group"
-                          style={{ top, height, backgroundColor: bg }}
-                          data-testid={`cal-job-${job.id}`}
-                        >
-                          <div className="font-semibold truncate leading-tight">{job.title}</div>
-                          {height >= 44 && job.customer_name && (
-                            <div className="truncate opacity-80 leading-tight">{job.customer_name}</div>
-                          )}
-                          {height >= 60 && job.assigned_crew.length > 0 && (
-                            <div className="truncate opacity-70 leading-tight">
-                              {job.assigned_crew.map(c => c.first_name).join(", ")}
-                            </div>
-                          )}
-                          {/* Remove button */}
-                          <button
-                            className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 bg-black/30 rounded p-0.5 transition-opacity"
-                            onClick={e => { e.stopPropagation(); unscheduleMutation.mutate(job.id); }}
-                            data-testid={`btn-unschedule-${job.id}`}
-                            title={t("removeFromSchedule")}
+                    {/* ── Multi-job bucket: @hello-pangea/dnd sortable list ── */}
+                    {isMulti ? (
+                      <Droppable droppableId={dayStr}>
+                        {(provided) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className="absolute inset-x-0 top-0 z-10 flex flex-col gap-0.5 p-0.5"
                           >
-                            <X className="h-2.5 w-2.5" />
-                          </button>
-                        </div>
-                      );
-                    })}
+                            {dayJobs.map((job, idx) => {
+                              const bg = job.color ?? getDivisionColor(job.division);
+                              return (
+                                <Draggable key={job.id} draggableId={job.id} index={idx}>
+                                  {(dragProvided, snapshot) => (
+                                    <div
+                                      ref={dragProvided.innerRef}
+                                      {...dragProvided.draggableProps}
+                                      {...dragProvided.dragHandleProps}
+                                      data-testid={`cal-job-${job.id}`}
+                                      className={[
+                                        "rounded text-white text-[10px] px-1.5 py-1 overflow-hidden cursor-grab active:cursor-grabbing transition-all group select-none",
+                                        snapshot.isDragging ? "shadow-lg opacity-90" : "hover:brightness-90",
+                                      ].join(" ")}
+                                      style={{ backgroundColor: bg, ...dragProvided.draggableProps.style }}
+                                    >
+                                      <div className="flex items-start justify-between gap-1">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-semibold truncate leading-tight">{job.title}</div>
+                                          {job.customer_name && (
+                                            <div className="truncate opacity-80 leading-tight">{job.customer_name}</div>
+                                          )}
+                                          {job.assigned_crew.length > 0 && (
+                                            <div className="truncate opacity-70 leading-tight">
+                                              {job.assigned_crew.map(c => c.first_name).join(", ")}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <button
+                                          className="shrink-0 opacity-0 group-hover:opacity-100 bg-black/30 rounded p-0.5 transition-opacity"
+                                          onClick={e => { e.stopPropagation(); unscheduleMutation.mutate(job.id); }}
+                                          data-testid={`btn-unschedule-${job.id}`}
+                                          title={t("removeFromSchedule")}
+                                        >
+                                          <X className="h-2.5 w-2.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </Draggable>
+                              );
+                            })}
+                            {provided.placeholder}
+                          </div>
+                        )}
+                      </Droppable>
+                    ) : (
+                      /* ── Single-job day: keep existing absolute time-positioned rendering ── */
+                      dayJobs.map(job => {
+                        const startH = parseHour(job.scheduled_start_time) ?? 8;
+                        const endH   = parseHour(job.scheduled_end_time)   ?? startH + 2;
+                        const clampedStart = Math.max(startH, HOURS[0]);
+                        const clampedEnd   = Math.min(endH,   HOURS[HOURS.length - 1] + 1);
+                        const top    = (clampedStart - HOURS[0]) * CELL_H;
+                        const height = Math.max((clampedEnd - clampedStart) * CELL_H, 28);
+                        const bg     = job.color ?? getDivisionColor(job.division);
+
+                        return (
+                          <div
+                            key={job.id}
+                            draggable
+                            onDragStart={e => handleDragStart(e, job.id)}
+                            className="absolute left-0.5 right-0.5 rounded text-white text-[10px] px-1.5 py-0.5 overflow-hidden cursor-grab active:cursor-grabbing hover:brightness-90 transition-all group"
+                            style={{ top, height, backgroundColor: bg }}
+                            data-testid={`cal-job-${job.id}`}
+                          >
+                            <div className="font-semibold truncate leading-tight">{job.title}</div>
+                            {height >= 44 && job.customer_name && (
+                              <div className="truncate opacity-80 leading-tight">{job.customer_name}</div>
+                            )}
+                            {height >= 60 && job.assigned_crew.length > 0 && (
+                              <div className="truncate opacity-70 leading-tight">
+                                {job.assigned_crew.map(c => c.first_name).join(", ")}
+                              </div>
+                            )}
+                            <button
+                              className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 bg-black/30 rounded p-0.5 transition-opacity"
+                              onClick={e => { e.stopPropagation(); unscheduleMutation.mutate(job.id); }}
+                              data-testid={`btn-unschedule-${job.id}`}
+                              title={t("removeFromSchedule")}
+                            >
+                              <X className="h-2.5 w-2.5" />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 );
               })}
             </div>
           )}
         </div>
+        </DragDropContext>
         </div>{/* end horizontal-scroll wrapper */}
       </div>
 
