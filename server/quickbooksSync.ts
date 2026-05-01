@@ -46,46 +46,107 @@ async function saveTokens(tokens: {
 
 async function refreshAccessToken(tok: any): Promise<any> {
   try {
-    const { default: OAuthClient } = await import("intuit-oauth");
-    const client = new OAuthClient({
-      clientId: process.env.QB_CLIENT_ID || process.env.QUICKBOOKS_CLIENT_ID!,
-      clientSecret: process.env.QB_CLIENT_SECRET || process.env.QUICKBOOKS_CLIENT_SECRET!,
-      environment: "production",
-      redirectUri: "https://companyhq.app/api/auth/quickbooks/callback",
-    });
-    client.setToken({
-      access_token: tok.access_token,
-      refresh_token: tok.refresh_token,
-      token_type: "bearer",
-      realmId: tok.realm_id,
-    });
-    const resp = await client.refresh();
-    const newTok = resp.getJson();
+    // ── Acquire a pooled connection for the advisory-lock transaction ─────────
+    const conn = await pool.connect();
+    try {
+      await conn.query("BEGIN");
 
-    // Bail immediately if Intuit's response is missing either token —
-    // persisting a null refresh_token would sever the connection permanently.
-    if (!newTok.access_token || !newTok.refresh_token) {
-      const errMsg = "Refresh response missing access_token or refresh_token";
-      qbAuthFailed = true;
-      await pool.query(
-        `UPDATE quickbooks_tokens SET needs_reauth=true, last_error=$1 WHERE realm_id=$2`,
-        [errMsg, tok.realm_id]
-      ).catch(() => {});
-      throw new Error(errMsg);
+      // Cross-process advisory lock: only one instance can rotate this realm's
+      // refresh_token at a time.  pg_advisory_xact_lock is released automatically
+      // when the transaction commits or rolls back.
+      await conn.query(
+        `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`,
+        [`qb-refresh:${tok.realm_id}`]
+      );
+
+      // Re-read post-lock state — a concurrent instance may have already rotated.
+      const { rows } = await conn.query(
+        `SELECT access_token, refresh_token, token_expiry
+         FROM quickbooks_tokens WHERE realm_id=$1`,
+        [tok.realm_id]
+      );
+
+      if (rows.length === 0) {
+        await conn.query("ROLLBACK");
+        throw new Error("QuickBooks tokens not found");
+      }
+
+      const dbTok = rows[0];
+
+      // If the DB already has a fresh token (another instance just refreshed),
+      // skip without calling Intuit and return the DB values.
+      if (new Date(dbTok.token_expiry) > new Date(Date.now() + 5 * 60 * 1000)) {
+        await conn.query("COMMIT");
+        console.log("[QB] Refresh skipped, DB has fresh token from concurrent rotation");
+        return {
+          ...tok,
+          access_token:  dbTok.access_token,
+          refresh_token: dbTok.refresh_token,
+          token_expiry:  dbTok.token_expiry,
+        };
+      }
+
+      // Use the LOCKED DB token values — not the stale in-memory tok passed in.
+      // @ts-ignore — intuit-oauth has no bundled type declarations
+      const { default: OAuthClient } = await import("intuit-oauth");
+      const qbClient = new OAuthClient({
+        clientId:     process.env.QB_CLIENT_ID || process.env.QUICKBOOKS_CLIENT_ID!,
+        clientSecret: process.env.QB_CLIENT_SECRET || process.env.QUICKBOOKS_CLIENT_SECRET!,
+        environment:  "production",
+        redirectUri:  "https://companyhq.app/api/auth/quickbooks/callback",
+      });
+      qbClient.setToken({
+        access_token:  dbTok.access_token,
+        refresh_token: dbTok.refresh_token,
+        token_type:    "bearer",
+        realmId:       tok.realm_id,
+      });
+
+      const resp   = await qbClient.refresh();
+      const newTok = resp.getJson();
+
+      // Bail if Intuit's response is missing either token — persisting a null
+      // refresh_token would sever the connection permanently.
+      if (!newTok.access_token || !newTok.refresh_token) {
+        // COMMIT to release the advisory lock without persisting bad data.
+        await conn.query("COMMIT");
+        const errMsg = "Refresh response missing access_token or refresh_token";
+        qbAuthFailed = true;
+        pool.query(
+          `UPDATE quickbooks_tokens SET needs_reauth=true, last_error=$1 WHERE realm_id=$2`,
+          [errMsg, tok.realm_id]
+        ).catch(() => {});
+        throw new Error(errMsg);
+      }
+
+      const expiry = new Date(Date.now() + (newTok.expires_in ?? 3600) * 1000);
+
+      // Persist inside the same transaction while the advisory lock is still held.
+      await conn.query(
+        `UPDATE quickbooks_tokens
+         SET access_token=$1, refresh_token=$2, token_expiry=$3,
+             last_sync=NOW(), needs_reauth=false, last_error=NULL
+         WHERE realm_id=$4`,
+        [newTok.access_token, newTok.refresh_token, expiry, tok.realm_id]
+      );
+
+      await conn.query("COMMIT");
+      qbAuthFailed = false;
+      console.log("[QB] Refresh rotated under advisory lock for realm_id=" + tok.realm_id);
+      return {
+        ...tok,
+        access_token:  newTok.access_token,
+        refresh_token: newTok.refresh_token,
+        token_expiry:  expiry,
+      };
+
+    } catch (innerErr) {
+      // ROLLBACK is a no-op if we already COMMITted (e.g. the missing-token path).
+      await conn.query("ROLLBACK").catch(() => {});
+      throw innerErr;
+    } finally {
+      conn.release();
     }
-
-    const expiry = new Date(Date.now() + (newTok.expires_in ?? 3600) * 1000);
-    // Persist BOTH the new access_token and the rotated refresh_token to DB
-    // before returning — Intuit revokes the old refresh_token within hours.
-    // saveTokens() also clears needs_reauth and last_error on success.
-    await saveTokens({
-      realm_id: tok.realm_id,
-      access_token: newTok.access_token,
-      refresh_token: newTok.refresh_token,
-      token_expiry: expiry,
-    });
-    qbAuthFailed = false;
-    return { ...tok, access_token: newTok.access_token, refresh_token: newTok.refresh_token, token_expiry: expiry };
   } catch (err: any) {
     const msg: string = err?.message ?? String(err);
     if (/invalid_grant|refresh token is invalid|unauthorized_client|token_revoked/i.test(msg)) {
