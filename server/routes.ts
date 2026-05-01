@@ -33,6 +33,7 @@ import { registerInvoiceRoutes } from "./invoiceRoutes";
 import { registerReportRoutes } from "./reportRoutes";
 import { registerConsultationRoutes } from "./consultationRoutes";
 import { registerServiceTypesRoutes } from "./serviceTypesRoutes";
+import { registerPricingRoutes } from "./pricingRoutes";
 import { registerUserAvailabilityRoutes } from "./userAvailabilityRoutes";
 import { registerPublicInquiryRoutes } from "./publicInquiryRoutes";
 import { registerPublicBookingRoutes } from "./publicBookingRoutes";
@@ -10486,6 +10487,7 @@ Provide accurate information based on publicly available documentation.`;
   registerWorksheetPhotoRoutes(app, requireAuth);
   registerDailyLogRoutes(app, requireAuth);
   registerSettingsRoutes(app, requireAuth, requireRole);
+  registerPricingRoutes(app, requireAuth);
   setInterval(runNoteReminderScheduler, 60 * 1000);
   console.log("[notes-scheduler] Note reminder scheduler started (checking every minute)");
 

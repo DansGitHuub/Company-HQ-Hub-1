@@ -3102,6 +3102,19 @@ export const insertWorksheetTeamMemberSchema = createInsertSchema(worksheetTeamM
 export type InsertWorksheetTeamMember = z.infer<typeof insertWorksheetTeamMemberSchema>;
 export type WorksheetTeamMember = typeof worksheetTeamMembers.$inferSelect;
 
+// ─── Estimating: Class Codes ──────────────────────────────────────────────────
+// Mirrors the four values in CATALOG_CLASSES below; keyed by integer id so
+// class_pricing_defaults and future estimate line items can FK to a stable PK.
+export const classCodes = pgTable("class_codes", {
+  id:        integer("id").primaryKey(),
+  name:      varchar("name", { length: 50 }).notNull().unique(),
+  label:     text("label").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export type ClassCode = typeof classCodes.$inferSelect;
+
 // ─── Materials Catalog ────────────────────────────────────────────────────────
 export const CATALOG_CLASSES = ["Labor", "Equipment", "Materials", "Subcontracting"] as const;
 export type CatalogClass = typeof CATALOG_CLASSES[number];
