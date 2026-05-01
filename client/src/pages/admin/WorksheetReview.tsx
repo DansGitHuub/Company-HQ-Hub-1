@@ -369,8 +369,8 @@ export default function WorksheetReview() {
           )}
 
           {!routeDaysLoading && routeDays.length === 0 && (
-            <p className="text-sm text-gray-500 text-center py-6">
-              No {routeDayStatus} route days.
+            <p className="text-sm text-gray-500 text-center py-6" data-testid="text-route-days-empty">
+              No route days yet.
             </p>
           )}
 
@@ -441,30 +441,39 @@ export default function WorksheetReview() {
                     />
                   )}
 
-                  {/* Actions */}
-                  {routeDayStatus === "submitted" && (
-                    <div className="flex gap-2 mt-1 border-t pt-2">
-                      <Button
-                        size="sm"
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white h-7 text-xs"
-                        onClick={() => approveMutation.mutate(rd.id)}
-                        disabled={approveMutation.isPending}
-                        data-testid={`btn-approve-rd-${rd.id}`}
-                      >
-                        {approveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Approve"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 border-red-300 text-red-600 hover:bg-red-50 h-7 text-xs"
-                        onClick={() => rejectMutation.mutate(rd.id)}
-                        disabled={rejectMutation.isPending}
-                        data-testid={`btn-reject-rd-${rd.id}`}
-                      >
-                        {rejectMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Reject"}
-                      </Button>
-                    </div>
-                  )}
+                  {/* Detail link + Actions */}
+                  <div className="mt-1 border-t pt-2 flex flex-col gap-2">
+                    <Link
+                      href={`/admin/route-days/${rd.id}`}
+                      className="text-xs text-green-700 hover:underline self-start"
+                      data-testid={`link-rd-detail-${rd.id}`}
+                    >
+                      View details →
+                    </Link>
+                    {routeDayStatus === "submitted" && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white h-7 text-xs"
+                          onClick={() => approveMutation.mutate(rd.id)}
+                          disabled={approveMutation.isPending}
+                          data-testid={`btn-approve-rd-${rd.id}`}
+                        >
+                          {approveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Approve"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 border-red-300 text-red-600 hover:bg-red-50 h-7 text-xs"
+                          onClick={() => rejectMutation.mutate(rd.id)}
+                          disabled={rejectMutation.isPending}
+                          data-testid={`btn-reject-rd-${rd.id}`}
+                        >
+                          {rejectMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Reject"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

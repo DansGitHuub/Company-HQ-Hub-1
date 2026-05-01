@@ -370,6 +370,142 @@ export function registerRouteRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── GET /api/admin/route-days/:id ────────────────────────────────────────
+  // Returns a single enriched route_day with per-stop drilldown.
+  // Each stop includes: job info, session status/skip_reason, closed time_entries,
+  // and worksheet_photos. Admin / Manager only.
+  app.get("/api/admin/route-days/:id", requireAuth, async (req: any, res) => {
+    const user = req.user;
+    if (user?.role !== "Admin" && user?.role !== "Manager" && !user?.isMasterAdmin) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const { id } = req.params;
+    try {
+      // ── Route day header ────────────────────────────────────────────────────
+      const rdResult = await pool.query(
+        `SELECT
+           rd.id,
+           rd.date::text                          AS date,
+           rd.weather,
+           rd.summary_notes,
+           rd.status,
+           COALESCE(u.name, u.username)           AS employee_name,
+           rd.employee_id,
+           rd.started_at,
+           rd.completed_at,
+           (
+             SELECT COALESCE(SUM(te.duration_minutes), 0)::int
+             FROM   time_entries te
+             WHERE  te.user_id = rd.employee_id
+               AND  DATE(te.clock_in AT TIME ZONE 'UTC') = rd.date
+           ) AS total_minutes,
+           (
+             SELECT COUNT(*)::int
+             FROM   job_assignments ja
+             JOIN   employees emp ON emp.id = ja.employee_id AND emp.user_id = rd.employee_id
+             JOIN   jobs j         ON j.id = ja.job_id
+             LEFT JOIN worksheet_sessions ws
+               ON  ws.job_id = j.id
+               AND ws.date = rd.date
+               AND ws.employee_id = rd.employee_id
+             WHERE  ja.scheduled_date = rd.date
+               AND  ws.status IN ('pending_review', 'submitted', 'approved')
+           ) AS completed_count
+         FROM  route_days rd
+         JOIN  users u ON u.id = rd.employee_id
+         WHERE rd.id = $1`,
+        [id]
+      );
+
+      if (rdResult.rows.length === 0) {
+        return res.status(404).json({ error: "Route day not found" });
+      }
+      const rd = rdResult.rows[0];
+
+      // ── Per-stop drilldown ──────────────────────────────────────────────────
+      // Resolve employee.id from users.id so we can query job_assignments.
+      const empResult = await pool.query(
+        `SELECT id FROM employees WHERE user_id = $1 LIMIT 1`,
+        [rd.employee_id]
+      );
+      const employeeId: string | null = empResult.rows[0]?.id ?? null;
+
+      let stops: any[] = [];
+      if (employeeId) {
+        const stopsResult = await pool.query(
+          `SELECT
+             j.id               AS job_id,
+             j.title            AS job_title,
+             COALESCE(
+               c.company_name,
+               TRIM(COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,''))
+             )                  AS customer_name,
+             ja.sort_order,
+             ws.id              AS session_id,
+             ws.status          AS session_status,
+             ws.skip_reason,
+             ws.skipped_at,
+             -- Closed time_entries for this user+job+date
+             (
+               SELECT COALESCE(
+                 json_agg(json_build_object(
+                   'id',               te.id,
+                   'clock_in',         te.clock_in,
+                   'clock_out',        te.clock_out,
+                   'duration_minutes', te.duration_minutes,
+                   'notes',            te.notes,
+                   'entry_type',       te.entry_type,
+                   'work_area_name',   te.work_area_name
+                 ) ORDER BY te.clock_in),
+                 '[]'::json
+               )
+               FROM time_entries te
+               WHERE te.job_id  = j.id
+                 AND te.user_id = $2
+                 AND DATE(te.clock_in AT TIME ZONE 'UTC') = $3::date
+                 AND te.clock_out IS NOT NULL
+             ) AS time_entries,
+             -- Photos linked to the worksheet_session
+             (
+               SELECT COALESCE(
+                 json_agg(json_build_object(
+                   'id',         wp.id,
+                   'photo_type', wp.photo_type,
+                   'photo_url',  '/api/worksheets/photos/' || wp.id::text || '/download',
+                   'caption',    wp.caption
+                 ) ORDER BY wp.created_at),
+                 '[]'::json
+               )
+               FROM worksheet_photos wp
+               WHERE ws.id IS NOT NULL AND wp.session_id = ws.id
+             ) AS photos
+           FROM job_assignments ja
+           JOIN jobs j         ON j.id  = ja.job_id
+           LEFT JOIN customers c  ON c.id  = j.customer_id
+           LEFT JOIN LATERAL (
+             SELECT id, status, skip_reason, skipped_at
+             FROM   worksheet_sessions
+             WHERE  job_id      = j.id
+               AND  date        = $3::date
+               AND  employee_id = $2
+             ORDER  BY created_at DESC
+             LIMIT  1
+           ) ws ON true
+           WHERE ja.scheduled_date = $3::date
+             AND ja.employee_id    = $1
+           ORDER BY ja.sort_order, j.scheduled_start_time NULLS LAST`,
+          [employeeId, rd.employee_id, rd.date]
+        );
+        stops = stopsResult.rows;
+      }
+
+      res.json({ ...rd, stops });
+    } catch (err: any) {
+      console.error("[admin/route-days/:id]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── GET /api/admin/route-days ─────────────────────────────────────────────
   // Returns route_days with status = 'submitted' (or optional ?status= filter)
   // enriched with employee name, total minutes, completed count, skipped stops.

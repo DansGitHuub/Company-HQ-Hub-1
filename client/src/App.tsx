@@ -139,6 +139,7 @@ import MessagesPage from "@/pages/Messages";
 import TimeReports from "@/pages/admin/TimeReports";
 import ServiceTypesPage from "@/pages/admin/ServiceTypesPage";
 import WorksheetReview from "@/pages/admin/WorksheetReview";
+import RouteDayDetail from "@/pages/admin/RouteDayDetail";
 import TimeCardApproval from "@/pages/admin/TimeCardApproval";
 import TimeAdminPage from "@/pages/admin/TimeAdminPage";
 import InquiryPage from "@/pages/Inquiry";
@@ -258,6 +259,7 @@ function AppRoutes() {
         <Route path="/clock-out-review" component={ClockOutReviewPage} />
         <Route path="/worksheet-review/:id" component={WorksheetReviewDetail} />
         <Route path="/worksheet-review" component={WorksheetReviewList} />
+        <Route path="/admin/route-days/:routeDayId" component={RouteDayDetail} />
         <Route path="/admin/work-areas" component={WorkAreasPage} />
         <Route path="/admin/qbo-export" component={QBOExportPage} />
         <Route path="/admin/archive" component={ArchivePage} />
