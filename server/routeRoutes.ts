@@ -1,5 +1,8 @@
 import type { Express } from "express";
 import { pool } from "./db";
+import { sendEmail } from "./emailService";
+import { getAdminManagerEmails } from "./dailyWorksheetRoutes";
+import { buildRouteDayEmail } from "./emailHelpers";
 
 export function registerRouteRoutes(app: Express, requireAuth: any) {
   // ── GET /api/route/today ──────────────────────────────────────────────────
@@ -202,6 +205,167 @@ export function registerRouteRoutes(app: Express, requireAuth: any) {
       res.json({ ok: true });
     } catch (err: any) {
       console.error("[route/start]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/route/submit ────────────────────────────────────────────────
+  // Marks today's route as complete, sends a summary email to admins/managers,
+  // and inserts an in-app notification for each Admin/Manager.
+  app.post("/api/route/submit", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+
+    // 1. Validate body.
+    const { summary_notes, weather } = req.body ?? {};
+    if (typeof summary_notes !== "string") {
+      return res.status(400).json({ error: "summary_notes must be a string" });
+    }
+    if (!Array.isArray(weather) || weather.some((w: any) => typeof w !== "string")) {
+      return res.status(400).json({ error: "weather must be an array of strings" });
+    }
+
+    try {
+      // 2. Mark route_day as submitted (weather is TEXT[] in the schema).
+      const rdResult = await pool.query(
+        `UPDATE route_days
+         SET    completed_at  = NOW(),
+                status        = 'submitted',
+                summary_notes = $1,
+                weather       = $2::text[],
+                updated_at    = NOW()
+         WHERE  employee_id = $3
+           AND  date        = CURRENT_DATE
+         RETURNING id, date`,
+        [summary_notes, weather, userId]
+      );
+
+      if (rdResult.rowCount === 0) {
+        return res.status(404).json({ error: "No active route day for today" });
+      }
+      const routeDay = rdResult.rows[0];
+      const routeDayId: string = routeDay.id;
+      const routeDate: string = routeDay.date instanceof Date
+        ? routeDay.date.toISOString().slice(0, 10)
+        : String(routeDay.date).slice(0, 10);
+
+      // Format date as MM/DD/YYYY for notification message.
+      const [yyyy, mm, dd] = routeDate.split("-");
+      const formattedDate = `${mm}/${dd}/${yyyy}`;
+
+      // Resolve employee name.
+      const userResult = await pool.query(
+        `SELECT name, username FROM users WHERE id = $1 LIMIT 1`,
+        [userId]
+      );
+      const userRow = userResult.rows[0];
+      const employeeName: string = userRow?.name || userRow?.username || "Employee";
+
+      // 3. Gather today's stops with clock times for the email body.
+      //    job_assignments.employee_id → employees.id; resolve it first.
+      const empResult = await pool.query(
+        `SELECT id FROM employees WHERE user_id = $1 LIMIT 1`,
+        [userId]
+      );
+      const employeeId: string | null = empResult.rows[0]?.id ?? null;
+
+      let stopsForEmail: Array<{
+        title: string;
+        customer_name: string | null;
+        address: string | null;
+        session_status: string | null;
+        skip_reason: string | null;
+        clock_in: string | null;
+        clock_out: string | null;
+      }> = [];
+
+      if (employeeId) {
+        const stopsResult = await pool.query(
+          `SELECT
+             j.title,
+             COALESCE(c.company_name, TRIM(COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,'')), NULL) AS customer_name,
+             COALESCE(p.address, j.address) AS address,
+             ws.status      AS session_status,
+             ws.skip_reason,
+             te.clock_in,
+             te.clock_out
+           FROM job_assignments ja
+           JOIN jobs j ON j.id = ja.job_id
+           LEFT JOIN customers c ON c.id = j.customer_id
+           LEFT JOIN properties p ON p.id = j.property_id
+           LEFT JOIN LATERAL (
+             SELECT status, skip_reason
+             FROM   worksheet_sessions
+             WHERE  job_id      = j.id
+               AND  date        = CURRENT_DATE
+               AND  employee_id = $2
+             ORDER  BY created_at DESC LIMIT 1
+           ) ws ON true
+           LEFT JOIN LATERAL (
+             SELECT clock_in, clock_out
+             FROM   time_entries
+             WHERE  job_id  = j.id
+               AND  user_id = $2
+               AND  DATE(clock_in AT TIME ZONE 'UTC') = CURRENT_DATE
+             ORDER  BY clock_in DESC LIMIT 1
+           ) te ON true
+           WHERE  ja.scheduled_date = CURRENT_DATE
+             AND  ja.employee_id    = $1
+           ORDER  BY ja.sort_order, j.scheduled_start_time NULLS LAST`,
+          [employeeId, userId]
+        );
+        stopsForEmail = stopsResult.rows;
+      }
+
+      // Completed stop count (for notification message).
+      const completedStatuses = ["pending_review", "submitted", "approved"];
+      const completedStopCount = stopsForEmail.filter(
+        (s) => s.session_status != null && completedStatuses.includes(s.session_status)
+      ).length;
+
+      // 4. Build HTML email and send to all Admin/Manager recipients.
+      const htmlBody = buildRouteDayEmail({
+        employeeName,
+        date: routeDate,
+        weather,
+        summaryNotes: summary_notes,
+        stops: stopsForEmail,
+      });
+
+      const subject = `Route Day Submitted — ${employeeName} (${formattedDate})`;
+      const recipients = await getAdminManagerEmails();
+      for (const r of recipients) {
+        sendEmail(r.email, subject, htmlBody).catch((err: any) =>
+          console.error("[route/submit] email error:", err.message)
+        );
+      }
+
+      // 5. Insert in-app notification for each Admin/Manager user.
+      const adminUsers = await pool.query(
+        `SELECT id FROM users WHERE role IN ('Admin','Manager')`
+      );
+      for (const admin of adminUsers.rows) {
+        await pool.query(
+          `INSERT INTO staff_notifications
+             (id, user_id, type, title, message, link, is_read, created_at)
+           VALUES
+             (gen_random_uuid(), $1, 'route_day', $2, $3, $4, false, NOW())`,
+          [
+            admin.id,
+            "Route Day Submitted",
+            `${employeeName} completed ${completedStopCount} stop${completedStopCount !== 1 ? "s" : ""} on ${formattedDate}`,
+            `/admin/route-days/${routeDayId}`,
+          ]
+        );
+      }
+
+      console.log(
+        `[route/submit] routeDayId=${routeDayId} employee=${employeeName} completed=${completedStopCount} emailsSent=${recipients.length}`
+      );
+
+      // 6. Return 200.
+      res.json({ ok: true, route_day_id: routeDayId });
+    } catch (err: any) {
+      console.error("[route/submit]", err.message);
       res.status(500).json({ error: err.message });
     }
   });

@@ -32,7 +32,7 @@ function calcHours(arrival: string, departure: string): string {
   return ((d - a) / 60).toFixed(2).replace(/\.?0+$/, "");
 }
 
-async function getAdminManagerEmails(): Promise<{ name: string; email: string }[]> {
+export async function getAdminManagerEmails(): Promise<{ name: string; email: string }[]> {
   const res = await pool.query(
     `SELECT name, username, email FROM users WHERE role IN ('Admin','Manager') AND email IS NOT NULL`
   );
