@@ -127,8 +127,14 @@ async function qbGet(tok: any, path: string) {
     fetch(url, { headers: { Authorization: `Bearer ${t.access_token}`, Accept: "application/json" } });
   let res = await doGet(tok);
   if (res.status === 401) {
-    // Access token expired mid-step — refresh once and retry immediately
-    const fresh = await refreshAccessToken(tok);
+    // Access token expired mid-step — route through getValidToken() so the
+    // refreshInFlight deduplication gate is respected.  Calling
+    // refreshAccessToken(tok) directly here was the source of the race: if
+    // the proactive 30-min refresh was already rotating the token, a second
+    // concurrent call with the old tok would try to reuse the now-invalidated
+    // refresh_token and receive "invalid_grant".
+    console.log("[QB] 401 mid-request — re-fetching valid token via dedup gate");
+    const fresh = await getValidToken();
     res = await doGet(fresh);
   }
   if (!res.ok) throw new Error(`QB GET ${path}: ${res.status} ${await res.text()}`);
@@ -149,7 +155,10 @@ async function qbPost(tok: any, path: string, body: any) {
     });
   let res = await doPost(tok);
   if (res.status === 401) {
-    const fresh = await refreshAccessToken(tok);
+    // Same dedup-gate fix as qbGet — avoid racing refreshAccessToken(tok) when
+    // the proactive refresh loop may already be rotating the refresh_token.
+    console.log("[QB] 401 mid-POST — re-fetching valid token via dedup gate");
+    const fresh = await getValidToken();
     res = await doPost(fresh);
   }
   if (!res.ok) throw new Error(`QB POST ${path}: ${res.status} ${await res.text()}`);
@@ -290,9 +299,10 @@ async function syncCustomers(tok: any) {
               body: JSON.stringify(qbBody),
             });
           let createRes = await doCreateFetch(tok);
-          // 401 mid-loop: refresh once and retry before any other response handling
+          // 401 mid-loop: route through dedup gate for the same reason as qbGet/qbPost
           if (createRes.status === 401) {
-            tok = await refreshAccessToken(tok);
+            console.log("[QB] 401 mid-customer-create — re-fetching valid token via dedup gate");
+            tok = await getValidToken();
             createRes = await doCreateFetch(tok);
           }
 
