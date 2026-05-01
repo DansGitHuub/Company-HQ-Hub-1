@@ -43,6 +43,7 @@ import { runWorksheetPhase3Migration } from "./migrations/worksheetPhase3";
 import { runPortalInviteMigration } from "./migrations/portalInvite";
 import { runPortalInviteUserMigration } from "./migrations/portalInviteUser";
 import { runEstimatingPhaseAMigration } from "./migrations/estimatingPhaseA";
+import { runEstimatingPhaseBMigration } from "./migrations/estimatingPhaseB";
 import { registerPublicPages } from "./publicPages";
 import { startLeadAlertScheduler } from "./consultationRoutes";
 
@@ -134,6 +135,7 @@ app.use((req, res, next) => {
   await runPortalInviteMigration();
   await runPortalInviteUserMigration();
   await runEstimatingPhaseAMigration();
+  await runEstimatingPhaseBMigration();
 
   // Public pages must be registered BEFORE registerRoutes (which sets up the React catch-all)
   registerPublicPages(app);

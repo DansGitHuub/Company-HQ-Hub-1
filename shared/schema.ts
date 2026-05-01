@@ -254,7 +254,7 @@ export type Material = typeof materials.$inferSelect;
 // Class Pricing Defaults - overhead and profit margin defaults per class per year
 export const classPricingDefaults = pgTable("class_pricing_defaults", {
   id: serial("id").primaryKey(),
-  classId: integer("class_id").notNull(),
+  classId: integer("class_id").notNull().references(() => classCodes.id),
   year: integer("year").notNull(),
   overheadPct: numeric("overhead_pct", { precision: 5, scale: 4 }).notNull().default("0.15"),
   profitMarginPct: numeric("profit_margin_pct", { precision: 5, scale: 4 }).notNull().default("0.20"),
