@@ -271,9 +271,10 @@ export function registerWorkAreaRoutes(app: Express, requireAuth: any, requireRo
   });
 
   // ── PATCH /api/jobs/:jobId/work-areas/:id ────────────────────────────────
-  // Admin only. Any subset of: name, estimated_hours, sort_order, notes, status
+  // Any authenticated user may update status (crew route mode). Admin/Manager
+  // may update any subset of: name, estimated_hours, sort_order, notes, status.
   // Valid status values: pending | active | on_hold | completed
-  app.patch("/api/jobs/:jobId/work-areas/:id", requireAuth, requireRole(["Admin"]), async (req, res) => {
+  app.patch("/api/jobs/:jobId/work-areas/:id", requireAuth, async (req, res) => {
     const parsed = patchWorkAreaSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Invalid body" });

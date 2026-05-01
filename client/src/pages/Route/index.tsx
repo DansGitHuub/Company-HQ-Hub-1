@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Dispatch, SetStateAction } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -8,8 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, MapPin, Navigation, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import RichTextEditor from "@/components/RichTextEditor";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
+
+interface WorkArea {
+  id: string;
+  name: string;
+  status: string;
+  sort_order: number;
+  is_active: boolean;
+}
 
 interface Stop {
   id: string;
@@ -21,7 +31,7 @@ interface Stop {
   address: string | null;
   scheduled_start_time: string | null;
   scheduled_end_time: string | null;
-  work_areas: any[];
+  work_areas: WorkArea[];
   session_id: number | null;
   session_status: string | null;
   skip_reason: string | null;
@@ -263,6 +273,7 @@ function StopView({
   stops,
   index,
   draftNotes,
+  setDraftNotes,
   clockedOutJobIds,
   onNext,
   onClockOutComplete,
@@ -270,6 +281,7 @@ function StopView({
   stops: Stop[];
   index: number;
   draftNotes: Record<string, string>;
+  setDraftNotes: Dispatch<SetStateAction<Record<string, string>>>;
   clockedOutJobIds: Set<string>;
   onNext: () => void;
   /** Called after a successful clock-out with the job id. */
@@ -354,6 +366,62 @@ function StopView({
     onClockOutComplete(stop.id, index === stops.length - 1);
   }
 
+  // ── Work-area checklist ───────────────────────────────────────────────────────
+  // Optimistic status overrides: workAreaId → 'completed' | 'pending'
+  const [waOverrides, setWaOverrides] = useState<Record<string, string>>({});
+  // Work-area IDs currently being patched (shows spinner on the checkbox row).
+  const [waToggling, setWaToggling] = useState<Set<string>>(new Set());
+
+  // Reset overrides when the stop changes so stale state doesn't bleed across.
+  useEffect(() => {
+    setWaOverrides({});
+    setWaToggling(new Set());
+  }, [stop?.id]);
+
+  async function handleWorkAreaToggle(waId: string, checked: boolean) {
+    if (!stop) return;
+    const newStatus = checked ? "completed" : "pending";
+    // Optimistic update first.
+    setWaOverrides((prev) => ({ ...prev, [waId]: newStatus }));
+    setWaToggling((prev) => new Set(prev).add(waId));
+    try {
+      const res = await apiRequest(
+        "PATCH",
+        `/api/jobs/${stop.id}/work-areas/${waId}`,
+        { status: newStatus }
+      );
+      if (!res.ok) {
+        // Revert optimistic update on failure.
+        setWaOverrides((prev) => {
+          const n = { ...prev };
+          delete n[waId];
+          return n;
+        });
+        toast({
+          title: "Couldn't update work area",
+          description: "Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        // Refresh in background — keeps server state in sync.
+        qc.invalidateQueries({ queryKey: ["/api/route/today"] });
+      }
+    } catch {
+      // Network error — revert.
+      setWaOverrides((prev) => {
+        const n = { ...prev };
+        delete n[waId];
+        return n;
+      });
+    } finally {
+      setWaToggling((prev) => {
+        const n = new Set(prev);
+        n.delete(waId);
+        return n;
+      });
+    }
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-5">
@@ -412,6 +480,66 @@ function StopView({
           </div>
         </CardContent>
       </Card>
+
+      {/* Work-area checklist */}
+      {stop?.work_areas && stop.work_areas.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            Work Areas
+          </p>
+          <div className="flex flex-col gap-2">
+            {stop.work_areas.map((wa) => {
+              const effectiveStatus = waOverrides[wa.id] ?? wa.status;
+              const isChecked = effectiveStatus === "completed";
+              const isToggling = waToggling.has(wa.id);
+              return (
+                <div
+                  key={wa.id}
+                  data-testid={`row-work-area-${wa.id}`}
+                  className="flex items-center gap-3 py-1"
+                >
+                  {isToggling ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+                  ) : (
+                    <Checkbox
+                      id={`wa-${wa.id}`}
+                      data-testid={`checkbox-work-area-${wa.id}`}
+                      checked={isChecked}
+                      onCheckedChange={(checked) =>
+                        handleWorkAreaToggle(wa.id, Boolean(checked))
+                      }
+                    />
+                  )}
+                  <label
+                    htmlFor={`wa-${wa.id}`}
+                    className={[
+                      "text-sm leading-none cursor-pointer select-none",
+                      isChecked ? "line-through text-muted-foreground" : "text-foreground",
+                    ].join(" ")}
+                  >
+                    {wa.name}
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Notes editor */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          Notes
+        </p>
+        <RichTextEditor
+          value={draftNotes[stop?.id ?? ""] ?? ""}
+          onChange={(html) =>
+            setDraftNotes((prev) => ({ ...prev, [stop.id]: html }))
+          }
+          placeholder="Add notes for this stop…"
+          minHeight="120px"
+        />
+      </div>
 
       {/* Clock-in / Clock-out / Next Stop */}
       {isCompletedStop ? (
@@ -618,6 +746,7 @@ export default function RoutePage() {
           stops={data.stops}
           index={stopIndex}
           draftNotes={draftNotes}
+          setDraftNotes={setDraftNotes}
           clockedOutJobIds={clockedOutJobIds}
           onNext={handleNext}
           onClockOutComplete={handleClockOutComplete}
