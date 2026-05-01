@@ -119,7 +119,17 @@ export function registerRouteRoutes(app: Express, requireAuth: any) {
         stops = stopsResult.rows;
       }
 
-      res.json({ route_day, stops });
+      // Total clocked-in minutes for the current user today (across all jobs).
+      const minResult = await pool.query(
+        `SELECT COALESCE(SUM(duration_minutes), 0)::int AS total_minutes_today
+         FROM time_entries
+         WHERE user_id = $1
+           AND DATE(clock_in AT TIME ZONE 'UTC') = CURRENT_DATE`,
+        [userId]
+      );
+      const total_minutes_today: number = minResult.rows[0]?.total_minutes_today ?? 0;
+
+      res.json({ route_day, stops, total_minutes_today });
     } catch (err: any) {
       console.error("[route/today]", err.message);
       res.status(500).json({ error: err.message });

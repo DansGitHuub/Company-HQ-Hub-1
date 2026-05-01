@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Dispatch, SetStateAction } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -70,12 +71,15 @@ interface RouteDay {
 interface RouteData {
   route_day: RouteDay;
   stops: Stop[];
+  total_minutes_today: number;
 }
 
 interface PersistedState {
   currentStopIndex: number;
   draftNotes: Record<string, string>;
   draftPhotos: Record<string, string[]>;
+  summaryNotes: string;
+  clockedOutJobIds: string[];
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -107,6 +111,8 @@ function lsRead(key: string): PersistedState | null {
       currentStopIndex: typeof parsed.currentStopIndex === "number" ? parsed.currentStopIndex : 0,
       draftNotes: parsed.draftNotes && typeof parsed.draftNotes === "object" ? parsed.draftNotes : {},
       draftPhotos: parsed.draftPhotos && typeof parsed.draftPhotos === "object" ? parsed.draftPhotos : {},
+      summaryNotes: typeof parsed.summaryNotes === "string" ? parsed.summaryNotes : "",
+      clockedOutJobIds: Array.isArray(parsed.clockedOutJobIds) ? parsed.clockedOutJobIds : [],
     };
   } catch {
     return null;
@@ -180,6 +186,14 @@ function formatElapsed(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
   const s = (totalSeconds % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
+}
+
+function formatMinutes(total: number): string {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
 }
 
 // ─── Sub-views ─────────────────────────────────────────────────────────────────
@@ -879,14 +893,125 @@ function StopView({
 
 // ── SummaryView ───────────────────────────────────────────────────────────────
 
-function SummaryView({ stops }: { stops: Stop[] }) {
+function SummaryView({
+  stops,
+  totalMinutes,
+  weather,
+  summaryNotes,
+  setSummaryNotes,
+  onSubmit,
+  submitting,
+}: {
+  stops: Stop[];
+  totalMinutes: number;
+  weather: string[];
+  summaryNotes: string;
+  setSummaryNotes: (s: string) => void;
+  onSubmit: () => void;
+  submitting: boolean;
+}) {
+  const completedStatuses = ["pending_review", "submitted", "approved"];
+  const completedCount = stops.filter(
+    (s) => s.session_status != null && completedStatuses.includes(s.session_status)
+  ).length;
+  const skippedStops = stops.filter((s) => s.session_status === "skipped");
+
   return (
-    <div className="flex flex-col items-center gap-4 py-10 text-center">
-      <div className="text-5xl">🎉</div>
-      <h2 data-testid="text-summary-heading" className="text-2xl font-bold">Route Complete</h2>
-      <p className="text-muted-foreground text-sm">
-        You finished {stops.length} stop{stops.length !== 1 ? "s" : ""} today. Great work!
-      </p>
+    <div className="flex flex-col gap-6 pb-10">
+      {/* Heading */}
+      <div>
+        <div className="text-4xl mb-2">🎉</div>
+        <h2 data-testid="text-summary-heading" className="text-2xl font-bold">Route Complete</h2>
+        <p className="text-muted-foreground text-sm">Here's your day at a glance.</p>
+      </div>
+
+      {/* Stats: total time + completed stops */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card>
+          <CardContent className="pt-4 pb-4 text-center">
+            <p data-testid="text-summary-total-time" className="text-2xl font-bold">
+              {formatMinutes(totalMinutes)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">Time on site</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-4 text-center">
+            <p data-testid="text-summary-completed-count" className="text-2xl font-bold">
+              {completedCount}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Completed stop{completedCount !== 1 ? "s" : ""}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Skipped stops list */}
+      {skippedStops.length > 0 && (
+        <div>
+          <p className="text-sm font-medium mb-2">Skipped stops</p>
+          <div className="flex flex-col gap-2">
+            {skippedStops.map((s) => (
+              <Card key={s.id} data-testid={`card-skipped-stop-${s.id}`}>
+                <CardContent className="py-3 px-4">
+                  <p className="font-medium text-sm">{s.title}</p>
+                  {s.customer_name && (
+                    <p className="text-xs text-muted-foreground">{s.customer_name}</p>
+                  )}
+                  {s.skip_reason && (
+                    <p className="text-xs text-muted-foreground italic mt-1">{s.skip_reason}</p>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Weather — read-only chips (only selected ones shown) */}
+      {weather.length > 0 && (
+        <div>
+          <p className="text-sm font-medium mb-2">Weather conditions</p>
+          <div className="flex flex-wrap gap-2">
+            {WEATHER_OPTIONS.filter((opt) => weather.includes(opt.value)).map((opt) => (
+              <span
+                key={opt.value}
+                data-testid={`chip-summary-weather-${opt.value}`}
+                className="px-3 py-1.5 rounded-full text-sm font-medium border bg-primary text-primary-foreground border-primary select-none"
+              >
+                {opt.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Day notes — RichTextEditor */}
+      <div>
+        <p className="text-sm font-medium mb-2">Day notes</p>
+        <RichTextEditor
+          value={summaryNotes}
+          onChange={setSummaryNotes}
+          placeholder="Add any notes about the day…"
+          minHeight="160px"
+        />
+      </div>
+
+      {/* Submit Day */}
+      <Button
+        data-testid="button-submit-day"
+        size="lg"
+        className="w-full text-base h-14"
+        disabled={submitting}
+        onClick={onSubmit}
+      >
+        {submitting ? (
+          <><Loader2 className="animate-spin mr-2 h-5 w-5" />Submitting…</>
+        ) : (
+          "Submit Day"
+        )}
+      </Button>
     </div>
   );
 }
@@ -897,6 +1022,7 @@ export default function RoutePage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { user } = useAuth();
+  const [, navigate] = useLocation();
 
   const today = todayISODate();
   const storageKey = user?.id ? lsKey(user.id, today) : null;
@@ -918,12 +1044,20 @@ export default function RoutePage() {
     return lsRead(storageKey)?.draftPhotos ?? {};
   });
 
+  const [summaryNotes, setSummaryNotes] = useState<string>(() => {
+    if (!storageKey) return "";
+    return lsRead(storageKey)?.summaryNotes ?? "";
+  });
+
   const [phase, setPhase] = useState<Phase>("pre");
   const [weather, setWeather] = useState<string[]>([]);
 
   // Tracks which job IDs have had their clock-out completed this session.
   // Lifted here so it survives between stop index transitions.
-  const [clockedOutJobIds, setClockedOutJobIds] = useState<Set<string>>(new Set());
+  const [clockedOutJobIds, setClockedOutJobIds] = useState<Set<string>>(() => {
+    if (!storageKey) return new Set<string>();
+    return new Set<string>(lsRead(storageKey)?.clockedOutJobIds ?? []);
+  });
 
   const hasHydratedPhase = useRef(false);
 
@@ -960,8 +1094,14 @@ export default function RoutePage() {
   // ── Persist state changes to localStorage ────────────────────────────────────
   useEffect(() => {
     if (!storageKey) return;
-    lsWrite(storageKey, { currentStopIndex: stopIndex, draftNotes, draftPhotos });
-  }, [storageKey, stopIndex, draftNotes, draftPhotos]);
+    lsWrite(storageKey, {
+      currentStopIndex: stopIndex,
+      draftNotes,
+      draftPhotos,
+      summaryNotes,
+      clockedOutJobIds: Array.from(clockedOutJobIds),
+    });
+  }, [storageKey, stopIndex, draftNotes, draftPhotos, summaryNotes, clockedOutJobIds]);
 
   // ── Start route mutation ──────────────────────────────────────────────────────
   const startMutation = useMutation({
@@ -977,7 +1117,25 @@ export default function RoutePage() {
   });
 
   // ── Phase D: POST /api/route/submit → lsRemove(storageKey) ───────────────────
-  // Reserved — no endpoint yet.
+  const submitMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", "/api/route/submit", {
+        summary_notes: summaryNotes,
+        weather: Array.from(weather),
+      }).then((r) => r.json()),
+    onSuccess: () => {
+      if (storageKey) lsRemove(storageKey);
+      toast({ title: "Day submitted" });
+      navigate("/dashboard");
+    },
+    onError: () => {
+      toast({
+        title: "Submit failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   // ── Navigation ────────────────────────────────────────────────────────────────
   function handleNext() {
@@ -1039,7 +1197,17 @@ export default function RoutePage() {
         />
       )}
 
-      {phase === "summary" && <SummaryView stops={data.stops} />}
+      {phase === "summary" && (
+        <SummaryView
+          stops={data.stops}
+          totalMinutes={data.total_minutes_today}
+          weather={weather}
+          summaryNotes={summaryNotes}
+          setSummaryNotes={setSummaryNotes}
+          onSubmit={() => submitMutation.mutate()}
+          submitting={submitMutation.isPending}
+        />
+      )}
     </div>
   );
 }
