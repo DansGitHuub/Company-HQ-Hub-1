@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { clockIn, clockOut } from "@/lib/timeApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, MapPin, Navigation, Clock } from "lucide-react";
+import { Loader2, MapPin, Navigation, Clock, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import RichTextEditor from "@/components/RichTextEditor";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,6 +21,12 @@ interface WorkArea {
   is_active: boolean;
 }
 
+interface Photo {
+  id: number;
+  photo_type: "before" | "after" | "damage" | "other";
+  photo_url: string;
+}
+
 interface Stop {
   id: string;
   sort_order: number;
@@ -32,6 +38,7 @@ interface Stop {
   scheduled_start_time: string | null;
   scheduled_end_time: string | null;
   work_areas: WorkArea[];
+  photos: Photo[];
   session_id: number | null;
   session_status: string | null;
   skip_reason: string | null;
@@ -422,6 +429,67 @@ function StopView({
     }
   }
 
+  // ── Photo upload ─────────────────────────────────────────────────────────────
+  const PHOTO_TYPES = [
+    { type: "before",  label: "Before"  },
+    { type: "after",   label: "After"   },
+    { type: "damage",  label: "Damage"  },
+    { type: "other",   label: "Other"   },
+  ] as const;
+
+  const photoInputRefs = {
+    before:  useRef<HTMLInputElement>(null),
+    after:   useRef<HTMLInputElement>(null),
+    damage:  useRef<HTMLInputElement>(null),
+    other:   useRef<HTMLInputElement>(null),
+  };
+  const [uploadingTypes, setUploadingTypes] = useState<Set<string>>(new Set());
+
+  // Reset uploading state when stop changes
+  useEffect(() => {
+    setUploadingTypes(new Set());
+  }, [stop?.id]);
+
+  async function handlePhotoFile(
+    photoType: "before" | "after" | "damage" | "other",
+    file: File
+  ) {
+    if (!stop?.session_id) return;
+    setUploadingTypes((prev) => new Set(prev).add(photoType));
+    try {
+      const form = new FormData();
+      form.append("photo", file);
+      form.append("photo_type", photoType);
+      const res = await fetch(`/api/worksheets/${stop.session_id}/photos`, {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast({
+          title: "Photo upload failed",
+          description: body.error ?? "Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        qc.invalidateQueries({ queryKey: ["/api/route/today"] });
+      }
+    } catch {
+      toast({
+        title: "Photo upload failed",
+        description: "Network error — please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingTypes((prev) => {
+        const n = new Set(prev);
+        n.delete(photoType);
+        return n;
+      });
+    }
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-5">
@@ -539,6 +607,88 @@ function StopView({
           placeholder="Add notes for this stop…"
           minHeight="120px"
         />
+      </div>
+
+      {/* Photo upload */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          Photos
+        </p>
+        {stop?.session_id ? (
+          <>
+            {/* Hidden file inputs — one per type */}
+            {PHOTO_TYPES.map(({ type }) => (
+              <input
+                key={type}
+                ref={photoInputRefs[type]}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                data-testid={`input-photo-${type}`}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handlePhotoFile(type, file);
+                  e.target.value = "";
+                }}
+              />
+            ))}
+
+            {/* Four labeled buttons */}
+            <div className="grid grid-cols-4 gap-2">
+              {PHOTO_TYPES.map(({ type, label }) => {
+                const busy = uploadingTypes.has(type);
+                return (
+                  <Button
+                    key={type}
+                    variant="outline"
+                    size="sm"
+                    data-testid={`button-photo-${type}`}
+                    disabled={busy}
+                    onClick={() => photoInputRefs[type].current?.click()}
+                    className="flex flex-col items-center gap-1 h-auto py-2 text-xs"
+                  >
+                    {busy ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
+                    {label}
+                  </Button>
+                );
+              })}
+            </div>
+
+            {/* Thumbnail strip */}
+            {stop.photos && stop.photos.length > 0 && (
+              <div
+                data-testid="scroll-photo-thumbnails"
+                className="flex gap-2 overflow-x-auto mt-3 pb-1"
+              >
+                {stop.photos.map((photo) => (
+                  <div key={photo.id} className="relative shrink-0">
+                    <img
+                      data-testid={`img-photo-${photo.id}`}
+                      src={photo.photo_url}
+                      alt={photo.photo_type}
+                      className="h-20 w-20 object-cover rounded-md border"
+                    />
+                    <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] text-center py-0.5 rounded-b-md capitalize">
+                      {photo.photo_type}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <p
+            data-testid="text-photos-locked"
+            className="text-sm text-muted-foreground italic"
+          >
+            Clock in to upload photos
+          </p>
+        )}
       </div>
 
       {/* Clock-in / Clock-out / Next Stop */}

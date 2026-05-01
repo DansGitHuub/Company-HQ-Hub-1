@@ -61,7 +61,21 @@ export function registerRouteRoutes(app: Express, requireAuth: any) {
              ws.skip_reason,
              ws.skipped_at,
              te.id                   AS time_entry_id,
-             te.clock_in             AS time_entry_clock_in
+             te.clock_in             AS time_entry_clock_in,
+             (SELECT COALESCE(
+               json_agg(
+                 json_build_object(
+                   'id',         wp.id,
+                   'photo_type', wp.photo_type,
+                   'photo_url',  '/api/worksheets/photos/' || wp.id::text || '/download'
+                 )
+                 ORDER BY wp.created_at
+               ) FILTER (WHERE wp.id IS NOT NULL),
+               '[]'::json
+             )
+             FROM worksheet_photos wp
+             WHERE ws.id IS NOT NULL AND wp.session_id = ws.id
+             )                       AS photos
            FROM job_assignments ja
            JOIN  jobs j        ON j.id  = ja.job_id
            LEFT JOIN customers c  ON c.id  = j.customer_id
