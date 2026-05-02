@@ -167,12 +167,16 @@ export default function RouteDayDetail() {
   if (error || !data) {
     return (
       <div className="p-6 max-w-3xl mx-auto">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1 as any)} className="mb-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1 as any)} className="mb-4 -ml-1" data-testid="btn-back">
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
-        <div className="text-center py-16 text-gray-500">
-          {(error as any)?.message ?? "Route day not found."}
-        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
+            <AlertCircle className="h-10 w-10 text-gray-300" />
+            <h2 className="text-lg font-semibold text-gray-700">Route day not found</h2>
+            <p className="text-sm text-gray-500">This route day does not exist or has been removed.</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
