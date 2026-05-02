@@ -102,8 +102,46 @@ async function refreshAccessToken(tok: any): Promise<any> {
         realmId:       tok.realm_id,
       });
 
-      const resp   = await qbClient.refresh();
-      const newTok = resp.getJson();
+      // Disable the SDK's built-in ECONNRESET/ETIMEDOUT retry so a stalled
+      // network request that Intuit already processed server-side cannot replay
+      // the now-invalid refresh_token on a second attempt.  retryConfig is a
+      // static class property with no constructor-time override surface, so we
+      // patch shouldRetry on this instance only.
+      (qbClient as any).shouldRetry = () => false;
+
+      // Race the SDK refresh against a hard 12-second wall-clock timeout.
+      // If the TCP connection stalls (Intuit slow / network drop), we fail fast,
+      // mark needs_reauth, and surface a clear error rather than hanging for the
+      // SDK's full 30-second axios default plus retry delays.
+      const refreshPromise = (qbClient.refresh() as Promise<any>).then((r: any) => r?.getJson());
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('QB refresh timeout 12s')), 12000)
+      );
+      let newTok: any;
+      try {
+        newTok = await Promise.race([refreshPromise, timeoutPromise]);
+      } catch (raceErr: any) {
+        const raceMsg: string = raceErr?.message ?? String(raceErr);
+        const isStall =
+          raceMsg.includes('QB refresh timeout 12s') ||
+          raceErr?.code === 'ECONNRESET' ||
+          raceErr?.code === 'ETIMEDOUT' ||
+          raceErr?.code === 'ENOTFOUND' ||
+          (raceErr?.isAxiosError === true && !raceErr?.response);
+        if (isStall) {
+          const stallMsg = 'Refresh stalled at Intuit; reauth required';
+          qbAuthFailed = true;
+          pool.query(
+            `UPDATE quickbooks_tokens SET needs_reauth=true, last_error=$1 WHERE realm_id=$2`,
+            [stallMsg, tok.realm_id]
+          ).catch(() => {});
+          console.error(
+            `[QB] Refresh timeout or network error - connection marked needs_reauth for realm_id=${tok.realm_id}`
+          );
+          throw new Error(stallMsg);
+        }
+        throw raceErr;
+      }
 
       // Bail if Intuit's response is missing either token — persisting a null
       // refresh_token would sever the connection permanently.
