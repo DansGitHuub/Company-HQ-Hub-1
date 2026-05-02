@@ -125,7 +125,7 @@ async function refreshAccessToken(tok: any): Promise<any> {
       await conn.query(
         `UPDATE quickbooks_tokens
          SET access_token=$1, refresh_token=$2, token_expiry=$3,
-             last_sync=NOW(), needs_reauth=false, last_error=NULL
+             needs_reauth=false, last_error=NULL
          WHERE realm_id=$4`,
         [newTok.access_token, newTok.refresh_token, expiry, tok.realm_id]
       );
