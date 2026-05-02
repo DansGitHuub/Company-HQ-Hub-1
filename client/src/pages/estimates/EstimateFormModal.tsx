@@ -17,6 +17,7 @@ import type { CatalogItem } from "@/components/CatalogBrowser";
 import {
   Plus, Trash2, ChevronDown, ChevronUp, Loader2, Calculator, Package, Hammer, Wrench, Search
 } from "lucide-react";
+import CalculatorRunner from "@/components/calculator/CalculatorRunner";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ interface LineItem {
 
 interface WorkAreaDraft {
   _key: string;
+  id?: string;
   name: string;
   work_area_type_id: string;
   cost_code: string;
@@ -136,6 +138,7 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
     if (existing?.work_areas?.length) {
       return existing.work_areas.map((a: any) => ({
         _key: key(),
+        id: a.id ?? undefined,
         name: a.name,
         work_area_type_id: a.work_area_type_id ?? "",
         cost_code: a.cost_code ?? "",
@@ -651,6 +654,12 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
                         </SelectContent>
                       </Select>
                       <span className="text-xs text-muted-foreground ml-2 shrink-0">{fmtMoney(areaSub)}</span>
+                      <CalculatorRunner
+                        workAreaId={area.id ?? ""}
+                        onInserted={() => {
+                          queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+                        }}
+                      />
                       <button type="button" onClick={() => removeArea(area._key)}
                         className="text-muted-foreground hover:text-destructive ml-1" data-testid={`btn-remove-area-${aIdx}`}>
                         <Trash2 className="h-3.5 w-3.5" />
