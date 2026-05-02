@@ -3115,6 +3115,38 @@ export const classCodes = pgTable("class_codes", {
 });
 export type ClassCode = typeof classCodes.$inferSelect;
 
+// ─── Estimating: Calculator Framework (Phase E2) ──────────────────────────────
+export const calculatorDefinitions = pgTable("calculator_definitions", {
+  id:             varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name:           varchar("name", { length: 100 }).notNull().unique(),
+  displayName:    text("display_name").notNull(),
+  category:       varchar("category", { length: 50 }).notNull(),
+  description:    text("description"),
+  inputSchema:    jsonb("input_schema").notNull(),
+  formula:        jsonb("formula").notNull(),
+  defaultClassId: integer("default_class_id").references(() => classCodes.id),
+  isActive:       boolean("is_active").notNull().default(true),
+  sortOrder:      integer("sort_order").notNull().default(0),
+  createdAt:      timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:      timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const insertCalculatorDefinitionSchema = createInsertSchema(calculatorDefinitions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCalculatorDefinition = z.infer<typeof insertCalculatorDefinitionSchema>;
+export type CalculatorDefinition = typeof calculatorDefinitions.$inferSelect;
+
+export const calculatorRuns = pgTable("calculator_runs", {
+  id:                   varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  calculatorId:         varchar("calculator_id", { length: 36 }).notNull().references(() => calculatorDefinitions.id, { onDelete: "restrict" }),
+  estimateWorkAreaId:   varchar("estimate_work_area_id", { length: 36 }).notNull(),
+  inputs:               jsonb("inputs").notNull(),
+  outputSummary:        jsonb("output_summary").notNull(),
+  runBy:                varchar("run_by", { length: 36 }),
+  runAt:                timestamp("run_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const insertCalculatorRunSchema = createInsertSchema(calculatorRuns).omit({ id: true, runAt: true });
+export type InsertCalculatorRun = z.infer<typeof insertCalculatorRunSchema>;
+export type CalculatorRun = typeof calculatorRuns.$inferSelect;
+
 // ─── Materials Catalog ────────────────────────────────────────────────────────
 export const CATALOG_CLASSES = ["Labor", "Equipment", "Materials", "Subcontracting"] as const;
 export type CatalogClass = typeof CATALOG_CLASSES[number];
