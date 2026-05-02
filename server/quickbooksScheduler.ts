@@ -8,6 +8,7 @@ export function startQuickBooksScheduler(): void {
     try {
       const tok = await getTokens();
       if (!tok) return; // Not connected — skip silently
+      if (tok?.needs_reauth) { console.log('[QB-Scheduler] Skipping refresh — needs_reauth=true; user must reauthorize at /admin?tab=quickbooks'); return; }
       console.log("[QB-Scheduler] Starting scheduled sync…");
       const results = await runFullSync();
       const total = Object.values(results).reduce((sum, r) => sum + (r as any).synced, 0);
@@ -25,6 +26,7 @@ export function startQuickBooksScheduler(): void {
     try {
       const tok = await getTokens();
       if (!tok) return; // Not connected — skip silently
+      if (tok?.needs_reauth) { console.log('[QB-Scheduler] Skipping refresh — needs_reauth=true; user must reauthorize at /admin?tab=quickbooks'); return; }
       await getValidToken();
       console.log("[QB-Token] Refresh cycle complete");
     } catch (err: any) {
