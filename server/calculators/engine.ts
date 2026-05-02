@@ -433,11 +433,43 @@ export function runCalculator(
       ? (formula["complexityMultipliers"] as Record<string, number>)
       : ctx.complexityMultipliers;
 
+  // Allow any other top-level numeric / string / numeric-object constants from the
+  // formula to be referenced by qtyExpr / unitPriceExpr. Reserved keys are skipped so
+  // explicit handling above isn't overridden, and identifier names are validated to
+  // avoid leaking dangerous prototype properties.
+  const RESERVED_FORMULA_KEYS = new Set([
+    "type",
+    "lineItems",
+    "expression",
+    "description",
+    "laborRate",
+    "productionRates",
+    "complexityMultipliers",
+  ]);
+  const extraFormulaConstants: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(formula)) {
+    if (RESERVED_FORMULA_KEYS.has(k)) continue;
+    if (!/^[a-z_][a-zA-Z0-9_]*$/.test(k)) continue;
+    if (typeof v === "number" || typeof v === "string") {
+      extraFormulaConstants[k] = v;
+    } else if (
+      v !== null &&
+      typeof v === "object" &&
+      !Array.isArray(v) &&
+      Object.values(v as Record<string, unknown>).every(
+        (x) => typeof x === "number"
+      )
+    ) {
+      extraFormulaConstants[k] = v;
+    }
+  }
+
   const evalScope: Record<string, unknown> = {
     ...validated,
     laborRate,
     productionRates,
     complexityMultipliers,
+    ...extraFormulaConstants,
     ...SAFE_MATH_SCOPE,
   };
 
