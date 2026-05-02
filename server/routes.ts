@@ -34,6 +34,7 @@ import { registerReportRoutes } from "./reportRoutes";
 import { registerConsultationRoutes } from "./consultationRoutes";
 import { registerServiceTypesRoutes } from "./serviceTypesRoutes";
 import { registerPricingRoutes } from "./pricingRoutes";
+import { registerCalculatorRoutes } from "./calculatorRoutes";
 import { registerUserAvailabilityRoutes } from "./userAvailabilityRoutes";
 import { registerPublicInquiryRoutes } from "./publicInquiryRoutes";
 import { registerPublicBookingRoutes } from "./publicBookingRoutes";
@@ -10492,6 +10493,7 @@ Provide accurate information based on publicly available documentation.`;
   registerDailyLogRoutes(app, requireAuth);
   registerSettingsRoutes(app, requireAuth, requireRole);
   registerPricingRoutes(app, requireAuth);
+  registerCalculatorRoutes(app, requireAuth);
   setInterval(runNoteReminderScheduler, 60 * 1000);
   console.log("[notes-scheduler] Note reminder scheduler started (checking every minute)");
 
