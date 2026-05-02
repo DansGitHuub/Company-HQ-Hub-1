@@ -24,6 +24,7 @@ const CLASS_COLORS: Record<number, string> = {
 
 interface ClassRow {
   classId: number;
+  className?: string;
   year: number;
   overheadPct: string;
   profitMarginPct: string;
@@ -57,15 +58,13 @@ export default function BudgetSettings() {
   useEffect(() => {
     if (defaults && defaults.length > 0) {
       setRows(
-        [1, 2, 3, 4].map((classId) => {
-          const found = defaults.find((d: any) => d.class_id === classId || d.classId === classId);
-          return {
-            classId,
-            year: found?.year ?? new Date().getFullYear(),
-            overheadPct: pctToDisplay(found?.overhead_pct ?? found?.overheadPct ?? 0.15),
-            profitMarginPct: pctToDisplay(found?.profit_margin_pct ?? found?.profitMarginPct ?? 0.20),
-          };
-        })
+        defaults.map((d: any) => ({
+          classId: d.class_id ?? d.classId,
+          className: d.class_name ?? undefined,
+          year: d.year ?? new Date().getFullYear(),
+          overheadPct: pctToDisplay(d.overhead_pct ?? d.overheadPct ?? 0.15),
+          profitMarginPct: pctToDisplay(d.profit_margin_pct ?? d.profitMarginPct ?? 0.20),
+        }))
       );
     } else if (!isLoading) {
       setRows(
@@ -153,9 +152,9 @@ export default function BudgetSettings() {
                   >
                     <div>
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${CLASS_COLORS[row.classId]}`}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${CLASS_COLORS[row.classId] ?? "bg-gray-100 text-gray-800"}`}
                       >
-                        {CLASS_NAMES[row.classId]}
+                        {row.className ?? CLASS_NAMES[row.classId] ?? ("Class " + row.classId)}
                       </span>
                     </div>
 

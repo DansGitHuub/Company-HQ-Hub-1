@@ -3894,7 +3894,11 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
     try {
       const year = parseInt(String(req.query.year) as string || String(new Date().getFullYear()), 10);
       const { rows } = await pool.query(
-        `SELECT * FROM class_pricing_defaults WHERE year = $1 ORDER BY class_id`,
+        `SELECT cpd.*, cc.name AS class_name, cc.label AS class_label
+         FROM class_pricing_defaults cpd
+         LEFT JOIN class_codes cc ON cc.id = cpd.class_id
+         WHERE cpd.year = $1
+         ORDER BY cc.sort_order ASC, cpd.class_id ASC`,
         [year]
       );
       res.json(rows);
