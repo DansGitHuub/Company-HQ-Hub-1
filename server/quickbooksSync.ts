@@ -113,7 +113,7 @@ async function refreshAccessToken(tok: any): Promise<any> {
       // If the TCP connection stalls (Intuit slow / network drop), we fail fast,
       // mark needs_reauth, and surface a clear error rather than hanging for the
       // SDK's full 30-second axios default plus retry delays.
-      const refreshPromise = (qbClient.refresh() as Promise<any>).then((r: any) => r?.getJson());
+      const refreshPromise = ((qbClient as any).refreshUsingToken(dbTok.refresh_token) as Promise<any>).then((r: any) => r?.getJson());
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('QB refresh timeout 12s')), 12000)
       );
