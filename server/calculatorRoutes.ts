@@ -190,9 +190,9 @@ export function registerCalculatorRoutes(app: Express, requireAuth: any) {
         const { rows: liRows } = await conn.query(
           `INSERT INTO estimate_line_items
              (id, estimate_work_area_id, item_type, description,
-              quantity, unit, unit_price, amount, sort_order, is_optional)
+              quantity, unit, unit_price, amount, sort_order, is_optional, class_id)
            VALUES
-             (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9)
+             (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
            RETURNING id`,
           [
             estimate_work_area_id,
@@ -204,6 +204,7 @@ export function registerCalculatorRoutes(app: Express, requireAuth: any) {
             li.amount,
             li.sort_order,
             li.is_optional,
+            li.class_id ?? null,
           ]
         );
         lineItemsWithIds.push({ ...li, id: liRows[0].id });

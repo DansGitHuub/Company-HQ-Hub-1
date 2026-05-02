@@ -3147,6 +3147,26 @@ export const insertCalculatorRunSchema = createInsertSchema(calculatorRuns).omit
 export type InsertCalculatorRun = z.infer<typeof insertCalculatorRunSchema>;
 export type CalculatorRun = typeof calculatorRuns.$inferSelect;
 
+// ─── Estimating: Line Items (Phase newEstimates + E2 Polish) ──────────────────
+export const estimateLineItems = pgTable("estimate_line_items", {
+  id:                 varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  estimateWorkAreaId: varchar("estimate_work_area_id", { length: 36 }).notNull(),
+  itemType:           varchar("item_type", { length: 20 }).notNull().default("service"),
+  description:        text("description").notNull(),
+  quantity:           numeric("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
+  unit:               varchar("unit", { length: 30 }),
+  unitPrice:          numeric("unit_price", { precision: 10, scale: 2 }).notNull().default("0"),
+  amount:             numeric("amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  sortOrder:          integer("sort_order").notNull().default(0),
+  isOptional:         boolean("is_optional").notNull().default(false),
+  imageUrl:           text("image_url"),
+  imageHidden:        boolean("image_hidden").default(false),
+  classId:            integer("class_id").references(() => classCodes.id),
+});
+export const insertEstimateLineItemSchema = createInsertSchema(estimateLineItems).omit({ id: true });
+export type InsertEstimateLineItem = z.infer<typeof insertEstimateLineItemSchema>;
+export type EstimateLineItem = typeof estimateLineItems.$inferSelect;
+
 // ─── Materials Catalog ────────────────────────────────────────────────────────
 export const CATALOG_CLASSES = ["Labor", "Equipment", "Materials", "Subcontracting"] as const;
 export type CatalogClass = typeof CATALOG_CLASSES[number];
