@@ -3343,75 +3343,91 @@ export const payments = pgTable("payments", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
-// ─── CompanyCam Integration (Phase 1) ─────────────────────────────────────────
-
-export const companycamProjects = pgTable("companycam_projects", {
-  id:                  serial("id").primaryKey(),
-  companycamProjectId: text("companycam_project_id").notNull().unique(),
-  name:                text("name").notNull(),
-  status:              text("status"),
-  addressStreet1:      text("address_street_1"),
-  addressStreet2:      text("address_street_2"),
-  addressCity:         text("address_city"),
-  addressState:        text("address_state"),
-  addressPostalCode:   text("address_postal_code"),
-  addressCountry:      text("address_country"),
-  latitude:            numeric("latitude",  { precision: 10, scale: 7 }),
-  longitude:           numeric("longitude", { precision: 10, scale: 7 }),
-  estimateId:          uuid("estimate_id"),
-  customerId:          uuid("customer_id"),
-  ccCreatedAt:         timestamp("cc_created_at", { withTimezone: true }),
-  ccUpdatedAt:         timestamp("cc_updated_at", { withTimezone: true }),
-  createdAt:           timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt:           timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
-export const insertCompanycamProjectSchema = createInsertSchema(companycamProjects).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertCompanycamProject = z.infer<typeof insertCompanycamProjectSchema>;
-export type CompanycamProject = typeof companycamProjects.$inferSelect;
+// ─── CompanyCam Integration (Phase 1 v2) ──────────────────────────────────────
 
 export const companycamUsers = pgTable("companycam_users", {
-  id:                serial("id").primaryKey(),
-  companycamUserId:  text("companycam_user_id").notNull().unique(),
-  emailAddress:      text("email_address"),
-  name:              text("name"),
-  createdAt:         timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt:         timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  id:               uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  companycamUserId: text("companycam_user_id").notNull().unique(),
+  emailAddress:     text("email_address"),
+  firstName:        text("first_name"),
+  lastName:         text("last_name"),
+  phoneNumber:      text("phone_number"),
+  status:           text("status"),
+  lastSyncedAt:     timestamp("last_synced_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt:        timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:        timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 export const insertCompanycamUserSchema = createInsertSchema(companycamUsers).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertCompanycamUser = z.infer<typeof insertCompanycamUserSchema>;
 export type CompanycamUser = typeof companycamUsers.$inferSelect;
 
+export const companycamProjects = pgTable("companycam_projects", {
+  id:                        uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  companycamProjectId:       text("companycam_project_id").notNull().unique(),
+  name:                      text("name").notNull(),
+  status:                    text("status"),
+  addressStreet1:            text("address_street_1"),
+  addressStreet2:            text("address_street_2"),
+  addressCity:               text("address_city"),
+  addressState:              text("address_state"),
+  addressPostalCode:         text("address_postal_code"),
+  addressCountry:            text("address_country"),
+  latitude:                  numeric("latitude",  { precision: 10, scale: 7 }),
+  longitude:                 numeric("longitude", { precision: 10, scale: 7 }),
+  creatorCompanycamUserId:   text("creator_companycam_user_id"),
+  archived:                  boolean("archived").notNull().default(false),
+  public:                    boolean("public").notNull().default(true),
+  featureImageUrl:           text("feature_image_url"),
+  rawPayload:                jsonb("raw_payload"),
+  estimateId:                uuid("estimate_id"),
+  customerId:                uuid("customer_id"),
+  ccCreatedAt:               timestamp("cc_created_at", { withTimezone: true }),
+  ccUpdatedAt:               timestamp("cc_updated_at", { withTimezone: true }),
+  createdAt:                 timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:                 timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const insertCompanycamProjectSchema = createInsertSchema(companycamProjects).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCompanycamProject = z.infer<typeof insertCompanycamProjectSchema>;
+export type CompanycamProject = typeof companycamProjects.$inferSelect;
+
 export const companycamPhotos = pgTable("companycam_photos", {
-  id:                     serial("id").primaryKey(),
-  companycamPhotoId:      text("companycam_photo_id").notNull().unique(),
-  companycamProjectId:    text("companycam_project_id").notNull(),
-  photoUrlOriginal:       text("photo_url_original"),
-  photoUrlWeb:            text("photo_url_web"),
-  photoUrlThumbnail:      text("photo_url_thumbnail"),
-  photoUrlWebAnnotation:  text("photo_url_web_annotation"),
-  capturedAt:             timestamp("captured_at", { withTimezone: true }),
-  latitude:               numeric("latitude",  { precision: 10, scale: 7 }),
-  longitude:              numeric("longitude", { precision: 10, scale: 7 }),
-  creatorId:              text("creator_id"),
-  capturedByEmail:        text("captured_by_email"),
-  createdAt:              timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  id:                        uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  companycamPhotoId:         text("companycam_photo_id").notNull().unique(),
+  companycamProjectId:       text("companycam_project_id").notNull(),
+  photoUrlOriginal:          text("photo_url_original"),
+  photoUrlWeb:               text("photo_url_web"),
+  photoUrlThumbnail:         text("photo_url_thumbnail"),
+  photoUrlWebAnnotation:     text("photo_url_web_annotation"),
+  capturedAt:                timestamp("captured_at", { withTimezone: true }),
+  latitude:                  numeric("latitude",  { precision: 10, scale: 7 }),
+  longitude:                 numeric("longitude", { precision: 10, scale: 7 }),
+  creatorCompanycamUserId:   text("creator_companycam_user_id"),
+  capturedByEmail:           text("captured_by_email"),
+  capturedByName:            text("captured_by_name"),
+  companycamAppUrl:          text("companycam_app_url"),
+  description:               text("description"),
+  internal:                  boolean("internal").notNull().default(false),
+  hash:                      text("hash"),
+  processingStatus:          text("processing_status"),
+  rawPayload:                jsonb("raw_payload"),
+  createdAt:                 timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 export const insertCompanycamPhotoSchema = createInsertSchema(companycamPhotos).omit({ id: true, createdAt: true });
 export type InsertCompanycamPhoto = z.infer<typeof insertCompanycamPhotoSchema>;
 export type CompanycamPhoto = typeof companycamPhotos.$inferSelect;
 
 export const companycamPhotoTags = pgTable("companycam_photo_tags", {
-  id:                 serial("id").primaryKey(),
-  companycamPhotoId:  text("companycam_photo_id").notNull(),
-  tagValue:           text("tag_value").notNull(),
-  createdAt:          timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  id:                uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  companycamPhotoId: text("companycam_photo_id").notNull(),
+  tagValue:          text("tag_value").notNull(),
+  createdAt:         timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 export const insertCompanycamPhotoTagSchema = createInsertSchema(companycamPhotoTags).omit({ id: true, createdAt: true });
 export type InsertCompanycamPhotoTag = z.infer<typeof insertCompanycamPhotoTagSchema>;
 export type CompanycamPhotoTag = typeof companycamPhotoTags.$inferSelect;
 
 export const companycamProjectLabels = pgTable("companycam_project_labels", {
-  id:                   serial("id").primaryKey(),
+  id:                   uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   companycamProjectId:  text("companycam_project_id").notNull(),
   labelValue:           text("label_value").notNull(),
   createdAt:            timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -3421,28 +3437,38 @@ export type InsertCompanycamProjectLabel = z.infer<typeof insertCompanycamProjec
 export type CompanycamProjectLabel = typeof companycamProjectLabels.$inferSelect;
 
 export const companycamWalkthroughs = pgTable("companycam_walkthroughs", {
-  id:                   serial("id").primaryKey(),
-  companycamDocumentId: text("companycam_document_id").notNull().unique(),
-  companycamProjectId:  text("companycam_project_id").notNull(),
-  documentType:         text("document_type").notNull(),
-  content:              text("content"),
-  ccCreatedAt:          timestamp("cc_created_at", { withTimezone: true }),
-  createdAt:            timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt:            timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  id:                    uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  companycamDocumentId:  text("companycam_document_id").notNull().unique(),
+  companycamProjectId:   text("companycam_project_id").notNull(),
+  documentType:          text("document_type").notNull(),
+  content:               text("content"),
+  ccCreatedAt:           timestamp("cc_created_at", { withTimezone: true }),
+  createdAt:             timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:             timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 export const insertCompanycamWalkthroughSchema = createInsertSchema(companycamWalkthroughs).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertCompanycamWalkthrough = z.infer<typeof insertCompanycamWalkthroughSchema>;
 export type CompanycamWalkthrough = typeof companycamWalkthroughs.$inferSelect;
 
 export const voiceTranscripts = pgTable("voice_transcripts", {
-  id:                     serial("id").primaryKey(),
-  appointmentId:          varchar("appointment_id",           { length: 36 }),
-  suggestedAppointmentId: varchar("suggested_appointment_id", { length: 36 }),
-  transcriptText:         text("transcript_text"),
-  source:                 text("source"),
-  durationSeconds:        integer("duration_seconds"),
-  recordedAt:             timestamp("recorded_at", { withTimezone: true }),
-  createdAt:              timestamp("created_at",  { withTimezone: true }).notNull().defaultNow(),
+  id:                      uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  externalId:              text("external_id").notNull().unique(),
+  appointmentId:           varchar("appointment_id",           { length: 36 }),
+  suggestedAppointmentId:  varchar("suggested_appointment_id", { length: 36 }),
+  transcriptText:          text("transcript_text"),
+  source:                  text("source"),
+  audioDurationSeconds:    integer("audio_duration_seconds"),
+  recordedAt:              timestamp("recorded_at",     { withTimezone: true }),
+  recordedByEmail:         text("recorded_by_email"),
+  summaryText:             text("summary_text"),
+  transcriptFormat:        text("transcript_format").notNull().default("json"),
+  estimateId:              uuid("estimate_id"),
+  customerId:              uuid("customer_id"),
+  suggestedEstimateId:     uuid("suggested_estimate_id"),
+  suggestedCustomerId:     uuid("suggested_customer_id"),
+  linkConfirmedAt:         timestamp("link_confirmed_at", { withTimezone: true }),
+  rawPayload:              jsonb("raw_payload"),
+  createdAt:               timestamp("created_at",      { withTimezone: true }).notNull().defaultNow(),
 });
 export const insertVoiceTranscriptSchema = createInsertSchema(voiceTranscripts).omit({ id: true, createdAt: true });
 export type InsertVoiceTranscript = z.infer<typeof insertVoiceTranscriptSchema>;

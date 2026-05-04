@@ -5,29 +5,58 @@ export async function runCompanyCamPhase1Migration() {
   try {
     await client.query("BEGIN");
 
-    // ── 1. companycam_projects ────────────────────────────────────────────────
+    // ── 1. companycam_users ───────────────────────────────────────────────────
+    // Lazy-populated user cache — email is NOT on photo/project payloads;
+    // resolved on demand via GET /v2/users/{companycam_user_id}.
+    // name is split into first_name + last_name per §A2 spec.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS companycam_users (
+        id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        companycam_user_id    TEXT        NOT NULL UNIQUE,
+        email_address         TEXT,
+        first_name            TEXT,
+        last_name             TEXT,
+        phone_number          TEXT,
+        status                TEXT,
+        last_synced_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_companycam_users_email
+        ON companycam_users(email_address)
+    `);
+
+    // ── 2. companycam_projects ────────────────────────────────────────────────
     // Central project cache.  estimate_id / customer_id are LOCAL linkage fields
     // preserved across CC webhook UPDATEs (never overwritten by webhook data).
+    // creator_companycam_user_id is a soft (denormalized) reference — no FK.
     await client.query(`
       CREATE TABLE IF NOT EXISTS companycam_projects (
-        id                    SERIAL PRIMARY KEY,
-        companycam_project_id TEXT         NOT NULL UNIQUE,
-        name                  TEXT         NOT NULL,
-        status                TEXT,
-        address_street_1      TEXT,
-        address_street_2      TEXT,
-        address_city          TEXT,
-        address_state         TEXT,
-        address_postal_code   TEXT,
-        address_country       TEXT,
-        latitude              NUMERIC(10,7),
-        longitude             NUMERIC(10,7),
-        estimate_id           UUID         REFERENCES sales_estimates(id) ON DELETE SET NULL,
-        customer_id           UUID         REFERENCES customers(id)       ON DELETE SET NULL,
-        cc_created_at         TIMESTAMPTZ,
-        cc_updated_at         TIMESTAMPTZ,
-        created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        updated_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        id                          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        companycam_project_id       TEXT        NOT NULL UNIQUE,
+        name                        TEXT        NOT NULL,
+        status                      TEXT,
+        address_street_1            TEXT,
+        address_street_2            TEXT,
+        address_city                TEXT,
+        address_state               TEXT,
+        address_postal_code         TEXT,
+        address_country             TEXT,
+        latitude                    NUMERIC(10,7),
+        longitude                   NUMERIC(10,7),
+        creator_companycam_user_id  TEXT,
+        archived                    BOOLEAN     NOT NULL DEFAULT FALSE,
+        public                      BOOLEAN     NOT NULL DEFAULT TRUE,
+        feature_image_url           TEXT,
+        raw_payload                 JSONB,
+        estimate_id                 UUID        REFERENCES sales_estimates(id) ON DELETE SET NULL,
+        customer_id                 UUID        REFERENCES customers(id)       ON DELETE SET NULL,
+        cc_created_at               TIMESTAMPTZ,
+        cc_updated_at               TIMESTAMPTZ,
+        created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
     await client.query(`
@@ -38,43 +67,41 @@ export async function runCompanyCamPhase1Migration() {
       CREATE INDEX IF NOT EXISTS idx_companycam_projects_customer_id
         ON companycam_projects(customer_id)
     `);
-
-    // ── 2. companycam_users ───────────────────────────────────────────────────
-    // Lazy-populated cache.  email_address is NOT on photo/project objects —
-    // resolved via /v2/users/{creator_id} on cache miss.
     await client.query(`
-      CREATE TABLE IF NOT EXISTS companycam_users (
-        id                    SERIAL PRIMARY KEY,
-        companycam_user_id    TEXT        NOT NULL UNIQUE,
-        email_address         TEXT,
-        name                  TEXT,
-        created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
+      CREATE INDEX IF NOT EXISTS idx_companycam_projects_address_state
+        ON companycam_projects(address_state)
     `);
 
     // ── 3. companycam_photos ──────────────────────────────────────────────────
-    // captured_at is stored via to_timestamp(epoch_seconds) because CC returns
-    // Unix epoch integers, not ISO-8601.
+    // captured_at stored via to_timestamp(epoch_seconds) — CC returns Unix epoch
+    // integers, not ISO-8601.
+    // creator_companycam_user_id is a SOFT denormalized reference (no FK
+    // constraint) because companycam_users is lazy-populated; a hard FK would
+    // cause webhook ingest to fail on cache-miss rows.
     await client.query(`
       CREATE TABLE IF NOT EXISTS companycam_photos (
-        id                       SERIAL PRIMARY KEY,
-        companycam_photo_id      TEXT         NOT NULL UNIQUE,
-        companycam_project_id    TEXT         NOT NULL
-                                   REFERENCES companycam_projects(companycam_project_id)
-                                   ON DELETE CASCADE,
-        photo_url_original       TEXT,
-        photo_url_web            TEXT,
-        photo_url_thumbnail      TEXT,
-        photo_url_web_annotation TEXT,
-        captured_at              TIMESTAMPTZ,
-        latitude                 NUMERIC(10,7),
-        longitude                NUMERIC(10,7),
-        creator_id               TEXT
-                                   REFERENCES companycam_users(companycam_user_id)
-                                   ON DELETE SET NULL,
-        captured_by_email        TEXT,
-        created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        id                          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        companycam_photo_id         TEXT        NOT NULL UNIQUE,
+        companycam_project_id       TEXT        NOT NULL
+                                      REFERENCES companycam_projects(companycam_project_id)
+                                      ON DELETE CASCADE,
+        photo_url_original          TEXT,
+        photo_url_web               TEXT,
+        photo_url_thumbnail         TEXT,
+        photo_url_web_annotation    TEXT,
+        captured_at                 TIMESTAMPTZ,
+        latitude                    NUMERIC(10,7),
+        longitude                   NUMERIC(10,7),
+        creator_companycam_user_id  TEXT,
+        captured_by_email           TEXT,
+        captured_by_name            TEXT,
+        companycam_app_url          TEXT,
+        description                 TEXT,
+        internal                    BOOLEAN     NOT NULL DEFAULT FALSE,
+        hash                        TEXT,
+        processing_status           TEXT,
+        raw_payload                 JSONB,
+        created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
     await client.query(`
@@ -83,19 +110,18 @@ export async function runCompanyCamPhase1Migration() {
     `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_companycam_photos_creator
-        ON companycam_photos(creator_id)
+        ON companycam_photos(creator_companycam_user_id)
     `);
 
     // ── 4. companycam_photo_tags ──────────────────────────────────────────────
-    // Upsert target: (companycam_photo_id, tag_value).
     await client.query(`
       CREATE TABLE IF NOT EXISTS companycam_photo_tags (
-        id                    SERIAL PRIMARY KEY,
-        companycam_photo_id   TEXT         NOT NULL
-                                REFERENCES companycam_photos(companycam_photo_id)
-                                ON DELETE CASCADE,
-        tag_value             TEXT         NOT NULL,
-        created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        companycam_photo_id  TEXT        NOT NULL
+                               REFERENCES companycam_photos(companycam_photo_id)
+                               ON DELETE CASCADE,
+        tag_value            TEXT        NOT NULL,
+        created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE(companycam_photo_id, tag_value)
       )
     `);
@@ -105,15 +131,14 @@ export async function runCompanyCamPhase1Migration() {
     `);
 
     // ── 5. companycam_project_labels ──────────────────────────────────────────
-    // Upsert target: (companycam_project_id, label_value).
     await client.query(`
       CREATE TABLE IF NOT EXISTS companycam_project_labels (
-        id                    SERIAL PRIMARY KEY,
-        companycam_project_id TEXT         NOT NULL
+        id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        companycam_project_id TEXT        NOT NULL
                                 REFERENCES companycam_projects(companycam_project_id)
                                 ON DELETE CASCADE,
-        label_value           TEXT         NOT NULL,
-        created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        label_value           TEXT        NOT NULL,
+        created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE(companycam_project_id, label_value)
       )
     `);
@@ -123,19 +148,18 @@ export async function runCompanyCamPhase1Migration() {
     `);
 
     // ── 6. companycam_walkthroughs ────────────────────────────────────────────
-    // Only document_type = 'ai_walkthrough_note' is ingested by the webhook.
     await client.query(`
       CREATE TABLE IF NOT EXISTS companycam_walkthroughs (
-        id                     SERIAL PRIMARY KEY,
-        companycam_document_id TEXT         NOT NULL UNIQUE,
-        companycam_project_id  TEXT         NOT NULL
+        id                     UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        companycam_document_id TEXT        NOT NULL UNIQUE,
+        companycam_project_id  TEXT        NOT NULL
                                  REFERENCES companycam_projects(companycam_project_id)
                                  ON DELETE CASCADE,
-        document_type          TEXT         NOT NULL,
+        document_type          TEXT        NOT NULL,
         content                TEXT,
         cc_created_at          TIMESTAMPTZ,
-        created_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
     await client.query(`
@@ -145,32 +169,50 @@ export async function runCompanyCamPhase1Migration() {
 
     // ── 7. voice_transcripts ──────────────────────────────────────────────────
     // appointment_id / suggested_appointment_id reference calendar_events
-    // (not appointments — that table does not exist in this schema).
-    // Column NAMES stay as appointment_id / suggested_appointment_id per
-    // domain convention; only the FK target differs from the original spec.
+    // (the appointments table does not exist in this schema).
+    // estimate_id / customer_id are LOCAL linkage for auto-matching after ingest.
+    // external_id is the Plaud (or other source) document identifier.
     await client.query(`
       CREATE TABLE IF NOT EXISTS voice_transcripts (
-        id                       SERIAL PRIMARY KEY,
-        appointment_id           VARCHAR(36)
-                                   REFERENCES calendar_events(id)
-                                   ON DELETE SET NULL,
-        suggested_appointment_id VARCHAR(36)
-                                   REFERENCES calendar_events(id)
-                                   ON DELETE SET NULL,
-        transcript_text          TEXT,
-        source                   TEXT,
-        duration_seconds         INTEGER,
-        recorded_at              TIMESTAMPTZ,
-        created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        id                        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        external_id               TEXT        NOT NULL UNIQUE,
+        appointment_id            VARCHAR(36) REFERENCES calendar_events(id)    ON DELETE SET NULL,
+        suggested_appointment_id  VARCHAR(36) REFERENCES calendar_events(id)    ON DELETE SET NULL,
+        transcript_text           TEXT,
+        source                    TEXT,
+        audio_duration_seconds    INTEGER,
+        recorded_at               TIMESTAMPTZ,
+        recorded_by_email         TEXT,
+        summary_text              TEXT,
+        transcript_format         TEXT        NOT NULL DEFAULT 'json',
+        estimate_id               UUID        REFERENCES sales_estimates(id)    ON DELETE SET NULL,
+        customer_id               UUID        REFERENCES customers(id)          ON DELETE SET NULL,
+        suggested_estimate_id     UUID        REFERENCES sales_estimates(id)    ON DELETE SET NULL,
+        suggested_customer_id     UUID        REFERENCES customers(id)          ON DELETE SET NULL,
+        link_confirmed_at         TIMESTAMPTZ,
+        raw_payload               JSONB,
+        created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_voice_transcripts_appointment
         ON voice_transcripts(appointment_id)
     `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_voice_transcripts_recorded_at
+        ON voice_transcripts(recorded_at DESC)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_voice_transcripts_estimate
+        ON voice_transcripts(estimate_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_voice_transcripts_customer
+        ON voice_transcripts(customer_id)
+    `);
 
     await client.query("COMMIT");
-    console.log("[migration] CompanyCam Phase 1 tables ready (7 tables)");
+    console.log("[migration] CompanyCam Phase 1 tables ready (7 tables, v2 schema)");
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
