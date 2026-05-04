@@ -156,7 +156,9 @@ export function registerCompanyCamRoutes(app: Express) {
       return res.status(400).json({ error: "Invalid JSON payload" });
     }
 
-    const eventType: string = payload?.event_name ?? payload?.type ?? "";
+    console.log('[companycam] Raw payload keys:', Object.keys(payload || {}).join(','), '| first 400:', JSON.stringify(payload).slice(0, 400));
+
+    const eventType: string = payload?.scope ?? payload?.event_name ?? payload?.type ?? "";
     const data: any          = payload?.payload    ?? payload?.data ?? payload ?? {};
 
     console.log(`[companycam] Received event: ${eventType}`);
@@ -223,8 +225,8 @@ export function registerCompanyCamRoutes(app: Express) {
         );
       }
 
-      // ── photo.processed ───────────────────────────────────────────────────
-      else if (eventType === "photo.processed") {
+      // ── photo.created ─────────────────────────────────────────────────────
+      else if (eventType === "photo.created") {
         const photo  = data?.photo     ?? data;
         const uris: { type: string; uri: string }[] = photo?.uris ?? [];
         const coords = photo?.coordinates ?? {};
@@ -316,36 +318,6 @@ export function registerCompanyCamRoutes(app: Express) {
               doc?.content ?? doc?.body ?? null,
               doc?.created_at        ?? null,
             ]
-          );
-        }
-      }
-
-      // ── tag.applied ───────────────────────────────────────────────────────
-      else if (eventType === "tag.applied") {
-        const tag      = data?.tag         ?? data;
-        const photoId  = String(tag?.photo_id   ?? data?.photo_id   ?? "");
-        const tagValue = String(tag?.value       ?? tag?.name        ?? "");
-        if (photoId && tagValue) {
-          await pool.query(
-            `INSERT INTO companycam_photo_tags (companycam_photo_id, tag_value)
-             VALUES ($1,$2)
-             ON CONFLICT (companycam_photo_id, tag_value) DO NOTHING`,
-            [photoId, tagValue]
-          );
-        }
-      }
-
-      // ── label.applied ─────────────────────────────────────────────────────
-      else if (eventType === "label.applied") {
-        const label      = data?.label           ?? data;
-        const projectId  = String(label?.project_id ?? data?.project_id ?? "");
-        const labelValue = String(label?.value       ?? label?.name      ?? "");
-        if (projectId && labelValue) {
-          await pool.query(
-            `INSERT INTO companycam_project_labels (companycam_project_id, label_value)
-             VALUES ($1,$2)
-             ON CONFLICT (companycam_project_id, label_value) DO NOTHING`,
-            [projectId, labelValue]
           );
         }
       }
