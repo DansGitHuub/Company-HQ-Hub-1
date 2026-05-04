@@ -158,7 +158,7 @@ export function registerCompanyCamRoutes(app: Express) {
 
     console.log('[companycam] Raw payload keys:', Object.keys(payload || {}).join(','), '| first 400:', JSON.stringify(payload).slice(0, 400));
 
-    const eventType: string = payload?.scope ?? payload?.event_name ?? payload?.type ?? "";
+    const eventType: string = payload?.event_type ?? payload?.scope ?? payload?.event_name ?? payload?.type ?? "";
     const data: any          = payload?.payload    ?? payload?.data ?? payload ?? {};
 
     console.log(`[companycam] Received event: ${eventType}`);
