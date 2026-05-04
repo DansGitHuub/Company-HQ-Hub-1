@@ -47,6 +47,8 @@ import { runEstimatingPhaseBMigration } from "./migrations/estimatingPhaseB";
 import { runEstimatingPhaseE2Migration } from "./migrations/estimatingPhaseE2";
 import { runEstimatingPhaseE2PolishMigration } from "./migrations/estimatingPhaseE2Polish";
 import { runEstimatingPhaseE3Migration } from "./migrations/estimatingPhaseE3";
+import { runCompanyCamPhase1Migration } from "./migrations/companyCamPhase1";
+import { registerCompanyCamRoutes } from "./companyCamRoutes";
 import { registerPublicPages } from "./publicPages";
 import { startLeadAlertScheduler } from "./consultationRoutes";
 
@@ -142,10 +144,21 @@ app.use((req, res, next) => {
   await runEstimatingPhaseE2Migration();
   await runEstimatingPhaseE2PolishMigration();
   await runEstimatingPhaseE3Migration();
+  await runCompanyCamPhase1Migration();
 
   // Public pages must be registered BEFORE registerRoutes (which sets up the React catch-all)
   registerPublicPages(app);
 
+  // ── CompanyCam env validation (warnings only — secrets set after Phase 1 ships) ──
+  const missingEnv: string[] = [];
+  if (!process.env.COMPANYCAM_API_TOKEN)      missingEnv.push("COMPANYCAM_API_TOKEN");
+  if (!process.env.COMPANYCAM_WEBHOOK_SECRET) missingEnv.push("COMPANYCAM_WEBHOOK_SECRET");
+  if (!process.env.PLAUD_WEBHOOK_SECRET)      missingEnv.push("PLAUD_WEBHOOK_SECRET");
+  if (missingEnv.length > 0) {
+    console.warn(`[env] Missing env vars (CompanyCam/Plaud features degraded): ${missingEnv.join(", ")}`);
+  }
+
+  registerCompanyCamRoutes(app);
   registerNotificationPreferenceRoutes(app);
   await registerRoutes(httpServer, app);
   
