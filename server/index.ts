@@ -159,7 +159,7 @@ app.use((req, res, next) => {
   }
 
   registerCompanyCamRoutes(app);
-  console.log('[boot] companycam receiver v3.0 — lazy-project enabled');
+  console.log('[boot] companycam receiver v3.1 — photo branch diagnostics');
   registerNotificationPreferenceRoutes(app);
   await registerRoutes(httpServer, app);
   

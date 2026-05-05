@@ -305,6 +305,8 @@ export function registerCompanyCamRoutes(app: Express) {
         const photo  = data?.photo     ?? data;
         const photoProjectId = String(photo?.project_id ?? "");
 
+        console.log('[companycam] photo.created branch — data keys:', Object.keys(data || {}).join(','), '| Boolean(data.photo):', Boolean(data?.photo), '| eventType:', eventType);
+
         // Guarantee FK target exists before the photo INSERT.
         await resolveProject(photoProjectId);
 
@@ -325,57 +327,65 @@ export function registerCompanyCamRoutes(app: Express) {
 
         const capturedAt = photo?.captured_at ?? photo?.created_at ?? null;
 
-        await pool.query(
-          `INSERT INTO companycam_photos
-             (companycam_photo_id, companycam_project_id,
-              photo_url_original, photo_url_web, photo_url_thumbnail,
-              photo_url_web_annotation,
-              captured_at, latitude, longitude,
-              creator_companycam_user_id, captured_by_email, captured_by_name,
-              companycam_app_url, description,
-              internal, hash, processing_status, raw_payload)
-           VALUES ($1,$2,$3,$4,$5,$6,
-                   to_timestamp($7),$8,$9,
-                   $10,$11,$12,$13,$14,$15,$16,$17,$18)
-           ON CONFLICT (companycam_photo_id) DO UPDATE
-             SET companycam_project_id       = EXCLUDED.companycam_project_id,
-                 photo_url_original          = EXCLUDED.photo_url_original,
-                 photo_url_web               = EXCLUDED.photo_url_web,
-                 photo_url_thumbnail         = EXCLUDED.photo_url_thumbnail,
-                 photo_url_web_annotation    = EXCLUDED.photo_url_web_annotation,
-                 captured_at                 = EXCLUDED.captured_at,
-                 latitude                    = EXCLUDED.latitude,
-                 longitude                   = EXCLUDED.longitude,
-                 creator_companycam_user_id  = EXCLUDED.creator_companycam_user_id,
-                 captured_by_email           = EXCLUDED.captured_by_email,
-                 captured_by_name            = EXCLUDED.captured_by_name,
-                 companycam_app_url          = EXCLUDED.companycam_app_url,
-                 description                 = EXCLUDED.description,
-                 internal                    = EXCLUDED.internal,
-                 hash                        = EXCLUDED.hash,
-                 processing_status           = EXCLUDED.processing_status,
-                 raw_payload                 = EXCLUDED.raw_payload`,
-          [
-            String(photo?.id ?? ""),
-            photoProjectId,
-            extractUri(uris, "original"),
-            extractUri(uris, "web"),
-            extractUri(uris, "thumbnail"),
-            extractUri(uris, "web_annotation"),
-            capturedAt,
-            coords?.lat              ?? null,
-            coords?.lng              ?? null,
-            creatorId                || null,
-            emailAddress,
-            capturedByName,
-            photo?.companycam_app_url ?? photo?.app_url ?? null,
-            photo?.description       ?? null,
-            photo?.internal          ?? false,
-            photo?.hash              ?? null,
-            photo?.processing_status ?? photo?.status ?? null,
-            photo ? JSON.stringify(photo) : null,
-          ]
-        );
+        console.log('[companycam] photo INSERT params:', JSON.stringify({ photoId: photo?.id, photoProjectId, urisLength: uris.length, capturedAt, creatorId, emailAddress, capturedByName }));
+
+        try {
+          const result = await pool.query(
+            `INSERT INTO companycam_photos
+               (companycam_photo_id, companycam_project_id,
+                photo_url_original, photo_url_web, photo_url_thumbnail,
+                photo_url_web_annotation,
+                captured_at, latitude, longitude,
+                creator_companycam_user_id, captured_by_email, captured_by_name,
+                companycam_app_url, description,
+                internal, hash, processing_status, raw_payload)
+             VALUES ($1,$2,$3,$4,$5,$6,
+                     to_timestamp($7),$8,$9,
+                     $10,$11,$12,$13,$14,$15,$16,$17,$18)
+             ON CONFLICT (companycam_photo_id) DO UPDATE
+               SET companycam_project_id       = EXCLUDED.companycam_project_id,
+                   photo_url_original          = EXCLUDED.photo_url_original,
+                   photo_url_web               = EXCLUDED.photo_url_web,
+                   photo_url_thumbnail         = EXCLUDED.photo_url_thumbnail,
+                   photo_url_web_annotation    = EXCLUDED.photo_url_web_annotation,
+                   captured_at                 = EXCLUDED.captured_at,
+                   latitude                    = EXCLUDED.latitude,
+                   longitude                   = EXCLUDED.longitude,
+                   creator_companycam_user_id  = EXCLUDED.creator_companycam_user_id,
+                   captured_by_email           = EXCLUDED.captured_by_email,
+                   captured_by_name            = EXCLUDED.captured_by_name,
+                   companycam_app_url          = EXCLUDED.companycam_app_url,
+                   description                 = EXCLUDED.description,
+                   internal                    = EXCLUDED.internal,
+                   hash                        = EXCLUDED.hash,
+                   processing_status           = EXCLUDED.processing_status,
+                   raw_payload                 = EXCLUDED.raw_payload`,
+            [
+              String(photo?.id ?? ""),
+              photoProjectId,
+              extractUri(uris, "original"),
+              extractUri(uris, "web"),
+              extractUri(uris, "thumbnail"),
+              extractUri(uris, "web_annotation"),
+              capturedAt,
+              coords?.lat              ?? null,
+              coords?.lng              ?? null,
+              creatorId                || null,
+              emailAddress,
+              capturedByName,
+              photo?.companycam_app_url ?? photo?.app_url ?? null,
+              photo?.description       ?? null,
+              photo?.internal          ?? false,
+              photo?.hash              ?? null,
+              photo?.processing_status ?? photo?.status ?? null,
+              photo ? JSON.stringify(photo) : null,
+            ]
+          );
+          console.log('[companycam] photo INSERT rowCount:', result.rowCount);
+        } catch (err: any) {
+          console.error('[companycam] photo INSERT failed:', err.stack ?? err.message ?? err);
+          throw err;
+        }
       }
 
       // ── document.created (ai_walkthrough_note only) ───────────────────────
