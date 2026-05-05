@@ -99,6 +99,81 @@ async function resolveCreatorUser(creatorId: string): Promise<{
   }
 }
 
+/**
+ * Lazy-populate companycam_projects so that a photo.created event whose parent
+ * project has never been seen locally does not hit the FK constraint and 500.
+ * Pattern mirrors resolveCreatorUser: check local first, then GET /v2/projects/{id}.
+ */
+async function resolveProject(projectId: string): Promise<void> {
+  if (!projectId) return;
+
+  // Local cache hit — FK will satisfy.
+  const { rows } = await pool.query(
+    `SELECT companycam_project_id FROM companycam_projects
+      WHERE companycam_project_id = $1`,
+    [projectId]
+  );
+  if (rows.length > 0) return;
+
+  // Cache miss — fetch from CC API.
+  const token = process.env.COMPANYCAM_API_TOKEN;
+  if (!token) {
+    console.warn("[companycam] COMPANYCAM_API_TOKEN not set — cannot lazy-fetch project", projectId);
+    return;
+  }
+
+  try {
+    const resp = await fetch(`https://api.companycam.com/v2/projects/${projectId}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    });
+    if (!resp.ok) {
+      console.warn(`[companycam] /v2/projects/${projectId} returned ${resp.status} — photo may fail FK`);
+      return;
+    }
+    const proj = (await resp.json()) as any;
+    const addr:   Record<string, any>           = proj?.address     ?? {};
+    const coords: Record<string, any>           = proj?.coordinates ?? {};
+    const uris:   { type: string; uri: string }[] = proj?.uris      ?? [];
+
+    await pool.query(
+      `INSERT INTO companycam_projects
+         (companycam_project_id, name, status,
+          address_street_1, address_street_2, address_city,
+          address_state, address_postal_code, address_country,
+          latitude, longitude,
+          creator_companycam_user_id,
+          archived, public, feature_image_url, raw_payload,
+          cc_created_at, cc_updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+               to_timestamp($17), to_timestamp($18))
+       ON CONFLICT (companycam_project_id) DO NOTHING`,
+      [
+        String(proj?.id ?? ""),
+        proj?.name                                          ?? "",
+        proj?.status                                        ?? null,
+        addr?.street_address_1                              ?? null,
+        addr?.street_address_2                              ?? null,
+        addr?.city                                          ?? null,
+        addr?.state                                         ?? null,
+        addr?.postal_code                                   ?? null,
+        addr?.country                                       ?? null,
+        coords?.lat                                         ?? null,
+        coords?.lng                                         ?? null,
+        String(proj?.creator_id ?? proj?.creator?.id ?? "") || null,
+        proj?.archived                                      ?? false,
+        proj?.public                                        ?? true,
+        proj?.feature_image_url ?? proj?.image_url ?? extractUri(uris, "web") ?? null,
+        proj ? JSON.stringify(proj)                         : null,
+        proj?.created_at                                    ?? null,
+        proj?.updated_at                                    ?? null,
+      ]
+    );
+    console.log(`[companycam] Lazy-fetched and cached project ${projectId}`);
+  } catch (err: any) {
+    console.error("[companycam] resolveProject fetch error:", err.message);
+  }
+}
+
 // ─── Route registration ───────────────────────────────────────────────────────
 
 export function registerCompanyCamRoutes(app: Express) {
@@ -228,6 +303,11 @@ export function registerCompanyCamRoutes(app: Express) {
       // ── photo.created ─────────────────────────────────────────────────────
       else if (eventType === "photo.created") {
         const photo  = data?.photo     ?? data;
+        const photoProjectId = String(photo?.project_id ?? "");
+
+        // Guarantee FK target exists before the photo INSERT.
+        await resolveProject(photoProjectId);
+
         const uris: { type: string; uri: string }[] = photo?.uris ?? [];
         const coords = photo?.coordinates ?? {};
         const creatorId = String(
@@ -276,8 +356,8 @@ export function registerCompanyCamRoutes(app: Express) {
                  processing_status           = EXCLUDED.processing_status,
                  raw_payload                 = EXCLUDED.raw_payload`,
           [
-            String(photo?.id         ?? ""),
-            String(photo?.project_id ?? ""),
+            String(photo?.id ?? ""),
+            photoProjectId,
             extractUri(uris, "original"),
             extractUri(uris, "web"),
             extractUri(uris, "thumbnail"),
