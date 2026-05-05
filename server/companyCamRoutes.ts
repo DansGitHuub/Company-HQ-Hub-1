@@ -419,7 +419,7 @@ export function registerCompanyCamRoutes(app: Express) {
       return res.status(200).json({ received: true });
     } catch (err: any) {
       console.error("[companycam] Webhook processing error:", err.message ?? err);
-      return res.status(500).json({ error: "Internal error processing webhook" });
+      return res.status(200).json({ received: true, error: "processing_failed" });
     }
   });
 }
