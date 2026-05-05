@@ -698,13 +698,13 @@ export function registerEstimateRoutes(app: Express) {
       const ccId = linkRow.rows[0].companycam_project_id;
       if (!ccId) return res.json({ photos: [] });
       const result = await client.query(
-        "SELECT p.companycam_photo_id, p.captured_at, " +
-        "COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), 'Unknown') AS captured_by_name, " +
-        "p.uris, p.coordinates " +
-        "FROM companycam_photos p " +
-        "LEFT JOIN companycam_users u ON u.companycam_user_id = p.creator_companycam_user_id " +
-        "WHERE p.companycam_project_id = $1 AND p.archived IS NOT TRUE " +
-        "ORDER BY p.captured_at DESC NULLS LAST",
+        "SELECT companycam_photo_id, captured_at, " +
+        "COALESCE(NULLIF(captured_by_name, ''), 'Unknown') AS captured_by_name, " +
+        "photo_url_original, photo_url_web, photo_url_thumbnail, " +
+        "latitude, longitude " +
+        "FROM companycam_photos " +
+        "WHERE companycam_project_id = $1 " +
+        "ORDER BY captured_at DESC NULLS LAST",
         [ccId]
       );
       res.json({ photos: result.rows });

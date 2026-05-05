@@ -6,22 +6,16 @@ type Photo = {
   companycam_photo_id: string;
   captured_at: string | null;
   captured_by_name: string;
-  uris: { type: string; uri: string }[] | string[] | null;
-  coordinates: { lat: number; lng: number } | null;
+  photo_url_original: string | null;
+  photo_url_web: string | null;
+  photo_url_thumbnail: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 interface Props {
   estimateId: string;
   linkedProjectId: string | null;
-}
-
-function pickUri(uris: Photo["uris"], idx: number): string | null {
-  if (!uris || !Array.isArray(uris) || uris.length === 0) return null;
-  const arr: any[] = uris as any[];
-  const item = arr[idx] ?? arr[0];
-  if (typeof item === "string") return item;
-  if (item && typeof item === "object" && "uri" in item) return item.uri;
-  return null;
 }
 
 function relativeTime(iso: string | null): string {
@@ -91,6 +85,7 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
       qc.invalidateQueries({ queryKey: ["estimate", estimateId] });
       qc.invalidateQueries({ queryKey: ["estimate-photos", estimateId] });
       qc.invalidateQueries({ queryKey: ["estimates"] });
+      qc.invalidateQueries();
       setOpen(false);
       setQuery("");
     },
@@ -129,8 +124,8 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
       ) : (
         <div className="flex flex-wrap gap-3">
           {photos.map((ph) => {
-            const thumb = pickUri(ph.uris, 2) || pickUri(ph.uris, 0);
-            const full = pickUri(ph.uris, 0);
+            const thumb = ph.photo_url_thumbnail || ph.photo_url_web || ph.photo_url_original;
+            const full = ph.photo_url_original || ph.photo_url_web || ph.photo_url_thumbnail;
             if (!thumb) return null;
             return (
               <button type="button" key={ph.companycam_photo_id} onClick={() => setLightboxUrl(full)} className="block w-[120px] text-left">
