@@ -2667,6 +2667,7 @@ export const estimates = pgTable("estimates", {
   signerIp: text("signer_ip"),
   signedAt: timestamp("signed_at"),
   signedDocumentUrl: text("signed_document_url"),
+  companycamProjectId: text("companycam_project_id"),
 });
 
 export const estimateItems = pgTable("estimate_items", {

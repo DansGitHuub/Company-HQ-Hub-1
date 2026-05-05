@@ -659,4 +659,90 @@ export function registerEstimateRoutes(app: Express) {
       res.status(500).json({ message: "Error saving response" });
     }
   });
+  // ----- Phase 2 Wave 1: CompanyCam integration on estimate detail page -----
+  // GET /api/companycam/projects?q=... -- search source for the dropdown
+  app.get("/api/companycam/projects", requireAuth, async (req: any, res: any) => {
+    const client = await pool.connect();
+    try {
+      const q = (req.query.q as string | undefined)?.trim() || "";
+      const params: any[] = [];
+      let where = "WHERE archived IS NOT TRUE";
+      if (q) {
+        params.push("%" + q + "%");
+        where += " AND name ILIKE $" + params.length;
+      }
+      const result = await client.query(
+        "SELECT companycam_project_id, name, " +
+        "NULLIF(CONCAT_WS(', ', NULLIF(address_street_1, ''), NULLIF(address_city, ''), NULLIF(address_state, '')), '') AS address " +
+        "FROM companycam_projects " + where + " ORDER BY name ASC NULLS LAST LIMIT 50",
+        params
+      );
+      res.json({ projects: result.rows });
+    } catch (err: any) {
+      console.error("[companycam] GET /projects failed:", err);
+      res.status(500).json({ error: "Failed to load projects" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // GET /api/estimates/:id/photos -- gallery data for an estimate
+  app.get("/api/estimates/:id/photos", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+    const client = await pool.connect();
+    try {
+      const linkRow = await client.query(
+        "SELECT companycam_project_id FROM sales_estimates WHERE id = $1",
+        [req.params.id]
+      );
+      if (linkRow.rowCount === 0) return res.status(404).json({ error: "Estimate not found" });
+      const ccId = linkRow.rows[0].companycam_project_id;
+      if (!ccId) return res.json({ photos: [] });
+      const result = await client.query(
+        "SELECT p.companycam_photo_id, p.captured_at, " +
+        "COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), 'Unknown') AS captured_by_name, " +
+        "p.uris, p.coordinates " +
+        "FROM companycam_photos p " +
+        "LEFT JOIN companycam_users u ON u.companycam_user_id = p.creator_companycam_user_id " +
+        "WHERE p.companycam_project_id = $1 AND p.archived IS NOT TRUE " +
+        "ORDER BY p.captured_at DESC NULLS LAST",
+        [ccId]
+      );
+      res.json({ photos: result.rows });
+    } catch (err: any) {
+      console.error("[estimates] GET /:id/photos failed:", err);
+      res.status(500).json({ error: "Failed to load photos" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // PATCH /api/estimates/:id/companycam-project -- link mutation
+  app.patch("/api/estimates/:id/companycam-project", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+    const client = await pool.connect();
+    try {
+      const newId: string | null = req.body?.companycamProjectId ?? null;
+      if (newId !== null && typeof newId !== "string") {
+        return res.status(400).json({ error: "companycamProjectId must be a string or null" });
+      }
+      if (newId) {
+        const exists = await client.query(
+          "SELECT 1 FROM companycam_projects WHERE companycam_project_id = $1",
+          [newId]
+        );
+        if (exists.rowCount === 0) return res.status(400).json({ error: "Unknown CompanyCam project" });
+      }
+      const result = await client.query(
+        "UPDATE sales_estimates SET companycam_project_id = $1, updated_at = NOW() WHERE id = $2 RETURNING id, companycam_project_id",
+        [newId, req.params.id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: "Estimate not found" });
+      res.json({ ok: true, id: result.rows[0].id, companycamProjectId: result.rows[0].companycam_project_id });
+    } catch (err: any) {
+      console.error("[estimates] PATCH /:id/companycam-project failed:", err);
+      res.status(500).json({ error: "Failed to update link" });
+    } finally {
+      client.release();
+    }
+  });
+
 }

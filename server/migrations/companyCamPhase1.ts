@@ -211,6 +211,32 @@ export async function runCompanyCamPhase1Migration() {
         ON voice_transcripts(customer_id)
     `);
 
+    // sales_estimates.companycam_project_id (Phase 2 Wave 1)
+    await client.query(`
+      ALTER TABLE sales_estimates
+      ADD COLUMN IF NOT EXISTS companycam_project_id TEXT
+    `);
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'sales_estimates_companycam_project_id_fkey'
+        ) THEN
+          ALTER TABLE sales_estimates
+          ADD CONSTRAINT sales_estimates_companycam_project_id_fkey
+          FOREIGN KEY (companycam_project_id)
+          REFERENCES companycam_projects(companycam_project_id)
+          ON DELETE SET NULL;
+        END IF;
+      END
+      $$;
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sales_estimates_companycam_project_id
+      ON sales_estimates(companycam_project_id)
+    `);
+
     await client.query("COMMIT");
     console.log("[migration] CompanyCam Phase 1 tables ready (7 tables, v2 schema)");
   } catch (err) {
