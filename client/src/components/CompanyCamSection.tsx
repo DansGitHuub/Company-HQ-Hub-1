@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 type Project = { companycam_project_id: string; name: string; address: string | null };
@@ -12,6 +12,9 @@ type Photo = {
   description: string | null;
   latitude: number | null;
   longitude: number | null;
+  description_override: string | null;
+  description_source: string | null;
+  hidden_on_estimate: boolean;
 };
 
 interface Props {
@@ -32,25 +35,49 @@ function relativeTime(iso: string | null): string {
   return `${d}d ago`;
 }
 
+function effectiveDesc(ph: Photo): string | null {
+  return ph.description_override ?? ph.description;
+}
+
 export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
   const qc = useQueryClient();
+
+  // ref so the lightbox Esc listener can read editingNote without stale closure
+  const editingNoteRef = useRef<string | null>(null);
+  // ref to suppress onBlur-save when Esc cancels an edit
+  const escCancelledRef = useRef(false);
+
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const [lightboxDesc, setLightboxDesc] = useState<string | null>(null);
 
+  const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
+
+  const [editingNote, setEditingNote] = useState<string | null>(null);
+  const [draftNote, setDraftNote] = useState("");
+
+  const [showHidden, setShowHidden] = useState(false);
+
+  // keep ref in sync
+  useEffect(() => { editingNoteRef.current = editingNote; }, [editingNote]);
+
+  // debounce project search
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 250);
     return () => clearTimeout(t);
   }, [query]);
 
+  // lightbox Esc — skip if currently editing a note
   useEffect(() => {
-    if (!lightboxUrl) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setLightboxUrl(null); setLightboxDesc(null); } };
+    if (!lightboxPhotoId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !editingNoteRef.current) {
+        setLightboxPhotoId(null);
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [lightboxUrl]);
+  }, [lightboxPhotoId]);
 
   const projectsQ = useQuery({
     queryKey: ["companycam-projects", debounced],
@@ -93,27 +120,132 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
     },
   });
 
+  const noteMutation = useMutation({
+    mutationFn: async ({ photoId, note }: { photoId: string; note: string | null }) => {
+      const r = await fetch(`/api/companycam/photos/${photoId}/note`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note }),
+      });
+      if (!r.ok) throw new Error("Note save failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["estimate-photos", estimateId] });
+    },
+  });
+
+  const hideMutation = useMutation({
+    mutationFn: async ({ photoId, hidden }: { photoId: string; hidden: boolean }) => {
+      const r = await fetch(`/api/companycam/photos/${photoId}/hidden`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hidden }),
+      });
+      if (!r.ok) throw new Error("Hide toggle failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["estimate-photos", estimateId] });
+    },
+  });
+
   const photos = photosQ.data?.photos ?? [];
   const projects = projectsQ.data?.projects ?? [];
+  const hiddenCount = photos.filter((p) => p.hidden_on_estimate).length;
+  const visiblePhotos = photos.filter((p) => showHidden || !p.hidden_on_estimate);
+  const lightboxPhoto = lightboxPhotoId
+    ? (photos.find((p) => p.companycam_photo_id === lightboxPhotoId) ?? null)
+    : null;
+
+  function startEdit(ph: Photo) {
+    setEditingNote(ph.companycam_photo_id);
+    setDraftNote(effectiveDesc(ph) ?? "");
+  }
+
+  function saveEdit() {
+    const id = editingNoteRef.current;
+    if (!id) return;
+    const trimmed = draftNote.trim();
+    noteMutation.mutate({ photoId: id, note: trimmed || null });
+    setEditingNote(null);
+    setDraftNote("");
+  }
+
+  function onNoteKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      saveEdit();
+    } else if (e.key === "Escape") {
+      escCancelledRef.current = true;
+      setEditingNote(null);
+      setDraftNote("");
+    }
+  }
+
+  function saveEditOnBlur() {
+    if (escCancelledRef.current) {
+      escCancelledRef.current = false;
+      return;
+    }
+    saveEdit();
+  }
+
+  function closeLightbox() {
+    setLightboxPhotoId(null);
+    setEditingNote(null);
+    setDraftNote("");
+  }
 
   return (
     <section className="border-t pt-6 mt-8">
       <h2 className="text-lg font-semibold mb-3">CompanyCam project</h2>
+
+      {/* ── Project link / picker ────────────────────────────────────────────── */}
       {linkedProjectId ? (
         <div className="flex items-center gap-3 mb-4 flex-wrap">
           <span className="font-medium font-mono text-sm break-all">{linkedProjectId}</span>
-          <a className="text-sm text-blue-600 underline" href={`https://app.companycam.com/projects/${linkedProjectId}`} target="_blank" rel="noreferrer">Open in CompanyCam &rarr;</a>
-          <button type="button" className="text-sm text-red-600 underline" onClick={() => link.mutate(null)} disabled={link.isPending}>Unlink</button>
+          <a
+            className="text-sm text-blue-600 underline"
+            href={`https://app.companycam.com/projects/${linkedProjectId}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open in CompanyCam &rarr;
+          </a>
+          <button
+            type="button"
+            className="text-sm text-red-600 underline"
+            onClick={() => link.mutate(null)}
+            disabled={link.isPending}
+          >
+            Unlink
+          </button>
         </div>
       ) : (
         <p className="text-sm text-gray-600 mb-3">No CompanyCam project linked yet.</p>
       )}
+
       <div className="relative mb-4 max-w-md">
-        <input type="text" value={query} onChange={(e) => { setQuery(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 200)} placeholder={linkedProjectId ? "Change linked project…" : "Pick a CompanyCam project…"} className="w-full border rounded px-3 py-2 text-sm" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 200)}
+          placeholder={linkedProjectId ? "Change linked project…" : "Pick a CompanyCam project…"}
+          className="w-full border rounded px-3 py-2 text-sm"
+        />
         {open && projects.length > 0 && (
           <ul className="absolute z-10 mt-1 w-full bg-white border rounded shadow max-h-72 overflow-auto">
             {projects.map((p) => (
-              <li key={p.companycam_project_id} className="px-3 py-2 hover:bg-gray-100 cursor-pointer" onMouseDown={(e) => { e.preventDefault(); link.mutate(p.companycam_project_id); }}>
+              <li
+                key={p.companycam_project_id}
+                className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                onMouseDown={(e) => { e.preventDefault(); link.mutate(p.companycam_project_id); }}
+              >
                 <div className="font-medium">{p.name}</div>
                 {p.address && <div className="text-xs text-gray-500">{p.address}</div>}
               </li>
@@ -121,34 +253,155 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
           </ul>
         )}
       </div>
+
+      {/* ── Gallery ─────────────────────────────────────────────────────────── */}
       {photos.length === 0 ? (
-        <p className="text-sm text-gray-500">{linkedProjectId ? "No photos yet — photos taken in this CompanyCam project will appear here within seconds." : "No photos yet — link a CompanyCam project above, then photos taken in that project will appear here within seconds."}</p>
+        <p className="text-sm text-gray-500">
+          {linkedProjectId
+            ? "No photos yet — photos taken in this CompanyCam project will appear here within seconds."
+            : "No photos yet — link a CompanyCam project above, then photos taken in that project will appear here within seconds."}
+        </p>
       ) : (
-        <div className="flex flex-wrap gap-3">
-          {photos.map((ph) => {
-            const thumb = ph.photo_url_thumbnail || ph.photo_url_web || ph.photo_url_original;
-            const full = ph.photo_url_original || ph.photo_url_web || ph.photo_url_thumbnail;
-            if (!thumb) return null;
-            return (
-              <button type="button" key={ph.companycam_photo_id} onClick={() => { setLightboxUrl(full); setLightboxDesc(ph.description); }} className="block w-[120px] text-left">
-                <img src={thumb} alt={`Photo by ${ph.captured_by_name}`} className="w-[120px] h-[120px] object-cover rounded border" loading="lazy" />
-                <div className="text-xs mt-1 text-gray-700 truncate">{ph.captured_by_name}</div>
-                <div className="text-[11px] text-gray-500">{relativeTime(ph.captured_at)}</div>
-                {ph.description && (<div className="text-[11px] text-gray-700 mt-1 italic line-clamp-3 whitespace-pre-wrap">{ph.description}</div>)}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {lightboxUrl && (
-        <div role="dialog" aria-modal="true" onClick={() => { setLightboxUrl(null); setLightboxDesc(null); }} className="fixed inset-0 bg-black/85 flex flex-col items-center justify-center z-50 p-2 sm:p-4 cursor-zoom-out">
-          <img src={lightboxUrl} onClick={(e) => e.stopPropagation()} className="max-w-[96vw] max-h-[80vh] object-contain cursor-default" alt="Full-size photo" />
-          {lightboxDesc && (
-            <div onClick={(e) => e.stopPropagation()} className="mt-3 max-w-[96vw] bg-white text-gray-900 text-sm sm:text-base p-3 rounded shadow whitespace-pre-wrap max-h-[15vh] overflow-auto cursor-default">
-              {lightboxDesc}
-            </div>
+        <>
+          <div className="flex flex-wrap gap-3">
+            {visiblePhotos.map((ph) => {
+              const thumb = ph.photo_url_thumbnail || ph.photo_url_web || ph.photo_url_original;
+              if (!thumb) return null;
+              const desc = effectiveDesc(ph);
+              const isEditing = editingNote === ph.companycam_photo_id;
+
+              return (
+                <div
+                  key={ph.companycam_photo_id}
+                  className={`group relative w-[120px] text-left${ph.hidden_on_estimate ? " opacity-40 grayscale" : ""}`}
+                >
+                  {/* Lightbox trigger — image only */}
+                  <button
+                    type="button"
+                    className="block"
+                    onClick={() => setLightboxPhotoId(ph.companycam_photo_id)}
+                  >
+                    <img
+                      src={thumb}
+                      alt={`Photo by ${ph.captured_by_name}`}
+                      className="w-[120px] h-[120px] object-cover rounded border"
+                      loading="lazy"
+                    />
+                  </button>
+
+                  {/* Hide toggle — absolutely positioned, visible on hover */}
+                  <button
+                    type="button"
+                    title={ph.hidden_on_estimate ? "Show on estimate" : "Hide from estimate"}
+                    className="absolute top-1 right-1 w-7 h-7 hidden group-hover:flex items-center justify-center bg-black/60 rounded-full text-white text-sm leading-none"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      hideMutation.mutate({ photoId: ph.companycam_photo_id, hidden: !ph.hidden_on_estimate });
+                    }}
+                  >
+                    {ph.hidden_on_estimate ? "👁" : "🙈"}
+                  </button>
+
+                  <div className="text-xs mt-1 text-gray-700 truncate">{ph.captured_by_name}</div>
+                  <div className="text-[11px] text-gray-500">{relativeTime(ph.captured_at)}</div>
+
+                  {/* Note area — editable */}
+                  {isEditing ? (
+                    <textarea
+                      autoFocus
+                      className="text-[11px] w-full mt-1 border rounded p-1 resize-none focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      rows={3}
+                      value={draftNote}
+                      onChange={(e) => setDraftNote(e.target.value)}
+                      onBlur={saveEditOnBlur}
+                      onKeyDown={onNoteKeyDown}
+                    />
+                  ) : (
+                    <p
+                      className="text-[11px] mt-1 line-clamp-3 whitespace-pre-wrap cursor-text"
+                      onClick={() => startEdit(ph)}
+                    >
+                      {desc ? (
+                        <>
+                          <span className="text-gray-700 italic">{desc}</span>
+                          {ph.description_override !== null && (
+                            <span className="ml-1 text-gray-400 not-italic text-[10px]">(edited)</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-gray-400 italic">Add note...</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Hidden count toggle */}
+          {hiddenCount > 0 && (
+            <button
+              type="button"
+              className="mt-3 text-sm text-gray-500 underline"
+              onClick={() => setShowHidden((v) => !v)}
+            >
+              ({hiddenCount} hidden) — {showHidden ? "collapse" : "show"}
+            </button>
           )}
-          <button type="button" onClick={() => { setLightboxUrl(null); setLightboxDesc(null); }} className="absolute top-2 right-2 text-white bg-black/60 rounded-full w-9 h-9 flex items-center justify-center text-xl leading-none" aria-label="Close">×</button>
+        </>
+      )}
+
+      {/* ── Lightbox ────────────────────────────────────────────────────────── */}
+      {lightboxPhoto && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={closeLightbox}
+          className="fixed inset-0 bg-black/85 flex flex-col items-center justify-center z-50 p-2 sm:p-4 cursor-zoom-out"
+        >
+          <img
+            src={lightboxPhoto.photo_url_original || lightboxPhoto.photo_url_web || lightboxPhoto.photo_url_thumbnail || ""}
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-[96vw] max-h-[80vh] object-contain cursor-default"
+            alt="Full-size photo"
+          />
+
+          {/* Lightbox note bar — always shown, always editable */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="mt-3 max-w-[96vw] w-full max-w-lg bg-white text-gray-900 text-sm sm:text-base p-3 rounded shadow cursor-default"
+          >
+            {editingNote === lightboxPhoto.companycam_photo_id ? (
+              <textarea
+                autoFocus
+                className="w-full border-none outline-none resize-none text-sm"
+                rows={4}
+                value={draftNote}
+                onChange={(e) => setDraftNote(e.target.value)}
+                onBlur={saveEditOnBlur}
+                onKeyDown={onNoteKeyDown}
+              />
+            ) : (
+              <p
+                className={`cursor-text whitespace-pre-wrap${effectiveDesc(lightboxPhoto) ? " text-gray-900" : " text-gray-400 italic"}`}
+                onClick={() => startEdit(lightboxPhoto)}
+              >
+                {effectiveDesc(lightboxPhoto) || "Add note..."}
+                {lightboxPhoto.description_override !== null && effectiveDesc(lightboxPhoto) && (
+                  <span className="ml-2 text-gray-400 text-xs not-italic">(edited)</span>
+                )}
+              </p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={closeLightbox}
+            className="absolute top-2 right-2 text-white bg-black/60 rounded-full w-9 h-9 flex items-center justify-center text-xl leading-none"
+            aria-label="Close"
+          >
+            ×
+          </button>
         </div>
       )}
     </section>

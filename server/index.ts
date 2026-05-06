@@ -48,6 +48,7 @@ import { runEstimatingPhaseE2Migration } from "./migrations/estimatingPhaseE2";
 import { runEstimatingPhaseE2PolishMigration } from "./migrations/estimatingPhaseE2Polish";
 import { runEstimatingPhaseE3Migration } from "./migrations/estimatingPhaseE3";
 import { runCompanyCamPhase1Migration } from "./migrations/companyCamPhase1";
+import { runCompanyCamPhotosPhase2Migration } from "./migrations/companyCamPhotosPhase2";
 import { registerCompanyCamRoutes } from "./companyCamRoutes";
 import { registerPublicPages } from "./publicPages";
 import { startLeadAlertScheduler } from "./consultationRoutes";
@@ -145,6 +146,7 @@ app.use((req, res, next) => {
   await runEstimatingPhaseE2PolishMigration();
   await runEstimatingPhaseE3Migration();
   await runCompanyCamPhase1Migration();
+  await runCompanyCamPhotosPhase2Migration();
 
   // Public pages must be registered BEFORE registerRoutes (which sets up the React catch-all)
   registerPublicPages(app);
@@ -159,7 +161,7 @@ app.use((req, res, next) => {
   }
 
   registerCompanyCamRoutes(app);
-  console.log('[boot] estimate.companycam ui v1.0.3 - Phase 2 Wave 1 (was companycam receiver v3.2) — outer catch returns 200 (§10.3)');
+  console.log('[boot] estimate.companycam ui v1.1.0 — Phase 2 Wave 1.5a — outer catch returns 200 (§10.3)');
   registerNotificationPreferenceRoutes(app);
   await registerRoutes(httpServer, app);
   

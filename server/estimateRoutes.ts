@@ -701,7 +701,8 @@ export function registerEstimateRoutes(app: Express) {
         "SELECT companycam_photo_id, captured_at, " +
         "COALESCE(NULLIF(captured_by_name, ''), 'Unknown') AS captured_by_name, " +
         "photo_url_original, photo_url_web, photo_url_thumbnail, " +
-        "description, latitude, longitude " +
+        "description, latitude, longitude, " +
+        "description_override, description_source, hidden_on_estimate " +
         "FROM companycam_photos " +
         "WHERE companycam_project_id = $1 " +
         "ORDER BY captured_at DESC NULLS LAST",
@@ -711,6 +712,49 @@ export function registerEstimateRoutes(app: Express) {
     } catch (err: any) {
       console.error("[estimates] GET /:id/photos failed:", err);
       res.status(500).json({ error: "Failed to load photos" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // PATCH /api/companycam/photos/:id/note -- save or clear per-photo note override
+  app.patch("/api/companycam/photos/:id/note", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+    const client = await pool.connect();
+    try {
+      const raw = req.body?.note;
+      const noteVal: string | null = (typeof raw === "string" && raw.trim()) ? raw.trim() : null;
+      const result = await client.query(
+        "UPDATE companycam_photos " +
+        "SET description_override = $1, description_source = $2, updated_at = NOW() " +
+        "WHERE companycam_photo_id = $3 RETURNING companycam_photo_id",
+        [noteVal, noteVal !== null ? "manual" : null, req.params.id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: "Photo not found" });
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[companycam] PATCH /photos/:id/note failed:", err);
+      res.status(500).json({ error: "Failed to save note" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // PATCH /api/companycam/photos/:id/hidden -- toggle hidden_on_estimate flag
+  app.patch("/api/companycam/photos/:id/hidden", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+    const client = await pool.connect();
+    try {
+      const hidden = Boolean(req.body?.hidden);
+      const result = await client.query(
+        "UPDATE companycam_photos " +
+        "SET hidden_on_estimate = $1, updated_at = NOW() " +
+        "WHERE companycam_photo_id = $2 RETURNING companycam_photo_id",
+        [hidden, req.params.id]
+      );
+      if (result.rowCount === 0) return res.status(404).json({ error: "Photo not found" });
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[companycam] PATCH /photos/:id/hidden failed:", err);
+      res.status(500).json({ error: "Failed to toggle hidden" });
     } finally {
       client.release();
     }
