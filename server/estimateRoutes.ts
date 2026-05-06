@@ -701,7 +701,7 @@ export function registerEstimateRoutes(app: Express) {
         "SELECT companycam_photo_id, captured_at, " +
         "COALESCE(NULLIF(captured_by_name, ''), 'Unknown') AS captured_by_name, " +
         "photo_url_original, photo_url_web, photo_url_thumbnail, " +
-        "latitude, longitude " +
+        "description, latitude, longitude " +
         "FROM companycam_photos " +
         "WHERE companycam_project_id = $1 " +
         "ORDER BY captured_at DESC NULLS LAST",

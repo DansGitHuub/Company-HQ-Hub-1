@@ -9,6 +9,7 @@ type Photo = {
   photo_url_original: string | null;
   photo_url_web: string | null;
   photo_url_thumbnail: string | null;
+  description: string | null;
   latitude: number | null;
   longitude: number | null;
 };
@@ -37,6 +38,7 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxDesc, setLightboxDesc] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 250);
@@ -45,7 +47,7 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
 
   useEffect(() => {
     if (!lightboxUrl) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLightboxUrl(null); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setLightboxUrl(null); setLightboxDesc(null); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [lightboxUrl]);
@@ -128,18 +130,19 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
             const full = ph.photo_url_original || ph.photo_url_web || ph.photo_url_thumbnail;
             if (!thumb) return null;
             return (
-              <button type="button" key={ph.companycam_photo_id} onClick={() => setLightboxUrl(full)} className="block w-[120px] text-left">
+              <button type="button" key={ph.companycam_photo_id} onClick={() => { setLightboxUrl(full); setLightboxDesc(ph.description); }} className="block w-[120px] text-left">
                 <img src={thumb} alt={`Photo by ${ph.captured_by_name}`} className="w-[120px] h-[120px] object-cover rounded border" loading="lazy" />
                 <div className="text-xs mt-1 text-gray-700 truncate">{ph.captured_by_name}</div>
                 <div className="text-[11px] text-gray-500">{relativeTime(ph.captured_at)}</div>
+                {ph.description && (<div className="text-[11px] text-gray-700 mt-1 italic line-clamp-3 whitespace-pre-wrap">{ph.description}</div>)}
               </button>
             );
           })}
         </div>
       )}
       {lightboxUrl && (
-        <div role="dialog" aria-modal="true" onClick={() => setLightboxUrl(null)} className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 cursor-zoom-out">
-          <img src={lightboxUrl} className="max-w-full max-h-full" alt="Full-size photo" />
+        <div role="dialog" aria-modal="true" onClick={() => { setLightboxUrl(null); setLightboxDesc(null); }} className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 cursor-zoom-out">
+          <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}><img src={lightboxUrl} className="max-w-full max-h-full" alt="Full-size photo" />{lightboxDesc && (<div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-sm p-3 whitespace-pre-wrap max-h-[40%] overflow-auto">{lightboxDesc}</div>)}</div>
         </div>
       )}
     </section>
