@@ -141,8 +141,14 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
         </div>
       )}
       {lightboxUrl && (
-        <div role="dialog" aria-modal="true" onClick={() => { setLightboxUrl(null); setLightboxDesc(null); }} className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 cursor-zoom-out">
-          <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}><img src={lightboxUrl} className="max-w-full max-h-full" alt="Full-size photo" />{lightboxDesc && (<div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-sm p-3 whitespace-pre-wrap max-h-[40%] overflow-auto">{lightboxDesc}</div>)}</div>
+        <div role="dialog" aria-modal="true" onClick={() => { setLightboxUrl(null); setLightboxDesc(null); }} className="fixed inset-0 bg-black/85 flex flex-col items-center justify-center z-50 p-2 sm:p-4 cursor-zoom-out">
+          <img src={lightboxUrl} onClick={(e) => e.stopPropagation()} className="max-w-[96vw] max-h-[80vh] object-contain cursor-default" alt="Full-size photo" />
+          {lightboxDesc && (
+            <div onClick={(e) => e.stopPropagation()} className="mt-3 max-w-[96vw] bg-white text-gray-900 text-sm sm:text-base p-3 rounded shadow whitespace-pre-wrap max-h-[15vh] overflow-auto cursor-default">
+              {lightboxDesc}
+            </div>
+          )}
+          <button type="button" onClick={() => { setLightboxUrl(null); setLightboxDesc(null); }} className="absolute top-2 right-2 text-white bg-black/60 rounded-full w-9 h-9 flex items-center justify-center text-xl leading-none" aria-label="Close">×</button>
         </div>
       )}
     </section>
