@@ -9,6 +9,20 @@ function extractUri(uris: { type: string; uri: string }[], type: string): string
 }
 
 /**
+ * CompanyCam description fields may arrive as a plain string OR as an object
+ * with a plain_text_content key (rich-text envelope).  This helper normalises
+ * both shapes and returns null for blank / missing values.
+ */
+function extractCompanyCamDescription(raw: any): string | null {
+  if (raw == null) return null;
+  if (typeof raw === 'string') return raw.trim() || null;
+  if (typeof raw === 'object' && typeof raw.plain_text_content === 'string') {
+    return raw.plain_text_content.trim() || null;
+  }
+  return null;
+}
+
+/**
  * Lazy-populate companycam_users cache and return { emailAddress, firstName, lastName }.
  * email_address is NOT on photo or project payloads — resolved via /v2/users/{id}.
  */
@@ -374,7 +388,7 @@ export function registerCompanyCamRoutes(app: Express) {
               emailAddress,
               capturedByName,
               photo?.companycam_app_url ?? photo?.app_url ?? null,
-              photo?.description       ?? null,
+              extractCompanyCamDescription(photo?.description),
               photo?.internal          ?? false,
               photo?.hash              ?? null,
               photo?.processing_status ?? photo?.status ?? null,
@@ -384,6 +398,74 @@ export function registerCompanyCamRoutes(app: Express) {
           console.log('[companycam] photo INSERT rowCount:', result.rowCount);
         } catch (err: any) {
           console.error('[companycam] photo INSERT failed:', err.stack ?? err.message ?? err);
+          throw err;
+        }
+      }
+
+      // ── photo.updated ─────────────────────────────────────────────────────
+      else if (eventType === "photo.updated") {
+        const photo = data?.photo ?? data;
+        const photoProjectId = String(photo?.project_id ?? "");
+
+        await resolveProject(photoProjectId);
+
+        const uris: { type: string; uri: string }[] = photo?.uris ?? [];
+        const coords = photo?.coordinates ?? {};
+        const creatorId = String(
+          photo?.creator_id ?? photo?.creator?.id ?? ""
+        );
+
+        const { emailAddress, firstName, lastName } = creatorId
+          ? await resolveCreatorUser(creatorId)
+          : { emailAddress: null, firstName: null, lastName: null };
+
+        const capturedByName = (firstName || lastName)
+          ? [firstName, lastName].filter(Boolean).join(" ")
+          : null;
+
+        const capturedAt = photo?.captured_at ?? photo?.created_at ?? null;
+
+        try {
+          const result = await pool.query(
+            `INSERT INTO companycam_photos
+               (companycam_photo_id, companycam_project_id,
+                photo_url_original, photo_url_web, photo_url_thumbnail,
+                photo_url_web_annotation,
+                captured_at, latitude, longitude,
+                creator_companycam_user_id, captured_by_email, captured_by_name,
+                companycam_app_url, description,
+                internal, hash, processing_status, raw_payload)
+             VALUES ($1,$2,$3,$4,$5,$6,
+                     to_timestamp($7),$8,$9,
+                     $10,$11,$12,$13,$14,$15,$16,$17,$18)
+             ON CONFLICT (companycam_photo_id) DO UPDATE
+               SET description = EXCLUDED.description,
+                   raw_payload = EXCLUDED.raw_payload,
+                   captured_at = COALESCE(EXCLUDED.captured_at, companycam_photos.captured_at)`,
+            [
+              String(photo?.id ?? ""),
+              photoProjectId,
+              extractUri(uris, "original"),
+              extractUri(uris, "web"),
+              extractUri(uris, "thumbnail"),
+              extractUri(uris, "web_annotation"),
+              capturedAt,
+              coords?.lat              ?? null,
+              coords?.lng              ?? null,
+              creatorId                || null,
+              emailAddress,
+              capturedByName,
+              photo?.companycam_app_url ?? photo?.app_url ?? null,
+              extractCompanyCamDescription(photo?.description),
+              photo?.internal          ?? false,
+              photo?.hash              ?? null,
+              photo?.processing_status ?? photo?.status ?? null,
+              photo ? JSON.stringify(photo) : null,
+            ]
+          );
+          console.log('[companycam] photo.updated rowCount:', result.rowCount);
+        } catch (err: any) {
+          console.error('[companycam] photo.updated INSERT failed:', err.stack ?? err.message ?? err);
           throw err;
         }
       }

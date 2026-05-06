@@ -760,6 +760,49 @@ export function registerEstimateRoutes(app: Express) {
     }
   });
 
+  // POST /api/admin/companycam/backfill-descriptions -- one-shot admin tool
+  // to back-fill description column on photos that arrived before §C.1 fix
+  app.post("/api/admin/companycam/backfill-descriptions", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT companycam_photo_id FROM companycam_photos WHERE description IS NULL ORDER BY captured_at DESC NULLS LAST`
+      );
+      const results: { id: string; status: 'updated' | 'still_null' | 'api_error'; description?: string | null }[] = [];
+      for (const r of rows) {
+        const id = r.companycam_photo_id;
+        try {
+          const resp = await fetch(`https://api.companycam.com/v2/photos/${id}`, {
+            headers: { Authorization: `Bearer ${process.env.COMPANYCAM_API_TOKEN}` },
+          });
+          if (!resp.ok) { results.push({ id, status: 'api_error' }); continue; }
+          const j: any = await resp.json();
+          const desc =
+            typeof j?.description === 'string'
+              ? (j.description.trim() || null)
+              : (typeof j?.description?.plain_text_content === 'string'
+                  ? (j.description.plain_text_content.trim() || null)
+                  : null);
+          if (desc) {
+            await pool.query(
+              `UPDATE companycam_photos SET description = $1 WHERE companycam_photo_id = $2`,
+              [desc, id]
+            );
+            results.push({ id, status: 'updated', description: desc });
+          } else {
+            results.push({ id, status: 'still_null' });
+          }
+        } catch (err) {
+          console.error('[companycam.backfill] photo', id, err);
+          results.push({ id, status: 'api_error' });
+        }
+      }
+      res.json({ scanned: rows.length, results });
+    } catch (err) {
+      console.error('[companycam.backfill] error', err);
+      res.status(500).json({ error: 'backfill failed' });
+    }
+  });
+
   // PATCH /api/estimates/:id/companycam-project -- link mutation
   app.patch("/api/estimates/:id/companycam-project", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
     const client = await pool.connect();
