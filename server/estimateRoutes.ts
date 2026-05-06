@@ -725,7 +725,7 @@ export function registerEstimateRoutes(app: Express) {
       const noteVal: string | null = (typeof raw === "string" && raw.trim()) ? raw.trim() : null;
       const result = await client.query(
         "UPDATE companycam_photos " +
-        "SET description_override = $1, description_source = $2, updated_at = NOW() " +
+        "SET description_override = $1, description_source = $2 " +
         "WHERE companycam_photo_id = $3 RETURNING companycam_photo_id",
         [noteVal, noteVal !== null ? "manual" : null, req.params.id]
       );
@@ -746,7 +746,7 @@ export function registerEstimateRoutes(app: Express) {
       const hidden = Boolean(req.body?.hidden);
       const result = await client.query(
         "UPDATE companycam_photos " +
-        "SET hidden_on_estimate = $1, updated_at = NOW() " +
+        "SET hidden_on_estimate = $1 " +
         "WHERE companycam_photo_id = $2 RETURNING companycam_photo_id",
         [hidden, req.params.id]
       );

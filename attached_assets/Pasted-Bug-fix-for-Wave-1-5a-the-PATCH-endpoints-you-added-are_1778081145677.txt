@@ -1,0 +1,27 @@
+Bug fix for Wave 1.5a — the PATCH endpoints you added are returning 500 in production.
+ 
+Repro: PATCH /api/companycam/photos/3159188506/note  body {"note":"second test"}  →  500  {"error":"Failed to save note"}
+ 
+The schema is verified correct: companycam_photos has both description_override (text) and hidden_on_estimate (boolean) columns in production, confirmed via SQL Playground after the v1.1.0 deploy. So the bug is NOT a missing column — it's in the endpoint runtime code.
+ 
+Please:
+ 
+1. Tail the deployment Logs (Publishing → Logs panel, search for "Failed to save note" or the console.error tag you used in the catch block, e.g. [companycam.note.patch]) and capture the actual stack trace / error message.
+ 
+2. Read server/estimateRoutes.ts and find the two new PATCH handlers you added in the previous task: PATCH /api/companycam/photos/:photo_id/note and PATCH /api/companycam/photos/:photo_id/hidden.
+ 
+3. Compare them against a known-working PATCH in the same file — PATCH /api/estimates/:id/companycam-project from Wave 1 — to spot the discrepancy. Common causes (in likelihood order):
+   - Wrong db client: the file might have `pool` from `pg` and a `db` from drizzle; the new endpoints may have grabbed the wrong one or one that's not imported.
+   - Wrong table reference: companycam_photos is correct (NOT sales_estimates). Confirm the UPDATE writes to companycam_photos, not estimates/sales_estimates.
+   - Missing await on the query.
+   - Auth/role middleware ordering (requireAuth before requireRoles is the convention used by Wave 1 endpoints).
+ 
+4. Fix BOTH endpoints together — they were written in the same batch and likely share the bug shape.
+ 
+5. Bump server/index.ts boot marker to: [boot] estimate.companycam ui v1.1.1 — Phase 2 Wave 1.5a — outer catch returns 200 (§10.3)
+ 
+6. Stop. Don't trigger Republish — Dan will hit it manually.
+ 
+Constraints: do NOT touch server/companyCamRoutes.ts (the receiver). Do NOT change Wave 1's outer-catch-200 invariant. The bug is purely in the two new endpoints.
+ 
+Verify: after the fix, check TS baseline with NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit (target ≈ 233 errors, no net new in modified files).
