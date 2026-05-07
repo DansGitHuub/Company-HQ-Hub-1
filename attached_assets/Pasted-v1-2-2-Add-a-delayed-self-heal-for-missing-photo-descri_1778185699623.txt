@@ -1,0 +1,56 @@
+v1.2.2 — Add a delayed self-heal for missing photo descriptions in server/companyCamRoutes.ts.
+
+CONTEXT
+We just verified in production that CompanyCam does NOT fire photo.updated for description-only changes, even though webhook 239152 has the photo.updated scope subscribed. So when a user adds a caption at-capture, photo.created arrives at T+0 with description=NULL (CC's backend sets the description ~28 seconds later, but never re-notifies us). The existing POST /api/admin/companycam/backfill-descriptions endpoint proves the description IS retrievable from CC's API after the fact. This change automates that pull for new photos.
+
+EXACT CHANGE in server/companyCamRoutes.ts
+Inside the existing photo.created branch, immediately after the try/catch that runs the INSERT and logs "[companycam] photo INSERT rowCount:" (currently around L391-L405), and before the closing brace of the photo.created else-if block, insert this non-blocking delayed re-fetch:
+
+      // v1.2.2: delayed-fetch self-heal — CC doesn't fire photo.updated for description-only changes, so if photo.created arrived without a description, refetch the photo from CC's API after 30s and update.
+      const insertedDesc = extractCompanyCamDescription(photo?.description);
+      if (!insertedDesc) {
+        const photoIdStr = String(photo?.id ?? "");
+        setTimeout(async () => {
+          try {
+            const resp = await fetch(`https://api.companycam.com/v2/photos/${photoIdStr}`, {
+              headers: { Authorization: `Bearer ${process.env.COMPANYCAM_API_TOKEN}` }
+            });
+            if (!resp.ok) {
+              console.error('[companycam] delayed-fetch HTTP', resp.status, 'for', photoIdStr);
+              return;
+            }
+            const fresh: any = await resp.json();
+            const freshDesc = extractCompanyCamDescription(fresh?.description);
+            if (!freshDesc) {
+              console.log('[companycam] delayed-fetch: still no description for', photoIdStr);
+              return;
+            }
+            const upd = await pool.query(
+              'UPDATE companycam_photos SET description = $1 WHERE companycam_photo_id = $2 AND description IS NULL',
+              [freshDesc, photoIdStr]
+            );
+            console.log('[companycam] delayed-fetch populated description for', photoIdStr, 'rowCount:', upd.rowCount);
+          } catch (err: any) {
+            console.error('[companycam] delayed-fetch error for', photoIdStr, ':', err?.stack ?? err?.message ?? err);
+          }
+        }, 30000);
+      }
+
+NOTES
+- Use the same DB query helper that the rest of this file already uses. If it's not "pool.query", swap to whatever pattern the existing photo.created INSERT uses (e.g. db.execute with sql template). Match the file's convention exactly so TypeScript stays clean.
+- Use the existing extractCompanyCamDescription helper from L16 — do not redefine it.
+- If a "photoId" variable already exists in the photo.created scope, reuse it instead of declaring photoIdStr.
+- DO NOT touch the photo.updated branch. Leave the scope subscription alone (it costs nothing and may catch other edge cases like rotation/re-tagging).
+- The WHERE description IS NULL clause on the UPDATE is intentional: it prevents the delayed write from clobbering anything that landed via another path (manual backfill, future photo.updated, etc.) in the 30s window.
+
+AFTER THE EDIT
+1. Update the boot marker in server/index.ts to:
+   [boot] estimate.companycam ui v1.2.2 — Phase 2 Wave 1.5c-fix1 (photo.created delayed-fetch self-heal for missing descriptions) — outer catch returns 200 (§10.3)
+2. Run TypeScript check. Baseline is 233 ±0 — report any deviation.
+3. Republish.
+
+REPORT BACK
+- Final boot marker text live in production
+- TS error count (expect 233)
+- Confirmation the delayed-fetch block is inside the photo.created branch (not photo.updated, not at module top level)
+- Any deviations from the spec above and why

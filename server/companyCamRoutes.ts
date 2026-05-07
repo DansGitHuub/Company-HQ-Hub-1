@@ -400,6 +400,38 @@ export function registerCompanyCamRoutes(app: Express) {
           console.error('[companycam] photo INSERT failed:', err.stack ?? err.message ?? err);
           throw err;
         }
+
+        // v1.2.2: delayed-fetch self-heal — CC doesn't fire photo.updated for
+        // description-only changes, so if photo.created arrived without a description,
+        // refetch the photo from CC's API after 30s and update.
+        const insertedDesc = extractCompanyCamDescription(photo?.description);
+        if (!insertedDesc) {
+          const photoIdStr = String(photo?.id ?? "");
+          setTimeout(async () => {
+            try {
+              const resp = await fetch(`https://api.companycam.com/v2/photos/${photoIdStr}`, {
+                headers: { Authorization: `Bearer ${process.env.COMPANYCAM_API_TOKEN}` }
+              });
+              if (!resp.ok) {
+                console.error('[companycam] delayed-fetch HTTP', resp.status, 'for', photoIdStr);
+                return;
+              }
+              const fresh: any = await resp.json();
+              const freshDesc = extractCompanyCamDescription(fresh?.description);
+              if (!freshDesc) {
+                console.log('[companycam] delayed-fetch: still no description for', photoIdStr);
+                return;
+              }
+              const upd = await pool.query(
+                'UPDATE companycam_photos SET description = $1 WHERE companycam_photo_id = $2 AND description IS NULL',
+                [freshDesc, photoIdStr]
+              );
+              console.log('[companycam] delayed-fetch populated description for', photoIdStr, 'rowCount:', upd.rowCount);
+            } catch (err: any) {
+              console.error('[companycam] delayed-fetch error for', photoIdStr, ':', err?.stack ?? err?.message ?? err);
+            }
+          }, 30000);
+        }
       }
 
       // ── photo.updated ─────────────────────────────────────────────────────
