@@ -237,8 +237,34 @@ export async function runCompanyCamPhase1Migration() {
       ON sales_estimates(companycam_project_id)
     `);
 
+    // Block 11: §C work area groups table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS estimate_work_area_groups (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        sales_estimate_id UUID NOT NULL REFERENCES sales_estimates(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_ewag_estimate_sort
+        ON estimate_work_area_groups(sales_estimate_id, sort_order)
+    `);
+
+    // Block 12: §C work_area_group_id column on companycam_photos
+    await client.query(`
+      ALTER TABLE companycam_photos
+        ADD COLUMN IF NOT EXISTS work_area_group_id UUID
+          REFERENCES estimate_work_area_groups(id) ON DELETE SET NULL
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_ccp_work_area_group_id
+        ON companycam_photos(work_area_group_id)
+    `);
+
     await client.query("COMMIT");
-    console.log("[migration] CompanyCam Phase 1 tables ready (7 tables, v2 schema)");
+    console.log("[migration] CompanyCam Phase 1 tables ready (7 tables + work-area groups, v2 schema)");
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

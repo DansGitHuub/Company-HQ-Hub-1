@@ -1,0 +1,139 @@
+Phase 2 Wave 1.5c — work-area-groups feature. Apply ALL of A through F as one batch, run TS check, then stop. Don't Republish — Dan will. Leave the older attached_assets/Pasted-Phase-2-Public-Application-Form-*.txt files ALONE — they're unrelated to this session.
+
+UX decisions Dan locked: (1) collapsible sections per group, stacked top-to-bottom, (2) "Ungrouped" bucket always visible at top (even when empty, with subtle placeholder), (3) drop-target highlight + native HTML5 ghost preview for drag feedback, (4) inline placeholder row for adding a new group (no modal).
+
+A. MIGRATION — append 2 idempotent blocks to server/migrations/companyCamPhase1.ts before COMMIT, in the same IF-NOT-EXISTS / pg_constraint-lookup style as the existing 10 blocks:
+
+  // Block 11: §C work area groups table
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS estimate_work_area_groups (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      sales_estimate_id UUID NOT NULL REFERENCES sales_estimates(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_ewag_estimate_sort
+      ON estimate_work_area_groups(sales_estimate_id, sort_order)
+  `);
+
+  // Block 12: §C work_area_group_id column on companycam_photos
+  await client.query(`
+    ALTER TABLE companycam_photos
+      ADD COLUMN IF NOT EXISTS work_area_group_id UUID
+        REFERENCES estimate_work_area_groups(id) ON DELETE SET NULL
+  `);
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_ccp_work_area_group_id
+      ON companycam_photos(work_area_group_id)
+  `);
+
+If gen_random_uuid() isn't available, fall back to the existing UUID-default pattern used elsewhere in the schema (likely uuid_generate_v4() with pgcrypto or uuid-ossp extension — check the existing sales_estimates.id default).
+
+B. DRIZZLE MIRROR — shared/schema.ts:
+
+  Add a new pgTable:
+    export const estimateWorkAreaGroups = pgTable("estimate_work_area_groups", {
+      id: uuid("id").primaryKey().defaultRandom(),
+      salesEstimateId: uuid("sales_estimate_id").notNull().references(() => salesEstimates.id, { onDelete: "cascade" }),
+      name: text("name").notNull(),
+      sortOrder: integer("sort_order").notNull().default(0),
+      createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    });
+
+  Extend companycamPhotos with:
+    workAreaGroupId: uuid("work_area_group_id").references(() => estimateWorkAreaGroups.id, { onDelete: "set null" }),
+
+  Run npx drizzle-kit generate; commit the resulting migrations/0005_*.sql.
+
+C. SERVER ENDPOINTS — server/estimateRoutes.ts. All endpoints use requireAuth + requireRole(...STAFF_ROLES). Outer catches return 500 (these are not webhook receivers). Add:
+
+  1) POST /api/estimates/:id/work-area-groups
+     Body: { name: string (1-80 chars), sort_order?: number }. If sort_order omitted, compute as (MAX(sort_order) + 1) for this estimate (or 0 if no groups yet). Return: { id, name, sort_order, created_at }.
+
+  2) GET /api/estimates/:id/work-area-groups
+     Returns: { groups: [{ id, name, sort_order, created_at, photo_count }] } sorted by sort_order, created_at. photo_count is COUNT(*) FROM companycam_photos WHERE work_area_group_id = g.id.
+
+  3) PATCH /api/work-area-groups/:id
+     Body: { name?: string (1-80 chars), sort_order?: number }. Build SET clause dynamically. Return updated row. 404 if not found.
+
+  4) DELETE /api/work-area-groups/:id
+     ON DELETE SET NULL on companycam_photos.work_area_group_id handles photo demotion automatically. Return { id }.
+
+  5) PATCH /api/companycam/photos/:photo_id/work-area-group
+     Body: { work_area_group_id: string | null }. Validate: if non-null, must be string (uuid format trust the FK constraint). UPDATE companycam_photos SET work_area_group_id = $1 WHERE companycam_photo_id = $2 RETURNING companycam_photo_id, work_area_group_id. 404 if photo not found. Note companycam_photo_id is TEXT (CompanyCam's id), not the row's UUID pk.
+
+  Also extend the existing GET /api/estimates/:id/photos handler: add cp.work_area_group_id to the SELECT list. Other columns unchanged.
+
+D. FRONTEND — client/src/components/CompanyCamSection.tsx (largest change):
+
+  New imports: useState (already there), useQuery + useMutation from @tanstack/react-query (already there).
+
+  New query (mirrors the existing photos query pattern):
+    const { data: groupsData } = useQuery({
+      queryKey: ['estimate-work-area-groups', estimateId],
+      queryFn: async () => {
+        const r = await fetch(`/api/estimates/${estimateId}/work-area-groups`, { credentials: 'include' });
+        if (!r.ok) throw new Error('failed');
+        return r.json() as Promise<{ groups: { id: string; name: string; sort_order: number; created_at: string; photo_count: number }[] }>;
+      },
+      enabled: !!estimateId,
+    });
+    const groups = groupsData?.groups ?? [];
+
+  Photo type: extend with workAreaGroupId: string | null.
+
+  New mutations (same auth/credentials pattern as existing noteMutation/hideMutation):
+    - createGroupMutation: POST /api/estimates/:id/work-area-groups, body { name }
+    - renameGroupMutation: PATCH /api/work-area-groups/:id, body { name }
+    - deleteGroupMutation: DELETE /api/work-area-groups/:id
+    - assignPhotoMutation: PATCH /api/companycam/photos/:photo_id/work-area-group, body { work_area_group_id }
+    - All onSuccess: qc.invalidateQueries({ queryKey: ['estimate-photos', estimateId] }) AND qc.invalidateQueries({ queryKey: ['estimate-work-area-groups', estimateId] }).
+
+  State:
+    const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+    const [editingGroupName, setEditingGroupName] = useState('');
+    const [creatingGroup, setCreatingGroup] = useState(false);
+    const [newGroupName, setNewGroupName] = useState('');
+    const [dragOverGroupId, setDragOverGroupId] = useState<string | null | 'ungrouped'>(null);
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  Layout refactor:
+    - Compute: ungroupedPhotos = visiblePhotos.filter(p => !p.work_area_group_id); groupedPhotosByGroup: Map<groupId, photos[]>; hidden filter unchanged.
+    - Render in order:
+      1) "Ungrouped" section header + grid (always visible; show "No unassigned photos." placeholder when empty)
+      2) For each group (sorted by sort_order, then created_at): collapsible section header (name, photo_count, edit + delete buttons, chevron) + grid of that group's photos
+      3) "+ New group" inline button below the last group. When clicked, becomes an inline input with placeholder "Group name...", autoFocus, save on Enter, cancel on Esc/blur if empty
+      4) The existing "Hidden (N)" collapsible section (logic unchanged — filter on hidden_on_estimate)
+
+    Section header pattern:
+      <div className="flex items-center justify-between mb-2 mt-4">
+        <button onClick={toggleCollapse} className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <span>{collapsed ? '▸' : '▾'}</span>
+          {editing ? <input ... /> : <span>{group.name}</span>}
+          <span className="text-gray-400 text-xs">({photos.length})</span>
+        </button>
+        <div className="flex gap-1">
+          <button onClick={startEditGroup} ...>✎</button>
+          <button onClick={confirmDelete} ...>🗑</button>
+        </div>
+      </div>
+
+  Drag-and-drop:
+    - On each thumbnail wrapper: draggable={true}, onDragStart={(e) => { e.dataTransfer.setData('text/plain', photo.companycam_photo_id); e.dataTransfer.effectAllowed = 'move'; }}.
+    - On each section's drop target wrapper (containing the section header AND the grid): onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverGroupId(targetGroupId); }}, onDragLeave={(e) => { if (e.currentTarget.contains(e.relatedTarget as Node)) return; setDragOverGroupId(null); }}, onDrop={(e) => { e.preventDefault(); const photoId = e.dataTransfer.getData('text/plain'); assignPhotoMutation.mutate({ photoId, workAreaGroupId: targetGroupId === 'ungrouped' ? null : targetGroupId }); setDragOverGroupId(null); }}.
+    - Visual: when dragOverGroupId === this section's id (or 'ungrouped' for the ungrouped bucket), section gets className with `ring-2 ring-blue-400 bg-blue-50/50 rounded` for the highlight.
+    - Native HTML5 ghost preview is sufficient (browser shows the dragged element's image automatically). Don't implement a custom ghost.
+
+  Note: lightbox + zoom + inline note editor + hide toggle are NOT touched. Only the gallery layout above the lightbox changes.
+
+  TypeScript: extend the Photo type with workAreaGroupId: string | null.
+
+E. BOOT MARKER — server/index.ts:
+  [boot] estimate.companycam ui v1.2.0 — Phase 2 Wave 1.5c (work area groups) — outer catch returns 200 (§10.3)
+
+F. TS BASELINE — Run NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit. Expected 233 ± 3-5 in the modified files (significant new code in CompanyCamSection.tsx + new types). Investigate any net regression beyond +5 before stopping.
+
+DON'T TOUCH: server/companyCamRoutes.ts (the webhook receiver — unchanged this session). Don't add new dependencies (no react-dnd; native HTML5 drag-drop is the requirement). Don't Republish.

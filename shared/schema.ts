@@ -3412,10 +3412,23 @@ export const companycamPhotos = pgTable("companycam_photos", {
   processingStatus:          text("processing_status"),
   rawPayload:                jsonb("raw_payload"),
   createdAt:                 timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  workAreaGroupId:           uuid("work_area_group_id"),
 });
 export const insertCompanycamPhotoSchema = createInsertSchema(companycamPhotos).omit({ id: true, createdAt: true });
 export type InsertCompanycamPhoto = z.infer<typeof insertCompanycamPhotoSchema>;
 export type CompanycamPhoto = typeof companycamPhotos.$inferSelect;
+
+// ─── Estimate Work Area Groups (Phase 2 Wave 1.5c) ────────────────────────────
+export const estimateWorkAreaGroups = pgTable("estimate_work_area_groups", {
+  id:              uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  salesEstimateId: uuid("sales_estimate_id").notNull(),
+  name:            text("name").notNull(),
+  sortOrder:       integer("sort_order").notNull().default(0),
+  createdAt:       timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const insertEstimateWorkAreaGroupSchema = createInsertSchema(estimateWorkAreaGroups).omit({ id: true, createdAt: true });
+export type InsertEstimateWorkAreaGroup = z.infer<typeof insertEstimateWorkAreaGroupSchema>;
+export type EstimateWorkAreaGroup = typeof estimateWorkAreaGroups.$inferSelect;
 
 export const companycamPhotoTags = pgTable("companycam_photo_tags", {
   id:                uuid("id").primaryKey().default(sql`gen_random_uuid()`),

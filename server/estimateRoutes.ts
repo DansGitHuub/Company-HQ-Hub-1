@@ -702,7 +702,7 @@ export function registerEstimateRoutes(app: Express) {
         "COALESCE(NULLIF(captured_by_name, ''), 'Unknown') AS captured_by_name, " +
         "photo_url_original, photo_url_web, photo_url_thumbnail, " +
         "description, latitude, longitude, " +
-        "description_override, description_source, hidden_on_estimate " +
+        "description_override, description_source, hidden_on_estimate, work_area_group_id " +
         "FROM companycam_photos " +
         "WHERE companycam_project_id = $1 " +
         "ORDER BY captured_at DESC NULLS LAST",
@@ -800,6 +800,125 @@ export function registerEstimateRoutes(app: Express) {
     } catch (err) {
       console.error('[companycam.backfill] error', err);
       res.status(500).json({ error: 'backfill failed' });
+    }
+  });
+
+  // POST /api/estimates/:id/work-area-groups
+  app.post("/api/estimates/:id/work-area-groups", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+    const client = await pool.connect();
+    try {
+      const name = typeof req.body?.name === "string" ? req.body.name.trim().slice(0, 80) : "";
+      if (!name) return res.status(400).json({ error: "name is required (1-80 chars)" });
+      const sortArg = req.body?.sort_order;
+      let sortOrder: number;
+      if (typeof sortArg === "number") {
+        sortOrder = sortArg;
+      } else {
+        const { rows } = await client.query(
+          "SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM estimate_work_area_groups WHERE sales_estimate_id = $1",
+          [req.params.id]
+        );
+        sortOrder = rows[0].next;
+      }
+      const { rows } = await client.query(
+        "INSERT INTO estimate_work_area_groups (sales_estimate_id, name, sort_order) VALUES ($1, $2, $3) RETURNING id, name, sort_order, created_at",
+        [req.params.id, name, sortOrder]
+      );
+      res.status(201).json(rows[0]);
+    } catch (err: any) {
+      console.error("[estimates] POST /:id/work-area-groups failed:", err);
+      res.status(500).json({ error: "Failed to create group" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // GET /api/estimates/:id/work-area-groups
+  app.get("/api/estimates/:id/work-area-groups", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+    const client = await pool.connect();
+    try {
+      const { rows } = await client.query(
+        `SELECT g.id, g.name, g.sort_order, g.created_at,
+                COUNT(cp.id)::int AS photo_count
+           FROM estimate_work_area_groups g
+           LEFT JOIN companycam_photos cp ON cp.work_area_group_id = g.id
+          WHERE g.sales_estimate_id = $1
+          GROUP BY g.id, g.name, g.sort_order, g.created_at
+          ORDER BY g.sort_order, g.created_at`,
+        [req.params.id]
+      );
+      res.json({ groups: rows });
+    } catch (err: any) {
+      console.error("[estimates] GET /:id/work-area-groups failed:", err);
+      res.status(500).json({ error: "Failed to load groups" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // PATCH /api/work-area-groups/:id
+  app.patch("/api/work-area-groups/:id", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+    const client = await pool.connect();
+    try {
+      const sets: string[] = [];
+      const vals: any[] = [];
+      if (typeof req.body?.name === "string") {
+        const name = req.body.name.trim().slice(0, 80);
+        if (!name) return res.status(400).json({ error: "name must be 1-80 chars" });
+        vals.push(name); sets.push(`name = $${vals.length}`);
+      }
+      if (typeof req.body?.sort_order === "number") {
+        vals.push(req.body.sort_order); sets.push(`sort_order = $${vals.length}`);
+      }
+      if (sets.length === 0) return res.status(400).json({ error: "No fields to update" });
+      vals.push(req.params.id);
+      const { rows } = await client.query(
+        `UPDATE estimate_work_area_groups SET ${sets.join(", ")} WHERE id = $${vals.length} RETURNING id, name, sort_order, created_at`,
+        vals
+      );
+      if (rows.length === 0) return res.status(404).json({ error: "Group not found" });
+      res.json(rows[0]);
+    } catch (err: any) {
+      console.error("[estimates] PATCH /work-area-groups/:id failed:", err);
+      res.status(500).json({ error: "Failed to update group" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // DELETE /api/work-area-groups/:id
+  app.delete("/api/work-area-groups/:id", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+    const client = await pool.connect();
+    try {
+      await client.query("DELETE FROM estimate_work_area_groups WHERE id = $1", [req.params.id]);
+      res.json({ id: req.params.id });
+    } catch (err: any) {
+      console.error("[estimates] DELETE /work-area-groups/:id failed:", err);
+      res.status(500).json({ error: "Failed to delete group" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // PATCH /api/companycam/photos/:photo_id/work-area-group
+  app.patch("/api/companycam/photos/:photo_id/work-area-group", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+    const client = await pool.connect();
+    try {
+      const groupId: string | null = req.body?.work_area_group_id ?? null;
+      if (groupId !== null && typeof groupId !== "string") {
+        return res.status(400).json({ error: "work_area_group_id must be a string uuid or null" });
+      }
+      const { rows } = await client.query(
+        "UPDATE companycam_photos SET work_area_group_id = $1 WHERE companycam_photo_id = $2 RETURNING companycam_photo_id, work_area_group_id",
+        [groupId, req.params.photo_id]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: "Photo not found" });
+      res.json(rows[0]);
+    } catch (err: any) {
+      console.error("[estimates] PATCH /photos/:photo_id/work-area-group failed:", err);
+      res.status(500).json({ error: "Failed to assign photo" });
+    } finally {
+      client.release();
     }
   });
 

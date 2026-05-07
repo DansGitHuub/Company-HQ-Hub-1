@@ -15,6 +15,7 @@ type Photo = {
   description_override: string | null;
   description_source: string | null;
   hidden_on_estimate: boolean;
+  work_area_group_id: string | null;
 };
 
 interface Props {
@@ -57,6 +58,13 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
   const [draftNote, setDraftNote] = useState("");
 
   const [showHidden, setShowHidden] = useState(false);
+
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState("");
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -137,6 +145,17 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
     refetchOnWindowFocus: true,
   });
 
+  const { data: groupsData } = useQuery({
+    queryKey: ["estimate-work-area-groups", estimateId],
+    queryFn: async () => {
+      const r = await fetch(`/api/estimates/${estimateId}/work-area-groups`, { credentials: "include" });
+      if (!r.ok) throw new Error("failed");
+      return r.json() as Promise<{ groups: { id: string; name: string; sort_order: number; created_at: string; photo_count: number }[] }>;
+    },
+    enabled: !!estimateId,
+  });
+  const groups = groupsData?.groups ?? [];
+
   const link = useMutation({
     mutationFn: async (newId: string | null) => {
       const r = await fetch(`/api/estimates/${estimateId}/companycam-project`, {
@@ -190,10 +209,73 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
     },
   });
 
+  const createGroupMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const r = await fetch(`/api/estimates/${estimateId}/work-area-groups`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!r.ok) throw new Error("Create group failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["estimate-photos", estimateId] });
+      qc.invalidateQueries({ queryKey: ["estimate-work-area-groups", estimateId] });
+    },
+  });
+
+  const renameGroupMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const r = await fetch(`/api/work-area-groups/${id}`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!r.ok) throw new Error("Rename group failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["estimate-photos", estimateId] });
+      qc.invalidateQueries({ queryKey: ["estimate-work-area-groups", estimateId] });
+    },
+  });
+
+  const deleteGroupMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/work-area-groups/${id}`, {
+        method: "DELETE", credentials: "include",
+      });
+      if (!r.ok) throw new Error("Delete group failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["estimate-photos", estimateId] });
+      qc.invalidateQueries({ queryKey: ["estimate-work-area-groups", estimateId] });
+    },
+  });
+
+  const assignPhotoMutation = useMutation({
+    mutationFn: async ({ photoId, workAreaGroupId }: { photoId: string; workAreaGroupId: string | null }) => {
+      const r = await fetch(`/api/companycam/photos/${photoId}/work-area-group`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ work_area_group_id: workAreaGroupId }),
+      });
+      if (!r.ok) throw new Error("Assign photo failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["estimate-photos", estimateId] });
+      qc.invalidateQueries({ queryKey: ["estimate-work-area-groups", estimateId] });
+    },
+  });
+
   const photos = photosQ.data?.photos ?? [];
   const projects = projectsQ.data?.projects ?? [];
   const visiblePhotos = photos.filter((p) => !p.hidden_on_estimate);
   const hiddenPhotos = photos.filter((p) => p.hidden_on_estimate);
+  const ungroupedPhotos = visiblePhotos.filter((p) => !p.work_area_group_id);
   const lightboxPhoto = lightboxPhotoId
     ? (photos.find((p) => p.companycam_photo_id === lightboxPhotoId) ?? null)
     : null;
@@ -253,6 +335,77 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
     if (zoom === 1) setZoom(2);
     else { setZoom(1); setPan({ x: 0, y: 0 }); }
   };
+
+  function renderPhotoCard(ph: Photo, isHiddenSection: boolean) {
+    const thumb = ph.photo_url_thumbnail || ph.photo_url_web || ph.photo_url_original;
+    if (!thumb) return null;
+    const desc = effectiveDesc(ph);
+    const isEditingThis = editingNote === ph.companycam_photo_id;
+    return (
+      <div
+        key={ph.companycam_photo_id}
+        className="group relative w-[120px] text-left"
+        draggable={!isHiddenSection}
+        onDragStart={isHiddenSection ? undefined : (e) => {
+          e.dataTransfer.setData("text/plain", ph.companycam_photo_id);
+          e.dataTransfer.effectAllowed = "move";
+        }}
+      >
+        <button
+          type="button"
+          className="block"
+          onClick={() => setLightboxPhotoId(ph.companycam_photo_id)}
+        >
+          <img
+            src={thumb}
+            alt={`Photo by ${ph.captured_by_name}`}
+            className="w-[120px] h-[120px] object-cover rounded border"
+            loading="lazy"
+          />
+        </button>
+        <button
+          type="button"
+          title={isHiddenSection ? "Show on estimate" : "Hide from estimate"}
+          className="absolute top-1 right-1 w-7 h-7 hidden group-hover:flex items-center justify-center bg-black/60 rounded-full text-white text-sm leading-none"
+          onClick={(e) => {
+            e.stopPropagation();
+            hideMutation.mutate({ photoId: ph.companycam_photo_id, hidden: !isHiddenSection });
+          }}
+        >
+          {isHiddenSection ? "👁" : "🙈"}
+        </button>
+        <div className="text-xs mt-1 text-gray-700 truncate">{ph.captured_by_name}</div>
+        <div className="text-[11px] text-gray-500">{relativeTime(ph.captured_at)}</div>
+        {isEditingThis ? (
+          <textarea
+            autoFocus
+            className="text-[11px] w-full mt-1 border rounded p-1 resize-none focus:outline-none focus:ring-1 focus:ring-blue-400"
+            rows={3}
+            value={draftNote}
+            onChange={(e) => setDraftNote(e.target.value)}
+            onBlur={saveEditOnBlur}
+            onKeyDown={onNoteKeyDown}
+          />
+        ) : (
+          <p
+            className="text-[11px] mt-1 line-clamp-3 whitespace-pre-wrap cursor-text"
+            onClick={() => startEdit(ph)}
+          >
+            {desc ? (
+              <>
+                <span className="text-gray-700 italic">{desc}</span>
+                {ph.description_override !== null && (
+                  <span className="ml-1 text-gray-400 not-italic text-[10px]">(edited)</span>
+                )}
+              </>
+            ) : (
+              <span className="text-gray-400 italic">Add note...</span>
+            )}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <section className="border-t pt-6 mt-8">
@@ -318,165 +471,154 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
         </p>
       ) : (
         <>
-          <div className="flex flex-wrap gap-3">
-            {visiblePhotos.map((ph) => {
-              const thumb = ph.photo_url_thumbnail || ph.photo_url_web || ph.photo_url_original;
-              if (!thumb) return null;
-              const desc = effectiveDesc(ph);
-              const isEditing = editingNote === ph.companycam_photo_id;
+          {/* ── Ungrouped section — always visible ────────────────────────── */}
+          <div
+            className={`rounded-lg p-2 -mx-2 transition-colors ${dragOverGroupId === "ungrouped" ? "ring-2 ring-blue-400 bg-blue-50/50" : ""}`}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverGroupId("ungrouped"); }}
+            onDragLeave={(e) => { if ((e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) return; setDragOverGroupId(null); }}
+            onDrop={(e) => { e.preventDefault(); const photoId = e.dataTransfer.getData("text/plain"); if (photoId) assignPhotoMutation.mutate({ photoId, workAreaGroupId: null }); setDragOverGroupId(null); }}
+          >
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Ungrouped <span className="font-normal">({ungroupedPhotos.length})</span>
+            </h3>
+            {ungroupedPhotos.length === 0 ? (
+              <p className="text-xs text-gray-400 italic py-2 pl-1">No unassigned photos.</p>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                {ungroupedPhotos.map((ph) => renderPhotoCard(ph, false))}
+              </div>
+            )}
+          </div>
 
+          {/* ── Per-group sections ─────────────────────────────────────────── */}
+          {[...groups]
+            .sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at))
+            .map((group) => {
+              const groupPhotos = visiblePhotos.filter((p) => p.work_area_group_id === group.id);
+              const isCollapsed = collapsedGroups.has(group.id);
+              const isEditingThisGroup = editingGroupId === group.id;
               return (
                 <div
-                  key={ph.companycam_photo_id}
-                  className="group relative w-[120px] text-left"
+                  key={group.id}
+                  className={`mt-4 rounded-lg p-2 -mx-2 transition-colors ${dragOverGroupId === group.id ? "ring-2 ring-blue-400 bg-blue-50/50" : ""}`}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverGroupId(group.id); }}
+                  onDragLeave={(e) => { if ((e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) return; setDragOverGroupId(null); }}
+                  onDrop={(e) => { e.preventDefault(); const photoId = e.dataTransfer.getData("text/plain"); if (photoId) assignPhotoMutation.mutate({ photoId, workAreaGroupId: group.id }); setDragOverGroupId(null); }}
                 >
-                  {/* Lightbox trigger — image only */}
-                  <button
-                    type="button"
-                    className="block"
-                    onClick={() => setLightboxPhotoId(ph.companycam_photo_id)}
-                  >
-                    <img
-                      src={thumb}
-                      alt={`Photo by ${ph.captured_by_name}`}
-                      className="w-[120px] h-[120px] object-cover rounded border"
-                      loading="lazy"
-                    />
-                  </button>
-
-                  {/* Hide toggle — absolutely positioned, visible on hover */}
-                  <button
-                    type="button"
-                    title="Hide from estimate"
-                    className="absolute top-1 right-1 w-7 h-7 hidden group-hover:flex items-center justify-center bg-black/60 rounded-full text-white text-sm leading-none"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      hideMutation.mutate({ photoId: ph.companycam_photo_id, hidden: true });
-                    }}
-                  >
-                    🙈
-                  </button>
-
-                  <div className="text-xs mt-1 text-gray-700 truncate">{ph.captured_by_name}</div>
-                  <div className="text-[11px] text-gray-500">{relativeTime(ph.captured_at)}</div>
-
-                  {/* Note area — editable */}
-                  {isEditing ? (
-                    <textarea
-                      autoFocus
-                      className="text-[11px] w-full mt-1 border rounded p-1 resize-none focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      rows={3}
-                      value={draftNote}
-                      onChange={(e) => setDraftNote(e.target.value)}
-                      onBlur={saveEditOnBlur}
-                      onKeyDown={onNoteKeyDown}
-                    />
-                  ) : (
-                    <p
-                      className="text-[11px] mt-1 line-clamp-3 whitespace-pre-wrap cursor-text"
-                      onClick={() => startEdit(ph)}
+                  <div className="flex items-center justify-between mb-2">
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 text-sm font-medium text-gray-700"
+                      onClick={() => setCollapsedGroups((s) => {
+                        const n = new Set(s);
+                        n.has(group.id) ? n.delete(group.id) : n.add(group.id);
+                        return n;
+                      })}
                     >
-                      {desc ? (
-                        <>
-                          <span className="text-gray-700 italic">{desc}</span>
-                          {ph.description_override !== null && (
-                            <span className="ml-1 text-gray-400 not-italic text-[10px]">(edited)</span>
-                          )}
-                        </>
+                      <span>{isCollapsed ? "▸" : "▾"}</span>
+                      {isEditingThisGroup ? (
+                        <input
+                          autoFocus
+                          value={editingGroupName}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => setEditingGroupName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              renameGroupMutation.mutate({ id: group.id, name: editingGroupName.trim() || group.name });
+                              setEditingGroupId(null);
+                            }
+                            if (e.key === "Escape") setEditingGroupId(null);
+                          }}
+                          onBlur={() => {
+                            renameGroupMutation.mutate({ id: group.id, name: editingGroupName.trim() || group.name });
+                            setEditingGroupId(null);
+                          }}
+                          className="border rounded px-1.5 py-0.5 text-sm font-medium"
+                        />
                       ) : (
-                        <span className="text-gray-400 italic">Add note...</span>
+                        <span>{group.name}</span>
                       )}
-                    </p>
+                      <span className="text-gray-400 text-xs font-normal">({groupPhotos.length})</span>
+                    </button>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        title="Rename group"
+                        className="w-7 h-7 flex items-center justify-center hover:bg-gray-100 rounded text-sm"
+                        onClick={(e) => { e.stopPropagation(); setEditingGroupId(group.id); setEditingGroupName(group.name); }}
+                      >✎</button>
+                      <button
+                        type="button"
+                        title="Delete group"
+                        className="w-7 h-7 flex items-center justify-center hover:bg-red-50 text-red-500 rounded text-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Delete group "${group.name}"? Photos will be ungrouped.`)) {
+                            deleteGroupMutation.mutate(group.id);
+                          }
+                        }}
+                      >🗑</button>
+                    </div>
+                  </div>
+                  {!isCollapsed && (
+                    <div className="flex flex-wrap gap-3">
+                      {groupPhotos.map((ph) => renderPhotoCard(ph, false))}
+                    </div>
                   )}
                 </div>
               );
             })}
-          </div>
 
-          {/* Hidden photos — collapsible section */}
+          {/* ── + New group ────────────────────────────────────────────────── */}
+          {creatingGroup ? (
+            <div className="mt-4 flex items-center gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={newGroupName}
+                placeholder="Group name..."
+                onChange={(e) => setNewGroupName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newGroupName.trim()) {
+                    createGroupMutation.mutate(newGroupName.trim());
+                    setCreatingGroup(false);
+                    setNewGroupName("");
+                  }
+                  if (e.key === "Escape") { setCreatingGroup(false); setNewGroupName(""); }
+                }}
+                onBlur={() => { if (!newGroupName.trim()) { setCreatingGroup(false); setNewGroupName(""); } }}
+                className="border rounded px-2 py-1 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => { setCreatingGroup(false); setNewGroupName(""); }}
+                className="text-sm text-gray-400 hover:text-gray-600"
+              >Cancel</button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCreatingGroup(true)}
+              className="mt-4 flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+            >
+              <span className="text-lg leading-none">+</span> New group
+            </button>
+          )}
+
+          {/* ── Hidden photos — collapsible section ───────────────────────── */}
           {hiddenPhotos.length > 0 && (
             <div className="mt-6 pt-4 border-t border-gray-200">
               <button
                 type="button"
-                onClick={() => setShowHidden(s => !s)}
+                onClick={() => setShowHidden((s) => !s)}
                 className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium transition-colors"
               >
-                <span>{showHidden ? '▾' : '▸'}</span>
+                <span>{showHidden ? "▾" : "▸"}</span>
                 <span>Hidden ({hiddenPhotos.length})</span>
               </button>
-
               {showHidden && (
                 <div className="flex flex-wrap gap-3 mt-3">
-                  {hiddenPhotos.map((ph) => {
-                    const thumb = ph.photo_url_thumbnail || ph.photo_url_web || ph.photo_url_original;
-                    if (!thumb) return null;
-                    const desc = effectiveDesc(ph);
-                    const isEditing = editingNote === ph.companycam_photo_id;
-
-                    return (
-                      <div
-                        key={ph.companycam_photo_id}
-                        className="group relative w-[120px] text-left"
-                      >
-                        <button
-                          type="button"
-                          className="block"
-                          onClick={() => setLightboxPhotoId(ph.companycam_photo_id)}
-                        >
-                          <img
-                            src={thumb}
-                            alt={`Photo by ${ph.captured_by_name}`}
-                            className="w-[120px] h-[120px] object-cover rounded border"
-                            loading="lazy"
-                          />
-                        </button>
-
-                        {/* Unhide toggle */}
-                        <button
-                          type="button"
-                          title="Show on estimate"
-                          className="absolute top-1 right-1 w-7 h-7 hidden group-hover:flex items-center justify-center bg-black/60 rounded-full text-white text-sm leading-none"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            hideMutation.mutate({ photoId: ph.companycam_photo_id, hidden: false });
-                          }}
-                        >
-                          👁
-                        </button>
-
-                        <div className="text-xs mt-1 text-gray-700 truncate">{ph.captured_by_name}</div>
-                        <div className="text-[11px] text-gray-500">{relativeTime(ph.captured_at)}</div>
-
-                        {isEditing ? (
-                          <textarea
-                            autoFocus
-                            className="text-[11px] w-full mt-1 border rounded p-1 resize-none focus:outline-none focus:ring-1 focus:ring-blue-400"
-                            rows={3}
-                            value={draftNote}
-                            onChange={(e) => setDraftNote(e.target.value)}
-                            onBlur={saveEditOnBlur}
-                            onKeyDown={onNoteKeyDown}
-                          />
-                        ) : (
-                          <p
-                            className="text-[11px] mt-1 line-clamp-3 whitespace-pre-wrap cursor-text"
-                            onClick={() => startEdit(ph)}
-                          >
-                            {desc ? (
-                              <>
-                                <span className="text-gray-700 italic">{desc}</span>
-                                {ph.description_override !== null && (
-                                  <span className="ml-1 text-gray-400 not-italic text-[10px]">(edited)</span>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-gray-400 italic">Add note...</span>
-                            )}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {hiddenPhotos.map((ph) => renderPhotoCard(ph, true))}
                 </div>
               )}
             </div>
