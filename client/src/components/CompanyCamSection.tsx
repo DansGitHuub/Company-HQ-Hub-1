@@ -98,7 +98,7 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-      setZoom(z => Math.max(0.25, Math.min(5, z * factor)));
+      setZoom(z => Math.max(1, Math.min(5, z * factor)));
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
@@ -110,7 +110,7 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (editingNoteRef.current) return;
       if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom(z => Math.min(5, z * 1.25)); }
-      else if (e.key === '-' || e.key === '_') { e.preventDefault(); setZoom(z => Math.max(0.25, z / 1.25)); }
+      else if (e.key === '-' || e.key === '_') { e.preventDefault(); setZoom(z => Math.max(1, z / 1.25)); }
       else if (e.key === '0') { e.preventDefault(); setZoom(1); setPan({ x: 0, y: 0 }); }
     };
     window.addEventListener('keydown', onKey);
@@ -192,8 +192,8 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
 
   const photos = photosQ.data?.photos ?? [];
   const projects = projectsQ.data?.projects ?? [];
-  const hiddenCount = photos.filter((p) => p.hidden_on_estimate).length;
-  const visiblePhotos = photos.filter((p) => showHidden || !p.hidden_on_estimate);
+  const visiblePhotos = photos.filter((p) => !p.hidden_on_estimate);
+  const hiddenPhotos = photos.filter((p) => p.hidden_on_estimate);
   const lightboxPhoto = lightboxPhotoId
     ? (photos.find((p) => p.companycam_photo_id === lightboxPhotoId) ?? null)
     : null;
@@ -260,21 +260,21 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
 
       {/* ── Project link / picker ────────────────────────────────────────────── */}
       {linkedProjectId ? (
-        <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           <span className="font-medium font-mono text-sm break-all">{linkedProjectId}</span>
           <a
-            className="text-sm text-blue-600 underline"
             href={`https://app.companycam.com/projects/${linkedProjectId}`}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors no-underline"
           >
-            Open in CompanyCam &rarr;
+            Open in CompanyCam <span aria-hidden="true">→</span>
           </a>
           <button
             type="button"
-            className="text-sm text-red-600 underline"
             onClick={() => link.mutate(null)}
             disabled={link.isPending}
+            className="inline-flex items-center px-4 py-1.5 rounded-full border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors"
           >
             Unlink
           </button>
@@ -328,7 +328,7 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
               return (
                 <div
                   key={ph.companycam_photo_id}
-                  className={`group relative w-[120px] text-left${ph.hidden_on_estimate ? " opacity-40 grayscale" : ""}`}
+                  className="group relative w-[120px] text-left"
                 >
                   {/* Lightbox trigger — image only */}
                   <button
@@ -347,14 +347,14 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
                   {/* Hide toggle — absolutely positioned, visible on hover */}
                   <button
                     type="button"
-                    title={ph.hidden_on_estimate ? "Show on estimate" : "Hide from estimate"}
+                    title="Hide from estimate"
                     className="absolute top-1 right-1 w-7 h-7 hidden group-hover:flex items-center justify-center bg-black/60 rounded-full text-white text-sm leading-none"
                     onClick={(e) => {
                       e.stopPropagation();
-                      hideMutation.mutate({ photoId: ph.companycam_photo_id, hidden: !ph.hidden_on_estimate });
+                      hideMutation.mutate({ photoId: ph.companycam_photo_id, hidden: true });
                     }}
                   >
-                    {ph.hidden_on_estimate ? "👁" : "🙈"}
+                    🙈
                   </button>
 
                   <div className="text-xs mt-1 text-gray-700 truncate">{ph.captured_by_name}</div>
@@ -393,15 +393,93 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
             })}
           </div>
 
-          {/* Hidden count toggle */}
-          {hiddenCount > 0 && (
-            <button
-              type="button"
-              className="mt-3 text-sm text-gray-500 underline"
-              onClick={() => setShowHidden((v) => !v)}
-            >
-              ({hiddenCount} hidden) — {showHidden ? "collapse" : "show"}
-            </button>
+          {/* Hidden photos — collapsible section */}
+          {hiddenPhotos.length > 0 && (
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setShowHidden(s => !s)}
+                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium transition-colors"
+              >
+                <span>{showHidden ? '▾' : '▸'}</span>
+                <span>Hidden ({hiddenPhotos.length})</span>
+              </button>
+
+              {showHidden && (
+                <div className="flex flex-wrap gap-3 mt-3">
+                  {hiddenPhotos.map((ph) => {
+                    const thumb = ph.photo_url_thumbnail || ph.photo_url_web || ph.photo_url_original;
+                    if (!thumb) return null;
+                    const desc = effectiveDesc(ph);
+                    const isEditing = editingNote === ph.companycam_photo_id;
+
+                    return (
+                      <div
+                        key={ph.companycam_photo_id}
+                        className="group relative w-[120px] text-left"
+                      >
+                        <button
+                          type="button"
+                          className="block"
+                          onClick={() => setLightboxPhotoId(ph.companycam_photo_id)}
+                        >
+                          <img
+                            src={thumb}
+                            alt={`Photo by ${ph.captured_by_name}`}
+                            className="w-[120px] h-[120px] object-cover rounded border"
+                            loading="lazy"
+                          />
+                        </button>
+
+                        {/* Unhide toggle */}
+                        <button
+                          type="button"
+                          title="Show on estimate"
+                          className="absolute top-1 right-1 w-7 h-7 hidden group-hover:flex items-center justify-center bg-black/60 rounded-full text-white text-sm leading-none"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            hideMutation.mutate({ photoId: ph.companycam_photo_id, hidden: false });
+                          }}
+                        >
+                          👁
+                        </button>
+
+                        <div className="text-xs mt-1 text-gray-700 truncate">{ph.captured_by_name}</div>
+                        <div className="text-[11px] text-gray-500">{relativeTime(ph.captured_at)}</div>
+
+                        {isEditing ? (
+                          <textarea
+                            autoFocus
+                            className="text-[11px] w-full mt-1 border rounded p-1 resize-none focus:outline-none focus:ring-1 focus:ring-blue-400"
+                            rows={3}
+                            value={draftNote}
+                            onChange={(e) => setDraftNote(e.target.value)}
+                            onBlur={saveEditOnBlur}
+                            onKeyDown={onNoteKeyDown}
+                          />
+                        ) : (
+                          <p
+                            className="text-[11px] mt-1 line-clamp-3 whitespace-pre-wrap cursor-text"
+                            onClick={() => startEdit(ph)}
+                          >
+                            {desc ? (
+                              <>
+                                <span className="text-gray-700 italic">{desc}</span>
+                                {ph.description_override !== null && (
+                                  <span className="ml-1 text-gray-400 not-italic text-[10px]">(edited)</span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-gray-400 italic">Add note...</span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           )}
         </>
       )}
@@ -482,7 +560,7 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
           >
             <button
               type="button"
-              onClick={() => setZoom(z => Math.max(0.25, z / 1.25))}
+              onClick={() => setZoom(z => Math.max(1, z / 1.25))}
               className="w-9 h-9 flex items-center justify-center hover:bg-white/15 rounded-full text-lg leading-none"
               aria-label="Zoom out"
             >−</button>

@@ -1,0 +1,69 @@
+Phase 2 Wave 1.5b — UI polish v1.1.4. Apply A–C as one batch, run TS check, stop. Don't Republish — Dan will.
+
+A. client/src/components/CompanyCamSection.tsx — three changes.
+
+1) ZOOM-OUT FLOOR → 1.0 (currently 0.25). The original lightbox fit-to-screen size becomes the minimum; users cannot shrink the image below that. Maximum stays at 5.0. Change all three call sites:
+
+  a) Native wheel handler (the useEffect that does addEventListener('wheel', ...)). Change:
+     setZoom(z => Math.max(0.25, Math.min(5, z * factor)));
+     to:
+     setZoom(z => Math.max(1, Math.min(5, z * factor)));
+
+  b) Keyboard '-' / '_' handler:
+     setZoom(z => Math.max(0.25, z / 1.25));
+     to:
+     setZoom(z => Math.max(1, z / 1.25));
+
+  c) Visible zoom-out button onClick (the '−' button in the controls pill):
+     onClick={() => setZoom(z => Math.max(0.25, z / 1.25))}
+     to:
+     onClick={() => setZoom(z => Math.max(1, z / 1.25))}
+
+  Don't change the maximum (5). Don't change the keyboard '0' / reset button — those still set zoom to exactly 1, which is fine.
+
+2) REFACTOR HIDDEN-PHOTO DISPLAY. Currently hidden photos render inline (with opacity-40 grayscale) when showHidden is true, plus a "(N hidden) — show/collapse" text link below the gallery. Replace with a separate collapsible section:
+
+  - Main gallery: filter to ONLY render photos where hidden_on_estimate === false. The visiblePhotos list does NOT depend on showHidden state anymore — visible photos always render normally.
+  - Below the main gallery (with a small visual separator like `mt-6 pt-4 border-t border-gray-200`), conditionally render a "Hidden" section IF hiddenPhotos.length > 0. Default state: collapsed.
+  - The collapse toggle is a pill-style button (NOT the existing underlined text link):
+      <button
+        type="button"
+        onClick={() => setShowHidden(s => !s)}
+        className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium transition-colors"
+      >
+        <span>{showHidden ? '▾' : '▸'}</span>
+        <span>Hidden ({hiddenPhotos.length})</span>
+      </button>
+  - When showHidden is true, render hiddenPhotos in their own grid (use the same grid classes as the main gallery — likely `grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mt-3` or whatever the main gallery uses; match it).
+  - Hidden-section thumbnails should NOT have opacity-40 grayscale — the section heading communicates they're hidden, no need to dim them. Each one still gets the hover-only top-right toggle button to unhide (eye icon, the same component logic as the main gallery's hide button, just with the inverse action since they're already hidden).
+  - REMOVE the old "(N hidden) — show/collapse" text-link button entirely.
+
+3) RESTYLE "Open in CompanyCam" AND "Unlink" AS OVAL PILL BUTTONS. They're currently underlined text links in the CompanyCam project header (where the linked project ID is shown — search for "Open in CompanyCam" or "openInCompanyCam" or for hrefs like `https://app.companycam.com` to locate). Replace with:
+
+  "Open in CompanyCam":
+    <a
+      href={...}  // keep existing href
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors no-underline"
+    >
+      Open in CompanyCam <span aria-hidden="true">→</span>
+    </a>
+
+  "Unlink":
+    <button
+      type="button"
+      onClick={...}  // keep existing onClick
+      className="inline-flex items-center px-4 py-1.5 rounded-full border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors"
+    >
+      Unlink
+    </button>
+
+  Both should sit on the same row, with a small gap between them (e.g., the parent container can use `flex items-center gap-2`). Keep the project ID label and any existing layout around them; only swap the button styling.
+
+B. server/index.ts — bump boot marker to:
+[boot] estimate.companycam ui v1.1.4 — Phase 2 Wave 1.5b (zoom floor + hidden group + button polish) — outer catch returns 200 (§10.3)
+
+C. Verify TS baseline. Run NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit. Expected: 233 ± 1-2 in CompanyCamSection.tsx.
+
+Do NOT touch: server/companyCamRoutes.ts, server/estimateRoutes.ts, schema files, migration files. No new dependencies. Do NOT Republish — Dan will.
