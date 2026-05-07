@@ -58,6 +58,11 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
 
   const [showHidden, setShowHidden] = useState(false);
 
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const dragStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const wheelContainerRef = useRef<HTMLDivElement | null>(null);
+
   // keep ref in sync
   useEffect(() => { editingNoteRef.current = editingNote; }, [editingNote]);
 
@@ -77,6 +82,39 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxPhotoId]);
+
+  // reset zoom/pan when lightbox photo changes or closes
+  useEffect(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    dragStartRef.current = null;
+  }, [lightboxPhotoId]);
+
+  // native wheel listener — must be non-passive to call preventDefault
+  useEffect(() => {
+    const el = wheelContainerRef.current;
+    if (!el || !lightboxPhotoId) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      setZoom(z => Math.max(0.25, Math.min(5, z * factor)));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [lightboxPhotoId]);
+
+  // keyboard +/-/0 zoom — skip while editing a note
+  useEffect(() => {
+    if (!lightboxPhotoId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (editingNoteRef.current) return;
+      if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom(z => Math.min(5, z * 1.25)); }
+      else if (e.key === '-' || e.key === '_') { e.preventDefault(); setZoom(z => Math.max(0.25, z / 1.25)); }
+      else if (e.key === '0') { e.preventDefault(); setZoom(1); setPan({ x: 0, y: 0 }); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [lightboxPhotoId]);
 
   const projectsQ = useQuery({
@@ -198,6 +236,23 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
     setEditingNote(null);
     setDraftNote("");
   }
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    if (zoom <= 1) return;
+    e.preventDefault();
+    dragStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+  };
+  const onMouseMove = (e: React.MouseEvent) => {
+    const ds = dragStartRef.current;
+    if (!ds) return;
+    setPan({ x: ds.panX + (e.clientX - ds.x), y: ds.panY + (e.clientY - ds.y) });
+  };
+  const onMouseUp = () => { dragStartRef.current = null; };
+  const onDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (zoom === 1) setZoom(2);
+    else { setZoom(1); setPan({ x: 0, y: 0 }); }
+  };
 
   return (
     <section className="border-t pt-6 mt-8">
@@ -359,12 +414,29 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
           onClick={closeLightbox}
           className="fixed inset-0 bg-black/85 flex flex-col items-center justify-center z-50 p-2 sm:p-4 cursor-zoom-out"
         >
-          <img
-            src={lightboxPhoto.photo_url_original || lightboxPhoto.photo_url_web || lightboxPhoto.photo_url_thumbnail || ""}
+          <div
+            ref={wheelContainerRef}
             onClick={(e) => e.stopPropagation()}
-            className="max-w-[96vw] max-h-[80vh] object-contain cursor-default"
-            alt="Full-size photo"
-          />
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            onMouseLeave={onMouseUp}
+            onDoubleClick={onDoubleClick}
+            className="relative max-w-[96vw] max-h-[80vh] overflow-hidden flex items-center justify-center"
+            style={{ cursor: zoom > 1 ? (dragStartRef.current ? 'grabbing' : 'grab') : 'default' }}
+          >
+            <img
+              src={lightboxPhoto.photo_url_original || lightboxPhoto.photo_url_web || lightboxPhoto.photo_url_thumbnail || ""}
+              alt="Full-size photo"
+              draggable={false}
+              className="max-w-[96vw] max-h-[80vh] object-contain pointer-events-none select-none"
+              style={{
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transformOrigin: 'center center',
+                transition: dragStartRef.current ? 'none' : 'transform 0.1s ease-out',
+              }}
+            />
+          </div>
 
           {/* Lightbox note bar — always shown, always editable */}
           <div
@@ -402,6 +474,33 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
           >
             ×
           </button>
+
+          {/* Zoom controls — bottom right corner of lightbox */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute bottom-4 right-4 flex items-center gap-0.5 bg-black/70 text-white rounded-full px-1 py-1 select-none"
+          >
+            <button
+              type="button"
+              onClick={() => setZoom(z => Math.max(0.25, z / 1.25))}
+              className="w-9 h-9 flex items-center justify-center hover:bg-white/15 rounded-full text-lg leading-none"
+              aria-label="Zoom out"
+            >−</button>
+            <span className="text-xs tabular-nums min-w-[3.5rem] text-center px-1">{Math.round(zoom * 100)}%</span>
+            <button
+              type="button"
+              onClick={() => setZoom(z => Math.min(5, z * 1.25))}
+              className="w-9 h-9 flex items-center justify-center hover:bg-white/15 rounded-full text-lg leading-none"
+              aria-label="Zoom in"
+            >+</button>
+            <button
+              type="button"
+              onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
+              className="w-9 h-9 flex items-center justify-center hover:bg-white/15 rounded-full text-base leading-none"
+              aria-label="Reset zoom"
+              title="Reset zoom (or press 0)"
+            >⟲</button>
+          </div>
         </div>
       )}
     </section>

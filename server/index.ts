@@ -161,7 +161,7 @@ app.use((req, res, next) => {
   }
 
   registerCompanyCamRoutes(app);
-  console.log('[boot] estimate.companycam ui v1.1.2 — Phase 2 Wave 1.5b (description fix) — outer catch returns 200 (§10.3)');
+  console.log('[boot] estimate.companycam ui v1.1.3 — Phase 2 Wave 1.5b (zoom + visible controls) — outer catch returns 200 (§10.3)');
   registerNotificationPreferenceRoutes(app);
   await registerRoutes(httpServer, app);
   

@@ -1,0 +1,145 @@
+Phase 2 Wave 1.5b — §C.2 lightbox zoom fix. The lightbox in client/src/components/CompanyCamSection.tsx is currently just a plain <img> at max-w-[96vw] max-h-[80vh] with no zoom interaction. Despite v11.11 handoff claiming §C.2 shipped, the zoom code was never added. Add it now per below. Apply ALL of A–C as one batch, run TS check, then stop. Don't Republish — Dan will.
+
+CRITICAL: React's onWheel is registered as a passive listener (since React 17), so e.preventDefault() does NOT stop page scrolling. Use a native addEventListener('wheel', handler, { passive: false }) on a ref instead.
+
+A. client/src/components/CompanyCamSection.tsx
+
+1) Add imports if not already present: useRef from react.
+
+2) Add state + refs near the existing lightbox state (around line 54 where lightboxPhotoId is defined):
+
+const [zoom, setZoom] = useState(1);
+const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+const dragStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+const wheelContainerRef = useRef<HTMLDivElement | null>(null);
+
+3) Reset zoom/pan whenever the lightbox photo changes (or closes):
+
+useEffect(() => {
+  setZoom(1);
+  setPan({ x: 0, y: 0 });
+  dragStartRef.current = null;
+}, [lightboxPhotoId]);
+
+4) Native wheel listener with { passive: false } so preventDefault actually works:
+
+useEffect(() => {
+  const el = wheelContainerRef.current;
+  if (!el || !lightboxPhotoId) return;
+  const onWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    setZoom(z => Math.max(0.25, Math.min(5, z * factor)));
+  };
+  el.addEventListener('wheel', onWheel, { passive: false });
+  return () => el.removeEventListener('wheel', onWheel);
+}, [lightboxPhotoId]);
+
+5) Keyboard +/-/0 — extend the existing Esc keyboard useEffect (or add a sibling). Skip when editingNote is set (the existing ref pattern at line 45 should be reused so stale closure is avoided):
+
+useEffect(() => {
+  if (!lightboxPhotoId) return;
+  const onKey = (e: KeyboardEvent) => {
+    // existing editingNote ref check pattern — DON'T intercept while editing a note
+    if (editingNoteRef.current) return;
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom(z => Math.min(5, z * 1.25)); }
+    else if (e.key === '-' || e.key === '_') { e.preventDefault(); setZoom(z => Math.max(0.25, z / 1.25)); }
+    else if (e.key === '0') { e.preventDefault(); setZoom(1); setPan({ x: 0, y: 0 }); }
+  };
+  window.addEventListener('keydown', onKey);
+  return () => window.removeEventListener('keydown', onKey);
+}, [lightboxPhotoId]);
+
+6) Mouse drag-pan + double-click toggle handlers (regular React handlers — no preventDefault concerns since they're not passive):
+
+const onMouseDown = (e: React.MouseEvent) => {
+  if (zoom <= 1) return;
+  e.preventDefault();
+  dragStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+};
+const onMouseMove = (e: React.MouseEvent) => {
+  const ds = dragStartRef.current;
+  if (!ds) return;
+  setPan({ x: ds.panX + (e.clientX - ds.x), y: ds.panY + (e.clientY - ds.y) });
+};
+const onMouseUp = () => { dragStartRef.current = null; };
+const onDoubleClick = (e: React.MouseEvent) => {
+  e.stopPropagation();
+  if (zoom === 1) setZoom(2);
+  else { setZoom(1); setPan({ x: 0, y: 0 }); }
+};
+
+B. Update the lightbox JSX (currently around lines 355-373).
+
+Wrap the existing <img> in a div carrying the wheel/drag handlers. Replace the plain img with a transform-based zoomable img. Add bottom-right floating zoom controls (−, %, +, ⟲ reset) inside the modal.
+
+REPLACE the existing structure that looks roughly like:
+  <img
+    src={lightboxPhoto.photo_url_original || ...}
+    onClick={(e) => e.stopPropagation()}
+    className="max-w-[96vw] max-h-[80vh] object-contain cursor-default"
+    alt="Full-size photo"
+  />
+
+WITH:
+  <div
+    ref={wheelContainerRef}
+    onClick={(e) => e.stopPropagation()}
+    onMouseDown={onMouseDown}
+    onMouseMove={onMouseMove}
+    onMouseUp={onMouseUp}
+    onMouseLeave={onMouseUp}
+    onDoubleClick={onDoubleClick}
+    className="relative max-w-[96vw] max-h-[80vh] overflow-hidden flex items-center justify-center"
+    style={{ cursor: zoom > 1 ? (dragStartRef.current ? 'grabbing' : 'grab') : 'default' }}
+  >
+    <img
+      src={lightboxPhoto.photo_url_original || lightboxPhoto.photo_url_web || lightboxPhoto.photo_url_thumbnail || ""}
+      alt="Full-size photo"
+      draggable={false}
+      className="max-w-[96vw] max-h-[80vh] object-contain pointer-events-none select-none"
+      style={{
+        transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+        transformOrigin: 'center center',
+        transition: dragStartRef.current ? 'none' : 'transform 0.1s ease-out'
+      }}
+    />
+  </div>
+
+ADD inside the lightbox dialog div (sibling to the image wrapper, BEFORE the closing </div> of the dialog) — these are the visible zoom controls:
+
+  {/* Zoom controls — bottom right corner of lightbox */}
+  <div
+    onClick={(e) => e.stopPropagation()}
+    className="absolute bottom-4 right-4 flex items-center gap-0.5 bg-black/70 text-white rounded-full px-1 py-1 select-none"
+  >
+    <button
+      type="button"
+      onClick={() => setZoom(z => Math.max(0.25, z / 1.25))}
+      className="w-9 h-9 flex items-center justify-center hover:bg-white/15 rounded-full text-lg leading-none"
+      aria-label="Zoom out"
+    >−</button>
+    <span className="text-xs tabular-nums min-w-[3.5rem] text-center px-1">{Math.round(zoom * 100)}%</span>
+    <button
+      type="button"
+      onClick={() => setZoom(z => Math.min(5, z * 1.25))}
+      className="w-9 h-9 flex items-center justify-center hover:bg-white/15 rounded-full text-lg leading-none"
+      aria-label="Zoom in"
+    >+</button>
+    <button
+      type="button"
+      onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
+      className="w-9 h-9 flex items-center justify-center hover:bg-white/15 rounded-full text-base leading-none"
+      aria-label="Reset zoom"
+      title="Reset zoom (or press 0)"
+    >⟲</button>
+  </div>
+
+Bounds: free-pan (no clamping) per the implementation pack §6.1 default. User can press 0 or click ⟲ to reset.
+
+C. server/index.ts — bump the boot marker to:
+[boot] estimate.companycam ui v1.1.3 — Phase 2 Wave 1.5b (zoom + visible controls) — outer catch returns 200 (§10.3)
+
+D. Verify TS baseline. Run NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit. Expected: 233 errors ± 2-3 new in CompanyCamSection.tsx (the new state/refs/handlers). Investigate any net regression beyond +3 before stopping.
+
+Do NOT touch: server/companyCamRoutes.ts, server/estimateRoutes.ts, shared/schema.ts, server/migrations/companyCamPhase1.ts. Do NOT add new dependencies (no react-zoom-pan-pinch — implementation is custom). Do NOT Republish — that's Dan's call.
