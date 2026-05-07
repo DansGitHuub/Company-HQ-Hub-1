@@ -27,7 +27,7 @@ import {
   User, Bell, BellOff, Globe, Shield, Save, Loader2, Lock, Eye, EyeOff, Check,
   Settings as SettingsIcon, Mail, Monitor, Sun, Moon, Layers, Tag, FileText, Building2,
   Plus, Pencil, Trash2, Link2, Link2Off, RefreshCw, CheckCircle, XCircle, AlertCircle,
-  ArrowLeftRight, Info, Calendar, Clock,
+  ArrowLeftRight, Info, Calendar, Clock, Camera,
 } from "lucide-react";
 type SettingsSection = "profile" | "notifications" | "language" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks" | "terms" | "availability";
 
@@ -388,7 +388,12 @@ export default function Settings() {
           {activeSection === "language" && <LanguageSection profile={profile} />}
           {activeSection === "availability" && <AvailabilitySection />}
           {activeSection === "work-areas" && isAdminOrManager && <WorkAreasSection />}
-          {activeSection === "company" && isAdminOrManager && <CompanyInfoSection />}
+          {activeSection === "company" && isAdminOrManager && (
+            <div className="space-y-4">
+              <CompanyInfoSection />
+              <CompanyCamSettingsCard />
+            </div>
+          )}
           {(["divisions", "estimate-templates", "quickbooks", "terms"] as const).includes(activeSection as any) && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 flex gap-3 items-start">
               <Info className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
@@ -1193,6 +1198,71 @@ function CompanyInfoSection() {
           <Button data-testid="btn-save-company" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
             {saveMut.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />{t("settings.saveCompanyInfo")}</>}
           </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── CompanyCam Settings Card ──────────────────────────────────────────────────
+function CompanyCamSettingsCard() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const { data: setting, isLoading } = useQuery<{ key: string; value: string } | null>({
+    queryKey: ["/api/settings/companycam.auto_create_projects"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/settings/companycam.auto_create_projects");
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error("Failed to load setting");
+      return res.json();
+    },
+  });
+
+  // Default ON when row is missing
+  const isEnabled = setting === null || setting?.value !== "false";
+
+  const saveMut = useMutation({
+    mutationFn: (val: boolean) =>
+      apiRequest("PUT", "/api/settings/companycam.auto_create_projects", {
+        value: val ? "true" : "false",
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/settings/companycam.auto_create_projects"] });
+      toast({ title: "CompanyCam setting saved" });
+    },
+    onError: (e: any) =>
+      toast({ title: "Failed to save setting", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader className="py-4">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Camera className="h-5 w-5" /> CompanyCam Integration
+        </CardTitle>
+        <CardDescription>Control how CompanyCam connects to new customer records</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between gap-4 py-1">
+          <div className="space-y-0.5">
+            <Label className="text-sm font-medium">
+              Auto-create CompanyCam projects when customers are added
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              When on, every new customer record creates a matching CompanyCam project.
+            </p>
+          </div>
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          ) : (
+            <Switch
+              checked={isEnabled}
+              onCheckedChange={(val) => saveMut.mutate(val)}
+              disabled={saveMut.isPending}
+              data-testid="toggle-companycam-auto-create"
+            />
+          )}
         </div>
       </CardContent>
     </Card>

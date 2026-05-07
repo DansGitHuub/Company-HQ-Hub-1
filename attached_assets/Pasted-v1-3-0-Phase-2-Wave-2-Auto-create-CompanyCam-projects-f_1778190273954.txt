@@ -1,0 +1,76 @@
+v1.3.0 — Phase 2 Wave 2: Auto-create CompanyCam projects from CompanyHQ when a customer is created.
+
+CONTEXT
+Companion to v1.2.2. v1.2.2 just shipped a delayed-fetch self-heal in photo.created (see v11.14 §1.1 + §4.16 — CompanyCam does NOT fire photo.updated for description-only changes). Wave 2 closes the office workflow loop: when a CompanyHQ customer is created, automatically create a CompanyCam project so photo capture is ready before anyone arrives on site. Master Roadmap §4.2.
+
+Standing operating norms: §4.1–§4.16 from v11.14 apply. Especially relevant for this work:
+- §4.4: This is OUTBOUND (HQ → CC), not a webhook receiver. The customer-create and retry endpoints CAN return 500 on errors (they are not in the webhook outer-catch-must-200 rule).
+- §4.8: Grep the customers table schema before any INSERT/ALTER. Trust the live schema, not stale Drizzle definitions.
+- §4.10: Default on technical decisions; Dan has already answered all four UX questions. Do not stop to ask UX questions again — they are spelled out below.
+- §4.11: Confirm Wave 1.5c is still intact via grep of CompanyCamSection.tsx (wheelContainerRef, dragStartRef, assignPhotoMutation, estimate_work_area_groups) and estimateRoutes.ts (/work-area-groups) before touching anything else.
+- §4.16: Do not rely on photo.updated for description sync (already mitigated by v1.2.2 — do not regress this).
+
+UX DECISIONS LOCKED (do not re-ask)
+1. NO "Open in CompanyCam" button on the customer page. The existing green pill on the estimate's CompanyCam section already serves that use case. Customer page only needs the failure badge (see #2) — don't add a positive-state button there.
+2. Failure state on customer page: Inline retry badge in the customer header area: "CompanyCam: not connected · Retry". Clicking the Retry text/button hits POST /api/admin/customers/:id/retry-companycam-project. Use a muted red/amber tone consistent with the rest of the app's warning treatments.
+3. Opt-out: Single global org-wide toggle in app settings: "Auto-create CompanyCam projects when customers are added" (default ON). Use whatever the existing global-settings table/pattern is in this codebase (likely app_settings or equivalent — grep first). Render the toggle in the existing admin/settings page.
+4. CC project name format: customer's display_name only. No address concatenation.
+
+SCHEMA (Migration block 13, idempotent — append to server/migrations/companyCamPhase1.ts or a Phase 3 file, whichever matches the existing naming pattern)
+- ALTER TABLE customers ADD COLUMN IF NOT EXISTS companycam_project_id TEXT.
+- ALTER TABLE customers ADD COLUMN IF NOT EXISTS companycam_create_status TEXT — values: 'created', 'failed', or NULL (NULL = not attempted, e.g. opt-out was off when customer was created, or pre-existing customer).
+- ALTER TABLE customers ADD COLUMN IF NOT EXISTS companycam_create_error TEXT — stores last error message when status='failed', NULL otherwise.
+- CREATE INDEX IF NOT EXISTS for companycam_create_status WHERE companycam_create_status = 'failed' (partial index — small footprint, fast badge query).
+- Drizzle mirror updates in shared/schema.ts. Regenerate Drizzle migration if the project uses generated migrations.
+
+DO NOT ADD a separate companycam_create_status enum type — keep it as TEXT with a comment in the column listing the allowed values. This matches the existing description_source pattern (also TEXT, not enum).
+
+SETTINGS TABLE
+Grep for the existing global-settings pattern. If app_settings is used, add a row with key like "companycam.auto_create_projects" and value 'true'. If the codebase has a different convention (e.g., a dedicated settings.ts module with a JSON blob in DB), match that. The toggle UI reads/writes through that. Default ON when the row is missing.
+
+SERVER LOGIC
+Grep for the customer-create endpoint (likely server/customerRoutes.ts — confirm by grep). After the existing customer INSERT (which must complete and the response must reflect success regardless of CC outcome):
+
+1. Read the global "auto_create_projects" setting. If false → skip the CC call, leave companycam_create_status NULL. Done.
+2. If true → fire a non-blocking call to POST https://api.companycam.com/v2/projects with body:
+   { name: customer.display_name, address: { street, city, state, postal_code, country: "US" } }
+   Use COMPANYCAM_API_TOKEN from process.env, same Authorization header pattern as v1.2.2's delayed-fetch.
+3. On success (HTTP 2xx with body containing project id): UPDATE customers SET companycam_project_id = $1, companycam_create_status = 'created', companycam_create_error = NULL WHERE id = $2.
+4. On failure (HTTP non-2xx, network error, or token missing): UPDATE customers SET companycam_create_status = 'failed', companycam_create_error = $1 WHERE id = $2. Log the failure with prefix [companycam] customer-create-fail for $customerId: $errorSummary.
+
+The CC API call MUST NOT block the customer-create HTTP response. Pattern: kick off via setTimeout(0, async () => {...}) or Promise.resolve().then(async () => {...}).catch(...), or pass to a fire-and-forget helper. Customer record is committed and returned to the client BEFORE the CC call resolves. Errors in the CC path log + persist to companycam_create_status — they do not surface to the client at create time.
+
+ADMIN RETRY ENDPOINT (in server/customerRoutes.ts or wherever Wave 2's customer logic lives)
+POST /api/admin/customers/:id/retry-companycam-project
+- Auth: requireAuth + requireRole(...STAFF_ROLES) — same pattern as v11.13's /api/admin/companycam/backfill-descriptions.
+- Body: empty.
+- Behavior: Look up customer by id. If companycam_project_id already exists, return 200 { skipped: true, project_id: ... } without re-creating. Otherwise re-run the same CC create call as in customer-create flow. Update companycam_create_status / companycam_create_error / companycam_project_id same as above. Return 200 { status: 'created', project_id } or 500 { status: 'failed', error } based on outcome.
+- This endpoint CAN return 500 on errors (it's not a webhook receiver — §4.4).
+
+UI: FAILURE BADGE
+On the customer detail page, in the same header region where customer name/address show: when companycam_create_status === 'failed', render an inline badge styled muted-red/amber matching existing app conventions, text "CompanyCam: not connected · Retry". The "Retry" word is the click target — it fires the admin retry endpoint, shows a brief spinner, then refetches the customer data to flip the badge to either green-success-disappears or red-still-failed (with the error tooltip showing companycam_create_error if present). Do not show this badge when companycam_create_status is NULL or 'created'.
+
+UI: GLOBAL TOGGLE
+In whatever the existing admin/settings page is, add a single labeled toggle: "Auto-create CompanyCam projects when customers are added" with a small subtitle "When on, every new customer record creates a matching CompanyCam project." Default ON. Read/write through the same settings pattern as existing toggles.
+
+DO NOT ADD a "Open in CompanyCam" button on the customer page in this wave. That decision is deferred per §C.3 Q1.
+
+ACCEPTANCE TEST (Dan will drive)
+1. With the global toggle ON, create a brand new customer with display_name + valid address. Within ~30s the customer record should have companycam_project_id populated AND a corresponding project visible in CompanyCam mobile.
+2. Set the toggle OFF, create another customer. Verify companycam_project_id is NULL and companycam_create_status is NULL. No CC API call fired (check logs).
+3. Toggle ON, set COMPANYCAM_API_TOKEN to an invalid value temporarily, create a customer. Customer creation succeeds; companycam_create_status='failed'; failure badge visible on customer header. Restore the token, click Retry — badge disappears, project_id populated.
+
+AFTER THE EDIT
+1. Update the boot marker in server/index.ts to:
+   [boot] estimate.companycam ui v1.3.0 — Phase 2 Wave 2 (auto-create CompanyCam projects on customer create) — outer catch returns 200 (§10.3)
+2. Run TypeScript check. Baseline is 233 ±0 — report any deviation.
+3. Republish.
+
+REPORT BACK
+- Final boot marker text live in production
+- TS error count
+- New columns in customers table (paste \d customers output if possible, or list)
+- Settings table key used for the toggle
+- Confirmation that customer-create response is NOT blocked on CC outcome
+- Any deviations from this spec and why
+- Any UX choices you had to make for the toggle/badge layout that weren't specified above

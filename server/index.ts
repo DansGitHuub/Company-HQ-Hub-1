@@ -161,7 +161,7 @@ app.use((req, res, next) => {
   }
 
   registerCompanyCamRoutes(app);
-  console.log('[boot] estimate.companycam ui v1.2.2 — Phase 2 Wave 1.5c-fix1 (photo.created delayed-fetch self-heal for missing descriptions) — outer catch returns 200 (§10.3)');
+  console.log('[boot] estimate.companycam ui v1.3.0 — Phase 2 Wave 2 (auto-create CompanyCam projects on customer create) — outer catch returns 200 (§10.3)');
   registerNotificationPreferenceRoutes(app);
   await registerRoutes(httpServer, app);
   

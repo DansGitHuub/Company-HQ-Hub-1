@@ -206,6 +206,10 @@ interface CustomerDetail {
   is_active: boolean; created_at: string;
   phones: CustomerPhone[]; emails: CustomerEmail[];
   contacts: any[]; properties: Property[];
+  // Wave 2: CompanyCam project sync
+  companycam_project_id: string | null;
+  companycam_create_status: string | null;
+  companycam_create_error: string | null;
 }
 interface Job {
   id: string; client: string; type: string; stage: string; category: string;
@@ -468,6 +472,26 @@ export default function CustomerDetailPage() {
     onError: () => toast({ title: "Could not unarchive customer", variant: "destructive" }),
   });
 
+  // ── Wave 2: CompanyCam project retry ──
+  const retryCC = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/admin/customers/${id}/retry-companycam-project`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).error || (err as any).message || "Retry failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", id] });
+      toast({ title: "CompanyCam project created successfully" });
+    },
+    onError: (e: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", id] });
+      toast({ title: "Retry failed: " + e.message, variant: "destructive" });
+    },
+  });
+
   // ── Portal Invite ──
   const inviteMutation = useMutation({
     mutationFn: async () => {
@@ -647,6 +671,31 @@ export default function CustomerDetailPage() {
                   <Badge className="bg-white/20 text-white border-0 text-xs" data-testid="badge-source">
                     {customer.source}
                   </Badge>
+                )}
+                {/* Wave 2: CompanyCam failure badge */}
+                {customer.companycam_create_status === "failed" && isAdminOrManager && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => retryCC.mutate()}
+                          disabled={retryCC.isPending}
+                          data-testid="button-retry-companycam"
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/30 text-white hover:bg-red-400/40 transition-colors disabled:opacity-60"
+                        >
+                          {retryCC.isPending
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <AlertTriangle className="h-3 w-3" />}
+                          CompanyCam: not connected · <span className="underline">Retry</span>
+                        </button>
+                      </TooltipTrigger>
+                      {customer.companycam_create_error && (
+                        <TooltipContent side="bottom" className="max-w-xs">
+                          <p className="text-xs">{customer.companycam_create_error}</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
                 <button
                   onClick={() => activeMutation.mutate(!customer.is_active)}

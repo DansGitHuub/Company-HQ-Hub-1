@@ -263,8 +263,22 @@ export async function runCompanyCamPhase1Migration() {
         ON companycam_photos(work_area_group_id)
     `);
 
+    // Block 13: Wave 2 — companycam sync columns on customers
+    // companycam_create_status values: 'created' | 'failed' | NULL (not attempted)
+    await client.query(`
+      ALTER TABLE customers
+        ADD COLUMN IF NOT EXISTS companycam_project_id    TEXT,
+        ADD COLUMN IF NOT EXISTS companycam_create_status TEXT,
+        ADD COLUMN IF NOT EXISTS companycam_create_error  TEXT
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_customers_companycam_status_failed
+        ON customers(companycam_create_status)
+        WHERE companycam_create_status = 'failed'
+    `);
+
     await client.query("COMMIT");
-    console.log("[migration] CompanyCam Phase 1 tables ready (7 tables + work-area groups, v2 schema)");
+    console.log("[migration] CompanyCam Phase 1 tables ready (7 tables + work-area groups + customer sync cols, v2 schema)");
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

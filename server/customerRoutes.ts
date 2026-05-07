@@ -6,6 +6,112 @@ import crypto from "crypto";
 import { getAppUrl } from "./emailService";
 import { customerArchiveEligibility } from "./services/archiveEligibility";
 
+// ── Wave 2: local role guard (no requireRole injected into this module) ────────
+function localRequireRole(...roles: string[]) {
+  return (req: any, res: any, next: any) => {
+    const u = req.user as any;
+    if (!u) return res.status(401).json({ message: "Unauthenticated" });
+    if (!roles.includes(u.role) && !u.isMasterAdmin)
+      return res.status(403).json({ message: "Forbidden" });
+    next();
+  };
+}
+
+// ── Wave 2: fire-and-forget CompanyCam project creation for a new customer ────
+async function createCCProjectForCustomer(customer: {
+  id: string;
+  first_name: string;
+  last_name: string;
+  company_name: string | null;
+  billing_address: string | null;
+  billing_city: string | null;
+  billing_state: string | null;
+  billing_zip: string | null;
+}) {
+  try {
+    // Read global toggle — default ON when row is missing
+    const settingRes = await pool.query(
+      "SELECT value FROM app_settings WHERE key = $1",
+      ["companycam.auto_create_projects"]
+    );
+    const enabled =
+      settingRes.rows.length === 0
+        ? true
+        : settingRes.rows[0].value !== "false";
+    if (!enabled) {
+      console.log(`[companycam] auto_create_projects=off, skipping customer ${customer.id}`);
+      return;
+    }
+
+    const token = process.env.COMPANYCAM_API_TOKEN;
+    if (!token) {
+      await pool.query(
+        "UPDATE customers SET companycam_create_status=$1, companycam_create_error=$2 WHERE id=$3",
+        ["failed", "COMPANYCAM_API_TOKEN not configured", customer.id]
+      );
+      console.error(`[companycam] customer-create-fail for ${customer.id}: token missing`);
+      return;
+    }
+
+    const displayName =
+      customer.company_name?.trim() ||
+      `${customer.first_name} ${customer.last_name}`;
+
+    const body: Record<string, any> = { name: displayName };
+    if (
+      customer.billing_address ||
+      customer.billing_city ||
+      customer.billing_state ||
+      customer.billing_zip
+    ) {
+      body.address = {
+        street: customer.billing_address ?? "",
+        city: customer.billing_city ?? "",
+        state: customer.billing_state ?? "",
+        postal_code: customer.billing_zip ?? "",
+        country: "US",
+      };
+    }
+
+    const resp = await fetch("https://api.companycam.com/v2/projects", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => `HTTP ${resp.status}`);
+      const errSummary = `HTTP ${resp.status}: ${errText.slice(0, 200)}`;
+      console.error(`[companycam] customer-create-fail for ${customer.id}: ${errSummary}`);
+      await pool.query(
+        "UPDATE customers SET companycam_create_status=$1, companycam_create_error=$2 WHERE id=$3",
+        ["failed", errSummary, customer.id]
+      );
+      return;
+    }
+
+    const proj: any = await resp.json();
+    const projectId = String(proj?.id ?? proj?.project?.id ?? "");
+    await pool.query(
+      "UPDATE customers SET companycam_project_id=$1, companycam_create_status=$2, companycam_create_error=NULL WHERE id=$3",
+      [projectId, "created", customer.id]
+    );
+    console.log(`[companycam] project created for customer ${customer.id}: ${projectId}`);
+  } catch (err: any) {
+    const errSummary = (err?.message ?? String(err)).slice(0, 500);
+    console.error(`[companycam] customer-create-fail for ${customer.id}: ${errSummary}`);
+    try {
+      await pool.query(
+        "UPDATE customers SET companycam_create_status=$1, companycam_create_error=$2 WHERE id=$3",
+        ["failed", errSummary, customer.id]
+      );
+    } catch {}
+  }
+}
+
 export function registerCustomerRoutes(app: Express, requireAuth: any) {
   // ─── Schema migration: ensure is_active column exists ───────────────────────
   pool
@@ -156,7 +262,10 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
       syncCustomersPublic().catch((e) =>
         console.error("[QB] customer sync error:", e.message),
       );
-      return res.status(201).json(result.rows[0]);
+      // Wave 2: non-blocking CompanyCam project creation — response is NOT blocked
+      const created = result.rows[0];
+      Promise.resolve().then(() => createCCProjectForCustomer(created)).catch(() => {});
+      return res.status(201).json(created);
     } catch (err: any) {
       await client.query("ROLLBACK");
       return res.status(500).json({ message: err.message });
@@ -588,4 +697,43 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
       return res.status(500).json({ message: "Server error" });
     }
   });
+
+  // ─── Wave 2: Retry CompanyCam project creation ────────────────────────────
+  app.post(
+    "/api/admin/customers/:id/retry-companycam-project",
+    requireAuth,
+    localRequireRole("Admin", "Manager", "Master Admin"),
+    async (req: any, res: any) => {
+      const { id } = req.params;
+      try {
+        const { rows } = await pool.query(
+          `SELECT id, first_name, last_name, company_name,
+                  billing_address, billing_city, billing_state, billing_zip,
+                  companycam_project_id
+           FROM customers WHERE id = $1`,
+          [id]
+        );
+        if (!rows.length) return res.status(404).json({ message: "Customer not found" });
+        const customer = rows[0];
+        if (customer.companycam_project_id) {
+          return res.json({ skipped: true, project_id: customer.companycam_project_id });
+        }
+        // Run synchronously (this endpoint can return 500 per §4.4)
+        await createCCProjectForCustomer(customer);
+        const { rows: updated } = await pool.query(
+          `SELECT companycam_project_id, companycam_create_status, companycam_create_error
+           FROM customers WHERE id = $1`,
+          [id]
+        );
+        const u = updated[0];
+        if (u.companycam_create_status === "created") {
+          return res.json({ status: "created", project_id: u.companycam_project_id });
+        } else {
+          return res.status(500).json({ status: "failed", error: u.companycam_create_error });
+        }
+      } catch (err: any) {
+        return res.status(500).json({ message: err.message });
+      }
+    }
+  );
 }

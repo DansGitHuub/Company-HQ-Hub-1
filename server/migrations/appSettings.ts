@@ -21,6 +21,11 @@ export async function runAppSettingsMigration() {
       VALUES ('company_info', '{"name":"Chapin Landscapes","phone":"","email":"","address":"","website":"","tax_rate":"0","payment_terms":"Net 30"}')
       ON CONFLICT (key) DO NOTHING
     `);
+    await client.query(`
+      INSERT INTO app_settings (key, value)
+      VALUES ('companycam.auto_create_projects', 'true')
+      ON CONFLICT (key) DO NOTHING
+    `);
     await client.query("COMMIT");
     console.log("[migration] app_settings table ready");
   } catch (err) {
