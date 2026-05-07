@@ -473,20 +473,29 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
         <>
           {/* ── Ungrouped section — always visible ────────────────────────── */}
           <div
-            className={`rounded-lg p-2 -mx-2 transition-colors ${dragOverGroupId === "ungrouped" ? "ring-2 ring-blue-400 bg-blue-50/50" : ""}`}
             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverGroupId("ungrouped"); }}
             onDragLeave={(e) => { if ((e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) return; setDragOverGroupId(null); }}
             onDrop={(e) => { e.preventDefault(); const photoId = e.dataTransfer.getData("text/plain"); if (photoId) assignPhotoMutation.mutate({ photoId, workAreaGroupId: null }); setDragOverGroupId(null); }}
           >
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Ungrouped <span className="font-normal">({ungroupedPhotos.length})</span>
-            </h3>
-            {ungroupedPhotos.length === 0 ? (
-              <p className="text-xs text-gray-400 italic py-2 pl-1">No unassigned photos.</p>
-            ) : (
-              <div className="flex flex-wrap gap-3">
-                {ungroupedPhotos.map((ph) => renderPhotoCard(ph, false))}
-              </div>
+            <div className={`flex items-center justify-between rounded-lg px-4 py-2.5 mb-3 mt-2 transition-colors ${dragOverGroupId === "ungrouped" ? "ring-2 ring-blue-400 bg-blue-50/70" : "bg-stone-100 hover:bg-stone-200/70"}`}>
+              <button
+                type="button"
+                onClick={() => setCollapsedGroups((s) => { const n = new Set(s); n.has("ungrouped") ? n.delete("ungrouped") : n.add("ungrouped"); return n; })}
+                className="flex items-center gap-2 text-sm font-medium text-gray-800 flex-1 text-left"
+              >
+                <span className="text-gray-500">{collapsedGroups.has("ungrouped") ? "▸" : "▾"}</span>
+                <span>Ungrouped</span>
+                <span className="text-gray-500 text-xs font-normal">({ungroupedPhotos.length})</span>
+              </button>
+            </div>
+            {!collapsedGroups.has("ungrouped") && (
+              ungroupedPhotos.length === 0 ? (
+                <p className="text-xs text-gray-400 italic py-2 pl-1">No unassigned photos.</p>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  {ungroupedPhotos.map((ph) => renderPhotoCard(ph, false))}
+                </div>
+              )
             )}
           </div>
 
@@ -500,22 +509,21 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
               return (
                 <div
                   key={group.id}
-                  className={`mt-4 rounded-lg p-2 -mx-2 transition-colors ${dragOverGroupId === group.id ? "ring-2 ring-blue-400 bg-blue-50/50" : ""}`}
                   onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverGroupId(group.id); }}
                   onDragLeave={(e) => { if ((e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) return; setDragOverGroupId(null); }}
                   onDrop={(e) => { e.preventDefault(); const photoId = e.dataTransfer.getData("text/plain"); if (photoId) assignPhotoMutation.mutate({ photoId, workAreaGroupId: group.id }); setDragOverGroupId(null); }}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className={`flex items-center justify-between rounded-lg px-4 py-2.5 mb-3 mt-4 transition-colors ${dragOverGroupId === group.id ? "ring-2 ring-blue-400 bg-blue-50/70" : "bg-stone-100 hover:bg-stone-200/70"}`}>
                     <button
                       type="button"
-                      className="flex items-center gap-2 text-sm font-medium text-gray-700"
+                      className="flex items-center gap-2 text-sm font-medium text-gray-800 flex-1 text-left"
                       onClick={() => setCollapsedGroups((s) => {
                         const n = new Set(s);
                         n.has(group.id) ? n.delete(group.id) : n.add(group.id);
                         return n;
                       })}
                     >
-                      <span>{isCollapsed ? "▸" : "▾"}</span>
+                      <span className="text-gray-500">{isCollapsed ? "▸" : "▾"}</span>
                       {isEditingThisGroup ? (
                         <input
                           autoFocus
@@ -533,24 +541,28 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
                             renameGroupMutation.mutate({ id: group.id, name: editingGroupName.trim() || group.name });
                             setEditingGroupId(null);
                           }}
-                          className="border rounded px-1.5 py-0.5 text-sm font-medium"
+                          className="px-2 py-0.5 rounded border border-gray-300 text-sm font-medium"
                         />
                       ) : (
-                        <span>{group.name}</span>
+                        <>
+                          <span>{group.name}</span>
+                          <span className="text-gray-500 text-xs font-normal">({groupPhotos.length})</span>
+                        </>
                       )}
-                      <span className="text-gray-400 text-xs font-normal">({groupPhotos.length})</span>
                     </button>
-                    <div className="flex gap-1">
+                    <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        title="Rename group"
-                        className="w-7 h-7 flex items-center justify-center hover:bg-gray-100 rounded text-sm"
+                        title="Rename"
+                        aria-label="Rename group"
+                        className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-300/60 text-gray-600 hover:text-gray-900 transition-colors"
                         onClick={(e) => { e.stopPropagation(); setEditingGroupId(group.id); setEditingGroupName(group.name); }}
                       >✎</button>
                       <button
                         type="button"
-                        title="Delete group"
-                        className="w-7 h-7 flex items-center justify-center hover:bg-red-50 text-red-500 rounded text-sm"
+                        title="Delete"
+                        aria-label="Delete group"
+                        className="w-7 h-7 flex items-center justify-center rounded hover:bg-red-100 text-gray-600 hover:text-red-600 transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (window.confirm(`Delete group "${group.name}"? Photos will be ungrouped.`)) {
@@ -608,16 +620,19 @@ export function CompanyCamSection({ estimateId, linkedProjectId }: Props) {
           {/* ── Hidden photos — collapsible section ───────────────────────── */}
           {hiddenPhotos.length > 0 && (
             <div className="mt-6 pt-4 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={() => setShowHidden((s) => !s)}
-                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium transition-colors"
-              >
-                <span>{showHidden ? "▾" : "▸"}</span>
-                <span>Hidden ({hiddenPhotos.length})</span>
-              </button>
+              <div className="flex items-center justify-between bg-stone-100 hover:bg-stone-200/70 transition-colors rounded-lg px-4 py-2.5 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setShowHidden((s) => !s)}
+                  className="flex items-center gap-2 text-sm font-medium text-gray-800 flex-1 text-left"
+                >
+                  <span className="text-gray-500">{showHidden ? "▾" : "▸"}</span>
+                  <span>Hidden</span>
+                  <span className="text-gray-500 text-xs font-normal">({hiddenPhotos.length})</span>
+                </button>
+              </div>
               {showHidden && (
-                <div className="flex flex-wrap gap-3 mt-3">
+                <div className="flex flex-wrap gap-3">
                   {hiddenPhotos.map((ph) => renderPhotoCard(ph, true))}
                 </div>
               )}

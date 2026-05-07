@@ -1,0 +1,77 @@
+Phase 2 Wave 1.5c polish — v1.2.1. Apply A + B + C as one batch, run TS check, then stop. Don't Republish — Dan will.
+
+Current problem: in client/src/components/CompanyCamSection.tsx, each photo-section header renders the group name as plain text on the far left, while the edit (pencil) and delete (trash) icons are absolute-positioned to the far right of the wrapping container — they appear floating ~800px away from the name with empty space between, which reads as disconnected and ugly. Dan wants the section header to be a contained horizontal bar (full content-area width) with the name + count on the left side of the bar and the edit/delete icons on the right side of the SAME bar.
+
+A. client/src/components/CompanyCamSection.tsx
+
+Refactor the section header rendering for ALL three section types (Ungrouped, custom work-area-groups, Hidden) into a consistent bar component/pattern. Suggested approach — extract a small inline helper or just apply consistent JSX:
+
+  <div className="flex items-center justify-between bg-stone-100 hover:bg-stone-200/70 transition-colors rounded-lg px-4 py-2.5 mb-3 mt-4">
+    <button
+      type="button"
+      onClick={toggleCollapse}
+      className="flex items-center gap-2 text-sm font-medium text-gray-800 flex-1 text-left"
+    >
+      <span className="text-gray-500">{collapsed ? '▸' : '▾'}</span>
+      {editing ? (
+        <input
+          autoFocus
+          value={editingName}
+          onChange={(e) => setEditingName(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); else if (e.key === 'Escape') cancelRename(); }}
+          className="px-2 py-0.5 rounded border border-gray-300 text-sm font-medium"
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <>
+          <span>{group.name}</span>
+          <span className="text-gray-500 text-xs font-normal">({group.photo_count})</span>
+        </>
+      )}
+    </button>
+    {/* Right-side icons — only for editable groups (custom work-area-groups), NOT for Ungrouped or Hidden */}
+    {isCustomGroup && (
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); startEditGroup(group); }}
+          className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-300/60 text-gray-600 hover:text-gray-900 transition-colors"
+          aria-label="Rename group"
+          title="Rename"
+        >✎</button>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); confirmDeleteGroup(group); }}
+          className="w-7 h-7 flex items-center justify-center rounded hover:bg-red-100 text-gray-600 hover:text-red-600 transition-colors"
+          aria-label="Delete group"
+          title="Delete"
+        >🗑</button>
+      </div>
+    )}
+  </div>
+
+Apply this same bar shell to:
+  - Ungrouped header (no edit/delete icons; show chevron + "Ungrouped" + count)
+  - Each custom work-area-group header (full bar with edit + delete icons inside the bar on the right)
+  - Hidden header (no edit/delete icons; show chevron + "Hidden" + count)
+
+The OLD code likely had the icons in a separate <div> positioned absolute or with ml-auto/justify-end on a flex parent that spanned the full container width — find and remove that pattern. The icons should now ONLY exist inside the bar's right-side <div>, not anywhere else.
+
+Drop-zone highlight: when dragOverGroupId matches this section, add additional ring classes to the bar (e.g. `ring-2 ring-blue-400 bg-blue-50/70` overriding the default bg-stone-100). The whole bar should highlight, not just the photo grid below it. The drop target wrapper that catches onDragOver/onDrop can stay as the parent container around bar + photo grid; just the bar's visual gets the highlight class swap.
+
+Keep all existing behavior:
+  - Click bar (the left button area) → toggle collapse.
+  - Pencil → start inline rename (input replaces the name span).
+  - Trash → confirm + delete (current window.confirm pattern is fine for now; §4.14 fix is a separate item).
+  - Drag-drop assignment unchanged.
+  - "+ New group" inline button unchanged (sits below the last group, outside the bar pattern).
+
+If a renderPhotoCard helper or section-rendering helper exists from v1.2.0, refactor it cleanly — extract the bar JSX into a small SectionHeader component if that reduces duplication, or keep inline if simpler.
+
+B. server/index.ts — bump boot marker to:
+[boot] estimate.companycam ui v1.2.1 — Phase 2 Wave 1.5c polish (group header bars) — outer catch returns 200 (§10.3)
+
+C. Verify TS baseline. Run NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit. Expected: 233 ± 1 in CompanyCamSection.tsx.
+
+DON'T TOUCH: server/companyCamRoutes.ts, server/estimateRoutes.ts, schema files, migration files. Don't add new dependencies. Don't Republish.
