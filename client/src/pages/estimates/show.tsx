@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -22,7 +22,7 @@ import { EstimateStatusBadge, ESTIMATE_TYPE_LABELS } from "./index";
 import {
   Calculator, ArrowLeft, Edit2, Send, CheckCircle2, XCircle,
   Briefcase, Building2, User, Calendar, Trash2, RefreshCw, Loader2, Eye, Globe, Copy, Check,
-  ChevronDown, ChevronRight, Pencil, RotateCcw, Upload
+  ChevronDown, ChevronRight, Pencil, RotateCcw, Upload, Plus, X,
 } from "lucide-react";
 import { format, parseISO, isAfter } from "date-fns";
 import { fmtDateOnly } from "@/lib/utils";
@@ -76,6 +76,24 @@ const TYPE_LABEL_KEY: Record<string, string> = {
   other: "typeOther",
 };
 
+// ── Local editing types ────────────────────────────────────────────────────────
+interface LocalLineItem {
+  key: string;
+  item_type: string;
+  description: string;
+  quantity: string;
+  unit: string;
+  unit_price: string;
+  amount: string;
+  is_optional: boolean;
+}
+interface LocalWorkArea {
+  key: string;
+  name: string;
+  line_items: LocalLineItem[];
+}
+const LI_TYPES = ["service", "labor", "material", "equipment", "subcontract"] as const;
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtMoney(v: any) {
   const n = parseFloat(v ?? "0");
@@ -119,6 +137,154 @@ export default function EstimateDetail() {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadFileUrl, setUploadFileUrl] = useState("");
   const [uploadSignerName, setUploadSignerName] = useState("");
+
+  // ── Scope editing state ──────────────────────────────────────────────────────
+  const [scopeEditing, setScopeEditing] = useState(false);
+  const [localAreas, setLocalAreas] = useState<LocalWorkArea[]>([]);
+  // Always reflects the latest localAreas value — prevents stale-closure on Save
+  const localAreasRef = useRef<LocalWorkArea[]>([]);
+  localAreasRef.current = localAreas;
+
+  function startScopeEdit() {
+    setLocalAreas(
+      (estimate?.work_areas ?? []).map(area => ({
+        key: area.id,
+        name: area.name,
+        line_items: (area.line_items ?? []).map(li => ({
+          key: li.id,
+          item_type: li.item_type || "service",
+          description: li.description,
+          quantity: String(li.quantity),
+          unit: li.unit || "",
+          unit_price: String(li.unit_price),
+          amount: String(li.amount),
+          is_optional: li.is_optional,
+        })),
+      }))
+    );
+    setScopeEditing(true);
+  }
+
+  function addWorkArea() {
+    setLocalAreas(prev => [
+      ...prev,
+      { key: `new-wa-${Date.now()}`, name: "New Work Area", line_items: [] },
+    ]);
+  }
+
+  function removeWorkArea(key: string) {
+    setLocalAreas(prev => prev.filter(a => a.key !== key));
+  }
+
+  function setAreaName(key: string, name: string) {
+    setLocalAreas(prev => prev.map(a => a.key === key ? { ...a, name } : a));
+  }
+
+  function addLineItem(areaKey: string) {
+    setLocalAreas(prev => prev.map(a =>
+      a.key !== areaKey ? a : {
+        ...a,
+        line_items: [
+          ...a.line_items,
+          {
+            key: `new-li-${Date.now()}-${Math.random()}`,
+            item_type: "service",
+            description: "",
+            quantity: "1",
+            unit: "",
+            unit_price: "0",
+            amount: "0",
+            is_optional: false,
+          },
+        ],
+      }
+    ));
+  }
+
+  function removeLineItem(areaKey: string, liKey: string) {
+    setLocalAreas(prev => prev.map(a =>
+      a.key !== areaKey ? a : { ...a, line_items: a.line_items.filter(li => li.key !== liKey) }
+    ));
+  }
+
+  function setLIField(areaKey: string, liKey: string, field: string, value: string) {
+    setLocalAreas(prev => prev.map(a =>
+      a.key !== areaKey ? a : {
+        ...a,
+        line_items: a.line_items.map(li => {
+          if (li.key !== liKey) return li;
+          const updated = { ...li, [field]: value };
+          if (field === "quantity" || field === "unit_price") {
+            const qty   = parseFloat(field === "quantity"   ? value : li.quantity)   || 0;
+            const price = parseFloat(field === "unit_price" ? value : li.unit_price) || 0;
+            updated.amount = (qty * price).toFixed(2);
+          }
+          return updated;
+        }),
+      }
+    ));
+  }
+
+  const saveScopeMutation = useMutation({
+    mutationFn: async (areas: LocalWorkArea[]) => {
+      if (!estimate) throw new Error("No estimate");
+      const newSubtotal = areas.reduce(
+        (sum, a) => sum + a.line_items.reduce((s, li) => s + (parseFloat(li.amount) || 0), 0),
+        0
+      );
+      const taxRate = parseFloat(estimate.tax_rate) || 0;
+      const newTaxAmt  = newSubtotal * taxRate;
+      const discAmt    = parseFloat(estimate.discount_amount) || 0;
+      const newTotal   = newSubtotal + newTaxAmt - discAmt;
+
+      const payload = {
+        customer_id:          estimate.customer_id,
+        property_id:          estimate.property_id,
+        estimate_type:        estimate.estimate_type,
+        template_name:        (estimate as any).template_name ?? null,
+        title:                estimate.title,
+        salesperson_id:       estimate.salesperson_id,
+        valid_until:          estimate.valid_until,
+        issued_date:          estimate.issued_date,
+        subtotal:             newSubtotal.toFixed(2),
+        tax_rate:             estimate.tax_rate,
+        tax_amount:           newTaxAmt.toFixed(2),
+        discount_amount:      estimate.discount_amount,
+        total:                newTotal.toFixed(2),
+        down_payment_percent: estimate.down_payment_percent,
+        down_payment_amount:  estimate.down_payment_amount,
+        notes:                estimate.notes,
+        customer_message:     estimate.customer_message,
+        terms:                estimate.terms,
+        work_areas: areas.map(a => ({
+          name: a.name,
+          line_items: a.line_items.map(li => ({
+            item_type:   li.item_type,
+            description: li.description,
+            quantity:    parseFloat(li.quantity)   || 0,
+            unit:        li.unit || null,
+            unit_price:  parseFloat(li.unit_price) || 0,
+            amount:      parseFloat(li.amount)     || 0,
+            is_optional: li.is_optional,
+          })),
+        })),
+      };
+
+      const res = await apiRequest("PUT", `/api/estimates/${id}`, payload);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).message ?? "Failed to save scope");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/estimates", id] });
+      qc.invalidateQueries({ queryKey: ["/api/estimates"] });
+      setScopeEditing(false);
+      toast({ title: "Scope of work saved" });
+    },
+    onError: (e: any) => toast({ title: "Save failed: " + e.message, variant: "destructive" }),
+  });
 
   const { data: estimate, isLoading, error } = useQuery<EstimateDetail>({
     queryKey: ["/api/estimates", id],
@@ -356,79 +522,292 @@ export default function EstimateDetail() {
             </CardContent>
           </Card>
 
-          {/* Work areas */}
-          {estimate.work_areas.length > 0 && (
+          {/* Scope of Work — read + inline-edit */}
+          {(estimate.work_areas.length > 0 || (estimate.status === "draft" && canEdit)) && (
             <Card>
-              <CardHeader className="pb-2 pt-4 px-5">
+              <CardHeader className="pb-2 pt-4 px-5 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm">{t("scopeOfWork")}</CardTitle>
+                {estimate.status === "draft" && canEdit && !scopeEditing && (
+                  <Button
+                    size="sm" variant="ghost"
+                    className="text-xs h-7 px-2"
+                    onClick={startScopeEdit}
+                    data-testid="btn-edit-scope"
+                  >
+                    <Pencil className="h-3 w-3 mr-1" /> Edit Scope
+                  </Button>
+                )}
               </CardHeader>
-              <CardContent className="px-5 pb-5 space-y-5">
-                {estimate.work_areas.map(area => {
-                  const areaSub = area.line_items.reduce((s, li) => s + parseFloat(li.amount ?? "0"), 0);
-                  return (
-                    <div key={area.id}>
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold text-sm">{area.name}</h3>
-                        <span className="text-sm text-muted-foreground tabular-nums">{fmtMoney(areaSub)}</span>
-                      </div>
-                      <div className="space-y-0.5">
-                        {/* Column headers */}
-                        <div className="grid grid-cols-[100px_1fr_60px_60px_90px_80px] gap-2 text-[10px] text-muted-foreground font-medium px-1 pb-1">
-                          <span>{t("colClass")}</span>
-                          <span>{t("colDescription")}</span>
-                          <span className="text-right">{t("colQty")}</span>
-                          <span>{t("colUnit")}</span>
-                          <span className="text-right">{t("colUnitPrice")}</span>
-                          <span className="text-right">{t("colAmount")}</span>
-                        </div>
-                        {area.line_items.map(li => (
-                          <div key={li.id} className="grid grid-cols-[100px_1fr_60px_60px_90px_80px] gap-2 text-sm items-center py-1.5 rounded-sm hover:bg-muted/40 px-1">
-                            <span className={`text-xs font-medium capitalize ${ITEM_TYPE_CLS[li.item_type] ?? ""}`}>{li.item_type}</span>
-                            <span className="text-sm">{li.description}{li.is_optional && <Badge variant="outline" className="ml-2 text-[10px] py-0">Optional</Badge>}</span>
-                            <span className="text-right tabular-nums">{li.quantity}</span>
-                            <span className="text-muted-foreground text-xs">{li.unit || "—"}</span>
-                            <span className="text-right tabular-nums">{fmtMoney(li.unit_price)}</span>
-                            <span className="text-right font-medium tabular-nums">{fmtMoney(li.amount)}</span>
-                          </div>
-                        ))}
-                      </div>
-                      {area !== estimate.work_areas[estimate.work_areas.length - 1] && <Separator className="mt-4" />}
-                    </div>
-                  );
-                })}
 
-                {/* Pricing summary */}
-                <div className="border-t pt-4 flex justify-end">
-                  <div className="w-64 space-y-1.5 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t("subtotal")}</span>
-                      <span className="tabular-nums">{fmtMoney(subtotal)}</span>
+              <CardContent className="px-5 pb-5 space-y-5">
+
+                {/* ── EDIT MODE ─────────────────────────────────────────────── */}
+                {scopeEditing ? (
+                  <>
+                    {localAreas.map((area) => (
+                      <div key={area.key} className="border rounded-lg p-3 space-y-3 bg-muted/20">
+
+                        {/* Area name row */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={area.name}
+                            onChange={e => setAreaName(area.key, e.target.value)}
+                            placeholder="Work area name"
+                            className="h-8 flex-1 rounded-md border border-input bg-background px-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-ring"
+                            data-testid="input-area-name"
+                          />
+                          <button
+                            onClick={() => removeWorkArea(area.key)}
+                            className="h-8 w-8 flex items-center justify-center rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Remove work area"
+                            data-testid="btn-remove-area"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        {/* Column headers */}
+                        {area.line_items.length > 0 && (
+                          <div className="grid grid-cols-[110px_1fr_70px_60px_96px_78px_32px] gap-2 text-[10px] text-muted-foreground font-medium px-1">
+                            <span>Class</span>
+                            <span>Description</span>
+                            <span className="text-right">Qty</span>
+                            <span>Unit</span>
+                            <span className="text-right">Unit Price</span>
+                            <span className="text-right">Amount</span>
+                            <span />
+                          </div>
+                        )}
+
+                        {/* Line item rows */}
+                        <div className="space-y-1.5">
+                          {area.line_items.map(li => (
+                            <div key={li.key} className="grid grid-cols-[110px_1fr_70px_60px_96px_78px_32px] gap-2 items-center">
+                              {/* Class */}
+                              <select
+                                value={li.item_type}
+                                onChange={e => setLIField(area.key, li.key, "item_type", e.target.value)}
+                                className="h-8 rounded-md border border-input bg-background px-2 text-xs w-full"
+                                data-testid="select-item-type"
+                              >
+                                {LI_TYPES.map(t => (
+                                  <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                                ))}
+                              </select>
+                              {/* Description */}
+                              <input
+                                type="text"
+                                value={li.description}
+                                onChange={e => setLIField(area.key, li.key, "description", e.target.value)}
+                                placeholder="Description"
+                                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                data-testid="input-description"
+                              />
+                              {/* Qty */}
+                              <input
+                                type="number" min="0" step="any"
+                                value={li.quantity}
+                                onChange={e => setLIField(area.key, li.key, "quantity", e.target.value)}
+                                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
+                                data-testid="input-quantity"
+                              />
+                              {/* Unit */}
+                              <input
+                                type="text"
+                                value={li.unit}
+                                onChange={e => setLIField(area.key, li.key, "unit", e.target.value)}
+                                placeholder="ea"
+                                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                data-testid="input-unit"
+                              />
+                              {/* Unit Price */}
+                              <input
+                                type="number" min="0" step="any"
+                                value={li.unit_price}
+                                onChange={e => setLIField(area.key, li.key, "unit_price", e.target.value)}
+                                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
+                                data-testid="input-unit-price"
+                              />
+                              {/* Computed Amount */}
+                              <div className="h-8 flex items-center justify-end text-sm tabular-nums font-medium text-muted-foreground pr-1">
+                                {fmtMoney(li.amount)}
+                              </div>
+                              {/* Delete */}
+                              <button
+                                onClick={() => removeLineItem(area.key, li.key)}
+                                className="h-8 w-8 flex items-center justify-center rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                title="Remove line item"
+                                data-testid="btn-remove-line-item"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* + Add Line Item */}
+                        <button
+                          onClick={() => addLineItem(area.key)}
+                          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium h-7 px-1"
+                          data-testid="btn-add-line-item"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Add Line Item
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* + Add Work Area */}
+                    <Button
+                      size="sm" variant="outline"
+                      className="w-full text-xs h-8 border-dashed"
+                      onClick={addWorkArea}
+                      data-testid="btn-add-work-area"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Work Area
+                    </Button>
+
+                    {/* Live totals preview */}
+                    {(() => {
+                      const lSub = localAreas.reduce(
+                        (s, a) => s + a.line_items.reduce((ss, li) => ss + (parseFloat(li.amount) || 0), 0), 0
+                      );
+                      const lTax = lSub * (parseFloat(estimate.tax_rate) || 0);
+                      const lTotal = lSub + lTax - (parseFloat(estimate.discount_amount) || 0);
+                      return (
+                        <div className="border-t pt-4 flex justify-end">
+                          <div className="w-64 space-y-1.5 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Subtotal</span>
+                              <span className="tabular-nums font-medium">{fmtMoney(lSub)}</span>
+                            </div>
+                            {(parseFloat(estimate.tax_rate) || 0) > 0 && (
+                              <div className="flex justify-between text-muted-foreground">
+                                <span>Tax ({(parseFloat(estimate.tax_rate) * 100).toFixed(2)}%)</span>
+                                <span className="tabular-nums">{fmtMoney(lTax)}</span>
+                              </div>
+                            )}
+                            {(parseFloat(estimate.discount_amount) || 0) > 0 && (
+                              <div className="flex justify-between text-green-600">
+                                <span>Discount</span>
+                                <span className="tabular-nums">-{fmtMoney(parseFloat(estimate.discount_amount))}</span>
+                              </div>
+                            )}
+                            <Separator />
+                            <div className="flex justify-between font-bold">
+                              <span>Total</span>
+                              <span className="tabular-nums">{fmtMoney(lTotal)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Save / Cancel */}
+                    <div className="flex justify-end gap-2 pt-1 border-t">
+                      <Button size="sm" variant="outline" onClick={() => setScopeEditing(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => saveScopeMutation.mutate(localAreasRef.current)}
+                        disabled={saveScopeMutation.isPending}
+                        data-testid="btn-save-scope"
+                      >
+                        {saveScopeMutation.isPending
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : "Save Scope"}
+                      </Button>
                     </div>
-                    {taxPct > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">{t("tax")} ({taxPct.toFixed(2)}%)</span>
-                        <span className="tabular-nums">{fmtMoney(taxAmt)}</span>
+                  </>
+
+                ) : (
+                  /* ── READ MODE ─────────────────────────────────────────────── */
+                  <>
+                    {estimate.work_areas.length === 0 ? (
+                      <div className="text-sm text-muted-foreground text-center py-6">
+                        No scope added yet.{" "}
+                        {estimate.status === "draft" && canEdit && (
+                          <button
+                            className="text-primary underline font-medium"
+                            onClick={startScopeEdit}
+                          >
+                            Add scope
+                          </button>
+                        )}
                       </div>
+                    ) : (
+                      <>
+                        {estimate.work_areas.map((area, aIdx) => {
+                          const areaSub = area.line_items.reduce((s, li) => s + parseFloat(li.amount ?? "0"), 0);
+                          return (
+                            <div key={area.id}>
+                              <div className="flex items-center justify-between mb-2">
+                                <h3 className="font-semibold text-sm">{area.name}</h3>
+                                <span className="text-sm text-muted-foreground tabular-nums">{fmtMoney(areaSub)}</span>
+                              </div>
+                              <div className="space-y-0.5">
+                                <div className="grid grid-cols-[100px_1fr_60px_60px_90px_80px] gap-2 text-[10px] text-muted-foreground font-medium px-1 pb-1">
+                                  <span>{t("colClass")}</span>
+                                  <span>{t("colDescription")}</span>
+                                  <span className="text-right">{t("colQty")}</span>
+                                  <span>{t("colUnit")}</span>
+                                  <span className="text-right">{t("colUnitPrice")}</span>
+                                  <span className="text-right">{t("colAmount")}</span>
+                                </div>
+                                {area.line_items.map(li => (
+                                  <div key={li.id} className="grid grid-cols-[100px_1fr_60px_60px_90px_80px] gap-2 text-sm items-center py-1.5 rounded-sm hover:bg-muted/40 px-1">
+                                    <span className={`text-xs font-medium capitalize ${ITEM_TYPE_CLS[li.item_type] ?? ""}`}>{li.item_type}</span>
+                                    <span className="text-sm">{li.description}{li.is_optional && <Badge variant="outline" className="ml-2 text-[10px] py-0">Optional</Badge>}</span>
+                                    <span className="text-right tabular-nums">{li.quantity}</span>
+                                    <span className="text-muted-foreground text-xs">{li.unit || "—"}</span>
+                                    <span className="text-right tabular-nums">{fmtMoney(li.unit_price)}</span>
+                                    <span className="text-right font-medium tabular-nums">{fmtMoney(li.amount)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              {aIdx < estimate.work_areas.length - 1 && <Separator className="mt-4" />}
+                            </div>
+                          );
+                        })}
+
+                        {/* Pricing summary */}
+                        <div className="border-t pt-4 flex justify-end">
+                          <div className="w-64 space-y-1.5 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">{t("subtotal")}</span>
+                              <span className="tabular-nums">{fmtMoney(subtotal)}</span>
+                            </div>
+                            {taxPct > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">{t("tax")} ({taxPct.toFixed(2)}%)</span>
+                                <span className="tabular-nums">{fmtMoney(taxAmt)}</span>
+                              </div>
+                            )}
+                            {discAmt > 0 && (
+                              <div className="flex justify-between text-green-600">
+                                <span>{t("discount")}</span>
+                                <span className="tabular-nums">-{fmtMoney(discAmt)}</span>
+                              </div>
+                            )}
+                            <Separator />
+                            <div className="flex justify-between font-bold text-base">
+                              <span>{t("total")}</span>
+                              <span className="tabular-nums">{fmtMoney(total)}</span>
+                            </div>
+                            {dpPct > 0 && (
+                              <div className="flex justify-between text-blue-600 text-xs">
+                                <span>{t("downPayment")} ({dpPct}%)</span>
+                                <span className="tabular-nums">{fmtMoney(dpAmt)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
                     )}
-                    {discAmt > 0 && (
-                      <div className="flex justify-between text-green-600">
-                        <span>{t("discount")}</span>
-                        <span className="tabular-nums">-{fmtMoney(discAmt)}</span>
-                      </div>
-                    )}
-                    <Separator />
-                    <div className="flex justify-between font-bold text-base">
-                      <span>{t("total")}</span>
-                      <span className="tabular-nums">{fmtMoney(total)}</span>
-                    </div>
-                    {dpPct > 0 && (
-                      <div className="flex justify-between text-blue-600 text-xs">
-                        <span>{t("downPayment")} ({dpPct}%)</span>
-                        <span className="tabular-nums">{fmtMoney(dpAmt)}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}
