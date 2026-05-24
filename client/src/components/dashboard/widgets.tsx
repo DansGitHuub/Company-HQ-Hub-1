@@ -616,7 +616,7 @@ export function QuizzesWidget({ size }: WidgetProps) {
   const withQuizzes = sops.filter((s: any) => s.hasQuiz);
 
   return (
-    <WidgetShell loading={isLoading} href="/testing">
+    <WidgetShell loading={isLoading} href="/training">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-xs text-muted-foreground">{withQuizzes.length} quizzes available</span>
       </div>

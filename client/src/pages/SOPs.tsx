@@ -637,7 +637,7 @@ export default function SOPs() {
                               <><Sparkles className="h-4 w-4 mr-2" /> Regenerate Quiz</>
                             )}
                           </Button>
-                          <a href="/testing">
+                          <a href="/training">
                             <Button
                               variant="default"
                               size="sm"

@@ -57,7 +57,7 @@ function getLink(result: SearchResult): string {
     case "form":      return "/forms";
     case "equipment": return "/equipment";
     case "campaign":  return "/marketing";
-    case "resource":  return "/education";
+    case "resource":  return "/customer-resources";
     default:          return "/";
   }
 }

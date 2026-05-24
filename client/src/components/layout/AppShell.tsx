@@ -357,7 +357,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const customerNav = [
     { id: "customer_hub", icon: LayoutDashboard, label: t("nav.myPortal"), href: "/customer-hub" },
     ...(user?.isApplicant ? [{ id: "applicant_portal", icon: ClipboardCheck, label: t("nav.myApplication"), href: "/applicant" }] : []),
-    { id: "customer_resources", icon: GraduationCap, label: t("nav.resources"), href: "/education" },
+    { id: "customer_resources", icon: GraduationCap, label: t("nav.resources"), href: "/customer-resources" },
     { id: "customer_account", icon: User, label: t("nav.myAccount"), href: "/profile" },
     { id: "customer_help", icon: LifeBuoy, label: t("nav.help"), href: "/help" },
   ];
@@ -366,7 +366,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     dashboard: { icon: LayoutDashboard, label: t("nav.myWorkspace"), href: "/" },
     applicant_portal: { icon: ClipboardCheck, label: t("nav.myApplication"), href: "/applicant" },
     sops: { icon: BookOpen, label: t("nav.sopLibrary"), href: "/sops" },
-    testing: { icon: Brain, label: t("nav.quizzes"), href: "/testing" },
+    testing: { icon: Brain, label: t("nav.quizzes"), href: "/training" },
     materials: { icon: Hammer, label: t("nav.materials"), href: "/materials" },
     equipment: { icon: Truck, label: t("nav.equipment"), href: "/equipment" },
     todos: { icon: CheckSquare, label: t("nav.tasks"), href: "/todos" },
@@ -385,7 +385,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     consultations: { icon: CalendarClock, label: t("nav.consultations"), href: "/consultations" },
     reports: { icon: BarChart2, label: t("nav.reports"), href: "/reports" },
     mors_budget: { icon: TrendingUp, label: t("nav.morsBudget"), href: "/mors-budget" },
-    education: { icon: GraduationCap, label: t("nav.resourceLibrary"), href: "/education" },
+    education: { icon: GraduationCap, label: t("nav.resourceLibrary"), href: "/customer-resources" },
     help: { icon: LifeBuoy, label: t("nav.help"), href: "/help" },
     hq: { icon: Building2, label: t("nav.companyHQ"), href: "/hq" },
     marketing: { icon: Megaphone, label: t("nav.marketing"), href: "/marketing" },

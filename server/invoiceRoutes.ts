@@ -108,6 +108,15 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   // ── SINGLE ────────────────────────────────────────────────────────────────────
   app.get("/api/invoices/:id", requireAuth, async (req, res) => {
     try {
+      let resolvedId = req.params.id;
+      if (/^INV-\d+$/i.test(resolvedId)) {
+        const { rows } = await pool.query(
+          `SELECT id FROM invoices WHERE invoice_number = $1 LIMIT 1`,
+          [resolvedId.toUpperCase()]
+        );
+        if (!rows.length) return res.status(404).json({ message: "Invoice not found" });
+        resolvedId = rows[0].id;
+      }
       const [invRes, itemsRes, paymentsRes] = await Promise.all([
         pool.query(`
           SELECT i.*,
@@ -118,14 +127,14 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
           LEFT JOIN customers c ON c.id = i.customer_id
           LEFT JOIN jobs j ON j.id = i.job_id
           WHERE i.id = $1
-        `, [req.params.id]),
+        `, [resolvedId]),
         pool.query(
           `SELECT * FROM invoice_line_items WHERE invoice_id=$1 ORDER BY sort_order, id`,
-          [req.params.id]
+          [resolvedId]
         ),
         pool.query(
           `SELECT * FROM payments WHERE invoice_id=$1 ORDER BY payment_date DESC`,
-          [req.params.id]
+          [resolvedId]
         ),
       ]);
 

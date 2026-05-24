@@ -26,8 +26,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/equipment": "Equipment",
   "/forms": "Forms",
   "/sops": "SOP Library",
-  "/education": "Customer Resources",
-  "/testing": "Training & Knowledge",
+  "/customer-resources": "Customer Resources",
+  "/training": "Training & Knowledge",
   "/admin": "Admin Panel",
   "/employees": "Employees",
   "/hiring": "Hiring",
@@ -231,7 +231,8 @@ function AppRoutes() {
         <Route path="/hiring" component={Hiring} />
         <Route path="/marketing" component={Marketing} />
         <Route path="/forms" component={Forms} />
-        <Route path="/education" component={Education} />
+        <Route path="/customer-resources" component={Education} />
+        <Route path="/education"><Redirect to="/customer-resources" /></Route>
         <Route path="/profile" component={Profile} />
         <Route path="/employees" component={Employees} />
         <Route path="/onboarding-forms/:formType?/:submissionId?" component={FormHub} />
@@ -287,7 +288,8 @@ function AppRoutes() {
         <Route path="/care-guides" component={CareGuideManager} />
         <Route path="/tools" component={Tools} />
         <Route path="/calendar" component={CalendarPage} />
-        <Route path="/testing" component={TestingKnowledge} />
+        <Route path="/training" component={TestingKnowledge} />
+        <Route path="/testing"><Redirect to="/training" /></Route>
         <Route path="/settings" component={SettingsPage} />
         <Route path="/messages" component={MessagesPage} />
         <Route path="/catalog/import" component={CatalogImport} />

@@ -156,7 +156,16 @@ export function registerEstimateRoutes(app: Express) {
   // ------ Single estimate ------
   app.get("/api/estimates/:id", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     try {
-      const estimate = await getEstimateFull(req.params.id);
+      let resolvedId = req.params.id;
+      if (/^EST-\d+$/i.test(resolvedId)) {
+        const { rows } = await pool.query(
+          `SELECT id FROM estimates WHERE estimate_number = $1 LIMIT 1`,
+          [resolvedId.toUpperCase()]
+        );
+        if (!rows.length) return res.status(404).json({ message: "Estimate not found" });
+        resolvedId = rows[0].id;
+      }
+      const estimate = await getEstimateFull(resolvedId);
       if (!estimate) return res.status(404).json({ message: "Estimate not found" });
       res.json(estimate);
     } catch (err) {
