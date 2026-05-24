@@ -290,11 +290,33 @@ export default function EstimateDetail() {
     queryKey: ["/api/estimates", id],
     queryFn: async () => {
       const res = await fetch(`/api/estimates/${id}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Not found");
-      return res.json();
+      if (res.ok) return res.json();
+      // Fallback for display-number URLs (EST-XXXX): resolve via list
+      if (/^EST-\d+$/i.test(id)) {
+        const listRes = await fetch(`/api/estimates`, { credentials: "include" });
+        if (listRes.ok) {
+          const list = await listRes.json();
+          const match = list.find((e: any) =>
+            e.estimate_number?.toUpperCase() === id.toUpperCase()
+          );
+          if (match?.id) {
+            const fullRes = await fetch(`/api/estimates/${match.id}`, { credentials: "include" });
+            if (fullRes.ok) return fullRes.json();
+          }
+        }
+      }
+      throw new Error("Not found");
     },
     enabled: !!id,
   });
+
+  // Canonicalize display-number URLs to UUID URLs (replace history entry)
+  React.useEffect(() => {
+    if (/^EST-\d+$/i.test(id) && estimate?.id && estimate.id !== id) {
+      qc.setQueryData(["/api/estimates", estimate.id], estimate);
+      nav(`/estimates/${estimate.id}`, { replace: true });
+    }
+  }, [id, estimate?.id]);
 
   // Map estimate type to the correct T&C type slug
   const tcType = (() => {

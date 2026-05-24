@@ -129,11 +129,33 @@ export default function InvoiceDetailPage() {
   const { data: invoice, isLoading } = useQuery<InvoiceDetail>({
     queryKey: ["/api/invoices", id],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/invoices/${id}`);
-      if (!res.ok) throw new Error("Invoice not found");
-      return res.json();
+      const res = await apiRequest("GET", `/api/invoices/${id ?? ""}`);
+      if (res.ok) return res.json();
+      // Fallback for display-number URLs (INV-XXXX): resolve via list
+      if (/^INV-\d+$/i.test(id ?? "")) {
+        const listRes = await apiRequest("GET", "/api/invoices");
+        if (listRes.ok) {
+          const list = await listRes.json();
+          const match = list.find((inv: any) =>
+            inv.invoice_number?.toUpperCase() === (id ?? "").toUpperCase()
+          );
+          if (match?.id) {
+            const fullRes = await apiRequest("GET", `/api/invoices/${match.id}`);
+            if (fullRes.ok) return fullRes.json();
+          }
+        }
+      }
+      throw new Error("Invoice not found");
     },
   });
+
+  // Canonicalize display-number URLs to UUID URLs (replace history entry)
+  React.useEffect(() => {
+    if (/^INV-\d+$/i.test(id ?? "") && invoice?.id && invoice.id !== id) {
+      qc.setQueryData(["/api/invoices", invoice.id], invoice);
+      navigate(`/invoices/${invoice.id}`, { replace: true });
+    }
+  }, [id, invoice?.id]);
 
   const statusMutation = useMutation({
     mutationFn: async (status: string) => {
