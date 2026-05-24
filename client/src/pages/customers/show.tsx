@@ -121,7 +121,7 @@ function CustomerInvoicesTab({ customerId }: { customerId: string }) {
 }
 
 // ── Customer Estimates Tab ────────────────────────────────────────────────────
-function CustomerEstimatesTab({ customerId }: { customerId: string }) {
+function CustomerEstimatesTab({ customerId, customerName }: { customerId: string; customerName: string }) {
   const { t } = useTranslation("customers");
   const [, nav] = useLocation();
   const qcEst = useQueryClient();
@@ -203,7 +203,8 @@ function CustomerEstimatesTab({ customerId }: { customerId: string }) {
         setShowNewEstimate(false);
         qcEst.invalidateQueries({ queryKey: ["/api/estimates", "customer", customerId] });
       }}
-      existing={{ customer_id: customerId }}
+      lockedCustomerId={customerId}
+      lockedCustomerName={customerName}
     />
     </>
   );
@@ -1086,7 +1087,10 @@ export default function CustomerDetailPage() {
 
             {/* ── Estimates ── */}
             <TabsContent value="estimates" className="mt-4">
-              <CustomerEstimatesTab customerId={customer.id} />
+              <CustomerEstimatesTab
+                customerId={customer.id}
+                customerName={`${customer.first_name} ${customer.last_name}${customer.company_name ? ` (${customer.company_name})` : ""}`}
+              />
             </TabsContent>
 
             {/* ── Invoices ── */}

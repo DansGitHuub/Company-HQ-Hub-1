@@ -103,18 +103,29 @@ interface Props {
   open: boolean;
   onClose: () => void;
   existing?: any;
+  lockedCustomerId?: string;
+  lockedCustomerName?: string;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function EstimateFormModal({ open, onClose, existing }: Props) {
+export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, lockedCustomerName }: Props) {
   const { t } = useTranslation("estimates");
   const { toast } = useToast();
   const isEdit = !!existing;
 
   // Header fields
-  const [customerId, setCustomerId] = useState(existing?.customer_id ?? "");
-  const [customerSearch, setCustomerSearch] = useState(existing?.customer_name ?? "");
+  const [customerId, setCustomerId] = useState(lockedCustomerId ?? existing?.customer_id ?? "");
+  const [customerSearch, setCustomerSearch] = useState(lockedCustomerName ?? existing?.customer_name ?? "");
+
+  // Reset customer fields each time the modal opens so pre-fill is always fresh
+  useEffect(() => {
+    if (!open) return;
+    if (lockedCustomerId) {
+      setCustomerId(lockedCustomerId);
+      setCustomerSearch(lockedCustomerName ?? "");
+    }
+  }, [open, lockedCustomerId, lockedCustomerName]);
   const [showCustomerDrop, setShowCustomerDrop] = useState(false);
   const [propertyId, setPropertyId] = useState(existing?.property_id ?? "");
   const [propertySearch, setPropertySearch] = useState(existing?.property_address ?? "");
@@ -432,33 +443,42 @@ export function EstimateFormModal({ open, onClose, existing }: Props) {
 
             <div className="relative">
               <Label className="text-xs">{t("customerLabel")}</Label>
-              <Input
-                value={customerSearch}
-                onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDrop(true); if (!e.target.value) { setCustomerId(""); setPropertyId(""); } }}
-                onFocus={() => setShowCustomerDrop(true)}
-                placeholder={t("searchCustomers")}
-                data-testid="input-customer-search"
-                className="mt-1"
-              />
-              {showCustomerDrop && customerResults.length > 0 && (
-                <div className="absolute z-50 w-full bg-popover border rounded-md shadow-md mt-1 max-h-40 overflow-y-auto">
-                  {customerResults.map((c: CustomerRow) => (
-                    <button
-                      key={c.id}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
-                      onClick={() => {
-                        setCustomerId(c.id);
-                        setCustomerSearch(`${c.first_name} ${c.last_name}${c.company_name ? ` (${c.company_name})` : ""}`);
-                        setShowCustomerDrop(false);
-                        setPropertyId("");
-                        setPropertySearch("");
-                      }}
-                    >
-                      {c.first_name} {c.last_name}
-                      {c.company_name && <span className="text-muted-foreground ml-1">— {c.company_name}</span>}
-                    </button>
-                  ))}
+              {lockedCustomerId ? (
+                <div className="mt-1 flex items-center gap-2 h-9 rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground" data-testid="input-customer-search-locked">
+                  {lockedCustomerName || lockedCustomerId}
+                  <span className="ml-auto text-xs opacity-60">locked</span>
                 </div>
+              ) : (
+                <>
+                  <Input
+                    value={customerSearch}
+                    onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDrop(true); if (!e.target.value) { setCustomerId(""); setPropertyId(""); } }}
+                    onFocus={() => setShowCustomerDrop(true)}
+                    placeholder={t("searchCustomers")}
+                    data-testid="input-customer-search"
+                    className="mt-1"
+                  />
+                  {showCustomerDrop && customerResults.length > 0 && (
+                    <div className="absolute z-50 w-full bg-popover border rounded-md shadow-md mt-1 max-h-40 overflow-y-auto">
+                      {customerResults.map((c: CustomerRow) => (
+                        <button
+                          key={c.id}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                          onClick={() => {
+                            setCustomerId(c.id);
+                            setCustomerSearch(`${c.first_name} ${c.last_name}${c.company_name ? ` (${c.company_name})` : ""}`);
+                            setShowCustomerDrop(false);
+                            setPropertyId("");
+                            setPropertySearch("");
+                          }}
+                        >
+                          {c.first_name} {c.last_name}
+                          {c.company_name && <span className="text-muted-foreground ml-1">— {c.company_name}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
