@@ -31,6 +31,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { format, parseISO } from "date-fns";
 import { CustomerFormModal, CustomerFormData, EMPTY_FORM } from "./CustomerFormModal";
 import { CannotArchiveDialog, type Blocker } from "@/components/CannotArchiveDialog";
+import { EstimateFormModal } from "@/pages/estimates/EstimateFormModal";
 
 // ── Invoice status badge helper ─────────────────────────────────────────────
 const INV_STATUS_CLS: Record<string, string> = {
@@ -123,6 +124,8 @@ function CustomerInvoicesTab({ customerId }: { customerId: string }) {
 function CustomerEstimatesTab({ customerId }: { customerId: string }) {
   const { t } = useTranslation("customers");
   const [, nav] = useLocation();
+  const qcEst = useQueryClient();
+  const [showNewEstimate, setShowNewEstimate] = useState(false);
   const fmtMoney = (v: any) => `$${parseFloat(v ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
   const fmtDate = (d: string | null) => { if (!d) return "—"; try { return format(parseISO(d), "MMM d, yyyy"); } catch { return d; } };
 
@@ -144,10 +147,16 @@ function CustomerEstimatesTab({ customerId }: { customerId: string }) {
   if (isLoading) return <div className="py-12 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
   return (
+    <>
     <Card>
       <CardHeader className="pb-3 pt-4 flex flex-row items-center justify-between">
         <CardTitle className="text-sm">{t("estimatesTab")}</CardTitle>
-        <Button size="sm" variant="outline" onClick={() => nav("/estimates")} className="text-xs h-7 px-2">
+        <Button
+          size="sm" variant="outline"
+          onClick={() => setShowNewEstimate(true)}
+          className="text-xs h-7 px-2"
+          data-testid="btn-new-estimate-for-customer"
+        >
           <Plus className="h-3.5 w-3.5 mr-1" /> {t("newEstimate")}
         </Button>
       </CardHeader>
@@ -188,6 +197,15 @@ function CustomerEstimatesTab({ customerId }: { customerId: string }) {
         )}
       </CardContent>
     </Card>
+    <EstimateFormModal
+      open={showNewEstimate}
+      onClose={() => {
+        setShowNewEstimate(false);
+        qcEst.invalidateQueries({ queryKey: ["/api/estimates", "customer", customerId] });
+      }}
+      existing={{ customer_id: customerId }}
+    />
+    </>
   );
 }
 

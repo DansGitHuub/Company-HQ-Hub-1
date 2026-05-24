@@ -421,9 +421,12 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
   );
 }
 
-function JobInvoicesTab({ jobId }: { jobId: string }) {
+function JobInvoicesTab({ jobId, customerId }: { jobId: string; customerId: string }) {
   const { t } = useTranslation("jobDetail");
   const [, nav] = useLocation();
+  const qcInv = useQueryClient();
+  const [showNewInvoice, setShowNewInvoice] = useState(false);
+
   const { data: invoices = [], isLoading } = useQuery<InvoiceSummary[]>({
     queryKey: ["/api/invoices", "job", jobId],
     queryFn: async () => {
@@ -438,12 +441,23 @@ function JobInvoicesTab({ jobId }: { jobId: string }) {
   if (isLoading) return <div className="py-12 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
   return (
+    <>
     <Card>
       <CardHeader className="pb-3 pt-4 flex flex-row items-center justify-between">
         <CardTitle className="text-sm">{t("invoicesCardTitle")}</CardTitle>
-        <Button size="sm" variant="outline" onClick={() => nav("/invoices")} className="text-xs h-7 px-2">
-          <FileText className="h-3.5 w-3.5 mr-1" /> {t("allInvoices")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm" variant="default"
+            onClick={() => setShowNewInvoice(true)}
+            className="text-xs h-7 px-2"
+            data-testid="btn-create-invoice-for-job"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" /> Create Invoice
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => nav("/invoices")} className="text-xs h-7 px-2">
+            <FileText className="h-3.5 w-3.5 mr-1" /> {t("allInvoices")}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="pb-4 px-0">
         {invoices.length === 0 ? (
@@ -486,6 +500,20 @@ function JobInvoicesTab({ jobId }: { jobId: string }) {
         )}
       </CardContent>
     </Card>
+    <InvoiceFormModal
+      open={showNewInvoice}
+      onOpenChange={(v) => {
+        setShowNewInvoice(v);
+        if (!v) qcInv.invalidateQueries({ queryKey: ["/api/invoices", "job", jobId] });
+      }}
+      lockedJobId={jobId}
+      lockedCustomerId={customerId || undefined}
+      onSuccess={() => {
+        setShowNewInvoice(false);
+        qcInv.invalidateQueries({ queryKey: ["/api/invoices", "job", jobId] });
+      }}
+    />
+    </>
   );
 }
 
@@ -942,7 +970,7 @@ export default function JobDetailPage() {
 
           {/* Invoices Tab */}
           <TabsContent value="invoices">
-            <JobInvoicesTab jobId={job.id} />
+            <JobInvoicesTab jobId={job.id} customerId={job.customer_id ?? ""} />
           </TabsContent>
 
           {/* Messages Tab */}
