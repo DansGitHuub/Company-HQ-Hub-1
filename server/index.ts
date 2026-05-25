@@ -50,7 +50,7 @@ import { runEstimatingPhaseE3Migration } from "./migrations/estimatingPhaseE3";
 import { runCompanyCamPhase1Migration } from "./migrations/companyCamPhase1";
 import { runCompanyCamPhotosPhase2Migration } from "./migrations/companyCamPhotosPhase2";
 import { runCompanyCamWave3Migration } from "./migrations/companyCamWave3";
-import { registerCompanyCamRoutes, syncCCProjectsFromApi } from "./companyCamRoutes";
+import { syncCCProjectsFromApi } from "./companyCamRoutes";
 import { registerPublicPages } from "./publicPages";
 import { startLeadAlertScheduler } from "./consultationRoutes";
 
@@ -162,7 +162,6 @@ app.use((req, res, next) => {
     console.warn(`[env] Missing env vars (CompanyCam/Plaud features degraded): ${missingEnv.join(", ")}`);
   }
 
-  registerCompanyCamRoutes(app);
   console.log('[boot] companycam v1.4.0 — Wave 3 reconciliation queue (sync + match + dismiss) ready');
 
   // Wave 3: initial sync on boot + every 6 hours
