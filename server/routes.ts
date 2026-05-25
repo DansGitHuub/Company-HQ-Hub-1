@@ -8,6 +8,7 @@ import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerCompanyCamRoutes } from "./companyCamRoutes";
 import { registerDuplicateCustomerRoutes } from "./duplicateCustomerRoutes";
 import { registerEstimateTranscriptRoutes } from "./estimateTranscriptRoutes";
+import { registerEstimateAiDraftRoutes } from "./estimateAiDraftRoutes";
 import { registerHiringRoutes } from "./hiringRoutes";
 import { registerEmployeeFormsRoutes } from "./employeeFormsRoutes";
 import { registerNotesRoutes, migrateNotesTable, runNoteReminderScheduler } from "./notesRoutes";
@@ -90,6 +91,7 @@ export async function registerRoutes(
   registerCompanyCamRoutes(app);
   registerDuplicateCustomerRoutes(app);
   registerEstimateTranscriptRoutes(app);
+  registerEstimateAiDraftRoutes(app);
 
   // Jobs + Invoices module routes (registered first to take precedence over legacy simple routes)
   registerJobRoutes(app, requireAuth);

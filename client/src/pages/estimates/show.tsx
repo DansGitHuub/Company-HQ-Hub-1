@@ -29,6 +29,7 @@ import { fmtDateOnly } from "@/lib/utils";
 import { Link } from "wouter";
 import { CompanyCamSection } from "@/components/CompanyCamSection";
 import { TranscriptSection } from "@/components/TranscriptSection";
+import { AiDraftLineItems } from "@/components/AiDraftLineItems";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface LineItemDetail {
@@ -1224,6 +1225,15 @@ export default function EstimateDetail() {
       </Dialog>
       {estimate?.id && (
         <TranscriptSection estimateId={estimate.id} />
+      )}
+      {estimate?.id && (
+        <AiDraftLineItems
+          estimateId={estimate.id}
+          onAccepted={() => {
+            qc.invalidateQueries({ queryKey: ["/api/estimates", id] });
+            qc.invalidateQueries({ queryKey: ["/api/estimates"] });
+          }}
+        />
       )}
       {estimate?.id && (
         <CompanyCamSection
