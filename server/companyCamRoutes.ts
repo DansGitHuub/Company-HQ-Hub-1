@@ -1,6 +1,7 @@
-import { Express } from "express";
+import { Express, Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import { pool } from "./db";
+import { requireAuth } from "./auth";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -186,17 +187,6 @@ async function resolveProject(projectId: string): Promise<void> {
   } catch (err: any) {
     console.error("[companycam] resolveProject fetch error:", err.message);
   }
-}
-
-// ─── Wave 3: Admin auth guard ─────────────────────────────────────────────────
-
-function requireAdminAuth(req: any, res: any, next: any) {
-  if (!req.isAuthenticated?.()) return res.status(401).json({ message: "Not authenticated" });
-  const role: string = req.user?.role ?? "";
-  if (!["Admin", "Manager", "Master Admin"].includes(role) && !req.user?.isMasterAdmin) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-  next();
 }
 
 // ─── Wave 3: Periodic API sync ────────────────────────────────────────────────
@@ -664,7 +654,7 @@ export function registerCompanyCamRoutes(app: Express) {
   // GET  /api/admin/companycam/recon-queue
   // Returns unmatched, non-dismissed, non-archived projects with address-based
   // customer suggestions (up to 6 per project, zip-exact first).
-  app.get("/api/admin/companycam/recon-queue", requireAdminAuth, async (_req: any, res: any) => {
+  app.get("/api/admin/companycam/recon-queue", requireAuth, async (_req: any, res: any) => {
     try {
       const { rows: projects } = await pool.query(`
         SELECT companycam_project_id, name,
@@ -706,7 +696,7 @@ export function registerCompanyCamRoutes(app: Express) {
   });
 
   // GET /api/admin/companycam/recon-stats
-  app.get("/api/admin/companycam/recon-stats", requireAdminAuth, async (_req: any, res: any) => {
+  app.get("/api/admin/companycam/recon-stats", requireAuth, async (_req: any, res: any) => {
     try {
       const { rows } = await pool.query(`
         SELECT
@@ -725,7 +715,7 @@ export function registerCompanyCamRoutes(app: Express) {
   // POST /api/admin/companycam/recon-queue/:id/match
   // Body: { customer_id: uuid }
   // Links the CC project to the customer in both directions.
-  app.post("/api/admin/companycam/recon-queue/:id/match", requireAdminAuth, async (req: any, res: any) => {
+  app.post("/api/admin/companycam/recon-queue/:id/match", requireAuth, async (req: any, res: any) => {
     const ccProjectId = req.params.id;
     const { customer_id } = req.body ?? {};
     if (!customer_id) return res.status(400).json({ message: "customer_id is required" });
@@ -759,7 +749,7 @@ export function registerCompanyCamRoutes(app: Express) {
   });
 
   // POST /api/admin/companycam/recon-queue/:id/dismiss
-  app.post("/api/admin/companycam/recon-queue/:id/dismiss", requireAdminAuth, async (req: any, res: any) => {
+  app.post("/api/admin/companycam/recon-queue/:id/dismiss", requireAuth, async (req: any, res: any) => {
     try {
       await pool.query(
         `UPDATE companycam_projects
@@ -775,7 +765,7 @@ export function registerCompanyCamRoutes(app: Express) {
 
   // POST /api/admin/companycam/sync
   // Triggers a full API sync on demand.
-  app.post("/api/admin/companycam/sync", requireAdminAuth, async (_req: any, res: any) => {
+  app.post("/api/admin/companycam/sync", requireAuth, async (_req: any, res: any) => {
     try {
       const result = await syncCCProjectsFromApi();
       return res.json(result);
