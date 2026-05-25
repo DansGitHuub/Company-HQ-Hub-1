@@ -143,6 +143,8 @@ import RouteDayDetail from "@/pages/admin/RouteDayDetail";
 import TimeCardApproval from "@/pages/admin/TimeCardApproval";
 import TimeAdminPage from "@/pages/admin/TimeAdminPage";
 import CompanyCamReconciliation from "@/pages/admin/CompanyCamReconciliation";
+import CustomerDuplicates from "@/pages/admin/CustomerDuplicates";
+import CompanyCamHealth from "@/pages/admin/CompanyCamHealth";
 import InquiryPage from "@/pages/Inquiry";
 import InquirySuccess from "@/pages/InquirySuccess";
 import BookingPage from "@/pages/BookingPage";
@@ -271,6 +273,8 @@ function AppRoutes() {
         <Route path="/admin/time-card-approval"><Redirect to="/admin/time?tab=approval" /></Route>
         <Route path="/admin/service-types" component={ServiceTypesPage} />
         <Route path="/admin/companycam-reconciliation" component={CompanyCamReconciliation} />
+        <Route path="/admin/customer-duplicates" component={CustomerDuplicates} />
+        <Route path="/admin/companycam-health" component={CompanyCamHealth} />
         <Route path="/budget-settings"><Redirect to="/mors-budget?tab=mark-up" /></Route>
         <Route path="/time" component={TimeTracking} />
         <Route path="/reports" component={ReportsPage} />

@@ -6,6 +6,7 @@ import { setupAuth, requireAuth, requireAdmin, hashPassword, comparePasswords } 
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerCompanyCamRoutes } from "./companyCamRoutes";
+import { registerDuplicateCustomerRoutes } from "./duplicateCustomerRoutes";
 import { registerHiringRoutes } from "./hiringRoutes";
 import { registerEmployeeFormsRoutes } from "./employeeFormsRoutes";
 import { registerNotesRoutes, migrateNotesTable, runNoteReminderScheduler } from "./notesRoutes";
@@ -84,8 +85,9 @@ export async function registerRoutes(
 ): Promise<Server> {
   setupAuth(app);
 
-  // CompanyCam routes registered here so Passport session middleware is active
+  // CompanyCam + Wave 4 routes registered here so Passport session middleware is active
   registerCompanyCamRoutes(app);
+  registerDuplicateCustomerRoutes(app);
 
   // Jobs + Invoices module routes (registered first to take precedence over legacy simple routes)
   registerJobRoutes(app, requireAuth);

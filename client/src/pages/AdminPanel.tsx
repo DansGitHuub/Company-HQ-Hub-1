@@ -79,6 +79,8 @@ import {
   Link2Off,
   Pencil,
   Camera,
+  GitMerge,
+  Activity,
   Save,
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
@@ -725,6 +727,8 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "service-types", label: "Service Types", icon: Tag, href: "/admin/service-types" },
         { value: "archive", label: "Archive", icon: Archive, href: "/admin/archive" },
         { value: "cc-reconciliation", label: "CC Reconciliation", icon: Camera, href: "/admin/companycam-reconciliation" },
+        { value: "cc-health", label: "CC Webhook Health", icon: Activity, href: "/admin/companycam-health" },
+        { value: "customer-duplicates", label: "Customer Duplicates", icon: GitMerge, href: "/admin/customer-duplicates" },
       ],
     },
     {

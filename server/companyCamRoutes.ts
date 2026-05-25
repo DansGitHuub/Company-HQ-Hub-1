@@ -642,9 +642,19 @@ export function registerCompanyCamRoutes(app: Express) {
         console.log(`[companycam] Unhandled event '${eventType}' — ignoring`);
       }
 
+      // Wave 4: log successful event (fire-and-forget — never blocks the 200 response)
+      pool.query(
+        `INSERT INTO companycam_webhook_events (event_type, success) VALUES ($1, true)`,
+        [eventType]
+      ).catch(() => {});
       return res.status(200).json({ received: true });
     } catch (err: any) {
       console.error("[companycam] Webhook processing error:", err.message ?? err);
+      // Wave 4: log failed event
+      pool.query(
+        `INSERT INTO companycam_webhook_events (event_type, success, error_message) VALUES ($1, false, $2)`,
+        [eventType, err?.message ?? "processing_failed"]
+      ).catch(() => {});
       return res.status(200).json({ received: true, error: "processing_failed" });
     }
   });
@@ -771,6 +781,69 @@ export function registerCompanyCamRoutes(app: Express) {
       return res.json(result);
     } catch (err: any) {
       console.error("[companycam] manual sync error:", err.message);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Wave 4: Webhook health dashboard ───────────────────────────────────────
+
+  // GET /api/admin/companycam/webhook-health
+  // Returns event counts (24h + 7d), last success timestamp, health flag, and
+  // the 50 most recent individual events for the health dashboard.
+  app.get("/api/admin/companycam/webhook-health", requireAuth, async (_req: any, res: any) => {
+    try {
+      const { rows: [agg] } = await pool.query(`
+        SELECT
+          (SELECT received_at FROM companycam_webhook_events
+            WHERE success = true ORDER BY received_at DESC LIMIT 1)  AS last_success_at,
+          COUNT(*) FILTER (WHERE received_at > NOW() - INTERVAL '24 hours')                         AS total_24h,
+          COUNT(*) FILTER (WHERE received_at > NOW() - INTERVAL '24 hours' AND success = true)      AS success_24h,
+          COUNT(*) FILTER (WHERE received_at > NOW() - INTERVAL '24 hours' AND success = false)     AS failed_24h,
+          COUNT(*) FILTER (WHERE received_at > NOW() - INTERVAL '7 days')                           AS total_7d,
+          COUNT(*) FILTER (WHERE received_at > NOW() - INTERVAL '7 days'  AND success = true)       AS success_7d,
+          COUNT(*) FILTER (WHERE received_at > NOW() - INTERVAL '7 days'  AND success = false)      AS failed_7d
+        FROM companycam_webhook_events
+      `);
+
+      const { rows: breakdown } = await pool.query(`
+        SELECT event_type,
+               COUNT(*)::int                              AS total,
+               COUNT(*) FILTER (WHERE success = true)::int AS success
+          FROM companycam_webhook_events
+         WHERE received_at > NOW() - INTERVAL '24 hours'
+         GROUP BY event_type
+         ORDER BY total DESC
+      `);
+
+      const { rows: recent } = await pool.query(`
+        SELECT id, event_type, success, error_message, received_at
+          FROM companycam_webhook_events
+         ORDER BY received_at DESC
+         LIMIT 50
+      `);
+
+      const lastSuccessAt: string | null = agg?.last_success_at ?? null;
+      const isHealthy = lastSuccessAt !== null &&
+        new Date(lastSuccessAt) > new Date(Date.now() - 48 * 60 * 60 * 1000);
+
+      return res.json({
+        last_success_at: lastSuccessAt,
+        is_healthy:       isHealthy,
+        counts_24h: {
+          total:   Number(agg?.total_24h   ?? 0),
+          success: Number(agg?.success_24h ?? 0),
+          failed:  Number(agg?.failed_24h  ?? 0),
+        },
+        counts_7d: {
+          total:   Number(agg?.total_7d   ?? 0),
+          success: Number(agg?.success_7d ?? 0),
+          failed:  Number(agg?.failed_7d  ?? 0),
+        },
+        event_type_breakdown_24h: breakdown,
+        recent_events:            recent,
+      });
+    } catch (err: any) {
+      console.error("[companycam] webhook-health error:", err.message);
       return res.status(500).json({ message: err.message });
     }
   });
