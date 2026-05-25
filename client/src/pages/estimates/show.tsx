@@ -28,6 +28,7 @@ import { format, parseISO, isAfter } from "date-fns";
 import { fmtDateOnly } from "@/lib/utils";
 import { Link } from "wouter";
 import { CompanyCamSection } from "@/components/CompanyCamSection";
+import { TranscriptSection } from "@/components/TranscriptSection";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface LineItemDetail {
@@ -1221,6 +1222,9 @@ export default function EstimateDetail() {
           </div>
         </DialogContent>
       </Dialog>
+      {estimate?.id && (
+        <TranscriptSection estimateId={estimate.id} />
+      )}
       {estimate?.id && (
         <CompanyCamSection
           estimateId={estimate.id}
