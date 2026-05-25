@@ -78,6 +78,7 @@ import {
   ArrowLeftRight,
   Link2Off,
   Pencil,
+  Camera,
   Save,
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
@@ -723,6 +724,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
         { value: "service-types", label: "Service Types", icon: Tag, href: "/admin/service-types" },
         { value: "archive", label: "Archive", icon: Archive, href: "/admin/archive" },
+        { value: "cc-reconciliation", label: "CC Reconciliation", icon: Camera, href: "/admin/companycam-reconciliation" },
       ],
     },
     {

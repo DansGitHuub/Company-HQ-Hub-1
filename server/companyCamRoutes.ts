@@ -188,6 +188,128 @@ async function resolveProject(projectId: string): Promise<void> {
   }
 }
 
+// ─── Wave 3: Admin auth guard ─────────────────────────────────────────────────
+
+function requireAdminAuth(req: any, res: any, next: any) {
+  if (!req.isAuthenticated?.()) return res.status(401).json({ message: "Not authenticated" });
+  const role: string = req.user?.role ?? "";
+  if (!["Admin", "Manager", "Master Admin"].includes(role) && !req.user?.isMasterAdmin) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  next();
+}
+
+// ─── Wave 3: Periodic API sync ────────────────────────────────────────────────
+
+export async function syncCCProjectsFromApi(): Promise<{ upserted: number; autoLinked: number }> {
+  const token = process.env.COMPANYCAM_API_TOKEN;
+  if (!token) {
+    console.warn("[companycam-sync] COMPANYCAM_API_TOKEN not set — skipping sync");
+    return { upserted: 0, autoLinked: 0 };
+  }
+
+  let page = 1;
+  let upserted = 0;
+
+  while (true) {
+    let projects: any[];
+    try {
+      const resp = await fetch(
+        `https://api.companycam.com/v2/projects?per_page=50&page=${page}`,
+        { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } }
+      );
+      if (!resp.ok) {
+        console.error(`[companycam-sync] API HTTP ${resp.status} on page ${page}`);
+        break;
+      }
+      projects = await resp.json();
+    } catch (err: any) {
+      console.error(`[companycam-sync] Fetch error on page ${page}:`, err.message);
+      break;
+    }
+
+    if (!Array.isArray(projects) || projects.length === 0) break;
+
+    for (const proj of projects) {
+      const addr   = proj.address     ?? {};
+      const coords = proj.coordinates ?? {};
+      try {
+        await pool.query(
+          `INSERT INTO companycam_projects
+             (companycam_project_id, name, status,
+              address_street_1, address_street_2, address_city,
+              address_state, address_postal_code, address_country,
+              latitude, longitude,
+              creator_companycam_user_id,
+              archived, public, feature_image_url, raw_payload,
+              cc_created_at, cc_updated_at, synced_from_api_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+                   to_timestamp($17), to_timestamp($18), NOW())
+           ON CONFLICT (companycam_project_id) DO UPDATE
+             SET name                       = EXCLUDED.name,
+                 status                     = EXCLUDED.status,
+                 address_street_1           = EXCLUDED.address_street_1,
+                 address_street_2           = EXCLUDED.address_street_2,
+                 address_city               = EXCLUDED.address_city,
+                 address_state              = EXCLUDED.address_state,
+                 address_postal_code        = EXCLUDED.address_postal_code,
+                 address_country            = EXCLUDED.address_country,
+                 latitude                   = EXCLUDED.latitude,
+                 longitude                  = EXCLUDED.longitude,
+                 archived                   = EXCLUDED.archived,
+                 feature_image_url          = EXCLUDED.feature_image_url,
+                 raw_payload                = EXCLUDED.raw_payload,
+                 cc_updated_at              = EXCLUDED.cc_updated_at,
+                 synced_from_api_at         = NOW(),
+                 updated_at                 = NOW()`,
+          [
+            String(proj.id ?? ""),
+            proj.name                                               ?? "",
+            proj.status                                             ?? null,
+            addr.street_address_1                                   ?? null,
+            addr.street_address_2                                   ?? null,
+            addr.city                                               ?? null,
+            addr.state                                              ?? null,
+            addr.postal_code                                        ?? null,
+            addr.country                                            ?? null,
+            coords.lat                                              ?? null,
+            coords.lng                                              ?? null,
+            String(proj.creator_id ?? proj.creator?.id ?? "")      || null,
+            proj.archived                                           ?? false,
+            proj.public                                             ?? true,
+            proj.feature_image_url ?? proj.image_url               ?? null,
+            JSON.stringify(proj),
+            proj.created_at                                         ?? null,
+            proj.updated_at                                         ?? null,
+          ]
+        );
+        upserted++;
+      } catch (err: any) {
+        console.error(`[companycam-sync] Upsert error for project ${proj.id}:`, err.message);
+      }
+    }
+
+    if (projects.length < 50) break;
+    page++;
+  }
+
+  // Auto-link: companycam_projects rows whose companycam_project_id is already
+  // stored on a customer record (set by createCCProjectForCustomer) but whose
+  // customer_id FK hasn't been filled in yet.
+  const linkResult = await pool.query(`
+    UPDATE companycam_projects cp
+       SET customer_id = c.id,
+           updated_at  = NOW()
+      FROM customers c
+     WHERE c.companycam_project_id = cp.companycam_project_id
+       AND cp.customer_id IS NULL
+  `);
+  const autoLinked = linkResult.rowCount ?? 0;
+
+  console.log(`[companycam-sync] Done: ${upserted} upserted, ${autoLinked} auto-linked`);
+  return { upserted, autoLinked };
+}
+
 // ─── Route registration ───────────────────────────────────────────────────────
 
 export function registerCompanyCamRoutes(app: Express) {
@@ -534,6 +656,132 @@ export function registerCompanyCamRoutes(app: Express) {
     } catch (err: any) {
       console.error("[companycam] Webhook processing error:", err.message ?? err);
       return res.status(200).json({ received: true, error: "processing_failed" });
+    }
+  });
+
+  // ── Wave 3: Reconciliation queue ───────────────────────────────────────────
+
+  // GET  /api/admin/companycam/recon-queue
+  // Returns unmatched, non-dismissed, non-archived projects with address-based
+  // customer suggestions (up to 6 per project, zip-exact first).
+  app.get("/api/admin/companycam/recon-queue", requireAdminAuth, async (_req: any, res: any) => {
+    try {
+      const { rows: projects } = await pool.query(`
+        SELECT companycam_project_id, name,
+               address_street_1, address_city, address_state, address_postal_code,
+               cc_created_at, synced_from_api_at
+          FROM companycam_projects
+         WHERE customer_id      IS NULL
+           AND recon_dismissed  = FALSE
+           AND archived         = FALSE
+         ORDER BY cc_created_at DESC NULLS LAST
+         LIMIT 200
+      `);
+
+      const result: any[] = [];
+      for (const p of projects) {
+        const zip  = p.address_postal_code ?? "";
+        const city = p.address_city ?? "";
+        const { rows: suggestions } = await pool.query(
+          `SELECT id, first_name, last_name, company_name,
+                  billing_address, billing_city, billing_state, billing_zip
+             FROM customers
+            WHERE is_active = true
+              AND companycam_project_id IS NULL
+              AND (
+                    (billing_zip  IS NOT NULL AND billing_zip  = $1)
+                 OR (billing_city IS NOT NULL AND billing_city ILIKE $2)
+                  )
+            ORDER BY (billing_zip = $1)::int DESC, last_name
+            LIMIT 6`,
+          [zip, city || "%NOMATCH%"]
+        );
+        result.push({ ...p, suggested_customers: suggestions });
+      }
+      return res.json(result);
+    } catch (err: any) {
+      console.error("[companycam] recon-queue error:", err.message);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // GET /api/admin/companycam/recon-stats
+  app.get("/api/admin/companycam/recon-stats", requireAdminAuth, async (_req: any, res: any) => {
+    try {
+      const { rows } = await pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE customer_id IS NULL AND recon_dismissed = FALSE AND archived = FALSE) AS queued,
+          COUNT(*) FILTER (WHERE customer_id IS NOT NULL)                                              AS linked,
+          COUNT(*) FILTER (WHERE recon_dismissed = TRUE)                                               AS dismissed,
+          MAX(synced_from_api_at)                                                                      AS last_synced_at
+        FROM companycam_projects
+      `);
+      return res.json(rows[0]);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // POST /api/admin/companycam/recon-queue/:id/match
+  // Body: { customer_id: uuid }
+  // Links the CC project to the customer in both directions.
+  app.post("/api/admin/companycam/recon-queue/:id/match", requireAdminAuth, async (req: any, res: any) => {
+    const ccProjectId = req.params.id;
+    const { customer_id } = req.body ?? {};
+    if (!customer_id) return res.status(400).json({ message: "customer_id is required" });
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `UPDATE companycam_projects
+            SET customer_id = $1, updated_at = NOW()
+          WHERE companycam_project_id = $2`,
+        [customer_id, ccProjectId]
+      );
+      await client.query(
+        `UPDATE customers
+            SET companycam_project_id    = $1,
+                companycam_create_status = 'linked',
+                companycam_create_error  = NULL
+          WHERE id = $2`,
+        [ccProjectId, customer_id]
+      );
+      await client.query("COMMIT");
+      return res.json({ ok: true });
+    } catch (err: any) {
+      await client.query("ROLLBACK");
+      console.error("[companycam] recon match error:", err.message);
+      return res.status(500).json({ message: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/admin/companycam/recon-queue/:id/dismiss
+  app.post("/api/admin/companycam/recon-queue/:id/dismiss", requireAdminAuth, async (req: any, res: any) => {
+    try {
+      await pool.query(
+        `UPDATE companycam_projects
+            SET recon_dismissed = TRUE, updated_at = NOW()
+          WHERE companycam_project_id = $1`,
+        [req.params.id]
+      );
+      return res.json({ ok: true });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // POST /api/admin/companycam/sync
+  // Triggers a full API sync on demand.
+  app.post("/api/admin/companycam/sync", requireAdminAuth, async (_req: any, res: any) => {
+    try {
+      const result = await syncCCProjectsFromApi();
+      return res.json(result);
+    } catch (err: any) {
+      console.error("[companycam] manual sync error:", err.message);
+      return res.status(500).json({ message: err.message });
     }
   });
 }

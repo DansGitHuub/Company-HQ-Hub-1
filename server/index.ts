@@ -49,7 +49,8 @@ import { runEstimatingPhaseE2PolishMigration } from "./migrations/estimatingPhas
 import { runEstimatingPhaseE3Migration } from "./migrations/estimatingPhaseE3";
 import { runCompanyCamPhase1Migration } from "./migrations/companyCamPhase1";
 import { runCompanyCamPhotosPhase2Migration } from "./migrations/companyCamPhotosPhase2";
-import { registerCompanyCamRoutes } from "./companyCamRoutes";
+import { runCompanyCamWave3Migration } from "./migrations/companyCamWave3";
+import { registerCompanyCamRoutes, syncCCProjectsFromApi } from "./companyCamRoutes";
 import { registerPublicPages } from "./publicPages";
 import { startLeadAlertScheduler } from "./consultationRoutes";
 
@@ -147,6 +148,7 @@ app.use((req, res, next) => {
   await runEstimatingPhaseE3Migration();
   await runCompanyCamPhase1Migration();
   await runCompanyCamPhotosPhase2Migration();
+  await runCompanyCamWave3Migration();
 
   // Public pages must be registered BEFORE registerRoutes (which sets up the React catch-all)
   registerPublicPages(app);
@@ -161,7 +163,17 @@ app.use((req, res, next) => {
   }
 
   registerCompanyCamRoutes(app);
-  console.log('[boot] estimate.companycam ui v1.3.0 — Phase 2 Wave 2 (auto-create CompanyCam projects on customer create) — outer catch returns 200 (§10.3)');
+  console.log('[boot] companycam v1.4.0 — Wave 3 reconciliation queue (sync + match + dismiss) ready');
+
+  // Wave 3: initial sync on boot + every 6 hours
+  syncCCProjectsFromApi().catch((e) =>
+    console.error("[companycam-sync] Boot sync failed:", e.message)
+  );
+  setInterval(() => {
+    syncCCProjectsFromApi().catch((e) =>
+      console.error("[companycam-sync] Scheduled sync failed:", e.message)
+    );
+  }, 6 * 60 * 60 * 1000);
   registerNotificationPreferenceRoutes(app);
   await registerRoutes(httpServer, app);
   
