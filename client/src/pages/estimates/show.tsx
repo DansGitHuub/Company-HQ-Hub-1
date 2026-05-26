@@ -30,11 +30,13 @@ import { Link } from "wouter";
 import { CompanyCamSection } from "@/components/CompanyCamSection";
 import { TranscriptSection } from "@/components/TranscriptSection";
 import { AiDraftLineItems } from "@/components/AiDraftLineItems";
+import { ImageLightbox } from "@/components/ImageLightbox";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface LineItemDetail {
   id: string; item_type: string; description: string;
   quantity: string; unit: string; unit_price: string; amount: string; is_optional: boolean;
+  image_url?: string | null; image_hidden?: boolean | null;
 }
 interface WorkAreaDetail {
   id: string; name: string; sort_order: number;
@@ -88,6 +90,8 @@ interface LocalLineItem {
   unit_price: string;
   amount: string;
   is_optional: boolean;
+  image_url?: string | null;
+  image_hidden?: boolean | null;
 }
 interface LocalWorkArea {
   key: string;
@@ -143,6 +147,7 @@ export default function EstimateDetail() {
   // ── Scope editing state ──────────────────────────────────────────────────────
   const [scopeEditing, setScopeEditing] = useState(false);
   const [localAreas, setLocalAreas] = useState<LocalWorkArea[]>([]);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   // Always reflects the latest localAreas value — prevents stale-closure on Save
   const localAreasRef = useRef<LocalWorkArea[]>([]);
   localAreasRef.current = localAreas;
@@ -161,6 +166,8 @@ export default function EstimateDetail() {
           unit_price: String(li.unit_price),
           amount: String(li.amount),
           is_optional: li.is_optional,
+          image_url: li.image_url ?? null,
+          image_hidden: li.image_hidden ?? false,
         })),
       }))
     );
@@ -593,7 +600,8 @@ export default function EstimateDetail() {
 
                         {/* Column headers */}
                         {area.line_items.length > 0 && (
-                          <div className="grid grid-cols-[110px_1fr_70px_60px_96px_78px_32px] gap-2 text-[10px] text-muted-foreground font-medium px-1">
+                          <div className="grid grid-cols-[48px_110px_1fr_70px_60px_96px_78px_32px] gap-2 text-[10px] text-muted-foreground font-medium px-1">
+                            <span />
                             <span>Class</span>
                             <span>Description</span>
                             <span className="text-right">Qty</span>
@@ -607,7 +615,19 @@ export default function EstimateDetail() {
                         {/* Line item rows */}
                         <div className="space-y-1.5">
                           {area.line_items.map(li => (
-                            <div key={li.key} className="grid grid-cols-[110px_1fr_70px_60px_96px_78px_32px] gap-2 items-center">
+                            <div key={li.key} className="grid grid-cols-[48px_110px_1fr_70px_60px_96px_78px_32px] gap-2 items-center">
+                              {/* Thumbnail (read-only in edit mode) */}
+                              {li.image_url && !li.image_hidden
+                                ? <img
+                                    src={li.image_url}
+                                    alt={li.description}
+                                    className="w-11 h-11 object-cover rounded border cursor-pointer shrink-0"
+                                    onClick={() => setLightboxSrc(li.image_url!)}
+                                    title="Click to enlarge"
+                                    data-testid="img-li-thumb-edit"
+                                  />
+                                : <div className="w-11 h-11" />
+                              }
                               {/* Class */}
                               <select
                                 value={li.item_type}
@@ -772,24 +792,47 @@ export default function EstimateDetail() {
                                 <span className="text-sm text-muted-foreground tabular-nums">{fmtMoney(areaSub)}</span>
                               </div>
                               <div className="space-y-0.5">
-                                <div className="grid grid-cols-[100px_1fr_60px_60px_90px_80px] gap-2 text-[10px] text-muted-foreground font-medium px-1 pb-1">
-                                  <span>{t("colClass")}</span>
-                                  <span>{t("colDescription")}</span>
-                                  <span className="text-right">{t("colQty")}</span>
-                                  <span>{t("colUnit")}</span>
-                                  <span className="text-right">{t("colUnitPrice")}</span>
-                                  <span className="text-right">{t("colAmount")}</span>
-                                </div>
-                                {area.line_items.map(li => (
-                                  <div key={li.id} className="grid grid-cols-[100px_1fr_60px_60px_90px_80px] gap-2 text-sm items-center py-1.5 rounded-sm hover:bg-muted/40 px-1">
-                                    <span className={`text-xs font-medium capitalize ${ITEM_TYPE_CLS[li.item_type] ?? ""}`}>{li.item_type}</span>
-                                    <span className="text-sm">{li.description}{li.is_optional && <Badge variant="outline" className="ml-2 text-[10px] py-0">Optional</Badge>}</span>
-                                    <span className="text-right tabular-nums">{li.quantity}</span>
-                                    <span className="text-muted-foreground text-xs">{li.unit || "—"}</span>
-                                    <span className="text-right tabular-nums">{fmtMoney(li.unit_price)}</span>
-                                    <span className="text-right font-medium tabular-nums">{fmtMoney(li.amount)}</span>
-                                  </div>
-                                ))}
+                                {(() => {
+                                  const hasPhoto = area.line_items.some(li => li.image_url && !li.image_hidden);
+                                  const colsHdr = hasPhoto
+                                    ? "grid-cols-[48px_100px_1fr_60px_60px_90px_80px]"
+                                    : "grid-cols-[100px_1fr_60px_60px_90px_80px]";
+                                  return (
+                                    <>
+                                      <div className={`grid ${colsHdr} gap-2 text-[10px] text-muted-foreground font-medium px-1 pb-1`}>
+                                        {hasPhoto && <span />}
+                                        <span>{t("colClass")}</span>
+                                        <span>{t("colDescription")}</span>
+                                        <span className="text-right">{t("colQty")}</span>
+                                        <span>{t("colUnit")}</span>
+                                        <span className="text-right">{t("colUnitPrice")}</span>
+                                        <span className="text-right">{t("colAmount")}</span>
+                                      </div>
+                                      {area.line_items.map(li => (
+                                        <div key={li.id} className={`grid ${colsHdr} gap-2 text-sm items-center py-1.5 rounded-sm hover:bg-muted/40 px-1`}>
+                                          {hasPhoto && (
+                                            li.image_url && !li.image_hidden
+                                              ? <img
+                                                  src={li.image_url}
+                                                  alt={li.description}
+                                                  className="w-11 h-11 object-cover rounded border cursor-pointer shrink-0"
+                                                  onClick={() => setLightboxSrc(li.image_url!)}
+                                                  title="Click to enlarge"
+                                                  data-testid="img-li-thumb"
+                                                />
+                                              : <div className="w-11 h-11" />
+                                          )}
+                                          <span className={`text-xs font-medium capitalize ${ITEM_TYPE_CLS[li.item_type] ?? ""}`}>{li.item_type}</span>
+                                          <span className="text-sm">{li.description}{li.is_optional && <Badge variant="outline" className="ml-2 text-[10px] py-0">Optional</Badge>}</span>
+                                          <span className="text-right tabular-nums">{li.quantity}</span>
+                                          <span className="text-muted-foreground text-xs">{li.unit || "—"}</span>
+                                          <span className="text-right tabular-nums">{fmtMoney(li.unit_price)}</span>
+                                          <span className="text-right font-medium tabular-nums">{fmtMoney(li.amount)}</span>
+                                        </div>
+                                      ))}
+                                    </>
+                                  );
+                                })()}
                               </div>
                               {aIdx < estimate.work_areas.length - 1 && <Separator className="mt-4" />}
                             </div>
@@ -1235,6 +1278,7 @@ export default function EstimateDetail() {
           }}
         />
       )}
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       {estimate?.id && (
         <CompanyCamSection
           estimateId={estimate.id}

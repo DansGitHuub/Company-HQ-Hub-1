@@ -27,6 +27,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { ArrowLeft, Save, Trash2, X, Plus, Tag, DollarSign, Upload, ImageIcon, Eye, EyeOff, Copy } from "lucide-react";
+import { ImageLightbox } from "@/components/ImageLightbox";
 
 const CLASS_OPTIONS = ["Labor", "Equipment", "Materials", "Subcontracting"];
 
@@ -82,6 +83,7 @@ export default function CatalogDetail() {
   const [form, setForm] = useState<Partial<CatalogItemDetail> | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [showEstimateDialog, setShowEstimateDialog] = useState(false);
   const [uploadingPrimary, setUploadingPrimary] = useState(false);
   const [uploadingOption, setUploadingOption] = useState<Record<string, boolean>>({});
@@ -676,8 +678,10 @@ export default function CatalogDetail() {
                         <img
                           src={form.imageUrl}
                           alt="Primary"
-                          className={`w-24 h-24 object-cover rounded-md border transition-opacity ${form.imageHidden ? "opacity-40" : ""}`}
+                          className={`w-24 h-24 object-cover rounded-md border transition-opacity cursor-pointer hover:ring-2 hover:ring-primary/50 ${form.imageHidden ? "opacity-40" : ""}`}
                           data-testid="img-primary-photo"
+                          onClick={() => form.imageUrl && setLightboxSrc(form.imageUrl)}
+                          title="Click to enlarge"
                         />
                         {form.imageHidden && (
                           <div className="absolute inset-0 flex items-center justify-center">
@@ -997,6 +1001,8 @@ export default function CatalogDetail() {
           </Card>
         </div>
       </div>
+
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
 
       {/* Bottom save bar */}
       {dirty && (

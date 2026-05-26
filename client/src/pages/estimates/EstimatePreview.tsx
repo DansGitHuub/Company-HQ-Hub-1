@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Loader2, Printer, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fmtDateOnly } from "@/lib/utils";
+import { ImageLightbox } from "@/components/ImageLightbox";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtMoney(v: any) {
@@ -17,6 +18,7 @@ function num(v: any) { return parseFloat(v ?? "0"); }
 function SimpleTemplate({ est }: { est: any }) {
   const { t } = useTranslation("estimates");
   const taxPct = (num(est.tax_rate) * 100).toFixed(2);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   return (
     <div className="max-w-2xl mx-auto bg-white text-gray-900 p-10 min-h-screen font-sans">
@@ -90,6 +92,38 @@ function SimpleTemplate({ est }: { est: any }) {
         </tbody>
       </table>
 
+      {/* Line Items Detail (grouped by work area, shown when any item has a photo or when expanded) */}
+      {(est.work_areas ?? []).some((wa: any) =>
+        (wa.line_items ?? []).some((li: any) => li.image_url && !li.image_hidden)
+      ) && (
+        <div className="mb-6 space-y-4">
+          {(est.work_areas ?? []).map((wa: any) => {
+            const items = (wa.line_items ?? []).filter((li: any) => li.image_url && !li.image_hidden);
+            if (items.length === 0) return null;
+            return (
+              <div key={wa.id}>
+                <div className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2 border-b pb-1">{wa.name}</div>
+                <div className="space-y-2">
+                  {items.map((li: any) => (
+                    <div key={li.id} className="flex items-center gap-3 text-sm">
+                      <img
+                        src={li.image_url}
+                        alt={li.description}
+                        className="w-12 h-12 object-cover rounded border shrink-0 cursor-pointer hover:ring-2 hover:ring-primary/50 print:cursor-default"
+                        onClick={() => setLightboxSrc(li.image_url)}
+                        title="Click to enlarge"
+                        data-testid="img-li-thumb-preview"
+                      />
+                      <span className="text-gray-700">{li.description}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Totals */}
       <div className="ml-auto w-64 text-sm space-y-1 mb-8">
         <div className="flex justify-between"><span className="text-gray-600">{t("subtotal")}</span><span>{fmtMoney(est.subtotal)}</span></div>
@@ -122,6 +156,7 @@ function SimpleTemplate({ est }: { est: any }) {
       <div className="mt-10 text-center text-[10px] text-gray-400">
         {t("thankYouSimple")}
       </div>
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
   );
 }
@@ -130,6 +165,7 @@ function SimpleTemplate({ est }: { est: any }) {
 function BookletTemplate({ est }: { est: any }) {
   const { t } = useTranslation("estimates");
   const taxPct = (num(est.tax_rate) * 100).toFixed(2);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   return (
     <div className="max-w-3xl mx-auto bg-white text-gray-900 font-sans">
@@ -215,7 +251,9 @@ function BookletTemplate({ est }: { est: any }) {
                                 <img
                                   src={li.image_url}
                                   alt={li.description}
-                                  className="w-16 h-16 object-cover rounded border shrink-0"
+                                  className="w-16 h-16 object-cover rounded border shrink-0 cursor-pointer hover:ring-2 hover:ring-primary/50 print:cursor-default"
+                                  onClick={() => setLightboxSrc(li.image_url)}
+                                  title="Click to enlarge"
                                 />
                               )}
                               <span>{li.description}</span>
@@ -299,6 +337,7 @@ function BookletTemplate({ est }: { est: any }) {
           {t("thankYouBooklet")}
         </div>
       </div>
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
   );
 }
