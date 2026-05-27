@@ -31,6 +31,13 @@ type CatalogRow = {
 const CLASS_TABS = ["All", "Labor", "Equipment", "Materials", "Subcontracting"];
 const SCROLL_KEY = "catalog:scroll";
 
+const PLANT_FILTERS = [
+  { label: "Trees",      cat: "TREE",       icon: "🌳" },
+  { label: "Shrubs",     cat: "SHRUB",      icon: "🌿" },
+  { label: "Perennials", cat: "Perennials", icon: "🌸" },
+  { label: "Annuals",    cat: "Annuals",    icon: "🌼" },
+] as const;
+
 function readParams() {
   const p = new URLSearchParams(window.location.search);
   return {
@@ -203,7 +210,38 @@ export default function CatalogPage() {
 
       {/* Filters */}
       <div className="space-y-3">
-        <Tabs value={classTab} onValueChange={setClassTab}>
+        {/* Plant quick-filter pills */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide mr-1">Plants</span>
+          {PLANT_FILTERS.map(pf => {
+            const active = categoryFilter === pf.cat;
+            return (
+              <button
+                key={pf.cat}
+                data-testid={`btn-plant-${pf.label.toLowerCase()}`}
+                onClick={() => {
+                  if (active) {
+                    setCategoryFilter("all");
+                  } else {
+                    setClassTab("All");
+                    setCategoryFilter(pf.cat);
+                  }
+                }}
+                className={[
+                  "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border transition-colors",
+                  active
+                    ? "bg-green-600 text-white border-green-600 shadow-sm"
+                    : "bg-background text-muted-foreground border-border hover:border-green-500 hover:text-green-700",
+                ].join(" ")}
+              >
+                <span>{pf.icon}</span>
+                {pf.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <Tabs value={classTab} onValueChange={v => { setClassTab(v); setCategoryFilter("all"); }}>
           <TabsList data-testid="tabs-class">
             {CLASS_TABS.map(t => (
               <TabsTrigger key={t} value={t} data-testid={`tab-class-${t.toLowerCase()}`}>{t}</TabsTrigger>

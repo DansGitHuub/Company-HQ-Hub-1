@@ -31,6 +31,9 @@ import { ImageLightbox } from "@/components/ImageLightbox";
 
 const CLASS_OPTIONS = ["Labor", "Equipment", "Materials", "Subcontracting"];
 
+// Plant categories always available even before any items use them
+const PLANT_CATEGORIES = ["TREE", "SHRUB", "Perennials", "Annuals"];
+
 const CLASS_ID_MAP: Record<string, number> = {
   Labor: 1,
   Equipment: 2,
@@ -131,6 +134,16 @@ export default function CatalogDetail() {
     queryKey: ["/api/class-pricing-defaults"],
     queryFn: () => apiRequest("GET", `/api/class-pricing-defaults`).then(r => r.json()),
   });
+
+  const { data: dbCategories = [] } = useQuery<string[]>({
+    queryKey: ["/api/catalog/categories"],
+    queryFn: () => apiRequest("GET", "/api/catalog/categories").then(r => r.json()),
+  });
+
+  // Merged, deduped, sorted category list — plant categories always present
+  const allCategories = Array.from(
+    new Set([...PLANT_CATEGORIES, ...dbCategories])
+  ).sort();
 
   // For name-uniqueness validation on freshly duplicated items
   const { data: allCatalogItems = [] } = useQuery<Array<{ id: number; name: string }>>({
@@ -529,14 +542,25 @@ export default function CatalogDetail() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="field-category">Category</Label>
-              <Input
-                id="field-category"
-                value={form.category ?? ""}
-                onChange={e => field("category", e.target.value || null)}
-                placeholder="e.g. Mulch, Pruning…"
-                data-testid="input-category"
-              />
+              <Label>Category</Label>
+              <Select
+                value={form.category ?? "none"}
+                onValueChange={v => field("category", v === "none" ? null : v)}
+              >
+                <SelectTrigger data-testid="select-category">
+                  <SelectValue placeholder="— None —" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— None —</SelectItem>
+                  {allCategories.map(c => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                  {/* If current value isn't in the list (legacy free-text), show it */}
+                  {form.category && !allCategories.includes(form.category) && (
+                    <SelectItem value={form.category}>{form.category}</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1.5">
