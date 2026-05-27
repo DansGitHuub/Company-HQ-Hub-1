@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Upload, Download, Plus } from "lucide-react";
+import { Search, Upload, Download } from "lucide-react";
 
 type Tag = { id: number; name: string };
 
@@ -29,21 +29,51 @@ type CatalogRow = {
 };
 
 const CLASS_TABS = ["All", "Labor", "Equipment", "Materials", "Subcontracting"];
+const SCROLL_KEY = "catalog:scroll";
+
+function readParams() {
+  const p = new URLSearchParams(window.location.search);
+  return {
+    tab:      CLASS_TABS.includes(p.get("tab") ?? "") ? (p.get("tab") as string) : "All",
+    cat:      p.get("cat") ?? "all",
+    q:        p.get("q") ?? "",
+    inactive: p.get("inactive") === "1",
+  };
+}
 
 export default function CatalogPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [search, setSearch] = useState("");
-  const [classTab, setClassTab] = useState("All");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [showInactive, setShowInactive] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const initial = useMemo(readParams, []);
 
+  const [classTab,        setClassTab]        = useState(initial.tab);
+  const [categoryFilter,  setCategoryFilter]  = useState(initial.cat);
+  const [search,          setSearch]          = useState(initial.q);
+  const [showInactive,    setShowInactive]    = useState(initial.inactive);
+  const [exporting,       setExporting]       = useState(false);
+
+  const scrollRestored = useRef(false);
+
+  // ── Sync filter state → URL (replaceState, not pushState) ──────────────────
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (classTab !== "All")  p.set("tab", classTab);
+    if (categoryFilter !== "all") p.set("cat", categoryFilter);
+    if (search)              p.set("q", search);
+    if (showInactive)        p.set("inactive", "1");
+    const qs = p.toString();
+    const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, "", newUrl);
+  }, [classTab, categoryFilter, search, showInactive]);
+
+  // ── Data ────────────────────────────────────────────────────────────────────
   const { data: items = [], isLoading } = useQuery<CatalogRow[]>({
     queryKey: ["/api/catalog", showInactive],
-    queryFn: () => apiRequest("GET", showInactive ? "/api/catalog?active_only=false" : "/api/catalog").then(r => r.json()),
+    queryFn: () =>
+      apiRequest("GET", showInactive ? "/api/catalog?active_only=false" : "/api/catalog")
+        .then(r => r.json()),
   });
 
   const toggleTaxableMut = useMutation({
@@ -86,6 +116,25 @@ export default function CatalogPage() {
     });
   }, [items, classTab, categoryFilter, search, showInactive]);
 
+  // ── Restore scroll after rows render ────────────────────────────────────────
+  useEffect(() => {
+    if (scrollRestored.current) return;
+    if (filtered.length === 0) return;
+    const saved = sessionStorage.getItem(SCROLL_KEY);
+    if (saved) {
+      sessionStorage.removeItem(SCROLL_KEY);
+      const y = parseInt(saved, 10);
+      if (!isNaN(y)) {
+        requestAnimationFrame(() => {
+          const el = document.getElementById("main-scroll-container");
+          if (el) el.scrollTop = y;
+        });
+      }
+    }
+    scrollRestored.current = true;
+  }, [filtered.length]);
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
   async function handleExport() {
     setExporting(true);
     try {
@@ -123,6 +172,14 @@ export default function CatalogPage() {
     return !isNaN(c) ? `$${c.toFixed(2)}` : "—";
   }
 
+  function handleRowClick(e: React.MouseEvent, itemId: number) {
+    if ((e.target as HTMLElement).closest('[role="switch"]')) return;
+    const el = document.getElementById("main-scroll-container");
+    sessionStorage.setItem(SCROLL_KEY, String(el ? el.scrollTop : 0));
+    navigate(`/catalog/${itemId}`);
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -214,10 +271,7 @@ export default function CatalogPage() {
                 <tr
                   key={item.id}
                   className={`border-b hover:bg-muted/30 transition-colors cursor-pointer ${!item.is_active ? "opacity-50" : ""}`}
-                  onClick={e => {
-                    if ((e.target as HTMLElement).closest('[role="switch"]')) return;
-                    navigate(`/catalog/${item.id}`);
-                  }}
+                  onClick={e => handleRowClick(e, item.id)}
                   data-testid={`row-catalog-${item.id}`}
                 >
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground" data-testid={`text-itemnum-${item.id}`}>

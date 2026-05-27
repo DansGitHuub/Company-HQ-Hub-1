@@ -946,6 +946,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Dynamic Content Container */}
         <main 
           ref={contentRef}
+          id="main-scroll-container"
           className="flex-1 overflow-y-auto bg-muted/5 p-4 lg:p-8 relative"
         >
           {children}
