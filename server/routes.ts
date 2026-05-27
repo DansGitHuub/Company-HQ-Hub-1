@@ -47,6 +47,7 @@ import { registerMorsRoutes } from "./morsRoutes";
 import { registerCatalogRoutes } from "./catalogRoutes";
 import { registerMessagesRoutes } from "./messagesRoutes";
 import { registerDirectMessageRoutes } from "./directMessageRoutes";
+import { registerPlantCardRoutes } from "./plantCardRoutes";
 import { searchProductImages } from "./imageSearchService";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail, sendApplicationLinkEmail } from "./email";
 import { logActivity } from "./activityLogger";
@@ -107,6 +108,7 @@ export async function registerRoutes(
   registerCatalogRoutes(app, requireAuth);
   registerMessagesRoutes(app, requireAuth);
   registerDirectMessageRoutes(app, requireAuth);
+  registerPlantCardRoutes(app, requireAuth, requireAdmin);
 
   // Global search endpoint - searches everything based on user role
   app.get("/api/search", requireAuth, async (req, res) => {

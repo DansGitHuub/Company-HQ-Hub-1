@@ -53,6 +53,7 @@ import {
   Clock,
   DollarSign,
   MessageSquare,
+  Leaf,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -398,6 +399,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   time_card_approval: { icon: CheckSquare, label: t("nav.timeCardApproval"), href: "/admin/time-card-approval" },
     time_admin: { icon: Clock, label: t("nav.timeAdmin"), href: "/admin/time" },
     catalog: { icon: BookMarked, label: t("nav.catalog"), href: "/catalog" },
+    plant_cards: { icon: Leaf, label: "Plant Library", href: "/plant-cards" },
     budget_settings: { icon: DollarSign, label: t("nav.budgetPricing"), href: "/budget-settings" },
     tools: { icon: Snowflake, label: t("nav.tools"), href: "/tools" },
   plow_mapper: { icon: Snowflake, label: t("nav.plowMapper"), href: "/tools/plow-mapper" },
@@ -418,7 +420,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["todos", "scheduling", "time_tracking", "equipment", "forms"] },
     { label: "RESOURCES", items: ["sops", "education", "testing"] },
-    { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "time_admin", "mors_budget", "catalog", "tools"] },
+    { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "time_admin", "mors_budget", "catalog", "plant_cards", "tools"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {

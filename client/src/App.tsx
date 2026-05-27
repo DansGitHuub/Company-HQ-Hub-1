@@ -132,6 +132,7 @@ import NotificationsPage from "@/pages/Notifications";
 import CatalogPage from "@/pages/catalog/index";
 import CatalogImport from "@/pages/catalog/CatalogImport";
 import CatalogDetail from "@/pages/catalog/CatalogDetail";
+import PlantCards from "@/pages/PlantCards";
 import CustomerPortal from "@/pages/CustomerPortal";
 import PortalCustomerRedeem from "@/pages/PortalCustomerRedeem";
 import PortalCrewRedeem from "@/pages/PortalCrewRedeem";
@@ -301,6 +302,7 @@ function AppRoutes() {
         <Route path="/catalog/import" component={CatalogImport} />
         <Route path="/catalog/:id" component={CatalogDetail} />
         <Route path="/catalog" component={CatalogPage} />
+        <Route path="/plant-cards" component={PlantCards} />
         <Route path="/route" component={RoutePage} />
         <Route component={NotFound} />
       </Switch>

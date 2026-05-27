@@ -820,16 +820,132 @@ function RequestDocumentDialog({ open, onClose, onSubmit, isPending }: {
   );
 }
 
+function PlantCardMini({ card, onClick }: { card: any; onClick: () => void }) {
+  const photo = card.photos?.[0] ?? null;
+  return (
+    <Card
+      className="cursor-pointer hover:shadow-md transition-shadow"
+      onClick={onClick}
+      data-testid={`card-plant-${card.id}`}
+    >
+      <CardContent className="p-0 overflow-hidden">
+        {photo && (
+          <img src={photo} alt={card.common_name} className="w-full h-32 object-cover" />
+        )}
+        <div className="p-3">
+          <div className="flex flex-wrap gap-1 mb-1.5">
+            {card.plant_type && (
+              <Badge className="text-xs bg-green-100 text-green-700 border-green-200">{card.plant_type}</Badge>
+            )}
+            {card.light_requirement && (
+              <Badge variant="outline" className="text-xs">{card.light_requirement}</Badge>
+            )}
+          </div>
+          <h3 className="font-semibold text-sm" style={{ color: brandColors.darkGreen }}>{card.common_name}</h3>
+          {card.botanical_name && (
+            <p className="text-xs text-muted-foreground italic mt-0.5">{card.botanical_name}</p>
+          )}
+          {card.mature_size && (
+            <p className="text-xs text-gray-500 mt-1">🌳 {card.mature_size}</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PlantCardDetail_Hub({ card, onBack }: { card: any; onBack: () => void }) {
+  return (
+    <div className="max-w-3xl mx-auto space-y-4" data-testid="plant-card-hub-detail">
+      <button onClick={onBack} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+        <ArrowLeft className="h-4 w-4" /> Back to Care Library
+      </button>
+
+      <div className="bg-gradient-to-r from-green-800 to-green-600 text-white rounded-xl px-6 py-5">
+        <h2 className="text-2xl font-bold">{card.common_name}</h2>
+        {card.botanical_name && <p className="italic text-green-200 mt-0.5">{card.botanical_name}</p>}
+        <div className="flex flex-wrap gap-2 mt-3">
+          {card.plant_type && <Badge className="bg-white/20 text-white border-white/30">{card.plant_type}</Badge>}
+          {card.deciduous_evergreen && <Badge className="bg-white/20 text-white border-white/30">{card.deciduous_evergreen}</Badge>}
+          {card.flowering && <Badge className="bg-white/20 text-white border-white/30">🌸 Flowering</Badge>}
+          {card.deer_resistant && <Badge className="bg-white/20 text-white border-white/30">🦌 Deer Resistant</Badge>}
+        </div>
+      </div>
+
+      {/* Quick facts */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {[
+          { label: "Mature Size", val: card.mature_size },
+          { label: "Hardiness Zone", val: card.hardiness_zone },
+          { label: "Light", val: card.light_requirement },
+          { label: "Water Needs", val: card.water_needs },
+          { label: "Soil", val: card.soil_moisture },
+          { label: "Growth Rate", val: card.growth_rate },
+          { label: "Pruning", val: card.pruning_time },
+          { label: "Flower Season", val: card.flowering && card.flower_season ? `${card.flower_season}${card.flower_color ? ` · ${card.flower_color}` : ""}` : null },
+        ].filter(f => f.val).map(({ label, val }) => (
+          <div key={label} className="bg-gray-50 rounded-lg p-3">
+            <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">{label}</div>
+            <div className="text-sm font-medium">{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {card.special_notes && (
+        <div className="bg-green-50 border border-green-100 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-green-800 mb-1 flex items-center gap-1.5"><Leaf className="w-4 h-4" /> About This Plant</h4>
+          <p className="text-sm text-gray-700 leading-relaxed">{card.special_notes}</p>
+        </div>
+      )}
+
+      {card.maintenance_notes && (
+        <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-amber-800 mb-1">✂️ Maintenance Tips</h4>
+          <p className="text-sm text-gray-700 leading-relaxed">{card.maintenance_notes}</p>
+        </div>
+      )}
+
+      {card.known_pests_issues && (
+        <div className="bg-red-50 border border-red-100 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-red-800 mb-1">🐛 Known Pests & Issues</h4>
+          <p className="text-sm text-gray-700 leading-relaxed">{card.known_pests_issues}</p>
+        </div>
+      )}
+
+      {/* Photos */}
+      {card.photos?.length > 0 && (
+        <div>
+          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Photos</h4>
+          <div className="grid grid-cols-3 gap-2">
+            {card.photos.map((url: string, i: number) => (
+              <img key={i} src={url} alt={`${card.common_name} ${i + 1}`} className="w-full aspect-square object-cover rounded-lg border" />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CareLibrarySection({ onSelectGuide }: { onSelectGuide: (id: string) => void }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
-  const [tab, setTab] = useState<"all" | "saved">("all");
+  const [tab, setTab] = useState<"all" | "saved" | "plants">("all");
+  const [plantTypeFilter, setPlantTypeFilter] = useState("all");
+  const [selectedPlant, setSelectedPlant] = useState<any | null>(null);
 
   const { data: guides = [], isLoading } = useQuery({
     queryKey: ["/api/customer-hub/care-guides"],
     queryFn: async () => (await apiRequest("GET", "/api/customer-hub/care-guides")).json(),
   });
+
+  const { data: plantCards = [], isLoading: plantsLoading } = useQuery({
+    queryKey: ["/api/plant-cards"],
+    queryFn: async () => (await apiRequest("GET", "/api/plant-cards")).json(),
+  });
+
+  const PLANT_TYPES_HUB = ["Tree", "Shrub", "Perennial", "Annual", "Groundcover", "Vine", "Grass", "Other"];
 
   const filtered = guides.filter((g: any) => {
     if (tab === "saved" && !g.isSaved) return false;
@@ -838,51 +954,104 @@ function CareLibrarySection({ onSelectGuide }: { onSelectGuide: (id: string) => 
     return true;
   });
 
+  const filteredPlants = (plantCards as any[]).filter((c: any) => {
+    if (plantTypeFilter !== "all" && c.plant_type !== plantTypeFilter) return false;
+    if (search && !c.common_name.toLowerCase().includes(search.toLowerCase()) && !(c.botanical_name ?? "").toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  // Plant detail view
+  if (selectedPlant) {
+    return <PlantCardDetail_Hub card={selectedPlant} onBack={() => setSelectedPlant(null)} />;
+  }
+
   return (
     <div className="space-y-4 max-w-3xl mx-auto" data-testid="care-library-section">
       <h2 className="text-xl font-bold" style={{ color: brandColors.darkGreen }}>Care Library</h2>
 
-      <Tabs value={tab} onValueChange={v => setTab(v as "all" | "saved")}>
+      <Tabs value={tab} onValueChange={v => { setTab(v as any); setSearch(""); }}>
         <TabsList>
-          <TabsTrigger value="all">All Guides</TabsTrigger>
-          <TabsTrigger value="saved">My Guides</TabsTrigger>
+          <TabsTrigger value="all" data-testid="tab-all-guides">All Guides</TabsTrigger>
+          <TabsTrigger value="saved" data-testid="tab-saved-guides">My Guides</TabsTrigger>
+          <TabsTrigger value="plants" data-testid="tab-plant-cards">
+            <Leaf className="w-3.5 h-3.5 mr-1" />
+            Plant Library
+            {(plantCards as any[]).length > 0 && (
+              <span className="ml-1.5 bg-green-100 text-green-700 text-xs rounded-full px-1.5 py-0.5 font-medium">
+                {(plantCards as any[]).length}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
+      {/* Search + filter row */}
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search care guides..."
+            placeholder={tab === "plants" ? "Search plants…" : "Search care guides..."}
             className="pl-9"
             data-testid="input-search-guides"
           />
         </div>
-        <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="w-48" data-testid="select-guide-category"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {CARE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {tab !== "plants" ? (
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="w-48" data-testid="select-guide-category"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {CARE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Select value={plantTypeFilter} onValueChange={setPlantTypeFilter}>
+            <SelectTrigger className="w-44" data-testid="select-plant-type-hub"><SelectValue placeholder="All Types" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {PLANT_TYPES_HUB.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
-      {isLoading ? (
-        <div className="grid md:grid-cols-2 gap-3">{[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-gray-200 rounded animate-pulse" />)}</div>
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={BookOpen}
-          title={tab === "saved" ? "No saved guides" : "No guides found"}
-          description={tab === "saved" ? "Bookmark guides to save them here for quick access." : "Try adjusting your search or category filter."}
-        />
-      ) : (
-        <div className="grid md:grid-cols-2 gap-3">
-          {filtered.map((guide: any) => (
-            <GuideCard key={guide.id} guide={guide} onClick={() => onSelectGuide(guide.id)} />
-          ))}
-        </div>
+      {/* Guides tab */}
+      {tab !== "plants" && (
+        isLoading ? (
+          <div className="grid md:grid-cols-2 gap-3">{[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-gray-200 rounded animate-pulse" />)}</div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={BookOpen}
+            title={tab === "saved" ? "No saved guides" : "No guides found"}
+            description={tab === "saved" ? "Bookmark guides to save them here for quick access." : "Try adjusting your search or category filter."}
+          />
+        ) : (
+          <div className="grid md:grid-cols-2 gap-3">
+            {filtered.map((guide: any) => (
+              <GuideCard key={guide.id} guide={guide} onClick={() => onSelectGuide(guide.id)} />
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Plant Cards tab */}
+      {tab === "plants" && (
+        plantsLoading ? (
+          <div className="grid sm:grid-cols-2 gap-3">{[1, 2, 3, 4].map(i => <div key={i} className="h-40 bg-gray-200 rounded-lg animate-pulse" />)}</div>
+        ) : filteredPlants.length === 0 ? (
+          <EmptyState
+            icon={Leaf}
+            title={(plantCards as any[]).length === 0 ? "No plant cards yet" : "No matches"}
+            description={(plantCards as any[]).length === 0 ? "Plant care cards will appear here once they're added." : "Try adjusting your search or type filter."}
+          />
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-3">
+            {filteredPlants.map((card: any) => (
+              <PlantCardMini key={card.id} card={card} onClick={() => setSelectedPlant(card)} />
+            ))}
+          </div>
+        )
       )}
     </div>
   );
