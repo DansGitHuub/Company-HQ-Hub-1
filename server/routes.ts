@@ -6968,6 +6968,55 @@ SECTION GENERATION RULES:
     }
   });
 
+  // ── Generic file upload → object storage ─────────────────────────────────
+  // Used by Education / Customer Resource Center when attaching PDFs/docs.
+  const resourceUpload = multerImport({ storage: multerImport.memoryStorage() }).single("file");
+  app.post("/api/upload", requireAdmin, async (req: any, res) => {
+    await new Promise<void>((resolve, reject) =>
+      resourceUpload(req, res, (err: any) => (err ? reject(err) : resolve()))
+    );
+    if (!req.file) return res.status(400).json({ message: "No file provided" });
+
+    const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+    if (!privateDir) return res.status(500).json({ message: "Object storage not configured" });
+
+    try {
+      const ext = (req.file.originalname.split(".").pop() || "bin").toLowerCase();
+      const fileId = crypto.randomUUID();
+      const objectPath = `${privateDir}/resources/${fileId}.${ext}`;
+      const parts = (objectPath.startsWith("/") ? objectPath.slice(1) : objectPath).split("/");
+      const bucketName = parts[0];
+      const objectName = parts.slice(1).join("/");
+
+      const SIDECAR = "http://127.0.0.1:1106";
+      const signRes = await fetch(`${SIDECAR}/object-storage/signed-object-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bucket_name: bucketName,
+          object_name: objectName,
+          method: "PUT",
+          expires_at: new Date(Date.now() + 900_000).toISOString(),
+        }),
+      });
+      if (!signRes.ok) return res.status(500).json({ message: "Failed to get upload URL from storage" });
+      const { signed_url } = await signRes.json() as { signed_url: string };
+
+      const putRes = await fetch(signed_url, {
+        method: "PUT",
+        headers: { "Content-Type": req.file.mimetype },
+        body: req.file.buffer,
+      });
+      if (!putRes.ok) return res.status(500).json({ message: "Failed to upload file to storage" });
+
+      const url = `/objects/resources/${fileId}.${ext}`;
+      res.json({ url, fileName: req.file.originalname });
+    } catch (err: any) {
+      console.error("[api/upload]", err.message);
+      res.status(500).json({ message: "Upload failed" });
+    }
+  });
+
   // Customer Resources routes
   app.get("/api/resources", requireAuth, async (req, res) => {
     try {
