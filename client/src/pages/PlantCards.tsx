@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   Leaf, Search, Plus, Sparkles, Sun, Droplets, Ruler, Thermometer,
   Scissors, Bug, Star, Edit, Trash2, Upload, X, Eye, EyeOff,
-  Printer, ArrowLeft, Image as ImageIcon, ChevronRight
+  Printer, ArrowLeft, Image as ImageIcon, ChevronRight, Check, Pencil
 } from "lucide-react";
 import { ImageLightbox } from "@/components/ImageLightbox";
 
@@ -79,6 +79,114 @@ function boolBadge(v: boolean, yes: string, no: string) {
     : <Badge variant="outline" className="text-muted-foreground">{no}</Badge>;
 }
 
+// ── Inline edit helpers ───────────────────────────────────────────────────────
+function InlineText({ value, onSave, placeholder, isAdmin, testId }: {
+  value: string; onSave: (v: string) => void; placeholder?: string; isAdmin: boolean; testId?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  useEffect(() => { setDraft(value); }, [value]);
+  if (!isAdmin) return <span>{value || <span className="text-muted-foreground/50 italic">—</span>}</span>;
+  if (editing) return (
+    <span className="flex items-center gap-1">
+      <input
+        ref={inputRef}
+        className="border rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white w-full"
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") { onSave(draft); setEditing(false); } if (e.key === "Escape") { setDraft(value); setEditing(false); } }}
+        onBlur={() => { onSave(draft); setEditing(false); }}
+        placeholder={placeholder}
+        data-testid={testId}
+      />
+    </span>
+  );
+  return (
+    <span className="group flex items-center gap-1 cursor-pointer" onClick={() => setEditing(true)}>
+      <span>{value || <span className="text-muted-foreground/50 italic">Click to add…</span>}</span>
+      <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
+    </span>
+  );
+}
+
+function InlineTextArea({ value, onSave, placeholder, isAdmin, testId }: {
+  value: string; onSave: (v: string) => void; placeholder?: string; isAdmin: boolean; testId?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+  useEffect(() => { setDraft(value); }, [value]);
+  if (!isAdmin) return <p className="text-sm leading-relaxed text-gray-700">{value || "—"}</p>;
+  if (editing) return (
+    <div className="flex flex-col gap-1">
+      <textarea
+        ref={ref}
+        className="w-full border rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[80px] bg-white"
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === "Escape") { setDraft(value); setEditing(false); } }}
+        placeholder={placeholder}
+        data-testid={testId}
+      />
+      <div className="flex gap-1">
+        <button className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700" onClick={() => { onSave(draft); setEditing(false); }}>
+          <Check className="w-3 h-3 inline mr-0.5" />Save
+        </button>
+        <button className="text-xs px-2 py-1 border rounded hover:bg-gray-50" onClick={() => { setDraft(value); setEditing(false); }}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+  return (
+    <div className="group relative cursor-pointer" onClick={() => setEditing(true)}>
+      <p className="text-sm leading-relaxed text-gray-700 pr-6">
+        {value || <span className="text-muted-foreground/50 italic">Click to add…</span>}
+      </p>
+      <Pencil className="w-3 h-3 text-muted-foreground absolute top-0.5 right-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+    </div>
+  );
+}
+
+function InlineSelect({ value, options, onSave, placeholder, isAdmin }: {
+  value: string; options: string[]; onSave: (v: string) => void; placeholder?: string; isAdmin: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  useEffect(() => { if (!editing) return; }, [editing]);
+  if (!isAdmin) return <span>{value || "—"}</span>;
+  if (editing) return (
+    <Select value={value || ""} onValueChange={v => { onSave(v); setEditing(false); }}>
+      <SelectTrigger className="h-7 text-sm" onBlur={() => setEditing(false)}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+  return (
+    <span className="group flex items-center gap-1 cursor-pointer" onClick={() => setEditing(true)}>
+      <span>{value || <span className="text-muted-foreground/50 italic">Click to set…</span>}</span>
+      <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
+    </span>
+  );
+}
+
+function InlineBool({ value, label, onToggle, isAdmin }: {
+  value: boolean; label: string; onToggle: () => void; isAdmin: boolean;
+}) {
+  if (!isAdmin) return value ? <Badge className="bg-green-100 text-green-800 border-green-200">{label}</Badge> : null;
+  return (
+    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+      <Switch checked={value} onCheckedChange={onToggle} />
+      <span className="text-sm text-white/90">{label}</span>
+    </label>
+  );
+}
+
 // ── Card Detail View ──────────────────────────────────────────────────────────
 function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
   card: PlantCard; onBack: () => void; isAdmin: boolean; onEdit: () => void;
@@ -88,6 +196,45 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
   const fileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Build the full payload for PUT (merges one field at a time)
+  function cardPayload(overrides: Partial<PlantCard>) {
+    const c = { ...card, ...overrides };
+    return {
+      commonName: c.common_name,
+      botanicalName: c.botanical_name || null,
+      plantType: c.plant_type || null,
+      deciduousEvergreen: c.deciduous_evergreen || null,
+      matureSize: c.mature_size || null,
+      growthRate: c.growth_rate || null,
+      hardinessZone: c.hardiness_zone || null,
+      lightRequirement: c.light_requirement || null,
+      soilMoisture: c.soil_moisture || null,
+      waterNeeds: c.water_needs || null,
+      deerResistant: c.deer_resistant ?? false,
+      flowering: c.flowering ?? false,
+      flowerSeason: c.flower_season || null,
+      flowerColor: c.flower_color || null,
+      pruningTime: c.pruning_time || null,
+      knownPestsIssues: c.known_pests_issues || null,
+      specialNotes: c.special_notes || null,
+      maintenanceNotes: c.maintenance_notes || null,
+      photos: c.photos ?? [],
+      published: c.published ?? true,
+    };
+  }
+
+  const patchCard = useMutation({
+    mutationFn: async (overrides: Partial<PlantCard>) => {
+      await apiRequest("PUT", `/api/plant-cards/${card.id}`, cardPayload(overrides));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/plant-cards/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/plant-cards"] });
+      toast({ title: "Saved", description: "Field updated successfully." });
+    },
+    onError: () => toast({ title: "Save failed", variant: "destructive" }),
+  });
 
   const uploadPhoto = useMutation({
     mutationFn: async (file: File) => {
@@ -136,6 +283,8 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
   const photos: string[] = card.photos ?? [];
   const coverPhoto = photos[0] ?? null;
 
+  function patch(overrides: Partial<PlantCard>) { patchCard.mutate(overrides); }
+
   return (
     <div className="max-w-4xl mx-auto" data-testid="plant-card-detail">
       {/* Back bar */}
@@ -143,15 +292,15 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
         <Button variant="ghost" size="sm" onClick={onBack} data-testid="btn-back-plant-cards">
           <ArrowLeft className="w-4 h-4 mr-1" /> All Plants
         </Button>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <span className="text-xs text-muted-foreground bg-green-50 border border-green-200 rounded px-2 py-1">
+              <Pencil className="w-3 h-3 inline mr-1 text-green-600" />Click any field to edit inline
+            </span>
+          )}
           <Button variant="outline" size="sm" onClick={() => window.print()} data-testid="btn-print-plant-card">
             <Printer className="w-4 h-4 mr-1" /> Print
           </Button>
-          {isAdmin && (
-            <Button size="sm" onClick={onEdit} data-testid="btn-edit-plant-card">
-              <Edit className="w-4 h-4 mr-1" /> Edit
-            </Button>
-          )}
         </div>
       </div>
 
@@ -160,18 +309,59 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
         {/* Header band */}
         <div className="bg-gradient-to-r from-green-800 to-green-600 text-white px-8 py-6 print:px-6 print:py-4">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
+            <div className="flex-1 space-y-1">
+              {/* Common name */}
               <h1 className="text-3xl font-bold tracking-tight print:text-2xl" data-testid="plant-card-common-name">
-                {card.common_name}
+                {isAdmin ? (
+                  <span className="group flex items-center gap-2">
+                    <EditableHeader
+                      value={card.common_name}
+                      onSave={v => patch({ common_name: v })}
+                      className="text-3xl font-bold bg-transparent border-0 border-b border-white/30 focus:border-white text-white placeholder-white/50 outline-none w-full"
+                    />
+                  </span>
+                ) : card.common_name}
               </h1>
-              {card.botanical_name && (
-                <p className="italic text-green-200 text-lg mt-0.5">{card.botanical_name}</p>
-              )}
-              <div className="flex flex-wrap gap-2 mt-3">
-                {card.plant_type && <Badge className="bg-white/20 text-white border-white/30">{card.plant_type}</Badge>}
-                {card.deciduous_evergreen && <Badge className="bg-white/20 text-white border-white/30">{card.deciduous_evergreen}</Badge>}
-                {card.flowering && boolBadge(true, "🌸 Flowering", "")}
-                {card.deer_resistant && boolBadge(true, "🦌 Deer Resistant", "")}
+              {/* Botanical name */}
+              <p className="italic text-green-200 text-lg mt-0.5">
+                {isAdmin ? (
+                  <EditableHeader
+                    value={card.botanical_name ?? ""}
+                    onSave={v => patch({ botanical_name: v })}
+                    placeholder="Botanical name…"
+                    className="italic text-green-200 bg-transparent border-0 border-b border-white/20 focus:border-white/60 outline-none w-full placeholder-white/30 text-lg"
+                  />
+                ) : card.botanical_name}
+              </p>
+              {/* Badges row */}
+              <div className="flex flex-wrap gap-2 mt-3 items-center">
+                {isAdmin ? (
+                  <>
+                    <InlineSelect
+                      value={card.plant_type ?? ""}
+                      options={PLANT_TYPES}
+                      onSave={v => patch({ plant_type: v })}
+                      placeholder="Type…"
+                      isAdmin={isAdmin}
+                    />
+                    <InlineSelect
+                      value={card.deciduous_evergreen ?? ""}
+                      options={["Deciduous", "Evergreen", "Semi-Evergreen"]}
+                      onSave={v => patch({ deciduous_evergreen: v })}
+                      placeholder="Dec/Evg…"
+                      isAdmin={isAdmin}
+                    />
+                    <InlineBool value={card.flowering} label="🌸 Flowering" onToggle={() => patch({ flowering: !card.flowering })} isAdmin={isAdmin} />
+                    <InlineBool value={card.deer_resistant} label="🦌 Deer Resistant" onToggle={() => patch({ deer_resistant: !card.deer_resistant })} isAdmin={isAdmin} />
+                  </>
+                ) : (
+                  <>
+                    {card.plant_type && <Badge className="bg-white/20 text-white border-white/30">{card.plant_type}</Badge>}
+                    {card.deciduous_evergreen && <Badge className="bg-white/20 text-white border-white/30">{card.deciduous_evergreen}</Badge>}
+                    {card.flowering && <Badge className="bg-green-100 text-green-800 border-green-200">🌸 Flowering</Badge>}
+                    {card.deer_resistant && <Badge className="bg-green-100 text-green-800 border-green-200">🦌 Deer Resistant</Badge>}
+                  </>
+                )}
               </div>
             </div>
             {coverPhoto && (
@@ -186,56 +376,82 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
         </div>
 
         <div className="p-8 print:p-6 space-y-6">
-          {/* Quick-facts grid */}
+          {/* Quick-facts grid — all inline-editable */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {[
-              { icon: Ruler, label: "Mature Size", val: card.mature_size },
-              { icon: Thermometer, label: "Hardiness Zone", val: card.hardiness_zone },
-              { icon: Sun, label: "Light", val: card.light_requirement },
-              { icon: Droplets, label: "Water Needs", val: card.water_needs },
-              { icon: Leaf, label: "Soil", val: card.soil_moisture },
-              { icon: ChevronRight, label: "Growth Rate", val: card.growth_rate },
-              { icon: Scissors, label: "Pruning", val: card.pruning_time },
-              { icon: Star, label: "Flower Season", val: card.flowering && card.flower_season ? `${card.flower_season}${card.flower_color ? ` · ${card.flower_color}` : ""}` : null },
-            ].filter(f => f.val).map(({ icon: Icon, label, val }) => (
+              { icon: Ruler, label: "Mature Size", field: "mature_size" as keyof PlantCard, type: "text", val: card.mature_size, placeholder: "e.g. 20-30 ft tall" },
+              { icon: Thermometer, label: "Hardiness Zone", field: "hardiness_zone" as keyof PlantCard, type: "text", val: card.hardiness_zone, placeholder: "e.g. 4-8" },
+              { icon: Sun, label: "Light", field: "light_requirement" as keyof PlantCard, type: "select", options: ["Full Sun", "Part Sun", "Part Shade", "Full Shade", "Adaptable"], val: card.light_requirement },
+              { icon: Droplets, label: "Water Needs", field: "water_needs" as keyof PlantCard, type: "select", options: ["Low", "Moderate", "High"], val: card.water_needs },
+              { icon: Leaf, label: "Soil", field: "soil_moisture" as keyof PlantCard, type: "text", val: card.soil_moisture, placeholder: "e.g. Well-drained" },
+              { icon: ChevronRight, label: "Growth Rate", field: "growth_rate" as keyof PlantCard, type: "select", options: ["Slow", "Moderate", "Fast"], val: card.growth_rate },
+              { icon: Scissors, label: "Pruning", field: "pruning_time" as keyof PlantCard, type: "text", val: card.pruning_time, placeholder: "e.g. Late winter" },
+              { icon: Star, label: "Flower Season", field: "flower_season" as keyof PlantCard, type: "text", val: card.flower_season, placeholder: "e.g. May-June" },
+              { icon: Star, label: "Flower Color", field: "flower_color" as keyof PlantCard, type: "text", val: card.flower_color, placeholder: "e.g. White" },
+            ].filter(f => f.val || isAdmin).map(({ icon: Icon, label, field, type, val, options, placeholder }: any) => (
               <div key={label} className="bg-gray-50 rounded-lg p-3 flex flex-col gap-1 print:bg-gray-100">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium uppercase tracking-wide">
                   <Icon className="w-3.5 h-3.5" /> {label}
                 </div>
-                <div className="text-sm font-medium">{val}</div>
+                <div className="text-sm font-medium">
+                  {type === "select"
+                    ? <InlineSelect value={val ?? ""} options={options} onSave={v => patch({ [field]: v } as any)} isAdmin={isAdmin} />
+                    : <InlineText value={val ?? ""} onSave={v => patch({ [field]: v } as any)} placeholder={placeholder} isAdmin={isAdmin} />
+                  }
+                </div>
               </div>
             ))}
           </div>
 
-          {/* Special Notes */}
-          {card.special_notes && (
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-                <Leaf className="w-4 h-4" /> About This Plant
-              </h3>
-              <p className="text-sm leading-relaxed text-gray-700">{card.special_notes}</p>
+          {/* Published toggle — admin only */}
+          {isAdmin && (
+            <div className="flex items-center gap-2 py-1 border-t pt-4">
+              <Switch checked={card.published} onCheckedChange={v => patch({ published: v })} />
+              <span className="text-sm">{card.published ? "Published — visible to all users" : "Draft — hidden from non-admins"}</span>
             </div>
           )}
+
+          {/* Special Notes */}
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+              <Leaf className="w-4 h-4" /> About This Plant
+            </h3>
+            <InlineTextArea
+              value={card.special_notes ?? ""}
+              onSave={v => patch({ special_notes: v })}
+              placeholder="Notable features, landscape uses…"
+              isAdmin={isAdmin}
+              testId="textarea-special-notes-inline"
+            />
+          </div>
 
           {/* Maintenance Notes */}
-          {card.maintenance_notes && (
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-                <Scissors className="w-4 h-4" /> Maintenance Tips
-              </h3>
-              <p className="text-sm leading-relaxed text-gray-700">{card.maintenance_notes}</p>
-            </div>
-          )}
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+              <Scissors className="w-4 h-4" /> Maintenance Tips
+            </h3>
+            <InlineTextArea
+              value={card.maintenance_notes ?? ""}
+              onSave={v => patch({ maintenance_notes: v })}
+              placeholder="Practical tips for the crew…"
+              isAdmin={isAdmin}
+              testId="textarea-maintenance-inline"
+            />
+          </div>
 
           {/* Pests / Issues */}
-          {card.known_pests_issues && (
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-                <Bug className="w-4 h-4" /> Known Pests & Issues
-              </h3>
-              <p className="text-sm leading-relaxed text-gray-700">{card.known_pests_issues}</p>
-            </div>
-          )}
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+              <Bug className="w-4 h-4" /> Known Pests & Issues
+            </h3>
+            <InlineTextArea
+              value={card.known_pests_issues ?? ""}
+              onSave={v => patch({ known_pests_issues: v })}
+              placeholder="e.g. Aphids, scale insects…"
+              isAdmin={isAdmin}
+              testId="textarea-pests-inline"
+            />
+          </div>
 
           {/* Photo gallery */}
           {(photos.length > 0 || isAdmin) && (
@@ -311,6 +527,24 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
 
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
+  );
+}
+
+// Simple editable header that renders as a styled input
+function EditableHeader({ value, onSave, placeholder, className }: {
+  value: string; onSave: (v: string) => void; placeholder?: string; className?: string;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => { setDraft(value); }, [value]);
+  return (
+    <input
+      className={className}
+      value={draft}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={() => { if (draft !== value) onSave(draft); }}
+      onKeyDown={e => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } }}
+      placeholder={placeholder}
+    />
   );
 }
 

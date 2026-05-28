@@ -268,8 +268,8 @@ Return this exact JSON (fill every field; null for truly unknown):
 
         let photoUrl: string;
         try {
-          const storageKey = await uploadToObjectStorage(req.file.buffer, req.file.mimetype, key);
-          photoUrl = `/api/object-storage${storageKey}`;
+          // storageKey is already the serving path, e.g. /objects/plant-cards/...
+          photoUrl = await uploadToObjectStorage(req.file.buffer, req.file.mimetype, key);
         } catch (storageErr) {
           // If object storage isn't configured, fall back gracefully
           console.warn("[plant-cards] object storage unavailable, photo not saved:", storageErr);
