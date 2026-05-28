@@ -243,6 +243,14 @@ const errorCodeRegistry: Record<string, ErrorCodeEntry> = {
     feature: "ai_agents",
   },
 
+  "AI-003": {
+    code: "AI-003",
+    description: "Plant card AI generation failed.",
+    fix: "The AI service may be temporarily unavailable or the API key may need to be refreshed. Try again in a moment.",
+    severity: "error",
+    feature: "plant_cards",
+  },
+
   "CAL-001": {
     code: "CAL-001",
     description: "Calendar connection failed.",

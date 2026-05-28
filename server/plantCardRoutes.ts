@@ -5,7 +5,10 @@ import multer from "multer";
 
 let _openai: OpenAI | null = null;
 function getOpenAI(): OpenAI {
-  if (!_openai) _openai = new OpenAI({ apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY });
+  if (!_openai) _openai = new OpenAI({
+    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  });
   return _openai;
 }
 const upload = multer({ storage: multer.memoryStorage() });
@@ -168,7 +171,7 @@ Return this exact JSON (fill every field; null for truly unknown):
       const data = JSON.parse(completion.choices[0].message.content || "{}");
       res.json(data);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: err.message, errorCode: "AI-003" });
     }
   });
 

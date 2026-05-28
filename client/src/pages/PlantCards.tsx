@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { showErrorToast } from "@/lib/errorToast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -391,7 +392,19 @@ function PlantCardForm({ initial, onSave, onCancel, isNew }: {
       }));
       toast({ title: "AI card generated — review and save" });
     } catch (err: any) {
-      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
+      showErrorToast(err, "AI Generation Failed");
+      // Log to diagnostics so admins can see it in the panel
+      fetch("/api/diagnostics/log-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          errorType: "ai_generation_error",
+          errorMessage: err?.serverMessage || err?.message || "Plant card AI generation failed",
+          feature: "plant_cards",
+          severity: "error",
+        }),
+      }).catch(() => {});
     } finally {
       setGenerating(false);
     }
