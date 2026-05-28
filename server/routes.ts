@@ -6970,8 +6970,9 @@ SECTION GENERATION RULES:
 
   // ── Generic file upload → object storage ─────────────────────────────────
   // Used by Education / Customer Resource Center when attaching PDFs/docs.
-  const resourceUpload = multerImport({ storage: multerImport.memoryStorage() }).single("file");
   app.post("/api/upload", requireAdmin, async (req: any, res) => {
+    const multer = (await import("multer")).default;
+    const resourceUpload = multer({ storage: multer.memoryStorage() }).single("file");
     await new Promise<void>((resolve, reject) =>
       resourceUpload(req, res, (err: any) => (err ? reject(err) : resolve()))
     );
