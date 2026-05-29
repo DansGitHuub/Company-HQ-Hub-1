@@ -7021,7 +7021,7 @@ SECTION GENERATION RULES:
   // Customer Resources routes
   app.get("/api/resources", requireAuth, async (req, res) => {
     try {
-      const type = String(req.query.type) as string | undefined;
+      const type = req.query.type ? String(req.query.type) : undefined;
       const resources = await storage.getCustomerResources(type);
       const isAdmin = req.user!.role === "Admin" || req.user!.role === "Manager";
       const filteredResources = isAdmin ? resources : resources.filter(r => r.isPublished);
