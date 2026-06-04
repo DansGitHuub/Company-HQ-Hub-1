@@ -589,6 +589,7 @@ function PlantCardForm({ initial, onSave, onCancel, isNew }: {
 }) {
   const [form, setForm] = useState({ ...EMPTY_FORM, ...initial });
   const [generating, setGenerating] = useState(false);
+  const [aiHasFilled, setAiHasFilled] = useState(!isNew);
   const { toast } = useToast();
 
   function f(key: string, val: any) { setForm(prev => ({ ...prev, [key]: val })); }
@@ -624,6 +625,7 @@ function PlantCardForm({ initial, onSave, onCancel, isNew }: {
         special_notes: data.specialNotes ?? prev.special_notes,
         maintenance_notes: data.maintenanceNotes ?? prev.maintenance_notes,
       }));
+      setAiHasFilled(true);
       toast({ title: "AI card generated — review and save" });
     } catch (err: any) {
       showErrorToast(err, "AI Generation Failed");
@@ -678,8 +680,8 @@ function PlantCardForm({ initial, onSave, onCancel, isNew }: {
       <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
         <Sparkles className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
         <div className="flex-1">
-          <p className="text-sm font-medium text-green-800">AI Auto-Fill</p>
-          <p className="text-xs text-green-700 mt-0.5">Enter the plant name below, then click Generate to fill all fields automatically.</p>
+          <p className="text-sm font-medium text-green-800">AI Auto-Fill {isNew && !aiHasFilled && <span className="text-green-600 font-normal">(required to create card)</span>}</p>
+          <p className="text-xs text-green-700 mt-0.5">Type the common or botanical name below and press <kbd className="px-1 py-0.5 bg-green-100 border border-green-300 rounded text-xs">Enter</kbd> — AI will fill the card automatically.</p>
         </div>
         <Button type="button" size="sm" onClick={generate} disabled={generating} className="bg-green-600 hover:bg-green-700 shrink-0" data-testid="btn-ai-generate">
           <Sparkles className="w-3.5 h-3.5 mr-1" />
@@ -690,11 +692,23 @@ function PlantCardForm({ initial, onSave, onCancel, isNew }: {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Common Name *</Label>
-          <Input value={fieldVal(form.common_name)} onChange={e => f("common_name", e.target.value)} placeholder="e.g. Red Maple" data-testid="input-common-name" />
+          <Input
+            value={fieldVal(form.common_name)}
+            onChange={e => f("common_name", e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); generate(); } }}
+            placeholder="e.g. Red Maple — press Enter to auto-fill"
+            data-testid="input-common-name"
+          />
         </div>
         <div className="space-y-1.5">
           <Label>Botanical Name</Label>
-          <Input value={fieldVal(form.botanical_name)} onChange={e => f("botanical_name", e.target.value)} placeholder="e.g. Acer rubrum" data-testid="input-botanical-name" />
+          <Input
+            value={fieldVal(form.botanical_name)}
+            onChange={e => f("botanical_name", e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); generate(); } }}
+            placeholder="e.g. Acer rubrum — press Enter to auto-fill"
+            data-testid="input-botanical-name"
+          />
         </div>
         <div className="space-y-1.5">
           <Label>Plant Type</Label>
@@ -815,7 +829,13 @@ function PlantCardForm({ initial, onSave, onCancel, isNew }: {
 
       <div className="flex justify-end gap-2 pt-2">
         <Button type="button" variant="outline" onClick={onCancel} data-testid="btn-cancel-plant-form">Cancel</Button>
-        <Button type="submit" className="bg-green-600 hover:bg-green-700" data-testid="btn-save-plant-card">
+        <Button
+          type="submit"
+          className="bg-green-600 hover:bg-green-700"
+          disabled={isNew && !aiHasFilled}
+          title={isNew && !aiHasFilled ? "Type a plant name and press Enter to auto-fill before saving" : undefined}
+          data-testid="btn-save-plant-card"
+        >
           {isNew ? "Create Card" : "Save Changes"}
         </Button>
       </div>
