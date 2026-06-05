@@ -267,16 +267,44 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
     onError: () => toast({ title: "Failed to remove photo", variant: "destructive" }),
   });
 
+  function checkImageSize(file: File): Promise<{ ok: boolean; w: number; h: number }> {
+    return new Promise(resolve => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const shorter = Math.min(img.naturalWidth, img.naturalHeight);
+        resolve({ ok: shorter >= 800, w: img.naturalWidth, h: img.naturalHeight });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve({ ok: false, w: 0, h: 0 }); };
+      img.src = url;
+    });
+  }
+
+  async function validateAndUpload(file: File) {
+    if (!file.type.startsWith("image/")) return;
+    const { ok, w, h } = await checkImageSize(file);
+    if (!ok) {
+      toast({
+        title: "Image too small",
+        description: `${file.name} is ${w}×${h}px — please use a photo that's at least 800px on the shorter side so it looks sharp when printed.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    uploadPhoto.mutate(file);
+  }
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     if (!isAdmin) return;
     const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"));
-    files.forEach(f => uploadPhoto.mutate(f));
+    files.forEach(f => validateAndUpload(f));
   }, [isAdmin, uploadPhoto]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    Array.from(e.target.files ?? []).forEach(f => uploadPhoto.mutate(f));
+    Array.from(e.target.files ?? []).forEach(f => validateAndUpload(f));
     e.target.value = "";
   };
 
@@ -284,6 +312,120 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
   const coverPhoto = photos[0] ?? null;
 
   function patch(overrides: Partial<PlantCard>) { patchCard.mutate(overrides); }
+
+  function printCard() {
+    const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) return;
+
+    const photosArr: string[] = card.photos ?? [];
+    const cover = photosArr[0] ?? null;
+
+    const facts = [
+      { label: "Mature Size", val: card.mature_size },
+      { label: "Hardiness Zone", val: card.hardiness_zone },
+      { label: "Light", val: card.light_requirement },
+      { label: "Water Needs", val: card.water_needs },
+      { label: "Soil", val: card.soil_moisture },
+      { label: "Growth Rate", val: card.growth_rate },
+      { label: "Pruning Time", val: card.pruning_time },
+      card.flowering ? { label: "Flower Season", val: card.flower_season } : null,
+      card.flowering ? { label: "Flower Color", val: card.flower_color } : null,
+    ].filter((f): f is { label: string; val: string | null } => !!f && !!f.val);
+
+    const factsHtml = facts.map(f => `
+      <div class="fact-card">
+        <div class="fact-label">${f.label}</div>
+        <div class="fact-val">${f.val}</div>
+      </div>`).join("");
+
+    const badges = [
+      card.plant_type, card.deciduous_evergreen,
+      card.flowering ? "🌸 Flowering" : null,
+      card.deer_resistant ? "🦌 Deer Resistant" : null,
+    ].filter(Boolean);
+
+    const badgesHtml = badges.map(b =>
+      `<span class="badge">${b}</span>`).join("");
+
+    const section = (title: string, content: string | null | undefined) => content ? `
+      <div class="section">
+        <h3>${title}</h3>
+        <p>${content.replace(/\n/g, "<br/>")}</p>
+      </div>` : "";
+
+    const coverHtml = cover
+      ? `<img src="${cover}" class="cover-img" />`
+      : "";
+
+    const photoPages = photosArr.map((url, i) => `
+      <div class="photo-page">
+        <img src="${url}" class="photo-full" />
+        <div class="photo-caption">${card.common_name} — Photo ${i + 1} of ${photosArr.length}</div>
+      </div>`).join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>${card.common_name} — Plant Care Guide</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111827;background:#fff;}
+    @media print{
+      @page{size:letter;margin:0;}
+      body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    }
+    /* ── Card page ── */
+    .card-page{width:100%;}
+    .header{background:linear-gradient(to right,#166534,#16a34a);color:#fff;padding:32px 40px;display:flex;align-items:flex-start;gap:20px;}
+    .header-text{flex:1;}
+    .header h1{font-size:28px;font-weight:700;letter-spacing:-0.02em;margin-bottom:4px;}
+    .botanical{font-style:italic;color:#bbf7d0;font-size:16px;margin-bottom:12px;}
+    .badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+    .badge{background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);border-radius:999px;padding:3px 10px;font-size:11px;color:#fff;}
+    .cover-img{width:100px;height:100px;object-fit:cover;border-radius:8px;border:2px solid rgba(255,255,255,0.3);flex-shrink:0;}
+    .body{padding:32px 40px;}
+    .facts-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px;}
+    .fact-card{background:#f0fdf4;border:1px solid #d1fae5;border-radius:6px;padding:10px 12px;}
+    .fact-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#6b7280;margin-bottom:4px;}
+    .fact-val{font-size:13px;font-weight:600;color:#111827;}
+    .section{margin-bottom:20px;}
+    .section h3{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#6b7280;margin-bottom:6px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;}
+    .section p{font-size:13px;color:#1f2937;line-height:1.65;}
+    .footer{border-top:1px solid #e5e7eb;margin-top:24px;padding-top:14px;font-size:10px;color:#9ca3af;text-align:center;}
+    /* ── Photo pages ── */
+    .photo-page{width:100%;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0.4in;page-break-before:always;break-before:page;}
+    .photo-full{max-width:100%;max-height:calc(100vh - 1.2in);width:100%;height:calc(100vh - 1.2in);object-fit:contain;}
+    .photo-caption{font-size:10px;color:#9ca3af;margin-top:10px;text-align:center;}
+  </style>
+</head>
+<body>
+  <div class="card-page">
+    <div class="header">
+      <div class="header-text">
+        <h1>${card.common_name}</h1>
+        ${card.botanical_name ? `<div class="botanical">${card.botanical_name}</div>` : ""}
+        <div class="badges">${badgesHtml}</div>
+      </div>
+      ${coverHtml}
+    </div>
+    <div class="body">
+      ${facts.length > 0 ? `<div class="facts-grid">${factsHtml}</div>` : ""}
+      ${section("About This Plant", card.special_notes)}
+      ${section("Maintenance Tips", card.maintenance_notes)}
+      ${section("Known Pests & Issues", card.known_pests_issues)}
+      <div class="footer">Chapin Landscapes · Plant Care Guide · ${card.common_name}${card.botanical_name ? ` (${card.botanical_name})` : ""} · Printed ${new Date().toLocaleDateString()}</div>
+    </div>
+  </div>
+  ${photoPages}
+</body>
+</html>`;
+
+    win.document.write(html);
+    win.document.close();
+    // Small delay so images finish loading before the print dialog opens
+    setTimeout(() => win.print(), 800);
+  }
 
   return (
     <div className="max-w-4xl mx-auto" data-testid="plant-card-detail">
@@ -298,7 +440,7 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
               <Pencil className="w-3 h-3 inline mr-1 text-green-600" />Click any field to edit inline
             </span>
           )}
-          <Button variant="outline" size="sm" onClick={() => window.print()} data-testid="btn-print-plant-card">
+          <Button variant="outline" size="sm" onClick={printCard} data-testid="btn-print-plant-card">
             <Printer className="w-4 h-4 mr-1" /> Print
           </Button>
         </div>
