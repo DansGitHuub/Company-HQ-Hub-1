@@ -1,5 +1,7 @@
 import { Express } from "express";
 import { pool } from "./db";
+import { sendEmail, escapeHtml } from "./emailService";
+import { sendSms, isSmsConfigured } from "./smsService";
 
 const JOB_TYPES = [
   "Lawn Care", "Landscaping", "Snow Removal", "Irrigation",
@@ -309,6 +311,84 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
       );
       return res.json({ success: true });
     } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── CONTACT CUSTOMER ─────────────────────────────────────────────────────────
+  app.post("/api/jobs/:id/contact-customer", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { via, subject, message } = req.body as {
+        via: ("email" | "sms")[];
+        subject: string;
+        message: string;
+      };
+
+      if (!via?.length) return res.status(400).json({ message: "Specify at least one channel (email or sms)" });
+      if (!message?.trim()) return res.status(400).json({ message: "Message is required" });
+
+      // Fetch job + customer primary contacts
+      const jobRes = await pool.query(`
+        SELECT j.id, j.title, j.client, j.customer_id,
+               c.first_name, c.last_name, c.company_name,
+               ce.email AS primary_email,
+               cp.phone AS primary_phone
+        FROM jobs j
+        LEFT JOIN customers c ON c.id = j.customer_id
+        LEFT JOIN customer_emails ce ON ce.customer_id = c.id AND ce.is_primary = true
+        LEFT JOIN customer_phones cp ON cp.customer_id = c.id AND cp.is_primary = true
+        WHERE j.id = $1
+      `, [id]);
+
+      if (!jobRes.rows.length) return res.status(404).json({ message: "Job not found" });
+
+      const job = jobRes.rows[0];
+      const customerName = job.first_name
+        ? `${job.first_name} ${job.last_name || ""}`.trim()
+        : (job.company_name || job.client || "Customer");
+
+      const results: Record<string, boolean | string> = {};
+
+      // ── Email ──
+      if (via.includes("email")) {
+        if (!job.primary_email) {
+          results.email = "no_email";
+        } else {
+          const html = `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+              <div style="background:#166534;padding:20px;text-align:center;">
+                <h1 style="color:white;margin:0;">Chapin Landscapes</h1>
+              </div>
+              <div style="padding:30px;background:#f9fafb;">
+                <p style="color:#374151;">Hi ${escapeHtml(customerName)},</p>
+                <div style="background:white;padding:20px;border-radius:8px;border:1px solid #e5e7eb;color:#374151;white-space:pre-wrap;">${escapeHtml(message)}</div>
+              </div>
+              <div style="padding:16px;text-align:center;color:#9ca3af;font-size:12px;">
+                Chapin Landscapes · Professional Landscape Services
+              </div>
+            </div>
+          `;
+          const sent = await sendEmail(job.primary_email, subject || `Regarding your job: ${job.title || ""}`, html);
+          results.email = sent ? "sent" : "failed";
+        }
+      }
+
+      // ── SMS ──
+      if (via.includes("sms")) {
+        if (!job.primary_phone) {
+          results.sms = "no_phone";
+        } else if (!isSmsConfigured()) {
+          results.sms = "not_configured";
+        } else {
+          const sent = await sendSms(job.primary_phone, message);
+          results.sms = sent ? "sent" : "failed";
+        }
+      }
+
+      return res.json({ ok: true, results, customerName, email: job.primary_email, phone: job.primary_phone });
+    } catch (err: any) {
+      console.error("[jobs] contact-customer error:", err.message);
       return res.status(500).json({ message: err.message });
     }
   });
