@@ -699,6 +699,7 @@ function PlantListCard({ card, onClick }: { card: PlantCard; onClick: () => void
       onClick={onClick}
       data-testid={`plant-card-row-${card.id}`}
     >
+      {/* Thumbnail — always the same size */}
       {photo ? (
         <img src={photo} alt={card.common_name} className="w-16 h-16 object-cover rounded-md shrink-0" />
       ) : (
@@ -706,16 +707,31 @@ function PlantListCard({ card, onClick }: { card: PlantCard; onClick: () => void
           <Leaf className="w-7 h-7 text-green-300" />
         </div>
       )}
+
+      {/* Text block — always renders the same three rows */}
       <div className="flex-1 min-w-0">
-        <div className="font-semibold text-sm truncate">{card.common_name}</div>
-        {card.botanical_name && (
-          <div className="italic text-xs text-muted-foreground truncate">{card.botanical_name}</div>
-        )}
-        <div className="flex flex-wrap gap-1 mt-1.5">
-          {card.plant_type && <Badge variant="secondary" className="text-xs">{card.plant_type}</Badge>}
-          {card.light_requirement && <Badge variant="outline" className="text-xs">{card.light_requirement}</Badge>}
-          {card.hardiness_zone && <Badge variant="outline" className="text-xs">Zone {card.hardiness_zone}</Badge>}
-          {!card.published && <Badge variant="destructive" className="text-xs">Draft</Badge>}
+        {/* Row 1: common name + draft badge */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="font-semibold text-sm truncate">{card.common_name}</span>
+          {!card.published && <Badge variant="destructive" className="text-xs shrink-0">Draft</Badge>}
+        </div>
+
+        {/* Row 2: botanical name — always present, placeholder when empty */}
+        <div className="italic text-xs text-muted-foreground truncate mt-0.5">
+          {card.botanical_name || <span className="not-italic text-muted-foreground/50">No botanical name</span>}
+        </div>
+
+        {/* Row 3: three fixed property chips — always shown */}
+        <div className="flex gap-1 mt-1.5">
+          <Badge variant="secondary" className="text-xs">
+            {card.plant_type || "—"}
+          </Badge>
+          <Badge variant="outline" className="text-xs">
+            {card.light_requirement || "—"}
+          </Badge>
+          <Badge variant="outline" className="text-xs">
+            {card.hardiness_zone ? `Zone ${card.hardiness_zone}` : "Zone —"}
+          </Badge>
         </div>
       </div>
     </div>
