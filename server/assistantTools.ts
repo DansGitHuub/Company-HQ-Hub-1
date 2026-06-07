@@ -9,6 +9,7 @@ const TOOLS_REQUIRING_CONFIRMATION = [
   "updateEquipmentHours",
   "submitRepairRequest",
   "createNote",
+  "createPlantCard",
 ];
 
 const STATUS_REQUIRING_CONFIRMATION = ["completed", "cancelled"];
@@ -348,6 +349,37 @@ export const allToolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = 
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "searchPlantCards",
+      description: "Search the plant card library by plant name. Use when the user asks about a specific plant, wants to look up care info, or asks if a plant card exists. Searches both common name and botanical name.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Plant name to search for (common name or botanical name)" },
+          plantType: { type: "string", description: "Optional filter by plant type: Tree, Shrub, Perennial, Annual, Groundcover, Vine, Grass, Other" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "createPlantCard",
+      description: "Create a new plant card in the plant library using AI to fill in all the horticultural details. Use when the user asks to add a new plant, create a plant card, or add a plant to the library. Admin only. Always confirm before creating.",
+      parameters: {
+        type: "object",
+        properties: {
+          commonName: { type: "string", description: "The common name of the plant (e.g. 'Red Maple')" },
+          botanicalName: { type: "string", description: "The botanical/scientific name (e.g. 'Acer rubrum')" },
+          plantType: { type: "string", description: "Plant type: Tree, Shrub, Perennial, Annual, Groundcover, Vine, Grass, Other" },
+        },
+        required: ["commonName"],
+      },
+    },
+  },
 ];
 
 const MODULE_ROUTES: Record<string, string> = {
@@ -380,6 +412,11 @@ const MODULE_ROUTES: Record<string, string> = {
   "plow-mapper": "/plow-mapper",
   employees: "/employees",
   admin: "/admin",
+  "plant library": "/plant-library",
+  "plant-library": "/plant-library",
+  "plant cards": "/plant-library",
+  "plant-cards": "/plant-library",
+  plants: "/plant-library",
 };
 
 const RECORD_ROUTES: Record<string, (id: string) => string> = {
@@ -395,10 +432,16 @@ function checkPermission(user: any, toolName: string): { allowed: boolean; reaso
     "searchGlobal", "searchEquipment", "searchTasks", "searchEmployees", "searchSOPs",
     "getDailyBriefing", "navigateTo", "openRecord", "lookupVIN",
     "getMessages", "getCalendarEvents", "getJobs", "getNotes",
+    "searchPlantCards",
   ];
   if (readOnlyTools.includes(toolName)) return { allowed: true };
 
   if (role === "Customer") return { allowed: false, reason: "This action is not available for customer accounts." };
+
+  if (toolName === "createPlantCard") {
+    if (!["Admin", "Master Admin"].includes(role)) return { allowed: false, reason: "Only admins can create plant cards." };
+    return { allowed: true };
+  }
 
   if (["createTask"].includes(toolName)) {
     if (role === "Customer") return { allowed: false, reason: "Customers cannot create tasks." };
@@ -808,6 +851,89 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
         }));
 
         return { result: { notes: noteList, count: rows.length } };
+      }
+
+      case "searchPlantCards": {
+        let sql = `SELECT id, common_name, botanical_name, plant_type, deciduous_evergreen,
+                    mature_size, hardiness_zone, light_requirement, water_needs,
+                    growth_rate, flowering, deer_resistant, published
+                   FROM plant_cards WHERE (common_name ILIKE $1 OR botanical_name ILIKE $1)`;
+        const params: any[] = [`%${toolArgs.query}%`];
+        if (toolArgs.plantType) {
+          sql += ` AND plant_type = $2`;
+          params.push(toolArgs.plantType);
+        }
+        sql += ` ORDER BY common_name ASC LIMIT 10`;
+        const res = await pool.query(sql, params);
+        if (res.rows.length === 0) {
+          return { result: { cards: [], count: 0, message: `No plant cards found matching "${toolArgs.query}". You can create one using the createPlantCard tool.` } };
+        }
+        return { result: { cards: res.rows, count: res.rows.length } };
+      }
+
+      case "createPlantCard": {
+        // Use AI to generate all the horticultural data
+        const aiClient = new OpenAI({
+          apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+          baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        });
+        const hint = [toolArgs.commonName, toolArgs.botanicalName, toolArgs.plantType].filter(Boolean).join(" / ");
+        const completion = await aiClient.chat.completions.create({
+          model: "gpt-4o-mini",
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: "You are a professional horticulturist. Return ONLY valid JSON. Be concise and accurate for northeastern USA (zones 5-7)." },
+            { role: "user", content: `Generate a complete plant info card for: ${hint}\n\nReturn this exact JSON (fill every field; null for truly unknown):\n{\n  "commonName": "",\n  "botanicalName": "",\n  "plantType": "Tree|Shrub|Perennial|Annual|Groundcover|Vine|Grass|Other",\n  "deciduousEvergreen": "Deciduous|Evergreen|Semi-Evergreen",\n  "matureSize": "e.g. 20-30 ft tall x 15-20 ft wide",\n  "growthRate": "Slow|Moderate|Fast",\n  "hardinessZone": "e.g. 4-8",\n  "lightRequirement": "Full Sun|Part Sun|Part Shade|Full Shade|Adaptable",\n  "soilMoisture": "e.g. Well-drained, tolerates clay",\n  "waterNeeds": "Low|Moderate|High",\n  "deerResistant": true,\n  "flowering": true,\n  "flowerSeason": "e.g. May-June",\n  "flowerColor": "e.g. White",\n  "pruningTime": "e.g. Late winter before new growth",\n  "knownPestsIssues": "e.g. Aphids, fireblight",\n  "specialNotes": "2-3 sentences about landscape use",\n  "maintenanceNotes": "2-3 practical maintenance tips for a landscape crew"\n}` },
+          ],
+        });
+        const data = JSON.parse(completion.choices[0].message.content || "{}");
+
+        const insertRes = await pool.query(
+          `INSERT INTO plant_cards (
+            common_name, botanical_name, plant_type, deciduous_evergreen,
+            mature_size, growth_rate, hardiness_zone, light_requirement, soil_moisture,
+            water_needs, deer_resistant, flowering, flower_season, flower_color,
+            pruning_time, known_pests_issues, special_notes, maintenance_notes,
+            photos, published, created_by
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+          RETURNING id, common_name, botanical_name, plant_type`,
+          [
+            data.commonName || toolArgs.commonName,
+            data.botanicalName || toolArgs.botanicalName || null,
+            data.plantType || toolArgs.plantType || null,
+            data.deciduousEvergreen || null,
+            data.matureSize || null,
+            data.growthRate || null,
+            data.hardinessZone || null,
+            data.lightRequirement || null,
+            data.soilMoisture || null,
+            data.waterNeeds || null,
+            data.deerResistant ?? false,
+            data.flowering ?? false,
+            data.flowerSeason || null,
+            data.flowerColor || null,
+            data.pruningTime || null,
+            data.knownPestsIssues || null,
+            data.specialNotes || null,
+            data.maintenanceNotes || null,
+            JSON.stringify([]),
+            true,
+            user.username || user.name || "admin",
+          ]
+        );
+
+        const card = insertRes.rows[0];
+        return {
+          result: {
+            success: true,
+            cardId: card.id,
+            commonName: card.common_name,
+            botanicalName: card.botanical_name,
+            plantType: card.plant_type,
+            message: `Plant card for "${card.common_name}" has been created and published. You can add photos by going to the Plant Library and opening the card.`,
+          },
+          navigationTarget: "/plant-library",
+        };
       }
 
       default:
