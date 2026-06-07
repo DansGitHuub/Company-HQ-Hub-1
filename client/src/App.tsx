@@ -35,6 +35,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/reports": "Reports",
   "/mors-budget": "MORS Budget",
   "/catalog": "Catalog",
+  "/work-orders": "Work Orders",
   "/tools/plow-mapper": "Plow Site Mapper",
   "/tools": "Tools",
   "/settings": "Settings",
@@ -133,6 +134,7 @@ import CatalogPage from "@/pages/catalog/index";
 import CatalogImport from "@/pages/catalog/CatalogImport";
 import CatalogDetail from "@/pages/catalog/CatalogDetail";
 import PlantCards from "@/pages/PlantCards";
+import WorkOrders from "@/pages/WorkOrders";
 import CustomerPortal from "@/pages/CustomerPortal";
 import PortalCustomerRedeem from "@/pages/PortalCustomerRedeem";
 import PortalCrewRedeem from "@/pages/PortalCrewRedeem";
@@ -303,6 +305,7 @@ function AppRoutes() {
         <Route path="/catalog/:id" component={CatalogDetail} />
         <Route path="/catalog" component={CatalogPage} />
         <Route path="/plant-cards" component={PlantCards} />
+        <Route path="/work-orders" component={WorkOrders} />
         <Route path="/route" component={RoutePage} />
         <Route component={NotFound} />
       </Switch>

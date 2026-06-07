@@ -33,6 +33,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   CheckSquare,
+  HardHat,
   Snowflake,
   BellRing,
   Brain,
@@ -400,6 +401,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     time_admin: { icon: Clock, label: t("nav.timeAdmin"), href: "/admin/time" },
     catalog: { icon: BookMarked, label: t("nav.catalog"), href: "/catalog" },
     plant_cards: { icon: Leaf, label: "Plant Library", href: "/plant-cards" },
+    work_orders: { icon: HardHat, label: "Work Orders", href: "/work-orders" },
     budget_settings: { icon: DollarSign, label: t("nav.budgetPricing"), href: "/budget-settings" },
     tools: { icon: Snowflake, label: t("nav.tools"), href: "/tools" },
   plow_mapper: { icon: Snowflake, label: t("nav.plowMapper"), href: "/tools/plow-mapper" },
@@ -418,7 +420,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const sidebarSections: NavSection[] = [
     { label: "MY SPACE", items: ["hq", "dashboard", "my_hours", "daily_worksheet", "messages"] },
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
-    { label: "OPERATIONS", items: ["todos", "scheduling", "time_tracking", "equipment", "forms"] },
+    { label: "OPERATIONS", items: ["todos", "work_orders", "scheduling", "time_tracking", "equipment", "forms"] },
     { label: "RESOURCES", items: ["sops", "education", "testing"] },
     { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "time_admin", "mors_budget", "catalog", "plant_cards", "tools"] },
   ];
@@ -496,6 +498,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       worksheet_review: tNav("nav.worksheetReview"),
       time_card_approval: tNav("nav.timeCardApproval"),
       catalog: tNav("nav.catalog"),
+      work_orders: "Work Orders",
       budget_settings: tNav("nav.budgetPricing"),
       tools: tNav("nav.tools"),
       plow_mapper: tNav("nav.plowMapper"),

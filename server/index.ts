@@ -49,6 +49,7 @@ import { runEstimatingPhaseE2PolishMigration } from "./migrations/estimatingPhas
 import { runEstimatingPhaseE3Migration } from "./migrations/estimatingPhaseE3";
 import { runCompanyCamPhase1Migration } from "./migrations/companyCamPhase1";
 import { runPlantCardsMigration } from "./migrations/plantCards";
+import { runWorkOrdersMigration } from "./migrations/workOrders";
 import { runCompanyCamPhotosPhase2Migration } from "./migrations/companyCamPhotosPhase2";
 import { runCompanyCamWave3Migration } from "./migrations/companyCamWave3";
 import { runWave4Migration } from "./migrations/wave4";
@@ -153,6 +154,7 @@ app.use((req, res, next) => {
   await runCompanyCamWave3Migration();
   await runWave4Migration();
   await runPlantCardsMigration();
+  await runWorkOrdersMigration();
 
   // Public pages must be registered BEFORE registerRoutes (which sets up the React catch-all)
   registerPublicPages(app);

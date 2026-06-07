@@ -48,6 +48,7 @@ import { registerCatalogRoutes } from "./catalogRoutes";
 import { registerMessagesRoutes } from "./messagesRoutes";
 import { registerDirectMessageRoutes } from "./directMessageRoutes";
 import { registerPlantCardRoutes } from "./plantCardRoutes";
+import { registerWorkOrderRoutes } from "./workOrderRoutes";
 import { searchProductImages } from "./imageSearchService";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail, sendApplicationLinkEmail } from "./email";
 import { logActivity } from "./activityLogger";
@@ -109,6 +110,7 @@ export async function registerRoutes(
   registerMessagesRoutes(app, requireAuth);
   registerDirectMessageRoutes(app, requireAuth);
   registerPlantCardRoutes(app, requireAuth, requireAdmin);
+  registerWorkOrderRoutes(app);
 
   // Global search endpoint - searches everything based on user role
   app.get("/api/search", requireAuth, async (req, res) => {
