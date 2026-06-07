@@ -412,11 +412,11 @@ const MODULE_ROUTES: Record<string, string> = {
   "plow-mapper": "/plow-mapper",
   employees: "/employees",
   admin: "/admin",
-  "plant library": "/plant-library",
-  "plant-library": "/plant-library",
-  "plant cards": "/plant-library",
-  "plant-cards": "/plant-library",
-  plants: "/plant-library",
+  "plant library": "/plant-cards",
+  "plant-library": "/plant-cards",
+  "plant cards": "/plant-cards",
+  "plant-cards": "/plant-cards",
+  plants: "/plant-cards",
 };
 
 const RECORD_ROUTES: Record<string, (id: string) => string> = {
@@ -932,7 +932,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
             plantType: card.plant_type,
             message: `Plant card for "${card.common_name}" has been created and published. You can add photos by going to the Plant Library and opening the card.`,
           },
-          navigationTarget: "/plant-library",
+          navigationTarget: "/plant-cards",
         };
       }
 
