@@ -4,7 +4,7 @@ export async function runWorkOrdersMigration() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS work_orders (
       id              SERIAL PRIMARY KEY,
-      job_id          INTEGER,
+      job_id          VARCHAR(36),
       title           TEXT NOT NULL,
       description     TEXT,
       status          TEXT NOT NULL DEFAULT 'draft',
@@ -70,6 +70,16 @@ export async function runWorkOrdersMigration() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_wo_steps_order   ON work_order_steps(work_order_id, step_number)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_wo_materials_wo  ON work_order_materials(work_order_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_wo_logs_date     ON work_order_daily_logs(work_order_id, log_date)`);
+
+  // Fix job_id column type if it was previously created as INTEGER
+  try {
+    await pool.query(`
+      ALTER TABLE work_orders
+        ALTER COLUMN job_id TYPE VARCHAR(36) USING job_id::text
+    `);
+  } catch (_) {
+    // Column is already VARCHAR(36) or table doesn't exist yet — safe to ignore
+  }
 
   console.log("[migration] Work orders tables ready");
 }

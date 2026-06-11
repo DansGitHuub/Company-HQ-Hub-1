@@ -360,7 +360,7 @@ function CreateWODialog({
     try {
       const res = await apiRequest("POST", "/api/work-orders", {
         ...form,
-        job_id: form.job_id ? Number(form.job_id) : null,
+        job_id: form.job_id || null,
         assigned_crew: [],
       });
       const data = await res.json();
