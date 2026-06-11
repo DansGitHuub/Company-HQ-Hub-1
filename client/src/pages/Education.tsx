@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
@@ -126,6 +126,20 @@ function FileDropZone({
 
   const accept = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv";
 
+  // Prevent the browser from opening dropped files anywhere on the page
+  useEffect(() => {
+    const stop = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    document.addEventListener("dragover", stop);
+    document.addEventListener("drop", stop);
+    return () => {
+      document.removeEventListener("dragover", stop);
+      document.removeEventListener("drop", stop);
+    };
+  }, []);
+
   if (currentFileName) {
     return (
       <div className="flex items-center gap-3 border-2 border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800 rounded-xl px-4 py-4">
@@ -150,10 +164,12 @@ function FileDropZone({
 
   return (
     <div
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
+      onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(true); }}
+      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(true); }}
+      onDragLeave={(e) => { e.stopPropagation(); setDragging(false); }}
       onDrop={(e) => {
         e.preventDefault();
+        e.stopPropagation();
         setDragging(false);
         const file = e.dataTransfer.files?.[0];
         if (file) onFile(file);
