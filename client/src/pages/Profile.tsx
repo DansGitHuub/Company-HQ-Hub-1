@@ -473,7 +473,7 @@ export default function Profile() {
             </div>
             <div>
               <CardTitle className="text-xl">{displayProfile?.name}</CardTitle>
-              <CardDescription>@{displayProfile?.username}</CardDescription>
+              <CardDescription>{displayProfile?.username}</CardDescription>
               <Badge className="mt-2" variant="outline">{displayProfile?.isMasterAdmin ? "Master Admin" : displayProfile?.role}</Badge>
             </div>
           </div>

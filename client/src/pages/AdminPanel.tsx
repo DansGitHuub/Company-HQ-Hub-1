@@ -1365,7 +1365,7 @@ export default function AdminPanel() {
                                 {u.name}
                                 {u.isMasterAdmin && <Crown className="w-4 h-4 text-amber-500" />}
                               </div>
-                              <div className="text-xs text-muted-foreground">@{u.username}</div>
+                              <div className="text-xs text-muted-foreground">{u.username}</div>
                             </div>
                           </div>
                         </TableCell>
@@ -1514,7 +1514,7 @@ export default function AdminPanel() {
                           <div>
                             <h4 className="font-medium">{requestUser?.name || "Unknown User"}</h4>
                             <p className="text-sm text-muted-foreground">
-                              {requestUser?.username && <span className="mr-2">@{requestUser.username}</span>}
+                              {requestUser?.username && <span className="mr-2">{requestUser.username}</span>}
                               Requesting: <Badge variant="outline">{req.requestedRole}</Badge>
                             </p>
                             {req.reason && <p className="text-sm mt-2">{req.reason}</p>}
