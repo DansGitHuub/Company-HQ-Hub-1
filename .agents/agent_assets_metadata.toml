@@ -6,3 +6,9 @@ id = "bnnlB94XY-Js3xpp2GAET"
 uri = "file://exports/employee-fields.md"
 type = "text"
 title = "Employee Record Fields"
+
+[[outputs]]
+id = "xhYsKTR3Rt26-2AKAkUKY"
+uri = "file://exports/employee-fields.txt"
+type = "text"
+title = "Employee Record Fields"

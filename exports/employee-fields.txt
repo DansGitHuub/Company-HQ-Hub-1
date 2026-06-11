@@ -1,0 +1,50 @@
+EMPLOYEE RECORD FIELDS
+======================
+
+IDENTITY
+  - Employee Number
+  - First Name
+  - Last Name
+  - Preferred Name
+  - Pronouns
+  - Date of Birth
+  - Profile Photo
+
+CONTACT
+  - Personal Email
+  - Personal Phone
+  - Address, City, State, Zip
+
+EMERGENCY CONTACT 1
+  - Name
+  - Relationship
+  - Phone
+
+EMERGENCY CONTACT 2
+  - Name
+  - Relationship
+  - Phone
+
+JOB / HR
+  - Job Title
+  - Department
+  - Employment Type (Full-time, Part-time, etc.)
+  - Start Date
+  - End Date
+  - Supervisor
+  - Work Location
+  - Status (Active, Inactive, etc.)
+
+PAY
+  - Pay Rate
+  - Pay Type
+  - Pay Period
+  - Payment Method
+  - Bank Name (last 4)
+  - Account Number (last 4)
+  - Routing Number (last 4)
+  - Account Type
+
+SYSTEM LINKS
+  - User ID (linked login account)
+  - Candidate ID (linked hiring record)
