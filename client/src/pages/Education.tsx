@@ -145,6 +145,8 @@ async function uploadFileToStorage(file: File): Promise<{ url: string; fileName:
 }
 
 // ── File Drop Zone ────────────────────────────────────────────────────────────
+// Uses native DOM listeners (not React synthetic events) so it works correctly
+// inside Radix UI dialog portals, which render outside the React root element.
 function FileDropZone({
   onFile,
   uploading,
@@ -157,25 +159,35 @@ function FileDropZone({
   onClear?: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragging(false);
-      const file = e.dataTransfer.files[0];
-      if (file) onFile(file);
-    },
-    [onFile],
-  );
+  const onFileRef = useRef(onFile);
+  useEffect(() => { onFileRef.current = onFile; }, [onFile]);
 
   useEffect(() => {
-    const prevent = (e: DragEvent) => e.preventDefault();
-    document.addEventListener("dragover", prevent);
-    document.addEventListener("drop", prevent);
+    const el = dropRef.current;
+    if (!el) return;
+
+    const onDragOver = (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
+    const onDragEnter = (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
+    const onDragLeave = (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
+    const onDrop = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      const file = e.dataTransfer?.files[0];
+      if (file) onFileRef.current(file);
+    };
+
+    el.addEventListener("dragover", onDragOver);
+    el.addEventListener("dragenter", onDragEnter);
+    el.addEventListener("dragleave", onDragLeave);
+    el.addEventListener("drop", onDrop);
     return () => {
-      document.removeEventListener("dragover", prevent);
-      document.removeEventListener("drop", prevent);
+      el.removeEventListener("dragover", onDragOver);
+      el.removeEventListener("dragenter", onDragEnter);
+      el.removeEventListener("dragleave", onDragLeave);
+      el.removeEventListener("drop", onDrop);
     };
   }, []);
 
@@ -195,13 +207,10 @@ function FileDropZone({
 
   return (
     <div
+      ref={dropRef}
       className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
         isDragging ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/50 hover:bg-muted/30"
       }`}
-      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-      onDragLeave={() => setIsDragging(false)}
-      onDragEnter={(e) => { e.preventDefault(); setIsDragging(true); }}
-      onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
     >
       <input
