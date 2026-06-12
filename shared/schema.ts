@@ -1149,7 +1149,8 @@ export const customerResources = pgTable("customer_resources", {
   title: text("title").notNull(),
   description: text("description"),
   type: text("type").notNull().default("guide"), // guide, instruction, document, faq
-  category: text("category").notNull().default("General"),
+  category: text("category").notNull().default("Care Guides"), // Care Guides, Manufacturer Info, Professional Documents, Seasonal Checklists
+  season: text("season").default("N/A"), // Spring, Summer, Fall, Year-Round, N/A
   content: text("content"), // Rich text content for guides
   fileUrl: text("file_url"), // URL for uploaded documents (PDF, Word)
   fileName: text("file_name"), // Original file name
@@ -1166,6 +1167,7 @@ export const insertCustomerResourceSchema = createInsertSchema(customerResources
   description: true,
   type: true,
   category: true,
+  season: true,
   content: true,
   fileUrl: true,
   fileName: true,
