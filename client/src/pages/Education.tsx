@@ -95,6 +95,19 @@ type SectionKey = typeof SECTION_CATEGORIES[number]["key"];
 
 const SEASONS = ["N/A", "Spring", "Summer", "Fall", "Year-Round"] as const;
 
+// Module-level default so document-level drop handlers can reference it without closure issues
+const DEFAULT_FORM = {
+  title: "",
+  description: "",
+  type: "guide" as const,
+  category: "Care Guides" as SectionKey,
+  season: "N/A",
+  content: "",
+  fileUrl: "",
+  fileName: "",
+  isPublished: true,
+};
+
 const SEASON_COLORS: Record<string, string> = {
   Spring: "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400",
   Summer: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-400",
@@ -145,8 +158,8 @@ async function uploadFileToStorage(file: File): Promise<{ url: string; fileName:
 }
 
 // ── File Drop Zone ────────────────────────────────────────────────────────────
-// Uses native DOM listeners (not React synthetic events) so it works correctly
-// inside Radix UI dialog portals, which render outside the React root element.
+// Click-to-browse inside the dialog. Page-level drag handling (see Education
+// component) covers the drag-and-drop path so this doesn't need portal tricks.
 function FileDropZone({
   onFile,
   uploading,
@@ -159,37 +172,8 @@ function FileDropZone({
   onClear?: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const dropRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const onFileRef = useRef(onFile);
-  useEffect(() => { onFileRef.current = onFile; }, [onFile]);
-
-  useEffect(() => {
-    const el = dropRef.current;
-    if (!el) return;
-
-    const onDragOver = (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
-    const onDragEnter = (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
-    const onDragLeave = (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
-    const onDrop = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-      const file = e.dataTransfer?.files[0];
-      if (file) onFileRef.current(file);
-    };
-
-    el.addEventListener("dragover", onDragOver);
-    el.addEventListener("dragenter", onDragEnter);
-    el.addEventListener("dragleave", onDragLeave);
-    el.addEventListener("drop", onDrop);
-    return () => {
-      el.removeEventListener("dragover", onDragOver);
-      el.removeEventListener("dragenter", onDragEnter);
-      el.removeEventListener("dragleave", onDragLeave);
-      el.removeEventListener("drop", onDrop);
-    };
-  }, []);
+  const dragCounter = useRef(0);
 
   if (currentFileName) {
     return (
@@ -207,10 +191,13 @@ function FileDropZone({
 
   return (
     <div
-      ref={dropRef}
       className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
         isDragging ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/50 hover:bg-muted/30"
       }`}
+      onDragEnter={(e) => { e.preventDefault(); dragCounter.current++; setIsDragging(true); }}
+      onDragLeave={(e) => { e.preventDefault(); dragCounter.current--; if (dragCounter.current <= 0) { dragCounter.current = 0; setIsDragging(false); } }}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => { e.preventDefault(); dragCounter.current = 0; setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) onFile(f); }}
       onClick={() => inputRef.current?.click()}
     >
       <input
@@ -227,7 +214,7 @@ function FileDropZone({
       ) : (
         <div className="flex flex-col items-center gap-2">
           <Upload className="w-8 h-8 text-muted-foreground/50" />
-          <p className="text-sm font-medium">Drop a file here or click to browse</p>
+          <p className="text-sm font-medium">Click to browse or drag a file anywhere on the page</p>
           <p className="text-xs text-muted-foreground">PDF, Word, Excel, and other documents accepted</p>
         </div>
       )}
@@ -462,29 +449,62 @@ export default function Education() {
   const [viewingResource, setViewingResource] = useState<CustomerResource | null>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [hasFile, setHasFile] = useState(false);
+  const [pageDragTarget, setPageDragTarget] = useState(false);
 
+  // Stable refs so the document-level effect (runs once) always sees current values
+  const isAdminRef = useRef(isAdmin);
+  const editDialogOpenRef = useRef(false);
+  const handleFileRef = useRef<(f: File) => Promise<void>>(() => Promise.resolve());
+  useEffect(() => { isAdminRef.current = isAdmin; }, [isAdmin]);
+  useEffect(() => { editDialogOpenRef.current = editDialogOpen; }, [editDialogOpen]);
+
+  // Page-level drag handler — fires at the document level so it works regardless
+  // of whether the Radix UI dialog portal is open.
   useEffect(() => {
-    const prevent = (e: DragEvent) => e.preventDefault();
-    document.addEventListener("dragover", prevent);
-    document.addEventListener("drop", prevent);
+    let dragCounter = 0;
+    const onDragEnter = (e: DragEvent) => {
+      if (!e.dataTransfer?.types.includes("Files")) return;
+      e.preventDefault();
+      dragCounter++;
+      if (isAdminRef.current) setPageDragTarget(true);
+    };
+    const onDragLeave = () => {
+      dragCounter = Math.max(0, dragCounter - 1);
+      if (dragCounter === 0) setPageDragTarget(false);
+    };
+    const onDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    };
+    const onDrop = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter = 0;
+      setPageDragTarget(false);
+      const file = e.dataTransfer?.files[0];
+      if (!file || !isAdminRef.current) return;
+      if (!editDialogOpenRef.current) {
+        setEditingResource(null);
+        setHasFile(true);
+        setFormData({ ...DEFAULT_FORM, type: "document" });
+        setEditDialogOpen(true);
+      } else {
+        setHasFile(true);
+      }
+      handleFileRef.current(file);
+    };
+    document.addEventListener("dragenter", onDragEnter);
+    document.addEventListener("dragleave", onDragLeave);
+    document.addEventListener("dragover", onDragOver);
+    document.addEventListener("drop", onDrop);
     return () => {
-      document.removeEventListener("dragover", prevent);
-      document.removeEventListener("drop", prevent);
+      document.removeEventListener("dragenter", onDragEnter);
+      document.removeEventListener("dragleave", onDragLeave);
+      document.removeEventListener("dragover", onDragOver);
+      document.removeEventListener("drop", onDrop);
     };
   }, []);
 
-  const defaultForm = {
-    title: "",
-    description: "",
-    type: "guide",
-    category: "Care Guides" as SectionKey,
-    season: "N/A",
-    content: "",
-    fileUrl: "",
-    fileName: "",
-    isPublished: true,
-  };
-  const [formData, setFormData] = useState(defaultForm);
+  const [formData, setFormData] = useState(DEFAULT_FORM);
 
   // ── Queries ──────────────────────────────────────────────────────────────────
   const { data: resources = [] } = useQuery<CustomerResource[]>({ queryKey: ["/api/resources"] });
@@ -529,7 +549,7 @@ export default function Education() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
       setEditDialogOpen(false);
-      setFormData(defaultForm);
+      setFormData(DEFAULT_FORM);
       setEditingResource(null);
       setHasFile(false);
       toast({ title: "Resource created successfully" });
@@ -551,7 +571,7 @@ export default function Education() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
       setEditDialogOpen(false);
-      setFormData(defaultForm);
+      setFormData(DEFAULT_FORM);
       setEditingResource(null);
       setHasFile(false);
       toast({ title: "Resource updated" });
@@ -590,7 +610,7 @@ export default function Education() {
     const defaultsToFile = catCfg?.defaultType === "document";
     setEditingResource(null);
     setHasFile(defaultsToFile);
-    setFormData({ ...defaultForm, category, type: defaultsToFile ? "document" : "guide" });
+    setFormData({ ...DEFAULT_FORM, category, type: defaultsToFile ? "document" : "guide" });
     setEditDialogOpen(true);
   };
 
@@ -644,6 +664,8 @@ export default function Education() {
     },
     [toast],
   );
+  // Keep the ref in sync so the document-level drop handler can call the latest version
+  useEffect(() => { handleFileRef.current = handleFile; }, [handleFile]);
 
   const toggleSave = (id: string) => {
     savedIds.has(id) ? unsaveMutation.mutate(id) : saveMutation.mutate(id);
@@ -784,6 +806,19 @@ export default function Education() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
+      {/* ── Full-page drag overlay (admin only) ─────────────────────────────── */}
+      {pageDragTarget && isAdmin && (
+        <div className="fixed inset-0 z-[9999] pointer-events-none">
+          <div className="absolute inset-3 rounded-2xl border-4 border-dashed border-primary bg-primary/10 flex items-center justify-center">
+            <div className="text-center">
+              <Upload className="w-16 h-16 text-primary mx-auto mb-3 animate-bounce" />
+              <p className="text-2xl font-bold text-primary">Drop to upload resource</p>
+              <p className="text-sm text-muted-foreground mt-1">The upload dialog will open automatically</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Page header ────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-4 items-start justify-between">
         <div>
@@ -922,7 +957,7 @@ export default function Education() {
         open={editDialogOpen}
         onOpenChange={(open) => {
           setEditDialogOpen(open);
-          if (!open) { setFormData(defaultForm); setEditingResource(null); setHasFile(false); }
+          if (!open) { setFormData(DEFAULT_FORM); setEditingResource(null); setHasFile(false); }
         }}
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
