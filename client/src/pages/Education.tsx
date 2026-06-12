@@ -454,6 +454,16 @@ export default function Education() {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [hasFile, setHasFile] = useState(false);
 
+  useEffect(() => {
+    const prevent = (e: DragEvent) => e.preventDefault();
+    document.addEventListener("dragover", prevent);
+    document.addEventListener("drop", prevent);
+    return () => {
+      document.removeEventListener("dragover", prevent);
+      document.removeEventListener("drop", prevent);
+    };
+  }, []);
+
   const defaultForm = {
     title: "",
     description: "",
