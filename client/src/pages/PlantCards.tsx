@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   Leaf, Search, Plus, Sparkles, Sun, Droplets, Ruler, Thermometer,
   Scissors, Bug, Star, Edit, Trash2, Upload, X, Eye, EyeOff,
-  Printer, ArrowLeft, Image as ImageIcon, ChevronRight, Check, Pencil
+  Printer, ArrowLeft, Image as ImageIcon, ChevronRight, Check, Pencil, Download
 } from "lucide-react";
 import { ImageLightbox } from "@/components/ImageLightbox";
 
@@ -194,12 +194,194 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Reset edit mode whenever we're viewing a different card
   useEffect(() => { setEditMode(false); }, [card.id]);
+
+  async function fetchImageAsBase64(url: string): Promise<string> {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function downloadCard() {
+    setIsDownloading(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      const pageW = 210;
+      const pageH = 297;
+      const margin = 14;
+      const contentW = pageW - margin * 2;
+      let y = 0;
+
+      // ── Green header band ──────────────────────────────────────────────────
+      doc.setFillColor(20, 83, 45);
+      doc.rect(0, 0, pageW, 52, "F");
+
+      // Cover photo in top-right corner of header
+      if (photos.length > 0) {
+        try {
+          const imgData = await fetchImageAsBase64(photos[0]);
+          doc.addImage(imgData, "JPEG", pageW - margin - 42, 5, 42, 42, undefined, "FAST");
+        } catch { /* skip on error */ }
+      }
+
+      // Plant name
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      const nameLines = doc.splitTextToSize(card.common_name, contentW - 50);
+      doc.text(nameLines, margin, 16);
+      y = 16 + nameLines.length * 8;
+
+      // Botanical name
+      if (card.botanical_name) {
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(187, 247, 208);
+        doc.text(card.botanical_name, margin, y + 1);
+        y += 7;
+      }
+
+      // Badges row
+      const badges: string[] = [
+        card.plant_type,
+        card.deciduous_evergreen,
+        card.flowering ? "Flowering" : null,
+        card.deer_resistant ? "Deer Resistant" : null,
+      ].filter(Boolean) as string[];
+
+      if (badges.length > 0) {
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        let bx = margin;
+        badges.forEach(b => {
+          const tw = doc.getTextWidth(b) + 6;
+          doc.setFillColor(255, 255, 255, 0.18);
+          doc.setDrawColor(255, 255, 255, 0.35);
+          doc.roundedRect(bx, y + 2, tw, 6, 1, 1, "FD");
+          doc.setTextColor(255, 255, 255);
+          doc.text(b, bx + 3, y + 6.2);
+          bx += tw + 3;
+        });
+      }
+
+      y = 58;
+
+      // ── Quick-facts grid ───────────────────────────────────────────────────
+      const facts: [string, string][] = [
+        ["Mature Size", card.mature_size ?? ""],
+        ["Hardiness Zone", card.hardiness_zone ?? ""],
+        ["Light", card.light_requirement ?? ""],
+        ["Water Needs", card.water_needs ?? ""],
+        ["Soil", card.soil_moisture ?? ""],
+        ["Growth Rate", card.growth_rate ?? ""],
+        ["Pruning", card.pruning_time ?? ""],
+        ["Flower Season", card.flower_season ?? ""],
+        ["Flower Color", card.flower_color ?? ""],
+      ].filter(([, v]) => v) as [string, string][];
+
+      if (facts.length > 0) {
+        const cols = 3;
+        const cellW = contentW / cols;
+        const cellH = 14;
+        facts.forEach(([label, val], i) => {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const cx = margin + col * cellW;
+          const cy = y + row * (cellH + 2);
+          doc.setFillColor(245, 247, 245);
+          doc.roundedRect(cx, cy, cellW - 2, cellH, 1.5, 1.5, "F");
+          doc.setFontSize(6.5);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(100, 100, 100);
+          doc.text(label.toUpperCase(), cx + 3, cy + 5);
+          doc.setFontSize(8.5);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(30, 30, 30);
+          doc.text(doc.splitTextToSize(val, cellW - 6)[0], cx + 3, cy + 10.5);
+        });
+        y += Math.ceil(facts.length / cols) * (cellH + 2) + 6;
+      }
+
+      // ── Text sections ──────────────────────────────────────────────────────
+      const sections: [string, string | null][] = [
+        ["About This Plant", card.special_notes ?? null],
+        ["Maintenance Tips", card.maintenance_notes ?? null],
+        ["Known Pests & Issues", card.known_pests_issues ?? null],
+      ];
+
+      for (const [title, content] of sections) {
+        if (!content) continue;
+        if (y > pageH - 35) { doc.addPage(); y = margin; }
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(22, 101, 52);
+        doc.text(title, margin, y);
+        y += 4;
+        doc.setDrawColor(22, 101, 52);
+        doc.setLineWidth(0.3);
+        doc.line(margin, y, margin + contentW, y);
+        y += 4;
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(40, 40, 40);
+        const lines = doc.splitTextToSize(content, contentW);
+        for (const line of lines) {
+          if (y > pageH - 15) { doc.addPage(); y = margin; }
+          doc.text(line, margin, y);
+          y += 4.5;
+        }
+        y += 4;
+      }
+
+      // ── Photos ─────────────────────────────────────────────────────────────
+      if (photos.length > 0) {
+        if (y > pageH - 80) { doc.addPage(); y = margin; }
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(22, 101, 52);
+        doc.text("Photos", margin, y);
+        y += 4;
+        doc.setDrawColor(22, 101, 52);
+        doc.setLineWidth(0.3);
+        doc.line(margin, y, margin + contentW, y);
+        y += 5;
+
+        const imgCols = 3;
+        const imgW = (contentW - (imgCols - 1) * 3) / imgCols;
+        const imgH = imgW * 0.75;
+
+        for (let i = 0; i < photos.length; i++) {
+          const col = i % imgCols;
+          const ix = margin + col * (imgW + 3);
+          if (col === 0 && i > 0) y += imgH + 3;
+          if (y + imgH > pageH - margin) { doc.addPage(); y = margin; }
+          try {
+            const imgData = await fetchImageAsBase64(photos[i]);
+            doc.addImage(imgData, "JPEG", ix, y, imgW, imgH, undefined, "FAST");
+          } catch { /* skip broken photos */ }
+        }
+      }
+
+      doc.save(`${card.common_name.replace(/\s+/g, "-")}-plant-card.pdf`);
+    } catch {
+      toast({ title: "Download failed", description: "Could not generate PDF. Please try again.", variant: "destructive" });
+    } finally {
+      setIsDownloading(false);
+    }
+  }
 
   // Build the full payload for PUT (merges one field at a time)
   function cardPayload(overrides: Partial<PlantCard>) {
@@ -530,6 +712,32 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
               />
             )}
           </div>
+        </div>
+
+        {/* ── Download strip ── */}
+        <div className="border-b bg-green-50 px-8 py-3 flex items-center justify-between print:hidden">
+          <p className="text-xs text-green-700">
+            Save a full copy of this plant card including all photos to your device.
+          </p>
+          <Button
+            onClick={downloadCard}
+            disabled={isDownloading}
+            size="sm"
+            className="bg-green-700 hover:bg-green-800 text-white shrink-0 gap-1.5"
+            data-testid="btn-download-plant-card"
+          >
+            {isDownloading ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                Generating PDF…
+              </>
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5" />
+                Download Plant Card
+              </>
+            )}
+          </Button>
         </div>
 
         <div className="p-8 print:p-6 space-y-6">
