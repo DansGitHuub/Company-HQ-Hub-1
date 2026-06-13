@@ -12,3 +12,9 @@ id = "xhYsKTR3Rt26-2AKAkUKY"
 uri = "file://exports/employee-fields.txt"
 type = "text"
 title = "Employee Record Fields"
+
+[[outputs]]
+id = "LM81hb_yDOeeSI8WQJQ-l"
+uri = "file://employee-data-audit.md"
+type = "text"
+title = "Employee Data Set Audit"
