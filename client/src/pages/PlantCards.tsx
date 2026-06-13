@@ -951,14 +951,14 @@ function PlantListCard({ card, onClick }: { card: PlantCard; onClick: () => void
         </div>
 
         {/* Row 3: three fixed property chips — always shown */}
-        <div className="flex gap-1 mt-1.5">
-          <Badge variant="secondary" className="text-xs">
+        <div className="flex flex-wrap gap-1 mt-1.5 overflow-hidden">
+          <Badge variant="secondary" className="text-xs max-w-[8rem] truncate shrink-0">
             {card.plant_type || "—"}
           </Badge>
-          <Badge variant="outline" className="text-xs">
+          <Badge variant="outline" className="text-xs max-w-[8rem] truncate shrink-0">
             {card.light_requirement || "—"}
           </Badge>
-          <Badge variant="outline" className="text-xs">
+          <Badge variant="outline" className="text-xs max-w-[8rem] truncate shrink-0">
             {card.hardiness_zone ? `Zone ${card.hardiness_zone}` : "Zone —"}
           </Badge>
         </div>
