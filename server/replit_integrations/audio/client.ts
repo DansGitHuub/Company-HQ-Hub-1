@@ -117,7 +117,7 @@ export async function speechToText(
   const file = await toFile(audioBuffer, `audio.${format}`);
   const response = await openai.audio.transcriptions.create({
     file,
-    model: "gpt-4o-mini-transcribe",
+    model: "gpt-5-mini-transcribe",
   });
   return response.text;
 }
@@ -129,7 +129,7 @@ export async function speechToTextStream(
   const file = await toFile(audioBuffer, `audio.${format}`);
   const stream = await openai.audio.transcriptions.create({
     file,
-    model: "gpt-4o-mini-transcribe",
+    model: "gpt-5-mini-transcribe",
     stream: true,
   });
 
@@ -213,7 +213,7 @@ export async function* voiceChatWithTextModel(
     inputFormat = "wav",
     systemPrompt = "You are a helpful assistant.",
     chatHistory = [],
-    textModel = "gpt-4o-mini",
+    textModel = "gpt-5-mini",
     locale = "en",
   } = options;
 

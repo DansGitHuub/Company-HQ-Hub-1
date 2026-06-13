@@ -714,7 +714,7 @@ Respond with a JSON object in this exact format:
 {"suggestions": [{"title": "suggestion title", "description": "detailed explanation of the improvement", "estimatedCost": "$0.05", "priority": "medium"}]}`;
 
           const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
+            model: "gpt-5-mini",
             messages: [{ role: "user", content: prompt }],
             response_format: { type: "json_object" },
             max_tokens: 500,
@@ -765,7 +765,7 @@ Respond with a JSON object in this exact format:
 {"suggestions": [{"title": "suggestion title", "description": "detailed explanation of the improvement", "estimatedCost": "$0.05", "priority": "medium"}]}`;
 
           const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
+            model: "gpt-5-mini",
             messages: [{ role: "user", content: prompt }],
             response_format: { type: "json_object" },
             max_tokens: 500,
@@ -816,7 +816,7 @@ Respond with a JSON object:
 {"suggestions": [{"title": "SOP Title - e.g., 'Lawn Mower Daily Maintenance'", "description": "Full SOP content with instructions, [IMAGE: description] and [VIDEO: description] placeholders, safety notes, equipment list, and estimated time", "estimatedCost": "$0.10", "priority": "high"}]}`;
 
         const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-5-mini",
           messages: [{ role: "user", content: prompt }],
           response_format: { type: "json_object" },
           max_tokens: 1500,
@@ -861,7 +861,7 @@ Respond with a JSON object:
 {"suggestions": [{"title": "Form Name - e.g., 'New Customer Intake Form'", "description": "Purpose: [why this form is useful]\\n\\nFields:\\n- Customer Name (text, required)\\n- Phone (phone, required)\\n- Email (email)\\n- Property Address (text, required)\\n- Service Type (select: Lawn Care, Landscaping, Snow Removal, Other)\\n- Budget Range (select: Under $500, $500-$1000, $1000-$5000, $5000+)\\n- Special Instructions (textarea)\\n- Preferred Contact Method (radio: Phone, Email, Text)", "estimatedCost": "$0.05", "priority": "medium"}]}`;
 
         const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-5-mini",
           messages: [{ role: "user", content: prompt }],
           response_format: { type: "json_object" },
           max_tokens: 1000,
@@ -904,7 +904,7 @@ Respond with a JSON object:
 {"suggestions": [{"title": "Article Title - e.g., 'Spring Lawn Care: 10 Essential Steps'", "description": "Full article content with introduction, main sections, tips, and conclusion. Make it informative and practical for both employees and customers.", "estimatedCost": "$0.08", "priority": "medium"}]}`;
 
         const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-5-mini",
           messages: [{ role: "user", content: prompt }],
           response_format: { type: "json_object" },
           max_tokens: 1500,
@@ -2349,7 +2349,7 @@ Generate comprehensive content with 5-8 detailed steps and image prompts for eve
       }
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "system",
@@ -2446,7 +2446,7 @@ Focus on accuracy. Include the most critical maintenance tasks that prevent brea
         : `Provide comprehensive OEM maintenance specifications and detailed procedures for: ${equipmentDesc}${engineInfo ? ` (Engine: ${engineInfo})` : ""}`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
@@ -2921,7 +2921,7 @@ Focus on accuracy. Include the most critical maintenance tasks that prevent brea
       const categoryNames = existingCategories.map(c => c.name);
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "system",
@@ -3516,7 +3516,7 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
       }
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "system",
@@ -6049,7 +6049,7 @@ Generate detailed information for this landscaping material.`;
         : "";
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "system",
@@ -6578,7 +6578,7 @@ SECTION GENERATION RULES:
       }
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "system",
@@ -8573,7 +8573,7 @@ Provide accurate information based on publicly available documentation.`;
           "Authorization": `Bearer ${process.env.AI_INTEGRATIONS_OPENAI_API_KEY}`
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: "gpt-5-mini",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }

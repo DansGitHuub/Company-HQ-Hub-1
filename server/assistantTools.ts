@@ -879,7 +879,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
         });
         const hint = [toolArgs.commonName, toolArgs.botanicalName, toolArgs.plantType].filter(Boolean).join(" / ");
         const completion = await aiClient.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-5-mini",
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: "You are a professional horticulturist. Return ONLY valid JSON. Be concise and accurate for northeastern USA (zones 5-7)." },
