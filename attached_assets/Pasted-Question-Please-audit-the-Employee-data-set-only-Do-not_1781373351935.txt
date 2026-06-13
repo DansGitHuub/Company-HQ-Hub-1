@@ -1,0 +1,128 @@
+Question: Please audit the **Employee data set** only. Do not make any code, database, schema, UI, permission, or workflow changes. Only inspect and report.
+
+Please answer in a clean, organized format that separates each question and answer clearly. I need the response to be easy to highlight/copy, and if possible, also create a downloadable Markdown file named:
+
+`employee-data-audit.md`
+
+Please include the following sections:
+
+# Employee Data Set Audit
+
+## 1. How does the data get there?
+
+Explain every way employee data is created, collected, imported, entered, updated, or synced.
+
+For each source, include:
+
+* Source name
+* User role or system responsible
+* Form, page, API route, backend function, or database process involved
+* Whether the data is manually entered, automatically generated, imported, or updated by another module
+* Any validation rules currently used
+
+## 2. What other modules does the Employee data set touch?
+
+List every module, feature, table, form, page, workflow, or API route that reads from, writes to, updates, depends on, or displays employee data.
+
+Please separate the answer like this:
+
+* Module / Feature
+* Type of connection: read, write, update, delete, display, permission check, reporting, etc.
+* Specific employee fields used
+* File paths, database tables, API routes, or components involved
+* Risk level if employee data is missing or incorrect
+
+Examples to check include, but are not limited to:
+
+* Estimates
+* Hiring
+* Benefits
+* Customers
+* Scheduling
+* Time tracking
+* Payroll / wages
+* Permissions / roles
+* Job assignments
+* SOPs / training
+* Reports / dashboards
+
+## 3. Who can see the data?
+
+Explain which user roles can view, create, edit, delete, or export employee data.
+
+Please separate by role:
+
+* Master Admin
+* Admin
+* Manager
+* Crew
+* Customer
+* Any other roles found in the app
+
+For each role, include:
+
+* What employee data they can see
+* What employee data they can edit
+* What employee data they should not be able to access
+* Where permissions are enforced
+* Any permission gaps or risks discovered
+
+## 4. What fields should be mandatory?
+
+Review the current employee fields and recommend which should be required.
+
+Please separate into:
+
+* Required at employee creation
+* Required before scheduling
+* Required before payroll / wage tracking
+* Required before customer-facing assignment
+* Optional fields
+* Sensitive fields that should have restricted access
+
+For each recommended required field, explain:
+
+* Why it should be mandatory
+* What could break or become unreliable if it is missing
+* Whether it is currently enforced
+
+## 5. Do we need to track a change log?
+
+Review whether the app currently tracks history or changes for employee data.
+
+Please answer:
+
+* Is there currently a change log or audit history for employee data?
+* Which fields should have change history?
+* Where should change history matter most?
+* Are wage increases, role changes, status changes, permissions, benefits, and contact info changes currently tracked?
+* Who should be able to view the change history?
+* Who should be able to make changes?
+* Should previous values, new values, changed by, changed date, and reason for change be tracked?
+
+Please specifically review whether wage history is properly preserved so past payroll, job costing, and reporting are not accidentally changed when an employee gets a raise.
+
+## 6. Missing fields, weak connections, or risks
+
+Please list anything important that appears missing, disconnected, duplicated, unclear, or risky.
+
+Separate the answer into:
+
+* Missing fields
+* Missing relationships
+* Permission risks
+* Data quality risks
+* Reporting risks
+* Payroll or wage history risks
+* Recommended fixes for later
+
+## 7. Final summary
+
+End with a plain-English summary that includes:
+
+* What is working well
+* What needs attention before alpha testing
+* What should be fixed before beta testing
+* What can wait until later
+
+Reminder: Do not make any changes. Only inspect and report.
