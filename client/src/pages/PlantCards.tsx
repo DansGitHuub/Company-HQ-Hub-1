@@ -193,9 +193,13 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
 }) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Reset edit mode whenever we're viewing a different card
+  useEffect(() => { setEditMode(false); }, [card.id]);
 
   // Build the full payload for PUT (merges one field at a time)
   function cardPayload(overrides: Partial<PlantCard>) {
@@ -436,9 +440,20 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
         </Button>
         <div className="flex items-center gap-2">
           {isAdmin && (
-            <span className="text-xs text-muted-foreground bg-green-50 border border-green-200 rounded px-2 py-1">
-              <Pencil className="w-3 h-3 inline mr-1 text-green-600" />Click any field to edit inline
-            </span>
+            <div
+              className={`flex items-center gap-2 rounded-md px-3 py-1.5 border text-xs font-medium transition-colors ${
+                editMode
+                  ? "bg-amber-50 border-amber-300 text-amber-800"
+                  : "bg-muted/50 border-border text-muted-foreground"
+              }`}
+            >
+              <Switch
+                checked={editMode}
+                onCheckedChange={setEditMode}
+                data-testid="toggle-edit-mode"
+              />
+              <span>{editMode ? "Editing" : "Read Only"}</span>
+            </div>
           )}
           <Button variant="outline" size="sm" onClick={printCard} data-testid="btn-print-plant-card">
             <Printer className="w-4 h-4 mr-1" /> Print
@@ -454,7 +469,7 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
             <div className="flex-1 space-y-1">
               {/* Common name */}
               <h1 className="text-3xl font-bold tracking-tight print:text-2xl" data-testid="plant-card-common-name">
-                {isAdmin ? (
+                {isAdmin && editMode ? (
                   <span className="group flex items-center gap-2">
                     <EditableHeader
                       value={card.common_name}
@@ -466,7 +481,7 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
               </h1>
               {/* Botanical name */}
               <p className="italic text-green-200 text-lg mt-0.5">
-                {isAdmin ? (
+                {isAdmin && editMode ? (
                   <EditableHeader
                     value={card.botanical_name ?? ""}
                     onSave={v => patch({ botanical_name: v })}
@@ -477,24 +492,24 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
               </p>
               {/* Badges row */}
               <div className="flex flex-wrap gap-2 mt-3 items-center">
-                {isAdmin ? (
+                {isAdmin && editMode ? (
                   <>
                     <InlineSelect
                       value={card.plant_type ?? ""}
                       options={PLANT_TYPES}
                       onSave={v => patch({ plant_type: v })}
                       placeholder="Type…"
-                      isAdmin={isAdmin}
+                      isAdmin={true}
                     />
                     <InlineSelect
                       value={card.deciduous_evergreen ?? ""}
                       options={["Deciduous", "Evergreen", "Semi-Evergreen"]}
                       onSave={v => patch({ deciduous_evergreen: v })}
                       placeholder="Dec/Evg…"
-                      isAdmin={isAdmin}
+                      isAdmin={true}
                     />
-                    <InlineBool value={card.flowering} label="🌸 Flowering" onToggle={() => patch({ flowering: !card.flowering })} isAdmin={isAdmin} />
-                    <InlineBool value={card.deer_resistant} label="🦌 Deer Resistant" onToggle={() => patch({ deer_resistant: !card.deer_resistant })} isAdmin={isAdmin} />
+                    <InlineBool value={card.flowering} label="🌸 Flowering" onToggle={() => patch({ flowering: !card.flowering })} isAdmin={true} />
+                    <InlineBool value={card.deer_resistant} label="🦌 Deer Resistant" onToggle={() => patch({ deer_resistant: !card.deer_resistant })} isAdmin={true} />
                   </>
                 ) : (
                   <>
@@ -530,23 +545,23 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
               { icon: Scissors, label: "Pruning", field: "pruning_time" as keyof PlantCard, type: "text", val: card.pruning_time, placeholder: "e.g. Late winter" },
               { icon: Star, label: "Flower Season", field: "flower_season" as keyof PlantCard, type: "text", val: card.flower_season, placeholder: "e.g. May-June" },
               { icon: Star, label: "Flower Color", field: "flower_color" as keyof PlantCard, type: "text", val: card.flower_color, placeholder: "e.g. White" },
-            ].filter(f => f.val || isAdmin).map(({ icon: Icon, label, field, type, val, options, placeholder }: any) => (
+            ].filter(f => f.val || (isAdmin && editMode)).map(({ icon: Icon, label, field, type, val, options, placeholder }: any) => (
               <div key={label} className="bg-gray-50 rounded-lg p-3 flex flex-col gap-1 print:bg-gray-100">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium uppercase tracking-wide">
                   <Icon className="w-3.5 h-3.5" /> {label}
                 </div>
                 <div className="text-sm font-medium">
                   {type === "select"
-                    ? <InlineSelect value={val ?? ""} options={options} onSave={v => patch({ [field]: v } as any)} isAdmin={isAdmin} />
-                    : <InlineText value={val ?? ""} onSave={v => patch({ [field]: v } as any)} placeholder={placeholder} isAdmin={isAdmin} />
+                    ? <InlineSelect value={val ?? ""} options={options} onSave={v => patch({ [field]: v } as any)} isAdmin={isAdmin && editMode} />
+                    : <InlineText value={val ?? ""} onSave={v => patch({ [field]: v } as any)} placeholder={placeholder} isAdmin={isAdmin && editMode} />
                   }
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Published toggle — admin only */}
-          {isAdmin && (
+          {/* Published toggle — admin only, edit mode only */}
+          {isAdmin && editMode && (
             <div className="flex items-center gap-2 py-1 border-t pt-4">
               <Switch checked={card.published} onCheckedChange={v => patch({ published: v })} />
               <span className="text-sm">{card.published ? "Published — visible to all users" : "Draft — hidden from non-admins"}</span>
@@ -554,49 +569,55 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
           )}
 
           {/* Special Notes */}
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-              <Leaf className="w-4 h-4" /> About This Plant
-            </h3>
-            <InlineTextArea
-              value={card.special_notes ?? ""}
-              onSave={v => patch({ special_notes: v })}
-              placeholder="Notable features, landscape uses…"
-              isAdmin={isAdmin}
-              testId="textarea-special-notes-inline"
-            />
-          </div>
+          {(card.special_notes || (isAdmin && editMode)) && (
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+                <Leaf className="w-4 h-4" /> About This Plant
+              </h3>
+              <InlineTextArea
+                value={card.special_notes ?? ""}
+                onSave={v => patch({ special_notes: v })}
+                placeholder="Notable features, landscape uses…"
+                isAdmin={isAdmin && editMode}
+                testId="textarea-special-notes-inline"
+              />
+            </div>
+          )}
 
           {/* Maintenance Notes */}
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-              <Scissors className="w-4 h-4" /> Maintenance Tips
-            </h3>
-            <InlineTextArea
-              value={card.maintenance_notes ?? ""}
-              onSave={v => patch({ maintenance_notes: v })}
-              placeholder="Practical tips for the crew…"
-              isAdmin={isAdmin}
-              testId="textarea-maintenance-inline"
-            />
-          </div>
+          {(card.maintenance_notes || (isAdmin && editMode)) && (
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+                <Scissors className="w-4 h-4" /> Maintenance Tips
+              </h3>
+              <InlineTextArea
+                value={card.maintenance_notes ?? ""}
+                onSave={v => patch({ maintenance_notes: v })}
+                placeholder="Practical tips for the crew…"
+                isAdmin={isAdmin && editMode}
+                testId="textarea-maintenance-inline"
+              />
+            </div>
+          )}
 
           {/* Pests / Issues */}
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-              <Bug className="w-4 h-4" /> Known Pests & Issues
-            </h3>
-            <InlineTextArea
-              value={card.known_pests_issues ?? ""}
-              onSave={v => patch({ known_pests_issues: v })}
-              placeholder="e.g. Aphids, scale insects…"
-              isAdmin={isAdmin}
-              testId="textarea-pests-inline"
-            />
-          </div>
+          {(card.known_pests_issues || (isAdmin && editMode)) && (
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+                <Bug className="w-4 h-4" /> Known Pests & Issues
+              </h3>
+              <InlineTextArea
+                value={card.known_pests_issues ?? ""}
+                onSave={v => patch({ known_pests_issues: v })}
+                placeholder="e.g. Aphids, scale insects…"
+                isAdmin={isAdmin && editMode}
+                testId="textarea-pests-inline"
+              />
+            </div>
+          )}
 
           {/* Photo gallery */}
-          {(photos.length > 0 || isAdmin) && (
+          {(photos.length > 0 || (isAdmin && editMode)) && (
             <div className="print:break-inside-avoid">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
                 <ImageIcon className="w-4 h-4" /> Photos
@@ -604,11 +625,11 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
               <div
                 className={[
                   "grid grid-cols-3 sm:grid-cols-4 gap-2",
-                  isAdmin && dragOver ? "ring-2 ring-green-400 ring-offset-2 rounded-lg" : "",
+                  isAdmin && editMode && dragOver ? "ring-2 ring-green-400 ring-offset-2 rounded-lg" : "",
                 ].join(" ")}
-                onDragOver={isAdmin ? (e) => { e.preventDefault(); setDragOver(true); } : undefined}
-                onDragLeave={isAdmin ? () => setDragOver(false) : undefined}
-                onDrop={isAdmin ? handleDrop : undefined}
+                onDragOver={isAdmin && editMode ? (e) => { e.preventDefault(); setDragOver(true); } : undefined}
+                onDragLeave={isAdmin && editMode ? () => setDragOver(false) : undefined}
+                onDrop={isAdmin && editMode ? handleDrop : undefined}
               >
                 {photos.map((url, i) => (
                   <div key={i} className="relative group aspect-square">
@@ -619,7 +640,7 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
                       onClick={() => setLightboxSrc(url)}
                       data-testid={`plant-photo-${i}`}
                     />
-                    {isAdmin && (
+                    {isAdmin && editMode && (
                       <button
                         className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity print:hidden"
                         onClick={() => deletePhoto.mutate(url)}
@@ -631,7 +652,7 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
                   </div>
                 ))}
 
-                {isAdmin && (
+                {isAdmin && editMode && (
                   <button
                     className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-green-500 flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-green-600 transition-colors print:hidden"
                     onClick={() => fileRef.current?.click()}
@@ -643,7 +664,7 @@ function PlantCardDetail({ card, onBack, isAdmin, onEdit }: {
                 )}
               </div>
 
-              {isAdmin && (
+              {isAdmin && editMode && (
                 <p className="text-xs text-muted-foreground mt-2 print:hidden">
                   Drag & drop images here or click "Add Photo" · First photo becomes the cover
                 </p>
