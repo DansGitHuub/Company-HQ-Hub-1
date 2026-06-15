@@ -9,13 +9,12 @@ export function registerWorkOrderRoutes(app: any) {
       `SELECT wo.*,
               COALESCE(j.title, j.client) AS job_title,
               st.name AS service_type_name,
-              u.username AS crew_leader_name,
-              u.first_name AS crew_leader_first,
-              u.last_name AS crew_leader_last
+              u.name AS crew_leader_name,
+              u.username AS crew_leader_username
        FROM work_orders wo
-       LEFT JOIN jobs j ON j.id = wo.job_id
-       LEFT JOIN service_types st ON st.id = wo.service_type_id
-       LEFT JOIN users u ON u.id = wo.crew_leader_id
+       LEFT JOIN jobs j ON j.id::text = wo.job_id::text
+       LEFT JOIN service_types st ON st.id::text = wo.service_type_id::text
+       LEFT JOIN users u ON u.id::text = wo.crew_leader_id::text
        WHERE wo.id = $1`,
       [id]
     );
@@ -133,15 +132,15 @@ export function registerWorkOrderRoutes(app: any) {
         SELECT wo.*,
                COALESCE(j.title, j.client) AS job_title,
                st.name AS service_type_name,
-               TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')) AS crew_leader_name,
+               COALESCE(u.name, u.username) AS crew_leader_name,
                (SELECT COUNT(*) FROM work_order_area_tasks t WHERE t.work_order_id = wo.id) AS total_tasks,
                (SELECT COUNT(*) FROM work_order_area_tasks t WHERE t.work_order_id = wo.id AND t.is_complete = true) AS complete_tasks,
                (SELECT COUNT(*) FROM work_order_areas a WHERE a.work_order_id = wo.id) AS total_areas,
                (SELECT COUNT(*) FROM work_order_materials m WHERE m.work_order_id = wo.id) AS total_materials
         FROM work_orders wo
-        LEFT JOIN jobs j ON j.id = wo.job_id
-        LEFT JOIN service_types st ON st.id = wo.service_type_id
-        LEFT JOIN users u ON u.id = wo.crew_leader_id
+        LEFT JOIN jobs j ON j.id::text = wo.job_id::text
+        LEFT JOIN service_types st ON st.id::text = wo.service_type_id::text
+        LEFT JOIN users u ON u.id::text = wo.crew_leader_id::text
       `;
       const params: any[] = [];
       const conds: string[] = [];

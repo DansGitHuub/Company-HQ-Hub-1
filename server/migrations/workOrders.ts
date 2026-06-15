@@ -32,9 +32,19 @@ export async function runWorkOrdersMigration() {
     `ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS contract_value DECIMAL(10,2)`,
     `ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS estimated_completion_date DATE`,
     `ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS companycam_project_id TEXT`,
-    `ALTER TABLE work_orders ALTER COLUMN job_id TYPE VARCHAR(36) USING job_id::text`,
   ];
   for (const sql of v2Cols) {
+    try { await pool.query(sql); } catch (_) {}
+  }
+
+  // Fix column types — in older prod DBs these were created as INTEGER.
+  // Cast all FK-like columns to TEXT so UUID/varchar joins work unconditionally.
+  const typeFixCols = [
+    `ALTER TABLE work_orders ALTER COLUMN job_id TYPE TEXT USING job_id::text`,
+    `ALTER TABLE work_orders ALTER COLUMN crew_leader_id TYPE TEXT USING crew_leader_id::text`,
+    `ALTER TABLE work_orders ALTER COLUMN service_type_id TYPE TEXT USING service_type_id::text`,
+  ];
+  for (const sql of typeFixCols) {
     try { await pool.query(sql); } catch (_) {}
   }
 

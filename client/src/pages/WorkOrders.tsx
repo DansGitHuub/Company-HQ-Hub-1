@@ -51,12 +51,10 @@ interface WorkOrder {
   customer_phone: string | null;
   contract_value: string | null;
   companycam_project_id: string | null;
-  service_type_id: number | null;
+  service_type_id: string | null;
   service_type_name: string | null;
   crew_leader_id: string | null;
   crew_leader_name: string | null;
-  crew_leader_first: string | null;
-  crew_leader_last: string | null;
   assigned_crew: { id: number; name: string }[];
   created_by: string | null;
   created_at: string;
@@ -405,7 +403,7 @@ function CreateWODialog({ onClose, onCreated }: { onClose: () => void; onCreated
         ...form,
         wo_type: woType,
         job_id: form.job_id !== "none" ? form.job_id : null,
-        service_type_id: form.service_type_id !== "none" ? Number(form.service_type_id) : null,
+        service_type_id: form.service_type_id !== "none" ? form.service_type_id : null,
         crew_leader_id: form.crew_leader_id !== "none" ? form.crew_leader_id : null,
         contract_value: form.contract_value ? Number(form.contract_value) : null,
       });
@@ -737,7 +735,7 @@ function OverviewTab({ detail }: { detail: WorkOrder }) {
       </Card>
 
       {/* Crew */}
-      {(detail.crew_leader_first || detail.crew_leader_name) && (
+      {detail.crew_leader_name && (
         <Card>
           <CardContent className="p-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Crew</p>
@@ -746,11 +744,7 @@ function OverviewTab({ detail }: { detail: WorkOrder }) {
                 <User className="w-4 h-4 text-primary" />
               </div>
               <div>
-                <p className="text-sm font-medium">
-                  {detail.crew_leader_first && detail.crew_leader_last
-                    ? `${detail.crew_leader_first} ${detail.crew_leader_last}`
-                    : detail.crew_leader_name}
-                </p>
+                <p className="text-sm font-medium">{detail.crew_leader_name}</p>
                 <p className="text-xs text-muted-foreground">Crew Leader</p>
               </div>
             </div>
@@ -1509,7 +1503,7 @@ function EditWODialog({ detail, onClose, onSaved }: { detail: WorkOrder; onClose
       await apiRequest("PUT", `/api/work-orders/${detail.id}`, {
         ...form, wo_type: woType, status: detail.status,
         job_id: form.job_id !== "none" ? form.job_id : null,
-        service_type_id: form.service_type_id !== "none" ? Number(form.service_type_id) : null,
+        service_type_id: form.service_type_id !== "none" ? form.service_type_id : null,
         crew_leader_id: form.crew_leader_id !== "none" ? form.crew_leader_id : null,
         contract_value: form.contract_value ? Number(form.contract_value) : null,
       });
