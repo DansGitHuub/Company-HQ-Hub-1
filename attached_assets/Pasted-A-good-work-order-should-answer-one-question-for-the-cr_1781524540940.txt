@@ -1,0 +1,289 @@
+A good work order should answer one question for the crew:
+
+"What exactly are we doing, where are we doing it, what materials do we need, how long should it take, and how do we know it's complete?"
+
+I would build two separate work order types because maintenance and installation projects have different requirements.
+
+Work Order Structure Overview
+Level 1: Customer Information
+
+Visible on every work order.
+
+Customer Details
+Customer Name
+Property Address
+Phone Number
+Email
+Gate Codes
+Pet Information
+HOA Requirements
+Parking Instructions
+Site Access Notes
+Project Information
+Job Number
+Work Order Number
+Service Type
+Salesperson
+Project Manager
+Crew Leader
+Scheduled Date
+Estimated Duration
+Maintenance Work Order
+
+Maintenance crews need speed and clarity.
+
+Property Summary
+Service Type
+Weekly Maintenance
+Spring Cleanup
+Summer Cleanup
+Fall Cleanup
+Mulch
+Bed Maintenance
+Shrub Pruning
+Fertilization
+Aeration
+Irrigation
+Miscellaneous
+Property Notes
+Customer requests
+Sensitive areas
+Recent concerns
+Areas to avoid
+Work Areas
+
+Each property is divided into zones.
+
+Example:
+
+Front Yard
+
+Tasks:
+
+Mow
+Trim
+Blow
+Weed beds
+
+Budget Hours:
+
+Crew Hours: 1.5
+
+Photos:
+
+CompanyCam links
+Left Side Yard
+
+Tasks:
+
+Trim fence line
+Weed gravel bed
+
+Budget Hours:
+
+Crew Hours: 0.5
+Backyard
+
+Tasks:
+
+Mow
+Trim around pool
+Blow patio
+
+Budget Hours:
+
+Crew Hours: 1.0
+Materials
+
+Usually minimal.
+
+Materials Needed
+Material	Qty
+Fertilizer	50 lbs
+Mulch	3 yd
+Roundup	1 gal
+Quality Checklist
+
+Crew must complete before closing.
+
+Completion Checklist
+ Lawn mowed
+ Trimming completed
+ Hard surfaces blown clean
+ Gates closed
+ Debris removed
+ Customer requests completed
+ Completion photos uploaded
+Time Tracking
+
+Actual Hours:
+
+Employee	Start	End
+Crew Leader		
+Crew Member		
+Project Work Order
+
+Projects require much more detail.
+
+This becomes the crew's construction plan.
+
+Project Summary
+Project Name
+
+Example:
+"Smith Backyard Renovation"
+
+Contract Value
+Estimated Labor Hours
+Estimated Start Date
+Estimated Completion Date
+Crew Leader
+Project Manager
+Project Documents
+
+Pull automatically from app.
+
+Attached Items
+Proposal
+Signed Contract
+Design Renderings
+Site Measurements
+Schematics
+Permit Documents
+Utility Markings
+CompanyCam Album
+Work Areas
+
+This is the most important section.
+
+Area 1: Patio
+Description
+
+Install 675 SF Unilock Beacon Hill Flagstone patio.
+
+Estimated Hours
+Task	Hours
+Excavation	16
+Base Installation	18
+Screeding	6
+Paver Installation	28
+Polymeric Sand	4
+
+Total:
+72 Labor Hours
+
+Materials
+Material	Qty
+Beacon Hill	675 SF
+#57 Stone	14 Tons
+CA7	4 Tons
+Poly Sand	8 Bags
+Quality Standards
+Verify elevations
+Verify slope
+Check pattern
+Check cuts
+Compact properly
+Area 2: Seat Wall
+Description
+
+Install 24 LF Rivercrest seat wall.
+
+Estimated Hours
+Materials
+QC Checklist
+Area 3: Landscape Bed
+Description
+
+Install shrubs, trees, mulch and edging.
+
+Estimated Hours
+Materials
+Plant List
+Plant	Qty
+Serviceberry	2
+Green Velvet Boxwood	12
+Nepeta	24
+Daily Checklist
+
+For jobs longer than one day.
+
+Day 1
+ Layout
+ Utility verification
+ Excavation
+ Spoil removal
+Day 2
+ Base installation
+ Compaction verification
+Day 3
+ Paver installation
+ Material delivery check
+Inspection Hold Points
+
+Crew cannot proceed until approved.
+
+Examples
+ Excavation inspected
+ Base depth verified
+ Drainage inspected
+ Geogrid inspected
+ Final grading approved
+
+These checkpoints will dramatically reduce expensive mistakes.
+
+CompanyCam Integration
+
+Every work order should contain required photo categories.
+
+Before Photos
+Front
+Rear
+Left
+Right
+Progress Photos
+Excavation
+Base
+Drainage
+Utilities
+Hardscape installation
+Completion Photos
+Overall
+Detail shots
+Lighting
+Plantings
+
+Require photos before work order can be closed.
+
+Recommended Database Structure
+
+If I were building CompanyHQ, I would separate it like this:
+
+Work Order
+Customer
+Property
+Schedule
+Crew
+Status
+Work Areas
+Front Yard
+Backyard
+Patio
+Bed #1
+Retaining Wall
+Tasks
+Linked to work area
+Materials
+Linked to work area
+Labor Budget
+Linked to work area
+Photos
+Linked from CompanyCam webhook
+Documents
+Linked from Designs/Schematics module
+Quality Checklist
+Linked to task
+Daily Logs
+Linked to work order
+Change Orders
+Linked to work order

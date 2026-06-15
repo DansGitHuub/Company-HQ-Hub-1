@@ -360,7 +360,7 @@ function CreateWODialog({
     try {
       const res = await apiRequest("POST", "/api/work-orders", {
         ...form,
-        job_id: form.job_id || null,
+        job_id: form.job_id && form.job_id !== "none" ? form.job_id : null,
         assigned_crew: [],
       });
       const data = await res.json();
@@ -406,7 +406,7 @@ function CreateWODialog({
                   <SelectValue placeholder="Select job" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {jobs.map(j => (
                     <SelectItem key={j.id} value={String(j.id)}>{j.title}</SelectItem>
                   ))}
