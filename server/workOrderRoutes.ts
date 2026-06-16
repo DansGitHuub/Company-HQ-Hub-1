@@ -125,6 +125,65 @@ export function registerWorkOrderRoutes(app: any) {
   //  WORK ORDERS CRUD
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // ── GET /api/jobs/:jobId/work-order ────────────────────────────────────────
+  // Returns the Work Order linked to a job, plus readiness checks, or null.
+  app.get("/api/jobs/:jobId/work-order", async (req: Request, res: Response) => {
+    try {
+      const { jobId } = req.params;
+      const { rows } = await pool.query(`
+        SELECT wo.*,
+               st.name AS service_type_name,
+               COALESCE(u.name, u.username) AS crew_leader_name,
+               (SELECT COUNT(*) FROM work_order_areas a WHERE a.work_order_id=wo.id)::int AS area_count,
+               (SELECT COUNT(*) FROM work_order_area_tasks t WHERE t.work_order_id=wo.id)::int AS task_count,
+               (SELECT COUNT(*) FROM invoices i WHERE i.job_id::text=$1 AND i.status='paid')::int AS deposit_paid_count
+        FROM work_orders wo
+        LEFT JOIN service_types st ON st.id::text = wo.service_type_id::text
+        LEFT JOIN users u ON u.id::text = wo.crew_leader_id::text
+        WHERE wo.job_id::text = $1
+        LIMIT 1
+      `, [jobId]);
+
+      if (!rows.length) return res.json(null);
+      const wo = rows[0];
+
+      const areas = await pool.query(
+        `SELECT * FROM work_order_areas WHERE work_order_id=$1 ORDER BY sort_order, id`,
+        [wo.id]
+      );
+      const tasks = await pool.query(
+        `SELECT * FROM work_order_area_tasks WHERE work_order_id=$1 ORDER BY sort_order, id`,
+        [wo.id]
+      );
+
+      const areaMap: Record<string, any> = {};
+      for (const a of areas.rows) {
+        areaMap[String(a.id)] = {
+          ...a,
+          tasks: tasks.rows.filter((t: any) => String(t.area_id) === String(a.id)),
+        };
+      }
+
+      const readiness = {
+        has_areas:       Number(wo.area_count) > 0,
+        has_tasks:       Number(wo.task_count) > 0,
+        has_crew_leader: !!wo.crew_leader_id,
+        has_site_notes:  !!(wo.site_access_notes && String(wo.site_access_notes).trim()),
+        deposit_paid:    Number(wo.deposit_paid_count) > 0,
+      };
+
+      return res.json({
+        ...wo,
+        areas: Object.values(areaMap),
+        readiness,
+        is_ready: Object.values(readiness).every(Boolean),
+      });
+    } catch (err: any) {
+      console.error("[job work-order]", err.message);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/work-orders", async (req: Request, res: Response) => {
     try {
       const { status, search, wo_type } = req.query as Record<string, string>;

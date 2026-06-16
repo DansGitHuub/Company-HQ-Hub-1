@@ -427,8 +427,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const getSectionsForRole = (role: string): NavSection[] => {
     const isAdmin = role === "Admin" || (user as any)?.isMasterAdmin;
+    const isManager = role === "Manager";
     if (!isAdmin) {
-      return sidebarSections.filter(s => s.label !== "ADMIN");
+      const base = sidebarSections.filter(s => s.label !== "ADMIN");
+      if (!isManager) {
+        // Crew (and other non-manager roles): hide Work Orders from sidebar
+        // — WO is accessed via the Work Order tab inside each Job detail page.
+        return base.map(s =>
+          s.label === "OPERATIONS"
+            ? { ...s, items: s.items.filter(i => i !== "work_orders") }
+            : s
+        );
+      }
+      return base;
     }
     return sidebarSections;
   };

@@ -58,6 +58,74 @@ async function syncInvoiceTotals(invoiceId: string) {
       AND status = 'paid'
       AND balance_due > 0
   `, [invoiceId]);
+
+  // Production handoff: if the invoice is now paid, flip the linked job to "sold"
+  // and auto-create a Work Order.
+  await checkAndFlipJobSold(invoiceId);
+}
+
+/** When a down-payment (or any) invoice goes to paid status, flip the linked
+ *  job to "sold" and auto-create a draft Work Order so the production handoff
+ *  process can begin. Safe to call multiple times — idempotent. */
+async function checkAndFlipJobSold(invoiceId: string) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT job_id, status FROM invoices WHERE id=$1`,
+      [invoiceId]
+    );
+    if (!rows.length || !rows[0].job_id || rows[0].status !== 'paid') return;
+    const job_id = rows[0].job_id;
+
+    // Flip job → sold (skip if already at a later stage)
+    await pool.query(
+      `UPDATE jobs SET status='sold', updated_at=NOW()
+       WHERE id=$1 AND status NOT IN ('sold','completed','invoiced','cancelled')`,
+      [job_id]
+    );
+
+    // Auto-create a Work Order if one doesn't already exist for this job
+    const { rows: existing } = await pool.query(
+      `SELECT id FROM work_orders WHERE job_id=$1 LIMIT 1`,
+      [job_id]
+    );
+    if (existing.length) return;
+
+    // Pull job + customer + property info for pre-population
+    const { rows: jd } = await pool.query(`
+      SELECT j.title, j.client, j.type,
+             COALESCE(NULLIF(TRIM(COALESCE(c.first_name,'')||' '||COALESCE(c.last_name,'')), ''), j.client) AS cust_name,
+             c.phone AS cust_phone,
+             NULLIF(TRIM(CONCAT_WS(', ', p.address, p.city, p.state)), '') AS cust_address,
+             se.service_type_id AS est_svc_type
+      FROM jobs j
+      LEFT JOIN customers c ON c.id::text = j.customer_id::text
+      LEFT JOIN properties p ON p.id::text = j.property_id::text
+      LEFT JOIN sales_estimates se ON se.converted_job_id = j.id
+      WHERE j.id = $1
+      LIMIT 1
+    `, [job_id]);
+    if (!jd.length) return;
+
+    const j = jd[0];
+    const woType = (j.type || '').toLowerCase().includes('maintenance') ? 'maintenance' : 'installation';
+    await pool.query(`
+      INSERT INTO work_orders
+        (job_id, title, wo_type, status, customer_name, customer_address, customer_phone,
+         service_type_id, created_by, created_at, updated_at)
+      VALUES ($1,$2,$3,'draft',$4,$5,$6,$7,'system',NOW(),NOW())
+    `, [
+      job_id,
+      j.title || `Work Order – ${j.cust_name || j.client || 'Job'}`,
+      woType,
+      j.cust_name || null,
+      j.cust_address || null,
+      j.cust_phone || null,
+      j.est_svc_type || null,
+    ]);
+    console.log(`[work-orders] Auto-created draft WO for job ${job_id}`);
+  } catch (err: any) {
+    console.error('[work-orders] checkAndFlipJobSold error:', err.message);
+  }
 }
 
 export function registerInvoiceRoutes(app: Express, requireAuth: any) {
@@ -414,6 +482,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
         WHERE id=$1 RETURNING *
       `, [req.params.id]);
       if (rows.length === 0) return res.status(404).json({ message: "Not found" });
+      await checkAndFlipJobSold(req.params.id);
       return res.json(rows[0]);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });

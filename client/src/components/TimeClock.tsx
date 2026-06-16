@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Clock, Square, ChevronDown } from "lucide-react";
+import { Clock, Square, ChevronDown, AlertTriangle } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TimeEntry {
@@ -131,15 +131,26 @@ export default function TimeClock() {
     refetchInterval: 30_000,
   });
 
-  // Jobs — only scheduled or in-progress
+  // Jobs — scheduled, sold, or in-progress
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: ["/api/jobs", "active"],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/jobs?status=scheduled,in_progress");
+      const res = await apiRequest("GET", "/api/jobs?status=scheduled,in_progress,sold");
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     },
     enabled: open && !activeEntry,
+  });
+
+  // WO readiness — fetched when a job is selected
+  const { data: jobWO } = useQuery<{ status: string; is_ready: boolean } | null>({
+    queryKey: ["/api/jobs", selectedJob, "work-order"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/jobs/${selectedJob}/work-order`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: open && !activeEntry && !!selectedJob,
   });
 
   // Unified work areas — fetched whenever the popover is open (re-fetches when job changes)
@@ -352,6 +363,17 @@ export default function TimeClock() {
               ))}
             </select>
           </div>
+
+          {/* WO readiness warning */}
+          {selectedJob && jobWO && jobWO.status === "draft" && (
+            <div className="flex items-start gap-2 rounded-md bg-amber-50 border border-amber-200 px-2.5 py-2 text-amber-800"
+              data-testid="wo-not-ready-warning">
+              <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+              <p className="text-xs leading-snug">
+                Work Order is still in <strong>Draft</strong>. Ask your manager to mark it Ready before clocking in.
+              </p>
+            </div>
+          )}
 
           {/* Work Area selector */}
           <div className="space-y-1">

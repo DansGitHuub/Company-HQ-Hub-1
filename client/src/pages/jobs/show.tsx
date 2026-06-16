@@ -30,6 +30,7 @@ import { format, parseISO } from "date-fns";
 import { JobFormModal, JOB_STATUSES } from "./JobFormModal";
 import { InvoiceFormModal } from "@/pages/invoices/InvoiceFormModal";
 import { useAuth } from "@/hooks/use-auth";
+import JobWorkOrderTab from "./JobWorkOrderTab";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TimeEntry {
@@ -54,10 +55,11 @@ interface JobDetail {
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 const STATUS_MAP: Record<string, { label: string; cls: string; dot: string }> = {
-  lead:        { label: "Lead",        cls: "bg-gray-100 text-gray-700 border-gray-200",      dot: "bg-gray-400" },
-  scheduled:   { label: "Scheduled",   cls: "bg-blue-100 text-blue-800 border-blue-200",      dot: "bg-blue-500" },
-  in_progress: { label: "In Progress", cls: "bg-amber-100 text-amber-800 border-amber-200",   dot: "bg-amber-500 animate-pulse" },
-  completed:   { label: "Completed",   cls: "bg-green-100 text-green-800 border-green-200",   dot: "bg-green-500" },
+  lead:        { label: "Lead",        cls: "bg-gray-100 text-gray-700 border-gray-200",         dot: "bg-gray-400" },
+  scheduled:   { label: "Scheduled",   cls: "bg-blue-100 text-blue-800 border-blue-200",         dot: "bg-blue-500" },
+  sold:        { label: "Sold",        cls: "bg-emerald-100 text-emerald-800 border-emerald-200", dot: "bg-emerald-500" },
+  in_progress: { label: "In Progress", cls: "bg-amber-100 text-amber-800 border-amber-200",      dot: "bg-amber-500 animate-pulse" },
+  completed:   { label: "Completed",   cls: "bg-green-100 text-green-800 border-green-200",      dot: "bg-green-500" },
   invoiced:    { label: "Invoiced",    cls: "bg-purple-100 text-purple-800 border-purple-200",dot: "bg-purple-500" },
   cancelled:   { label: "Cancelled",   cls: "bg-red-100 text-red-800 border-red-200",         dot: "bg-red-500" },
 };
@@ -814,6 +816,7 @@ export default function JobDetailPage() {
         <Tabs defaultValue="overview">
           <TabsList className="mb-4">
             <TabsTrigger value="overview">{t("tabOverview")}</TabsTrigger>
+            <TabsTrigger value="work-order" data-testid="tab-work-order">Work Order</TabsTrigger>
             <TabsTrigger value="time">{t("tabTime")}</TabsTrigger>
             <TabsTrigger value="notes">{t("tabNotes")}</TabsTrigger>
             <TabsTrigger value="invoices">{t("tabInvoices")}</TabsTrigger>
@@ -1017,6 +1020,11 @@ export default function JobDetailPage() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Work Order Tab */}
+          <TabsContent value="work-order">
+            <JobWorkOrderTab jobId={id} isAdminOrManager={isAdminOrManager} />
           </TabsContent>
 
           {/* Daily Logs Tab */}
