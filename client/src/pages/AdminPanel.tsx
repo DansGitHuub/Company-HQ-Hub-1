@@ -932,7 +932,8 @@ export default function AdminPanel() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState("users");
+  const [activeTab, setActiveTab] = useState("home");
+  const [homeSystemExpanded, setHomeSystemExpanded] = useState(false);
 
   // On mount: honour ?tab= param so OAuth callbacks (e.g. QuickBooks) land on
   // the correct section rather than defaulting to "users".
@@ -1268,60 +1269,65 @@ export default function AdminPanel() {
       <div className="block md:hidden">
         <Select value={activeTab} onValueChange={(v) => {
           if (v === "time-reports") { navigate("/admin/time-reports"); return; }
-          if (v === "work-areas") { navigate("/admin/work-areas"); return; }
-          if (v === "service-types") { navigate("/admin/service-types"); return; }
+          if (v === "time-admin") { navigate("/admin/time"); return; }
+          if (v === "worksheet-review") { navigate("/worksheet-review"); return; }
           if (v === "qbo-export") { navigate("/admin/qbo-export"); return; }
           if (v === "archive") { navigate("/admin/archive"); return; }
-          if (v === "qbo-export-cs") { navigate("/admin/qbo-export"); return; }
+          if (v === "work-areas") { navigate("/admin/work-areas"); return; }
+          if (v === "service-types") { navigate("/admin/service-types"); return; }
+          if (v === "catalog-link") { navigate("/catalog"); return; }
+          if (v === "plant-cards-link") { navigate("/plant-cards"); return; }
+          if (v === "admin-tools") { navigate("/tools"); return; }
           setActiveTab(v);
         }}>
           <SelectTrigger className="w-full" data-testid="admin-mobile-nav">
             <SelectValue placeholder="Select section…" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="home">⬅ Overview</SelectItem>
             <SelectGroup>
-              <SelectLabel>People &amp; HR</SelectLabel>
+              <SelectLabel>Daily Operations</SelectLabel>
+              <SelectItem value="time-reports">Time Reports</SelectItem>
+              <SelectItem value="time-admin">Time Admin</SelectItem>
+              <SelectItem value="worksheet-review">Worksheet Review</SelectItem>
+              <SelectItem value="qbo-export">QuickBooks Export</SelectItem>
+              <SelectItem value="archive">Time Archive</SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>People</SelectLabel>
               <SelectItem value="users">{t("nav.employees")}</SelectItem>
               <SelectItem value="requests">HR Communications</SelectItem>
               <SelectItem value="agreements">Agreement Templates</SelectItem>
-              <SelectItem value="todos">Task Access</SelectItem>
               <SelectItem value="suggestions">Suggestions</SelectItem>
             </SelectGroup>
             <SelectGroup>
-              <SelectLabel>Content</SelectLabel>
+              <SelectLabel>Settings</SelectLabel>
+              <SelectItem value="company">Company Info &amp; Branding</SelectItem>
+              <SelectItem value="divisions">Divisions</SelectItem>
+              <SelectItem value="work-areas">Work Areas</SelectItem>
+              <SelectItem value="service-types">Service Types</SelectItem>
+              <SelectItem value="estimate-templates">Estimate Templates</SelectItem>
+              <SelectItem value="terms">Terms &amp; Conditions</SelectItem>
+              <SelectItem value="quickbooks">QuickBooks Settings</SelectItem>
+              <SelectItem value="catalog-link">Materials Catalog</SelectItem>
+              <SelectItem value="plant-cards-link">Plant Library</SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>Content &amp; SOPs</SelectLabel>
               <SelectItem value="sop-pipeline">SOP Pipeline</SelectItem>
               <SelectItem value="documents">Documents</SelectItem>
               <SelectItem value="shared-links">Shared Links</SelectItem>
-              <SelectItem value="help-reports">Help Reports</SelectItem>
             </SelectGroup>
             <SelectGroup>
-              <SelectLabel>Company</SelectLabel>
-              <SelectItem value="company">Company Info &amp; Branding</SelectItem>
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel>Company Settings</SelectLabel>
-              <SelectItem value="divisions">Divisions</SelectItem>
-              <SelectItem value="estimate-templates">Estimate Templates</SelectItem>
-              <SelectItem value="quickbooks">QuickBooks</SelectItem>
-              <SelectItem value="terms">Terms &amp; Conditions</SelectItem>
-              <SelectItem value="integration-wizard">Integration Wizard</SelectItem>
-              <SelectItem value="qbo-export-cs">QB Export</SelectItem>
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel>AI &amp; Automation</SelectLabel>
+              <SelectLabel>System &amp; Advanced</SelectLabel>
+              <SelectItem value="admin-tools">Admin Tools</SelectItem>
+              <SelectItem value="todos">Task Access</SelectItem>
               <SelectItem value="assistant-agents">AI Assistant</SelectItem>
               <SelectItem value="ai-logs">AI Logs</SelectItem>
               {isMasterAdmin && <SelectItem value="ai-agents">AI Agents</SelectItem>}
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel>Operations</SelectLabel>
-              <SelectItem value="time-reports">Time Reports</SelectItem>
+              <SelectItem value="integration-wizard">Integration Wizard</SelectItem>
               <SelectItem value="process-auditor">Process Auditor</SelectItem>
-              <SelectItem value="work-areas">Work Areas</SelectItem>
-              <SelectItem value="archive">Archive</SelectItem>
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel>System</SelectLabel>
+              <SelectItem value="help-reports">Help Reports</SelectItem>
               <SelectItem value="app-testing">App Testing</SelectItem>
               <SelectItem value="system-status">System Status</SelectItem>
               {isMasterAdmin && <SelectItem value="diagnostics">Diagnostics</SelectItem>}
@@ -1331,20 +1337,214 @@ export default function AdminPanel() {
       </div>
 
       <div className="flex gap-6 items-start">
-        {/* Left sidebar nav — hidden on mobile, shown on md+ */}
-        <div className="hidden md:block w-48 shrink-0 sticky top-4">
-          <AdminSidebar
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            pendingRequests={pendingRequests}
-            isMasterAdmin={isMasterAdmin}
-            t={t}
-          />
-        </div>
+        {/* Left sidebar nav — hidden on home view and mobile */}
+        {activeTab !== "home" && (
+          <div className="hidden md:block w-48 shrink-0 sticky top-4">
+            <button
+              onClick={() => setActiveTab("home")}
+              data-testid="admin-nav-back-home"
+              className="w-full flex items-center gap-1.5 px-3 py-2 mb-3 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <ChevronDown className="h-3 w-3 -rotate-90" />
+              Back to overview
+            </button>
+            <AdminSidebar
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              pendingRequests={pendingRequests}
+              isMasterAdmin={isMasterAdmin}
+              t={t}
+            />
+          </div>
+        )}
 
         {/* Main content */}
         <div className="flex-1 min-w-0">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+
+        {/* ── Home overview card grid ── */}
+        <TabsContent value="home" className="mt-0">
+          <div className="space-y-4">
+
+            {/* Daily Operations */}
+            <div className="rounded-xl border border-green-500/20 bg-card overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-3 border-b bg-green-500/5">
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0" />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-foreground">Daily Operations</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">⭐ Quick access</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Payroll, hours &amp; billing — used every day</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-border/30">
+                {([
+                  { label: "Time Reports", desc: "View & adjust all employee hours", icon: ClipboardList, href: "/admin/time-reports", daily: true },
+                  { label: "Time Admin", desc: "Manage clock-in/out records", icon: Clock, href: "/admin/time", daily: false },
+                  { label: "Worksheet Review", desc: "Review daily crew worksheets", icon: ClipboardCheck, href: "/worksheet-review", daily: true },
+                  { label: "QuickBooks Export", desc: "Export time to QuickBooks payroll", icon: Upload, href: "/admin/qbo-export", daily: true },
+                  { label: "Time Archive", desc: "Archive old completed entries", icon: Archive, href: "/admin/archive", daily: false },
+                ] as { label: string; desc: string; icon: any; href: string; daily: boolean }[]).map((item) => (
+                  <button key={item.label} onClick={() => navigate(item.href)} data-testid={`admin-home-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                    className={`flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 ${item.daily ? "border-l-green-500 hover:bg-green-500/10" : "border-l-transparent hover:bg-muted/50"}`}>
+                    <item.icon className={`h-4 w-4 shrink-0 ${item.daily ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`} />
+                    <div>
+                      <div className={`text-xs font-medium flex items-center gap-1.5 flex-wrap ${item.daily ? "text-green-700 dark:text-green-300" : "text-foreground"}`}>
+                        {item.label}
+                        {item.daily && <span className="text-[9px] font-bold bg-green-500/20 text-green-600 dark:text-green-400 px-1.5 py-px rounded">DAILY USE</span>}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{item.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* People */}
+            <div className="rounded-xl border border-blue-500/20 bg-card overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-3 border-b bg-blue-500/5">
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-foreground">People</span>
+                    {pendingRequests.length > 0 && (
+                      <Badge variant="destructive" className="h-5 px-2 text-xs">{pendingRequests.length} pending</Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Staff, hiring &amp; HR communications</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-px bg-border/30">
+                {([
+                  { label: "User Management", desc: "Roles, access & permissions", icon: Users, tab: "users" },
+                  { label: "HR Communications", desc: "Messages & requests", icon: Megaphone, tab: "requests" },
+                  { label: "Agreement Templates", desc: "Position-based agreements", icon: FileSignature, tab: "agreements" },
+                  { label: "Suggestions", desc: "Customer improvement ideas", icon: Lightbulb, tab: "suggestions" },
+                ] as { label: string; desc: string; icon: any; tab: string }[]).map((item) => (
+                  <button key={item.label} onClick={() => setActiveTab(item.tab)} data-testid={`admin-home-${item.tab}`}
+                    className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">
+                    <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div>
+                      <div className="text-xs font-medium text-foreground">{item.label}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{item.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Settings */}
+            <div className="rounded-xl border border-purple-500/20 bg-card overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-3 border-b bg-purple-500/5">
+                <div className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
+                <div className="flex-1">
+                  <span className="text-sm font-semibold text-foreground">Settings</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">Company info, divisions &amp; integrations</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-border/30">
+                {([
+                  { label: "Company Info & Branding", desc: "Name, logo, colors", icon: Building2, tab: "company" },
+                  { label: "Divisions", desc: "Business divisions", icon: Layers, tab: "divisions" },
+                  { label: "Work Areas", desc: "Service zones", icon: Layers, href: "/admin/work-areas" },
+                  { label: "Service Types", desc: "Job service categories", icon: Tag, href: "/admin/service-types" },
+                  { label: "Estimate Templates", desc: "Default estimate types", icon: FileText, tab: "estimate-templates" },
+                  { label: "Terms & Conditions", desc: "Legal terms", icon: FileSignature, tab: "terms" },
+                  { label: "QuickBooks Settings", desc: "QB connection settings", icon: DollarSign, tab: "quickbooks" },
+                  { label: "Materials Catalog", desc: "Materials & labor catalog", icon: BookOpen, href: "/catalog" },
+                  { label: "Plant Library", desc: "Plant card database", icon: Leaf, href: "/plant-cards" },
+                ] as { label: string; desc: string; icon: any; tab?: string; href?: string }[]).map((item) => (
+                  <button key={item.label} onClick={() => item.href ? navigate(item.href) : setActiveTab(item.tab!)} data-testid={`admin-home-${item.tab ?? item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                    className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">
+                    <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div>
+                      <div className="text-xs font-medium text-foreground">{item.label}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{item.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Content & SOPs */}
+            <div className="rounded-xl border border-amber-500/20 bg-card overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-3 border-b bg-amber-500/5">
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                <div className="flex-1">
+                  <span className="text-sm font-semibold text-foreground">Content &amp; SOPs</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">Training, documents &amp; shared resources</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-border/30">
+                {([
+                  { label: "SOP Pipeline", desc: "Create & schedule SOPs", icon: Zap, tab: "sop-pipeline" },
+                  { label: "Documents", desc: "Shared file library", icon: FileText, tab: "documents" },
+                  { label: "Shared Links", desc: "External resource links", icon: ExternalLink, tab: "shared-links" },
+                ] as { label: string; desc: string; icon: any; tab: string }[]).map((item) => (
+                  <button key={item.label} onClick={() => setActiveTab(item.tab)} data-testid={`admin-home-${item.tab}`}
+                    className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">
+                    <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div>
+                      <div className="text-xs font-medium text-foreground">{item.label}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{item.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* System & Advanced — collapsible */}
+            <div className="rounded-xl border border-slate-500/20 bg-card overflow-hidden opacity-80">
+              <button
+                onClick={() => setHomeSystemExpanded(v => !v)}
+                className="w-full flex items-center gap-3 px-5 py-3 border-b bg-slate-500/5 hover:bg-slate-500/10 transition-colors"
+                data-testid="admin-home-system-toggle"
+              >
+                <div className="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0" />
+                <div className="flex-1 text-left">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-foreground">System &amp; Advanced</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20">🔒 Advanced</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Technical tools — rarely needed</p>
+                </div>
+                {homeSystemExpanded
+                  ? <ChevronUp className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+                  : <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">▼ expand</span>}
+              </button>
+              {homeSystemExpanded && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-border/30">
+                  {([
+                    { label: "Admin Tools", desc: "Form builder & admin utilities", icon: Wrench, href: "/tools" },
+                    { label: "Task Access", desc: "Who can see tasks", icon: CheckCircle, tab: "todos" },
+                    { label: "AI Assistant", desc: "AI assistant configuration", icon: Sparkles, tab: "assistant-agents" },
+                    { label: "AI Logs", desc: "AI usage history", icon: Bot, tab: "ai-logs" },
+                    { label: "Integration Wizard", desc: "Connect services", icon: Puzzle, tab: "integration-wizard" },
+                    { label: "Process Auditor", desc: "Run process audits", icon: ClipboardCheck, tab: "process-auditor" },
+                    { label: "Help Reports", desc: "Reported help articles", icon: HelpCircle, tab: "help-reports" },
+                    { label: "CC Reconciliation", desc: "CompanyCam sync", icon: Camera, href: "/admin/companycam-reconciliation" },
+                    { label: "CC Webhook Health", desc: "Webhook status", icon: Activity, href: "/admin/companycam-health" },
+                    { label: "Customer Duplicates", desc: "Find duplicate records", icon: GitMerge, href: "/admin/customer-duplicates" },
+                    { label: "App Testing", desc: "Internal testing tools", icon: Eye, tab: "app-testing" },
+                    { label: "System Status", desc: "System diagnostics", icon: AlertCircle, tab: "system-status" },
+                    ...(isMasterAdmin ? [{ label: "Diagnostics", desc: "Deep diagnostics", icon: Wrench, tab: "diagnostics" }] : []),
+                  ] as { label: string; desc: string; icon: any; tab?: string; href?: string }[]).map((item) => (
+                    <button key={item.label} onClick={() => item.href ? navigate(item.href) : setActiveTab(item.tab!)} data-testid={`admin-home-sys-${item.tab ?? item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                      className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">
+                      <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div>
+                        <div className="text-xs font-medium text-foreground">{item.label}</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">{item.desc}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+        </TabsContent>
 
         <TabsContent value="users" className="mt-6">
           <Card>
