@@ -78,6 +78,7 @@ import {
   ArrowLeftRight,
   Link2Off,
   Pencil,
+  Leaf,
   Camera,
   GitMerge,
   Activity,
@@ -672,68 +673,63 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
   t: any;
 }) {
   const [, navigate] = useLocation();
+  const [systemExpanded, setSystemExpanded] = useState(false);
   const groups = [
     {
-      label: "People & HR",
+      label: "Daily Operations",
+      items: [
+        { value: "time-reports", label: "Time Reports", icon: ClipboardList, href: "/admin/time-reports" },
+        { value: "time-admin", label: "Time Admin", icon: Clock, href: "/admin/time" },
+        { value: "worksheet-review", label: "Worksheet Review", icon: ClipboardCheck, href: "/worksheet-review" },
+        { value: "qbo-export", label: "QuickBooks Export", icon: Upload, href: "/admin/qbo-export" },
+        { value: "archive", label: "Time Archive", icon: Archive, href: "/admin/archive" },
+      ],
+    },
+    {
+      label: "People",
       items: [
         { value: "users", label: t("nav.employees"), icon: Users },
         { value: "requests", label: "HR Communications", icon: Megaphone, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
         { value: "agreements", label: "Agreement Templates", icon: FileSignature },
-        { value: "todos", label: "Task Access", icon: CheckCircle },
         { value: "suggestions", label: "Suggestions", icon: Lightbulb },
       ],
     },
     {
-      label: "Content",
+      label: "Settings",
+      items: [
+        { value: "company", label: "Company Info & Branding", icon: Building2 },
+        { value: "divisions", label: "Divisions", icon: Layers },
+        { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
+        { value: "service-types", label: "Service Types", icon: Tag, href: "/admin/service-types" },
+        { value: "estimate-templates", label: "Estimate Templates", icon: FileText },
+        { value: "terms", label: "Terms & Conditions", icon: FileSignature },
+        { value: "quickbooks", label: "QuickBooks Settings", icon: DollarSign },
+        { value: "catalog-link", label: "Materials Catalog", icon: BookOpen, href: "/catalog" },
+        { value: "plant-cards-link", label: "Plant Library", icon: Leaf, href: "/plant-cards" },
+      ],
+    },
+    {
+      label: "Content & SOPs",
       items: [
         { value: "sop-pipeline", label: "SOP Pipeline", icon: Zap },
         { value: "documents", label: "Documents", icon: FileText },
         { value: "shared-links", label: "Shared Links", icon: ExternalLink },
-        { value: "help-reports", label: "Help Reports", icon: HelpCircle },
       ],
     },
     {
-      label: "Company",
+      label: "System & Advanced",
       items: [
-        { value: "company", label: "Company Info & Branding", icon: Building2 },
-      ],
-    },
-    {
-      label: "Company Settings",
-      items: [
-        { value: "divisions", label: "Divisions", icon: Layers },
-        { value: "estimate-templates", label: "Estimate Templates", icon: FileText },
-        { value: "quickbooks", label: "QuickBooks", icon: DollarSign },
-        { value: "terms", label: "Terms & Conditions", icon: FileSignature },
-        { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle },
-        { value: "qbo-export-cs", label: "QB Export", icon: Upload, href: "/admin/qbo-export" },
-      ],
-    },
-    {
-      label: "AI & Automation",
-      items: [
+        { value: "admin-tools", label: "Admin Tools", icon: Wrench, href: "/tools" },
+        { value: "todos", label: "Task Access", icon: CheckCircle },
         { value: "assistant-agents", label: "AI Assistant", icon: Sparkles },
         { value: "ai-logs", label: "AI Logs", icon: Bot },
         ...(isMasterAdmin ? [{ value: "ai-agents", label: "AI Agents", icon: Bot }] : []),
-      ],
-    },
-    {
-      label: "Operations",
-      items: [
-        { value: "time-reports", label: "Time Reports", icon: ClipboardList, href: "/admin/time-reports" },
+        { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle },
         { value: "process-auditor", label: "Process Auditor", icon: ClipboardCheck },
-        { value: "worksheet-review", label: "Worksheet Review", icon: FileText, href: "/worksheet-review" },
-        { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
-        { value: "service-types", label: "Service Types", icon: Tag, href: "/admin/service-types" },
-        { value: "archive", label: "Archive", icon: Archive, href: "/admin/archive" },
+        { value: "help-reports", label: "Help Reports", icon: HelpCircle },
         { value: "cc-reconciliation", label: "CC Reconciliation", icon: Camera, href: "/admin/companycam-reconciliation" },
         { value: "cc-health", label: "CC Webhook Health", icon: Activity, href: "/admin/companycam-health" },
         { value: "customer-duplicates", label: "Customer Duplicates", icon: GitMerge, href: "/admin/customer-duplicates" },
-      ],
-    },
-    {
-      label: "System",
-      items: [
         { value: "app-testing", label: "App Testing", icon: Eye },
         { value: "system-status", label: "System Status", icon: AlertCircle },
         ...(isMasterAdmin ? [{ value: "diagnostics", label: "Diagnostics", icon: Wrench }] : []),
@@ -743,54 +739,75 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
 
   const groupLabelColor = (label: string) => {
     switch (label) {
-      case "People & HR": return "text-blue-600 dark:text-blue-400";
-      case "Company Settings": return "text-purple-600 dark:text-purple-400";
-      case "Operations": return "text-green-600 dark:text-green-400";
-      case "AI & Automation": return "text-orange-500 dark:text-orange-400";
+      case "Daily Operations": return "text-green-600 dark:text-green-400";
+      case "People": return "text-blue-600 dark:text-blue-400";
+      case "Settings": return "text-purple-600 dark:text-purple-400";
+      case "Content & SOPs": return "text-amber-600 dark:text-amber-400";
+      case "System & Advanced": return "text-muted-foreground/60";
       default: return "text-muted-foreground/60";
     }
   };
 
+  const navItemRow = (item: any) => {
+    const Icon = item.icon;
+    const isActive = item.href ? false : activeTab === item.value;
+    const handleClick = () => {
+      if (item.href) {
+        navigate(item.href);
+      } else {
+        setActiveTab(item.value);
+      }
+    };
+    return (
+      <button
+        key={item.value}
+        onClick={handleClick}
+        data-testid={`admin-nav-${item.value}`}
+        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
+          isActive
+            ? "bg-primary text-primary-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+        }`}
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="truncate">{item.label}</span>
+        {item.badge && (
+          <Badge variant="destructive" className="ml-auto h-5 min-w-[20px] px-1 text-xs shrink-0">
+            {item.badge}
+          </Badge>
+        )}
+      </button>
+    );
+  };
+
   return (
     <nav className="flex flex-col gap-1 py-1" data-testid="admin-sidebar">
-      {groups.map((group) => (
-        <div key={group.label} className="mb-3">
-          <p className={`px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest select-none ${groupLabelColor(group.label)}`}>
-            {group.label}
-          </p>
-          {group.items.map((item) => {
-            const Icon = item.icon;
-            const isActive = (item as any).href ? false : activeTab === item.value;
-            const handleClick = () => {
-              if ((item as any).href) {
-                navigate((item as any).href);
-              } else {
-                setActiveTab(item.value);
-              }
-            };
-            return (
+      {groups.map((group) => {
+        const isSystem = group.label === "System & Advanced";
+        return (
+          <div key={group.label} className="mb-3">
+            {isSystem ? (
               <button
-                key={item.value}
-                onClick={handleClick}
-                data-testid={`admin-nav-${item.value}`}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
-                  isActive
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
+                onClick={() => setSystemExpanded(v => !v)}
+                className="w-full flex items-center justify-between px-3 mb-1 hover:opacity-80 transition-opacity"
+                data-testid="admin-nav-system-toggle"
               >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{item.label}</span>
-                {(item as any).badge && (
-                  <Badge variant="destructive" className="ml-auto h-5 min-w-[20px] px-1 text-xs shrink-0">
-                    {(item as any).badge}
-                  </Badge>
-                )}
+                <span className={`text-[10px] font-semibold uppercase tracking-widest select-none ${groupLabelColor(group.label)}`}>
+                  {group.label}
+                </span>
+                {systemExpanded
+                  ? <ChevronUp className="h-3 w-3 text-muted-foreground/60" />
+                  : <ChevronDown className="h-3 w-3 text-muted-foreground/60" />}
               </button>
-            );
-          })}
-        </div>
-      ))}
+            ) : (
+              <p className={`px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest select-none ${groupLabelColor(group.label)}`}>
+                {group.label}
+              </p>
+            )}
+            {(!isSystem || systemExpanded) && group.items.map(navItemRow)}
+          </div>
+        );
+      })}
     </nav>
   );
 }

@@ -422,7 +422,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["todos", "work_orders", "scheduling", "time_tracking", "equipment", "forms"] },
     { label: "RESOURCES", items: ["sops", "education", "testing"] },
-    { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "time_admin", "mors_budget", "catalog", "plant_cards", "tools"] },
+    { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "budget_settings"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {
