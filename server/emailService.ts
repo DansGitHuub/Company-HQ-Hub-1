@@ -51,11 +51,10 @@ export async function sendEmail(
     return true;
   } catch (err: any) {
     const responseBody = err?.response?.body;
-    console.error("[emailService] Failed to send email:", {
-      to,
-      subject,
-      error: responseBody || err.message,
-    });
+    const errorDetail = responseBody
+      ? JSON.stringify(responseBody, null, 2)
+      : err.message;
+    console.error(`[emailService] Failed to send email to ${to} | Subject: "${subject}" | Error: ${errorDetail}`);
     return false;
   }
 }
