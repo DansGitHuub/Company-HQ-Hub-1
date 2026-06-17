@@ -71,7 +71,8 @@ import {
   todoAssignments,
   users,
   type User,
-  activityLog
+  activityLog,
+  dailyAgendas
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -11148,6 +11149,83 @@ Provide accurate information based on publicly available documentation.`;
       });
     } catch (err: any) {
       console.error("[status] Error:", err.message);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // ─── Daily Agenda ───────────────────────────────────────────────────────────
+  app.get("/api/daily-agenda/history", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const rows = await db
+        .select({
+          id: dailyAgendas.id,
+          date: dailyAgendas.date,
+          todoItems: dailyAgendas.todoItems,
+          updatedAt: dailyAgendas.updatedAt,
+        })
+        .from(dailyAgendas)
+        .where(eq(dailyAgendas.userId, userId))
+        .orderBy(desc(dailyAgendas.date))
+        .limit(60);
+      return res.json(rows);
+    } catch (err: any) {
+      console.error("[daily-agenda] history error:", err.message);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.get("/api/daily-agenda", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const date = (req.query.date as string) || new Date().toISOString().split("T")[0];
+      const rows = await db
+        .select()
+        .from(dailyAgendas)
+        .where(and(eq(dailyAgendas.userId, userId), eq(dailyAgendas.date, date)))
+        .limit(1);
+      if (rows.length > 0) return res.json(rows[0]);
+      const [fresh] = await db
+        .insert(dailyAgendas)
+        .values({
+          userId,
+          date,
+          todoItems: [],
+          delegateItems: [],
+          equipmentItems: [],
+          needOrderItems: [],
+          newLeads: [],
+          memoItems: [],
+          callItems: [],
+          otherItems: [],
+        })
+        .returning();
+      return res.json(fresh);
+    } catch (err: any) {
+      console.error("[daily-agenda] get error:", err.message);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.put("/api/daily-agenda/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const { id } = req.params;
+      const check = await db
+        .select({ id: dailyAgendas.id })
+        .from(dailyAgendas)
+        .where(and(eq(dailyAgendas.id, id), eq(dailyAgendas.userId, userId)))
+        .limit(1);
+      if (check.length === 0) return res.status(404).json({ message: "Not found" });
+      const { todoItems, delegateItems, equipmentItems, needOrderItems, newLeads, memoItems, callItems, otherItems } = req.body;
+      const [updated] = await db
+        .update(dailyAgendas)
+        .set({ todoItems, delegateItems, equipmentItems, needOrderItems, newLeads, memoItems, callItems, otherItems, updatedAt: new Date() })
+        .where(eq(dailyAgendas.id, id))
+        .returning();
+      return res.json(updated);
+    } catch (err: any) {
+      console.error("[daily-agenda] put error:", err.message);
       return res.status(500).json({ message: "Server error" });
     }
   });

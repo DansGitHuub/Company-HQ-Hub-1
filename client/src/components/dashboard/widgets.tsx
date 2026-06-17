@@ -58,6 +58,7 @@ import {
   Save,
   AlarmClock,
   Palette,
+  ClipboardList,
   X,
 } from "lucide-react";
 import type { WidgetSize } from "./widgetRegistry";
@@ -1385,6 +1386,82 @@ export function NotesWidget({ size }: WidgetProps) {
   );
 }
 
+function DailyAgendaWidget({ size }: WidgetProps) {
+  function todayStr() {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  }
+
+  const { data: agenda, isLoading } = useQuery<any>({
+    queryKey: ["/api/daily-agenda", "widget"],
+    queryFn: async () => {
+      const r = await fetch(`/api/daily-agenda?date=${todayStr()}`, { credentials: "include" });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const todos: any[] = Array.isArray(agenda?.todoItems) ? agenda.todoItems : [];
+  const withText = todos.filter((t: any) => t.text);
+  const done = withText.filter((t: any) => t.completed);
+  const preview = withText.slice(0, size === "small" ? 3 : size === "medium" ? 5 : 7);
+
+  return (
+    <div className="h-full flex flex-col gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-muted-foreground font-medium">
+          {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+        </span>
+        {withText.length > 0 && (
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${done.length === withText.length ? "border-green-500 text-green-600" : "border-border text-muted-foreground"}`}>
+            {done.length}/{withText.length} done
+          </span>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center flex-1">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        </div>
+      ) : preview.length === 0 ? (
+        <Link href="/daily-agenda">
+          <div className="flex-1 flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-4">
+            <ClipboardList className="h-7 w-7 opacity-40" />
+            <p className="text-xs">Start today's agenda</p>
+          </div>
+        </Link>
+      ) : (
+        <div className="flex-1 space-y-1 min-h-0 overflow-hidden">
+          {preview.map((item: any) => (
+            <div key={item.id} className="flex items-center gap-1.5">
+              {item.completed
+                ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                : <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              }
+              <span className={`text-xs truncate ${item.completed ? "line-through text-muted-foreground" : ""}`}>
+                {item.text}
+              </span>
+            </div>
+          ))}
+          {withText.length > preview.length && (
+            <p className="text-xs text-muted-foreground pl-5">+{withText.length - preview.length} more</p>
+          )}
+        </div>
+      )}
+
+      <Link href="/daily-agenda">
+        <div
+          className="flex items-center justify-center gap-1.5 w-full mt-auto pt-2 border-t text-xs text-primary hover:text-primary/80 transition-colors font-medium cursor-pointer"
+          data-testid="open-daily-agenda"
+        >
+          <Maximize2 className="h-3 w-3" /> Open Agenda
+        </div>
+      </Link>
+    </div>
+  );
+}
+
 export const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>> = {
   messages: MessagesWidget,
   todos: TodosWidget,
@@ -1404,4 +1481,5 @@ export const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>>
   devtracker: DevTrackerWidget,
   soppipeline: SOPPipelineWidget,
   notes: NotesWidget,
+  dailyagenda: DailyAgendaWidget,
 };

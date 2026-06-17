@@ -383,6 +383,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     invoices: { icon: FileText, label: t("nav.invoices"), href: "/invoices" },
     customers: { icon: Contact, label: t("nav.customers"), href: "/customers" },
     daily_worksheet: { icon: ClipboardList, label: t("nav.dailyWorksheet"), href: "/daily-worksheet" },
+    daily_agenda: { icon: ClipboardList, label: "Daily Agenda", href: "/daily-agenda" },
     time_tracking: { icon: Timer, label: t("nav.clockInOut"), href: "/time" },
     consultations: { icon: CalendarClock, label: t("nav.consultations"), href: "/consultations" },
     reports: { icon: BarChart2, label: t("nav.reports"), href: "/reports" },
@@ -418,7 +419,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const sidebarSections: NavSection[] = [
-    { label: "MY SPACE", items: ["hq", "dashboard", "my_hours", "daily_worksheet", "messages"] },
+    { label: "MY SPACE", items: ["hq", "dashboard", "my_hours", "daily_agenda", "daily_worksheet", "messages"] },
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["todos", "work_orders", "scheduling", "time_tracking", "equipment", "forms"] },
     { label: "RESOURCES", items: ["sops", "education", "testing"] },

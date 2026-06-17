@@ -3489,3 +3489,23 @@ export const voiceTranscripts = pgTable("voice_transcripts", {
 export const insertVoiceTranscriptSchema = createInsertSchema(voiceTranscripts).omit({ id: true, createdAt: true });
 export type InsertVoiceTranscript = z.infer<typeof insertVoiceTranscriptSchema>;
 export type VoiceTranscript = typeof voiceTranscripts.$inferSelect;
+
+// ─── Daily Agenda ─────────────────────────────────────────────────────────────
+export const dailyAgendas = pgTable("daily_agendas", {
+  id:             uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId:         text("user_id").notNull(),
+  date:           text("date").notNull(),
+  todoItems:      jsonb("todo_items").notNull().default(sql`'[]'::jsonb`),
+  delegateItems:  jsonb("delegate_items").notNull().default(sql`'[]'::jsonb`),
+  equipmentItems: jsonb("equipment_items").notNull().default(sql`'[]'::jsonb`),
+  needOrderItems: jsonb("need_order_items").notNull().default(sql`'[]'::jsonb`),
+  newLeads:       jsonb("new_leads").notNull().default(sql`'[]'::jsonb`),
+  memoItems:      jsonb("memo_items").notNull().default(sql`'[]'::jsonb`),
+  callItems:      jsonb("call_items").notNull().default(sql`'[]'::jsonb`),
+  otherItems:     jsonb("other_items").notNull().default(sql`'[]'::jsonb`),
+  createdAt:      timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:      timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const insertDailyAgendaSchema = createInsertSchema(dailyAgendas).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDailyAgenda = z.infer<typeof insertDailyAgendaSchema>;
+export type DailyAgendaRecord = typeof dailyAgendas.$inferSelect;

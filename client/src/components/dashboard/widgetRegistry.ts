@@ -203,6 +203,15 @@ export const WIDGET_DEFINITIONS: WidgetDefinition[] = [
     defaultSize: "medium",
     sizes: ["small", "medium", "large"],
   },
+  {
+    type: "dailyagenda",
+    label: "Daily Agenda",
+    description: "Plan your day — to-dos, calls, leads, delegate, equipment, and more",
+    icon: ClipboardList,
+    roles: ["Admin", "Manager", "Crew", "HR", "Sales", "New Hire"],
+    defaultSize: "medium",
+    sizes: ["small", "medium", "large"],
+  },
 ];
 
 export function getDefaultWidgets(role: string): WidgetConfig[] {
