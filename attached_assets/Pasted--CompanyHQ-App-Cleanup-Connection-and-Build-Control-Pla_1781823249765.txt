@@ -1,0 +1,990 @@
+# CompanyHQ App Cleanup, Connection, and Build Control Plan
+
+## Main Goal
+
+We are not trying to blindly add more features.
+
+The goal is to make CompanyHQ a complete, connected, simple-to-use operating system for a landscape / contracting business.
+
+The app should handle everything except:
+
+* Landscape/design creation
+* Collecting payments
+* Making payments
+* Full business accounting
+
+QuickBooks and other outside tools may still handle accounting, payments, payroll processing, and other external functions.
+
+CompanyHQ must become:
+
+* Properly connected
+* Easy to use
+* Cleanly organized
+* Safe from duplicate systems
+* Reliable for field crews
+* Reliable for office/admin
+* Reliable for customer portal use
+* Capable of growing into a website, Android app, or iOS app later
+
+Before adding any new feature, Replit must always double-check that the feature:
+
+1. Does not duplicate an existing feature
+2. Does not hide or bury a wanted feature
+3. Does not add unnecessary menu clutter
+4. Connects to the correct database tables
+5. Connects to the correct workflow
+6. Has proper role permissions
+7. Has a clear owner/user
+8. Has a visible place in the UI
+9. Has a clear reason to exist
+10. Does not miss the actual business workflow
+
+No feature should be added just because it sounds useful.
+
+---
+
+# Phase 0 — Stop and Clean the Foundation First
+
+Do not build more major features until these are complete.
+
+## 1. Remove `storedPassword`
+
+### Decision
+
+Remove it immediately.
+
+### Why
+
+Plaintext password storage is unacceptable. Admin convenience is not worth the security risk.
+
+### Replit should:
+
+* Find every reference to `storedPassword`
+* Remove it from the schema
+* Remove it from admin UI
+* Remove it from create/update user logic
+* Create a migration to drop the column
+* Replace the workflow with password reset / invite flow
+
+### Do not:
+
+* Keep it hidden
+* Rename it
+* Encrypt and keep it
+* Let admins view staff passwords
+
+---
+
+## 2. Add `customer_id` to `jobs`
+
+### Decision
+
+Jobs must directly belong to customers.
+
+### Why
+
+Customer job history, portal visibility, warranty records, closeout records, reports, and future work all depend on this.
+
+### Replit should:
+
+* Add `jobs.customer_id`
+* Reference `users.id`
+* Backfill existing jobs by matching existing client/contact data
+* Keep old text fields temporarily as historical snapshot fields
+* Update create/edit job routes
+* Update job detail page
+* Update customer portal
+* Update reports
+* Deprecate `customerJobs` after the new FK is confirmed
+
+### Do not:
+
+* Keep relying on customer name text
+* Build more customer-facing features without this relationship
+
+---
+
+## 3. Add / Confirm `property_id`
+
+### Decision
+
+Landscaping is property-centered. We need a real property system.
+
+### Replit should:
+
+* Confirm whether the old properties migration exists in the live DB
+* Add properties to `shared/schema.ts`
+* Build or activate a minimal properties module
+* Add:
+
+  * `properties.id`
+  * `properties.customer_id`
+  * address
+  * city
+  * state
+  * zip
+  * property type
+  * notes
+  * access notes
+  * gate code if needed
+  * pets/dogs if needed
+* Add `property_id` to:
+
+  * jobs
+  * estimates
+  * CompanyCam projects if possible
+  * warranties later
+  * plow sites later
+
+### Do not:
+
+* Keep scattering property addresses across jobs, estimates, work requests, and plow sites forever
+
+---
+
+## 4. Decide the Authoritative Estimate System
+
+### Decision
+
+Use the newer estimate system as the future direction:
+
+* `estimateLineItems`
+* `estimateWorkAreaGroups`
+* `calculatorRuns`
+* `catalogItems`
+* class-code-based structure
+
+The older `estimates + estimateItems` system can remain temporarily for legacy records.
+
+### Replit should:
+
+* Document which system is authoritative
+* Mark the old system as legacy
+* Stop building new features on the old line-item system
+* Make change orders attach to the authoritative system
+* Build a migration plan before deleting anything
+
+### Do not:
+
+* Build change orders twice
+* Let some pages use old estimates while others use new estimates without clear labeling
+
+---
+
+## 5. Unify Materials / Catalog
+
+### Decision
+
+Use `catalogItems` as the single source of truth.
+
+### Replit should:
+
+* Migrate old `materials` into `catalogItems`
+* Update worksheet material autocomplete to use `catalogItems`
+* Update estimate line items to use `catalogItems`
+* Update change orders to use `catalogItems`
+* Update calculators to output catalog-linked items where possible
+* Hide the old Materials page after migration
+* Redirect old material routes to catalog
+
+### Do not:
+
+* Let estimators and foremen pull materials from different databases
+* Keep `jobs.materialsUsed` as the final source of actual material usage
+
+---
+
+## 6. Retire Duplicate Worksheet System
+
+### Decision
+
+Keep:
+
+* `worksheetSessions`
+* related child tables
+
+Retire:
+
+* old `dailyWorksheets`
+
+### Replit should:
+
+* Confirm all active worksheet UI uses the new session system
+* Archive or migrate old records
+* Remove old worksheet page from navigation
+* Redirect old worksheet URLs
+* Make all worksheet materials, time, photos, expenses, and notes flow through the new system
+
+### Do not:
+
+* Build new worksheet features twice
+* Let foremen accidentally use the old system
+
+---
+
+## 7. Confirm Work Orders Are Real
+
+### Decision
+
+Work orders are too important to be a fake or disconnected screen.
+
+### Replit should:
+
+* Confirm whether a `work_orders` table exists
+* If it exists, register it in Drizzle
+* If it does not exist, either:
+
+  * build it properly, or
+  * hide the Work Orders pages until ready
+
+### Work orders should connect to:
+
+* job
+* property
+* customer
+* crew / crew lead
+* materials
+* checklist
+* photos
+* schedule
+* time entries
+* job packet
+* completion / closeout
+
+### Do not:
+
+* Leave WorkOrders.tsx visible if the backend is not real
+
+---
+
+## 8. Register Raw SQL Tables in Drizzle
+
+### Decision
+
+Every real table must be visible in `shared/schema.ts`.
+
+### Replit should confirm and register:
+
+* `route_days`
+* route stop table
+* direct messages tables
+* message attachments
+* message folders
+* properties table if it exists
+* work orders table if it exists
+
+### Do not:
+
+* Let active production tables live outside schema management
+
+---
+
+# Phase 1 — Simplify Duplicate Systems
+
+## 9. Messaging
+
+### Decision
+
+Keep:
+
+* `messagingThreads + threadMessages` for customer-staff messaging
+* staff direct messages separately if needed
+
+Retire:
+
+* old `customerMessages`
+
+### Replit should:
+
+* Migrate open customer messages
+* Hide old inbox
+* Make one clear customer message inbox
+* Make customer messages visible from:
+
+  * customer record
+  * job record if related
+  * customer portal
+  * task if created from message
+
+---
+
+## 10. Forms
+
+### Decision
+
+Pick one main form system.
+
+Recommended:
+
+* `builderForms` as the future system
+
+Keep separately only when truly needed:
+
+* PDF field placer for uploaded PDF forms
+* HR/government forms if legally structured differently
+
+### Replit should:
+
+* Hide old form builders from main navigation
+* Link every form submission to a business record:
+
+  * job
+  * employee
+  * customer
+  * property
+  * equipment
+  * warranty
+  * task
+
+### Do not:
+
+* Add a sixth form system
+* Let form submissions disappear into a standalone table
+
+---
+
+## 11. Photos / Files / Documents
+
+### Decision
+
+CompanyCam remains the primary jobsite photo system.
+
+But the app needs one clear “all files/photos for this record” view.
+
+### Replit should:
+
+* Create unified views for:
+
+  * all job photos/files
+  * all customer files
+  * all property files
+  * all equipment files
+* Show whether each file came from:
+
+  * CompanyCam
+  * worksheet upload
+  * job document
+  * customer upload
+  * equipment upload
+  * central document library
+
+### Do not:
+
+* Force admin to check six different places for job files
+
+---
+
+## 12. Navigation Cleanup
+
+### Rule
+
+No old or duplicate page should remain in the main menu after replacement.
+
+### Replit should remove or hide:
+
+* old Materials page after catalog migration
+* old DailyWorksheet page after worksheet migration
+* old customerMessages inbox after messaging migration
+* standalone Lead Qualifier results after pipeline bridge
+* unused Process Auditor if not actively used
+
+### Important
+
+Adding a main menu tab should require a reason. The sidebar should get simpler, not bigger.
+
+---
+
+# Phase 2 — Fix the Business Data Chain
+
+The app should follow this operating chain:
+
+Customer
+→ Property
+→ Contact
+→ Lead / Consultation
+→ Estimate
+→ Job
+→ Work Order
+→ Schedule
+→ Time Entry
+→ Worksheet
+→ Materials Used
+→ Photos
+→ Change Orders
+→ Closeout
+→ Warranty
+→ Future Work
+
+Every module should connect into this chain.
+
+---
+
+## 13. Build Contacts
+
+### Needed table
+
+`contacts`
+
+### Fields:
+
+* id
+* customer_id
+* name
+* role
+* phone
+* email
+* is_primary
+* notes
+
+### Contact roles:
+
+* owner
+* spouse
+* billing contact
+* site contact
+* property manager
+* HOA contact
+* commercial contact
+
+### Replit should:
+
+* Stop copying contact text everywhere as the only source
+* Allow jobs and estimates to reference a contact
+* Keep snapshot contact text only for historical records if needed
+
+---
+
+## 14. Separate Consultations From Estimates
+
+### Decision
+
+A lead/consultation is not the same thing as an estimate.
+
+### Replit should create:
+
+`consultations`
+
+### Fields:
+
+* customer_id
+* property_id
+* contact_id
+* source
+* stage
+* assigned salesperson
+* service type
+* budget
+* timeline
+* notes
+* lead score
+* lost reason
+* next follow-up date
+
+### Then:
+
+* estimates become child records of consultations
+* proposals/signatures stay with estimates
+* sales pipeline tracks consultations
+* financial proposal data tracks estimates
+
+### Do not:
+
+* Keep using estimate records as both leads and signed proposals long-term
+
+---
+
+## 15. Connect Lead Qualifier to Pipeline
+
+### Replit should:
+
+* When a qualified lead is saved, automatically create:
+
+  * consultation, or
+  * temporary new_lead estimate until consultations exist
+* Copy score, rating, service type, and notes
+* Notify assigned salesperson
+* Show qualifier score on the pipeline card
+
+### Do not:
+
+* Leave qualified leads sitting in a separate dead-end table
+
+---
+
+## 16. Connect Customer Work Requests to Pipeline
+
+### Replit should:
+
+* When a customer submits a work request:
+
+  * create a consultation/new lead
+  * attach customer_id
+  * attach property_id if available
+  * create staff notification
+  * create follow-up task
+
+### Do not:
+
+* Let customer portal requests live separately from sales workflow
+
+---
+
+## 17. Add Source Estimate Link to Jobs
+
+### Replit should add:
+
+`jobs.source_estimate_id`
+
+### Why
+
+When an estimate becomes a job, the app must preserve the full history.
+
+### This supports:
+
+* change orders
+* job scope
+* sold value
+* original estimate comparison
+* reporting
+* customer disputes
+
+---
+
+## 18. Add Crew Lead FK
+
+### Replit should add:
+
+`jobs.crew_lead_id`
+
+### Why
+
+`crewLeadName` as text is not enough.
+
+### Also confirm:
+
+* `jobAssignments` is the source of truth for crew assignments
+* My Day reads from `jobAssignments`
+* Dispatch writes to `jobAssignments`
+* Reports use `jobAssignments`
+
+---
+
+## 19. Connect CompanyCam Directly to Jobs
+
+### Replit should add:
+
+* `jobs.companycam_project_id`, or
+* `companycamProjects.job_id`
+
+### Why
+
+Photos should attach directly to jobs, not only estimates.
+
+### Also helpful:
+
+* property_id on CompanyCam projects
+* customer_id if useful
+* unified job photo tab
+
+---
+
+## 20. Connect Time Entries to Worksheet Time
+
+### Problem
+
+Clock-in/out time and worksheet time can exist in parallel.
+
+### Replit should:
+
+* Decide whether to merge them or link them
+* Add `timeEntries.worksheet_time_entry_id` if needed
+* Make sure approved worksheet time and QBO export use the same source of truth
+
+### Do not:
+
+* Let payroll time and worksheet time drift apart
+
+---
+
+# Phase 3 — Job Lifecycle Features
+
+Only after foundation cleanup.
+
+## 21. Auto Stage Progression
+
+### Replit should define triggers:
+
+* worksheet submitted
+* all time approved
+* foreman marks complete
+* manager reviews
+* closeout approved
+
+### Must support:
+
+* manager override
+* audit history
+* customer notification settings
+
+---
+
+## 22. Job Packet Gate
+
+### Purpose
+
+No job should start unless required info is complete.
+
+### Checklist may include:
+
+* signed estimate
+* customer_id
+* property_id
+* source_estimate_id
+* scope confirmed
+* materials confirmed
+* crew assigned
+* schedule date
+* CompanyCam project
+* 811/OUPS task
+* permits if needed
+* HOA approval if needed
+* access notes
+* pets/dogs notes
+* design/photos attached
+* work order created
+
+### Replit should:
+
+* Block job start if critical items are missing
+* Allow Admin/Manager bypass with reason
+* Log bypass in audit trail
+
+---
+
+## 23. Change Orders
+
+### Only build after estimate authority is decided.
+
+### Change orders should connect to:
+
+* job
+* customer
+* property
+* source estimate
+* catalogItems
+* added labor
+* added equipment
+* added subcontractor cost
+* photos
+* customer approval
+* date/time approved
+* approver
+* job value change
+
+### Approval types:
+
+* digital signature
+* written approval
+* verbal approval with staff note
+
+---
+
+## 24. Checkpoints + Walkthroughs
+
+### Checkpoints should support:
+
+* required photo
+* required note
+* required checkbox
+* assigned role
+* due stage
+* customer-visible or internal-only
+
+### Examples:
+
+* pre-construction photos
+* base inspection
+* wall drainage before backfill
+* planting layout approval
+* lighting test
+* final cleanup
+* customer walkthrough
+
+---
+
+## 25. Closeout Record
+
+### Closeout should include:
+
+* final scope confirmation
+* final photos
+* materials used
+* change orders
+* remaining issues
+* warranty terms
+* customer notes
+* internal notes
+* manager approval
+* ready-for-invoice status
+
+### Closeout should trigger:
+
+* invoice sync or invoice task
+* warranty record creation
+* customer completion message
+* review request
+* future follow-up task
+
+---
+
+## 26. Warranty / Service Issues
+
+### Replit should build minimal warranty system:
+
+`job_warranties`
+`warranty_claims`
+
+### Warranty connects to:
+
+* job
+* customer
+* property
+* materials/plants if possible
+* photos
+* closeout record
+* service visit
+* resolution
+
+---
+
+# Phase 4 — Reporting and Management
+
+## 27. Record History / Audit Trail
+
+### Replit should create:
+
+`record_history`
+
+### Track changes for:
+
+* jobs
+* estimates
+* time entries
+* users/roles
+* employee pay rates
+* customer info
+* job status
+* change orders
+* closeout records
+
+### Each record should store:
+
+* entity type
+* entity id
+* field changed
+* old value
+* new value
+* changed by
+* changed at
+
+---
+
+## 28. Job Profitability Report
+
+### Should include:
+
+* sold value
+* original estimate
+* approved change orders
+* actual labor hours
+* labor cost from employee pay rate
+* actual material use from worksheet/collated catalog cost
+* equipment cost if tracked
+* gross profit
+* margin
+* variance from estimate
+
+### Do not build this until:
+
+* customer_id exists
+* source_estimate_id exists
+* catalogItems are unified
+* worksheet material usage is connected
+
+---
+
+## 29. Equipment-to-Job Linking
+
+### Replit should create:
+
+`job_equipment_assignments`
+
+### Fields:
+
+* job_id
+* equipment_id
+* date
+* hours used
+* operator
+* notes
+
+### This supports:
+
+* job costing
+* equipment utilization
+* maintenance planning
+* repair accountability
+
+---
+
+# Phase 5 — Field Simplicity
+
+## 30. One Start Button for Crew
+
+### Goal
+
+Crew should not need to know whether to use My Day or Route.
+
+### Replit should build:
+
+“Start My Day”
+
+Logic:
+
+* If user has route today → open Route
+* If user has job assignment today → open My Day
+* If neither → show message and contact manager option
+
+---
+
+## 31. Route Offline Support
+
+### Replit should:
+
+* Add offline support to Route page
+* Use same strategy as My Day
+* Store clock-ins, notes, photos, and stop completions locally until sync
+
+---
+
+## 32. Employee Schedule Visibility
+
+### Replit should:
+
+* Add “My Schedule” to employee portal
+* Pull from jobAssignments / route assignments
+* Show today, tomorrow, and upcoming week
+
+---
+
+# Phase 6 — Later / Optional
+
+Do not prioritize until foundation is solid.
+
+## Later improvements:
+
+* Customer invoice visibility in portal
+* Customer property portal
+* plow site → route stop → snow service log
+* SOP quiz requirements at clock-in
+* push notifications
+* PTO balances
+* recurring route generation
+* vendor/subcontractor system
+* full inventory/purchasing system
+
+---
+
+# Do Not Build Yet
+
+Do not build these until the foundation is clean:
+
+1. Native Android app
+2. Native iOS app
+3. Large inventory system
+4. Full vendor/subcontractor management
+5. Push notifications
+6. Advanced customer portal features
+7. Advanced snow billing
+8. SOP enforcement blocks
+9. More dashboards
+10. More main menu tabs
+
+---
+
+# Main Menu Rule
+
+The main menu should be treated like prime real estate.
+
+Before adding a tab, Replit must answer:
+
+1. Who uses this?
+2. How often?
+3. Is it already available somewhere else?
+4. Should it be a tab, sub-tab, button, or hidden admin tool?
+5. Does it make the app simpler or more complicated?
+6. Does it connect to the correct data?
+7. Does it have a complete backend?
+8. Does it have permissions?
+9. Does it show real data?
+10. Will this confuse crews, office, or customers?
+
+---
+
+# Connector Rule
+
+All connectors must be properly installed, labeled, tested, and visibly connected.
+
+Replit should audit connectors for:
+
+* QuickBooks
+* CompanyCam
+* Google Calendar
+* Gmail/email
+* Google OAuth
+* Replit object storage
+* Resend/email sending
+* future Zapier/webhooks
+
+For each connector:
+
+* What does it connect to?
+* What data enters the app?
+* What data leaves the app?
+* What table stores the external ID?
+* What happens if sync fails?
+* Is there a health/status page?
+* Is there a manual resync button?
+* Is it labeled clearly in the UI?
+* Who can access it?
+* Is it customer-facing or internal only?
+
+---
+
+# Final Replit Instruction
+
+Before making any change, Replit should provide:
+
+1. What problem this solves
+2. What existing feature it touches
+3. Whether a duplicate system already exists
+4. What tables are affected
+5. What relationships are created or changed
+6. What pages/components are affected
+7. What permissions are needed
+8. What data migration is required
+9. What should be hidden or removed after completion
+10. What must be tested before the change is accepted
+
+No new feature should be considered complete unless:
+
+* It has a real database connection
+* It appears in the correct UI location
+* It has permissions
+* It connects to the correct workflow
+* It creates no duplicate system
+* It has a clear owner/user
+* It is simple enough for real staff to use
+* It supports the business instead of adding clutter
+
+The app should become powerful enough to run the company, but simple enough that crews, office staff, customers, and managers can use it without feeling like they are inside complicated software.
