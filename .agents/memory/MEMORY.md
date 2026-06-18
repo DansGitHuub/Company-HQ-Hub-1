@@ -1,0 +1,4 @@
+- [Phase 0 execution](phase0-execution.md) — DB has many more tables than schema.ts knew about; critical discoveries and completed cleanup steps.
+- [Schema safety rule](schema-safety.md) — never run drizzle-kit push on this project; always use raw SQL for new columns then add type definitions to schema.ts.
+- [Phase 3 DB pattern](phase3-pattern.md) — All Phase 3 tables use raw SQL migrations registered in server/index.ts; route files import pool directly.
+- [Job detail tabs](job-detail-tabs.md) — show.tsx tab architecture: which tabs exist, which are admin-only, pattern for adding new feature tabs.

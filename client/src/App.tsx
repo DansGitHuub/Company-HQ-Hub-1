@@ -43,7 +43,6 @@ const ROUTE_TITLES: Record<string, string> = {
   "/profile": "Profile",
   "/calendar": "Calendar",
   "/notifications": "Notifications",
-  "/customers": "Customers",
 };
 
 function DocumentTitleSetter() {
@@ -235,7 +234,7 @@ function AppRoutes() {
         <Route path="/admin" component={AdminPanel} />
         <Route path="/inbox" component={AdminInbox} />
         <Route path="/sops" component={SOPs} />
-        <Route path="/materials" component={Materials} />
+        <Route path="/materials"><Redirect to="/catalog" /></Route>
         <Route path="/hiring" component={Hiring} />
         <Route path="/marketing" component={Marketing} />
         <Route path="/forms" component={Forms} />
@@ -255,7 +254,7 @@ function AppRoutes() {
         <Route path="/estimates/:id/preview" component={EstimatePreview} />
         <Route path="/estimates/:id" component={EstimateDetail} />
         <Route path="/scheduling" component={SchedulingCalendar} />
-        <Route path="/my-day"><Redirect to="/daily-worksheet" /></Route>
+        <Route path="/my-day" component={MyDayPage} />
         <Route path="/my-hours" component={MyHoursPage} />
         <Route path="/pipeline" component={JobPipeline} />
         <Route path="/help" component={Help} />

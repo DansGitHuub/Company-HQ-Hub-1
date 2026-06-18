@@ -186,6 +186,7 @@ export function registerEstimateRoutes(app: Express) {
         total = 0, down_payment_percent = 0, down_payment_amount = 0,
         notes, customer_message, terms,
         presentation_style = "simple",
+        consultation_id,
         work_areas = [],
       } = req.body;
 
@@ -197,14 +198,14 @@ export function registerEstimateRoutes(app: Express) {
             title, status, salesperson_id, valid_until, issued_date,
             subtotal, tax_rate, tax_amount, discount_amount, total,
             down_payment_percent, down_payment_amount, notes, customer_message, terms,
-            presentation_style)
-         VALUES ($1,$2,$3,$4,$5,$6,'draft',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+            presentation_style, consultation_id)
+         VALUES ($1,$2,$3,$4,$5,$6,'draft',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
          RETURNING id`,
         [estNum, customer_id || null, property_id || null, estimate_type, template_name || null,
          title, salesperson_id || null, valid_until || null, issued_date || new Date().toISOString().slice(0, 10),
          subtotal, tax_rate, tax_amount, discount_amount, total,
          down_payment_percent, down_payment_amount, notes || null, customer_message || null, terms || null,
-         presentation_style || "simple"]
+         presentation_style || "simple", consultation_id || null]
       );
       const estimateId = rows[0].id;
 
@@ -271,14 +272,14 @@ export function registerEstimateRoutes(app: Express) {
           title, status, salesperson_id, valid_until, issued_date,
           subtotal, tax_rate, tax_amount, discount_amount, total,
           down_payment_percent, down_payment_amount, notes, customer_message, terms,
-          presentation_style)
-         VALUES ($1,$2,$3,$4,$5,$6,'draft',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+          presentation_style, consultation_id)
+         VALUES ($1,$2,$3,$4,$5,$6,'draft',$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
          RETURNING id`,
         [estNum, c.customer_id, null, "project", null,
          title, null, null, new Date().toISOString().slice(0, 10),
          0, 0, 0, 0, 0,
          0, 0, notes, null, null,
-         "simple"]
+         "simple", req.params.id]
       );
       const estimateId = rows[0].id;
       await client.query("COMMIT");

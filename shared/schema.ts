@@ -18,7 +18,6 @@ export const users = pgTable("users", {
   isApplicant: boolean("is_applicant").notNull().default(false),
   recoveryToken: text("recovery_token"),
   recoveryExpires: timestamp("recovery_expires"),
-  storedPassword: text("stored_password"), // Plaintext password for staff (Admin/Manager/Crew) visible to Master Admin
   bio: text("bio"),
   phone: text("phone"),
   profilePicture: text("profile_picture"),
@@ -599,10 +598,29 @@ export const jobs = pgTable("jobs", {
   contactEmail: text("contact_email"),
   zone: text("zone"),
   notes: text("notes"),
+  crewNotes: text("crew_notes"),
   crewNotesCustomerVisible: text("crew_notes_customer_visible"),
   crewLeadName: text("crew_lead_name"),
   scopeOfWork: text("scope_of_work"),
   materialsUsed: text("materials_used"),
+  // Extended job fields
+  customerId: uuid("customer_id"),
+  propertyId: uuid("property_id"),
+  title: varchar("title"),
+  description: text("description"),
+  status: varchar("status"),
+  jobType: varchar("job_type"),
+  price: numeric("price"),
+  division: varchar("division"),
+  color: varchar("color"),
+  scheduledStartTime: text("scheduled_start_time"),
+  scheduledEndTime: text("scheduled_end_time"),
+  // Chain links (Phase 0 additions)
+  estimateId: varchar("estimate_id"),
+  sourceEstimateId: varchar("source_estimate_id"),
+  crewLeadId: varchar("crew_lead_id"),
+  // CompanyCam link (Phase 2 addition)
+  companycamProjectId: varchar("companycam_project_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -2636,6 +2654,11 @@ export type InsertCustomerSuggestion = z.infer<typeof insertCustomerSuggestionSc
 export const ESTIMATE_STAGES = ["New Lead", "Contact Made", "Site Visit", "Proposal Sent", "Follow Up", "Won", "Lost"] as const;
 export type EstimateStage = typeof ESTIMATE_STAGES[number];
 
+// ─── LEGACY Estimate System (System A) ───────────────────────────────────────
+// DO NOT build new features on these tables.
+// The authoritative estimate system is salesEstimates (sales_estimates) + estimateLineItems
+// + estimateWorkAreaGroups + calculatorRuns + catalogItems (System B).
+// These legacy tables remain only for historical records already in the database.
 export const estimates = pgTable("estimates", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   clientName: text("client_name").notNull(),
@@ -3262,6 +3285,7 @@ export const timeEntries = pgTable("time_entries", {
   rejectionNote: text("rejection_note"),
   autoClockedOut: boolean("auto_clocked_out").notNull().default(false),
   lastReminderAt: timestamp("last_reminder_at", { withTimezone: true }),
+  worksheetSessionId: integer("worksheet_session_id"),
 });
 
 export const gpsPings = pgTable("gps_pings", {
@@ -3384,6 +3408,7 @@ export const companycamProjects = pgTable("companycam_projects", {
   rawPayload:                jsonb("raw_payload"),
   estimateId:                uuid("estimate_id"),
   customerId:                uuid("customer_id"),
+  jobId:                     varchar("job_id"),
   ccCreatedAt:               timestamp("cc_created_at", { withTimezone: true }),
   ccUpdatedAt:               timestamp("cc_updated_at", { withTimezone: true }),
   createdAt:                 timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -3509,3 +3534,398 @@ export const dailyAgendas = pgTable("daily_agendas", {
 export const insertDailyAgendaSchema = createInsertSchema(dailyAgendas).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertDailyAgenda = z.infer<typeof insertDailyAgendaSchema>;
 export type DailyAgendaRecord = typeof dailyAgendas.$inferSelect;
+
+// ─── Properties ───────────────────────────────────────────────────────────────
+// Registered from live DB (existed via raw migration). Landscaping is property-centered.
+export const properties = pgTable("properties", {
+  id:           uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId:   uuid("customer_id").notNull(),
+  address:      text("address").notNull(),
+  city:         text("city"),
+  state:        text("state"),
+  zip:          text("zip"),
+  propertyType: text("property_type"),
+  notes:        text("notes"),
+  accessNotes:  text("access_notes"),
+  gateCode:     text("gate_code"),
+  hasPets:      boolean("has_pets").default(false),
+  createdAt:    timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt:    timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export const insertPropertySchema = createInsertSchema(properties).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertProperty = z.infer<typeof insertPropertySchema>;
+export type Property = typeof properties.$inferSelect;
+
+// ─── Customers (entity — separate from users auth table) ──────────────────────
+// Registered from live DB. The customers table holds business-entity customer records.
+// Users with role="Customer" are their portal login accounts; this table stores CRM data.
+export const customersEntity = pgTable("customers", {
+  id:                    uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  firstName:             text("first_name").notNull(),
+  lastName:              text("last_name").notNull(),
+  companyName:           text("company_name"),
+  billingAddress:        text("billing_address"),
+  billingCity:           text("billing_city"),
+  billingState:          text("billing_state"),
+  billingZip:            text("billing_zip"),
+  source:                text("source"),
+  notes:                 text("notes"),
+  isActive:              boolean("is_active").notNull().default(true),
+  qbCustomerId:          varchar("qb_customer_id"),
+  qbSyncedAt:            timestamp("qb_synced_at", { withTimezone: true }),
+  companycamProjectId:   text("companycam_project_id"),
+  companycamCreateStatus: text("companycam_create_status"),
+  companycamCreateError:  text("companycam_create_error"),
+  createdAt:             timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt:             timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export const insertCustomerEntitySchema = createInsertSchema(customersEntity).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCustomerEntity = z.infer<typeof insertCustomerEntitySchema>;
+export type CustomerEntity = typeof customersEntity.$inferSelect;
+
+// ─── Customer Contacts ────────────────────────────────────────────────────────
+// Multiple contacts per customer (owner, spouse, billing contact, site contact, etc.)
+export const customerContacts = pgTable("customer_contacts", {
+  id:         uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: uuid("customer_id").notNull(),
+  firstName:  text("first_name").notNull(),
+  lastName:   text("last_name"),
+  role:       text("role"),
+  phone:      text("phone"),
+  email:      text("email"),
+  isPrimary:  boolean("is_primary").default(false),
+  notes:      text("notes"),
+  createdAt:  timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export const insertCustomerContactSchema = createInsertSchema(customerContacts).omit({ id: true, createdAt: true });
+export type InsertCustomerContact = z.infer<typeof insertCustomerContactSchema>;
+export type CustomerContact = typeof customerContacts.$inferSelect;
+
+// ─── Consultations ────────────────────────────────────────────────────────────
+// Separate from estimates. Consultations are sales pipeline records (leads → booked).
+// Estimates are financial proposals generated from consultations.
+export const consultations = pgTable("consultations", {
+  id:                 uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId:         uuid("customer_id"),
+  propertyId:         uuid("property_id"),
+  contactId:          uuid("contact_id"),
+  contactName:        varchar("contact_name"),
+  contactPhone:       varchar("contact_phone"),
+  contactEmail:       varchar("contact_email"),
+  scheduledDate:      date("scheduled_date"),
+  scheduledTime:      text("scheduled_time"),
+  durationMinutes:    integer("duration_minutes").default(60),
+  status:             varchar("status").notNull().default("scheduled"),
+  address:            text("address"),
+  notes:              text("notes"),
+  followUpRequired:   boolean("follow_up_required").default(false),
+  followUpDate:       date("follow_up_date"),
+  nextFollowUpDate:   date("next_follow_up_date"),
+  assignedTo:         varchar("assigned_to"),
+  estimatedValue:     numeric("estimated_value"),
+  leadSource:         varchar("lead_source"),
+  leadScore:          integer("lead_score").default(0),
+  lostReason:         text("lost_reason"),
+  pipelineStage:      varchar("pipeline_stage").default("new_lead"),
+  budgetRange:        varchar("budget_range"),
+  projectDescription: text("project_description"),
+  bestTimeToReach:    varchar("best_time_to_reach"),
+  utilitiesMarked:    boolean("utilities_marked").default(false),
+  permitRequired:     boolean("permit_required").default(false),
+  permitStatus:       varchar("permit_status"),
+  serviceType:        varchar("service_type"),
+  photoUrls:          jsonb("photo_urls").default(sql`'[]'::jsonb`),
+  howHeard:           varchar("how_heard"),
+  projectType:        varchar("project_type"),
+  desiredTimeline:    varchar("desired_timeline"),
+  additionalNotes:    text("additional_notes"),
+  createdAt:          timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:          timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const insertConsultationSchema = createInsertSchema(consultations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertConsultation = z.infer<typeof insertConsultationSchema>;
+export type Consultation = typeof consultations.$inferSelect;
+
+// ─── Sales Estimates (System B — AUTHORITATIVE) ───────────────────────────────
+// This is the authoritative estimate system. Use salesEstimates + estimateLineItems
+// + estimateWorkAreaGroups + calculatorRuns + catalogItems for all new estimate work.
+// The older `estimates` + `estimateItems` tables are LEGACY — do not build new features on them.
+export const salesEstimates = pgTable("sales_estimates", {
+  id:                          uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  estimateNumber:              varchar("estimate_number"),
+  customerId:                  uuid("customer_id"),
+  propertyId:                  uuid("property_id"),
+  estimateType:                varchar("estimate_type").notNull().default("project"),
+  templateName:                varchar("template_name"),
+  title:                       varchar("title").notNull().default("New Estimate"),
+  status:                      varchar("status").notNull().default("draft"),
+  salespersonId:               varchar("salesperson_id"),
+  validUntil:                  date("valid_until"),
+  issuedDate:                  date("issued_date").notNull().default(sql`CURRENT_DATE`),
+  subtotal:                    numeric("subtotal").notNull().default("0"),
+  taxRate:                     numeric("tax_rate").notNull().default("0"),
+  taxAmount:                   numeric("tax_amount").notNull().default("0"),
+  discountAmount:              numeric("discount_amount").notNull().default("0"),
+  total:                       numeric("total").notNull().default("0"),
+  downPaymentPercent:          numeric("down_payment_percent").notNull().default("0"),
+  downPaymentAmount:           numeric("down_payment_amount").notNull().default("0"),
+  notes:                       text("notes"),
+  customerMessage:             text("customer_message"),
+  terms:                       text("terms"),
+  customerResponse:            text("customer_response"),
+  customerResponseAt:          timestamp("customer_response_at", { withTimezone: true }),
+  customerResponseNote:        text("customer_response_note"),
+  sentAt:                      timestamp("sent_at", { withTimezone: true }),
+  viewedAt:                    timestamp("viewed_at", { withTimezone: true }),
+  convertedAt:                 timestamp("converted_at", { withTimezone: true }),
+  convertedJobId:              varchar("converted_job_id"),
+  presentationStyle:           varchar("presentation_style").default("simple"),
+  portalToken:                 text("portal_token"),
+  signatureData:               text("signature_data"),
+  termsAndConditionsOverride:  text("terms_and_conditions_override"),
+  depositPercentage:           integer("deposit_percentage").default(50),
+  initials:                    text("initials"),
+  approvedAt:                  timestamp("approved_at", { withTimezone: true }),
+  companycamProjectId:         text("companycam_project_id"),
+  consultationId:              uuid("consultation_id"),
+  createdAt:                   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:                   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const insertSalesEstimateSchema = createInsertSchema(salesEstimates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertSalesEstimate = z.infer<typeof insertSalesEstimateSchema>;
+export type SalesEstimate = typeof salesEstimates.$inferSelect;
+
+// ─── Work Orders ──────────────────────────────────────────────────────────────
+// Full work order system with 8 child tables. Real DB tables, registered here for type safety.
+export const workOrders = pgTable("work_orders", {
+  id:                      serial("id").primaryKey(),
+  jobId:                   text("job_id"),
+  title:                   text("title").notNull(),
+  description:             text("description"),
+  status:                  text("status").notNull().default("draft"),
+  scheduledDate:           date("scheduled_date"),
+  officeNotes:             text("office_notes"),
+  assignedCrew:            jsonb("assigned_crew").default(sql`'[]'::jsonb`),
+  createdBy:               text("created_by"),
+  woType:                  text("wo_type").notNull().default("maintenance"),
+  serviceTypeId:           text("service_type_id"),
+  crewLeaderId:            text("crew_leader_id"),
+  estimatedDuration:       text("estimated_duration"),
+  propertyNotes:           text("property_notes"),
+  siteAccessNotes:         text("site_access_notes"),
+  customerName:            text("customer_name"),
+  customerAddress:         text("customer_address"),
+  customerPhone:           text("customer_phone"),
+  contractValue:           numeric("contract_value"),
+  estimatedCompletionDate: date("estimated_completion_date"),
+  companycamProjectId:     text("companycam_project_id"),
+  createdAt:               timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt:               timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export const insertWorkOrderSchema = createInsertSchema(workOrders).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWorkOrder = z.infer<typeof insertWorkOrderSchema>;
+export type WorkOrder = typeof workOrders.$inferSelect;
+
+export const workOrderAreas = pgTable("work_order_areas", {
+  id:             serial("id").primaryKey(),
+  workOrderId:    integer("work_order_id").notNull(),
+  name:           text("name").notNull(),
+  description:    text("description"),
+  estimatedHours: numeric("estimated_hours"),
+  sortOrder:      integer("sort_order").notNull(),
+  createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type WorkOrderArea = typeof workOrderAreas.$inferSelect;
+
+export const workOrderMaterials = pgTable("work_order_materials", {
+  id:            serial("id").primaryKey(),
+  workOrderId:   integer("work_order_id"),
+  areaId:        integer("area_id"),
+  itemName:      text("item_name").notNull(),
+  quantity:      numeric("quantity"),
+  unit:          text("unit"),
+  catalogItemId: integer("catalog_item_id"),
+  status:        text("status").notNull(),
+  notes:         text("notes"),
+  createdAt:     timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type WorkOrderMaterial = typeof workOrderMaterials.$inferSelect;
+
+export const workOrderSteps = pgTable("work_order_steps", {
+  id:             serial("id").primaryKey(),
+  workOrderId:    integer("work_order_id"),
+  stepNumber:     integer("step_number").notNull(),
+  title:          text("title").notNull(),
+  description:    text("description"),
+  requiresPhoto:  boolean("requires_photo"),
+  isComplete:     boolean("is_complete"),
+  completedBy:    text("completed_by"),
+  completedAt:    timestamp("completed_at", { withTimezone: true }),
+  completionNote: text("completion_note"),
+  photos:         jsonb("photos"),
+  createdAt:      timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type WorkOrderStep = typeof workOrderSteps.$inferSelect;
+
+export const workOrderChecklists = pgTable("work_order_checklists", {
+  id:          serial("id").primaryKey(),
+  workOrderId: integer("work_order_id").notNull(),
+  areaId:      integer("area_id"),
+  label:       text("label").notNull(),
+  isComplete:  boolean("is_complete"),
+  completedBy: text("completed_by"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  sortOrder:   integer("sort_order").notNull(),
+  createdAt:   timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type WorkOrderChecklist = typeof workOrderChecklists.$inferSelect;
+
+export const workOrderHoldPoints = pgTable("work_order_hold_points", {
+  id:          serial("id").primaryKey(),
+  workOrderId: integer("work_order_id").notNull(),
+  areaId:      integer("area_id"),
+  label:       text("label").notNull(),
+  description: text("description"),
+  isApproved:  boolean("is_approved"),
+  approvedBy:  text("approved_by"),
+  approvedAt:  timestamp("approved_at", { withTimezone: true }),
+  sortOrder:   integer("sort_order").notNull(),
+  createdAt:   timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type WorkOrderHoldPoint = typeof workOrderHoldPoints.$inferSelect;
+
+export const workOrderAreaTasks = pgTable("work_order_area_tasks", {
+  id:            serial("id").primaryKey(),
+  workOrderId:   integer("work_order_id").notNull(),
+  areaId:        integer("area_id").notNull(),
+  title:         text("title").notNull(),
+  description:   text("description"),
+  requiresPhoto: boolean("requires_photo"),
+  isComplete:    boolean("is_complete"),
+  completedBy:   text("completed_by"),
+  completedAt:   timestamp("completed_at", { withTimezone: true }),
+  photos:        jsonb("photos"),
+  sortOrder:     integer("sort_order").notNull(),
+  createdAt:     timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type WorkOrderAreaTask = typeof workOrderAreaTasks.$inferSelect;
+
+export const workOrderDailyLogs = pgTable("work_order_daily_logs", {
+  id:                      serial("id").primaryKey(),
+  workOrderId:             integer("work_order_id"),
+  logDate:                 date("log_date").notNull(),
+  workCompleted:           text("work_completed"),
+  crewNotes:               text("crew_notes"),
+  materialsNeededTomorrow: text("materials_needed_tomorrow"),
+  truckEmptied:            boolean("truck_emptied"),
+  truckLoaded:             boolean("truck_loaded"),
+  truckFueled:             boolean("truck_fueled"),
+  truckClean:              boolean("truck_clean"),
+  truckNotes:              text("truck_notes"),
+  officeUpdate:            text("office_update"),
+  submittedBy:             text("submitted_by"),
+  submittedAt:             timestamp("submitted_at", { withTimezone: true }),
+});
+export type WorkOrderDailyLog = typeof workOrderDailyLogs.$inferSelect;
+
+// ─── Direct Messages (Gmail-style DM system) ──────────────────────────────────
+// The original single-message inbox system (directMessages).
+// Also registers the newer conversation-threaded system (dmConversations/dmMessages).
+export const directMessages = pgTable("direct_messages", {
+  id:                  varchar("id").primaryKey(),
+  senderId:            varchar("sender_id").notNull(),
+  recipientId:         varchar("recipient_id").notNull(),
+  subject:             text("subject"),
+  body:                text("body").notNull(),
+  sentAt:              timestamp("sent_at"),
+  readAt:              timestamp("read_at"),
+  deletedBySender:     boolean("deleted_by_sender").notNull().default(false),
+  deletedByRecipient:  boolean("deleted_by_recipient").notNull().default(false),
+  starredBySender:     boolean("starred_by_sender").notNull().default(false),
+  starredByRecipient:  boolean("starred_by_recipient").notNull().default(false),
+  archivedBySender:    boolean("archived_by_sender").notNull().default(false),
+  archivedByRecipient: boolean("archived_by_recipient").notNull().default(false),
+  jobId:               varchar("job_id"),
+  taskId:              varchar("task_id"),
+});
+export type DirectMessage = typeof directMessages.$inferSelect;
+
+export const dmConversations = pgTable("dm_conversations", {
+  id:             serial("id").primaryKey(),
+  participant1Id: varchar("participant1_id").notNull(),
+  participant2Id: varchar("participant2_id").notNull(),
+  lastMessageAt:  timestamp("last_message_at"),
+  createdAt:      timestamp("created_at"),
+});
+export type DmConversation = typeof dmConversations.$inferSelect;
+
+export const dmMessages = pgTable("dm_messages", {
+  id:             serial("id").primaryKey(),
+  conversationId: integer("conversation_id").notNull(),
+  senderId:       varchar("sender_id").notNull(),
+  body:           text("body").notNull(),
+  createdAt:      timestamp("created_at"),
+});
+export type DmMessage = typeof dmMessages.$inferSelect;
+
+export const dmReads = pgTable("dm_reads", {
+  conversationId: integer("conversation_id").notNull(),
+  userId:         varchar("user_id").notNull(),
+  lastReadAt:     timestamp("last_read_at"),
+});
+export type DmRead = typeof dmReads.$inferSelect;
+
+// ─── Message Folders (custom Gmail-style folders for DMs) ─────────────────────
+export const messageFolders = pgTable("message_folders", {
+  id:        serial("id").primaryKey(),
+  userId:    varchar("user_id").notNull(),
+  name:      text("name").notNull(),
+  color:     text("color"),
+  createdAt: timestamp("created_at"),
+});
+export type MessageFolder = typeof messageFolders.$inferSelect;
+
+export const messageFolderItems = pgTable("message_folder_items", {
+  id:                   varchar("id").primaryKey(),
+  folderId:             varchar("folder_id").notNull(),
+  conversationPartnerId: varchar("conversation_partner_id").notNull(),
+  userId:               varchar("user_id").notNull(),
+  createdAt:            timestamp("created_at"),
+});
+export type MessageFolderItem = typeof messageFolderItems.$inferSelect;
+
+export const messageNotifications = pgTable("message_notifications", {
+  id:        varchar("id").primaryKey(),
+  userId:    varchar("user_id").notNull(),
+  messageId: varchar("message_id").notNull(),
+  seen:      boolean("seen").notNull().default(false),
+  createdAt: timestamp("created_at"),
+});
+export type MessageNotification = typeof messageNotifications.$inferSelect;
+
+export const messageAttachments = pgTable("message_attachments", {
+  id:         varchar("id").primaryKey(),
+  messageId:  varchar("message_id").notNull(),
+  fileName:   text("file_name").notNull(),
+  fileSize:   integer("file_size").notNull(),
+  mimeType:   text("mime_type").notNull(),
+  storageKey: text("storage_key").notNull(),
+  createdAt:  timestamp("created_at"),
+});
+export type MessageAttachment = typeof messageAttachments.$inferSelect;
+
+// ─── Route Days ───────────────────────────────────────────────────────────────
+// Registered from live DB (existed via raw migration). Used by Route/dispatch system.
+export const routeDays = pgTable("route_days", {
+  id:           varchar("id").primaryKey(),
+  employeeId:   varchar("employee_id").notNull(),
+  date:         date("date").notNull(),
+  weather:      text("weather").array(),
+  startedAt:    timestamp("started_at", { withTimezone: true }),
+  completedAt:  timestamp("completed_at", { withTimezone: true }),
+  summaryNotes: text("summary_notes"),
+  status:       text("status").notNull(),
+  createdAt:    timestamp("created_at", { withTimezone: true }),
+  updatedAt:    timestamp("updated_at", { withTimezone: true }),
+});
+export type RouteDay = typeof routeDays.$inferSelect;

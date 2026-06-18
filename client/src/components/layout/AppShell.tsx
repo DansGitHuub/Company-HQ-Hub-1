@@ -215,6 +215,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       description: "Track your job application status and required documents.",
       tips: ["View hiring progress", "Upload required documents", "See next steps"]
     },
+    my_day: {
+      title: t("nav.myDay"),
+      description: "Your daily crew view — clock in/out, track drive time, shop time, and breaks with live timers.",
+      tips: ["Clock in to a job to start tracking", "GPS pings when clocked in", "View assigned jobs for the day"]
+    },
     calendar: {
       title: t("nav.calendar"),
       description: "Schedule and manage events, jobs, and meetings with Google Calendar sync.",
@@ -369,7 +374,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     applicant_portal: { icon: ClipboardCheck, label: t("nav.myApplication"), href: "/applicant" },
     sops: { icon: BookOpen, label: t("nav.sopLibrary"), href: "/sops" },
     testing: { icon: Brain, label: t("nav.quizzes"), href: "/training" },
-    materials: { icon: Hammer, label: t("nav.materials"), href: "/materials" },
     equipment: { icon: Truck, label: t("nav.equipment"), href: "/equipment" },
     todos: { icon: CheckSquare, label: t("nav.tasks"), href: "/todos" },
     hiring: { icon: Users, label: t("nav.hiring"), href: "/hiring" },
@@ -419,7 +423,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const sidebarSections: NavSection[] = [
-    { label: "MY SPACE", items: ["hq", "dashboard", "my_hours", "daily_agenda", "daily_worksheet", "messages"] },
+    { label: "MY SPACE", items: ["hq", "dashboard", "my_hours", "daily_agenda", "my_day", "daily_worksheet", "messages"] },
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["todos", "work_orders", "scheduling", "time_tracking", "equipment", "forms"] },
     { label: "RESOURCES", items: ["sops", "education", "testing"] },

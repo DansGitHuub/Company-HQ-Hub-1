@@ -143,7 +143,7 @@ export function setupAuth(app: Express) {
 
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const { password: _p, storedPassword: _sp, googleAccessToken: _ga, googleRefreshToken: _gr, googleTokenExpiry: _ge, recoveryToken: _rt, recoveryExpires: _re, ...safeUser } = req.user!;
+    const { password: _p, googleAccessToken: _ga, googleRefreshToken: _gr, googleTokenExpiry: _ge, recoveryToken: _rt, recoveryExpires: _re, ...safeUser } = req.user!;
     res.json(safeUser);
   });
 
@@ -188,11 +188,6 @@ export function setupAuth(app: Express) {
         recoveryToken: null,
         recoveryExpires: null,
       };
-      
-      // Update storedPassword for staff (non-customer) so Master Admin sees updated password
-      if (user.role !== "Customer") {
-        updates.storedPassword = newPassword;
-      }
       
       await storage.updateUser(user.id, updates);
       

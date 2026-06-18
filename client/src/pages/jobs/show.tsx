@@ -16,7 +16,7 @@ import {
 import {
   ChevronLeft, Pencil, User, MapPin, Calendar, Clock,
   DollarSign, Briefcase, Timer, ChevronDown, Loader2, FileText,
-  Plus, Trash2, HardHat, MessageSquare,
+  Plus, Trash2, HardHat, MessageSquare, ShieldCheck, GitMerge, CheckSquare, ClipboardCheck, Award,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -31,6 +31,11 @@ import { JobFormModal, JOB_STATUSES } from "./JobFormModal";
 import { InvoiceFormModal } from "@/pages/invoices/InvoiceFormModal";
 import { useAuth } from "@/hooks/use-auth";
 import JobWorkOrderTab from "./JobWorkOrderTab";
+import JobPacketGate from "./JobPacketGate";
+import JobChangeOrders from "./JobChangeOrders";
+import JobCheckpoints from "./JobCheckpoints";
+import JobCloseout from "./JobCloseout";
+import JobWarranty from "./JobWarranty";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TimeEntry {
@@ -823,6 +828,34 @@ export default function JobDetailPage() {
             <TabsTrigger value="messages" data-testid="tab-messages">{t("tabMessages")}</TabsTrigger>
             <TabsTrigger value="activity">{t("tabActivity")}</TabsTrigger>
             <TabsTrigger value="daily-logs" data-testid="tab-daily-logs">Journal</TabsTrigger>
+            {isAdminOrManager && (
+              <TabsTrigger value="change-orders" data-testid="tab-change-orders">
+                <GitMerge className="h-3.5 w-3.5 mr-1" />
+                Change Orders
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="checkpoints" data-testid="tab-checkpoints">
+              <CheckSquare className="h-3.5 w-3.5 mr-1" />
+              Checkpoints
+            </TabsTrigger>
+            {isAdminOrManager && (
+              <TabsTrigger value="closeout" data-testid="tab-closeout">
+                <ClipboardCheck className="h-3.5 w-3.5 mr-1" />
+                Closeout
+              </TabsTrigger>
+            )}
+            {isAdminOrManager && (
+              <TabsTrigger value="warranty" data-testid="tab-warranty">
+                <Award className="h-3.5 w-3.5 mr-1" />
+                Warranty
+              </TabsTrigger>
+            )}
+            {isAdminOrManager && (
+              <TabsTrigger value="packet-gate" data-testid="tab-packet-gate">
+                <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+                Job Gate
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Overview Tab */}
@@ -1031,6 +1064,39 @@ export default function JobDetailPage() {
           <TabsContent value="daily-logs">
             <DailyLogsTab jobId={id} />
           </TabsContent>
+
+          {/* Change Orders Tab */}
+          {isAdminOrManager && (
+            <TabsContent value="change-orders">
+              <JobChangeOrders jobId={id} isAdminOrManager={isAdminOrManager} />
+            </TabsContent>
+          )}
+
+          {/* Checkpoints Tab */}
+          <TabsContent value="checkpoints">
+            <JobCheckpoints jobId={id} isAdminOrManager={isAdminOrManager} />
+          </TabsContent>
+
+          {/* Closeout Tab */}
+          {isAdminOrManager && (
+            <TabsContent value="closeout">
+              <JobCloseout jobId={id} isAdminOrManager={isAdminOrManager} />
+            </TabsContent>
+          )}
+
+          {/* Warranty Tab */}
+          {isAdminOrManager && (
+            <TabsContent value="warranty">
+              <JobWarranty jobId={id} isAdminOrManager={isAdminOrManager} />
+            </TabsContent>
+          )}
+
+          {/* Job Packet Gate Tab */}
+          {isAdminOrManager && (
+            <TabsContent value="packet-gate">
+              <JobPacketGate jobId={id} isAdminOrManager={isAdminOrManager} />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 

@@ -48,6 +48,10 @@ import { registerCatalogRoutes } from "./catalogRoutes";
 import { registerMessagesRoutes } from "./messagesRoutes";
 import { registerDirectMessageRoutes } from "./directMessageRoutes";
 import { registerPlantCardRoutes } from "./plantCardRoutes";
+import { registerChangeOrderRoutes } from "./changeOrderRoutes";
+import { registerCheckpointRoutes } from "./checkpointRoutes";
+import { registerCloseoutRoutes } from "./closeoutRoutes";
+import { registerWarrantyRoutes } from "./warrantyRoutes";
 import { registerWorkOrderRoutes } from "./workOrderRoutes";
 import { searchProductImages } from "./imageSearchService";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail, sendApplicationLinkEmail } from "./email";
@@ -404,12 +408,7 @@ export async function registerRoutes(
         role: userRole,
       });
       
-      // Update storedPassword separately for staff
-      if (isStaff) {
-        await storage.updateUser(user.id, { storedPassword: password });
-      }
-      
-      const { password: _, storedPassword: __, ...safeUser } = user;
+      const { password: _, ...safeUser } = user;
       res.status(201).json(safeUser);
     } catch (err) {
       res.status(500).json({ message: "Error creating user" });
@@ -443,15 +442,10 @@ export async function registerRoutes(
       if (isActive !== undefined) updates.isActive = Boolean(isActive);
       if (password) {
         updates.password = await hashPassword(password);
-        // Update storedPassword for staff (non-customer) so Master Admin sees updated password
-        const effectiveRole = role || targetUser.role;
-        if (effectiveRole !== "Customer") {
-          updates.storedPassword = password;
-        }
       }
       
       const user = await storage.updateUser(id, updates);
-      const { password: _, storedPassword: __, ...safeUser } = user!;
+      const { password: _, ...safeUser } = user!;
       res.json(safeUser);
     } catch (err) {
       res.status(500).json({ message: "Error updating user" });
@@ -550,7 +544,6 @@ export async function registerRoutes(
       });
 
       const {
-        storedPassword: _sp,
         recoveryToken: _rt,
         googleAccessToken: _gat,
         googleRefreshToken: _grt,
@@ -562,35 +555,6 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("[crew-portal-invite] Redeem error:", err.message);
       return res.status(500).json({ message: "Server error" });
-    }
-  });
-
-  // Master Admin view stored password for staff users
-  app.get("/api/admin/users/:id/password", requireAuth, async (req, res) => {
-    try {
-      if (!req.user?.isMasterAdmin) {
-        return res.status(403).json({ message: "Only Master Admin can view stored passwords" });
-      }
-      
-      const id = req.params.id as string;
-      const targetUser = await storage.getUser(id);
-      
-      if (!targetUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Only allow viewing passwords for staff (non-customer)
-      if (targetUser.role === "Customer") {
-        return res.status(403).json({ message: "Cannot view customer passwords. Customers must use password recovery." });
-      }
-      
-      res.json({ 
-        userId: targetUser.id,
-        username: targetUser.username,
-        storedPassword: targetUser.storedPassword || "(not stored)"
-      });
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching password" });
     }
   });
 
@@ -4742,6 +4706,163 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
+  // ── Job Packet Gate ─────────────────────────────────────────────────────────
+  // GET /api/jobs/:id/packet-gate  — checklist of readiness items
+  app.get("/api/jobs/:id/packet-gate", requireAuth, async (req: any, res) => {
+    const { id } = req.params;
+    try {
+      const { rows: jobRows } = await pool.query(
+        `SELECT j.customer_id, j.property_id, j.source_estimate_id, j.companycam_project_id,
+                j.crew_lead_id, j.scheduled_start_time, j.scheduled_date,
+                j.description, j.scope_of_work, j.division, j.status, j.job_type, j.type,
+                se.signature_data AS estimate_signature,
+                (SELECT COUNT(*) FROM job_assignments WHERE job_id = j.id) AS crew_assignment_count
+         FROM jobs j
+         LEFT JOIN sales_estimates se ON se.id = j.source_estimate_id::uuid
+         WHERE j.id = $1`,
+        [id]
+      );
+      if (!jobRows.length) return res.status(404).json({ message: "Job not found" });
+      const j = jobRows[0];
+
+      // Fetch existing bypasses for this job
+      const { rows: bypasses } = await pool.query(
+        `SELECT jpb.gate_item, jpb.reason, jpb.created_at,
+                u.first_name, u.last_name
+         FROM job_packet_bypasses jpb
+         LEFT JOIN users u ON u.id = jpb.bypassed_by
+         WHERE jpb.job_id = $1`,
+        [id]
+      );
+      const bypassMap: Record<string, { reason: string; by_name: string; at: string }> = {};
+      for (const b of bypasses) {
+        bypassMap[b.gate_item] = {
+          reason: b.reason,
+          by_name: [b.first_name, b.last_name].filter(Boolean).join(" ") || "Admin",
+          at: b.created_at,
+        };
+      }
+
+      const jobType = (j.job_type || j.type || "").toLowerCase();
+      const isInstall = !["maintenance", "snow removal", "salt application", "seasonal clean up", "cleanup"].some(t =>
+        jobType.includes(t)
+      );
+
+      type GateItem = {
+        key: string; label: string; description: string;
+        required: boolean; passed: boolean;
+        bypassed: boolean; bypass_reason: string | null;
+        bypass_by: string | null; bypass_at: string | null;
+      };
+
+      const pass = (val: any) => val !== null && val !== undefined && String(val).trim() !== "";
+      const bypass = (key: string): Pick<GateItem, "bypassed" | "bypass_reason" | "bypass_by" | "bypass_at"> =>
+        bypassMap[key]
+          ? { bypassed: true, bypass_reason: bypassMap[key].reason, bypass_by: bypassMap[key].by_name, bypass_at: bypassMap[key].at }
+          : { bypassed: false, bypass_reason: null, bypass_by: null, bypass_at: null };
+
+      const items: GateItem[] = [
+        {
+          key: "customer_linked", label: "Customer Linked",
+          description: "A customer record must be associated with this job.",
+          required: true, passed: pass(j.customer_id), ...bypass("customer_linked"),
+        },
+        {
+          key: "property_linked", label: "Property Address Set",
+          description: "A service property must be linked so the crew knows where to go.",
+          required: true, passed: pass(j.property_id), ...bypass("property_linked"),
+        },
+        {
+          key: "schedule_set", label: "Schedule Date Set",
+          description: "The job must have a scheduled date before it can start.",
+          required: true, passed: pass(j.scheduled_date) || pass(j.scheduled_start_time), ...bypass("schedule_set"),
+        },
+        {
+          key: "crew_assigned", label: "Crew Lead Assigned",
+          description: "A crew lead or at least one crew member must be assigned.",
+          required: true,
+          passed: pass(j.crew_lead_id) || Number(j.crew_assignment_count) > 0,
+          ...bypass("crew_assigned"),
+        },
+        {
+          key: "scope_defined", label: "Scope of Work Defined",
+          description: "Job description or scope of work must be filled in.",
+          required: true, passed: pass(j.description) || pass(j.scope_of_work), ...bypass("scope_defined"),
+        },
+        {
+          key: "estimate_linked", label: "Source Estimate Linked",
+          description: "This job should be created from an approved estimate.",
+          required: isInstall, passed: pass(j.source_estimate_id), ...bypass("estimate_linked"),
+        },
+        {
+          key: "estimate_signed", label: "Estimate Signed by Customer",
+          description: "The customer must have signed the estimate before work begins.",
+          required: isInstall, passed: pass(j.estimate_signature), ...bypass("estimate_signed"),
+        },
+        {
+          key: "companycam_linked", label: "CompanyCam Project Linked",
+          description: "Link a CompanyCam project so site photos are tracked with this job.",
+          required: false, passed: pass(j.companycam_project_id), ...bypass("companycam_linked"),
+        },
+        {
+          key: "division_set", label: "Division Set",
+          description: "The job must be assigned to a business division.",
+          required: false, passed: pass(j.division), ...bypass("division_set"),
+        },
+      ];
+
+      const requiredItems = items.filter(i => i.required);
+      const blockedItems = requiredItems.filter(i => !i.passed && !i.bypassed);
+      const bypassedItems = requiredItems.filter(i => !i.passed && i.bypassed);
+
+      const gate_status =
+        blockedItems.length === 0 ? "ready" :
+        bypassedItems.length > 0 && blockedItems.length === 0 ? "bypassed_all" :
+        "blocked";
+
+      return res.json({ gate_status, items, blocked_count: blockedItems.length, bypassed_count: bypassedItems.length });
+    } catch (err: any) {
+      console.error("[packet-gate] GET error:", err.message);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // POST /api/jobs/:id/packet-gate/bypass  — admin/manager bypass a gate item
+  app.post("/api/jobs/:id/packet-gate/bypass", requireAuth, requireRole("Admin", "Manager", "Master Admin"), async (req: any, res) => {
+    const { id } = req.params;
+    const { gate_item, reason } = req.body;
+    if (!gate_item || !reason?.trim()) {
+      return res.status(400).json({ message: "gate_item and reason are required" });
+    }
+    try {
+      await pool.query(
+        `INSERT INTO job_packet_bypasses (job_id, gate_item, bypassed_by, reason)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (job_id, gate_item) DO UPDATE SET reason = $4, bypassed_by = $3, created_at = NOW()`,
+        [id, gate_item, req.user.id, reason.trim()]
+      );
+      logActivity("packet_gate_bypass", `Gate item "${gate_item}" bypassed for job`, `/jobs/${id}`, req.user?.id);
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[packet-gate] bypass error:", err.message);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // DELETE /api/jobs/:id/packet-gate/bypass/:item — remove a bypass
+  app.delete("/api/jobs/:id/packet-gate/bypass/:item", requireAuth, requireRole("Admin", "Manager", "Master Admin"), async (req: any, res) => {
+    const { id, item } = req.params;
+    try {
+      await pool.query(
+        `DELETE FROM job_packet_bypasses WHERE job_id = $1 AND gate_item = $2`,
+        [id, item]
+      );
+      return res.json({ ok: true });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/job-pipeline-tabs", requireAuth, async (req, res) => {
     try {
       const tabs = await storage.getJobPipelineTabs();
@@ -5216,20 +5337,24 @@ Generate detailed information for this landscaping material.`;
 
       const customerUser = req.user!;
       try {
-        await storage.createEstimate({
-          clientName: customerUser.fullName || customerUser.username,
-          serviceType: req.body.serviceType,
-          stage: "New Lead",
-          description: req.body.description,
-          propertyAddress: req.body.propertyAddress,
-          contactName: customerUser.fullName || customerUser.username,
-          contactEmail: customerUser.email || undefined,
-          source: "work_request",
-          workRequestId: request.id,
-          customerId: customerUser.id,
-        });
+        // Phase 2: create a consultation (new_lead) instead of a legacy estimate
+        const { rows: consultRows } = await pool.query(`
+          INSERT INTO consultations (
+            customer_id, contact_name, contact_phone, contact_email,
+            pipeline_stage, service_type, project_description, address, lead_source
+          ) VALUES ($1,$2,$3,$4,'new_lead',$5,$6,$7,'customer_portal') RETURNING *
+        `, [
+          customerUser.id,
+          customerUser.fullName || customerUser.username,
+          customerUser.phone || null,
+          customerUser.email || null,
+          req.body.serviceType || null,
+          req.body.description || null,
+          req.body.propertyAddress || null,
+        ]);
+        console.log(`[work-request] Auto-created consultation ${consultRows[0]?.id} for customer ${customerUser.id}`);
       } catch (estErr) {
-        console.error("Error auto-creating estimate from work request:", estErr);
+        console.error("Error auto-creating consultation from work request:", estErr);
       }
 
       try {
@@ -5241,7 +5366,7 @@ Generate detailed information for this landscaping material.`;
             type: "work_request",
             title: "New Work Request",
             message: `${customerUser.fullName || customerUser.username} submitted a work request: "${req.body.title}"`,
-            link: "/jobs",
+            link: "/consultations",
             isRead: false,
           });
         }
@@ -6627,7 +6752,7 @@ SECTION GENERATION RULES:
     try {
       const user = await storage.getUser(req.user!.id);
       if (!user) return res.status(404).json({ message: "User not found" });
-      const { password, recoveryToken, recoveryExpires, storedPassword, ...safeUser } = user;
+      const { password, recoveryToken, recoveryExpires, ...safeUser } = user;
       res.json(safeUser);
     } catch (err) {
       res.status(500).json({ message: "Error fetching profile" });
@@ -6663,16 +6788,11 @@ SECTION GENERATION RULES:
         }
         
         updates.password = await hashPassword(newPassword);
-        
-        // Update storedPassword for staff (non-customer) so Master Admin sees updated password
-        if (currentUser.role !== "Customer") {
-          updates.storedPassword = newPassword;
-        }
       }
       
       const user = await storage.updateUser(req.user!.id, updates);
       if (!user) return res.status(404).json({ message: "User not found" });
-      const { password, recoveryToken, recoveryExpires, storedPassword, ...safeUser } = user;
+      const { password, recoveryToken, recoveryExpires, ...safeUser } = user;
       res.json(safeUser);
     } catch (err) {
       res.status(500).json({ message: "Error updating profile" });
@@ -9835,6 +9955,40 @@ Provide accurate information based on publicly available documentation.`;
         rating: ["hot", "warm", "cold", "unqualified"].includes(rating) ? rating : "cold",
         qualifiedBy: req.user!.id,
       });
+
+      // Phase 2: auto-create a consultation (new_lead stage) from the qualified lead
+      try {
+        const leadScoreVal = typeof score === "number" && typeof maxScore === "number" && maxScore > 0
+          ? Math.round((score / maxScore) * 100)
+          : 0;
+        const { rows } = await pool.query(`
+          INSERT INTO consultations (
+            contact_name, contact_phone, contact_email, pipeline_stage,
+            service_type, budget_range, desired_timeline, lead_source, lead_score, notes
+          ) VALUES ($1,$2,$3,'new_lead',$4,$5,$6,$7,$8,$9) RETURNING *
+        `, [
+          contactName, contactPhone || null, contactEmail || null,
+          serviceType || null, budget || null, timeline || null,
+          source || "Lead Qualifier", leadScoreVal, notes || null,
+        ]);
+        const consultation = rows[0];
+        // Notify admins about the new lead
+        const allUsers = await storage.getAllUsers();
+        const admins = allUsers.filter((u: any) => u.role === "Admin" || u.role === "Master Admin");
+        for (const admin of admins) {
+          await storage.createStaffNotification({
+            userId: admin.id,
+            type: "new_lead",
+            title: "New Qualified Lead",
+            message: `${contactName} qualified as ${rating?.toUpperCase() || "COLD"} lead (${leadScoreVal}% score) — ${serviceType || "service TBD"}`,
+            link: `/consultations?id=${consultation.id}`,
+            isRead: false,
+          });
+        }
+      } catch (consultErr: any) {
+        console.error("[qualified-leads] auto-consultation error:", consultErr.message);
+      }
+
       res.status(201).json(lead);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -10551,6 +10705,10 @@ Provide accurate information based on publicly available documentation.`;
   registerWorkAreaRoutes(app, requireAuth, requireRole);
   registerArchiveRoutes(app, requireAuth, requireRole);
   registerEstimateRoutes(app);
+  registerChangeOrderRoutes(app, requireAuth);
+  registerCheckpointRoutes(app, requireAuth);
+  registerCloseoutRoutes(app, requireAuth);
+  registerWarrantyRoutes(app, requireAuth);
   registerSchedulingRoutes(app);
   registerMyDayRoutes(app);
   registerRouteRoutes(app, requireAuth);

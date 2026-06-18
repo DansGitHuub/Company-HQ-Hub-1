@@ -847,4 +847,75 @@ export function registerCompanyCamRoutes(app: Express) {
       return res.status(500).json({ message: err.message });
     }
   });
+
+  // ── Phase 2: Link CompanyCam project to a Job ────────────────────────────────
+  // PATCH /api/jobs/:jobId/companycam-project { companycam_project_id }
+  app.patch("/api/jobs/:jobId/companycam-project", requireAuth, async (req: any, res: any) => {
+    const { jobId } = req.params;
+    const { companycam_project_id } = req.body;
+    try {
+      // Update jobs table
+      await pool.query(
+        `UPDATE jobs SET companycam_project_id = $1, updated_at = NOW() WHERE id = $2`,
+        [companycam_project_id || null, jobId]
+      );
+      // If linking (not unlinking), update the companycam_projects row too
+      if (companycam_project_id) {
+        await pool.query(
+          `UPDATE companycam_projects SET job_id = $1, updated_at = NOW() WHERE companycam_project_id = $2`,
+          [jobId, companycam_project_id]
+        );
+      } else {
+        // Unlinking — clear job_id on the old project
+        await pool.query(
+          `UPDATE companycam_projects SET job_id = NULL, updated_at = NOW() WHERE job_id = $1`,
+          [jobId]
+        );
+      }
+      return res.json({ ok: true, job_id: jobId, companycam_project_id: companycam_project_id || null });
+    } catch (err: any) {
+      console.error("[companycam] job-link error:", err.message);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // GET /api/jobs/:jobId/companycam-photos — get all photos for a job via linked CC project
+  app.get("/api/jobs/:jobId/companycam-photos", requireAuth, async (req: any, res: any) => {
+    const { jobId } = req.params;
+    try {
+      // Get job's CompanyCam project ID
+      const { rows: jobRows } = await pool.query(
+        `SELECT companycam_project_id, source_estimate_id FROM jobs WHERE id = $1`,
+        [jobId]
+      );
+      if (!jobRows.length) return res.status(404).json({ message: "Job not found" });
+
+      let ccProjectId = jobRows[0].companycam_project_id;
+
+      // Fallback: try the source estimate's companycam_project_id
+      if (!ccProjectId && jobRows[0].source_estimate_id) {
+        const { rows: estRows } = await pool.query(
+          `SELECT companycam_project_id FROM sales_estimates WHERE id = $1`,
+          [jobRows[0].source_estimate_id]
+        );
+        ccProjectId = estRows[0]?.companycam_project_id || null;
+      }
+
+      if (!ccProjectId) return res.json({ project: null, photos: [] });
+
+      // Get project and photos
+      const { rows: projRows } = await pool.query(
+        `SELECT * FROM companycam_projects WHERE companycam_project_id = $1`,
+        [ccProjectId]
+      );
+      const { rows: photos } = await pool.query(
+        `SELECT * FROM companycam_photos WHERE companycam_project_id = $1 ORDER BY captured_at DESC NULLS LAST`,
+        [ccProjectId]
+      );
+      return res.json({ project: projRows[0] || null, photos });
+    } catch (err: any) {
+      console.error("[companycam] job-photos error:", err.message);
+      return res.status(500).json({ message: err.message });
+    }
+  });
 }

@@ -86,5 +86,11 @@ export async function runEstimatesMigration() {
     )
   `);
 
+  // Phase 2: consultation chain link
+  await pool.query(`
+    ALTER TABLE sales_estimates
+      ADD COLUMN IF NOT EXISTS consultation_id UUID
+  `);
+
   console.log("[Migration] estimates table ready + sales_estimates + estimate_work_areas columns added + estimate date fields + estimate_items table");
 }

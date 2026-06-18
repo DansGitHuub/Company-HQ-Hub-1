@@ -60,6 +60,13 @@ async function migrateConsultations() {
   await pool.query(`ALTER TABLE consultations ADD COLUMN IF NOT EXISTS additional_notes TEXT`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultations_pipeline_stage ON consultations(pipeline_stage)`);
 
+  // Phase 2: business data chain columns
+  await pool.query(`ALTER TABLE consultations ADD COLUMN IF NOT EXISTS property_id UUID`);
+  await pool.query(`ALTER TABLE consultations ADD COLUMN IF NOT EXISTS contact_id UUID`);
+  await pool.query(`ALTER TABLE consultations ADD COLUMN IF NOT EXISTS lead_score INT DEFAULT 0`);
+  await pool.query(`ALTER TABLE consultations ADD COLUMN IF NOT EXISTS lost_reason TEXT`);
+  await pool.query(`ALTER TABLE consultations ADD COLUMN IF NOT EXISTS next_follow_up_date DATE`);
+
   // Fix assigned_to FK: drop any existing constraint (old or new) then re-add pointing to employees
   await pool.query(`ALTER TABLE consultations DROP CONSTRAINT IF EXISTS consultations_assigned_to_fkey`);
   await pool.query(`ALTER TABLE consultations DROP CONSTRAINT IF EXISTS consultations_assigned_to_employees_fkey`);
