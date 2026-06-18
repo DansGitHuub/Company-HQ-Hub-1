@@ -1,0 +1,76 @@
+We are no longer trying to brainstorm what this app could become. We are auditing the existing app to identify what is missing, broken, duplicated, overcomplicated, disconnected, or not properly aligned with how a landscape / contracting business actually operates.
+
+Please inspect the entire current codebase, database schema, routes, API endpoints, UI components, forms, role permissions, workflows, and data relationships.
+
+Do not make any changes yet.
+
+Please create a detailed audit report organized by module.
+
+For each module, identify:
+
+1. What currently exists
+2. What database tables and fields support it
+3. What API endpoints support it
+4. What frontend components and pages support it
+5. What user roles can access it
+6. What data is collected
+7. Where that data is stored
+8. Where that data flows next
+9. What other modules it connects to
+10. What appears duplicated or overlapping
+11. What appears missing
+12. What appears broken or incomplete
+13. What appears overcomplicated
+14. What appears too disconnected from the real workflow
+15. What should be simplified
+16. What should be protected by permissions
+17. What should have an audit/change log
+18. What should trigger notifications, tasks, or workflow updates
+19. What assumptions the current app appears to be making
+20. What questions need to be answered before improving this module
+
+Please organize the audit around these business modules:
+
+- Users, roles, and permissions
+- Employees and employee records
+- Customers and contacts
+- Properties
+- Leads and sales pipeline
+- Estimates and proposals
+- Projects / jobs
+- Work orders
+- Scheduling
+- Time tracking / clock-in
+- Photos, files, and attachments
+- Customer communication
+- Customer portal
+- Employee portal
+- Training / SOPs
+- Forms and checklists
+- Materials / item catalog
+- Calculators
+- Inventory / purchasing
+- Vendors and subcontractors
+- Equipment records
+- Maintenance routes
+- Snow / emergency work
+- Warranty / service issues
+- Tasks / reminders
+- Reports / dashboards
+- Admin settings
+- Integrations / webhooks
+- Mobile usability / field workflow
+- Audit logs and change history
+
+For each module, please also answer:
+
+- Is this module production-ready?
+- Is it partially built?
+- Is it only a placeholder?
+- Is it disconnected from the rest of the app?
+- Does it duplicate another module?
+- What is the recommended next action: keep, simplify, merge, rebuild, connect, hide, or remove?
+
+Please be direct and specific. Reference actual file names, table names, field names, routes, components, and functions wherever possible.
+
+Do not fix anything yet. Only inspect and report.
