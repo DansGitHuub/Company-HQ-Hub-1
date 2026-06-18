@@ -1,0 +1,183 @@
+Landscaping Project Workflow
+1. Lead Intake
+Receive the initial customer contact by phone, web form, referral, text, or email.
+
+Capture the customer name, contact information, address, and basic job type.
+
+Enter the lead into the system immediately.
+
+2. Lead Qualification
+Review the job type, scope, location, and expected fit.
+
+Decide whether the project is a fit for your company.
+
+Decide whether a site visit is needed or whether photos and remote information are enough.
+
+If the project is not a fit, decline or refer it appropriately.
+
+3. Site Visit or Remote Review
+For most jobs, schedule a site visit.
+
+For smaller or simpler jobs, review photos and information remotely when appropriate.
+
+During the site visit, take measurements and photos.
+
+Capture wide shots, close-ups, and any problem areas.
+
+Record access issues, site conditions, and anything that may affect the job.
+
+4. Estimate and Proposal
+Build the estimate from measurements, photos, and site notes.
+
+Prepare a clear proposal that defines scope, assumptions, and pricing.
+
+Send the proposal electronically unless an in-person review makes more sense for a larger job.
+
+For complex projects, plan for follow-up meetings to review materials, heights, samples, plants, layout, and other decisions.
+
+5. Follow-Up and Approval
+Follow up on every proposal.
+
+Answer customer questions and revise as needed.
+
+Track whether the proposal is open, pending, revised, or approved.
+
+When the customer accepts, collect the deposit, generally 50%.
+
+Mark the job as sold only after payment is received.
+
+6. Production Handoff
+Assign a crew and schedule the work on the calendar.
+
+Create a job packet that includes scope, drawings, schematics, photos, measurements, notes, and special instructions.
+
+Confirm whether materials are stocked or must be ordered.
+
+Make sure all required materials are secured before the start date whenever possible.
+
+Review the job with the crew lead ahead of time, preferably on site for larger jobs.
+
+7. Job Readiness
+Confirm the crew has access to all job information before the start date.
+
+Confirm the timeline, sequence of work, and any customer promises.
+
+Confirm equipment, materials, and documents are ready.
+
+Confirm who to call if something is unclear.
+
+Do not let the crew guess when a written answer should exist.
+
+8. Job Start
+Crew clocks in through the app.
+
+Crew reviews the job details before starting.
+
+Crew confirms the first day’s plan with the crew lead.
+
+Crew begins work only after the job packet and materials are ready.
+
+9. Job Execution
+Crew tracks time and materials in the app.
+
+Crew follows the written instructions and approved plan.
+
+Crew takes progress photos on schedule.
+
+Crew records notable issues, delays, or field changes immediately.
+
+Questions should be answered from the job packet whenever possible.
+
+10. Milestone Checkpoints
+For larger jobs, break the work into checkpoints.
+
+Examples include patio complete, deck complete, grading complete, planting complete, or irrigation complete.
+
+At each checkpoint, take photos and verify the work before moving forward.
+
+Get customer sign-off when appropriate.
+
+Do not continue hidden work without documenting the completed phase.
+
+11. Change Orders
+If the customer changes the scope, materials, design, or expectations, stop and document it.
+
+Record what changed, why it changed, and what it will cost.
+
+Get approval before proceeding with the changed work.
+
+Update the job packet so the crew is working from the current plan.
+
+12. Quality Check
+Complete an internal review at the end of the job.
+
+Confirm that the work matches the approved scope.
+
+Confirm punch-list items are complete.
+
+Verify the site is clean and ready for customer review.
+
+13. Customer Walkthrough
+Walk the completed job with the customer.
+
+Review what was completed and confirm satisfaction.
+
+Address any final punch-list items.
+
+Obtain final approval or sign-off when appropriate.
+
+14. Final Invoice and Closeout
+Send the final invoice after approval.
+
+Collect the remaining balance.
+
+Save final photos, notes, and closeout documents.
+
+Store any warranty, maintenance, or care instructions.
+
+Record lessons learned for future jobs.
+
+Standards to Enforce
+Every job should have one source of truth.
+
+Every job should have a complete packet before the crew starts.
+
+Every crew should know the next step before starting the current one.
+
+Every larger job should have checkpoints.
+
+Every scope change should become a documented change order.
+
+Every completed job should have a closeout record.
+
+Documents to Attach
+Proposal.
+
+Measurements and site notes.
+
+Photos.
+
+Drawings or schematics.
+
+Material list.
+
+Crew instructions.
+
+Checkpoint list.
+
+Change-order form.
+
+Final walkthrough checklist.
+
+Closeout notes and final photos.
+
+Recommended Next Version
+Add role names next to each step.
+
+Add a checkbox column for field use.
+
+Add a “required for all jobs” vs. “only for larger jobs” label.
+
+Add exact photo requirements.
+
+Add a short “do not guess” rule for crew leads.
