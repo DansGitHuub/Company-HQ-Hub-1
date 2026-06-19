@@ -339,4 +339,155 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // ── TIME BY DIVISION ─────────────────────────────────────────────────────────
+  app.get("/api/reports/time-by-division", requireAuth, async (req, res) => {
+    const { date_from, date_to } = req.query as Record<string, string>;
+    try {
+      const params: any[] = [];
+      const conditions: string[] = ["te.clock_out IS NOT NULL"];
+      if (date_from) { params.push(date_from); conditions.push(`te.clock_in::date >= $${params.length}`); }
+      if (date_to)   { params.push(date_to);   conditions.push(`te.clock_in::date <= $${params.length}`); }
+      const where = "WHERE " + conditions.join(" AND ");
+
+      const [byDiv, byMonth, byEmployee] = await Promise.all([
+        pool.query(`
+          SELECT
+            COALESCE(j.division, 'Unassigned') AS division,
+            COUNT(DISTINCT te.user_id)::int AS crew_count,
+            COUNT(*)::int AS entry_count,
+            ROUND(SUM(EXTRACT(EPOCH FROM (te.clock_out - te.clock_in)) / 3600)::numeric, 1) AS total_hours
+          FROM time_entries te
+          LEFT JOIN jobs j ON j.id = te.job_id
+          ${where}
+          GROUP BY COALESCE(j.division, 'Unassigned')
+          ORDER BY total_hours DESC
+        `, params),
+        pool.query(`
+          SELECT
+            TO_CHAR(DATE_TRUNC('month', te.clock_in), 'Mon YYYY') AS month,
+            DATE_TRUNC('month', te.clock_in) AS month_start,
+            COALESCE(j.division, 'Unassigned') AS division,
+            ROUND(SUM(EXTRACT(EPOCH FROM (te.clock_out - te.clock_in)) / 3600)::numeric, 1) AS total_hours
+          FROM time_entries te
+          LEFT JOIN jobs j ON j.id = te.job_id
+          ${where}
+          GROUP BY DATE_TRUNC('month', te.clock_in), COALESCE(j.division, 'Unassigned')
+          ORDER BY month_start, division
+        `, params),
+        pool.query(`
+          SELECT
+            COALESCE(u.name, 'Unknown') AS employee_name,
+            COALESCE(j.division, 'Unassigned') AS division,
+            ROUND(SUM(EXTRACT(EPOCH FROM (te.clock_out - te.clock_in)) / 3600)::numeric, 1) AS total_hours
+          FROM time_entries te
+          LEFT JOIN jobs j ON j.id = te.job_id
+          LEFT JOIN users u ON u.id = te.user_id
+          ${where}
+          GROUP BY u.name, COALESCE(j.division, 'Unassigned')
+          ORDER BY total_hours DESC
+          LIMIT 50
+        `, params),
+      ]);
+
+      const totalHours = byDiv.rows.reduce((s: number, r: any) => s + Number(r.total_hours), 0);
+
+      // Pivot monthly rows into { month, Install: X, Maintenance: Y, ... }
+      const monthMap: Record<string, any> = {};
+      for (const r of byMonth.rows) {
+        if (!monthMap[r.month]) monthMap[r.month] = { month: r.month, month_start: r.month_start };
+        monthMap[r.month][r.division] = Number(r.total_hours);
+      }
+      const divisions = [...new Set(byDiv.rows.map((r: any) => r.division))];
+
+      res.json({
+        summary: { total_hours: Math.round(totalHours * 10) / 10, division_count: byDiv.rows.length },
+        by_division: byDiv.rows.map((r: any) => ({ ...r, total_hours: Number(r.total_hours) })),
+        by_month: Object.values(monthMap).sort((a: any, b: any) => a.month_start < b.month_start ? -1 : 1),
+        by_employee: byEmployee.rows.map((r: any) => ({ ...r, total_hours: Number(r.total_hours) })),
+        divisions,
+      });
+    } catch (err: any) {
+      console.error("[reports/time-by-division]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── MATERIALS SPEND ───────────────────────────────────────────────────────────
+  app.get("/api/reports/materials-spend", requireAuth, async (req, res) => {
+    const { date_from, date_to, division } = req.query as Record<string, string>;
+    try {
+      const params: any[] = [];
+      const conditions: string[] = ["jm.quantity IS NOT NULL", "jm.unit_cost IS NOT NULL"];
+      if (date_from) { params.push(date_from); conditions.push(`jm.created_at::date >= $${params.length}`); }
+      if (date_to)   { params.push(date_to);   conditions.push(`jm.created_at::date <= $${params.length}`); }
+      if (division)  { params.push(division);   conditions.push(`j.division = $${params.length}`); }
+      const where = "WHERE " + conditions.join(" AND ");
+
+      const [byMonth, byItem, byDiv, totals] = await Promise.all([
+        pool.query(`
+          SELECT
+            TO_CHAR(DATE_TRUNC('month', jm.created_at), 'Mon YYYY') AS month,
+            DATE_TRUNC('month', jm.created_at) AS month_start,
+            COUNT(*)::int AS line_count,
+            ROUND(SUM(jm.quantity * jm.unit_cost)::numeric, 2) AS total_spend
+          FROM job_materials jm
+          LEFT JOIN jobs j ON j.id = jm.job_id
+          ${where}
+          GROUP BY DATE_TRUNC('month', jm.created_at)
+          ORDER BY month_start
+        `, params),
+        pool.query(`
+          SELECT
+            jm.item_name,
+            jm.item_number,
+            COUNT(*)::int AS usage_count,
+            ROUND(SUM(jm.quantity)::numeric, 2) AS total_qty,
+            ROUND(SUM(jm.quantity * jm.unit_cost)::numeric, 2) AS total_spend
+          FROM job_materials jm
+          LEFT JOIN jobs j ON j.id = jm.job_id
+          ${where}
+          GROUP BY jm.item_name, jm.item_number
+          ORDER BY total_spend DESC
+          LIMIT 20
+        `, params),
+        pool.query(`
+          SELECT
+            COALESCE(j.division, 'Unassigned') AS division,
+            COUNT(DISTINCT jm.job_id)::int AS job_count,
+            ROUND(SUM(jm.quantity * jm.unit_cost)::numeric, 2) AS total_spend
+          FROM job_materials jm
+          LEFT JOIN jobs j ON j.id = jm.job_id
+          ${where}
+          GROUP BY COALESCE(j.division, 'Unassigned')
+          ORDER BY total_spend DESC
+        `, params),
+        pool.query(`
+          SELECT
+            COUNT(DISTINCT jm.job_id)::int AS job_count,
+            COUNT(*)::int AS line_count,
+            ROUND(SUM(jm.quantity * jm.unit_cost)::numeric, 2) AS total_spend,
+            ROUND(AVG(jm.quantity * jm.unit_cost)::numeric, 2) AS avg_line_value
+          FROM job_materials jm
+          LEFT JOIN jobs j ON j.id = jm.job_id
+          ${where}
+        `, params),
+      ]);
+
+      res.json({
+        summary: {
+          total_spend:    Number(totals.rows[0]?.total_spend ?? 0),
+          job_count:      totals.rows[0]?.job_count ?? 0,
+          line_count:     totals.rows[0]?.line_count ?? 0,
+          avg_line_value: Number(totals.rows[0]?.avg_line_value ?? 0),
+        },
+        by_month:    byMonth.rows.map((r: any) => ({ ...r, total_spend: Number(r.total_spend) })),
+        by_item:     byItem.rows.map((r: any) => ({ ...r, total_spend: Number(r.total_spend), total_qty: Number(r.total_qty) })),
+        by_division: byDiv.rows.map((r: any) => ({ ...r, total_spend: Number(r.total_spend) })),
+      });
+    } catch (err: any) {
+      console.error("[reports/materials-spend]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
 }

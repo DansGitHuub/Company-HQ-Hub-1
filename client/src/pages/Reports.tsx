@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Loader2 } from "lucide-react";
 
-type Tab = "revenue" | "job-costing" | "invoice-aging" | "crew-hours" | "profitability";
+type Tab = "revenue" | "job-costing" | "invoice-aging" | "crew-hours" | "profitability" | "time-by-division" | "materials-spend";
 
 const DIVISIONS = ["Maintenance", "Install", "Snow", "General"];
 
@@ -818,14 +818,324 @@ function ProfitabilityReport() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  Tab 6 — Time by Division
+// ═══════════════════════════════════════════════════════════════════════════════
+const DIV_COLORS = ["hsl(var(--primary))", "#22c55e", "#f59e0b", "#3b82f6", "#a855f7", "#ef4444", "#06b6d4"];
+
+function TimeByDivision() {
+  const thisYear = new Date().getFullYear();
+  const [filters, setFilters] = useState({ date_from: `${thisYear}-01-01`, date_to: `${thisYear}-12-31` });
+  const [applied, setApplied] = useState(filters);
+
+  const params = new URLSearchParams();
+  if (applied.date_from) params.set("date_from", applied.date_from);
+  if (applied.date_to)   params.set("date_to",   applied.date_to);
+
+  const { data, isLoading, error } = useQuery<any>({
+    queryKey: ["/api/reports/time-by-division", applied],
+    queryFn: () => fetch(`/api/reports/time-by-division?${params}`, { credentials: "include" }).then(r => r.json()),
+  });
+
+  return (
+    <div className="space-y-5">
+      <Card>
+        <CardContent className="pt-4 pb-4">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="space-y-1">
+              <Label className="text-xs">From</Label>
+              <Input type="date" className="h-8 text-sm w-36" value={filters.date_from}
+                onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))}
+                data-testid="filter-tbd-from" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">To</Label>
+              <Input type="date" className="h-8 text-sm w-36" value={filters.date_to}
+                onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))}
+                data-testid="filter-tbd-to" />
+            </div>
+            <Button size="sm" className="h-8" onClick={() => setApplied(filters)} data-testid="btn-apply-tbd-filters">
+              Apply Filters
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {isLoading && <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
+      {error && <div className="flex items-center gap-2 text-destructive text-sm"><AlertCircle className="h-4 w-4" />Failed to load report</div>}
+
+      {data && !isLoading && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard title="Total Hours" value={fmtHrs(data.summary.total_hours)} icon={Clock} color="blue" />
+            <StatCard title="Divisions" value={String(data.summary.division_count)} icon={BarChart2} />
+            {data.by_division[0] && (
+              <StatCard title="Top Division" value={data.by_division[0].division}
+                sub={fmtHrs(data.by_division[0].total_hours)} icon={TrendingUp} color="green" />
+            )}
+            {data.by_division[1] && (
+              <StatCard title="2nd Division" value={data.by_division[1].division}
+                sub={fmtHrs(data.by_division[1].total_hours)} icon={TrendingUp} />
+            )}
+          </div>
+
+          {data.by_month.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Hours by Division — Monthly</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={data.by_month} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <YAxis tickFormatter={v => `${v}h`} tick={{ fontSize: 11 }} width={40} />
+                    <Tooltip formatter={(v: any) => `${Number(v).toFixed(1)} hrs`} />
+                    <Legend />
+                    {data.divisions.map((div: string, i: number) => (
+                      <Bar key={div} dataKey={div} name={div} stackId="a"
+                        fill={DIV_COLORS[i % DIV_COLORS.length]} radius={i === data.divisions.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {data.by_division.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Hours by Division</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Division</TableHead>
+                      <TableHead className="text-right">Total Hours</TableHead>
+                      <TableHead className="text-right">Crew Members</TableHead>
+                      <TableHead className="text-right">Entries</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.by_division.map((r: any) => (
+                      <TableRow key={r.division}>
+                        <TableCell className="font-medium">{r.division}</TableCell>
+                        <TableCell className="text-right">{fmtHrs(r.total_hours)}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{r.crew_count}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{r.entry_count}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {data.by_employee.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Employee Hours by Division</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Division</TableHead>
+                      <TableHead className="text-right">Hours</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.by_employee.map((r: any, i: number) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium">{r.employee_name}</TableCell>
+                        <TableCell className="text-muted-foreground">{r.division}</TableCell>
+                        <TableCell className="text-right">{fmtHrs(r.total_hours)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Tab 7 — Materials Spend
+// ═══════════════════════════════════════════════════════════════════════════════
+function MaterialsSpend() {
+  const thisYear = new Date().getFullYear();
+  const [filters, setFilters] = useState({ date_from: `${thisYear}-01-01`, date_to: `${thisYear}-12-31`, division: "" });
+  const [applied, setApplied] = useState(filters);
+
+  const params = new URLSearchParams();
+  if (applied.date_from) params.set("date_from", applied.date_from);
+  if (applied.date_to)   params.set("date_to",   applied.date_to);
+  if (applied.division)  params.set("division",   applied.division);
+
+  const { data, isLoading, error } = useQuery<any>({
+    queryKey: ["/api/reports/materials-spend", applied],
+    queryFn: () => fetch(`/api/reports/materials-spend?${params}`, { credentials: "include" }).then(r => r.json()),
+  });
+
+  return (
+    <div className="space-y-5">
+      <Card>
+        <CardContent className="pt-4 pb-4">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="space-y-1">
+              <Label className="text-xs">From</Label>
+              <Input type="date" className="h-8 text-sm w-36" value={filters.date_from}
+                onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))}
+                data-testid="filter-ms-from" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">To</Label>
+              <Input type="date" className="h-8 text-sm w-36" value={filters.date_to}
+                onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))}
+                data-testid="filter-ms-to" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Division</Label>
+              <Select value={filters.division} onValueChange={v => setFilters(f => ({ ...f, division: v === "_all" ? "" : v }))}>
+                <SelectTrigger className="h-8 text-sm w-40" data-testid="filter-ms-division">
+                  <SelectValue placeholder="All Divisions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">All Divisions</SelectItem>
+                  {DIVISIONS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button size="sm" className="h-8" onClick={() => setApplied(filters)} data-testid="btn-apply-ms-filters">
+              Apply Filters
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {isLoading && <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
+      {error && <div className="flex items-center gap-2 text-destructive text-sm"><AlertCircle className="h-4 w-4" />Failed to load report</div>}
+
+      {data && !isLoading && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard title="Total Spend"     value={fmt$(data.summary.total_spend)}    icon={DollarSign} color="green" />
+            <StatCard title="Jobs with Materials" value={String(data.summary.job_count)} icon={Briefcase}  color="blue" />
+            <StatCard title="Line Items"      value={String(data.summary.line_count)}   icon={FileText} />
+            <StatCard title="Avg Line Value"  value={fmt$(data.summary.avg_line_value)} icon={TrendingUp} />
+          </div>
+
+          {data.by_month.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Spend by Month</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={data.by_month} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <YAxis tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} width={52} />
+                    <Tooltip formatter={(v: any) => fmt$(Number(v))} />
+                    <Bar dataKey="total_spend" name="Spend" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {data.by_division.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">By Division</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Division</TableHead>
+                        <TableHead className="text-right">Jobs</TableHead>
+                        <TableHead className="text-right">Total Spend</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.by_division.map((r: any) => (
+                        <TableRow key={r.division}>
+                          <TableCell className="font-medium">{r.division}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{r.job_count}</TableCell>
+                          <TableCell className="text-right font-semibold">{fmt$(r.total_spend)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+
+            {data.by_item.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">Top Items by Spend</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="text-right">Spend</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.by_item.slice(0, 10).map((r: any, i: number) => (
+                        <TableRow key={i}>
+                          <TableCell>
+                            <p className="font-medium text-sm truncate max-w-[160px]">{r.item_name}</p>
+                            {r.item_number && <p className="text-xs text-muted-foreground">{r.item_number}</p>}
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">{r.total_qty}</TableCell>
+                          <TableCell className="text-right font-semibold">{fmt$(r.total_spend)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {data.by_item.length === 0 && data.by_month.length === 0 && (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Layers className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No materials spend data for this period.</p>
+                <p className="text-xs text-muted-foreground mt-1">Add materials to jobs using the Materials tab on any job detail page.</p>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  Main Reports Page
 // ═══════════════════════════════════════════════════════════════════════════════
 const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] = [
-  { id: "revenue",        label: "Revenue Report",    icon: DollarSign, desc: "Revenue trends, job volume, and division breakdown" },
-  { id: "job-costing",    label: "Job Costing",       icon: Layers,     desc: "Estimated vs actual cost, gross profit, and margins" },
-  { id: "invoice-aging",  label: "Invoice Aging",     icon: FileText,   desc: "Outstanding AR bucketed by days past due" },
-  { id: "crew-hours",     label: "Crew Hours",        icon: Timer,      desc: "Employee hours, overtime, and weekly trends" },
-  { id: "profitability",  label: "Job Profitability", icon: PieChart,   desc: "Actual labor + materials vs sold value, gross margin per job" },
+  { id: "revenue",          label: "Revenue Report",    icon: DollarSign, desc: "Revenue trends, job volume, and division breakdown" },
+  { id: "job-costing",      label: "Job Costing",       icon: Layers,     desc: "Estimated vs actual cost, gross profit, and margins" },
+  { id: "invoice-aging",    label: "Invoice Aging",     icon: FileText,   desc: "Outstanding AR bucketed by days past due" },
+  { id: "crew-hours",       label: "Crew Hours",        icon: Timer,      desc: "Employee hours, overtime, and weekly trends" },
+  { id: "profitability",    label: "Job Profitability", icon: PieChart,   desc: "Actual labor + materials vs sold value, gross margin per job" },
+  { id: "time-by-division", label: "Time by Division",  icon: BarChart2,  desc: "Hours worked broken down by division and month" },
+  { id: "materials-spend",  label: "Materials Spend",   icon: Layers,     desc: "Materials cost from job records by item, division, and month" },
 ];
 
 export default function Reports() {
@@ -864,11 +1174,13 @@ export default function Reports() {
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          {activeTab === "revenue"        && <RevenueReport />}
-          {activeTab === "job-costing"    && <JobCosting />}
-          {activeTab === "invoice-aging"  && <InvoiceAging />}
-          {activeTab === "crew-hours"     && <CrewHours />}
-          {activeTab === "profitability"  && <ProfitabilityReport />}
+          {activeTab === "revenue"          && <RevenueReport />}
+          {activeTab === "job-costing"      && <JobCosting />}
+          {activeTab === "invoice-aging"    && <InvoiceAging />}
+          {activeTab === "crew-hours"       && <CrewHours />}
+          {activeTab === "profitability"    && <ProfitabilityReport />}
+          {activeTab === "time-by-division" && <TimeByDivision />}
+          {activeTab === "materials-spend"  && <MaterialsSpend />}
         </div>
       </div>
     </div>

@@ -10,7 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from "lucide-react";
+import { Loader2, Layers, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 export const JOB_TYPES = [
@@ -77,6 +80,26 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
 
   const [form, setForm] = useState<JobFormData>({ ...EMPTY_JOB, ...initialData });
   const [custSearch, setCustSearch] = useState("");
+
+  // ── Job Templates ────────────────────────────────────────────────────────────
+  const { data: jobTemplates = [] } = useQuery<any[]>({
+    queryKey: ["/api/job-templates"],
+    queryFn: () => fetch("/api/job-templates", { credentials: "include" }).then(r => r.json()),
+    enabled: open,
+  });
+  const activeTemplates = jobTemplates.filter((t: any) => t.is_active !== false);
+
+  function applyTemplate(tpl: any) {
+    setForm(f => ({
+      ...f,
+      job_type:        tpl.job_type        || f.job_type,
+      estimated_hours: tpl.estimated_hours != null ? String(tpl.estimated_hours) : f.estimated_hours,
+      price:           tpl.price           != null ? String(tpl.price)           : f.price,
+      description:     tpl.scope_of_work   || f.description,
+      crew_notes:      tpl.crew_notes      || f.crew_notes,
+    }));
+    toast({ title: `Template "${tpl.name}" loaded` });
+  }
 
   useEffect(() => {
     if (open) setForm({ ...EMPTY_JOB, ...initialData });
@@ -162,7 +185,38 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? t("editJob") : t("newJob")}</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>{isEdit ? t("editJob") : t("newJob")}</DialogTitle>
+            {!isEdit && activeTemplates.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5" data-testid="button-load-template">
+                    <Layers className="h-3.5 w-3.5" />
+                    Load Template
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {activeTemplates.map((tpl: any) => (
+                    <DropdownMenuItem
+                      key={tpl.id}
+                      onClick={() => applyTemplate(tpl)}
+                      data-testid={`template-option-${tpl.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{tpl.name}</p>
+                        {(tpl.job_type || tpl.division) && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {[tpl.job_type, tpl.division].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">

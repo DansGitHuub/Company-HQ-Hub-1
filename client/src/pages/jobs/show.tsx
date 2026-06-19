@@ -17,6 +17,7 @@ import {
   ChevronLeft, Pencil, User, MapPin, Calendar, Clock,
   DollarSign, Briefcase, Timer, ChevronDown, Loader2, FileText,
   Plus, Trash2, HardHat, MessageSquare, ShieldCheck, GitMerge, CheckSquare, ClipboardCheck, Award, Truck, Users, Package,
+  TrendingUp, TrendingDown,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -935,6 +936,9 @@ export default function JobDetailPage() {
               </Card>
             </div>
 
+            {/* Job Costing Card */}
+            {isAdminOrManager && <JobCostingCard jobId={id} job={job} actualHours={actualHours} />}
+
             {job.description && (
               <Card className="mt-4">
                 <CardHeader className="pb-2 pt-4">
@@ -1230,5 +1234,81 @@ export default function JobDetailPage() {
         />
       )}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Job Costing Card — shown in Overview tab for Admin/Manager
+// ─────────────────────────────────────────────────────────────────────────────
+function JobCostingCard({ jobId, job, actualHours }: { jobId: string; job: any; actualHours: number }) {
+  const fmt$ = (v: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(v);
+
+  // Materials cost from job_materials
+  const { data: materials = [] } = useQuery<any[]>({
+    queryKey: ["/api/jobs", jobId, "materials"],
+    queryFn: () => fetch(`/api/jobs/${jobId}/materials`, { credentials: "include" }).then(r => r.json()),
+  });
+
+  // Invoice totals
+  const { data: invoices = [] } = useQuery<any[]>({
+    queryKey: ["/api/invoices", { job_id: jobId }],
+    queryFn: () => fetch(`/api/invoices?job_id=${jobId}`, { credentials: "include" }).then(r => r.json()),
+  });
+
+  const materialsCost = materials.reduce((s: number, m: any) =>
+    s + (Number(m.quantity ?? 0) * Number(m.unit_cost ?? 0)), 0);
+
+  const invoiceTotal = invoices
+    .filter((inv: any) => inv.status !== "void")
+    .reduce((s: number, inv: any) => s + Number(inv.total ?? 0), 0);
+
+  const contractValue = Number(job.price ?? job.value ?? 0);
+  const grossProfit = contractValue - materialsCost;
+  const margin = contractValue > 0 ? (grossProfit / contractValue) * 100 : 0;
+  const hasData = materialsCost > 0 || invoiceTotal > 0 || contractValue > 0;
+
+  if (!hasData) return null;
+
+  return (
+    <Card className="mt-4">
+      <CardHeader className="pb-2 pt-4">
+        <CardTitle className="text-sm flex items-center gap-1.5">
+          <DollarSign className="h-4 w-4 text-green-600" /> Job Costing Summary
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="space-y-0.5">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Contract Value</p>
+            <p className="text-lg font-bold">{contractValue > 0 ? fmt$(contractValue) : "—"}</p>
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Materials Cost</p>
+            <p className="text-lg font-bold text-amber-600">{materialsCost > 0 ? fmt$(materialsCost) : "—"}</p>
+            {materials.length > 0 && (
+              <p className="text-xs text-muted-foreground">{materials.length} item{materials.length !== 1 ? "s" : ""}</p>
+            )}
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Invoiced</p>
+            <p className="text-lg font-bold text-blue-600">{invoiceTotal > 0 ? fmt$(invoiceTotal) : "—"}</p>
+            {invoices.filter((i: any) => i.status !== "void").length > 0 && (
+              <p className="text-xs text-muted-foreground">{invoices.filter((i: any) => i.status !== "void").length} invoice{invoices.filter((i: any) => i.status !== "void").length !== 1 ? "s" : ""}</p>
+            )}
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Gross Margin</p>
+            <p className={`text-lg font-bold flex items-center gap-1 ${margin >= 30 ? "text-green-600" : margin >= 0 ? "text-amber-500" : "text-red-600"}`}>
+              {margin >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+              {contractValue > 0 ? `${margin.toFixed(1)}%` : "—"}
+            </p>
+            {contractValue > 0 && materialsCost > 0 && (
+              <p className={`text-xs ${grossProfit >= 0 ? "text-green-600" : "text-red-500"}`}>{fmt$(grossProfit)}</p>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
