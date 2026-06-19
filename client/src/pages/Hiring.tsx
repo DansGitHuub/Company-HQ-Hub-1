@@ -19,7 +19,7 @@ import {
   MessageSquare, Calendar, ChevronRight, X, GripVertical, Upload,
   Send, CheckCircle2, Circle, AlertCircle, ClipboardList, Users,
   UserPlus, Copy, Eye, EyeOff, ShieldCheck, Video, ExternalLink, Loader2,
-  FileCheck, UserCheck, Briefcase, Lock, HelpCircle
+  FileCheck, UserCheck, Briefcase, Lock, HelpCircle, BarChart2, TrendingUp,
 } from "lucide-react";
 import HiringEmailTemplates from "@/components/HiringEmailTemplates";
 import { apiRequest } from "@/lib/queryClient";
@@ -348,6 +348,9 @@ export default function Hiring() {
             <TabsTrigger value="pipeline" data-testid="tab-pipeline">
               <ClipboardList className="h-4 w-4 mr-2" /> Pipeline
             </TabsTrigger>
+            <TabsTrigger value="analytics" data-testid="tab-hiring-analytics">
+              <BarChart2 className="h-4 w-4 mr-2" /> Analytics
+            </TabsTrigger>
             <TabsTrigger value="application-links" data-testid="tab-application-links">
               <ExternalLink className="h-4 w-4 mr-2" /> Application Links
             </TabsTrigger>
@@ -536,6 +539,10 @@ export default function Hiring() {
       ) : (
         <EmployeeRecords />
       )}
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-4">
+          <HiringAnalytics />
         </TabsContent>
 
         <TabsContent value="application-links" className="mt-4">
@@ -2843,4 +2850,183 @@ function EmployeeNotesTab({ employeeId }: { employeeId: string }) {
 
 function EmployeeOnboardingTab({ employeeId }: { employeeId: string }) {
   return <OnboardingChecklist employeeId={employeeId} showCard={true} />;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hiring Analytics Tab
+// ─────────────────────────────────────────────────────────────────────────────
+const ANALYTICS_STAGE_COLORS: Record<string, string> = {
+  "Application Received": "bg-blue-500",
+  "Review & Rate":        "bg-gray-400",
+  "Phone Screen":         "bg-purple-400",
+  "Interview Scheduled":  "bg-cyan-500",
+  "1st Interview":        "bg-amber-400",
+  "2nd Interview":        "bg-orange-400",
+  "Offer Extended":       "bg-emerald-400",
+  "Hired":                "bg-green-600",
+  "Declined / Not a Fit": "bg-gray-300",
+};
+const ANALYTICS_RATING_META: Record<string, { label: string; cls: string }> = {
+  green:   { label: "Strong",  cls: "bg-green-500" },
+  yellow:  { label: "Maybe",   cls: "bg-yellow-400" },
+  red:     { label: "Weak",    cls: "bg-red-500" },
+  unrated: { label: "Unrated", cls: "bg-gray-300" },
+};
+
+function HiringAnalytics() {
+  const { data, isLoading } = useQuery<any>({
+    queryKey: ["/api/hiring/analytics"],
+    queryFn: () => fetch("/api/hiring/analytics", { credentials: "include" }).then(r => r.json()),
+  });
+
+  if (isLoading) {
+    return <div className="py-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  const { summary = {}, byStage = [], bySource = [], byRating = [], byRole = [], recentHires = [] } = data ?? {};
+  const maxStageCount = Math.max(...byStage.map((r: any) => r.count), 1);
+
+  return (
+    <div className="space-y-5 py-1">
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "Total Candidates",  value: summary.total ?? 0, icon: Users,      cls: "text-blue-500" },
+          { label: "Active in Pipeline", value: summary.active ?? 0, icon: TrendingUp, cls: "text-amber-500" },
+          { label: "Hired",             value: summary.hired ?? 0, icon: UserCheck,   cls: "text-green-600" },
+        ].map(({ label, value, icon: Icon, cls }) => (
+          <Card key={label}>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2">
+                <Icon className={`h-4 w-4 ${cls}`} />
+                <p className="text-xs text-muted-foreground">{label}</p>
+              </div>
+              <p className="text-2xl font-bold mt-1">{value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Pipeline funnel */}
+        <Card>
+          <CardHeader className="pb-2 pt-4">
+            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+              <BarChart2 className="h-4 w-4" /> Pipeline Funnel
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 pb-4">
+            {byStage.length === 0
+              ? <p className="text-sm text-muted-foreground text-center py-4">No data</p>
+              : byStage.map((r: any) => (
+                <div key={r.stage}>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs text-muted-foreground truncate max-w-[160px]">{r.stage}</span>
+                    <span className="text-xs font-semibold ml-2">{r.count}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${ANALYTICS_STAGE_COLORS[r.stage] ?? "bg-primary"}`}
+                      style={{ width: `${(r.count / maxStageCount) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+          </CardContent>
+        </Card>
+
+        {/* Source + Rating side by side */}
+        <div className="space-y-5">
+          <Card>
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm font-semibold">By Source</CardTitle>
+            </CardHeader>
+            <CardContent className="pb-4">
+              {bySource.length === 0
+                ? <p className="text-sm text-muted-foreground">No source data</p>
+                : <div className="flex flex-wrap gap-2">
+                    {bySource.map((r: any) => (
+                      <div key={r.source} className="flex items-center gap-1.5 bg-muted rounded-full px-2.5 py-1">
+                        <span className="text-xs font-medium">{r.source}</span>
+                        <span className="text-xs text-muted-foreground">({r.count})</span>
+                      </div>
+                    ))}
+                  </div>
+              }
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm font-semibold">Rating Distribution</CardTitle>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <div className="flex gap-3 flex-wrap">
+                {byRating.map((r: any) => {
+                  const meta = ANALYTICS_RATING_META[r.rating] ?? { label: r.rating, cls: "bg-muted" };
+                  return (
+                    <div key={r.rating} className="flex items-center gap-1.5">
+                      <div className={`h-3 w-3 rounded-full ${meta.cls}`} />
+                      <span className="text-sm">{meta.label}</span>
+                      <span className="text-sm font-semibold">{r.count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Roles */}
+      {byRole.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2 pt-4">
+            <CardTitle className="text-sm font-semibold">Applicants by Role</CardTitle>
+          </CardHeader>
+          <CardContent className="pb-4">
+            <div className="flex flex-wrap gap-2">
+              {byRole.map((r: any) => (
+                <div key={r.role} className="flex items-center gap-1 bg-muted rounded px-2 py-1">
+                  <span className="text-xs font-medium">{r.role}</span>
+                  <span className="text-xs text-muted-foreground ml-1">{r.count}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recent hires */}
+      {recentHires.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2 pt-4">
+            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+              <UserCheck className="h-4 w-4 text-green-600" /> Recent Hires
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {recentHires.map((c: any) => (
+                <div key={c.id} className="flex items-center gap-3 px-4 py-2.5">
+                  <div className="h-7 w-7 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                    {c.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{c.name}</p>
+                    <p className="text-xs text-muted-foreground">{c.role ?? "—"}{c.source ? ` · via ${c.source}` : ""}</p>
+                  </div>
+                  {c.applied_date && (
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(c.applied_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
 }

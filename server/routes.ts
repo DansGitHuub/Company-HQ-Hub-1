@@ -55,6 +55,8 @@ import { registerWarrantyRoutes } from "./warrantyRoutes";
 import { registerJobEquipmentRoutes } from "./jobEquipmentRoutes";
 import { registerAuditRoutes } from "./auditRoutes";
 import { registerJobCrewRoutes } from "./jobCrewRoutes";
+import { registerJobMaterialsRoutes } from "./jobMaterialsRoutes";
+import { registerJobTemplateRoutes } from "./jobTemplateRoutes";
 import { registerWorkOrderRoutes } from "./workOrderRoutes";
 import { searchProductImages } from "./imageSearchService";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail, sendApplicationLinkEmail } from "./email";
@@ -4362,6 +4364,54 @@ Generate detailed information for this landscaping material.`;
         }
       }
       res.json(results);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Hiring Analytics ─────────────────────────────────────────────────────────
+  app.get("/api/hiring/analytics", requireAuth, async (req, res) => {
+    try {
+      const [stageCounts, sourceCounts, recentHires, ratingDist, roleDist] = await Promise.all([
+        pool.query(`
+          SELECT stage, COUNT(*)::int AS count
+          FROM candidates
+          GROUP BY stage ORDER BY count DESC
+        `),
+        pool.query(`
+          SELECT COALESCE(NULLIF(source,''), 'Unknown') AS source, COUNT(*)::int AS count
+          FROM candidates GROUP BY source ORDER BY count DESC
+        `),
+        pool.query(`
+          SELECT id, name, role, stage, applied_date, rating, source
+          FROM candidates
+          WHERE stage = 'Hired'
+          ORDER BY updated_at DESC LIMIT 10
+        `),
+        pool.query(`
+          SELECT COALESCE(NULLIF(rating,''),'unrated') AS rating, COUNT(*)::int AS count
+          FROM candidates GROUP BY rating ORDER BY count DESC
+        `),
+        pool.query(`
+          SELECT COALESCE(NULLIF(role,''), 'Unknown') AS role, COUNT(*)::int AS count
+          FROM candidates GROUP BY role ORDER BY count DESC LIMIT 10
+        `),
+      ]);
+
+      const total = stageCounts.rows.reduce((s: number, r: any) => s + r.count, 0);
+      const hired = stageCounts.rows.find((r: any) => r.stage === 'Hired')?.count ?? 0;
+      const active = stageCounts.rows
+        .filter((r: any) => !['Hired','Declined / Not a Fit'].includes(r.stage))
+        .reduce((s: number, r: any) => s + r.count, 0);
+
+      res.json({
+        summary: { total, hired, active },
+        byStage: stageCounts.rows,
+        bySource: sourceCounts.rows,
+        byRating: ratingDist.rows,
+        byRole: roleDist.rows,
+        recentHires: recentHires.rows,
+      });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -10715,6 +10765,8 @@ Provide accurate information based on publicly available documentation.`;
   registerJobEquipmentRoutes(app, requireAuth);
   registerAuditRoutes(app, requireAuth);
   registerJobCrewRoutes(app, requireAuth);
+  registerJobMaterialsRoutes(app, requireAuth);
+  registerJobTemplateRoutes(app, requireAuth);
   registerSchedulingRoutes(app);
   registerMyDayRoutes(app);
   registerRouteRoutes(app, requireAuth);
