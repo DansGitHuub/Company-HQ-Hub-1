@@ -16,7 +16,7 @@ import {
 import {
   ChevronLeft, Pencil, User, MapPin, Calendar, Clock,
   DollarSign, Briefcase, Timer, ChevronDown, Loader2, FileText,
-  Plus, Trash2, HardHat, MessageSquare, ShieldCheck, GitMerge, CheckSquare, ClipboardCheck, Award, Truck,
+  Plus, Trash2, HardHat, MessageSquare, ShieldCheck, GitMerge, CheckSquare, ClipboardCheck, Award, Truck, Users,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -37,6 +37,7 @@ import JobCheckpoints from "./JobCheckpoints";
 import JobCloseout from "./JobCloseout";
 import JobWarranty from "./JobWarranty";
 import JobEquipment from "./JobEquipment";
+import JobCrew from "./JobCrew";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TimeEntry {
@@ -830,6 +831,12 @@ export default function JobDetailPage() {
             <TabsTrigger value="activity">{t("tabActivity")}</TabsTrigger>
             <TabsTrigger value="daily-logs" data-testid="tab-daily-logs">Journal</TabsTrigger>
             {isAdminOrManager && (
+              <TabsTrigger value="crew" data-testid="tab-crew">
+                <Users className="h-3.5 w-3.5 mr-1" />
+                Crew
+              </TabsTrigger>
+            )}
+            {isAdminOrManager && (
               <TabsTrigger value="equipment" data-testid="tab-equipment">
                 <Truck className="h-3.5 w-3.5 mr-1" />
                 Equipment
@@ -1071,6 +1078,13 @@ export default function JobDetailPage() {
           <TabsContent value="daily-logs">
             <DailyLogsTab jobId={id} />
           </TabsContent>
+
+          {/* Crew Tab */}
+          {isAdminOrManager && (
+            <TabsContent value="crew">
+              <JobCrew jobId={id} isAdminOrManager={isAdminOrManager} />
+            </TabsContent>
+          )}
 
           {/* Equipment Tab */}
           {isAdminOrManager && (

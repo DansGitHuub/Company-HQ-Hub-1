@@ -4,6 +4,74 @@ import { sendEmail, escapeHtml } from "./emailService";
 import { sendSms, isSmsConfigured } from "./smsService";
 import { logChange } from "./auditLog";
 
+// Statuses that trigger a customer notification email
+const NOTIFY_STATUSES: Record<string, string> = {
+  scheduled:   "Your Job Has Been Scheduled",
+  in_progress: "Your Job Is Now In Progress",
+  completed:   "Your Job Is Complete",
+  cancelled:   "Update on Your Job",
+};
+
+async function sendJobStatusEmail(jobId: string, newStatus: string) {
+  const label = NOTIFY_STATUSES[newStatus];
+  if (!label) return; // only notify for specific statuses
+
+  try {
+    const jobRes = await pool.query(`
+      SELECT j.title, j.scheduled_date, j.address, j.city, j.state, j.description,
+             c.first_name, c.last_name, c.company_name,
+             ce.email AS customer_email
+      FROM jobs j
+      LEFT JOIN customers c ON c.id = j.customer_id
+      LEFT JOIN customer_emails ce ON ce.customer_id = c.id AND ce.is_primary = true
+      WHERE j.id = $1
+    `, [jobId]);
+    const row = jobRes.rows[0];
+    if (!row?.customer_email) return;
+
+    const customerName = row.first_name
+      ? `${row.first_name} ${row.last_name}`.trim()
+      : row.company_name || "Valued Customer";
+
+    const statusLine: Record<string, string> = {
+      scheduled:   "Great news — your job has been scheduled! Our team will be there on the date below.",
+      in_progress: "Our crew has started work on your job. We'll keep you updated as we make progress.",
+      completed:   "Your job is complete! Thank you for choosing Chapin Landscapes.",
+      cancelled:   "We wanted to let you know that your job has been cancelled. Please contact us if you have any questions.",
+    };
+
+    const dateStr = row.scheduled_date
+      ? new Date(row.scheduled_date).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+      : null;
+    const location = [row.address, row.city, row.state].filter(Boolean).join(", ");
+
+    await sendEmail({
+      to: row.customer_email,
+      subject: `${label} — ${row.title}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:560px;margin:auto;color:#222">
+          <div style="background:#2d5a27;padding:20px 24px;border-radius:8px 8px 0 0">
+            <h1 style="color:#fff;margin:0;font-size:20px">Chapin Landscapes</h1>
+          </div>
+          <div style="padding:24px;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 8px 8px">
+            <p>Hi ${escapeHtml(customerName)},</p>
+            <p>${statusLine[newStatus] ?? ""}</p>
+            <table style="border-collapse:collapse;width:100%;margin:16px 0">
+              <tr><td style="padding:8px 12px;font-weight:bold;background:#f9fafb;border:1px solid #e5e7eb">Job</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${escapeHtml(row.title)}</td></tr>
+              ${dateStr ? `<tr><td style="padding:8px 12px;font-weight:bold;background:#f9fafb;border:1px solid #e5e7eb">Date</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${dateStr}</td></tr>` : ""}
+              ${location ? `<tr><td style="padding:8px 12px;font-weight:bold;background:#f9fafb;border:1px solid #e5e7eb">Location</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${escapeHtml(location)}</td></tr>` : ""}
+            </table>
+            <p>If you have any questions, please don't hesitate to reach out.</p>
+            <p style="margin-top:24px;color:#666;font-size:0.85em">Chapin Landscapes · (555) 000-0000</p>
+          </div>
+        </div>
+      `,
+    });
+  } catch {
+    // don't block the response if email fails
+  }
+}
+
 const JOB_TYPES = [
   "Lawn Care", "Landscaping", "Snow Removal", "Irrigation",
   "Cleanup", "Tree Service", "Mulching", "Hardscaping",
@@ -312,6 +380,8 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
           changedById: req.user?.id ?? null,
           changedByName: req.user ? `${req.user.firstName ?? req.user.first_name ?? ""} ${req.user.lastName ?? req.user.last_name ?? ""}`.trim() : null,
         });
+        // Fire-and-forget customer notification email
+        sendJobStatusEmail(req.params.id, status);
       }
       return res.json(result.rows[0]);
     } catch (err: any) {
