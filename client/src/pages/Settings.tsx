@@ -29,7 +29,7 @@ import {
   Plus, Pencil, Trash2, Link2, Link2Off, RefreshCw, CheckCircle, XCircle, AlertCircle,
   ArrowLeftRight, Info, Calendar, Clock, Camera,
 } from "lucide-react";
-type SettingsSection = "profile" | "notifications" | "language" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks" | "terms" | "availability";
+type SettingsSection = "profile" | "notifications" | "language" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks" | "terms" | "availability" | "job-templates";
 
 function TermsSection() {
   const { toast } = useToast();
@@ -328,7 +328,7 @@ export default function Settings() {
   const tabParam = urlParams.get("tab") as SettingsSection | null;
   const qbParam  = urlParams.get("qb");
   const [activeSection, setActiveSection] = useState<SettingsSection>(
-    tabParam && ["quickbooks","company","work-areas","divisions","estimate-templates","terms"].includes(tabParam)
+    tabParam && ["quickbooks","company","work-areas","divisions","estimate-templates","terms","job-templates"].includes(tabParam)
       ? tabParam
       : "profile"
   );
@@ -342,6 +342,9 @@ export default function Settings() {
     { id: "notifications" as const, label: t("settings.sectionTabs.notifications"), icon: Bell },
     { id: "language" as const, label: t("settings.sectionTabs.language"), icon: Globe },
     { id: "availability" as const, label: t("settings.sectionTabs.availability"), icon: Calendar },
+    ...(isAdminOrManager
+      ? [{ id: "job-templates" as const, label: "Job Templates", icon: Layers }]
+      : []),
   ];
 
   if (isLoading) {
@@ -387,6 +390,7 @@ export default function Settings() {
           {activeSection === "notifications" && <NotificationsSection profile={profile} />}
           {activeSection === "language" && <LanguageSection profile={profile} />}
           {activeSection === "availability" && <AvailabilitySection />}
+          {activeSection === "job-templates" && isAdminOrManager && <JobTemplatesSection />}
           {activeSection === "work-areas" && isAdminOrManager && <WorkAreasSection />}
           {activeSection === "company" && isAdminOrManager && (
             <div className="space-y-4">
@@ -1534,6 +1538,302 @@ function QuickBooksSection({ qbParam }: { qbParam: string | null }) {
         </Card>
       )}
       
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Job Templates Section
+// ─────────────────────────────────────────────────────────────────────────────
+const DIVISIONS_JT = ["Install", "Maintenance", "Snow", "Irrigation", "Other"];
+const JOB_TYPE_JT = [
+  "Patio", "Walkway", "Retaining Wall", "Landscape", "Irrigation",
+  "Spring Clean Up", "Summer Clean Up", "Fall Clean Up", "Snow Removal",
+  "Salt Application", "Full Install", "Maintenance", "Drainage", "Lighting",
+  "Grading", "Other",
+];
+
+const emptyJT = () => ({
+  name: "", description: "", job_type: "", division: "",
+  estimated_hours: "", estimated_days: "", scope_of_work: "",
+  crew_notes: "", price: "", checklist: [] as string[], is_active: true,
+});
+
+function JobTemplatesSection() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [showDialog, setShowDialog] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [form, setForm] = useState<ReturnType<typeof emptyJT>>(emptyJT());
+  const [newStep, setNewStep] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+
+  const { data: templates = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/job-templates"],
+    queryFn: () => fetch("/api/job-templates", { credentials: "include" }).then(r => r.json()),
+  });
+
+  function openNew() { setEditing(null); setForm(emptyJT()); setNewStep(""); setShowDialog(true); }
+  function openEdit(tpl: any) {
+    setEditing(tpl);
+    setForm({
+      name: tpl.name ?? "", description: tpl.description ?? "",
+      job_type: tpl.job_type ?? "", division: tpl.division ?? "",
+      estimated_hours: tpl.estimated_hours ?? "", estimated_days: tpl.estimated_days ?? "",
+      scope_of_work: tpl.scope_of_work ?? "", crew_notes: tpl.crew_notes ?? "",
+      price: tpl.price ?? "",
+      checklist: Array.isArray(tpl.checklist) ? tpl.checklist : [],
+      is_active: tpl.is_active !== false,
+    });
+    setNewStep("");
+    setShowDialog(true);
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest(
+        editing ? "PUT" : "POST",
+        editing ? `/api/job-templates/${editing.id}` : "/api/job-templates",
+        data
+      );
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/job-templates"] });
+      setShowDialog(false);
+      toast({ title: editing ? "Template updated" : "Template created" });
+    },
+    onError: () => toast({ title: "Failed to save template", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/job-templates/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/job-templates"] });
+      setDeleteTarget(null);
+      toast({ title: "Template deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete", variant: "destructive" }),
+  });
+
+  function handleSave() {
+    if (!form.name.trim()) { toast({ title: "Name is required", variant: "destructive" }); return; }
+    saveMutation.mutate({
+      ...form,
+      estimated_hours: form.estimated_hours !== "" ? Number(form.estimated_hours) : null,
+      estimated_days:  form.estimated_days  !== "" ? Number(form.estimated_days)  : null,
+      price:           form.price           !== "" ? Number(form.price)           : null,
+    });
+  }
+
+  function addStep() {
+    const s = newStep.trim();
+    if (!s) return;
+    setForm(f => ({ ...f, checklist: [...f.checklist, s] }));
+    setNewStep("");
+  }
+
+  const active   = templates.filter(t => t.is_active !== false);
+  const archived = templates.filter(t => t.is_active === false);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Job Templates</h2>
+          <p className="text-sm text-muted-foreground">Pre-built configurations that speed up new job creation.</p>
+        </div>
+        <Button size="sm" onClick={openNew} data-testid="button-new-job-template">
+          <Plus className="h-4 w-4 mr-1" /> New Template
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : templates.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Layers className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+            <p className="text-muted-foreground">No templates yet. Create your first one above.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-5">
+          {active.length > 0 && (
+            <div className="space-y-2">
+              {active.map((tpl: any) => (
+                <Card key={tpl.id} data-testid={`card-job-template-${tpl.id}`}>
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm">{tpl.name}</span>
+                          {tpl.job_type && <Badge variant="outline" className="text-xs">{tpl.job_type}</Badge>}
+                          {tpl.division && <Badge variant="secondary" className="text-xs">{tpl.division}</Badge>}
+                        </div>
+                        {tpl.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{tpl.description}</p>}
+                        <div className="flex gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                          {tpl.estimated_hours && <span><Clock className="h-3 w-3 inline mr-0.5" />{tpl.estimated_hours}h</span>}
+                          {tpl.estimated_days  && <span>{tpl.estimated_days}d</span>}
+                          {tpl.price           && <span className="text-foreground font-medium">${Number(tpl.price).toLocaleString()} est.</span>}
+                          {Array.isArray(tpl.checklist) && tpl.checklist.length > 0 && (
+                            <span>{tpl.checklist.length} checklist step{tpl.checklist.length !== 1 ? "s" : ""}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(tpl)} data-testid={`button-edit-template-${tpl.id}`}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(tpl)} data-testid={`button-delete-template-${tpl.id}`}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {archived.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Archived</p>
+              {archived.map((tpl: any) => (
+                <Card key={tpl.id} className="opacity-60" data-testid={`card-job-template-${tpl.id}`}>
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-sm line-through text-muted-foreground">{tpl.name}</span>
+                        {tpl.job_type && <Badge variant="outline" className="text-xs ml-2">{tpl.job_type}</Badge>}
+                      </div>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(tpl)} data-testid={`button-edit-archived-template-${tpl.id}`}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(tpl)} data-testid={`button-delete-archived-template-${tpl.id}`}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Create / Edit Dialog */}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit Template" : "New Job Template"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div>
+              <Label>Template Name <span className="text-destructive">*</span></Label>
+              <Input className="mt-1" placeholder="e.g. Patio Install Standard" value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))} data-testid="input-jt-name" />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Input className="mt-1" placeholder="Short summary" value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))} data-testid="input-jt-description" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Job Type</Label>
+                <Select value={form.job_type} onValueChange={v => setForm(f => ({ ...f, job_type: v }))}>
+                  <SelectTrigger className="mt-1" data-testid="select-jt-job-type"><SelectValue placeholder="Select…" /></SelectTrigger>
+                  <SelectContent>{JOB_TYPE_JT.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Division</Label>
+                <Select value={form.division} onValueChange={v => setForm(f => ({ ...f, division: v }))}>
+                  <SelectTrigger className="mt-1" data-testid="select-jt-division"><SelectValue placeholder="Select…" /></SelectTrigger>
+                  <SelectContent>{DIVISIONS_JT.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label>Est. Hours</Label>
+                <Input type="number" min="0" className="mt-1" placeholder="0" value={form.estimated_hours}
+                  onChange={e => setForm(f => ({ ...f, estimated_hours: e.target.value }))} data-testid="input-jt-hours" />
+              </div>
+              <div>
+                <Label>Est. Days</Label>
+                <Input type="number" min="0" className="mt-1" placeholder="0" value={form.estimated_days}
+                  onChange={e => setForm(f => ({ ...f, estimated_days: e.target.value }))} data-testid="input-jt-days" />
+              </div>
+              <div>
+                <Label>Default Price ($)</Label>
+                <Input type="number" min="0" className="mt-1" placeholder="0.00" value={form.price}
+                  onChange={e => setForm(f => ({ ...f, price: e.target.value }))} data-testid="input-jt-price" />
+              </div>
+            </div>
+            <div>
+              <Label>Scope of Work</Label>
+              <Textarea className="mt-1 min-h-[80px]" placeholder="What this job includes…" value={form.scope_of_work}
+                onChange={e => setForm(f => ({ ...f, scope_of_work: e.target.value }))} data-testid="input-jt-scope" />
+            </div>
+            <div>
+              <Label>Crew Notes</Label>
+              <Textarea className="mt-1 min-h-[60px]" placeholder="Internal notes for the crew…" value={form.crew_notes}
+                onChange={e => setForm(f => ({ ...f, crew_notes: e.target.value }))} data-testid="input-jt-crew-notes" />
+            </div>
+            <div>
+              <Label>Default Checklist</Label>
+              <div className="mt-1 space-y-1.5">
+                {form.checklist.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-muted rounded px-2.5 py-1.5">
+                    <span className="flex-1 text-sm">{item}</span>
+                    <button type="button" onClick={() => setForm(f => ({ ...f, checklist: f.checklist.filter((_, i) => i !== idx) }))}
+                      className="text-muted-foreground hover:text-destructive" data-testid={`button-remove-step-${idx}`}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex gap-2">
+                  <Input placeholder="Add checklist step…" value={newStep}
+                    onChange={e => setNewStep(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addStep(); } }}
+                    data-testid="input-jt-checklist-step" />
+                  <Button type="button" variant="outline" size="sm" onClick={addStep} data-testid="button-add-step">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={form.is_active} onCheckedChange={v => setForm(f => ({ ...f, is_active: v }))} data-testid="switch-jt-active" />
+              <Label>Active (visible when creating jobs)</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save-jt">
+              {saveMutation.isPending
+                ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Saving…</>
+                : <><Save className="h-4 w-4 mr-1" />Save Template</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "<strong>{deleteTarget?.name}</strong>" will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive hover:bg-destructive/90"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              data-testid="button-confirm-delete-jt">
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
