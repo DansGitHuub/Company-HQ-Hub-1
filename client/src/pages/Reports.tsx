@@ -12,11 +12,11 @@ import {
 } from "recharts";
 import {
   DollarSign, Briefcase, TrendingUp, TrendingDown, Clock, Users,
-  AlertCircle, BarChart2, Layers, FileText, Timer,
+  AlertCircle, BarChart2, Layers, FileText, Timer, PieChart, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Loader2 } from "lucide-react";
 
-type Tab = "revenue" | "job-costing" | "invoice-aging" | "crew-hours";
+type Tab = "revenue" | "job-costing" | "invoice-aging" | "crew-hours" | "profitability";
 
 const DIVISIONS = ["Maintenance", "Install", "Snow", "General"];
 
@@ -624,13 +624,208 @@ function CrewHours() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  Profitability Report
+// ═══════════════════════════════════════════════════════════════════════════════
+type SortKey = "sold_value" | "gross_profit" | "margin_pct" | "labor_cost" | "material_cost" | "actual_hours";
+
+function marginColor(pct: number) {
+  if (pct >= 40) return "text-green-600 dark:text-green-400";
+  if (pct >= 20) return "text-amber-600 dark:text-amber-400";
+  return "text-red-600 dark:text-red-400";
+}
+
+function ProfitabilityReport() {
+  const thisYear = new Date().getFullYear();
+  const [year, setYear] = useState(String(thisYear));
+  const [division, setDivision] = useState("");
+  const [applied, setApplied] = useState({ year: String(thisYear), division: "" });
+  const [sortKey, setSortKey] = useState<SortKey>("gross_profit");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const params = new URLSearchParams();
+  if (applied.year)     params.set("year", applied.year);
+  if (applied.division) params.set("division", applied.division);
+
+  const { data = [], isLoading, error } = useQuery<any[]>({
+    queryKey: ["/api/reports/job-profitability", applied],
+    queryFn: () => fetch(`/api/reports/job-profitability?${params}`, { credentials: "include" }).then(r => r.json()),
+  });
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("desc"); }
+  }
+
+  const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
+    const aVal = Number(a[sortKey] ?? 0);
+    const bVal = Number(b[sortKey] ?? 0);
+    return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+  });
+
+  // Summary totals
+  const totals = sorted.reduce((acc, r) => ({
+    sold: acc.sold + Number(r.sold_value ?? 0),
+    profit: acc.profit + Number(r.gross_profit ?? 0),
+    labor: acc.labor + Number(r.labor_cost ?? 0),
+    materials: acc.materials + Number(r.material_cost ?? 0),
+    hours: acc.hours + Number(r.actual_hours ?? 0),
+  }), { sold: 0, profit: 0, labor: 0, materials: 0, hours: 0 });
+
+  const avgMargin = totals.sold > 0 ? (totals.profit / totals.sold) * 100 : 0;
+
+  function SortIcon({ k }: { k: SortKey }) {
+    if (sortKey !== k) return null;
+    return sortDir === "desc" ? <ChevronDown className="h-3 w-3 inline ml-0.5" /> : <ChevronUp className="h-3 w-3 inline ml-0.5" />;
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-4 pb-4">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="space-y-1">
+              <Label className="text-xs">Year</Label>
+              <select value={year} onChange={e => setYear(e.target.value)}
+                className="h-8 text-sm rounded-md border border-input bg-background px-2 w-24"
+                data-testid="filter-profit-year">
+                {[thisYear, thisYear - 1, thisYear - 2].map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Division</Label>
+              <select value={division} onChange={e => setDivision(e.target.value)}
+                className="h-8 text-sm rounded-md border border-input bg-background px-2 w-36"
+                data-testid="filter-profit-division">
+                <option value="">All Divisions</option>
+                {["Maintenance", "Install", "Snow", "General"].map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <Button size="sm" onClick={() => setApplied({ year, division })} data-testid="button-apply-profit-filter">
+              Apply
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Summary cards */}
+      {!isLoading && sorted.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Revenue</p>
+              <p className="text-xl font-bold mt-0.5">{fmt$(totals.sold)}</p>
+              <p className="text-xs text-muted-foreground">{sorted.length} jobs</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Gross Profit</p>
+              <p className={`text-xl font-bold mt-0.5 ${marginColor(avgMargin)}`}>{fmt$(totals.profit)}</p>
+              <p className="text-xs text-muted-foreground">{fmtPct(avgMargin)} avg margin</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Labor Cost</p>
+              <p className="text-xl font-bold mt-0.5">{fmt$(totals.labor)}</p>
+              <p className="text-xs text-muted-foreground">{fmtHrs(totals.hours)} total hrs</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Material Cost</p>
+              <p className="text-xl font-bold mt-0.5">{fmt$(totals.materials)}</p>
+              <p className="text-xs text-muted-foreground">
+                {totals.sold > 0 ? fmtPct((totals.materials / totals.sold) * 100) : "0%"} of revenue
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Table */}
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="py-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : error ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">Failed to load data</div>
+          ) : sorted.length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">No jobs found for the selected filters</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[220px]">Job</TableHead>
+                    <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("sold_value")}>
+                      Sold Value <SortIcon k="sold_value" />
+                    </TableHead>
+                    <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("actual_hours")}>
+                      Act. Hours <SortIcon k="actual_hours" />
+                    </TableHead>
+                    <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("labor_cost")}>
+                      Labor Cost <SortIcon k="labor_cost" />
+                    </TableHead>
+                    <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("material_cost")}>
+                      Materials <SortIcon k="material_cost" />
+                    </TableHead>
+                    <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("gross_profit")}>
+                      Gross Profit <SortIcon k="gross_profit" />
+                    </TableHead>
+                    <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("margin_pct")}>
+                      Margin <SortIcon k="margin_pct" />
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sorted.map(r => (
+                    <TableRow key={r.id} data-testid={`row-profit-${r.id}`}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-sm truncate max-w-[200px]">{r.title}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-[200px]">{r.client}</p>
+                          {r.division && (
+                            <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{r.division}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">{fmt$(r.sold_value)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{fmtHrs(Number(r.actual_hours))}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{fmt$(r.labor_cost)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{fmt$(r.material_cost)}</TableCell>
+                      <TableCell className={`text-right font-semibold ${r.gross_profit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600"}`}>
+                        {fmt$(r.gross_profit)}
+                      </TableCell>
+                      <TableCell className={`text-right font-bold ${marginColor(r.margin_pct)}`}>
+                        {fmtPct(Number(r.margin_pct))}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  Main Reports Page
 // ═══════════════════════════════════════════════════════════════════════════════
 const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] = [
-  { id: "revenue",       label: "Revenue Report",  icon: DollarSign, desc: "Revenue trends, job volume, and division breakdown" },
-  { id: "job-costing",   label: "Job Costing",     icon: Layers,     desc: "Estimated vs actual cost, gross profit, and margins" },
-  { id: "invoice-aging", label: "Invoice Aging",   icon: FileText,   desc: "Outstanding AR bucketed by days past due" },
-  { id: "crew-hours",    label: "Crew Hours",      icon: Timer,      desc: "Employee hours, overtime, and weekly trends" },
+  { id: "revenue",        label: "Revenue Report",    icon: DollarSign, desc: "Revenue trends, job volume, and division breakdown" },
+  { id: "job-costing",    label: "Job Costing",       icon: Layers,     desc: "Estimated vs actual cost, gross profit, and margins" },
+  { id: "invoice-aging",  label: "Invoice Aging",     icon: FileText,   desc: "Outstanding AR bucketed by days past due" },
+  { id: "crew-hours",     label: "Crew Hours",        icon: Timer,      desc: "Employee hours, overtime, and weekly trends" },
+  { id: "profitability",  label: "Job Profitability", icon: PieChart,   desc: "Actual labor + materials vs sold value, gross margin per job" },
 ];
 
 export default function Reports() {
@@ -669,10 +864,11 @@ export default function Reports() {
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          {activeTab === "revenue"       && <RevenueReport />}
-          {activeTab === "job-costing"   && <JobCosting />}
-          {activeTab === "invoice-aging" && <InvoiceAging />}
-          {activeTab === "crew-hours"    && <CrewHours />}
+          {activeTab === "revenue"        && <RevenueReport />}
+          {activeTab === "job-costing"    && <JobCosting />}
+          {activeTab === "invoice-aging"  && <InvoiceAging />}
+          {activeTab === "crew-hours"     && <CrewHours />}
+          {activeTab === "profitability"  && <ProfitabilityReport />}
         </div>
       </div>
     </div>

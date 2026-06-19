@@ -2,6 +2,7 @@ import { Express } from "express";
 import { pool } from "./db";
 import { sendEmail, escapeHtml } from "./emailService";
 import { sendSms, isSmsConfigured } from "./smsService";
+import { logChange } from "./auditLog";
 
 const JOB_TYPES = [
   "Lawn Care", "Landscaping", "Snow Removal", "Irrigation",
@@ -287,15 +288,31 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
   });
 
   // ── PATCH STATUS ONLY ─────────────────────────────────────────────────────────
-  app.patch("/api/jobs/:id/status", requireAuth, async (req, res) => {
+  app.patch("/api/jobs/:id/status", requireAuth, async (req: any, res) => {
     const { status } = req.body;
     if (!status) return res.status(400).json({ message: "status is required" });
     try {
+      const before = await pool.query(`SELECT status, title FROM jobs WHERE id = $1`, [req.params.id]);
+      const oldStatus = before.rows[0]?.status ?? "";
       const result = await pool.query(
         `UPDATE jobs SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
         [status, req.params.id]
       );
       if (result.rows.length === 0) return res.status(404).json({ message: "Job not found" });
+      // Audit log
+      if (oldStatus !== status) {
+        await logChange({
+          entityType: "job",
+          entityId: req.params.id,
+          entityLabel: before.rows[0]?.title,
+          fieldChanged: "status",
+          oldValue: oldStatus,
+          newValue: status,
+          action: "status_change",
+          changedById: req.user?.id ?? null,
+          changedByName: req.user ? `${req.user.firstName ?? req.user.first_name ?? ""} ${req.user.lastName ?? req.user.last_name ?? ""}`.trim() : null,
+        });
+      }
       return res.json(result.rows[0]);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });

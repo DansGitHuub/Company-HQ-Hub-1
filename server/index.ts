@@ -55,6 +55,7 @@ import { runChangeOrdersMigration } from "./migrations/changeOrders";
 import { runCheckpointsMigration } from "./migrations/checkpoints";
 import { runCloseoutMigration } from "./migrations/closeout";
 import { runWarrantyMigration } from "./migrations/warranty";
+import { runPhase4Migration } from "./migrations/phase4";
 import { runResourcesSeasonMigration } from "./migrations/resourcesSeason";
 import { runCompanyCamPhotosPhase2Migration } from "./migrations/companyCamPhotosPhase2";
 import { runCompanyCamWave3Migration } from "./migrations/companyCamWave3";
@@ -167,6 +168,7 @@ app.use((req, res, next) => {
   await runCheckpointsMigration();
   await runCloseoutMigration();
   await runWarrantyMigration();
+  await runPhase4Migration();
 
   // Public pages must be registered BEFORE registerRoutes (which sets up the React catch-all)
   registerPublicPages(app);
