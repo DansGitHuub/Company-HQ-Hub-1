@@ -18,3 +18,9 @@ id = "LM81hb_yDOeeSI8WQJQ-l"
 uri = "file://employee-data-audit.md"
 type = "text"
 title = "Employee Data Set Audit"
+
+[[outputs]]
+id = "2-xcxsyAA0-6eZH0ID4z6"
+uri = "file://.local/audits/group-08-jobs-projects.md"
+type = "text"
+title = "Group 8 — Jobs / Projects Audit"
