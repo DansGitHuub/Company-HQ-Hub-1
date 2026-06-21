@@ -30,3 +30,9 @@ id = "iMDxR4sSqEjoX5l_XgMc_"
 uri = "file://.local/audits/group-09-work-orders.md"
 type = "text"
 title = "Group 9 — Work Orders Audit"
+
+[[outputs]]
+id = "MmxKPKc_yBa067cRmgzmw"
+uri = "file://.local/audits/group-10-scheduling-dispatch.md"
+type = "text"
+title = "Group 10 — Scheduling / Dispatch Audit"
