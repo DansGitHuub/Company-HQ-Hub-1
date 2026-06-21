@@ -108,3 +108,9 @@ id = "dxVvyR-2HAK9C4DLmjbhB"
 uri = "file://.local/audits/group-22-tasks-reminders.md"
 type = "text"
 title = "Group 22 — Tasks / Reminders Audit"
+
+[[outputs]]
+id = "aN3tJqi_BXNYN7bVYwwUi"
+uri = "file://.local/audits/group-23-equipment.md"
+type = "text"
+title = "Group 23 — Equipment / Fleet Management Audit"
