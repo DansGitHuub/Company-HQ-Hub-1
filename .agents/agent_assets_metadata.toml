@@ -60,3 +60,9 @@ id = "wti262NSJxgfZKoT2j1lz"
 uri = "file://.local/audits/group-14-calculators.md"
 type = "text"
 title = "Group 14 — Calculators Audit"
+
+[[outputs]]
+id = "TEN_3xPcxSK6uRKUqNCZE"
+uri = "file://.local/audits/group-15-photos-documents-files.md"
+type = "text"
+title = "Group 15 — Photos / Documents / Files Audit"
