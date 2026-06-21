@@ -156,3 +156,9 @@ id = "Pe5y8IEa4NPFYhFeKwsck"
 uri = "file://.local/audits/group-30-closeout.md"
 type = "text"
 title = "Group 30 — Closeout Audit"
+
+[[outputs]]
+id = "ryWdEysEYNYcvIWE5qB-a"
+uri = "file://.local/audits/group-31-invoices-quickbooks.md"
+type = "text"
+title = "Group 31 — Invoices / QuickBooks Audit"
