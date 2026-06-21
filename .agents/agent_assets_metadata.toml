@@ -192,3 +192,9 @@ id = "xOOuzuor3YB-k61iZbo1D"
 uri = "file://.local/audits/group-36-audit-logs-change-history.md"
 type = "text"
 title = "Group 36 — Audit Logs / Change History Audit"
+
+[[outputs]]
+id = "KDKWFjgngczF0OD4uUBi-"
+uri = "file://.local/audits/group-37-notifications.md"
+type = "text"
+title = "Group 37 — Notifications Audit"
