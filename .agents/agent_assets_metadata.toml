@@ -174,3 +174,9 @@ id = "4gndA1OUcUn8jkxVtFS1P"
 uri = "file://.local/audits/group-33-maintenance-routes.md"
 type = "text"
 title = "Group 33 — Maintenance Routes Audit"
+
+[[outputs]]
+id = "rQY0-ghvAtVUu61c2CXn7"
+uri = "file://.local/audits/group-34-snow-plow.md"
+type = "text"
+title = "Group 34 — Snow / Plow (Plow Site Mapper) Audit"
