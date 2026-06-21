@@ -84,3 +84,9 @@ id = "hVYl6soJRKzFHdrZXOmV8"
 uri = "file://.local/audits/group-18-customer-portal.md"
 type = "text"
 title = "Group 18 — Customer Portal Audit"
+
+[[outputs]]
+id = "6SM-PbG7fx-PatkyqDcAh"
+uri = "file://.local/audits/group-19-employee-portal.md"
+type = "text"
+title = "Group 19 — Employee Portal Audit"
