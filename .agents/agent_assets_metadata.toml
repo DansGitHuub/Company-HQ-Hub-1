@@ -42,3 +42,9 @@ id = "nnC7SRzAbJdSxeYyo5LOi"
 uri = "file://.local/audits/group-11-time-tracking.md"
 type = "text"
 title = "Group 11 — Time Tracking Audit"
+
+[[outputs]]
+id = "MhIIZTUDbvif81Ci_Gob-"
+uri = "file://.local/audits/group-12-worksheets.md"
+type = "text"
+title = "Group 12 — Worksheets Audit"
