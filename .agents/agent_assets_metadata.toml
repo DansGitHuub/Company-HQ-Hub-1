@@ -138,3 +138,9 @@ id = "b9riymVFAPeTO8PdDWElk"
 uri = "file://.local/audits/group-27-change-orders.md"
 type = "text"
 title = "Group 27 — Change Orders Audit"
+
+[[outputs]]
+id = "FpK6RsAnYOrr67Da93iQF"
+uri = "file://.local/audits/group-28-job-packet-gate.md"
+type = "text"
+title = "Group 28 — Job Packet Gate Audit"
