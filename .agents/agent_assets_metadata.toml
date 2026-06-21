@@ -24,3 +24,9 @@ id = "2-xcxsyAA0-6eZH0ID4z6"
 uri = "file://.local/audits/group-08-jobs-projects.md"
 type = "text"
 title = "Group 8 — Jobs / Projects Audit"
+
+[[outputs]]
+id = "iMDxR4sSqEjoX5l_XgMc_"
+uri = "file://.local/audits/group-09-work-orders.md"
+type = "text"
+title = "Group 9 — Work Orders Audit"

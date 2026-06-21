@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Audit Viewer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; flex-direction: column; }
+  header { background: #1e293b; border-bottom: 1px solid #334155; padding: 12px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 15px; font-weight: 600; color: #94a3b8; white-space: nowrap; }
+  select { background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; padding: 6px 10px; font-size: 13px; min-width: 280px; cursor: pointer; }
+  select:focus { outline: none; border-color: #3b82f6; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; background: #3b82f6; color: #fff; border: none; border-radius: 6px; padding: 7px 14px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background 0.15s; }
+  .btn:hover { background: #2563eb; }
+  .btn:active { background: #1d4ed8; }
+  .btn.success { background: #16a34a; }
+  .btn-sec { background: #334155; }
+  .btn-sec:hover { background: #475569; }
+  .spacer { flex: 1; }
+  #status { font-size: 12px; color: #64748b; }
+  main { flex: 1; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
+  textarea { flex: 1; min-height: calc(100vh - 120px); background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 8px; padding: 16px; font-family: 'Menlo', 'Consolas', monospace; font-size: 12.5px; line-height: 1.6; resize: none; }
+  textarea:focus { outline: none; border-color: #3b82f6; }
+  #empty { color: #475569; font-size: 13px; text-align: center; padding: 40px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Audit Viewer</h1>
+  <select id="fileSelect"><option value="">— select an audit —</option></select>
+  <button class="btn" id="copyBtn" onclick="copyContent()">&#128203; Copy All</button>
+  <button class="btn btn-sec" onclick="selectAll()">Select All</button>
+  <span class="spacer"></span>
+  <span id="status"></span>
+</header>
+<main>
+  <textarea id="content" readonly placeholder="Select an audit file above to load it here."></textarea>
+</main>
+
+<script>
+  const sel = document.getElementById('fileSelect');
+  const ta  = document.getElementById('content');
+  const st  = document.getElementById('status');
+
+  async function load() {
+    const r = await fetch('/api/audit-files', { credentials: 'include' });
+    if (!r.ok) { st.textContent = 'Not logged in — open the app first.'; return; }
+    const files = await r.json();
+    files.forEach(f => {
+      const o = document.createElement('option');
+      o.value = f; o.textContent = f;
+      sel.appendChild(o);
+    });
+    if (files.length) {
+      sel.value = files[files.length - 1];
+      await loadFile(files[files.length - 1]);
+    }
+  }
+
+  async function loadFile(name) {
+    if (!name) { ta.value = ''; st.textContent = ''; return; }
+    st.textContent = 'Loading…';
+    const r = await fetch(`/api/audit-files/${encodeURIComponent(name)}`, { credentials: 'include' });
+    if (!r.ok) { st.textContent = 'Failed to load'; return; }
+    ta.value = await r.text();
+    st.textContent = name + ' — ' + ta.value.length.toLocaleString() + ' chars';
+  }
+
+  sel.addEventListener('change', () => loadFile(sel.value));
+
+  function copyContent() {
+    if (!ta.value) return;
+    navigator.clipboard.writeText(ta.value).then(() => {
+      const btn = document.getElementById('copyBtn');
+      const orig = btn.innerHTML;
+      btn.innerHTML = '&#10003; Copied!';
+      btn.classList.add('success');
+      setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('success'); }, 2000);
+      st.textContent = 'Copied to clipboard!';
+    }).catch(() => { ta.select(); document.execCommand('copy'); st.textContent = 'Copied (fallback)!'; });
+  }
+
+  function selectAll() { ta.select(); }
+
+  load();
+</script>
+</body>
+</html>

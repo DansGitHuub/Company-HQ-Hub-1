@@ -11446,6 +11446,34 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  // ── Audit file reader (dev utility — serves .local/audits/ markdown files) ──
+  app.get("/api/audit-files", requireAuth, async (req, res) => {
+    try {
+      const fs = await import("fs/promises");
+      const path = await import("path");
+      const dir = path.resolve(".local/audits");
+      const files = await fs.readdir(dir);
+      const mdFiles = files.filter((f: string) => f.endsWith(".md")).sort();
+      res.json(mdFiles);
+    } catch {
+      res.json([]);
+    }
+  });
+
+  app.get("/api/audit-files/:filename", requireAuth, async (req, res) => {
+    try {
+      const fs = await import("fs/promises");
+      const path = await import("path");
+      const name = path.basename(req.params.filename);
+      if (!name.endsWith(".md")) return res.status(400).json({ message: "md only" });
+      const filePath = path.resolve(".local/audits", name);
+      const content = await fs.readFile(filePath, "utf8");
+      res.type("text/plain").send(content);
+    } catch {
+      res.status(404).json({ message: "Not found" });
+    }
+  });
+
   // Catch-all for unmatched /api/* routes — must be registered AFTER all other
   // API handlers and BEFORE the SPA static-file / Vite fallback.
   app.use("/api", (_req, res) => {
