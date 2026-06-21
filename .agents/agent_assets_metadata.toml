@@ -54,3 +54,9 @@ id = "55DWapAB1cmAHMGAH9SLD"
 uri = "file://.local/audits/group-13-materials-catalog.md"
 type = "text"
 title = "Group 13 — Materials / Catalog Audit"
+
+[[outputs]]
+id = "wti262NSJxgfZKoT2j1lz"
+uri = "file://.local/audits/group-14-calculators.md"
+type = "text"
+title = "Group 14 — Calculators Audit"
