@@ -120,3 +120,9 @@ id = "ALNN6Uh5GEknAwDPO3G9k"
 uri = "file://.local/audits/group-24-vendors-subcontractors.md"
 type = "text"
 title = "Group 24 — Vendors / Subcontractors Audit"
+
+[[outputs]]
+id = "3VRk3zou1_WFXPJ6A_Du-"
+uri = "file://.local/audits/group-25-inventory-purchasing.md"
+type = "text"
+title = "Group 25 — Inventory / Purchasing Audit"
