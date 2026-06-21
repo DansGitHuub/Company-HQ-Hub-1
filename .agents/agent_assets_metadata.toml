@@ -168,3 +168,9 @@ id = "skhWPQwZ8JZnIHysP2rZG"
 uri = "file://.local/audits/group-32-payroll-qbo-time-export.md"
 type = "text"
 title = "Group 32 — Payroll / QBO Time Export Audit"
+
+[[outputs]]
+id = "4gndA1OUcUn8jkxVtFS1P"
+uri = "file://.local/audits/group-33-maintenance-routes.md"
+type = "text"
+title = "Group 33 — Maintenance Routes Audit"
