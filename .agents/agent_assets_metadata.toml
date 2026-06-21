@@ -144,3 +144,9 @@ id = "FpK6RsAnYOrr67Da93iQF"
 uri = "file://.local/audits/group-28-job-packet-gate.md"
 type = "text"
 title = "Group 28 — Job Packet Gate Audit"
+
+[[outputs]]
+id = "-VkT2DS0SfOJxO-Na-snJ"
+uri = "file://.local/audits/group-29-checkpoints-walkthroughs.md"
+type = "text"
+title = "Group 29 — Checkpoints / Walkthroughs Audit"
