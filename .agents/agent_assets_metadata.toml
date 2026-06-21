@@ -186,3 +186,9 @@ id = "OAnDicnL9MxGXGqZofRII"
 uri = "file://.local/audits/group-35-reports-dashboards.md"
 type = "text"
 title = "Group 35 — Reports / Dashboards Audit"
+
+[[outputs]]
+id = "xOOuzuor3YB-k61iZbo1D"
+uri = "file://.local/audits/group-36-audit-logs-change-history.md"
+type = "text"
+title = "Group 36 — Audit Logs / Change History Audit"
