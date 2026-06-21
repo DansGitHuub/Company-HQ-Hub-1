@@ -66,3 +66,9 @@ id = "TEN_3xPcxSK6uRKUqNCZE"
 uri = "file://.local/audits/group-15-photos-documents-files.md"
 type = "text"
 title = "Group 15 — Photos / Documents / Files Audit"
+
+[[outputs]]
+id = "xCgDi4XlQuefe1u1fCCud"
+uri = "file://.local/audits/group-16-companycam.md"
+type = "text"
+title = "Group 16 — CompanyCam Audit"
