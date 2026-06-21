@@ -48,3 +48,9 @@ id = "MhIIZTUDbvif81Ci_Gob-"
 uri = "file://.local/audits/group-12-worksheets.md"
 type = "text"
 title = "Group 12 — Worksheets Audit"
+
+[[outputs]]
+id = "55DWapAB1cmAHMGAH9SLD"
+uri = "file://.local/audits/group-13-materials-catalog.md"
+type = "text"
+title = "Group 13 — Materials / Catalog Audit"
