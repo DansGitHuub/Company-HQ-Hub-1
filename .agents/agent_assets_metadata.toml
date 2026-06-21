@@ -162,3 +162,9 @@ id = "ryWdEysEYNYcvIWE5qB-a"
 uri = "file://.local/audits/group-31-invoices-quickbooks.md"
 type = "text"
 title = "Group 31 — Invoices / QuickBooks Audit"
+
+[[outputs]]
+id = "skhWPQwZ8JZnIHysP2rZG"
+uri = "file://.local/audits/group-32-payroll-qbo-time-export.md"
+type = "text"
+title = "Group 32 — Payroll / QBO Time Export Audit"
