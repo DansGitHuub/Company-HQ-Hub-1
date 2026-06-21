@@ -90,3 +90,9 @@ id = "6SM-PbG7fx-PatkyqDcAh"
 uri = "file://.local/audits/group-19-employee-portal.md"
 type = "text"
 title = "Group 19 — Employee Portal Audit"
+
+[[outputs]]
+id = "8TbLS6uQWvTJGUkPKPKfo"
+uri = "file://.local/audits/group-20-training-sops.md"
+type = "text"
+title = "Group 20 — Training / SOPs Audit"
