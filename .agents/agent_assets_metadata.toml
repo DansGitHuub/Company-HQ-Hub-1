@@ -36,3 +36,9 @@ id = "MmxKPKc_yBa067cRmgzmw"
 uri = "file://.local/audits/group-10-scheduling-dispatch.md"
 type = "text"
 title = "Group 10 — Scheduling / Dispatch Audit"
+
+[[outputs]]
+id = "nnC7SRzAbJdSxeYyo5LOi"
+uri = "file://.local/audits/group-11-time-tracking.md"
+type = "text"
+title = "Group 11 — Time Tracking Audit"
