@@ -78,3 +78,9 @@ id = "GyWcGBKUqIbfIlhqHr1li"
 uri = "file://.local/audits/group-17-customer-communication.md"
 type = "text"
 title = "Group 17 — Customer Communication Audit"
+
+[[outputs]]
+id = "hVYl6soJRKzFHdrZXOmV8"
+uri = "file://.local/audits/group-18-customer-portal.md"
+type = "text"
+title = "Group 18 — Customer Portal Audit"
