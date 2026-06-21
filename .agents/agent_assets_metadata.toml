@@ -150,3 +150,9 @@ id = "-VkT2DS0SfOJxO-Na-snJ"
 uri = "file://.local/audits/group-29-checkpoints-walkthroughs.md"
 type = "text"
 title = "Group 29 — Checkpoints / Walkthroughs Audit"
+
+[[outputs]]
+id = "Pe5y8IEa4NPFYhFeKwsck"
+uri = "file://.local/audits/group-30-closeout.md"
+type = "text"
+title = "Group 30 — Closeout Audit"
