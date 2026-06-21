@@ -114,3 +114,9 @@ id = "aN3tJqi_BXNYN7bVYwwUi"
 uri = "file://.local/audits/group-23-equipment.md"
 type = "text"
 title = "Group 23 — Equipment / Fleet Management Audit"
+
+[[outputs]]
+id = "ALNN6Uh5GEknAwDPO3G9k"
+uri = "file://.local/audits/group-24-vendors-subcontractors.md"
+type = "text"
+title = "Group 24 — Vendors / Subcontractors Audit"
