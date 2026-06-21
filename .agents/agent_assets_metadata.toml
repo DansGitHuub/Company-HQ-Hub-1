@@ -132,3 +132,9 @@ id = "BehffEGjUtsgJoPeJSND9"
 uri = "file://.local/audits/group-26-warranty-service-issues.md"
 type = "text"
 title = "Group 26 — Warranty / Service Issues Audit"
+
+[[outputs]]
+id = "b9riymVFAPeTO8PdDWElk"
+uri = "file://.local/audits/group-27-change-orders.md"
+type = "text"
+title = "Group 27 — Change Orders Audit"
