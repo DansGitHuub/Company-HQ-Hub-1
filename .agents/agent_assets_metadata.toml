@@ -180,3 +180,9 @@ id = "rQY0-ghvAtVUu61c2CXn7"
 uri = "file://.local/audits/group-34-snow-plow.md"
 type = "text"
 title = "Group 34 — Snow / Plow (Plow Site Mapper) Audit"
+
+[[outputs]]
+id = "OAnDicnL9MxGXGqZofRII"
+uri = "file://.local/audits/group-35-reports-dashboards.md"
+type = "text"
+title = "Group 35 — Reports / Dashboards Audit"
