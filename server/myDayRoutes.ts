@@ -48,34 +48,6 @@ export function registerMyDayRoutes(app: Express) {
         [employeeId]
       );
 
-      // If employee has no assignments today, fall back to all of today's scheduled jobs
-      if (rows.length === 0 && employeeId) {
-        const { rows: allRows } = await pool.query(
-          `SELECT
-             j.id, j.title, j.status, j.division, j.color,
-             j.client,
-             j.scheduled_date::date AS scheduled_date,
-             j.scheduled_start_time, j.scheduled_end_time,
-             j.address,
-             COALESCE(c.first_name || ' ' || c.last_name, c.company_name) AS customer_name,
-             COALESCE(p.address, j.address) AS customer_address,
-             COALESCE(
-               json_agg(
-                 jwa ORDER BY jwa.sort_order, jwa.name
-               ) FILTER (WHERE jwa.id IS NOT NULL), '[]'::json
-             ) AS work_areas
-           FROM jobs j
-           LEFT JOIN customers c ON c.id = j.customer_id
-           LEFT JOIN properties p ON p.id = j.property_id
-           LEFT JOIN job_work_areas jwa ON jwa.job_id = j.id AND jwa.is_active = true
-           WHERE j.scheduled_date::date = CURRENT_DATE
-             AND j.status NOT IN ('cancelled', 'completed', 'invoiced')
-           GROUP BY j.id, c.first_name, c.last_name, c.company_name, p.address
-           ORDER BY j.scheduled_start_time NULLS LAST, j.created_at`
-        );
-        return res.json(allRows);
-      }
-
       res.json(rows);
     } catch (err) {
       console.error("[my-day]", err);
