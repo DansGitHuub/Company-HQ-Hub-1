@@ -60,6 +60,7 @@ interface JobDetail {
   time_entries: TimeEntry[];
   linked_invoice_id: string | null;
   linked_invoice_number: string | null;
+  companycam_project_id: string | null;
 }
 
 // ── Status helpers ────────────────────────────────────────────────────────────
@@ -896,6 +897,21 @@ export default function JobDetailPage() {
                 />
               )}
               <InfoRow icon={DollarSign} label={t("priceLabel")} value={fmtMoney(job.price ?? job.value) ?? undefined} />
+              {job.companycam_project_id && (
+                <div className="flex items-center gap-3 py-1.5">
+                  <Camera className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground w-20 shrink-0">CompanyCam</span>
+                  <a
+                    href={`https://app.companycam.com/projects/${job.companycam_project_id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    data-testid="link-open-companycam"
+                  >
+                    Open Project <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              )}
             </CardContent>
           </Card>
 
