@@ -66,6 +66,7 @@ import Home from "@/pages/Home";
 import AuthPage from "@/pages/auth-page";
 import AdminPanel from "@/pages/AdminPanel";
 import AdminInbox from "@/pages/AdminInbox";
+import CustomerMessagesInbox from "@/pages/CustomerMessagesInbox";
 import CustomerHub from "@/pages/CustomerHub";
 import CareGuideManager from "@/pages/CareGuideManager";
 import ApplicantPortal from "@/pages/ApplicantPortal";
@@ -302,6 +303,7 @@ function AppRoutes() {
         <Route path="/testing"><Redirect to="/training" /></Route>
         <Route path="/settings" component={SettingsPage} />
         <Route path="/messages" component={MessagesPage} />
+        <Route path="/customer-messages" component={CustomerMessagesInbox} />
         <Route path="/catalog/import" component={CatalogImport} />
         <Route path="/catalog/:id" component={CatalogDetail} />
         <Route path="/catalog" component={CatalogPage} />

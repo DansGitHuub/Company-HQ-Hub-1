@@ -399,6 +399,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     forms: { icon: FileText, label: t("nav.forms"), href: "/forms" },
     inbox: { icon: Mail, label: t("nav.messages"), href: "/inbox" },
     messages: { icon: MessageSquare, label: t("nav.messages"), href: "/messages" },
+    customer_messages: { icon: MessageSquare, label: "Customer Messages", href: "/customer-messages" },
     admin: { icon: Shield, label: t("nav.adminPanel"), href: "/admin" },
   time_reports: { icon: ClipboardList, label: t("nav.timeReports"), href: "/admin/time-reports" },
   worksheet_review: { icon: ClipboardList, label: t("nav.worksheetReview"), href: "/admin/worksheet-review" },
@@ -427,7 +428,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["todos", "work_orders", "scheduling", "time_tracking", "equipment", "forms"] },
     { label: "RESOURCES", items: ["sops", "education", "testing"] },
-    { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "budget_settings"] },
+    { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "budget_settings", "customer_messages"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {
