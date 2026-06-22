@@ -3,6 +3,16 @@ import { pool } from "./db";
 
 const PAYMENT_METHODS = ["cash", "check", "card", "ach", "zelle", "other"];
 
+const STAFF_ROLES = ["Admin", "Manager", "Master Admin"];
+
+function requireRole(...roles: string[]) {
+  return (req: any, res: any, next: any) => {
+    if (!req.user) return res.status(401).json({ message: "Authentication required" });
+    if (!roles.includes(req.user.role)) return res.status(403).json({ message: "Insufficient permissions" });
+    next();
+  };
+}
+
 async function generateInvoiceNumber(): Promise<string> {
   const { rows } = await pool.query(`SELECT NEXTVAL('invoice_number_seq') AS n`);
   return `INV-${String(rows[0].n).padStart(4, "0")}`;
@@ -215,7 +225,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── CREATE ────────────────────────────────────────────────────────────────────
-  app.post("/api/invoices", requireAuth, async (req, res) => {
+  app.post("/api/invoices", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     const {
       customer_id, job_id, issued_date, due_date,
       tax_rate = 0, discount_amount = 0, notes, terms, customer_message, customer_response, customer_response_at, customer_response_note, line_items = [],
@@ -284,7 +294,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── UPDATE ────────────────────────────────────────────────────────────────────
-  app.put("/api/invoices/:id", requireAuth, async (req, res) => {
+  app.put("/api/invoices/:id", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     const {
       customer_id, job_id, status, issued_date, due_date,
       tax_rate, discount_amount, notes, terms, customer_message, customer_response,
@@ -357,7 +367,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── PATCH STATUS ──────────────────────────────────────────────────────────────
-  app.patch("/api/invoices/:id/status", requireAuth, async (req, res) => {
+  app.patch("/api/invoices/:id/status", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     const { status } = req.body;
     if (!status) return res.status(400).json({ message: "status required" });
     try {
@@ -375,7 +385,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── DELETE (void) ─────────────────────────────────────────────────────────────
-  app.delete("/api/invoices/:id", requireAuth, async (req, res) => {
+  app.delete("/api/invoices/:id", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     try {
       await pool.query(
         `UPDATE invoices SET status='void', updated_at=NOW() WHERE id=$1`,
@@ -388,7 +398,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── ADD PAYMENT ───────────────────────────────────────────────────────────────
-  app.post("/api/invoices/:id/payments", requireAuth, async (req, res) => {
+  app.post("/api/invoices/:id/payments", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     const { amount, payment_method = "cash", payment_date, reference_number, notes } = req.body;
     if (!amount) return res.status(400).json({ message: "amount required" });
 
@@ -420,7 +430,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── DELETE PAYMENT ────────────────────────────────────────────────────────────
-  app.delete("/api/payments/:paymentId", requireAuth, async (req, res) => {
+  app.delete("/api/payments/:paymentId", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     try {
       const { rows } = await pool.query(
         `DELETE FROM payments WHERE id=$1 RETURNING invoice_id`,
@@ -434,7 +444,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── SEND ──────────────────────────────────────────────────────────────────────
-  app.patch("/api/invoices/:id/send", requireAuth, async (req, res) => {
+  app.patch("/api/invoices/:id/send", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     try {
       const { rows } = await pool.query(`
         UPDATE invoices
@@ -449,7 +459,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── CUSTOMER RESPONSE (accept / decline / changes_requested) ──────────────────
-  app.patch("/api/invoices/:id/response", requireAuth, async (req, res) => {
+  app.patch("/api/invoices/:id/response", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     const { status, customer_response, customer_response_note } = req.body;
     const VALID = ["accepted", "declined", "changes_requested"];
     if (!status || !VALID.includes(status)) {
@@ -474,7 +484,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── MARK PAID ─────────────────────────────────────────────────────────────────
-  app.patch("/api/invoices/:id/paid", requireAuth, async (req, res) => {
+  app.patch("/api/invoices/:id/paid", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     try {
       const { rows } = await pool.query(`
         UPDATE invoices
