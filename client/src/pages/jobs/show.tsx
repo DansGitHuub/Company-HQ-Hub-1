@@ -18,6 +18,7 @@ import {
   DollarSign, Briefcase, Timer, ChevronDown, Loader2, FileText,
   Plus, Trash2, HardHat, MessageSquare, ShieldCheck, GitMerge, CheckSquare, ClipboardCheck, Award, Truck, Users, Package,
   TrendingUp, TrendingDown, Camera, Image, ExternalLink, ClipboardList, Phone,
+  LayoutDashboard, BookOpen, Activity, StickyNote, Wrench,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -780,6 +781,7 @@ export default function JobDetailPage() {
   const { effectiveRole } = useAuth();
   const isAdminOrManager = ["Admin", "Manager", "Master Admin"].includes(effectiveRole ?? "");
 
+  const [activeSection, setActiveSection] = useState("overview");
   const [showEdit, setShowEdit] = useState(false);
   const [showGenerateInvoice, setShowGenerateInvoice] = useState(false);
   const [crewNotes, setCrewNotes] = useState<string | null>(null);
@@ -896,7 +898,7 @@ export default function JobDetailPage() {
   const estimatedHours = job.estimated_hours ? parseFloat(String(job.estimated_hours)) : null;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-6 max-w-7xl mx-auto space-y-4">
       {/* Back + Title */}
       <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="sm" onClick={() => navigate("/jobs")} className="text-muted-foreground"
@@ -925,98 +927,108 @@ export default function JobDetailPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[320px,1fr] gap-6">
+      {/* ── Compact info chips ──────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Status chip */}
+        {isAdminOrManager ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold transition-colors hover:opacity-90 ${statusInfo.cls}`}
+                data-testid="button-status"
+              >
+                <span className={`h-2 w-2 rounded-full flex-shrink-0 ${statusInfo.dot}`} />
+                {statusInfo.label}
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {JOB_STATUSES.map((s) => (
+                <DropdownMenuItem
+                  key={s.value}
+                  className={`cursor-pointer ${status === s.value ? "font-bold" : ""}`}
+                  onClick={() => statusMutation.mutate(s.value)}
+                >
+                  {s.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold ${statusInfo.cls}`}>
+            <span className={`h-2 w-2 rounded-full ${statusInfo.dot}`} />
+            {statusInfo.label}
+          </span>
+        )}
+        {custName && (
+          job.customer_id
+            ? <a href={`/customers/${job.customer_id}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-xs font-medium hover:bg-muted/70 transition-colors">
+                <User className="h-3 w-3 text-muted-foreground" />{custName}
+              </a>
+            : <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-xs font-medium">
+                <User className="h-3 w-3 text-muted-foreground" />{custName}
+              </span>
+        )}
+        {job.cust_primary_phone && (
+          <a href={`tel:${job.cust_primary_phone}`}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-xs font-medium hover:bg-muted/70 transition-colors">
+            <Phone className="h-3 w-3 text-muted-foreground" />{job.cust_primary_phone}
+          </a>
+        )}
+        {(job.job_type || job.type) && (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-xs font-medium">
+            <Briefcase className="h-3 w-3 text-muted-foreground" />{job.job_type || job.type}
+          </span>
+        )}
+        {fmtDate(job.scheduled_date) && (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-xs font-medium">
+            <Calendar className="h-3 w-3 text-muted-foreground" />{fmtDate(job.scheduled_date)}
+          </span>
+        )}
+        {(job.scheduled_start_time || job.scheduled_end_time) && (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-xs font-medium">
+            <Clock className="h-3 w-3 text-muted-foreground" />
+            {[fmtTime(job.scheduled_start_time), fmtTime(job.scheduled_end_time)].filter(Boolean).join(" – ")}
+          </span>
+        )}
+        {fmtMoney(job.price ?? job.value) && (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-xs font-medium">
+            <DollarSign className="h-3 w-3 text-muted-foreground" />{fmtMoney(job.price ?? job.value)}
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[280px,1fr] gap-6">
         {/* ── Left Column ──────────────────────────────────────────────────── */}
         <div className="space-y-4">
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              {/* Status — big, clickable */}
-              <div className="mb-4">
-                <p className="text-xs text-muted-foreground font-medium mb-2">{t("status")}</p>
-                {isAdminOrManager ? (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold transition-colors hover:opacity-90 ${statusInfo.cls}`}
-                        data-testid="button-status">
-                        <span className={`h-2.5 w-2.5 rounded-full ${statusInfo.dot}`} />
-                        {statusInfo.label}
-                        <ChevronDown className="h-3.5 w-3.5 ml-1 opacity-60" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      {JOB_STATUSES.map((s) => (
-                        <DropdownMenuItem
-                          key={s.value}
-                          className={`cursor-pointer ${status === s.value ? "font-bold" : ""}`}
-                          onClick={() => statusMutation.mutate(s.value)}
-                        >
-                          {s.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : (
-                  <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold ${statusInfo.cls}`}>
-                    <span className={`h-2.5 w-2.5 rounded-full ${statusInfo.dot}`} />
-                    {statusInfo.label}
-                  </span>
-                )}
-              </div>
-
-              <Separator className="mb-3" />
-
-              {/* Info rows */}
-              <InfoRow
-                icon={User} label={t("customer")} value={custName}
-                href={job.customer_id ? `/customers/${job.customer_id}` : undefined}
-              />
-              {job.cust_primary_phone && (
-                <div className="flex items-center gap-3 py-1.5">
-                  <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground w-20 shrink-0">Phone</span>
-                  <a href={`tel:${job.cust_primary_phone}`}
-                    className="text-sm font-medium text-blue-600 hover:underline">
-                    {job.cust_primary_phone}
-                  </a>
-                </div>
+          {/* Site access info */}
+          {(job.prop_access_notes || job.prop_gate_code || job.prop_has_pets) && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 space-y-1.5">
+              <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide flex items-center gap-1.5">
+                <span>⚠</span> Site Access Info
+              </p>
+              {job.prop_has_pets && (
+                <p className="text-sm text-amber-900 flex items-center gap-1.5">
+                  <span>🐾</span> <span className="font-medium">Pets on property</span>
+                </p>
               )}
-              {propAddr && <InfoRow icon={MapPin} label={t("property")} value={propAddr} />}
-              <InfoRow icon={Briefcase} label={t("jobType")} value={job.job_type || job.type} />
-              <InfoRow
-                icon={Calendar} label={t("scheduledLabel")}
-                value={fmtDate(job.scheduled_date) ?? undefined}
-              />
-              {(job.scheduled_start_time || job.scheduled_end_time) && (
-                <InfoRow
-                  icon={Clock} label={t("timeLabel")}
-                  value={[fmtTime(job.scheduled_start_time), fmtTime(job.scheduled_end_time)].filter(Boolean).join(" – ")}
-                />
+              {job.prop_gate_code && (
+                <p className="text-sm text-amber-900">
+                  <span className="font-medium">Gate code:</span> {job.prop_gate_code}
+                </p>
               )}
-              <InfoRow icon={DollarSign} label={t("priceLabel")} value={fmtMoney(job.price ?? job.value) ?? undefined} />
-              {(job.prop_access_notes || job.prop_gate_code || job.prop_has_pets) && (
-                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 space-y-1.5">
-                  <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide flex items-center gap-1.5">
-                    <span>⚠</span> Site Access Info
-                  </p>
-                  {job.prop_has_pets && (
-                    <p className="text-sm text-amber-900 flex items-center gap-1.5">
-                      <span>🐾</span> <span className="font-medium">Pets on property</span>
-                    </p>
-                  )}
-                  {job.prop_gate_code && (
-                    <p className="text-sm text-amber-900">
-                      <span className="font-medium">Gate code:</span> {job.prop_gate_code}
-                    </p>
-                  )}
-                  {job.prop_access_notes && (
-                    <p className="text-sm text-amber-900 whitespace-pre-wrap">{job.prop_access_notes}</p>
-                  )}
-                </div>
+              {job.prop_access_notes && (
+                <p className="text-sm text-amber-900 whitespace-pre-wrap">{job.prop_access_notes}</p>
               )}
-              {job.companycam_project_id && (
-                <div className="flex items-center gap-3 py-1.5">
+            </div>
+          )}
+          {/* CompanyCam link */}
+          {job.companycam_project_id && (
+            <Card>
+              <CardContent className="px-4 py-3">
+                <div className="flex items-center gap-3">
                   <Camera className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground w-20 shrink-0">CompanyCam</span>
                   <a
                     href={`https://app.companycam.com/projects/${job.companycam_project_id}`}
                     target="_blank"
@@ -1024,12 +1036,12 @@ export default function JobDetailPage() {
                     className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
                     data-testid="link-open-companycam"
                   >
-                    Open Project <ExternalLink className="h-3 w-3" />
+                    Open CompanyCam Project <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Crew Notes (left col quick view) */}
           {(job.crew_notes || job.notes) && (
@@ -1109,74 +1121,93 @@ export default function JobDetailPage() {
         </div>
 
         {/* ── Right Column ─────────────────────────────────────────────────── */}
-        <Tabs defaultValue="overview">
-          <TabsList className="mb-4">
-            <TabsTrigger value="overview">{t("tabOverview")}</TabsTrigger>
-            <TabsTrigger value="work-order" data-testid="tab-work-order">Work Order</TabsTrigger>
-            <TabsTrigger value="time">{t("tabTime")}</TabsTrigger>
-            <TabsTrigger value="notes">{t("tabNotes")}</TabsTrigger>
-            <TabsTrigger value="invoices">{t("tabInvoices")}</TabsTrigger>
-            <TabsTrigger value="messages" data-testid="tab-messages">{t("tabMessages")}</TabsTrigger>
-            <TabsTrigger value="activity">{t("tabActivity")}</TabsTrigger>
-            <TabsTrigger value="daily-logs" data-testid="tab-daily-logs">Journal</TabsTrigger>
-            {isAdminOrManager && (
-              <TabsTrigger value="materials" data-testid="tab-materials">
-                <Package className="h-3.5 w-3.5 mr-1" />
-                Materials
-              </TabsTrigger>
-            )}
-            {isAdminOrManager && (
-              <TabsTrigger value="crew" data-testid="tab-crew">
-                <Users className="h-3.5 w-3.5 mr-1" />
-                Crew
-              </TabsTrigger>
-            )}
-            {isAdminOrManager && (
-              <TabsTrigger value="equipment" data-testid="tab-equipment">
-                <Truck className="h-3.5 w-3.5 mr-1" />
-                Equipment
-              </TabsTrigger>
-            )}
-            {isAdminOrManager && (
-              <TabsTrigger value="change-orders" data-testid="tab-change-orders">
-                <GitMerge className="h-3.5 w-3.5 mr-1" />
-                Change Orders
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="checkpoints" data-testid="tab-checkpoints">
-              <CheckSquare className="h-3.5 w-3.5 mr-1" />
-              Checkpoints
-            </TabsTrigger>
-            {isAdminOrManager && (
-              <TabsTrigger value="closeout" data-testid="tab-closeout">
-                <ClipboardCheck className="h-3.5 w-3.5 mr-1" />
-                Closeout
-              </TabsTrigger>
-            )}
-            {isAdminOrManager && (
-              <TabsTrigger value="warranty" data-testid="tab-warranty">
-                <Award className="h-3.5 w-3.5 mr-1" />
-                Warranty
-              </TabsTrigger>
-            )}
-            {isAdminOrManager && (
-              <TabsTrigger value="packet-gate" data-testid="tab-packet-gate">
-                <ShieldCheck className="h-3.5 w-3.5 mr-1" />
-                Job Gate
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="tasks" data-testid="tab-tasks">
-              <ClipboardList className="h-3.5 w-3.5 mr-1" />
-              Tasks
-            </TabsTrigger>
-            <TabsTrigger value="files-photos" data-testid="tab-files-photos">
-              <Camera className="h-3.5 w-3.5 mr-1" />
-              Files &amp; Photos
-            </TabsTrigger>
-          </TabsList>
+        <div>
+          {/* ── Tile navigation grid ─────────────────────────────────────── */}
+          <div className="mb-4 space-y-3">
+            {(
+              [
+                {
+                  label: "Overview",
+                  tiles: [
+                    { value: "overview", label: "Overview", icon: LayoutDashboard, show: true },
+                  ],
+                },
+                {
+                  label: "Field Work",
+                  tiles: [
+                    { value: "work-order",  label: "Work Order",  icon: Wrench,        show: true },
+                    { value: "tasks",       label: "Tasks",       icon: ClipboardList, show: true },
+                    { value: "checkpoints", label: "Checkpoints", icon: CheckSquare,   show: true },
+                    { value: "crew",        label: "Crew",        icon: Users,         show: isAdminOrManager },
+                    { value: "equipment",   label: "Equipment",   icon: Truck,         show: isAdminOrManager },
+                    { value: "materials",   label: "Materials",   icon: Package,       show: isAdminOrManager },
+                  ],
+                },
+                {
+                  label: "Time & Money",
+                  tiles: [
+                    { value: "time",          label: "Time Entries",  icon: Clock,     show: true },
+                    { value: "invoices",      label: "Invoices",      icon: FileText,  show: true },
+                    { value: "change-orders", label: "Change Orders", icon: GitMerge,  show: isAdminOrManager },
+                  ],
+                },
+                {
+                  label: "Comms & Files",
+                  tiles: [
+                    { value: "messages",    label: "Messages",      icon: MessageSquare, show: true },
+                    { value: "notes",       label: "Notes",         icon: StickyNote,    show: true },
+                    { value: "daily-logs",  label: "Journal",       icon: BookOpen,      show: true },
+                    { value: "activity",    label: "Activity",      icon: Activity,      show: true },
+                    { value: "files-photos", label: "Files & Photos", icon: Camera,      show: true },
+                  ],
+                },
+                {
+                  label: "Completion",
+                  tiles: [
+                    { value: "closeout",    label: "Closeout", icon: ClipboardCheck, show: isAdminOrManager },
+                    { value: "warranty",    label: "Warranty", icon: Award,          show: isAdminOrManager },
+                    { value: "packet-gate", label: "Job Gate", icon: ShieldCheck,    show: isAdminOrManager },
+                  ],
+                },
+              ] as Array<{ label: string; tiles: Array<{ value: string; label: string; icon: React.ElementType; show: boolean }> }>
+            ).map((group) => {
+              const visible = group.tiles.filter((t) => t.show);
+              if (visible.length === 0) return null;
+              return (
+                <div key={group.label}>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
+                    {group.label}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {visible.map((tile) => {
+                      const TileIcon = tile.icon;
+                      const isActive = activeSection === tile.value;
+                      return (
+                        <button
+                          key={tile.value}
+                          data-testid={`tab-${tile.value}`}
+                          onClick={() => setActiveSection(tile.value)}
+                          className={[
+                            "inline-flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg border text-xs font-medium transition-all min-w-[78px]",
+                            isActive
+                              ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                              : "bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground",
+                          ].join(" ")}
+                        >
+                          <TileIcon className="h-4 w-4" />
+                          <span className="text-center leading-tight">{tile.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-          {/* Overview Tab */}
-          <TabsContent value="overview">
+          {/* Overview Panel */}
+          {activeSection === "overview" && (
+            <>
             <div className="grid grid-cols-2 gap-4">
               <Card>
                 <CardContent className="p-4">
@@ -1244,10 +1275,11 @@ export default function JobDetailPage() {
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
+            </>
+          )}
 
-          {/* Time Entries Tab */}
-          <TabsContent value="time">
+          {/* Time Entries Panel */}
+          {activeSection === "time" && (
             <Card>
               <CardContent className="p-0">
                 {job.time_entries.length === 0 ? (
@@ -1296,10 +1328,10 @@ export default function JobDetailPage() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
-          {/* Notes Tab */}
-          <TabsContent value="notes">
+          {/* Notes Panel */}
+          {activeSection === "notes" && (
             <Card>
               <CardHeader className="pb-2 pt-4">
                 <CardTitle className="text-sm">{t("crewNotes")}</CardTitle>
@@ -1322,20 +1354,20 @@ export default function JobDetailPage() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
-          {/* Invoices Tab */}
-          <TabsContent value="invoices">
+          {/* Invoices Panel */}
+          {activeSection === "invoices" && (
             <JobInvoicesTab jobId={job.id} customerId={job.customer_id ?? ""} />
-          </TabsContent>
+          )}
 
-          {/* Messages Tab */}
-          <TabsContent value="messages">
+          {/* Messages Panel */}
+          {activeSection === "messages" && (
             <JobMessagesTab jobId={job.id} />
-          </TabsContent>
+          )}
 
-          {/* Activity Tab */}
-          <TabsContent value="activity">
+          {/* Activity Panel */}
+          {activeSection === "activity" && (
             <Card>
               <CardContent className="pt-5 pb-4 space-y-3">
                 <div className="flex items-start gap-3">
@@ -1373,82 +1405,68 @@ export default function JobDetailPage() {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
-          {/* Work Order Tab */}
-          <TabsContent value="work-order">
+          {/* Work Order Panel */}
+          {activeSection === "work-order" && (
             <JobWorkOrderTab jobId={id} isAdminOrManager={isAdminOrManager} />
-          </TabsContent>
+          )}
 
-          {/* Daily Logs Tab */}
-          <TabsContent value="daily-logs">
+          {/* Daily Logs Panel */}
+          {activeSection === "daily-logs" && (
             <DailyLogsTab jobId={id} />
-          </TabsContent>
-
-          {/* Materials Tab */}
-          {isAdminOrManager && (
-            <TabsContent value="materials">
-              <JobMaterials jobId={id} isAdminOrManager={isAdminOrManager} />
-            </TabsContent>
           )}
 
-          {/* Crew Tab */}
-          {isAdminOrManager && (
-            <TabsContent value="crew">
-              <JobCrew jobId={id} isAdminOrManager={isAdminOrManager} />
-            </TabsContent>
+          {/* Materials Panel */}
+          {isAdminOrManager && activeSection === "materials" && (
+            <JobMaterials jobId={id} isAdminOrManager={isAdminOrManager} />
           )}
 
-          {/* Equipment Tab */}
-          {isAdminOrManager && (
-            <TabsContent value="equipment">
-              <JobEquipment jobId={id} isAdminOrManager={isAdminOrManager} />
-            </TabsContent>
+          {/* Crew Panel */}
+          {isAdminOrManager && activeSection === "crew" && (
+            <JobCrew jobId={id} isAdminOrManager={isAdminOrManager} />
           )}
 
-          {/* Change Orders Tab */}
-          {isAdminOrManager && (
-            <TabsContent value="change-orders">
-              <JobChangeOrders jobId={id} isAdminOrManager={isAdminOrManager} />
-            </TabsContent>
+          {/* Equipment Panel */}
+          {isAdminOrManager && activeSection === "equipment" && (
+            <JobEquipment jobId={id} isAdminOrManager={isAdminOrManager} />
           )}
 
-          {/* Checkpoints Tab */}
-          <TabsContent value="checkpoints">
+          {/* Change Orders Panel */}
+          {isAdminOrManager && activeSection === "change-orders" && (
+            <JobChangeOrders jobId={id} isAdminOrManager={isAdminOrManager} />
+          )}
+
+          {/* Checkpoints Panel */}
+          {activeSection === "checkpoints" && (
             <JobCheckpoints jobId={id} isAdminOrManager={isAdminOrManager} />
-          </TabsContent>
-
-          {/* Closeout Tab */}
-          {isAdminOrManager && (
-            <TabsContent value="closeout">
-              <JobCloseout jobId={id} isAdminOrManager={isAdminOrManager} />
-            </TabsContent>
           )}
 
-          {/* Warranty Tab */}
-          {isAdminOrManager && (
-            <TabsContent value="warranty">
-              <JobWarranty jobId={id} isAdminOrManager={isAdminOrManager} />
-            </TabsContent>
+          {/* Closeout Panel */}
+          {isAdminOrManager && activeSection === "closeout" && (
+            <JobCloseout jobId={id} isAdminOrManager={isAdminOrManager} />
           )}
 
-          {/* Job Packet Gate Tab */}
-          {isAdminOrManager && (
-            <TabsContent value="packet-gate">
-              <JobPacketGate jobId={id} isAdminOrManager={isAdminOrManager} />
-            </TabsContent>
+          {/* Warranty Panel */}
+          {isAdminOrManager && activeSection === "warranty" && (
+            <JobWarranty jobId={id} isAdminOrManager={isAdminOrManager} />
           )}
 
-          {/* Tasks Tab */}
-          <TabsContent value="tasks">
+          {/* Job Gate Panel */}
+          {isAdminOrManager && activeSection === "packet-gate" && (
+            <JobPacketGate jobId={id} isAdminOrManager={isAdminOrManager} />
+          )}
+
+          {/* Tasks Panel */}
+          {activeSection === "tasks" && (
             <LinkedTasksTab jobId={id} />
-          </TabsContent>
+          )}
 
-          {/* Files & Photos Tab */}
-          <TabsContent value="files-photos">
+          {/* Files & Photos Panel */}
+          {activeSection === "files-photos" && (
             <FilesPhotosTab jobId={id} />
-          </TabsContent>
-        </Tabs>
+          )}
+        </div>
       </div>
 
       {/* Add Work Area Dialog */}
