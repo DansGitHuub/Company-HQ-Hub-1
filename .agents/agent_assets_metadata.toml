@@ -210,3 +210,9 @@ id = "so4lSyIyx64xQ94ZcuZGS"
 uri = "file://.local/audits/group-39-mobile-field-usability.md"
 type = "text"
 title = "Group 39 — Mobile / Field Usability Audit"
+
+[[outputs]]
+id = "ylcPaPVM_5xevLgkEp74A"
+uri = "file://.local/audits/group-40-final-sweep.md"
+type = "text"
+title = "Group 40 — Final “Did We Miss Anything?” Sweep"

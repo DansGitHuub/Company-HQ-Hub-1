@@ -1,0 +1,25 @@
+Audit ONLY Group 40: Final "Did We Miss Anything?" sweep (CompanyHQ). Inspect and report only — do not make code changes. This is a cross-cutting checklist, so the 10-point module framework is optional here — focus on the specific questions.
+
+EVALUATION LENS (applies to every answer): Do not assume a feature is valuable just because it exists. If a feature duplicates another, creates a second source of truth, adds unnecessary navigation, is not connected to a workflow, is not visible where users expect it, or is unlikely to be used — recommend removing, merging, hiding, or simplifying it. Goal: the simplest app that completely runs the business, not the largest.
+
+SPECIFIC QUESTIONS — Group 40 (answer these exactly):
+- Are there any database tables that are no longer used?
+- Are there any frontend pages that point to old tables?
+- Are there any API routes that are unused?
+- Are there any tables not registered in Drizzle?
+- Are there any records with broken foreign keys?
+- Are there any records that cannot be reached from the UI?
+- Are there any visible pages with no working backend?
+- Are there any duplicate source-of-truth problems left?
+- Are there any customer-facing features exposing internal data?
+- Are there any crew-facing features that are too complicated?
+- Are there any admin-only tools accidentally visible to managers or crew?
+- Are there any unfinished features still in the main menu?
+- Are there any features that were hidden but should still be available?
+- Are there any workflows where data is collected but does not go anywhere?
+- Are there any workflows where data is needed later but not collected early?
+- Are there any app actions that should create a task but do not?
+- Are there any app actions that should create a notification but do not?
+- Are there any app actions that should update a job stage but do not?
+- Are there any customer, property, job, estimate, or invoice records that are disconnected?
+- Are there any modules that should be paused until after alpha testing?
