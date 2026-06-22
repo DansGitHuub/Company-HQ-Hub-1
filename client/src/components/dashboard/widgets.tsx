@@ -220,7 +220,7 @@ function TasksBoardPanel() {
           </Badge>
         )}
         <div className="ml-auto">
-          <Link href="/todo">
+          <Link href="/todos">
             <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7" data-testid="open-full-tasks-page">
               <ExternalLink className="h-3 w-3" /> Open Full Tasks Page
             </Button>
