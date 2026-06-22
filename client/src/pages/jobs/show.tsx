@@ -17,7 +17,7 @@ import {
   ChevronLeft, Pencil, User, MapPin, Calendar, Clock,
   DollarSign, Briefcase, Timer, ChevronDown, Loader2, FileText,
   Plus, Trash2, HardHat, MessageSquare, ShieldCheck, GitMerge, CheckSquare, ClipboardCheck, Award, Truck, Users, Package,
-  TrendingUp, TrendingDown, Camera, Image, ExternalLink,
+  TrendingUp, TrendingDown, Camera, Image, ExternalLink, ClipboardList,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -588,6 +588,86 @@ function FilesPhotosTab({ jobId }: { jobId: string }) {
   );
 }
 
+// ── Linked Tasks Tab ──────────────────────────────────────────────────────────
+function LinkedTasksTab({ jobId }: { jobId: string }) {
+  const { data: linkedTasks = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/tasks/linked/job", jobId],
+    queryFn: () => fetch(`/api/tasks/linked/job/${jobId}`, { credentials: "include" }).then((r) => r.json()),
+  });
+
+  const statusCls = (s: string) =>
+    s === "in_progress" ? "bg-blue-100 text-blue-700" :
+    s === "complete"    ? "bg-green-100 text-green-700" :
+    s === "cancelled"   ? "bg-red-50 text-red-400" :
+    s === "blocked"     ? "bg-orange-100 text-orange-700" :
+                          "bg-gray-100 text-gray-600";
+
+  const priorityCls = (p: string) =>
+    p === "urgent" ? "bg-red-100 text-red-700" :
+    p === "high"   ? "bg-orange-100 text-orange-700" :
+    p === "medium" ? "bg-yellow-100 text-yellow-700" :
+                     "bg-gray-100 text-gray-500";
+
+  const fmtLabel = (s: string) =>
+    s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2 pt-4 px-5">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <ClipboardList className="h-4 w-4 text-muted-foreground" />
+          Linked Tasks
+          <span className="ml-auto text-xs font-normal text-muted-foreground">
+            {linkedTasks.length} task{linkedTasks.length !== 1 ? "s" : ""}
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-5 pb-4">
+        {linkedTasks.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">No tasks linked to this job</p>
+        ) : (
+          <div className="divide-y">
+            {linkedTasks.map((task: any) => (
+              <div key={task.id} className="flex items-start gap-3 py-3" data-testid={`row-task-${task.id}`}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{task.title}</p>
+                  {task.description && (
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{task.description}</p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${statusCls(task.status)}`}>
+                      {fmtLabel(task.status)}
+                    </span>
+                    <span className={`text-[11px] font-medium capitalize px-1.5 py-0.5 rounded ${priorityCls(task.priority)}`}>
+                      {task.priority}
+                    </span>
+                    {task.category && (
+                      <span className="text-[11px] text-muted-foreground capitalize">{task.category}</span>
+                    )}
+                  </div>
+                </div>
+                {task.dueDate && (
+                  <span className="text-xs text-muted-foreground whitespace-nowrap mt-0.5 shrink-0">
+                    Due {format(new Date(task.dueDate), "MMM d, yyyy")}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function JobInvoicesTab({ jobId, customerId }: { jobId: string; customerId: string }) {
   const { t } = useTranslation("jobDetail");
   const [, nav] = useLocation();
@@ -1049,6 +1129,10 @@ export default function JobDetailPage() {
                 Job Gate
               </TabsTrigger>
             )}
+            <TabsTrigger value="tasks" data-testid="tab-tasks">
+              <ClipboardList className="h-3.5 w-3.5 mr-1" />
+              Tasks
+            </TabsTrigger>
             <TabsTrigger value="files-photos" data-testid="tab-files-photos">
               <Camera className="h-3.5 w-3.5 mr-1" />
               Files &amp; Photos
@@ -1318,6 +1402,11 @@ export default function JobDetailPage() {
               <JobPacketGate jobId={id} isAdminOrManager={isAdminOrManager} />
             </TabsContent>
           )}
+
+          {/* Tasks Tab */}
+          <TabsContent value="tasks">
+            <LinkedTasksTab jobId={id} />
+          </TabsContent>
 
           {/* Files & Photos Tab */}
           <TabsContent value="files-photos">
