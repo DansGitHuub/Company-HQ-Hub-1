@@ -137,7 +137,7 @@ export function registerWorksheetPhotoRoutes(app: Express, requireAuth: any) {
       );
     } catch (err: any) {
       console.error("[worksheets/photos] job-photos error:", err.message);
-      res.status(500).json({ error: err.message });
+      res.json([]);
     }
   });
 

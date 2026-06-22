@@ -439,7 +439,9 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
 function FilesPhotosTab({ jobId }: { jobId: string }) {
   const { data: docs = [] } = useQuery<any[]>({
     queryKey: ["/api/jobs", jobId, "documents"],
-    queryFn: () => fetch(`/api/jobs/${jobId}/documents`, { credentials: "include" }).then((r) => r.json()),
+    queryFn: () => fetch(`/api/jobs/${jobId}/documents`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => Array.isArray(d) ? d : []),
   });
   const { data: ccData } = useQuery<any>({
     queryKey: ["/api/jobs", jobId, "companycam-photos"],
@@ -447,7 +449,9 @@ function FilesPhotosTab({ jobId }: { jobId: string }) {
   });
   const { data: wsPhotos = [] } = useQuery<any[]>({
     queryKey: ["/api/jobs", jobId, "worksheet-photos"],
-    queryFn: () => fetch(`/api/jobs/${jobId}/worksheet-photos`, { credentials: "include" }).then((r) => r.json()),
+    queryFn: () => fetch(`/api/jobs/${jobId}/worksheet-photos`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => Array.isArray(d) ? d : []),
   });
 
   const ccPhotos: any[] = ccData?.photos ?? [];
