@@ -190,7 +190,7 @@ async function checkPendingApplicationFollowups(): Promise<void> {
     });
     if (stale.length === 0) return;
     const users = await storage.getAllUsers();
-    const admins = users.filter((u: any) => ["admin", "super_admin"].includes(u.role));
+    const admins = users.filter((u: any) => ["Admin", "Manager", "Master Admin"].includes(u.role) || u.isMasterAdmin);
     for (const app of stale) {
       for (const admin of admins) {
         try {
