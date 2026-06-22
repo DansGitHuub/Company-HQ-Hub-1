@@ -322,8 +322,14 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
     return "service";
   }
 
-  const addCatalogItem = (aKey: string, item: CatalogItem, imageUrl?: string) => {
+  function catalogSellPrice(item: CatalogItem): number {
     const cost = parseFloat((item.cost ?? "0").toString().replace(/[$,]/g, "")) || 0;
+    const markup = parseFloat((item.markupPct ?? "0").toString()) || 0;
+    return cost * (1 + markup / 100);
+  }
+
+  const addCatalogItem = (aKey: string, item: CatalogItem, imageUrl?: string) => {
+    const price = catalogSellPrice(item);
     setAreas(prev => prev.map(a => a._key === aKey ? {
       ...a,
       line_items: [...a.line_items, {
@@ -332,8 +338,8 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
         description: item.name,
         quantity: 1,
         unit: item.units ?? "",
-        unit_price: cost,
-        amount: cost,
+        unit_price: price,
+        amount: price,
         is_optional: false,
         image_url: imageUrl ?? null,
         catalog_item_id: item.id,
@@ -342,12 +348,12 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
   };
 
   function applyFromCatalog(aKey: string, iKey: string, item: CatalogItem) {
-    const cost = parseFloat((item.cost ?? "0").toString().replace(/[$,]/g, "")) || 0;
+    const price = catalogSellPrice(item);
     updateLineItem(aKey, iKey, {
       item_type: catalogClassToItemType(item.class),
       description: item.name,
       unit: item.units ?? "",
-      unit_price: cost,
+      unit_price: price,
       catalog_item_id: item.id,
     });
     setCatalogPickerKey(null);

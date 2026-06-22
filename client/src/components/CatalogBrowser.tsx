@@ -15,6 +15,7 @@ export interface CatalogItem {
   category: string | null;
   units: string | null;
   cost: string | null;
+  markupPct: string | null;
   taxable: boolean | null;
   description: string | null;
   sku: string | null;

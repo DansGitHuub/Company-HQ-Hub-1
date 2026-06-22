@@ -21,6 +21,7 @@ type CatalogRow = {
   category: string | null;
   units: string | null;
   cost: string | null;
+  markupPct: string | null;
   taxable: boolean | null;
   description: string | null;
   sku: string | null;
@@ -146,19 +147,26 @@ export default function CatalogPage() {
     setExporting(true);
     try {
       const rows = [
-        ["Item #", "Name", "Class", "Category", "Units", "Cost", "Taxable", "SKU", "Tags", "Active"].join(","),
-        ...filtered.map(item => [
-          item.itemNumber,
-          `"${(item.name ?? "").replace(/"/g, '""')}"`,
-          item.class ?? "",
-          item.category ?? "",
-          item.units ?? "",
-          item.cost ?? "",
-          item.taxable ? "TRUE" : "FALSE",
-          item.sku ?? "",
-          `"${item.tags.map(t => t.name).join("; ")}"`,
-          item.is_active ? "TRUE" : "FALSE",
-        ].join(","))
+        ["Item #", "Name", "Class", "Category", "Units", "Cost", "Markup %", "Sell Price", "Taxable", "SKU", "Tags", "Active"].join(","),
+        ...filtered.map(item => {
+          const c = item.cost != null ? parseFloat(item.cost) : NaN;
+          const m = item.markupPct != null ? parseFloat(item.markupPct) : 0;
+          const sellPrice = !isNaN(c) ? (c * (1 + m / 100)).toFixed(2) : "";
+          return [
+            item.itemNumber,
+            `"${(item.name ?? "").replace(/"/g, '""')}"`,
+            item.class ?? "",
+            item.category ?? "",
+            item.units ?? "",
+            item.cost ?? "",
+            m.toFixed(2),
+            sellPrice,
+            item.taxable ? "TRUE" : "FALSE",
+            item.sku ?? "",
+            `"${item.tags.map(t => t.name).join("; ")}"`,
+            item.is_active ? "TRUE" : "FALSE",
+          ].join(",");
+        })
       ].join("\n");
       const blob = new Blob([rows], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
@@ -177,6 +185,13 @@ export default function CatalogPage() {
   function fmtCost(item: CatalogRow) {
     const c = item.cost != null ? parseFloat(item.cost) : NaN;
     return !isNaN(c) ? `$${c.toFixed(2)}` : "—";
+  }
+
+  function fmtSellPrice(item: CatalogRow) {
+    const c = item.cost != null ? parseFloat(item.cost) : NaN;
+    const m = item.markupPct != null ? parseFloat(item.markupPct) : 0;
+    if (isNaN(c)) return "—";
+    return `$${(c * (1 + m / 100)).toFixed(2)}`;
   }
 
   function handleRowClick(e: React.MouseEvent, itemId: number) {
@@ -289,16 +304,18 @@ export default function CatalogPage() {
               <th className="text-left px-4 py-3 font-medium">Category</th>
               <th className="text-left px-4 py-3 font-medium">Units</th>
               <th className="text-right px-4 py-3 font-medium">Cost</th>
+              <th className="text-right px-4 py-3 font-medium">Markup %</th>
+              <th className="text-right px-4 py-3 font-medium">Sell Price</th>
               <th className="text-center px-4 py-3 font-medium">Tax</th>
               <th className="text-left px-4 py-3 font-medium">Tags</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={10} className="text-center py-12 text-muted-foreground">Loading…</td></tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                <td colSpan={10} className="text-center py-12 text-muted-foreground">
                   {items.length === 0
                     ? "No catalog items yet. Import a CSV to get started."
                     : "No items match your filters"}
@@ -336,6 +353,14 @@ export default function CatalogPage() {
                   </td>
                   <td className="px-4 py-3 text-right font-mono" data-testid={`text-cost-${item.id}`}>
                     {fmtCost(item)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono text-muted-foreground" data-testid={`text-markup-${item.id}`}>
+                    {item.markupPct != null && parseFloat(item.markupPct) !== 0
+                      ? `${parseFloat(item.markupPct).toFixed(1)}%`
+                      : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono text-green-700 dark:text-green-400 font-medium" data-testid={`text-sellprice-${item.id}`}>
+                    {fmtSellPrice(item)}
                   </td>
                   <td className="px-4 py-3 text-center" data-testid={`text-taxable-${item.id}`} onClick={e => e.stopPropagation()}>
                     <Switch

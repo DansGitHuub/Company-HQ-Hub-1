@@ -51,6 +51,7 @@ type CatalogItemDetail = {
   category: string | null;
   units: string | null;
   cost: string | null;
+  markupPct: string | null;
   taxable: boolean | null;
   description: string | null;
   sku: string | null;
@@ -598,6 +599,27 @@ export default function CatalogDetail() {
             </div>
 
             <div className="space-y-1.5">
+              <Label htmlFor="field-markup">Markup %</Label>
+              <Input
+                id="field-markup"
+                type="number"
+                min="0"
+                step="0.1"
+                value={form.markupPct != null ? parseFloat(form.markupPct as string) || "" : ""}
+                onChange={e => field("markupPct", e.target.value === "" ? "0" : e.target.value)}
+                placeholder="0"
+                data-testid="input-markup-pct"
+              />
+              {costNum > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Sell price: <span className="font-medium text-green-700 dark:text-green-400">
+                    ${(costNum * (1 + (parseFloat((form.markupPct as string) ?? "0") || 0) / 100)).toFixed(2)}
+                  </span>
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
               <Label>Taxable</Label>
               <div className="flex items-center gap-2 pt-2">
                 <Switch
@@ -900,6 +922,36 @@ export default function CatalogDetail() {
                   data-testid="pricing-input-cost"
                 />
               </div>
+
+              {/* Markup % */}
+              <div className="space-y-1">
+                <Label htmlFor="pricing-markup" className="text-xs">Markup (%)</Label>
+                <Input
+                  id="pricing-markup"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={form.markupPct != null ? parseFloat(form.markupPct as string) || "" : ""}
+                  onChange={e => field("markupPct", e.target.value === "" ? "0" : e.target.value)}
+                  placeholder="0"
+                  className="h-8 text-sm"
+                  data-testid="pricing-input-markup"
+                />
+              </div>
+
+              {/* Sell Price */}
+              {(() => {
+                const markupNum = parseFloat((form.markupPct as string) ?? "0") || 0;
+                const sellPrice = costNum * (1 + markupNum / 100);
+                return markupNum > 0 ? (
+                  <div className="flex justify-between items-center rounded-md bg-green-50 dark:bg-green-950/30 px-3 py-2">
+                    <span className="text-xs font-medium text-green-800 dark:text-green-300">Sell Price</span>
+                    <span className="text-sm font-bold text-green-700 dark:text-green-400" data-testid="pricing-sell-price">
+                      ${fmt(sellPrice)}
+                    </span>
+                  </div>
+                ) : null;
+              })()}
 
               {/* Taxable toggle */}
               <div className="flex items-center justify-between">

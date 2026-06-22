@@ -88,6 +88,7 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
     await pool.query(`ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS option_images_hidden JSONB DEFAULT '{}'`);
     await pool.query(`ALTER TABLE estimate_line_items ADD COLUMN IF NOT EXISTS image_url TEXT`);
     await pool.query(`ALTER TABLE estimate_line_items ADD COLUMN IF NOT EXISTS image_hidden BOOLEAN DEFAULT FALSE`);
+    await pool.query(`ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS markup_pct NUMERIC(5,2) DEFAULT 0`);
     console.log("[migration] Catalog tables ready");
   })();
 
@@ -129,11 +130,11 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
       const { tags = [], ...body } = req.body;
       const itemNumber = await nextItemNumber();
       const result = await pool.query<{ id: number }>(
-        `INSERT INTO catalog_items (item_number, name, class, category, units, cost, taxable, description, sku, other_options, is_active)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+        `INSERT INTO catalog_items (item_number, name, class, category, units, cost, taxable, description, sku, other_options, is_active, markup_pct)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
         [itemNumber, body.name, body.class ?? null, body.category ?? null, body.units ?? null,
          body.cost ?? 0, body.taxable ?? false, body.description ?? null, body.sku ?? null,
-         body.other_options ?? null, body.is_active ?? true]
+         body.other_options ?? null, body.is_active ?? true, body.markup_pct ?? body.markupPct ?? 0]
       );
       const id = result.rows[0].id;
       if (Array.isArray(tags) && tags.length) await syncItemTags(id, tags);
@@ -199,11 +200,12 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
       const { tags = [], ...body } = req.body;
       await pool.query(
         `UPDATE catalog_items SET name=$1, class=$2, category=$3, units=$4, cost=$5, taxable=$6,
-         description=$7, sku=$8, other_options=$9, is_active=$10, updated_at=NOW() WHERE id=$11`,
+         description=$7, sku=$8, other_options=$9, is_active=$10, markup_pct=$11, updated_at=NOW() WHERE id=$12`,
         [body.name, body.class ?? null, body.category ?? null, body.units ?? null,
          body.cost ?? 0, body.taxable ?? false, body.description ?? null, body.sku ?? null,
          body.other_options ?? body.otherOptions ?? null,
-         body.is_active ?? body.isActive ?? true, id]
+         body.is_active ?? body.isActive ?? true,
+         body.markup_pct ?? body.markupPct ?? 0, id]
       );
       if (Array.isArray(tags)) await syncItemTags(id, tags);
       const item = await getItemWithTags(id);
@@ -317,8 +319,8 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
       const { rows: inserted } = await pool.query(
         `INSERT INTO catalog_items
            (item_number, name, class, category, units, cost, taxable, description, sku,
-            other_options, image_url, option_images, image_hidden, option_images_hidden, is_active)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+            other_options, image_url, option_images, image_hidden, option_images_hidden, is_active, markup_pct)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          RETURNING id`,
         [
           newNum, `Copy of ${orig.name}`, orig.class, orig.category, orig.units,
@@ -326,6 +328,7 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
           orig.other_options, orig.image_url,
           orig.option_images ?? {}, orig.image_hidden ?? false,
           orig.option_images_hidden ?? {}, orig.is_active,
+          orig.markup_pct ?? 0,
         ]
       );
       res.status(201).json({ id: inserted[0].id });
