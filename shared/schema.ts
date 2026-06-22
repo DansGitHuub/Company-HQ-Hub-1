@@ -3219,6 +3219,8 @@ export const timeEntries = pgTable("time_entries", {
   autoClockedOut: boolean("auto_clocked_out").notNull().default(false),
   lastReminderAt: timestamp("last_reminder_at", { withTimezone: true }),
   worksheetSessionId: integer("worksheet_session_id"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
+  editedBy: varchar("edited_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
 });
 
 export const gpsPings = pgTable("gps_pings", {

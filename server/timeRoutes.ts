@@ -79,6 +79,17 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
       }
 
       await client.query("COMMIT");
+
+      // Audit log — time entry created
+      const auditDesc = job_id
+        ? `Clocked in (${resolvedEntryType}) linked to job`
+        : `Clocked in (${resolvedEntryType})`;
+      pool.query(
+        `INSERT INTO activity_log (id, user_id, event_type, description, link, seen_by, created_at)
+         VALUES (gen_random_uuid(), $1, 'time_entry_create', $2, '/admin/time-reports', '[]'::jsonb, now())`,
+        [userId, auditDesc]
+      ).catch((e: any) => console.error("[timeRoutes] audit log clock-in:", e.message));
+
       return res.status(201).json(timeEntry);
     } catch (err: any) {
       await client.query("ROLLBACK");
@@ -110,6 +121,16 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
       if (result.rows.length === 0) {
         return res.status(404).json({ message: "Active time entry not found" });
       }
+
+      // Audit log — clock out
+      const durMin = result.rows[0].duration_minutes;
+      const durDesc = durMin != null ? ` after ${durMin} minutes` : "";
+      pool.query(
+        `INSERT INTO activity_log (id, user_id, event_type, description, link, seen_by, created_at)
+         VALUES (gen_random_uuid(), $1, 'time_entry_clock_out', $2, '/admin/time-reports', '[]'::jsonb, now())`,
+        [userId, `Clocked out${durDesc}`]
+      ).catch((e: any) => console.error("[timeRoutes] audit log clock-out:", e.message));
+
     // Update time_card and worksheet_session on clock-out
     try {
       const tcResult = await pool.query(
@@ -590,8 +611,9 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
 
   // ── Admin: Edit any time entry ───────────────────────────────────────────────
   app.patch("/api/admin/time-entries/:id", requireAuth, async (req, res) => {
-    const callerRole = (req.user as any)?.role;
-    const isMaster   = (req.user as any)?.isMasterAdmin;
+    const actor     = req.user as any;
+    const callerRole = actor?.role;
+    const isMaster   = actor?.isMasterAdmin;
     if (!["Admin", "Manager"].includes(callerRole) && !isMaster) {
       return res.status(403).json({ message: "Admins only" });
     }
@@ -613,6 +635,17 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
       : null;
 
     try {
+      // Fetch current record (with employee name) before applying changes
+      const oldResult = await pool.query(
+        `SELECT te.*, u.name AS employee_name
+         FROM time_entries te
+         JOIN users u ON u.id = te.user_id
+         WHERE te.id = $1`,
+        [id]
+      );
+      if (oldResult.rows.length === 0) return res.status(404).json({ message: "Entry not found" });
+      const old = oldResult.rows[0];
+
       const result = await pool.query(
         `UPDATE time_entries
          SET clock_in         = $1,
@@ -621,12 +654,38 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
              job_id           = $4,
              work_area_name   = $5,
              notes            = $6,
-             entry_type       = COALESCE($7, entry_type)
+             entry_type       = COALESCE($7, entry_type),
+             updated_at       = NOW(),
+             edited_by        = $9
          WHERE id = $8
          RETURNING *`,
-        [cin, cout, durationMinutes, job_id ?? null, work_area_name ?? null, notes ?? null, entry_type ?? null, id]
+        [cin, cout, durationMinutes, job_id ?? null, work_area_name ?? null, notes ?? null, entry_type ?? null, id, actor?.id ?? null]
       );
       if (result.rows.length === 0) return res.status(404).json({ message: "Entry not found" });
+
+      // Build a human-readable diff for the audit log
+      const fmt = (d: any) => d ? new Date(d).toLocaleString("en-US", { timeZone: "UTC", hour12: false }) : "—";
+      const changes: string[] = [];
+      if (cin.toISOString() !== new Date(old.clock_in).toISOString())
+        changes.push(`clock_in: ${fmt(old.clock_in)} → ${fmt(cin)}`);
+      if ((cout?.toISOString() ?? null) !== (old.clock_out ? new Date(old.clock_out).toISOString() : null))
+        changes.push(`clock_out: ${fmt(old.clock_out)} → ${fmt(cout)}`);
+      if ((job_id ?? null) !== (old.job_id ?? null))
+        changes.push(`job_id: ${old.job_id ?? "none"} → ${job_id ?? "none"}`);
+      if ((notes ?? null) !== (old.notes ?? null))
+        changes.push(`notes updated`);
+      if (entry_type && entry_type !== old.entry_type)
+        changes.push(`type: ${old.entry_type} → ${entry_type}`);
+
+      const diffText = changes.length > 0 ? changes.join("; ") : "no field changes";
+      const description = `${actor?.name ?? "Admin"} edited time entry for ${old.employee_name}: ${diffText}`;
+
+      pool.query(
+        `INSERT INTO activity_log (id, user_id, event_type, description, link, seen_by, created_at)
+         VALUES (gen_random_uuid(), $1, 'time_entry_edit', $2, '/admin/time-reports', '[]'::jsonb, now())`,
+        [actor?.id ?? null, description]
+      ).catch((e: any) => console.error("[timeRoutes] audit log edit:", e.message));
+
       return res.status(200).json(result.rows[0]);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });

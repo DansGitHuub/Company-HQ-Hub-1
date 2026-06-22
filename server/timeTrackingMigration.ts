@@ -54,6 +54,13 @@ export async function runTimeTrackingMigration() {
         ADD COLUMN IF NOT EXISTS last_reminder_at TIMESTAMPTZ;
     `);
 
+    // ── Audit columns ─────────────────────────────────────────────────────────
+    await pool.query(`
+      ALTER TABLE time_entries
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS edited_by  VARCHAR(36) REFERENCES users(id) ON DELETE SET NULL;
+    `);
+
     console.log("[migration] Time tracking tables ready");
   } catch (err: any) {
     console.error("[migration] Time tracking migration error:", err.message);
