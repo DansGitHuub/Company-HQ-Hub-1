@@ -213,7 +213,7 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Approve change order ─────────────────────────────────────────────────
-  app.post("/api/change-orders/:id/approve", requireAuth, async (req: any, res) => {
+  app.post("/api/change-orders/:id/approve", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
     const { approval_type, signature_data, approved_by_name } = req.body;
     if (!approval_type) return res.status(400).json({ message: "approval_type required" });
     try {
