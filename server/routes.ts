@@ -449,6 +449,34 @@ export async function registerRoutes(
       
       const user = await storage.updateUser(id, updates);
       const { password: _, ...safeUser } = user!;
+
+      // Audit log — record role and/or active-status changes only
+      const actorId = (req.user as any)?.id ?? null;
+      const actorName = (req.user as any)?.name ?? "Unknown admin";
+      const auditEntries: { event_type: string; description: string }[] = [];
+
+      if (role !== undefined && role !== targetUser.role) {
+        auditEntries.push({
+          event_type: "user_role_change",
+          description: `${actorName} changed ${targetUser.name}'s role from "${targetUser.role}" to "${role}"`,
+        });
+      }
+      if (isActive !== undefined && Boolean(isActive) !== Boolean(targetUser.isActive)) {
+        const action = Boolean(isActive) ? "activated" : "deactivated";
+        auditEntries.push({
+          event_type: "user_status_change",
+          description: `${actorName} ${action} ${targetUser.name}'s account`,
+        });
+      }
+
+      for (const entry of auditEntries) {
+        await pool.query(
+          `INSERT INTO activity_log (id, user_id, event_type, description, link, seen_by, created_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, '/admin', '[]'::jsonb, now())`,
+          [actorId, entry.event_type, entry.description]
+        );
+      }
+
       res.json(safeUser);
     } catch (err) {
       res.status(500).json({ message: "Error updating user" });
