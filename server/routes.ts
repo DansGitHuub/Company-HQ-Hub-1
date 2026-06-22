@@ -1017,6 +1017,10 @@ Respond with a JSON object:
   });
 
   app.post("/api/sops", requireAuth, async (req, res) => {
+    const _sopUser = req.user as any;
+    if (!["Admin", "Manager", "Master Admin"].includes(_sopUser?.role) && !_sopUser?.isMasterAdmin) {
+      return res.status(403).json({ message: "Insufficient permissions" });
+    }
     try {
       const body = { ...req.body, ownerId: req.user?.id };
       if (body.title && !body.superCategory) {
@@ -1037,6 +1041,10 @@ Respond with a JSON object:
   });
 
   app.patch("/api/sops/:id", requireAuth, async (req, res) => {
+    const _sopUser = req.user as any;
+    if (!["Admin", "Manager", "Master Admin"].includes(_sopUser?.role) && !_sopUser?.isMasterAdmin) {
+      return res.status(403).json({ message: "Insufficient permissions" });
+    }
     try {
       const sop = await storage.updateSop(req.params.id as string, req.body);
       if (!sop) return res.status(404).json({ message: "SOP not found" });
@@ -1057,7 +1065,8 @@ Respond with a JSON object:
 
   app.post("/api/sops/:id/save-version", requireAuth, async (req, res) => {
     try {
-      if ((req.user as any)?.role !== "Admin") return res.status(403).json({ message: "Admin only" });
+      const _svUser = req.user as any;
+      if (!["Admin", "Manager", "Master Admin"].includes(_svUser?.role) && !_svUser?.isMasterAdmin) return res.status(403).json({ message: "Insufficient permissions" });
       const sop = await storage.getSop(req.params.id);
       if (!sop) return res.status(404).json({ message: "SOP not found" });
       const existingVersions = await storage.getSopVersions(sop.id);
@@ -1079,7 +1088,8 @@ Respond with a JSON object:
 
   app.post("/api/sops/:id/restore-version/:versionId", requireAuth, async (req, res) => {
     try {
-      if ((req.user as any)?.role !== "Admin") return res.status(403).json({ message: "Admin only" });
+      const _rvUser = req.user as any;
+      if (!["Admin", "Manager", "Master Admin"].includes(_rvUser?.role) && !_rvUser?.isMasterAdmin) return res.status(403).json({ message: "Insufficient permissions" });
       const sop = await storage.getSop(req.params.id);
       if (!sop) return res.status(404).json({ message: "SOP not found" });
       const version = await storage.getSopVersion(req.params.versionId);
@@ -1108,7 +1118,8 @@ Respond with a JSON object:
 
   app.post("/api/sops/:id/ai-rewrite", requireAuth, async (req, res) => {
     try {
-      if ((req.user as any)?.role !== "Admin") return res.status(403).json({ message: "Admin only" });
+      const _arUser = req.user as any;
+      if (!["Admin", "Manager", "Master Admin"].includes(_arUser?.role) && !_arUser?.isMasterAdmin) return res.status(403).json({ message: "Insufficient permissions" });
       const sop = await storage.getSop(req.params.id);
       if (!sop) return res.status(404).json({ message: "SOP not found" });
       const { field, stepIndex, instruction } = req.body;
@@ -1178,7 +1189,8 @@ Respond with a JSON object:
 
   app.post("/api/sops/:id/ai-regenerate-image", requireAuth, async (req, res) => {
     try {
-      if ((req.user as any)?.role !== "Admin") return res.status(403).json({ message: "Admin only" });
+      const _aiUser = req.user as any;
+      if (!["Admin", "Manager", "Master Admin"].includes(_aiUser?.role) && !_aiUser?.isMasterAdmin) return res.status(403).json({ message: "Insufficient permissions" });
       const sop = await storage.getSop(req.params.id);
       if (!sop) return res.status(404).json({ message: "SOP not found" });
       const { imageType, stepIndex, instruction } = req.body;
@@ -1241,6 +1253,10 @@ Respond with a JSON object:
   });
 
   app.delete("/api/sops/:id", requireAuth, async (req, res) => {
+    const _sopUser = req.user as any;
+    if (!["Admin", "Manager", "Master Admin"].includes(_sopUser?.role) && !_sopUser?.isMasterAdmin) {
+      return res.status(403).json({ message: "Insufficient permissions" });
+    }
     try {
       await storage.deleteSop(req.params.id as string);
       res.sendStatus(204);
@@ -1250,6 +1266,10 @@ Respond with a JSON object:
   });
 
   app.post("/api/sops/:id/copy", requireAuth, async (req, res) => {
+    const _sopUser = req.user as any;
+    if (!["Admin", "Manager", "Master Admin"].includes(_sopUser?.role) && !_sopUser?.isMasterAdmin) {
+      return res.status(403).json({ message: "Insufficient permissions" });
+    }
     try {
       const { categoryId, categoryName } = req.body || {};
       const sop = await storage.copySop(req.params.id as string, categoryId, categoryName);
