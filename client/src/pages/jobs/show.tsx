@@ -17,7 +17,7 @@ import {
   ChevronLeft, Pencil, User, MapPin, Calendar, Clock,
   DollarSign, Briefcase, Timer, ChevronDown, Loader2, FileText,
   Plus, Trash2, HardHat, MessageSquare, ShieldCheck, GitMerge, CheckSquare, ClipboardCheck, Award, Truck, Users, Package,
-  TrendingUp, TrendingDown,
+  TrendingUp, TrendingDown, Camera, Image, ExternalLink,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -428,6 +428,161 @@ function DailyLogsTab({ jobId }: { jobId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ── Files & Photos Tab ────────────────────────────────────────────────────────
+function FilesPhotosTab({ jobId }: { jobId: string }) {
+  const { data: docs = [] } = useQuery<any[]>({
+    queryKey: ["/api/jobs", jobId, "documents"],
+    queryFn: () => fetch(`/api/jobs/${jobId}/documents`, { credentials: "include" }).then((r) => r.json()),
+  });
+  const { data: ccData } = useQuery<any>({
+    queryKey: ["/api/jobs", jobId, "companycam-photos"],
+    queryFn: () => fetch(`/api/jobs/${jobId}/companycam-photos`, { credentials: "include" }).then((r) => r.json()),
+  });
+  const { data: wsPhotos = [] } = useQuery<any[]>({
+    queryKey: ["/api/jobs", jobId, "worksheet-photos"],
+    queryFn: () => fetch(`/api/jobs/${jobId}/worksheet-photos`, { credentials: "include" }).then((r) => r.json()),
+  });
+
+  const ccPhotos: any[] = ccData?.photos ?? [];
+
+  const typeColor = (t: string) =>
+    t === "before" ? "bg-blue-100 text-blue-700" :
+    t === "after"  ? "bg-green-100 text-green-700" :
+    t === "damage" ? "bg-red-100 text-red-700" :
+    "bg-gray-100 text-gray-600";
+
+  return (
+    <div className="space-y-5">
+      {/* ── Job Documents ─────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-2 pt-4 px-5">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            Job Documents
+            <span className="ml-auto text-xs font-normal text-muted-foreground">{docs.length} file{docs.length !== 1 ? "s" : ""}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-5 pb-4">
+          {docs.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-3 text-center">No documents attached to this job</p>
+          ) : (
+            <div className="divide-y">
+              {docs.map((doc: any) => (
+                <div key={doc.id} className="flex items-center gap-3 py-2.5" data-testid={`row-doc-${doc.id}`}>
+                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{doc.name}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{doc.type}</p>
+                  </div>
+                  {doc.uploadedAt && (
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {format(parseISO(doc.uploadedAt), "MMM d, yyyy")}
+                    </span>
+                  )}
+                  <a href={doc.url} target="_blank" rel="noreferrer">
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" data-testid={`button-open-doc-${doc.id}`}>
+                      <ExternalLink className="h-3 w-3" /> Open
+                    </Button>
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── CompanyCam Photos ─────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-2 pt-4 px-5">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Camera className="h-4 w-4 text-muted-foreground" />
+            CompanyCam Photos
+            <span className="ml-auto text-xs font-normal text-muted-foreground">{ccPhotos.length} photo{ccPhotos.length !== 1 ? "s" : ""}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-5 pb-4">
+          {ccPhotos.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-3 text-center">
+              {ccData?.project ? "No photos in this CompanyCam project yet" : "No CompanyCam project linked to this job"}
+            </p>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+              {ccPhotos.map((photo: any) => (
+                <a
+                  key={photo.companycam_photo_id}
+                  href={photo.app_url || photo.uri}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block group"
+                  data-testid={`img-companycam-${photo.companycam_photo_id}`}
+                >
+                  <div className="aspect-square rounded-md overflow-hidden bg-muted border">
+                    <img
+                      src={photo.uri}
+                      alt={photo.description || "Site photo"}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                    />
+                  </div>
+                  {photo.captured_at && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5 text-center truncate">
+                      {format(new Date(photo.captured_at), "MMM d")}
+                    </p>
+                  )}
+                </a>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Worksheet Photos ──────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-2 pt-4 px-5">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Image className="h-4 w-4 text-muted-foreground" />
+            Worksheet Photos
+            <span className="ml-auto text-xs font-normal text-muted-foreground">{wsPhotos.length} photo{wsPhotos.length !== 1 ? "s" : ""}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-5 pb-4">
+          {wsPhotos.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-3 text-center">No worksheet photos linked to this job</p>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+              {wsPhotos.map((photo: any) => (
+                <a
+                  key={photo.id}
+                  href={photo.photo_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block group"
+                  data-testid={`img-worksheet-${photo.id}`}
+                >
+                  <div className="aspect-square rounded-md overflow-hidden bg-muted border">
+                    <img
+                      src={photo.photo_url}
+                      alt={`${photo.photo_type} photo`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                    />
+                  </div>
+                  <div className="flex justify-center mt-0.5">
+                    <span className={`text-[10px] font-medium capitalize px-1.5 py-0.5 rounded ${typeColor(photo.photo_type)}`}>
+                      {photo.photo_type}
+                    </span>
+                  </div>
+                  {photo.employee_name && (
+                    <p className="text-[10px] text-muted-foreground text-center truncate mt-0.5">{photo.employee_name}</p>
+                  )}
+                </a>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -878,6 +1033,10 @@ export default function JobDetailPage() {
                 Job Gate
               </TabsTrigger>
             )}
+            <TabsTrigger value="files-photos" data-testid="tab-files-photos">
+              <Camera className="h-3.5 w-3.5 mr-1" />
+              Files &amp; Photos
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -1143,6 +1302,11 @@ export default function JobDetailPage() {
               <JobPacketGate jobId={id} isAdminOrManager={isAdminOrManager} />
             </TabsContent>
           )}
+
+          {/* Files & Photos Tab */}
+          <TabsContent value="files-photos">
+            <FilesPhotosTab jobId={id} />
+          </TabsContent>
         </Tabs>
       </div>
 

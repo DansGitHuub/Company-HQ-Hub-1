@@ -112,6 +112,35 @@ export function registerWorksheetPhotoRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── GET /api/jobs/:jobId/worksheet-photos ──────────────────────────────────
+  // Returns all worksheet photos linked to a job (via worksheet_sessions.job_id).
+  // Accessible to any authenticated user who can see the job.
+  app.get("/api/jobs/:jobId/worksheet-photos", requireAuth, async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT wp.id,
+                wp.photo_type,
+                wp.created_at,
+                COALESCE(u.first_name || ' ' || u.last_name, 'Unknown') AS employee_name
+         FROM   worksheet_photos wp
+         JOIN   worksheet_sessions ws ON ws.id = wp.session_id
+         LEFT   JOIN users u ON u.id::text = ws.employee_id::text
+         WHERE  ws.job_id = $1
+         ORDER  BY wp.created_at DESC`,
+        [req.params.jobId]
+      );
+      res.json(
+        rows.map((r) => ({
+          ...r,
+          photo_url: `/api/worksheets/photos/${r.id}/download`,
+        }))
+      );
+    } catch (err: any) {
+      console.error("[worksheets/photos] job-photos error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── GET /api/worksheets/photos/:photoId/download ────────────────────────────
   // Streams the photo from object storage to the authenticated user.
   // Only the session owner (or an Admin) may download.
