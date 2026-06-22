@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Loader2 } from "lucide-react";
 
-type Tab = "revenue" | "job-costing" | "invoice-aging" | "crew-hours" | "profitability" | "time-by-division" | "materials-spend";
+type Tab = "revenue" | "invoice-aging" | "crew-hours" | "profitability" | "time-by-division" | "materials-spend";
 
 const DIVISIONS = ["Maintenance", "Install", "Snow", "General"];
 
@@ -250,157 +250,7 @@ function RevenueReport() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  Tab 2 — Job Costing
-// ═══════════════════════════════════════════════════════════════════════════════
-const JOB_STATUSES = ["Lead", "Scheduled", "In Progress", "Completed", "Invoiced"];
-
-function JobCosting() {
-  const thisYear = new Date().getFullYear();
-  const [filters, setFilters] = useState({ date_from: `${thisYear}-01-01`, date_to: `${thisYear}-12-31`, status: "", division: "" });
-  const [applied, setApplied] = useState(filters);
-
-  const params = new URLSearchParams();
-  if (applied.date_from) params.set("date_from", applied.date_from);
-  if (applied.date_to)   params.set("date_to",   applied.date_to);
-  if (applied.status)    params.set("status",     applied.status);
-  if (applied.division)  params.set("division",   applied.division);
-
-  const { data, isLoading, error } = useQuery<any>({
-    queryKey: ["/api/reports/job-costing", applied],
-    queryFn: () => fetch(`/api/reports/job-costing?${params}`, { credentials: "include" }).then(r => r.json()),
-  });
-
-  return (
-    <div className="space-y-5">
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="space-y-1">
-              <Label className="text-xs">From</Label>
-              <Input type="date" className="h-8 text-sm w-36" value={filters.date_from}
-                onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))}
-                data-testid="filter-costing-from" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">To</Label>
-              <Input type="date" className="h-8 text-sm w-36" value={filters.date_to}
-                onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))}
-                data-testid="filter-costing-to" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Status</Label>
-              <Select value={filters.status} onValueChange={v => setFilters(f => ({ ...f, status: v === "_all" ? "" : v }))}>
-                <SelectTrigger className="h-8 text-sm w-36" data-testid="filter-costing-status">
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">All Statuses</SelectItem>
-                  {JOB_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Division</Label>
-              <Select value={filters.division} onValueChange={v => setFilters(f => ({ ...f, division: v === "_all" ? "" : v }))}>
-                <SelectTrigger className="h-8 text-sm w-36" data-testid="filter-costing-division">
-                  <SelectValue placeholder="All Divisions" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">All Divisions</SelectItem>
-                  {DIVISIONS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button size="sm" className="h-8" onClick={() => setApplied(filters)}
-              data-testid="btn-apply-costing-filters">
-              Apply Filters
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {isLoading && <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
-      {error && <div className="flex items-center gap-2 text-destructive text-sm"><AlertCircle className="h-4 w-4" />Failed to load report</div>}
-
-      {data && !isLoading && (
-        <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard title="Est. Cost" value={fmt$(data.summary.total_est_cost)} icon={Briefcase} />
-            <StatCard title="Actual Cost" value={fmt$(data.summary.total_actual_cost)} icon={DollarSign}
-              color={data.summary.total_actual_cost > data.summary.total_est_cost ? "red" : "green"} />
-            <StatCard title="Gross Profit" value={fmt$(data.summary.total_gross_profit)} icon={TrendingUp}
-              color={data.summary.total_gross_profit >= 0 ? "green" : "red"} />
-            <StatCard title="Avg Margin" value={fmtPct(data.summary.avg_margin_pct)} icon={BarChart2}
-              color={data.summary.avg_margin_pct >= 30 ? "green" : data.summary.avg_margin_pct >= 15 ? "blue" : "red"}
-              sub={`${data.jobs.length} jobs`} />
-          </div>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Job Detail</CardTitle>
-              <CardDescription className="text-xs">Cost estimates based on 60% cost ratio; OT from variance</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {data.jobs.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground text-sm">No jobs found</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table data-testid="job-costing-table">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Job</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Contract</TableHead>
-                        <TableHead className="text-right">Est Cost</TableHead>
-                        <TableHead className="text-right">Actual Cost</TableHead>
-                        <TableHead className="text-right">Profit</TableHead>
-                        <TableHead className="text-right">Margin</TableHead>
-                        <TableHead className="text-right">Est Hrs</TableHead>
-                        <TableHead className="text-right">Act Hrs</TableHead>
-                        <TableHead className="text-right">Variance</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.jobs.map((job: any) => (
-                        <TableRow key={job.id} data-testid={`costing-row-${job.id}`}>
-                          <TableCell className="font-medium max-w-[140px] truncate">{job.title}</TableCell>
-                          <TableCell className="text-muted-foreground text-xs max-w-[100px] truncate">{job.customer}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="text-xs">{job.status}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-xs">{fmt$(job.contract_value)}</TableCell>
-                          <TableCell className="text-right font-mono text-xs">{fmt$(job.est_cost)}</TableCell>
-                          <TableCell className={`text-right font-mono text-xs ${job.actual_cost > job.est_cost ? "text-red-500" : ""}`}>
-                            {fmt$(job.actual_cost)}
-                          </TableCell>
-                          <TableCell className={`text-right font-mono text-xs ${job.gross_profit < 0 ? "text-red-500" : "text-green-600"}`}>
-                            {fmt$(job.gross_profit)}
-                          </TableCell>
-                          <TableCell className={`text-right text-xs ${job.margin_pct < 15 ? "text-red-500" : job.margin_pct >= 30 ? "text-green-600" : ""}`}>
-                            {fmtPct(job.margin_pct)}
-                          </TableCell>
-                          <TableCell className="text-right text-xs">{job.est_hours > 0 ? job.est_hours : "—"}</TableCell>
-                          <TableCell className="text-right text-xs">{job.actual_hours > 0 ? job.actual_hours : "—"}</TableCell>
-                          <TableCell className={`text-right text-xs ${job.hour_variance > 0 ? "text-red-500" : job.hour_variance < 0 ? "text-green-600" : ""}`}>
-                            {job.est_hours > 0 || job.actual_hours > 0 ? `${job.hour_variance > 0 ? "+" : ""}${job.hour_variance}` : "—"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Tab 3 — Invoice Aging
+//  Tab 2 — Invoice Aging
 // ═══════════════════════════════════════════════════════════════════════════════
 function InvoiceAging() {
   const [asOf, setAsOf] = useState(new Date().toISOString().split("T")[0]);
@@ -1158,7 +1008,6 @@ function MaterialsSpend() {
 // ═══════════════════════════════════════════════════════════════════════════════
 const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] = [
   { id: "revenue",          label: "Revenue Report",    icon: DollarSign, desc: "Revenue trends, job volume, and division breakdown" },
-  { id: "job-costing",      label: "Job Costing",       icon: Layers,     desc: "Estimated vs actual cost, gross profit, and margins" },
   { id: "invoice-aging",    label: "Invoice Aging",     icon: FileText,   desc: "Outstanding AR bucketed by days past due" },
   { id: "crew-hours",       label: "Crew Hours",        icon: Timer,      desc: "Employee hours, overtime, and weekly trends" },
   { id: "profitability",    label: "Job Profitability", icon: PieChart,   desc: "Actual labor + materials vs sold value, gross margin per job" },
@@ -1203,7 +1052,6 @@ export default function Reports() {
         {/* Content */}
         <div className="flex-1 min-w-0">
           {activeTab === "revenue"          && <RevenueReport />}
-          {activeTab === "job-costing"      && <JobCosting />}
           {activeTab === "invoice-aging"    && <InvoiceAging />}
           {activeTab === "crew-hours"       && <CrewHours />}
           {activeTab === "profitability"    && <ProfitabilityReport />}
