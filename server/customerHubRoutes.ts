@@ -78,6 +78,35 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
   });
 
   // ===== CUSTOMER JOBS =====
+
+  // Whitelist of fields a customer is allowed to see on a job object.
+  // Internal fields (value, price, estimatedHours, totalHours, notes, crewNotes,
+  // contactName/Phone/Email, zone, IDs, integration keys, timestamps) are intentionally omitted.
+  function toCustomerJob(job: any) {
+    return {
+      id:                       job.id,
+      type:                     job.type,
+      title:                    job.title,
+      client:                   job.client,
+      stage:                    job.stage,
+      status:                   job.status,
+      division:                 job.division,
+      description:              job.description,
+      scheduledDate:            job.scheduledDate,
+      completionDate:           job.completionDate,
+      scheduledStartTime:       job.scheduledStartTime,
+      scheduledEndTime:         job.scheduledEndTime,
+      address:                  job.address,
+      city:                     job.city,
+      state:                    job.state,
+      zip:                      job.zip,
+      crewLeadName:             job.crewLeadName             || null,
+      crewNotesCustomerVisible: job.crewNotesCustomerVisible || null,
+      scopeOfWork:              job.scopeOfWork              || null,
+      materialsUsed:            job.materialsUsed            || null,
+    };
+  }
+
   app.get("/api/customer-hub/jobs", requireAuth, requireCustomer, async (req: any, res) => {
     try {
       const links = await storage.getCustomerJobs(req.user.id);
@@ -87,12 +116,8 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
         if (job) {
           const docs = await storage.getJobDocuments(link.jobId);
           jobsWithDetails.push({
-            ...job,
+            ...toCustomerJob(job),
             documents: docs,
-            crewNotesCustomerVisible: job.crewNotesCustomerVisible || null,
-            crewLeadName: job.crewLeadName || null,
-            scopeOfWork: job.scopeOfWork || null,
-            materialsUsed: job.materialsUsed || null,
           });
         }
       }
@@ -116,13 +141,9 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
       const jobCustomerDocs = customerDocs.filter(d => d.jobId === req.params.id);
 
       res.json({
-        ...job,
+        ...toCustomerJob(job),
         documents: docs,
         customerDocuments: jobCustomerDocs,
-        crewNotesCustomerVisible: job.crewNotesCustomerVisible || null,
-        crewLeadName: job.crewLeadName || null,
-        scopeOfWork: job.scopeOfWork || null,
-        materialsUsed: job.materialsUsed || null,
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
