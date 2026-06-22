@@ -5,14 +5,21 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
 
   // ── REVENUE REPORT ──────────────────────────────────────────────────────────
   app.get("/api/reports/revenue", requireAuth, async (req, res) => {
-    const { date_from, date_to, division } = req.query as Record<string, string>;
+    const { date_from, date_to, division, statuses } = req.query as Record<string, string>;
     try {
+      // Parse status list. "_all" → no status filter. Empty → default to realized work.
+      const statusList: string[] | null =
+        statuses === "_all"  ? null :
+        statuses             ? statuses.split(",").map(s => s.trim()).filter(Boolean) :
+                               ["Completed", "Invoiced", "Paid"];
+
       const params: any[] = [];
       const conditions: string[] = ["j.price IS NOT NULL", "j.price > 0"];
 
-      if (date_from) { params.push(date_from); conditions.push(`j.scheduled_date >= $${params.length}`); }
-      if (date_to)   { params.push(date_to);   conditions.push(`j.scheduled_date <= $${params.length}`); }
-      if (division)  { params.push(division);   conditions.push(`j.division = $${params.length}`); }
+      if (date_from)   { params.push(date_from);  conditions.push(`j.scheduled_date >= $${params.length}`); }
+      if (date_to)     { params.push(date_to);    conditions.push(`j.scheduled_date <= $${params.length}`); }
+      if (division)    { params.push(division);   conditions.push(`j.division = $${params.length}`); }
+      if (statusList)  { params.push(statusList); conditions.push(`j.status = ANY($${params.length})`); }
 
       const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
 
@@ -51,7 +58,7 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
         ${where}
       `, params);
 
-      // Prior period comparison (same date range shifted back)
+      // Prior period comparison (same date range shifted back, same status filter)
       let priorRevenue = 0;
       if (date_from && date_to) {
         const start = new Date(date_from);
@@ -59,9 +66,12 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
         const diff  = end.getTime() - start.getTime();
         const priorStart = new Date(start.getTime() - diff).toISOString().split("T")[0];
         const priorEnd   = new Date(start.getTime() - 1).toISOString().split("T")[0];
+        const priorParams: any[] = [priorStart, priorEnd];
+        const priorStatusClause = statusList ? ` AND status = ANY($3)` : "";
+        if (statusList) priorParams.push(statusList);
         const prior = await pool.query(
-          `SELECT COALESCE(SUM(price), 0)::numeric AS rev FROM jobs WHERE price > 0 AND scheduled_date BETWEEN $1 AND $2`,
-          [priorStart, priorEnd]
+          `SELECT COALESCE(SUM(price), 0)::numeric AS rev FROM jobs WHERE price > 0 AND scheduled_date BETWEEN $1 AND $2${priorStatusClause}`,
+          priorParams
         );
         priorRevenue = Number(prior.rows[0]?.rev ?? 0);
       }

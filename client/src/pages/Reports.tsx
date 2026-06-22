@@ -76,12 +76,24 @@ function AgingBadge({ bucket }: { bucket: string }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Tab 1 — Revenue Report
 // ═══════════════════════════════════════════════════════════════════════════════
+const REVENUE_STATUS_OPTIONS = [
+  { value: "Completed,Invoiced,Paid", label: "Realized (Completed + Invoiced + Paid)" },
+  { value: "_all",                    label: "All Statuses" },
+  { value: "Completed",               label: "Completed Only" },
+  { value: "Invoiced",                label: "Invoiced Only" },
+  { value: "Paid",                    label: "Paid Only" },
+  { value: "In Progress",             label: "In Progress" },
+  { value: "Scheduled",               label: "Scheduled" },
+  { value: "Lead",                    label: "Lead" },
+];
+
 function RevenueReport() {
   const thisYear = new Date().getFullYear();
   const [filters, setFilters] = useState({
     date_from: `${thisYear}-01-01`,
     date_to:   `${thisYear}-12-31`,
     division:  "",
+    statuses:  "Completed,Invoiced,Paid",
   });
   const [applied, setApplied] = useState(filters);
 
@@ -89,11 +101,14 @@ function RevenueReport() {
   if (applied.date_from) params.set("date_from", applied.date_from);
   if (applied.date_to)   params.set("date_to",   applied.date_to);
   if (applied.division)  params.set("division",   applied.division);
+  if (applied.statuses)  params.set("statuses",   applied.statuses);
 
   const { data, isLoading, error } = useQuery<any>({
     queryKey: ["/api/reports/revenue", applied],
     queryFn: () => fetch(`/api/reports/revenue?${params}`, { credentials: "include" }).then(r => r.json()),
   });
+
+  const statusLabel = REVENUE_STATUS_OPTIONS.find(o => o.value === applied.statuses)?.label ?? applied.statuses;
 
   return (
     <div className="space-y-5">
@@ -112,6 +127,19 @@ function RevenueReport() {
               <Input type="date" className="h-8 text-sm w-36" value={filters.date_to}
                 onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))}
                 data-testid="filter-revenue-to" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Job Status</Label>
+              <Select value={filters.statuses} onValueChange={v => setFilters(f => ({ ...f, statuses: v }))}>
+                <SelectTrigger className="h-8 text-sm w-60" data-testid="filter-revenue-statuses">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {REVENUE_STATUS_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Division</Label>
@@ -142,8 +170,8 @@ function RevenueReport() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard title="Total Revenue" value={fmt$(data.summary.total_revenue)} icon={DollarSign}
               trend={data.summary.pct_vs_prior} color="green" />
-            <StatCard title="Jobs Completed" value={String(data.summary.total_jobs)} icon={Briefcase}
-              sub="with price data" color="blue" />
+            <StatCard title="Jobs Counted" value={String(data.summary.total_jobs)} icon={Briefcase}
+              sub={statusLabel} color="blue" />
             <StatCard title="Avg Job Value" value={fmt$(data.summary.avg_job_value)} icon={TrendingUp} />
             <StatCard title="vs Prior Period"
               value={data.summary.pct_vs_prior != null ? `${data.summary.pct_vs_prior >= 0 ? "+" : ""}${data.summary.pct_vs_prior.toFixed(1)}%` : "—"}
