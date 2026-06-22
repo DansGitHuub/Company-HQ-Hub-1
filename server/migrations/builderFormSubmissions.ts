@@ -24,12 +24,8 @@ export async function runBuilderFormSubmissionsMigration() {
     `);
     console.log("[migration] builder_form_submissions table ready");
 
-    await client.query(`
-      DROP TABLE IF EXISTS form_templates CASCADE;
-      DROP TABLE IF EXISTS form_folders CASCADE;
-      DROP TABLE IF EXISTS custom_forms CASCADE;
-    `);
-    console.log("[migration] Legacy custom_forms tables dropped");
+    // form_submissions / custom_forms / form_folders / form_templates are kept:
+    // candidates.form_submission_id is a live FK — do not drop this cluster.
   } catch (err: any) {
     console.error("[migration] builderFormSubmissions migration error:", err.message);
   } finally {

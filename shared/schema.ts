@@ -844,6 +844,102 @@ export const insertAccessRequestSchema = createInsertSchema(accessRequests).pick
 export type InsertAccessRequest = z.infer<typeof insertAccessRequestSchema>;
 export type AccessRequest = typeof accessRequests.$inferSelect;
 
+// ── Legacy form cluster (kept in schema so Drizzle does not generate DROPs) ──
+// form_submissions.form_submission_id is a live FK on the candidates table.
+
+// Form Folders for organizing forms
+export const formFolders = pgTable("form_folders", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color").default("#6366f1"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFormFolderSchema = createInsertSchema(formFolders).pick({
+  name: true,
+  description: true,
+  color: true,
+  sortOrder: true,
+});
+
+export type InsertFormFolder = z.infer<typeof insertFormFolderSchema>;
+export type FormFolder = typeof formFolders.$inferSelect;
+
+export const customForms = pgTable("custom_forms", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category").default("General"),
+  fields: jsonb("fields").notNull().default([]),
+  accessLevel: text("access_level").default("All"),
+  isPublished: boolean("is_published").notNull().default(false),
+  styling: jsonb("styling"),
+  folderId: varchar("folder_id", { length: 36 }),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCustomFormSchema = createInsertSchema(customForms).pick({
+  title: true,
+  description: true,
+  category: true,
+  fields: true,
+  accessLevel: true,
+  isPublished: true,
+  styling: true,
+  folderId: true,
+  createdBy: true,
+});
+
+export type InsertCustomForm = z.infer<typeof insertCustomFormSchema>;
+export type CustomForm = typeof customForms.$inferSelect;
+
+export const formSubmissions = pgTable("form_submissions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  formId: varchar("form_id", { length: 36 }).references(() => customForms.id).notNull(),
+  submittedBy: varchar("submitted_by", { length: 36 }).references(() => users.id),
+  data: jsonb("data").notNull(),
+  status: text("status").default("submitted"),
+  reviewedBy: varchar("reviewed_by", { length: 36 }).references(() => users.id),
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).pick({
+  formId: true,
+  submittedBy: true,
+  data: true,
+});
+
+export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
+export type FormSubmission = typeof formSubmissions.$inferSelect;
+
+// Form Templates for quick form creation
+export const formTemplates = pgTable("form_templates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").default("General"),
+  fields: jsonb("fields").notNull().default([]),
+  styling: jsonb("styling"),
+  folderId: varchar("folder_id", { length: 36 }).references(() => formFolders.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFormTemplateSchema = createInsertSchema(formTemplates).pick({
+  name: true,
+  description: true,
+  category: true,
+  fields: true,
+  styling: true,
+  folderId: true,
+});
+
+export type InsertFormTemplate = z.infer<typeof insertFormTemplateSchema>;
+export type FormTemplate = typeof formTemplates.$inferSelect;
 
 export const conversations = pgTable("conversations", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
