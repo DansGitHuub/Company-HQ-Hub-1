@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useToast } from "@/hooks/use-toast";
 import {
   User, Home, CreditCard, Stethoscope, Plane, Save,
-  Shield, Calendar, Clock, DollarSign, Heart, Umbrella,
   CheckCircle2, AlertCircle, FileText, LogOut, Loader2,
   ClipboardList, ShieldAlert, PenLine, Type, Pen
 } from "lucide-react";
@@ -122,6 +121,12 @@ export default function EmployeePortal() {
 
   const ptoDays = calcDays(ptoStart, ptoEnd);
 
+  const [profileForm, setProfileForm] = useState({
+    firstName: "", lastName: "", personalEmail: "", personalPhone: "",
+    emergencyContactName: "", emergencyContactRelationship: "", emergencyContactPhone: "",
+  });
+  const [addressForm, setAddressForm] = useState({ address: "", city: "", state: "", zip: "" });
+
   const { data: myEmployee, isLoading: empLoading } = useQuery({
     queryKey: ["/api/employees/me"],
     queryFn: async () => {
@@ -200,6 +205,27 @@ export default function EmployeePortal() {
     },
   });
 
+  // Seed controlled form state when employee record loads
+  useEffect(() => {
+    if (myEmployee) {
+      setProfileForm({
+        firstName: myEmployee.firstName || "",
+        lastName: myEmployee.lastName || "",
+        personalEmail: myEmployee.personalEmail || "",
+        personalPhone: myEmployee.personalPhone || "",
+        emergencyContactName: myEmployee.emergencyContactName || "",
+        emergencyContactRelationship: myEmployee.emergencyContactRelationship || "",
+        emergencyContactPhone: myEmployee.emergencyContactPhone || "",
+      });
+      setAddressForm({
+        address: myEmployee.address || "",
+        city: myEmployee.city || "",
+        state: myEmployee.state || "",
+        zip: myEmployee.zip || "",
+      });
+    }
+  }, [myEmployee]);
+
   const submitPTO = useMutation({
     mutationFn: async () => {
       if (!myEmployee?.id) throw new Error("No employee record found for your account.");
@@ -226,12 +252,35 @@ export default function EmployeePortal() {
     },
   });
 
-  const handleSave = () => {
-    toast({ title: t("common.saved"), description: t("common.changesSaved") });
-  };
-  const handleDiscard = () => {
-    toast({ title: t("common.cancelled"), description: t("common.changesSaved") });
-  };
+  const saveProfileMutation = useMutation({
+    mutationFn: async (data: typeof profileForm) => {
+      const res = await apiRequest("PATCH", "/api/employees/me", data);
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to save"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Profile saved", description: "Your profile has been updated." });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees/me"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const saveAddressMutation = useMutation({
+    mutationFn: async (data: typeof addressForm) => {
+      const res = await apiRequest("PATCH", "/api/employees/me", data);
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to save"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Address saved", description: "Your address has been updated." });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees/me"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    },
+  });
 
   const navItems: { id: Section; icon: React.ElementType; label: string; badge?: number }[] = [
     { id: "profile", icon: User, label: "Personal Profile" },
@@ -256,23 +305,23 @@ export default function EmployeePortal() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">{t("employees.firstName")}</Label>
-                  <Input id="firstName" defaultValue={myEmployee?.firstName || user?.name?.split(" ")[0] || ""} data-testid="input-first-name" />
+                  <Input id="firstName" value={profileForm.firstName} onChange={e => setProfileForm(f => ({ ...f, firstName: e.target.value }))} data-testid="input-first-name" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName">{t("employees.lastName")}</Label>
-                  <Input id="lastName" defaultValue={myEmployee?.lastName || user?.name?.split(" ").slice(1).join(" ") || ""} data-testid="input-last-name" />
+                  <Input id="lastName" value={profileForm.lastName} onChange={e => setProfileForm(f => ({ ...f, lastName: e.target.value }))} data-testid="input-last-name" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">{t("common.email")}</Label>
-                  <Input id="email" defaultValue={myEmployee?.personalEmail || user?.email || ""} data-testid="input-email" />
+                  <Input id="email" value={profileForm.personalEmail} onChange={e => setProfileForm(f => ({ ...f, personalEmail: e.target.value }))} data-testid="input-email" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">{t("common.phone")}</Label>
-                  <Input id="phone" defaultValue={myEmployee?.personalPhone || ""} placeholder="(555) 123-4567" data-testid="input-phone" />
+                  <Input id="phone" value={profileForm.personalPhone} onChange={e => setProfileForm(f => ({ ...f, personalPhone: e.target.value }))} placeholder="(555) 123-4567" data-testid="input-phone" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="startDate">{t("employees.startDate")}</Label>
-                  <Input id="startDate" type="date" defaultValue={myEmployee?.startDate || ""} data-testid="input-start-date" />
+                  <Input id="startDate" type="date" defaultValue={myEmployee?.startDate || ""} readOnly className="bg-muted" data-testid="input-start-date" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="department">{t("employees.department")}</Label>
@@ -287,23 +336,33 @@ export default function EmployeePortal() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>{t("common.name")}</Label>
-                    <Input defaultValue={myEmployee?.emergencyContactName || ""} placeholder="Jane Doe" data-testid="input-emergency-name" />
+                    <Input value={profileForm.emergencyContactName} onChange={e => setProfileForm(f => ({ ...f, emergencyContactName: e.target.value }))} placeholder="Jane Doe" data-testid="input-emergency-name" />
                   </div>
                   <div className="space-y-2">
                     <Label>{t("common.type")}</Label>
-                    <Input defaultValue={myEmployee?.emergencyContactRelationship || ""} placeholder="Spouse" data-testid="input-emergency-relationship" />
+                    <Input value={profileForm.emergencyContactRelationship} onChange={e => setProfileForm(f => ({ ...f, emergencyContactRelationship: e.target.value }))} placeholder="Spouse" data-testid="input-emergency-relationship" />
                   </div>
                   <div className="space-y-2">
                     <Label>{t("common.phone")}</Label>
-                    <Input defaultValue={myEmployee?.emergencyContactPhone || ""} placeholder="(555) 987-6543" data-testid="input-emergency-phone" />
+                    <Input value={profileForm.emergencyContactPhone} onChange={e => setProfileForm(f => ({ ...f, emergencyContactPhone: e.target.value }))} placeholder="(555) 987-6543" data-testid="input-emergency-phone" />
                   </div>
                 </div>
               </div>
 
               <div className="pt-6 border-t flex justify-end gap-3">
-                <Button variant="outline" onClick={handleDiscard}>{t("common.cancel")}</Button>
-                <Button className="gap-2" onClick={handleSave} data-testid="button-save-profile">
-                  <Save className="w-4 h-4" /> {t("common.saveChanges")}
+                <Button variant="outline" disabled={saveProfileMutation.isPending} onClick={() => {
+                  if (myEmployee) setProfileForm({
+                    firstName: myEmployee.firstName || "",
+                    lastName: myEmployee.lastName || "",
+                    personalEmail: myEmployee.personalEmail || "",
+                    personalPhone: myEmployee.personalPhone || "",
+                    emergencyContactName: myEmployee.emergencyContactName || "",
+                    emergencyContactRelationship: myEmployee.emergencyContactRelationship || "",
+                    emergencyContactPhone: myEmployee.emergencyContactPhone || "",
+                  });
+                }}>{t("common.cancel")}</Button>
+                <Button className="gap-2" disabled={saveProfileMutation.isPending} onClick={() => saveProfileMutation.mutate(profileForm)} data-testid="button-save-profile">
+                  {saveProfileMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : <><Save className="w-4 h-4" /> {t("common.saveChanges")}</>}
                 </Button>
               </div>
             </CardContent>
@@ -321,26 +380,30 @@ export default function EmployeePortal() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="street">Street Address</Label>
-                  <Input id="street" defaultValue={myEmployee?.address || ""} placeholder="123 Landscape Way" data-testid="input-street" />
+                  <Input id="street" value={addressForm.address} onChange={e => setAddressForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Landscape Way" data-testid="input-street" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="city">City</Label>
-                    <Input id="city" defaultValue={myEmployee?.city || ""} placeholder="Garden City" data-testid="input-city" />
+                    <Input id="city" value={addressForm.city} onChange={e => setAddressForm(f => ({ ...f, city: e.target.value }))} placeholder="Garden City" data-testid="input-city" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="state">State</Label>
-                    <Input id="state" defaultValue={myEmployee?.state || ""} placeholder="OH" data-testid="input-state" />
+                    <Input id="state" value={addressForm.state} onChange={e => setAddressForm(f => ({ ...f, state: e.target.value }))} placeholder="OH" data-testid="input-state" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="zip">ZIP Code</Label>
-                    <Input id="zip" defaultValue={myEmployee?.zip || ""} placeholder="12345" data-testid="input-zip" />
+                    <Input id="zip" value={addressForm.zip} onChange={e => setAddressForm(f => ({ ...f, zip: e.target.value }))} placeholder="12345" data-testid="input-zip" />
                   </div>
                 </div>
               </div>
               <div className="pt-6 border-t flex justify-end gap-3">
-                <Button variant="outline" onClick={handleDiscard}>Discard Changes</Button>
-                <Button className="gap-2" onClick={handleSave} data-testid="button-save-address"><Save className="w-4 h-4" /> Save Address</Button>
+                <Button variant="outline" disabled={saveAddressMutation.isPending} onClick={() => {
+                  if (myEmployee) setAddressForm({ address: myEmployee.address || "", city: myEmployee.city || "", state: myEmployee.state || "", zip: myEmployee.zip || "" });
+                }}>Discard Changes</Button>
+                <Button className="gap-2" disabled={saveAddressMutation.isPending} onClick={() => saveAddressMutation.mutate(addressForm)} data-testid="button-save-address">
+                  {saveAddressMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : <><Save className="w-4 h-4" /> Save Address</>}
+                </Button>
               </div>
             </CardContent>
           </>
@@ -351,61 +414,15 @@ export default function EmployeePortal() {
           <>
             <CardHeader className="border-b">
               <CardTitle>Payroll & Tax Settings</CardTitle>
-              <CardDescription>Manage direct deposit and tax withholdings.</CardDescription>
+              <CardDescription>Direct deposit, tax withholdings, and W-4 information.</CardDescription>
             </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              <div className="space-y-4">
-                <h3 className="font-heading font-bold text-lg flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-primary" /> Direct Deposit
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Bank Name</Label>
-                    <Input placeholder="First National Bank" data-testid="input-bank-name" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Account Type</Label>
-                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" data-testid="select-account-type">
-                      <option>Checking</option>
-                      <option>Savings</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Routing Number</Label>
-                    <Input type="password" placeholder="•••••••••" data-testid="input-routing" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Account Number</Label>
-                    <Input type="password" placeholder="•••••••••••••" data-testid="input-account" />
-                  </div>
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4 p-4 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-950/20 dark:border-amber-800">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-amber-900 dark:text-amber-200">Contact HR to Update</p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">Changes to direct deposit, routing numbers, and tax withholdings must be processed by HR. Please reach out to your HR administrator directly.</p>
                 </div>
-              </div>
-              <div className="pt-6 border-t space-y-4">
-                <h3 className="font-heading font-bold text-lg flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-primary" /> Tax Withholding (W-4)
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Filing Status</Label>
-                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" data-testid="select-filing-status">
-                      <option>Single or Married filing separately</option>
-                      <option>Married filing jointly</option>
-                      <option>Head of household</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Number of Dependents</Label>
-                    <Input type="number" defaultValue="0" min="0" data-testid="input-dependents" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Extra Withholding per Paycheck</Label>
-                    <Input type="number" placeholder="$0.00" data-testid="input-extra-withholding" />
-                  </div>
-                </div>
-              </div>
-              <div className="pt-6 border-t flex justify-end gap-3">
-                <Button variant="outline" onClick={handleDiscard}>Discard Changes</Button>
-                <Button className="gap-2" onClick={handleSave} data-testid="button-save-payroll"><Save className="w-4 h-4" /> Save Payroll Settings</Button>
               </div>
             </CardContent>
           </>
@@ -416,74 +433,14 @@ export default function EmployeePortal() {
           <>
             <CardHeader className="border-b">
               <CardTitle>Health Insurance & Benefits</CardTitle>
-              <CardDescription>View and manage your health insurance elections.</CardDescription>
+              <CardDescription>Your health insurance elections and benefit enrollments.</CardDescription>
             </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Heart className="w-6 h-6 text-green-600" />
-                      <div>
-                        <h4 className="font-bold">Medical Insurance</h4>
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">Enrolled</Badge>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Premium Health Plan - PPO</p>
-                    <p className="text-xs text-muted-foreground mt-1">Coverage: Employee + Family</p>
-                    <p className="text-sm font-medium mt-2">$185.00/paycheck</p>
-                  </CardContent>
-                </Card>
-                <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Stethoscope className="w-6 h-6 text-blue-600" />
-                      <div>
-                        <h4 className="font-bold">Dental Insurance</h4>
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-800">Enrolled</Badge>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Dental Plus Plan</p>
-                    <p className="text-xs text-muted-foreground mt-1">Coverage: Employee + Family</p>
-                    <p className="text-sm font-medium mt-2">$35.00/paycheck</p>
-                  </CardContent>
-                </Card>
-                <Card className="border-purple-200 bg-purple-50/50 dark:bg-purple-950/20 dark:border-purple-800">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Umbrella className="w-6 h-6 text-purple-600" />
-                      <div>
-                        <h4 className="font-bold">Vision Insurance</h4>
-                        <Badge variant="secondary" className="bg-purple-100 text-purple-800">Enrolled</Badge>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Vision Care Basic</p>
-                    <p className="text-xs text-muted-foreground mt-1">Coverage: Employee Only</p>
-                    <p className="text-sm font-medium mt-2">$12.00/paycheck</p>
-                  </CardContent>
-                </Card>
-                <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20 dark:border-orange-800">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Shield className="w-6 h-6 text-orange-600" />
-                      <div>
-                        <h4 className="font-bold">Life Insurance</h4>
-                        <Badge variant="secondary" className="bg-orange-100 text-orange-800">Enrolled</Badge>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Basic Life - 2x Salary</p>
-                    <p className="text-xs text-muted-foreground mt-1">Beneficiary: Jane Doe</p>
-                    <p className="text-sm font-medium mt-2">Company Paid</p>
-                  </CardContent>
-                </Card>
-              </div>
-              <div className="pt-6 border-t">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Open Enrollment Period</p>
-                    <p className="font-medium">November 1 - November 30</p>
-                  </div>
-                  <Button variant="outline" onClick={() => toast({ title: "Benefits Guide", description: "Contact HR for your benefits guide." })}>View Benefits Guide</Button>
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4 p-4 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-950/20 dark:border-amber-800">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-amber-900 dark:text-amber-200">Contact HR to Update</p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">Benefit elections, plan changes, and beneficiary updates must be processed by HR. Please contact your HR administrator or wait for the open enrollment period (November 1 – November 30).</p>
                 </div>
               </div>
             </CardContent>

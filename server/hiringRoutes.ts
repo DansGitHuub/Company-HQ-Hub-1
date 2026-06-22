@@ -569,6 +569,68 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
     }
   });
 
+  app.patch("/api/employees/me", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
+      const { pool } = await import("./db");
+      const result = await pool.query(`SELECT id FROM employees WHERE user_id = $1 LIMIT 1`, [userId]);
+      if (result.rows.length === 0) return res.status(404).json({ message: "No employee record found" });
+      const empId = result.rows[0].id;
+
+      const allowed: Record<string, string> = {
+        firstName: "first_name",
+        lastName: "last_name",
+        personalEmail: "personal_email",
+        personalPhone: "personal_phone",
+        address: "address",
+        city: "city",
+        state: "state",
+        zip: "zip",
+        emergencyContactName: "emergency_contact_name",
+        emergencyContactRelationship: "emergency_contact_relationship",
+        emergencyContactPhone: "emergency_contact_phone",
+      };
+
+      const setClauses: string[] = [];
+      const values: any[] = [];
+      let p = 1;
+      for (const [bodyKey, col] of Object.entries(allowed)) {
+        if (bodyKey in req.body) {
+          setClauses.push(`${col} = $${p++}`);
+          values.push(req.body[bodyKey] ?? null);
+        }
+      }
+      if (setClauses.length === 0) return res.status(400).json({ message: "No valid fields provided" });
+
+      values.push(empId);
+      const updated = await pool.query(
+        `UPDATE employees SET ${setClauses.join(", ")} WHERE id = $${p} RETURNING
+          id, first_name, last_name, personal_email, personal_phone,
+          address, city, state, zip,
+          emergency_contact_name, emergency_contact_relationship, emergency_contact_phone`,
+        values
+      );
+      const e = updated.rows[0];
+      res.json({
+        id: e.id,
+        firstName: e.first_name,
+        lastName: e.last_name,
+        personalEmail: e.personal_email,
+        personalPhone: e.personal_phone,
+        address: e.address,
+        city: e.city,
+        state: e.state,
+        zip: e.zip,
+        emergencyContactName: e.emergency_contact_name,
+        emergencyContactRelationship: e.emergency_contact_relationship,
+        emergencyContactPhone: e.emergency_contact_phone,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Admin-only: list all employees
   app.get("/api/employees", requireAuth, requireHRAccess, async (req: any, res) => {
     const role = req.user?.role;
