@@ -1,5 +1,6 @@
 import type { Express, RequestHandler } from "express";
 import { storage } from "./storage";
+import { pool } from "./db";
 import { sendCustomerWelcomeEmail, sendCustomerNotificationEmail } from "./email";
 import { hashPassword } from "./auth";
 import crypto from "crypto";
@@ -505,6 +506,42 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
 
       const link = await storage.createCustomerJob({ customerId, jobId });
       res.status(201).json(link);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ===== STAFF: GET DOCUMENTS FOR A CUSTOMER (by customers.id) =====
+  app.get("/api/customers/:id/documents", requireAuth, requireStaff, async (req: any, res) => {
+    try {
+      const { rows: userRows } = await pool.query(
+        `SELECT u.id FROM users u
+         JOIN customer_emails ce ON LOWER(ce.email) = LOWER(u.email)
+         WHERE ce.customer_id = $1 AND u.role = 'Customer'
+         LIMIT 1`,
+        [req.params.id]
+      );
+      if (!userRows.length) return res.json([]);
+      const docs = await storage.getCustomerDocuments(userRows[0].id);
+      res.json(docs);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ===== STAFF: GET PORTAL MESSAGE THREADS FOR A CUSTOMER (by customers.id) =====
+  app.get("/api/customers/:id/messages", requireAuth, requireStaff, async (req: any, res) => {
+    try {
+      const { rows: userRows } = await pool.query(
+        `SELECT u.id FROM users u
+         JOIN customer_emails ce ON LOWER(ce.email) = LOWER(u.email)
+         WHERE ce.customer_id = $1 AND u.role = 'Customer'
+         LIMIT 1`,
+        [req.params.id]
+      );
+      if (!userRows.length) return res.json([]);
+      const threads = await storage.getMessagingThreads({ customerId: userRows[0].id });
+      res.json(threads);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

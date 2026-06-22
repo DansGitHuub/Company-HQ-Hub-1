@@ -24,6 +24,7 @@ import {
   Loader2, Pencil, Plus, Trash2, CheckCircle2, XCircle,
   Briefcase, DollarSign, CalendarDays, Clock, Home, LayoutGrid, Calculator,
   AlertTriangle, Archive, ArchiveRestore, Link2,
+  ClipboardList, FolderOpen, MessageSquare, ExternalLink, Download,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -207,6 +208,227 @@ function CustomerEstimatesTab({ customerId, customerName }: { customerId: string
       lockedCustomerName={customerName}
     />
     </>
+  );
+}
+
+// ── Pipeline stage badge helper ───────────────────────────────────────────────
+const STAGE_COLOR: Record<string, string> = {
+  new_lead: "bg-orange-100 text-orange-700",
+  needs_review: "bg-amber-100 text-amber-700",
+  qualified: "bg-blue-100 text-blue-700",
+  appointment_scheduled: "bg-blue-100 text-blue-700",
+  pre_visit_ready: "bg-sky-100 text-sky-700",
+  site_visit_complete: "bg-indigo-100 text-indigo-700",
+  estimate_in_progress: "bg-violet-100 text-violet-700",
+  estimate_ready: "bg-purple-100 text-purple-700",
+  estimate_sent: "bg-purple-100 text-purple-700",
+  follow_up: "bg-amber-100 text-amber-700",
+  sold_approved: "bg-green-100 text-green-700",
+  lost_nurture: "bg-red-100 text-red-700",
+  handoff_production: "bg-green-100 text-green-700",
+  job_scheduled: "bg-teal-100 text-teal-700",
+  in_progress: "bg-blue-100 text-blue-700",
+  punch_list: "bg-yellow-100 text-yellow-700",
+  complete: "bg-emerald-100 text-emerald-700",
+  invoice_review: "bg-cyan-100 text-cyan-700",
+  closed: "bg-gray-100 text-gray-600",
+};
+
+// ── Customer Consultations Tab ────────────────────────────────────────────────
+function CustomerConsultationsTab({ customerId }: { customerId: string }) {
+  const [, nav] = useLocation();
+  const fmtDate = (d: string | null) => {
+    if (!d) return "—";
+    try { return format(parseISO(d), "MMM d, yyyy"); } catch { return d; }
+  };
+  const fmtMoney = (v: any) => v ? `$${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 0 })}` : "—";
+
+  const { data: consultations = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/consultations", "customer", customerId],
+    queryFn: () =>
+      fetch(`/api/consultations?customer_id=${customerId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!customerId,
+  });
+
+  if (isLoading) return <div className="py-12 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3 pt-4 flex flex-row items-center justify-between">
+        <CardTitle className="text-sm">Consultations & Leads</CardTitle>
+        <Button size="sm" variant="outline" className="text-xs h-7 px-2"
+          onClick={() => nav("/consultations")} data-testid="btn-go-to-consultations">
+          <ExternalLink className="h-3.5 w-3.5 mr-1" /> View All
+        </Button>
+      </CardHeader>
+      <CardContent className="pb-4 px-0">
+        {consultations.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">
+            <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No consultations or leads on record</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-6">Date</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>Service Type</TableHead>
+                <TableHead>Stage</TableHead>
+                <TableHead className="text-right pr-6">Est. Value</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {consultations.map((c: any) => (
+                <TableRow key={c.id} className="cursor-pointer hover:bg-muted/40"
+                  data-testid={`row-consultation-${c.id}`}>
+                  <TableCell className="pl-6 text-sm">{fmtDate(c.scheduled_date)}</TableCell>
+                  <TableCell className="text-sm">{c.contact_name || c.customer_name || "—"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{c.service_type || "—"}</TableCell>
+                  <TableCell>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STAGE_COLOR[c.pipeline_stage] ?? "bg-gray-100 text-gray-600"}`}>
+                      {(c.pipeline_stage ?? "—").replace(/_/g, " ")}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right text-sm font-medium pr-6">{fmtMoney(c.estimated_value)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Customer Documents Tab ────────────────────────────────────────────────────
+function CustomerDocumentsTab({ customerId }: { customerId: string }) {
+  const fmtDate = (d: string | null) => {
+    if (!d) return "—";
+    try { return format(parseISO(d), "MMM d, yyyy"); } catch { return d; }
+  };
+
+  const { data: docs = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/customers", customerId, "documents"],
+    queryFn: () =>
+      fetch(`/api/customers/${customerId}/documents`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!customerId,
+  });
+
+  if (isLoading) return <div className="py-12 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3 pt-4">
+        <CardTitle className="text-sm">Customer Documents</CardTitle>
+        <p className="text-xs text-muted-foreground mt-0.5">Documents shared with this customer via the portal</p>
+      </CardHeader>
+      <CardContent className="pb-4 px-0">
+        {docs.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">
+            <FolderOpen className="h-8 w-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No documents on file</p>
+            <p className="text-xs mt-1 opacity-70">Documents are shared when the customer has a portal account</p>
+          </div>
+        ) : (
+          <div className="divide-y">
+            {docs.map((doc: any) => (
+              <div key={doc.id} className="flex items-center justify-between gap-3 px-6 py-3" data-testid={`row-doc-${doc.id}`}>
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{doc.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <Badge variant="outline" className="text-xs">{doc.folder || "Other"}</Badge>
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${doc.status === "Available" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                        {doc.status}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{fmtDate(doc.createdAt)}</span>
+                    </div>
+                  </div>
+                </div>
+                {doc.url && (
+                  <a href={doc.url} target="_blank" rel="noopener noreferrer"
+                    className="shrink-0" data-testid={`link-doc-${doc.id}`}
+                    onClick={e => e.stopPropagation()}>
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+                      <Download className="h-3 w-3" /> Download
+                    </Button>
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Customer Messages Tab ─────────────────────────────────────────────────────
+const MSG_STATUS_CLS: Record<string, string> = {
+  open: "bg-blue-100 text-blue-700",
+  in_progress: "bg-amber-100 text-amber-700",
+  resolved: "bg-green-100 text-green-700",
+  closed: "bg-gray-100 text-gray-600",
+};
+
+function CustomerMessagesTab({ customerId }: { customerId: string }) {
+  const fmtDate = (d: string | null) => {
+    if (!d) return "—";
+    try { return format(parseISO(d), "MMM d, yyyy 'at' h:mm a"); } catch { return d; }
+  };
+
+  const { data: threads = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/customers", customerId, "messages"],
+    queryFn: () =>
+      fetch(`/api/customers/${customerId}/messages`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!customerId,
+  });
+
+  if (isLoading) return <div className="py-12 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3 pt-4">
+        <CardTitle className="text-sm">Portal Messages</CardTitle>
+        <p className="text-xs text-muted-foreground mt-0.5">Messages sent through the customer portal</p>
+      </CardHeader>
+      <CardContent className="pb-4 px-0">
+        {threads.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">
+            <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No portal messages found</p>
+            <p className="text-xs mt-1 opacity-70">Messages appear here once the customer has a portal account and sends a message</p>
+          </div>
+        ) : (
+          <div className="divide-y">
+            {threads.map((thread: any) => (
+              <div key={thread.id} className="px-6 py-3 flex items-start justify-between gap-3" data-testid={`row-thread-${thread.id}`}>
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <div className={`mt-1 h-2 w-2 rounded-full shrink-0 ${thread.unreadByEmployee ? "bg-blue-500" : "bg-transparent"}`} />
+                  <div className="min-w-0">
+                    <p className={`text-sm truncate ${thread.unreadByEmployee ? "font-semibold" : "font-medium"}`}>{thread.subject}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${MSG_STATUS_CLS[thread.status] ?? "bg-gray-100 text-gray-600"}`}>
+                        {(thread.status ?? "open").replace(/_/g, " ")}
+                      </span>
+                      {thread.priority && thread.priority !== "normal" && (
+                        <Badge variant="outline" className="text-xs capitalize">{thread.priority}</Badge>
+                      )}
+                      <span className="text-xs text-muted-foreground">{fmtDate(thread.lastMessageAt)}</span>
+                    </div>
+                  </div>
+                </div>
+                {thread.unreadByEmployee && (
+                  <Badge className="shrink-0 text-xs bg-blue-600 hover:bg-blue-600">New</Badge>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -917,6 +1139,15 @@ export default function CustomerDetailPage() {
               <TabsTrigger value="activity" className="flex items-center gap-1.5 text-xs" data-testid="tab-activity">
                 <Clock className="h-3.5 w-3.5" /> {t("activity")}
               </TabsTrigger>
+              <TabsTrigger value="consultations" className="flex items-center gap-1.5 text-xs" data-testid="tab-consultations">
+                <ClipboardList className="h-3.5 w-3.5" /> Leads
+              </TabsTrigger>
+              <TabsTrigger value="documents" className="flex items-center gap-1.5 text-xs" data-testid="tab-documents">
+                <FolderOpen className="h-3.5 w-3.5" /> Docs
+              </TabsTrigger>
+              <TabsTrigger value="messages" className="flex items-center gap-1.5 text-xs" data-testid="tab-messages">
+                <MessageSquare className="h-3.5 w-3.5" /> Messages
+              </TabsTrigger>
             </TabsList>
 
             {/* ── Overview ── */}
@@ -1174,6 +1405,22 @@ export default function CustomerDetailPage() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {/* ── Consultations / Leads ── */}
+            <TabsContent value="consultations" className="mt-4">
+              <CustomerConsultationsTab customerId={id ?? ""} />
+            </TabsContent>
+
+            {/* ── Documents ── */}
+            <TabsContent value="documents" className="mt-4">
+              <CustomerDocumentsTab customerId={id ?? ""} />
+            </TabsContent>
+
+            {/* ── Portal Messages ── */}
+            <TabsContent value="messages" className="mt-4">
+              <CustomerMessagesTab customerId={id ?? ""} />
+            </TabsContent>
+
           </Tabs>
         </div>
       </div>

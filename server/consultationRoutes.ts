@@ -252,11 +252,12 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
 
   // ── LIST ──────────────────────────────────────────────────────────────────────
   app.get("/api/consultations", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
-    const { status, date_from, date_to, assigned_to, search, pipeline_stage } = req.query as Record<string, string>;
+    const { status, date_from, date_to, assigned_to, search, pipeline_stage, customer_id } = req.query as Record<string, string>;
     try {
       const params: any[] = [];
       const conds: string[] = [];
 
+      if (customer_id)    { params.push(customer_id);    conds.push(`c.customer_id = $${params.length}`); }
       if (status)         { params.push(status);         conds.push(`c.status = $${params.length}`); }
       if (pipeline_stage) { params.push(pipeline_stage); conds.push(`c.pipeline_stage = $${params.length}`); }
       if (date_from)      { params.push(date_from);      conds.push(`c.scheduled_date >= $${params.length}`); }
