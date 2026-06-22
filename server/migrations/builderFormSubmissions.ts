@@ -25,7 +25,6 @@ export async function runBuilderFormSubmissionsMigration() {
     console.log("[migration] builder_form_submissions table ready");
 
     await client.query(`
-      DROP TABLE IF EXISTS form_submissions CASCADE;
       DROP TABLE IF EXISTS form_templates CASCADE;
       DROP TABLE IF EXISTS form_folders CASCADE;
       DROP TABLE IF EXISTS custom_forms CASCADE;
