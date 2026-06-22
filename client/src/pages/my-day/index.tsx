@@ -30,6 +30,10 @@ import {
   BookOpen,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DailyAgenda from "@/pages/DailyAgenda";
+import DailyWorksheet from "@/pages/DailyWorksheet";
+import RoutePage from "@/pages/Route/index";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface WorkArea {
@@ -286,10 +290,23 @@ export default function MyDayPage() {
 
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-lg mx-auto px-4 pb-12 pt-4 space-y-6">
+    <div data-testid="my-day-page">
       <OfflineBanner />
+      <Tabs defaultValue="today" className="w-full">
+        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b">
+          <div className="max-w-lg mx-auto px-4">
+            <TabsList className="w-full grid grid-cols-4 rounded-none bg-transparent h-11 gap-0 p-0">
+              <TabsTrigger value="today" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-xs font-medium">My Day</TabsTrigger>
+              <TabsTrigger value="route" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-xs font-medium">Route</TabsTrigger>
+              <TabsTrigger value="worksheet" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-xs font-medium">Worksheet</TabsTrigger>
+              <TabsTrigger value="agenda" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-xs font-medium">Agenda</TabsTrigger>
+            </TabsList>
+          </div>
+        </div>
 
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+        <TabsContent value="today" className="mt-0">
+          <div className="max-w-lg mx-auto px-4 pb-12 pt-4 space-y-6">
+            {/* ── Header ─────────────────────────────────────────────────────── */}
       <div>
         <h1 data-testid="my-day-greeting" className="text-2xl font-bold text-gray-900">
           {t(greetingKey, { name: firstName })}
@@ -446,6 +463,21 @@ export default function MyDayPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="route" className="mt-0">
+          <RoutePage />
+        </TabsContent>
+
+        <TabsContent value="worksheet" className="mt-0">
+          <DailyWorksheet />
+        </TabsContent>
+
+        <TabsContent value="agenda" className="mt-0">
+          <DailyAgenda />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

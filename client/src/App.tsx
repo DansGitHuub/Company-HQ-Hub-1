@@ -97,8 +97,6 @@ import Tasks from "@/pages/Tasks";
 import SearchPage from "@/pages/Search";
 import TodoList from "@/pages/TodoList";
 
-import DailyWorksheet from "@/pages/DailyWorksheet";
-import RoutePage from "@/pages/Route/index";
 import ClockOutReviewPage from "@/pages/ClockOutReviewPage";
 import WorksheetReviewList from "@/pages/WorksheetReviewList";
 import WorksheetReviewDetail from "@/pages/WorksheetReviewDetail";
@@ -138,7 +136,6 @@ import CustomerPortal from "@/pages/CustomerPortal";
 import PortalCustomerRedeem from "@/pages/PortalCustomerRedeem";
 import PortalCrewRedeem from "@/pages/PortalCrewRedeem";
 import MessagesPage from "@/pages/Messages";
-import DailyAgenda from "@/pages/DailyAgenda";
 import TimeReports from "@/pages/admin/TimeReports";
 import ServiceTypesPage from "@/pages/admin/ServiceTypesPage";
 import WorksheetReview from "@/pages/admin/WorksheetReview";
@@ -260,7 +257,7 @@ function AppRoutes() {
         <Route path="/search" component={SearchPage} />
         <Route path="/todos" component={TodoList} />
         <Route path="/tasks" component={Tasks} />
-        <Route path="/daily-worksheet" component={DailyWorksheet} />
+        <Route path="/daily-worksheet"><Redirect to="/my-day" /></Route>
         <Route path="/clock-out-review" component={ClockOutReviewPage} />
         <Route path="/worksheet-review/:id" component={WorksheetReviewDetail} />
         <Route path="/worksheet-review" component={WorksheetReviewList} />
@@ -302,8 +299,8 @@ function AppRoutes() {
         <Route path="/catalog" component={CatalogPage} />
         <Route path="/plant-cards" component={PlantCards} />
         <Route path="/work-orders" component={WorkOrders} />
-        <Route path="/route" component={RoutePage} />
-        <Route path="/daily-agenda" component={DailyAgenda} />
+        <Route path="/route"><Redirect to="/my-day" /></Route>
+        <Route path="/daily-agenda"><Redirect to="/my-day" /></Route>
         <Route component={NotFound} />
       </Switch>
     </AppShell>
