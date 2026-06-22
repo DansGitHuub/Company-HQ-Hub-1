@@ -487,13 +487,17 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
       const entries = result.rows;
       const totalMinutes = entries.reduce((s: number, r: any) => s + (Number(r.duration_minutes) || 0), 0);
 
+      const summaryParams: any[] = [];
+      let summaryWhere = `WHERE te.clock_out IS NOT NULL`;
+      if (startDate)                          { summaryParams.push(startDate);    summaryWhere += ` AND te.clock_in::date >= $${summaryParams.length}`; }
+      if (endDate)                            { summaryParams.push(endDate);      summaryWhere += ` AND te.clock_in::date <= $${summaryParams.length}`; }
+      if (employeeId && employeeId !== "all") { summaryParams.push(employeeId);   summaryWhere += ` AND te.user_id = $${summaryParams.length}`; }
+
       const allResult = await pool.query(
         `SELECT approval_status FROM time_entries te
          LEFT JOIN users u ON u.id = te.user_id
-         WHERE te.clock_out IS NOT NULL
-         ${startDate ? `AND te.clock_in::date >= '${startDate}'` : ''}
-         ${endDate   ? `AND te.clock_in::date <= '${endDate}'`   : ''}
-         ${(employeeId && employeeId !== "all") ? `AND te.user_id = '${employeeId}'` : ''}`
+         ${summaryWhere}`,
+        summaryParams
       );
       const allRows = allResult.rows;
       const counts = {
