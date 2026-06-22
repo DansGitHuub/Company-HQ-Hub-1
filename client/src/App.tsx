@@ -65,7 +65,6 @@ function DocumentTitleSetter() {
 import Home from "@/pages/Home";
 import AuthPage from "@/pages/auth-page";
 import AdminPanel from "@/pages/AdminPanel";
-import AdminInbox from "@/pages/AdminInbox";
 import CustomerMessagesInbox from "@/pages/CustomerMessagesInbox";
 import CustomerHub from "@/pages/CustomerHub";
 import CareGuideManager from "@/pages/CareGuideManager";
@@ -80,7 +79,6 @@ import EmployeePortal from "@/pages/EmployeePortal";
 import Employees from "@/pages/Employees";
 import FormHub from "@/pages/FormHub";
 import HQOverview from "@/pages/HQOverview";
-import JobPipeline from "@/pages/JobPipeline";
 import JobList from "@/pages/jobs/index";
 import JobDetail from "@/pages/jobs/show";
 import InvoiceList from "@/pages/invoices/index";
@@ -234,14 +232,12 @@ function AppRoutes() {
         <Route path="/customer-hub/:section?" component={CustomerHub} />
         <Route path="/applicant" component={ApplicantPortal} />
         <Route path="/admin" component={AdminPanel} />
-        <Route path="/inbox" component={AdminInbox} />
         <Route path="/sops" component={SOPs} />
         <Route path="/materials"><Redirect to="/catalog" /></Route>
         <Route path="/hiring" component={Hiring} />
         <Route path="/marketing" component={Marketing} />
         <Route path="/forms" component={Forms} />
         <Route path="/customer-resources" component={Education} />
-        <Route path="/education"><Redirect to="/customer-resources" /></Route>
         <Route path="/profile" component={Profile} />
         <Route path="/employees" component={Employees} />
         <Route path="/onboarding-forms/:formType?/:submissionId?" component={FormHub} />
@@ -258,7 +254,6 @@ function AppRoutes() {
         <Route path="/scheduling" component={SchedulingCalendar} />
         <Route path="/my-day" component={MyDayPage} />
         <Route path="/my-hours" component={MyHoursPage} />
-        <Route path="/pipeline" component={JobPipeline} />
         <Route path="/help" component={Help} />
         <Route path="/admin-setup" component={AdminSetup} />
         <Route path="/equipment" component={EquipmentTracker} />
@@ -285,9 +280,7 @@ function AppRoutes() {
         <Route path="/time" component={TimeTracking} />
         <Route path="/reports" component={ReportsPage} />
         <Route path="/consultations" component={ConsultationsPage} />
-        <Route path="/consultas"><Redirect to="/consultations" /></Route>
         <Route path="/mors-budget" component={MorsBudget} />
-        <Route path="/clients"><Redirect to="/customers" /></Route>
         <Route path="/admin/employees"><Redirect to="/employees" /></Route>
         <Route path="/notifications" component={NotificationsPage} />
         <Route path="/customers" component={CustomerList} />
@@ -301,7 +294,6 @@ function AppRoutes() {
         <Route path="/tools" component={Tools} />
         <Route path="/calendar" component={CalendarPage} />
         <Route path="/training" component={TestingKnowledge} />
-        <Route path="/testing"><Redirect to="/training" /></Route>
         <Route path="/settings" component={SettingsPage} />
         <Route path="/messages" component={MessagesPage} />
         <Route path="/customer-messages" component={CustomerMessagesInbox} />
