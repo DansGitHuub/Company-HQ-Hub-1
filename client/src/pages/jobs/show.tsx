@@ -17,7 +17,7 @@ import {
   ChevronLeft, Pencil, User, MapPin, Calendar, Clock,
   DollarSign, Briefcase, Timer, ChevronDown, Loader2, FileText,
   Plus, Trash2, HardHat, MessageSquare, ShieldCheck, GitMerge, CheckSquare, ClipboardCheck, Award, Truck, Users, Package,
-  TrendingUp, TrendingDown, Camera, Image, ExternalLink, ClipboardList,
+  TrendingUp, TrendingDown, Camera, Image, ExternalLink, ClipboardList, Phone,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -57,6 +57,7 @@ interface JobDetail {
   cust_first: string | null; cust_last: string | null; cust_company: string | null;
   prop_address: string | null; prop_city: string | null; prop_state: string | null; prop_zip: string | null;
   prop_access_notes: string | null; prop_gate_code: string | null; prop_has_pets: boolean | null;
+  cust_primary_phone: string | null; cust_primary_email: string | null;
   created_at: string; updated_at: string;
   time_entries: TimeEntry[];
   linked_invoice_id: string | null;
@@ -965,6 +966,16 @@ export default function JobDetailPage() {
                 icon={User} label={t("customer")} value={custName}
                 href={job.customer_id ? `/customers/${job.customer_id}` : undefined}
               />
+              {job.cust_primary_phone && (
+                <div className="flex items-center gap-3 py-1.5">
+                  <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground w-20 shrink-0">Phone</span>
+                  <a href={`tel:${job.cust_primary_phone}`}
+                    className="text-sm font-medium text-blue-600 hover:underline">
+                    {job.cust_primary_phone}
+                  </a>
+                </div>
+              )}
               {propAddr && <InfoRow icon={MapPin} label={t("property")} value={propAddr} />}
               <InfoRow icon={Briefcase} label={t("jobType")} value={job.job_type || job.type} />
               <InfoRow

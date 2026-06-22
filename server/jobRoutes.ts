@@ -149,6 +149,10 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
           c.first_name  AS cust_first,
           c.last_name   AS cust_last,
           c.company_name AS cust_company,
+          (SELECT cp.phone FROM customer_phones cp
+           WHERE cp.customer_id = c.id AND cp.is_primary = true LIMIT 1) AS cust_primary_phone,
+          (SELECT ce.email FROM customer_emails ce
+           WHERE ce.customer_id = c.id AND ce.is_primary = true LIMIT 1) AS cust_primary_email,
           p.address      AS prop_address,
           p.city         AS prop_city,
           p.state        AS prop_state,

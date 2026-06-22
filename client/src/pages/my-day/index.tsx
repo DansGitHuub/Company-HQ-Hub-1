@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   Loader2,
   ChevronRight,
+  Phone,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -48,6 +49,7 @@ interface MyDayJob {
   scheduled_end_time: string | null;
   customer_name: string | null;
   customer_address: string | null;
+  customer_phone: string | null;
   access_notes: string | null;
   gate_code: string | null;
   has_pets: boolean | null;
@@ -640,6 +642,15 @@ function JobCard({
               {[job.customer_name, job.customer_address].filter(Boolean).join(" · ")}
             </span>
           </div>
+        )}
+
+        {/* Customer phone — tappable for crew */}
+        {job.customer_phone && (
+          <a href={`tel:${job.customer_phone}`}
+            className="flex items-center gap-1.5 text-sm text-blue-600 font-medium">
+            <Phone className="w-3.5 h-3.5 shrink-0" />
+            {job.customer_phone}
+          </a>
         )}
 
         {/* Site access info — highlighted for crews */}
