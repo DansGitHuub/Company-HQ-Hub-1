@@ -2,7 +2,7 @@
   "name": "Company HQ",
   "short_name": "CompanyHQ",
   "description": "All-in-one management dashboard for landscape install and maintenance",
-  "start_url": "/",
+  "start_url": "/my-day",
   "display": "standalone",
   "background_color": "#1a1a2e",
   "theme_color": "#22c55e",

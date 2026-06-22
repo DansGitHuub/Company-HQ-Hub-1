@@ -218,14 +218,15 @@ function AppRoutes() {
   }
 
   const isCustomer = user?.role === "Customer";
-  const defaultPath = isCustomer ? "/customer-hub" : "/";
+  const isCrew = user?.role === "Crew";
+  const defaultPath = isCustomer ? "/customer-hub" : isCrew ? "/my-day" : "/";
 
   return (
     <AppShell>
       <DocumentTitleSetter />
       <Switch>
         <Route path="/">
-          {isCustomer ? <Redirect to="/customer-hub" /> : <Home />}
+          {isCustomer ? <Redirect to="/customer-hub" /> : isCrew ? <Redirect to="/my-day" /> : <Home />}
         </Route>
         <Route path="/auth">
           <Redirect to={defaultPath} />

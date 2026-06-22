@@ -50,7 +50,7 @@ export default function AuthPage() {
   });
 
   if (user) {
-    setLocation("/");
+    setLocation(user.role === "Crew" ? "/my-day" : "/");
     return null;
   }
 

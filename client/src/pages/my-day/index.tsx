@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +27,7 @@ import {
   Loader2,
   ChevronRight,
   Phone,
+  BookOpen,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -235,7 +237,8 @@ export default function MyDayPage() {
   const handleMyDayClockIn = () => {
     if (!pending) return;
     if (!navigator.geolocation) {
-      toast({ title: t("gpsRequired"), description: t("gpsNotSupported"), variant: "destructive" });
+      toast({ title: "Location unavailable", description: "Clocking in without GPS — add a note if your site requires it." });
+      clockInMutation.mutate(pending);
       return;
     }
     setGpsChecking(true);
@@ -246,7 +249,8 @@ export default function MyDayPage() {
       },
       () => {
         setGpsChecking(false);
-        toast({ title: t("gpsRequired"), description: t("gpsAccessDenied"), variant: "destructive" });
+        toast({ title: "Location not captured", description: "GPS was denied — clocking in without location." });
+        clockInMutation.mutate(pending);
       },
       { enableHighAccuracy: false, timeout: 10000 }
     );
@@ -255,7 +259,8 @@ export default function MyDayPage() {
   const handlePickerConfirm = (p: PendingClockIn) => {
     setPickerJob(null);
     if (!navigator.geolocation) {
-      toast({ title: t("gpsRequired"), description: t("gpsNotSupported"), variant: "destructive" });
+      toast({ title: "Location unavailable", description: "Clocking in without GPS — add a note if your site requires it." });
+      clockInMutation.mutate(p);
       return;
     }
     setGpsChecking(true);
@@ -266,7 +271,8 @@ export default function MyDayPage() {
       },
       () => {
         setGpsChecking(false);
-        toast({ title: t("gpsRequired"), description: t("gpsAccessDenied"), variant: "destructive" });
+        toast({ title: "Location not captured", description: "GPS was denied — clocking in without location." });
+        clockInMutation.mutate(p);
       },
       { enableHighAccuracy: false, timeout: 10000 }
     );
@@ -587,6 +593,7 @@ function JobCard({
   onPickerOpen: (picker: PickerJob) => void;
 }) {
   const { t } = useTranslation("myDay");
+  const [, nav] = useLocation();
   const borderColor = divisionColor(job.division);
   const timeLabel =
     job.scheduled_start_time
@@ -734,8 +741,16 @@ function JobCard({
           </div>
         )}
 
-        {/* Clock In button — always present, opens work area picker */}
-        <div className="flex justify-end">
+        {/* Footer: View Instructions + Clock In */}
+        <div className="flex items-center justify-between">
+          <button
+            data-testid={`view-instructions-${job.id}`}
+            onClick={() => nav(`/jobs/${job.id}`)}
+            className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 active:text-blue-800 transition-colors"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            View Instructions
+          </button>
           <button
             data-testid={`clock-in-job-${job.id}`}
             onClick={() =>
