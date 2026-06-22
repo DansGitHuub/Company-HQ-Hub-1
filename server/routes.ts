@@ -5690,6 +5690,7 @@ Generate detailed information for this landscaping material.`;
         await client.query(
           `UPDATE jobs
            SET estimate_id = $1,
+               source_estimate_id = $1,
                price = COALESCE(price, (SELECT estimated_value::text FROM estimates WHERE id = $1))
            WHERE id = $2`,
           [req.params.id, job.id]
