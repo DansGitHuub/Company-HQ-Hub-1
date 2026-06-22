@@ -482,7 +482,11 @@ export function CalendarWidget({ size }: WidgetProps) {
 
 export function EquipmentWidget({ size }: WidgetProps) {
   const { data: equipment = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/equipment"],
+    queryKey: ["/api/fleet/assets"],
+    queryFn: async () => {
+      const res = await fetch("/api/fleet/assets", { credentials: "include" });
+      return res.json();
+    },
   });
 
   const totalCount = equipment.length;

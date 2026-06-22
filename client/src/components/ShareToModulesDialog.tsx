@@ -60,8 +60,8 @@ export default function ShareToModulesDialog({ open, onOpenChange, documentId, d
   });
 
   const { data: equipmentRecords = [] } = useQuery<any[]>({
-    queryKey: ["/api/equipment"],
-    queryFn: async () => { const r = await apiRequest("GET", "/api/equipment"); return r.json(); },
+    queryKey: ["/api/fleet/assets"],
+    queryFn: async () => { const r = await apiRequest("GET", "/api/fleet/assets"); return r.json(); },
     enabled: open && !!selectedModules.equipment,
   });
 
