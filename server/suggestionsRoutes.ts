@@ -3,6 +3,7 @@ import { db } from "./db";
 import { customerSuggestions, users } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { sendSuggestionConfirmationEmail, sendSuggestionStatusUpdateEmail } from "./email";
+import { requireAdmin } from "./auth";
 
 export function registerSuggestionsRoutes(app: Express, requireAuth: RequestHandler) {
   const requireCustomer: RequestHandler = (req: any, res, next) => {
@@ -11,11 +12,6 @@ export function registerSuggestionsRoutes(app: Express, requireAuth: RequestHand
     next();
   };
 
-  const requireAdmin: RequestHandler = (req: any, res, next) => {
-    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
-    if (req.user.role !== "Admin" && !req.user.isMasterAdmin) return res.status(403).json({ message: "Admin access only" });
-    next();
-  };
 
   app.post("/api/suggestions", requireAuth, requireCustomer, async (req: any, res) => {
     try {

@@ -1,21 +1,6 @@
 import type { Express } from "express";
 import { pool } from "./db";
-
-function requireAuth(req: any, res: any, next: any) {
-  if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
-  next();
-}
-
-function requireRole(...roles: string[]) {
-  return (req: any, res: any, next: any) => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ message: "Not authorized" });
-    }
-    next();
-  };
-}
-
-const STAFF_ROLES = ["Admin", "Manager", "Master Admin"];
+import { requireAuth, requireRole } from "./auth";
 
 async function nextEstimateNumber(): Promise<string> {
   const { rows } = await pool.query(`SELECT nextval('sales_estimate_seq') AS n`);
@@ -64,7 +49,7 @@ async function getEstimateFull(id: string) {
 export function registerEstimateRoutes(app: Express) {
   // ------ Templates ------
   // ?all=true returns inactive templates too (settings page)
-  app.get("/api/estimate-templates", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.get("/api/estimate-templates", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const showAll = req.query.all === "true";
       const { rows } = await pool.query(
@@ -127,7 +112,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // ------ Estimates list ------
-  app.get("/api/estimates", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.get("/api/estimates", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const { status, customer_id } = req.query as any;
       let sql = `
@@ -154,7 +139,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // ------ Single estimate ------
-  app.get("/api/estimates/:id", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.get("/api/estimates/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       let resolvedId = req.params.id;
       if (/^EST-\d+$/i.test(resolvedId)) {
@@ -175,7 +160,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // ------ Create estimate ------
-  app.post("/api/estimates", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.post("/api/estimates", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -241,7 +226,7 @@ export function registerEstimateRoutes(app: Express) {
 
     // A20: Convert a consultation into a draft estimate. Replaces the previous client-side
   // "navigate to /estimates?customer_id=…" no-op with an actual record creation.
-  app.post("/api/consultations/:id/convert-to-estimate", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.post("/api/consultations/:id/convert-to-estimate", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -295,7 +280,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // ------ Update estimate header ------
-  app.put("/api/estimates/:id", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.put("/api/estimates/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -362,7 +347,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // ------ Status transitions ------
-  app.patch("/api/estimates/:id/send", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.patch("/api/estimates/:id/send", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       await pool.query(
         `UPDATE sales_estimates SET status='sent', sent_at=NOW(), updated_at=NOW() WHERE id=$1`,
@@ -375,7 +360,7 @@ export function registerEstimateRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/estimates/:id/approve", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.patch("/api/estimates/:id/approve", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       await pool.query(
         `UPDATE sales_estimates SET status='approved', customer_response='approved', customer_response_at=NOW(), updated_at=NOW() WHERE id=$1`,
@@ -387,7 +372,7 @@ export function registerEstimateRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/estimates/:id/decline", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.patch("/api/estimates/:id/decline", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       await pool.query(
         `UPDATE sales_estimates SET status='declined', customer_response='declined', customer_response_at=NOW(), customer_response_note=$2, updated_at=NOW() WHERE id=$1`,
@@ -400,7 +385,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // ------ Convert to Job ------
-  app.patch("/api/estimates/:id/convert", requireAuth, requireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.patch("/api/estimates/:id/convert", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -460,7 +445,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // ------ Delete ------
-  app.delete("/api/estimates/:id", requireAuth, requireRole("Admin", "Master Admin"), async (req, res) => {
+  app.delete("/api/estimates/:id", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       await pool.query(`DELETE FROM sales_estimates WHERE id=$1`, [req.params.id]);
       res.json({ success: true });
@@ -555,7 +540,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // PATCH /api/estimates/:id/terms — update T&C override + deposit percentage
-  app.patch("/api/estimates/:id/terms", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.patch("/api/estimates/:id/terms", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const { terms_and_conditions_override, deposit_percentage } = req.body;
       await pool.query(
@@ -697,7 +682,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // GET /api/estimates/:id/photos -- gallery data for an estimate
-  app.get("/api/estimates/:id/photos", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+  app.get("/api/estimates/:id/photos", requireAuth, requireRole("Admin", "Manager"), async (req: any, res: any) => {
     const client = await pool.connect();
     try {
       const linkRow = await client.query(
@@ -728,7 +713,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // PATCH /api/companycam/photos/:id/note -- save or clear per-photo note override
-  app.patch("/api/companycam/photos/:id/note", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+  app.patch("/api/companycam/photos/:id/note", requireAuth, requireRole("Admin", "Manager"), async (req: any, res: any) => {
     const client = await pool.connect();
     try {
       const raw = req.body?.note;
@@ -750,7 +735,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // PATCH /api/companycam/photos/:id/hidden -- toggle hidden_on_estimate flag
-  app.patch("/api/companycam/photos/:id/hidden", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+  app.patch("/api/companycam/photos/:id/hidden", requireAuth, requireRole("Admin", "Manager"), async (req: any, res: any) => {
     const client = await pool.connect();
     try {
       const hidden = Boolean(req.body?.hidden);
@@ -772,7 +757,7 @@ export function registerEstimateRoutes(app: Express) {
 
   // POST /api/admin/companycam/backfill-descriptions -- one-shot admin tool
   // to back-fill description column on photos that arrived before §C.1 fix
-  app.post("/api/admin/companycam/backfill-descriptions", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+  app.post("/api/admin/companycam/backfill-descriptions", requireAuth, requireRole("Admin", "Manager"), async (req: any, res: any) => {
     try {
       const { rows } = await pool.query(
         `SELECT companycam_photo_id FROM companycam_photos WHERE description IS NULL ORDER BY captured_at DESC NULLS LAST`
@@ -814,7 +799,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // POST /api/estimates/:id/work-area-groups
-  app.post("/api/estimates/:id/work-area-groups", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+  app.post("/api/estimates/:id/work-area-groups", requireAuth, requireRole("Admin", "Manager"), async (req: any, res: any) => {
     const client = await pool.connect();
     try {
       const name = typeof req.body?.name === "string" ? req.body.name.trim().slice(0, 80) : "";
@@ -844,7 +829,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // GET /api/estimates/:id/work-area-groups
-  app.get("/api/estimates/:id/work-area-groups", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+  app.get("/api/estimates/:id/work-area-groups", requireAuth, requireRole("Admin", "Manager"), async (req: any, res: any) => {
     const client = await pool.connect();
     try {
       const { rows } = await client.query(
@@ -867,7 +852,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // PATCH /api/work-area-groups/:id
-  app.patch("/api/work-area-groups/:id", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+  app.patch("/api/work-area-groups/:id", requireAuth, requireRole("Admin", "Manager"), async (req: any, res: any) => {
     const client = await pool.connect();
     try {
       const sets: string[] = [];
@@ -897,7 +882,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // DELETE /api/work-area-groups/:id
-  app.delete("/api/work-area-groups/:id", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+  app.delete("/api/work-area-groups/:id", requireAuth, requireRole("Admin", "Manager"), async (req: any, res: any) => {
     const client = await pool.connect();
     try {
       await client.query("DELETE FROM estimate_work_area_groups WHERE id = $1", [req.params.id]);
@@ -911,7 +896,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // PATCH /api/companycam/photos/:photo_id/work-area-group
-  app.patch("/api/companycam/photos/:photo_id/work-area-group", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+  app.patch("/api/companycam/photos/:photo_id/work-area-group", requireAuth, requireRole("Admin", "Manager"), async (req: any, res: any) => {
     const client = await pool.connect();
     try {
       const groupId: string | null = req.body?.work_area_group_id ?? null;
@@ -933,7 +918,7 @@ export function registerEstimateRoutes(app: Express) {
   });
 
   // PATCH /api/estimates/:id/companycam-project -- link mutation
-  app.patch("/api/estimates/:id/companycam-project", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res: any) => {
+  app.patch("/api/estimates/:id/companycam-project", requireAuth, requireRole("Admin", "Manager"), async (req: any, res: any) => {
     const client = await pool.connect();
     try {
       const newId: string | null = req.body?.companycamProjectId ?? null;

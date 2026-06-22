@@ -6,16 +6,7 @@ import crypto from "crypto";
 import { getAppUrl } from "./emailService";
 import { customerArchiveEligibility } from "./services/archiveEligibility";
 
-// ── Wave 2: local role guard (no requireRole injected into this module) ────────
-function localRequireRole(...roles: string[]) {
-  return (req: any, res: any, next: any) => {
-    const u = req.user as any;
-    if (!u) return res.status(401).json({ message: "Unauthenticated" });
-    if (!roles.includes(u.role) && !u.isMasterAdmin)
-      return res.status(403).json({ message: "Forbidden" });
-    next();
-  };
-}
+import { requireRole } from "./auth";
 
 // ── Wave 2: fire-and-forget CompanyCam project creation for a new customer ────
 async function createCCProjectForCustomer(customer: {
@@ -123,7 +114,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
     .catch(() => {});
 
   // ─── LIST ────────────────────────────────────────────────────────────────────
-  app.get("/api/customers", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.get("/api/customers", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const search = (req.query.search as string | undefined)?.trim() ?? "";
       // Only apply a row limit when a search term is provided (to keep autocomplete fast).
@@ -189,7 +180,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   });
 
   // ─── CREATE ──────────────────────────────────────────────────────────────────
-  app.post("/api/customers", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.post("/api/customers", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const {
       first_name,
       last_name,
@@ -275,7 +266,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   });
 
   // ─── UPDATE ──────────────────────────────────────────────────────────────────
-  app.put("/api/customers/:id", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.put("/api/customers/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const { id } = req.params;
     const {
       first_name,
@@ -353,7 +344,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   });
 
   // ─── TOGGLE ACTIVE ────────────────────────────────────────────────────────────
-  app.patch("/api/customers/:id/active", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.patch("/api/customers/:id/active", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const { id } = req.params;
     const { is_active } = req.body;
     try {
@@ -370,7 +361,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   });
 
   // ─── DETAIL ──────────────────────────────────────────────────────────────────
-  app.get("/api/customers/:id", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.get("/api/customers/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const { id } = req.params;
       const customerResult = await pool.query(
@@ -414,7 +405,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   });
 
   // ─── CUSTOMER JOBS ────────────────────────────────────────────────────────────
-  app.get("/api/customers/:id/jobs", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.get("/api/customers/:id/jobs", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const { id } = req.params;
       const result = await pool.query(
@@ -429,7 +420,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   });
 
   // ─── DUPLICATE DETECTION ─────────────────────────────────────────────────────
-  app.get("/api/customers/:id/duplicates", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.get("/api/customers/:id/duplicates", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const dupes = await findCustomerDuplicates(req.params.id);
       return res.json(dupes);
@@ -454,7 +445,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   // GET /api/customers/:id/archive-eligibility
   // Returns whether the customer can be safely archived and, if not, the list
   // of entity blockers that must be resolved first.
-  app.get("/api/customers/:id/archive-eligibility", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.get("/api/customers/:id/archive-eligibility", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const { rows } = await pool.query(
         `SELECT id FROM customers WHERE id = $1`,
@@ -470,7 +461,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  app.patch("/api/customers/:id/archive", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.patch("/api/customers/:id/archive", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     if (!requireAdminOrManager(req, res)) return;
     try {
       // Server-side enforcement: reject archiving if blockers exist.
@@ -491,7 +482,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  app.patch("/api/customers/:id/unarchive", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.patch("/api/customers/:id/unarchive", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     if (!requireAdminOrManager(req, res)) return;
     try {
       const result = await pool.query(
@@ -509,7 +500,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
 
   // ─── PROPERTY LIST ───────────────────────────────────────────────────────────
   // GET /api/properties?customer_id=&search=
-  app.get("/api/properties", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.get("/api/properties", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const customerId =
         (req.query.customer_id as string | undefined)?.trim() ?? "";
@@ -558,7 +549,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   });
 
   // ─── PROPERTY CRUD ───────────────────────────────────────────────────────────
-  app.post("/api/customers/:id/properties", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.post("/api/customers/:id/properties", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const { id } = req.params;
     const { address, city, state, zip, property_type, notes, access_notes, gate_code, has_pets } = req.body;
     if (!address?.trim())
@@ -586,7 +577,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  app.put("/api/properties/:propId", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.put("/api/properties/:propId", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const { propId } = req.params;
     const { address, city, state, zip, property_type, notes, access_notes, gate_code, has_pets } = req.body;
     if (!address?.trim())
@@ -618,7 +609,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  app.delete("/api/properties/:propId", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.delete("/api/properties/:propId", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const { propId } = req.params;
     try {
       await pool.query(`DELETE FROM properties WHERE id=$1`, [propId]);
@@ -629,7 +620,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Portal Invite: mint a single-use token for a customer ────────────────────
-  app.post("/api/customers/:id/portal-invite", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
+  app.post("/api/customers/:id/portal-invite", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     if (!requireAdminOrManager(req, res)) return;
     const { id } = req.params;
     try {
@@ -709,7 +700,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   app.post(
     "/api/admin/customers/:id/retry-companycam-project",
     requireAuth,
-    localRequireRole("Admin", "Manager", "Master Admin"),
+    requireRole("Admin", "Manager"),
     async (req: any, res: any) => {
       const { id } = req.params;
       try {

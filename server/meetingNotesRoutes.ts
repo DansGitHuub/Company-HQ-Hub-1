@@ -1,18 +1,6 @@
 import { Express } from "express";
 import { pool } from "./db";
-
-const MGMT_ROLES = ["Admin", "Manager", "Master Admin"];
-
-function requireRole(...roles: string[]) {
-  return (req: any, res: any, next: any) => {
-    const user = req.user as any;
-    if (!user) return res.status(401).json({ message: "Unauthorized" });
-    if (!roles.includes(user.role) && !user.isMasterAdmin) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-    next();
-  };
-}
+import { requireRole } from "./auth";
 
 export async function migrateMeetingNotesTable() {
   try {
@@ -53,7 +41,7 @@ export function registerMeetingNotesRoutes(app: Express, requireAuth: any) {
   });
 
   // POST create — Admin / Manager only
-  app.post("/api/meeting-notes", requireAuth, requireRole(...MGMT_ROLES), async (req: any, res) => {
+  app.post("/api/meeting-notes", requireAuth, requireRole("Admin", "Manager"), async (req: any, res) => {
     const { meeting_date, title, attendees, content } = req.body;
     if (!meeting_date || !title) {
       return res.status(400).json({ error: "meeting_date and title are required" });
@@ -73,7 +61,7 @@ export function registerMeetingNotesRoutes(app: Express, requireAuth: any) {
   });
 
   // PATCH update — Admin / Manager only
-  app.patch("/api/meeting-notes/:id", requireAuth, requireRole(...MGMT_ROLES), async (req, res) => {
+  app.patch("/api/meeting-notes/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const { id } = req.params;
     const { meeting_date, title, attendees, content } = req.body;
     try {
@@ -97,7 +85,7 @@ export function registerMeetingNotesRoutes(app: Express, requireAuth: any) {
   });
 
   // DELETE — Admin / Manager only
-  app.delete("/api/meeting-notes/:id", requireAuth, requireRole(...MGMT_ROLES), async (req, res) => {
+  app.delete("/api/meeting-notes/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const { id } = req.params;
     try {
       const result = await pool.query(`DELETE FROM meeting_notes WHERE id = $1 RETURNING id`, [id]);

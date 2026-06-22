@@ -1,15 +1,6 @@
 import { pool } from "./db";
 import type { Express } from "express";
-
-const STAFF_ROLES = ["Admin", "Manager", "Master Admin"];
-
-function requireRole(...roles: string[]) {
-  return (req: any, res: any, next: any) => {
-    if (!req.user) return res.status(401).json({ message: "Authentication required" });
-    if (!roles.includes(req.user.role)) return res.status(403).json({ message: "Insufficient permissions" });
-    next();
-  };
-}
+import { requireRole } from "./auth";
 
 function logAudit(actorId: string | null, eventType: string, description: string, link = "/") {
   pool.query(
@@ -68,7 +59,7 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Create change order ──────────────────────────────────────────────────
-  app.post("/api/jobs/:jobId/change-orders", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
+  app.post("/api/jobs/:jobId/change-orders", requireAuth, requireRole("Admin", "Manager"), async (req: any, res) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -140,7 +131,7 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Update change order ──────────────────────────────────────────────────
-  app.patch("/api/change-orders/:id", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
+  app.patch("/api/change-orders/:id", requireAuth, requireRole("Admin", "Manager"), async (req: any, res) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -220,7 +211,7 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Send for approval (status → pending_approval) ──────────────────────
-  app.post("/api/change-orders/:id/send-for-approval", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
+  app.post("/api/change-orders/:id/send-for-approval", requireAuth, requireRole("Admin", "Manager"), async (req: any, res) => {
     try {
       const { rows } = await pool.query(
         `UPDATE job_change_orders SET status = 'pending_approval', updated_at = NOW() WHERE id = $1
@@ -242,7 +233,7 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Approve change order ─────────────────────────────────────────────────
-  app.post("/api/change-orders/:id/approve", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
+  app.post("/api/change-orders/:id/approve", requireAuth, requireRole("Admin", "Manager"), async (req: any, res) => {
     const { approval_type, signature_data, approved_by_name } = req.body;
     if (!approval_type) return res.status(400).json({ message: "approval_type required" });
     try {
@@ -274,7 +265,7 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Reject change order ──────────────────────────────────────────────────
-  app.post("/api/change-orders/:id/reject", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
+  app.post("/api/change-orders/:id/reject", requireAuth, requireRole("Admin", "Manager"), async (req: any, res) => {
     const { reason } = req.body;
     try {
       const { rows } = await pool.query(
@@ -299,7 +290,7 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Delete change order (draft only) ────────────────────────────────────
-  app.delete("/api/change-orders/:id", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
+  app.delete("/api/change-orders/:id", requireAuth, requireRole("Admin", "Manager"), async (req: any, res) => {
     try {
       const { rows } = await pool.query(
         `SELECT status, co_number, title, job_id FROM job_change_orders WHERE id = $1`,

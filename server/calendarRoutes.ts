@@ -9,14 +9,6 @@ import { logActivity } from "./activityLogger";
 type AuthRequest = Request & { user?: any };
 
 export function registerCalendarRoutes(app: Express, requireAuth: any) {
-  const requireRole = (roles: string[]) => (req: Request, res: Response, next: NextFunction) => {
-    const user = (req as AuthRequest).user;
-    if (!user || !roles.includes(user.role)) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-    next();
-  };
-
   async function getValidAccessToken(user: any): Promise<string | null> {
     if (!user.googleRefreshToken) return null;
 

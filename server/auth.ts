@@ -198,7 +198,7 @@ export function setupAuth(app: Express) {
   });
 }
 
-import type { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated()) {
@@ -211,8 +211,26 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Authentication required" });
   }
-  if (req.user?.role !== "Admin") {
+  const user = req.user as any;
+  if (user.role !== "Admin" && !user.isMasterAdmin) {
     return res.status(403).json({ message: "Admin access required" });
   }
   next();
+}
+
+/**
+ * Middleware factory for role-based access control.
+ * Master Admin (isMasterAdmin=true) always passes regardless of the role list.
+ * Accepts both spread args and a single array: requireRole("Admin","Manager") or requireRole(["Admin","Manager"])
+ */
+export function requireRole(...roles: (string | string[])[]): RequestHandler {
+  const allowedRoles = roles.flat() as string[];
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    const user = req.user as any;
+    if (user.isMasterAdmin || allowedRoles.includes(user.role)) return next();
+    return res.status(403).json({ message: "Insufficient permissions" });
+  };
 }

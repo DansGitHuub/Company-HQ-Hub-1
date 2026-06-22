@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import crypto from "crypto";
 import { storage } from "./storage";
-import { setupAuth, requireAuth, requireAdmin, hashPassword, comparePasswords } from "./auth";
+import { setupAuth, requireAuth, requireAdmin, requireRole, hashPassword, comparePasswords } from "./auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerCompanyCamRoutes } from "./companyCamRoutes";
@@ -596,13 +596,6 @@ export async function registerRoutes(
     next();
   };
   
-  // Role-based access control middleware
-  const requireRole = (roles: string[]) => (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ message: `Access denied. Required role: ${roles.join(" or ")}` });
-    }
-    next();
-  };
 
   app.get("/api/ai-agents", requireAuth, requireMasterAdmin, async (req, res) => {
     try {
@@ -4926,7 +4919,7 @@ Generate detailed information for this landscaping material.`;
   });
 
   // POST /api/jobs/:id/packet-gate/bypass  — admin/manager bypass a gate item
-  app.post("/api/jobs/:id/packet-gate/bypass", requireAuth, requireRole("Admin", "Manager", "Master Admin"), async (req: any, res) => {
+  app.post("/api/jobs/:id/packet-gate/bypass", requireAuth, requireRole("Admin", "Manager"), async (req: any, res) => {
     const { id } = req.params;
     const { gate_item, reason } = req.body;
     if (!gate_item || !reason?.trim()) {
@@ -4948,7 +4941,7 @@ Generate detailed information for this landscaping material.`;
   });
 
   // DELETE /api/jobs/:id/packet-gate/bypass/:item — remove a bypass
-  app.delete("/api/jobs/:id/packet-gate/bypass/:item", requireAuth, requireRole("Admin", "Manager", "Master Admin"), async (req: any, res) => {
+  app.delete("/api/jobs/:id/packet-gate/bypass/:item", requireAuth, requireRole("Admin", "Manager"), async (req: any, res) => {
     const { id, item } = req.params;
     try {
       await pool.query(

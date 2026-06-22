@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import OpenAI from "openai";
+import { requireAdmin } from "./auth";
 
 type AuthRequest = Request & { user?: any };
 import { pool } from "./db";
@@ -67,13 +68,6 @@ const requireInternalRole = (req: Request, res: Response, next: NextFunction) =>
   next();
 };
 
-const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
-  const user = req.user as any;
-  if (!user || !["Admin", "Master Admin"].includes(user.role)) {
-    return res.status(403).json({ message: "Admin access required" });
-  }
-  next();
-};
 
 async function getAppContext(userId: string, userRole: string) {
   const context = { overdueTasks: 0, p1Alerts: 0, unacknowledgedTasks: 0, unreadMessages: 0 };

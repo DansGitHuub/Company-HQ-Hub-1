@@ -1,15 +1,6 @@
 import { pool } from "./db";
 import type { Express } from "express";
-
-const STAFF_ROLES = ["Admin", "Manager", "Master Admin"];
-
-function requireRole(...roles: string[]) {
-  return (req: any, res: any, next: any) => {
-    if (!req.user) return res.status(401).json({ message: "Authentication required" });
-    if (!roles.includes(req.user.role)) return res.status(403).json({ message: "Insufficient permissions" });
-    next();
-  };
-}
+import { requireRole } from "./auth";
 
 async function nextClaimNumber(): Promise<string> {
   const { rows } = await pool.query(`SELECT nextval('claim_number_seq') AS n`);
@@ -19,7 +10,7 @@ async function nextClaimNumber(): Promise<string> {
 export function registerWarrantyRoutes(app: Express, requireAuth: any) {
 
   // ── List all warranties (admin) ──────────────────────────────────────────
-  app.get("/api/warranties", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
+  app.get("/api/warranties", requireAuth, requireRole("Admin", "Manager"), async (req: any, res) => {
     const { status, customer_id } = req.query;
     const conditions: string[] = [];
     const params: any[] = [];
@@ -95,7 +86,7 @@ export function registerWarrantyRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Create warranty manually ─────────────────────────────────────────────
-  app.post("/api/jobs/:jobId/warranty", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
+  app.post("/api/jobs/:jobId/warranty", requireAuth, requireRole("Admin", "Manager"), async (req: any, res) => {
     const {
       title, description, warranty_type = "workmanship",
       duration_months = 12, start_date, end_date, terms,
@@ -157,7 +148,7 @@ export function registerWarrantyRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Update claim status ──────────────────────────────────────────────────
-  app.patch("/api/warranty-claims/:id", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
+  app.patch("/api/warranty-claims/:id", requireAuth, requireRole("Admin", "Manager"), async (req: any, res) => {
     const { status, resolution, service_job_id } = req.body;
     try {
       const { rows } = await pool.query(
@@ -180,7 +171,7 @@ export function registerWarrantyRoutes(app: Express, requireAuth: any) {
   });
 
   // ── List all warranty claims for admin view ──────────────────────────────
-  app.get("/api/warranty-claims", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
+  app.get("/api/warranty-claims", requireAuth, requireRole("Admin", "Manager"), async (req: any, res) => {
     const { status } = req.query;
     const params: any[] = [];
     let where = "";

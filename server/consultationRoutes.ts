@@ -3,16 +3,7 @@ import { pool } from "./db";
 import { sendEmail, escapeHtml, getAppUrl } from "./emailService";
 import { storage } from "./storage";
 
-const STAFF_ROLES = ["Admin", "Manager", "Master Admin"];
-
-function requireRole(...roles: string[]) {
-  return (req: any, res: any, next: any) => {
-    const u = req.user as any;
-    if (!u) return res.status(401).json({ message: "Authentication required" });
-    if (!roles.includes(u.role) && !u.isMasterAdmin) return res.status(403).json({ message: "Insufficient permissions" });
-    next();
-  };
-}
+import { requireRole } from "./auth";
 
 // ── Pipeline stage definitions ─────────────────────────────────────────────────
 export const PIPELINE_STAGES = [
@@ -214,7 +205,7 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
   await migrateConsultations();
 
   // ── STATS ─────────────────────────────────────────────────────────────────────
-  app.get("/api/consultations/stats", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.get("/api/consultations/stats", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const now = new Date();
       const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
@@ -235,7 +226,7 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
   });
 
   // ── PIPELINE STATS ───────────────────────────────────────────────────────────
-  app.get("/api/consultations/pipeline-stats", requireAuth, requireRole(...STAFF_ROLES), async (_req, res) => {
+  app.get("/api/consultations/pipeline-stats", requireAuth, requireRole("Admin", "Manager"), async (_req, res) => {
     try {
       const { rows } = await pool.query(`
         SELECT pipeline_stage, COUNT(*)::int AS count
@@ -251,7 +242,7 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
   });
 
   // ── LIST ──────────────────────────────────────────────────────────────────────
-  app.get("/api/consultations", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.get("/api/consultations", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const { status, date_from, date_to, assigned_to, search, pipeline_stage, customer_id } = req.query as Record<string, string>;
     try {
       const params: any[] = [];
@@ -299,7 +290,7 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
   });
 
   // ── CREATE ────────────────────────────────────────────────────────────────────
-  app.post("/api/consultations", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.post("/api/consultations", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const {
       customer_id, contact_name, contact_phone, contact_email,
       scheduled_date, scheduled_time, duration_minutes, status,
@@ -350,7 +341,7 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
   });
 
   // ── UPDATE ────────────────────────────────────────────────────────────────────
-  app.patch("/api/consultations/:id", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.patch("/api/consultations/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const { id } = req.params;
     const {
       customer_id, contact_name, contact_phone, contact_email,
@@ -435,7 +426,7 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
   });
 
   // ── DELETE ────────────────────────────────────────────────────────────────────
-  app.delete("/api/consultations/:id", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
+  app.delete("/api/consultations/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       await pool.query("DELETE FROM consultations WHERE id = $1", [req.params.id]);
       res.status(204).end();

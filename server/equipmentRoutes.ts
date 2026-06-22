@@ -1,18 +1,9 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import { recalculateAssetPriorities, calculateNextDue } from "./priorityEngine";
+import { requireRole } from "./auth";
 
 type AuthMiddleware = (req: Request, res: Response, next: () => void) => void;
-
-function requireRole(...roles: string[]) {
-  return (req: any, res: Response, next: () => void) => {
-    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
-    const userRole = req.user.role;
-    const isMasterAdmin = req.user.isMasterAdmin;
-    if (isMasterAdmin || roles.includes(userRole)) return next();
-    return res.status(403).json({ message: "Insufficient permissions" });
-  };
-}
 
 function canAccessEquipment(req: any): boolean {
   const role = req.user?.role;
