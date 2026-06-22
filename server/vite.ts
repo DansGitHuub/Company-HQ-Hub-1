@@ -29,6 +29,21 @@ export async function setupVite(server: Server, app: Express) {
     appType: "custom",
   });
 
+  // Trigger dep optimization to complete BEFORE the server starts accepting
+  // connections. Without this, the first browser request arrives during the
+  // optimization window and gets transforms with stale dep chunk URLs.
+  // transformRequest drives dep discovery → optimizer runs → resolves when done.
+  try {
+    await vite.transformRequest("/src/main.tsx");
+  } catch {
+    // Not fatal — warmup may fail if the file path differs; optimization
+    // will still complete on the first real request.
+  }
+
+  // Invalidate all cached module transforms after optimization completes so
+  // browsers get fresh transforms referencing the current .vite-cache URLs.
+  vite.moduleGraph.invalidateAll();
+
   app.use(vite.middlewares);
 
   app.use("/{*path}", async (req, res, next) => {
@@ -49,7 +64,7 @@ export async function setupVite(server: Server, app: Express) {
         `src="/src/main.tsx?v=${nanoid()}"`,
       );
       const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      res.status(200).set({ "Content-Type": "text/html", "Cache-Control": "no-store" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);

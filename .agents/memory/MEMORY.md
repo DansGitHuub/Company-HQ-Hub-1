@@ -2,3 +2,4 @@
 - [Schema safety rule](schema-safety.md) — never run drizzle-kit push on this project; always use raw SQL for new columns then add type definitions to schema.ts.
 - [Phase 3 DB pattern](phase3-pattern.md) — All Phase 3 tables use raw SQL migrations registered in server/index.ts; route files import pool directly.
 - [Job detail tabs](job-detail-tabs.md) — show.tsx tab architecture: which tabs exist, which are admin-only, pattern for adding new feature tabs.
+- [Vite React dedupe fix](vite-react-dedupe-fix.md) — how to fix "Cannot read properties of null (reading 'useEffect')" duplicate-React crash; what to change in vite.config.ts and server/vite.ts.
