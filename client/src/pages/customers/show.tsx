@@ -216,6 +216,7 @@ interface CustomerEmail { id: string; email: string; email_type: string | null; 
 interface Property {
   id: string; address: string; city: string | null; state: string | null;
   zip: string | null; property_type: string | null; notes: string | null;
+  access_notes: string | null; gate_code: string | null; has_pets: boolean | null;
   created_at?: string;
 }
 interface CustomerDetail {
@@ -238,8 +239,9 @@ interface Job {
 interface PropertyFormState {
   address: string; city: string; state: string; zip: string;
   property_type: string; notes: string;
+  access_notes: string; gate_code: string; has_pets: boolean;
 }
-const EMPTY_PROP: PropertyFormState = { address: "", city: "", state: "", zip: "", property_type: "", notes: "" };
+const EMPTY_PROP: PropertyFormState = { address: "", city: "", state: "", zip: "", property_type: "", notes: "", access_notes: "", gate_code: "", has_pets: false };
 const PROP_TYPES = ["Residential", "Commercial", "HOA", "Municipal", "Other"];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -291,6 +293,8 @@ function PropertyModal({ open, onClose, customerId, editing, onSaved }:
       setForm(editing ? {
         address: editing.address, city: editing.city ?? "", state: editing.state ?? "",
         zip: editing.zip ?? "", property_type: editing.property_type ?? "", notes: editing.notes ?? "",
+        access_notes: editing.access_notes ?? "", gate_code: editing.gate_code ?? "",
+        has_pets: editing.has_pets ?? false,
       } : EMPTY_PROP);
     }
   }, [open, editing]);
@@ -359,6 +363,30 @@ function PropertyModal({ open, onClose, customerId, editing, onSaved }:
             <Label>{t("notes")}</Label>
             <Textarea placeholder={t("propertyNotesPlaceholder")} value={form.notes}
               onChange={(e) => set("notes", e.target.value)} rows={2} data-testid="textarea-prop-notes" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Access Notes</Label>
+            <Textarea placeholder="e.g. Enter through back gate, code on keypad" value={form.access_notes}
+              onChange={(e) => set("access_notes", e.target.value)} rows={2} data-testid="textarea-prop-access-notes" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Gate Code</Label>
+              <Input placeholder="e.g. #1234" value={form.gate_code}
+                onChange={(e) => set("gate_code", e.target.value)} data-testid="input-prop-gate-code" />
+            </div>
+            <div className="space-y-1.5 flex flex-col justify-end">
+              <label className="flex items-center gap-2 cursor-pointer pb-1">
+                <input
+                  type="checkbox"
+                  checked={form.has_pets}
+                  onChange={(e) => setForm((f) => ({ ...f, has_pets: e.target.checked }))}
+                  className="h-4 w-4 rounded border-input"
+                  data-testid="checkbox-prop-has-pets"
+                />
+                <span className="text-sm">Pets on property</span>
+              </label>
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>{t("cancel")}</Button>

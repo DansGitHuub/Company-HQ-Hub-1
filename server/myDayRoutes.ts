@@ -27,6 +27,9 @@ export function registerMyDayRoutes(app: Express) {
            j.address,
            COALESCE(c.first_name || ' ' || c.last_name, c.company_name) AS customer_name,
            COALESCE(p.address, j.address) AS customer_address,
+           p.access_notes,
+           p.gate_code,
+           p.has_pets,
            COALESCE(
              json_agg(
                jwa ORDER BY jwa.sort_order, jwa.name
@@ -43,7 +46,7 @@ export function registerMyDayRoutes(app: Express) {
          WHERE j.scheduled_date::date = CURRENT_DATE
            AND j.status NOT IN ('cancelled', 'completed', 'invoiced')
            AND ($1::text IS NULL OR ja.employee_id = $1)
-         GROUP BY j.id, c.first_name, c.last_name, c.company_name, p.address
+         GROUP BY j.id, c.first_name, c.last_name, c.company_name, p.address, p.access_notes, p.gate_code, p.has_pets
          ORDER BY j.scheduled_start_time NULLS LAST, j.created_at`,
         [employeeId]
       );

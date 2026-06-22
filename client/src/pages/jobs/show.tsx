@@ -56,6 +56,7 @@ interface JobDetail {
   customer_id: string | null; property_id: string | null;
   cust_first: string | null; cust_last: string | null; cust_company: string | null;
   prop_address: string | null; prop_city: string | null; prop_state: string | null; prop_zip: string | null;
+  prop_access_notes: string | null; prop_gate_code: string | null; prop_has_pets: boolean | null;
   created_at: string; updated_at: string;
   time_entries: TimeEntry[];
   linked_invoice_id: string | null;
@@ -977,6 +978,26 @@ export default function JobDetailPage() {
                 />
               )}
               <InfoRow icon={DollarSign} label={t("priceLabel")} value={fmtMoney(job.price ?? job.value) ?? undefined} />
+              {(job.prop_access_notes || job.prop_gate_code || job.prop_has_pets) && (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 space-y-1.5">
+                  <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide flex items-center gap-1.5">
+                    <span>⚠</span> Site Access Info
+                  </p>
+                  {job.prop_has_pets && (
+                    <p className="text-sm text-amber-900 flex items-center gap-1.5">
+                      <span>🐾</span> <span className="font-medium">Pets on property</span>
+                    </p>
+                  )}
+                  {job.prop_gate_code && (
+                    <p className="text-sm text-amber-900">
+                      <span className="font-medium">Gate code:</span> {job.prop_gate_code}
+                    </p>
+                  )}
+                  {job.prop_access_notes && (
+                    <p className="text-sm text-amber-900 whitespace-pre-wrap">{job.prop_access_notes}</p>
+                  )}
+                </div>
+              )}
               {job.companycam_project_id && (
                 <div className="flex items-center gap-3 py-1.5">
                   <Camera className="h-4 w-4 shrink-0 text-muted-foreground" />

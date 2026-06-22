@@ -149,10 +149,13 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
           c.first_name  AS cust_first,
           c.last_name   AS cust_last,
           c.company_name AS cust_company,
-          p.address     AS prop_address,
-          p.city        AS prop_city,
-          p.state       AS prop_state,
-          p.zip         AS prop_zip,
+          p.address      AS prop_address,
+          p.city         AS prop_city,
+          p.state        AS prop_state,
+          p.zip          AS prop_zip,
+          p.access_notes AS prop_access_notes,
+          p.gate_code    AS prop_gate_code,
+          p.has_pets     AS prop_has_pets,
           COALESCE(
             (SELECT SUM(te.duration_minutes)
              FROM time_entries te

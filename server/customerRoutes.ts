@@ -560,13 +560,13 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   // ─── PROPERTY CRUD ───────────────────────────────────────────────────────────
   app.post("/api/customers/:id/properties", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
     const { id } = req.params;
-    const { address, city, state, zip, property_type, notes } = req.body;
+    const { address, city, state, zip, property_type, notes, access_notes, gate_code, has_pets } = req.body;
     if (!address?.trim())
       return res.status(400).json({ message: "Address is required" });
     try {
       const result = await pool.query(
-        `INSERT INTO properties (customer_id, address, city, state, zip, property_type, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        `INSERT INTO properties (customer_id, address, city, state, zip, property_type, notes, access_notes, gate_code, has_pets)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
         [
           id,
           address.trim(),
@@ -575,6 +575,9 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
           zip || null,
           property_type || null,
           notes || null,
+          access_notes || null,
+          gate_code || null,
+          has_pets === true || has_pets === "true" ? true : false,
         ],
       );
       return res.status(201).json(result.rows[0]);
@@ -585,14 +588,15 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
 
   app.put("/api/properties/:propId", requireAuth, localRequireRole("Admin", "Manager", "Master Admin"), async (req, res) => {
     const { propId } = req.params;
-    const { address, city, state, zip, property_type, notes } = req.body;
+    const { address, city, state, zip, property_type, notes, access_notes, gate_code, has_pets } = req.body;
     if (!address?.trim())
       return res.status(400).json({ message: "Address is required" });
     try {
       const result = await pool.query(
         `UPDATE properties SET address=$1, city=$2, state=$3, zip=$4,
-           property_type=$5, notes=$6, updated_at=now()
-         WHERE id=$7 RETURNING *`,
+           property_type=$5, notes=$6, access_notes=$7, gate_code=$8, has_pets=$9,
+           updated_at=now()
+         WHERE id=$10 RETURNING *`,
         [
           address.trim(),
           city || null,
@@ -600,6 +604,9 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
           zip || null,
           property_type || null,
           notes || null,
+          access_notes || null,
+          gate_code || null,
+          has_pets === true || has_pets === "true" ? true : false,
           propId,
         ],
       );
