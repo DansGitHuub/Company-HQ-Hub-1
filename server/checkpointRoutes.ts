@@ -1,6 +1,8 @@
 import { pool } from "./db";
 import type { Express } from "express";
 
+const STAFF_ROLES = ["Admin", "Manager", "Master Admin"];
+
 export function registerCheckpointRoutes(app: Express, requireAuth: any) {
 
   // ── Checkpoint templates ─────────────────────────────────────────────────
@@ -96,7 +98,21 @@ export function registerCheckpointRoutes(app: Express, requireAuth: any) {
   // ── Complete a checkpoint ────────────────────────────────────────────────
   app.patch("/api/jobs/:jobId/checkpoints/:checkpointId", requireAuth, async (req: any, res) => {
     const { note, photo_url, checked, status } = req.body;
+    const user = req.user;
+    const isStaff = STAFF_ROLES.includes(user?.role);
     try {
+      // Fetch first so we can enforce role-based access on assigned_role
+      const { rows: existing } = await pool.query(
+        `SELECT assigned_role FROM job_checkpoints WHERE id = $1 AND job_id = $2`,
+        [req.params.checkpointId, req.params.jobId]
+      );
+      if (!existing.length) return res.status(404).json({ message: "Checkpoint not found" });
+
+      // Manager-assigned (or any non-Crew) checkpoints require Admin/Manager/Master Admin
+      if (existing[0].assigned_role !== "Crew" && !isStaff) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
       const newStatus = status ?? (checked !== undefined ? (checked ? "completed" : "pending") : undefined);
       const { rows } = await pool.query(
         `UPDATE job_checkpoints SET
@@ -110,7 +126,7 @@ export function registerCheckpointRoutes(app: Express, requireAuth: any) {
          WHERE id = $6 AND job_id = $7
          RETURNING *`,
         [note ?? null, photo_url ?? null, checked ?? null, newStatus ?? null,
-         req.user?.id ?? null, req.params.checkpointId, req.params.jobId]
+         user?.id ?? null, req.params.checkpointId, req.params.jobId]
       );
       if (!rows.length) return res.status(404).json({ message: "Checkpoint not found" });
       return res.json(rows[0]);
@@ -121,6 +137,9 @@ export function registerCheckpointRoutes(app: Express, requireAuth: any) {
 
   // ── Delete a checkpoint ──────────────────────────────────────────────────
   app.delete("/api/jobs/:jobId/checkpoints/:checkpointId", requireAuth, async (req: any, res) => {
+    if (!STAFF_ROLES.includes(req.user?.role)) {
+      return res.status(403).json({ message: "Insufficient permissions" });
+    }
     try {
       await pool.query(
         `DELETE FROM job_checkpoints WHERE id = $1 AND job_id = $2`,
