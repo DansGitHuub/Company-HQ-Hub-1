@@ -65,6 +65,7 @@ import { runWave4Migration } from "./migrations/wave4";
 import { syncCCProjectsFromApi } from "./companyCamRoutes";
 import { registerPublicPages } from "./publicPages";
 import { startLeadAlertScheduler } from "./consultationRoutes";
+import { startGpsPingCleanupScheduler } from "./gpsPingCleanupScheduler";
 
 const app = express();
 const httpServer = createServer(app);
@@ -254,6 +255,7 @@ app.use((req, res, next) => {
       startQuickBooksScheduler();
       startNotificationScheduler();
       startLeadAlertScheduler();
+      startGpsPingCleanupScheduler();
     },
   );
 })();
