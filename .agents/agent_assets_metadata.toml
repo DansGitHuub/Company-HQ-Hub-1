@@ -204,3 +204,9 @@ id = "2DHOnNzPnxeUuPhSy2NcZ"
 uri = "file://.local/audits/group-38-connectors-integrations.md"
 type = "text"
 title = "Group 38 — Connectors / Integrations Audit"
+
+[[outputs]]
+id = "so4lSyIyx64xQ94ZcuZGS"
+uri = "file://.local/audits/group-39-mobile-field-usability.md"
+type = "text"
+title = "Group 39 — Mobile / Field Usability Audit"
