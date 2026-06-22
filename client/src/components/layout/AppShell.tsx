@@ -48,6 +48,7 @@ import {
   Sun,
   Cog,
   CalendarClock,
+  Calendar,
   BarChart2,
   TrendingUp,
   BookMarked,
@@ -408,7 +409,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     catalog: { icon: BookMarked, label: t("nav.catalog"), href: "/catalog" },
     plant_cards: { icon: Leaf, label: "Plant Library", href: "/plant-cards" },
     work_orders: { icon: HardHat, label: "Work Orders", href: "/work-orders" },
-    budget_settings: { icon: DollarSign, label: t("nav.budgetPricing"), href: "/budget-settings" },
+    calendar: { icon: Calendar, label: t("nav.calendar"), href: "/calendar" },
+    budget_settings: { icon: DollarSign, label: t("nav.budgetPricing"), href: "/mors-budget" },
     tools: { icon: Snowflake, label: t("nav.tools"), href: "/tools" },
   plow_mapper: { icon: Snowflake, label: t("nav.plowMapper"), href: "/tools/plow-mapper" },
   };
@@ -424,7 +426,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const sidebarSections: NavSection[] = [
-    { label: "MY SPACE", items: ["hq", "dashboard", "my_hours", "daily_agenda", "my_day", "daily_worksheet", "messages"] },
+    { label: "MY SPACE", items: ["hq", "dashboard", "calendar", "my_hours", "daily_agenda", "my_day", "daily_worksheet", "messages"] },
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["todos", "work_orders", "scheduling", "time_tracking", "equipment", "forms"] },
     { label: "RESOURCES", items: ["sops", "education", "testing"] },
