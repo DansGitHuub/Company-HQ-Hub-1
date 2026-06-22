@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { pool } from "./db";
 
-export function registerWorkOrderRoutes(app: any) {
+export function registerWorkOrderRoutes(app: any, requireAuth: any) {
 
   // ── Helper: load full detail for a WO ─────────────────────────────────────
   async function loadDetail(id: string | number) {
@@ -127,7 +127,7 @@ export function registerWorkOrderRoutes(app: any) {
 
   // ── GET /api/jobs/:jobId/work-order ────────────────────────────────────────
   // Returns the Work Order linked to a job, plus readiness checks, or null.
-  app.get("/api/jobs/:jobId/work-order", async (req: Request, res: Response) => {
+  app.get("/api/jobs/:jobId/work-order", requireAuth, async (req: Request, res: Response) => {
     try {
       const { jobId } = req.params;
       const { rows } = await pool.query(`
@@ -184,7 +184,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.get("/api/work-orders", async (req: Request, res: Response) => {
+  app.get("/api/work-orders", requireAuth, async (req: Request, res: Response) => {
     try {
       const { status, search, wo_type } = req.query as Record<string, string>;
       let query = `
@@ -219,7 +219,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.get("/api/work-orders/:id", async (req: Request, res: Response) => {
+  app.get("/api/work-orders/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const detail = await loadDetail(req.params.id);
       if (!detail) return res.status(404).json({ message: "Not found" });
@@ -230,7 +230,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.post("/api/work-orders", async (req: Request, res: Response) => {
+  app.post("/api/work-orders", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
       const {
@@ -263,7 +263,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.put("/api/work-orders/:id", async (req: Request, res: Response) => {
+  app.put("/api/work-orders/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const {
@@ -297,7 +297,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.patch("/api/work-orders/:id/status", async (req: Request, res: Response) => {
+  app.patch("/api/work-orders/:id/status", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { status } = req.body;
@@ -311,7 +311,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.delete("/api/work-orders/:id", async (req: Request, res: Response) => {
+  app.delete("/api/work-orders/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       await pool.query(`DELETE FROM work_orders WHERE id=$1`, [req.params.id]);
       res.json({ ok: true });
@@ -325,7 +325,7 @@ export function registerWorkOrderRoutes(app: any) {
   //  WORK ORDER AREAS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  app.post("/api/work-orders/:id/areas", async (req: Request, res: Response) => {
+  app.post("/api/work-orders/:id/areas", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { name, description, estimated_hours } = req.body;
@@ -346,7 +346,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.put("/api/work-orders/:id/areas/:areaId", async (req: Request, res: Response) => {
+  app.put("/api/work-orders/:id/areas/:areaId", requireAuth, async (req: Request, res: Response) => {
     try {
       const { areaId } = req.params;
       const { name, description, estimated_hours } = req.body;
@@ -363,7 +363,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.delete("/api/work-orders/:id/areas/:areaId", async (req: Request, res: Response) => {
+  app.delete("/api/work-orders/:id/areas/:areaId", requireAuth, async (req: Request, res: Response) => {
     try {
       await pool.query(`DELETE FROM work_order_areas WHERE id=$1`, [req.params.areaId]);
       res.json({ ok: true });
@@ -377,7 +377,7 @@ export function registerWorkOrderRoutes(app: any) {
   //  AREA TASKS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  app.post("/api/work-orders/:id/areas/:areaId/tasks", async (req: Request, res: Response) => {
+  app.post("/api/work-orders/:id/areas/:areaId/tasks", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id, areaId } = req.params;
       const { title, description, requires_photo } = req.body;
@@ -398,7 +398,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.put("/api/work-orders/:id/areas/:areaId/tasks/:taskId", async (req: Request, res: Response) => {
+  app.put("/api/work-orders/:id/areas/:areaId/tasks/:taskId", requireAuth, async (req: Request, res: Response) => {
     try {
       const { taskId } = req.params;
       const { title, description, requires_photo } = req.body;
@@ -415,7 +415,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.patch("/api/work-orders/:id/areas/:areaId/tasks/:taskId/complete", async (req: Request, res: Response) => {
+  app.patch("/api/work-orders/:id/areas/:areaId/tasks/:taskId/complete", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
       const { id, taskId } = req.params;
@@ -425,7 +425,7 @@ export function registerWorkOrderRoutes(app: any) {
          SET is_complete=$1, completed_by=$2,
              completed_at=CASE WHEN $1=true THEN NOW() ELSE NULL END
          WHERE id=$3 RETURNING *`,
-        [!!is_complete, is_complete ? (user?.username||"crew") : null, taskId]
+        [!!is_complete, is_complete ? (user.name || user.username) : null, taskId]
       );
       if (!result.rows.length) return res.status(404).json({ message: "Not found" });
       await pool.query(`UPDATE work_orders SET updated_at=NOW() WHERE id=$1`, [id]);
@@ -436,7 +436,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.delete("/api/work-orders/:id/areas/:areaId/tasks/:taskId", async (req: Request, res: Response) => {
+  app.delete("/api/work-orders/:id/areas/:areaId/tasks/:taskId", requireAuth, async (req: Request, res: Response) => {
     try {
       await pool.query(`DELETE FROM work_order_area_tasks WHERE id=$1`, [req.params.taskId]);
       res.json({ ok: true });
@@ -447,7 +447,7 @@ export function registerWorkOrderRoutes(app: any) {
   });
 
   // Task photo upload
-  app.post("/api/work-orders/:id/areas/:areaId/tasks/:taskId/photos", async (req: Request, res: Response) => {
+  app.post("/api/work-orders/:id/areas/:areaId/tasks/:taskId/photos", requireAuth, async (req: Request, res: Response) => {
     try {
       const multer = (await import("multer")).default;
       const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
@@ -479,7 +479,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.delete("/api/work-orders/:id/areas/:areaId/tasks/:taskId/photos", async (req: Request, res: Response) => {
+  app.delete("/api/work-orders/:id/areas/:areaId/tasks/:taskId/photos", requireAuth, async (req: Request, res: Response) => {
     try {
       const { taskId } = req.params;
       const { url } = req.body;
@@ -498,7 +498,7 @@ export function registerWorkOrderRoutes(app: any) {
   //  MATERIALS (WO-level or area-level)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  app.post("/api/work-orders/:id/materials", async (req: Request, res: Response) => {
+  app.post("/api/work-orders/:id/materials", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { item_name, quantity, unit, catalog_item_id, notes, area_id } = req.body;
@@ -517,7 +517,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.put("/api/work-orders/:id/materials/:materialId", async (req: Request, res: Response) => {
+  app.put("/api/work-orders/:id/materials/:materialId", requireAuth, async (req: Request, res: Response) => {
     try {
       const { materialId } = req.params;
       const { item_name, quantity, unit, notes, status } = req.body;
@@ -534,7 +534,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.patch("/api/work-orders/:id/materials/:materialId/status", async (req: Request, res: Response) => {
+  app.patch("/api/work-orders/:id/materials/:materialId/status", requireAuth, async (req: Request, res: Response) => {
     try {
       const { materialId, id } = req.params;
       const { status } = req.body;
@@ -553,7 +553,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.delete("/api/work-orders/:id/materials/:materialId", async (req: Request, res: Response) => {
+  app.delete("/api/work-orders/:id/materials/:materialId", requireAuth, async (req: Request, res: Response) => {
     try {
       await pool.query(`DELETE FROM work_order_materials WHERE id=$1`, [req.params.materialId]);
       res.json({ ok: true });
@@ -567,7 +567,7 @@ export function registerWorkOrderRoutes(app: any) {
   //  CHECKLISTS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  app.post("/api/work-orders/:id/checklists", async (req: Request, res: Response) => {
+  app.post("/api/work-orders/:id/checklists", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { label, area_id } = req.body;
@@ -587,7 +587,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.patch("/api/work-orders/:id/checklists/:checkId/complete", async (req: Request, res: Response) => {
+  app.patch("/api/work-orders/:id/checklists/:checkId/complete", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
       const { id, checkId } = req.params;
@@ -597,7 +597,7 @@ export function registerWorkOrderRoutes(app: any) {
          SET is_complete=$1, completed_by=$2,
              completed_at=CASE WHEN $1=true THEN NOW() ELSE NULL END
          WHERE id=$3 RETURNING *`,
-        [!!is_complete, is_complete ? (user?.username||"crew") : null, checkId]
+        [!!is_complete, is_complete ? (user.name || user.username) : null, checkId]
       );
       if (!result.rows.length) return res.status(404).json({ message: "Not found" });
       await pool.query(`UPDATE work_orders SET updated_at=NOW() WHERE id=$1`, [id]);
@@ -608,7 +608,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.delete("/api/work-orders/:id/checklists/:checkId", async (req: Request, res: Response) => {
+  app.delete("/api/work-orders/:id/checklists/:checkId", requireAuth, async (req: Request, res: Response) => {
     try {
       await pool.query(`DELETE FROM work_order_checklists WHERE id=$1`, [req.params.checkId]);
       res.json({ ok: true });
@@ -622,7 +622,7 @@ export function registerWorkOrderRoutes(app: any) {
   //  HOLD POINTS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  app.post("/api/work-orders/:id/hold-points", async (req: Request, res: Response) => {
+  app.post("/api/work-orders/:id/hold-points", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { label, description, area_id } = req.body;
@@ -642,7 +642,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.patch("/api/work-orders/:id/hold-points/:hpId/approve", async (req: Request, res: Response) => {
+  app.patch("/api/work-orders/:id/hold-points/:hpId/approve", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
       const { id, hpId } = req.params;
@@ -652,7 +652,7 @@ export function registerWorkOrderRoutes(app: any) {
          SET is_approved=$1, approved_by=$2,
              approved_at=CASE WHEN $1=true THEN NOW() ELSE NULL END
          WHERE id=$3 RETURNING *`,
-        [!!is_approved, is_approved ? (user?.username||"manager") : null, hpId]
+        [!!is_approved, is_approved ? (user.name || user.username) : null, hpId]
       );
       if (!result.rows.length) return res.status(404).json({ message: "Not found" });
       res.json(result.rows[0]);
@@ -662,7 +662,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.delete("/api/work-orders/:id/hold-points/:hpId", async (req: Request, res: Response) => {
+  app.delete("/api/work-orders/:id/hold-points/:hpId", requireAuth, async (req: Request, res: Response) => {
     try {
       await pool.query(`DELETE FROM work_order_hold_points WHERE id=$1`, [req.params.hpId]);
       res.json({ ok: true });
@@ -676,7 +676,7 @@ export function registerWorkOrderRoutes(app: any) {
   //  LEGACY STEPS (kept for backward compat)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  app.post("/api/work-orders/:id/steps", async (req: Request, res: Response) => {
+  app.post("/api/work-orders/:id/steps", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { title, description, requires_photo, step_number } = req.body;
@@ -701,7 +701,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.patch("/api/work-orders/:id/steps/:stepId/complete", async (req: Request, res: Response) => {
+  app.patch("/api/work-orders/:id/steps/:stepId/complete", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
       const { stepId, id } = req.params;
@@ -712,7 +712,7 @@ export function registerWorkOrderRoutes(app: any) {
              completed_at=CASE WHEN $1=true THEN NOW() ELSE NULL END,
              completion_note=$3
          WHERE id=$4`,
-        [!!is_complete, is_complete ? (user?.username||"crew") : null, completion_note||null, stepId]
+        [!!is_complete, is_complete ? (user.name || user.username) : null, completion_note||null, stepId]
       );
       await pool.query(`UPDATE work_orders SET updated_at=NOW() WHERE id=$1`, [id]);
       res.json({ ok: true });
@@ -722,7 +722,7 @@ export function registerWorkOrderRoutes(app: any) {
     }
   });
 
-  app.delete("/api/work-orders/:id/steps/:stepId", async (req: Request, res: Response) => {
+  app.delete("/api/work-orders/:id/steps/:stepId", requireAuth, async (req: Request, res: Response) => {
     try {
       await pool.query(`DELETE FROM work_order_steps WHERE id=$1`, [req.params.stepId]);
       res.json({ ok: true });
@@ -736,7 +736,7 @@ export function registerWorkOrderRoutes(app: any) {
   //  DAILY LOGS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  app.post("/api/work-orders/:id/daily-logs", async (req: Request, res: Response) => {
+  app.post("/api/work-orders/:id/daily-logs", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
       const { id } = req.params;

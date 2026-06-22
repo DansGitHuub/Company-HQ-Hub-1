@@ -120,7 +120,7 @@ export async function registerRoutes(
   registerMessagesRoutes(app, requireAuth);
   registerDirectMessageRoutes(app, requireAuth);
   registerPlantCardRoutes(app, requireAuth, requireAdmin);
-  registerWorkOrderRoutes(app);
+  registerWorkOrderRoutes(app, requireAuth);
 
   // Global search endpoint - searches everything based on user role
   app.get("/api/search", requireAuth, async (req, res) => {
