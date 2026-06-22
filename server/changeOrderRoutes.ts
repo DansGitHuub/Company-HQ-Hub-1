@@ -11,6 +11,14 @@ function requireRole(...roles: string[]) {
   };
 }
 
+function logAudit(actorId: string | null, eventType: string, description: string, link = "/") {
+  pool.query(
+    `INSERT INTO activity_log (id, user_id, event_type, description, link, seen_by, created_at)
+     VALUES (gen_random_uuid(), $1, $2, $3, $4, '[]'::jsonb, now())`,
+    [actorId, eventType, description, link]
+  ).catch((e: any) => console.error(`[audit] ${eventType}:`, e.message));
+}
+
 async function nextCONumber(): Promise<string> {
   const { rows } = await pool.query(`SELECT nextval('co_number_seq') AS n`);
   const n = Number(rows[0].n);
@@ -115,6 +123,12 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
       const { rows: fullItems } = await pool.query(
         `SELECT * FROM job_change_order_items WHERE change_order_id = $1 ORDER BY sort_order`, [coId]
       );
+      logAudit(
+        (req.user as any).id,
+        "change_order_create",
+        `${(req.user as any).name ?? "Staff"} created change order ${full[0].co_number} "${full[0].title}" ($${Number(full[0].total).toFixed(2)})`,
+        `/jobs/${req.params.jobId}`
+      );
       return res.status(201).json({ ...full[0], items: fullItems });
     } catch (err: any) {
       await client.query("ROLLBACK");
@@ -190,6 +204,12 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
       const { rows: fullItems } = await pool.query(
         `SELECT * FROM job_change_order_items WHERE change_order_id = $1 ORDER BY sort_order`, [req.params.id]
       );
+      logAudit(
+        (req.user as any).id,
+        "change_order_edit",
+        `${(req.user as any).name ?? "Staff"} edited change order ${full[0].co_number} "${full[0].title}" (total: $${Number(full[0].total).toFixed(2)})`,
+        `/jobs/${full[0].job_id}`
+      );
       return res.json({ ...full[0], items: fullItems });
     } catch (err: any) {
       await client.query("ROLLBACK");
@@ -202,10 +222,19 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
   // ── Send for approval (status → pending_approval) ──────────────────────
   app.post("/api/change-orders/:id/send-for-approval", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
     try {
-      await pool.query(
-        `UPDATE job_change_orders SET status = 'pending_approval', updated_at = NOW() WHERE id = $1`,
+      const { rows } = await pool.query(
+        `UPDATE job_change_orders SET status = 'pending_approval', updated_at = NOW() WHERE id = $1
+         RETURNING co_number, title, job_id`,
         [req.params.id]
       );
+      if (rows.length) {
+        logAudit(
+          req.user.id,
+          "change_order_sent_for_approval",
+          `${req.user.name ?? "Staff"} sent change order ${rows[0].co_number} "${rows[0].title}" for customer approval`,
+          `/jobs/${rows[0].job_id}`
+        );
+      }
       return res.json({ ok: true });
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
@@ -232,6 +261,12 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
         `UPDATE jobs SET price = COALESCE(price::numeric, 0) + $1, updated_at = NOW() WHERE id = $2`,
         [rows[0].total, rows[0].job_id]
       );
+      logAudit(
+        (req.user as any).id,
+        "change_order_approved",
+        `${(req.user as any).name ?? "Staff"} approved change order ${rows[0].co_number} "${rows[0].title}" ($${Number(rows[0].total).toFixed(2)})${approved_by_name ? ` — signed by: ${approved_by_name}` : ""}`,
+        `/jobs/${rows[0].job_id}`
+      );
       return res.json(rows[0]);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
@@ -249,6 +284,14 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
          RETURNING *`,
         [reason || null, req.params.id]
       );
+      if (rows.length) {
+        logAudit(
+          req.user.id,
+          "change_order_rejected",
+          `${req.user.name ?? "Staff"} rejected change order ${rows[0].co_number} "${rows[0].title}"${reason ? `: ${reason}` : ""}`,
+          `/jobs/${rows[0].job_id}`
+        );
+      }
       return res.json(rows[0]);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
@@ -258,12 +301,21 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
   // ── Delete change order (draft only) ────────────────────────────────────
   app.delete("/api/change-orders/:id", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
     try {
-      const { rows } = await pool.query(`SELECT status FROM job_change_orders WHERE id = $1`, [req.params.id]);
+      const { rows } = await pool.query(
+        `SELECT status, co_number, title, job_id FROM job_change_orders WHERE id = $1`,
+        [req.params.id]
+      );
       if (!rows.length) return res.status(404).json({ message: "Not found" });
       if (rows[0].status === "approved") {
         return res.status(400).json({ message: "Cannot delete an approved change order" });
       }
       await pool.query(`DELETE FROM job_change_orders WHERE id = $1`, [req.params.id]);
+      logAudit(
+        req.user.id,
+        "change_order_delete",
+        `${req.user.name ?? "Staff"} deleted change order ${rows[0].co_number} "${rows[0].title}"`,
+        `/jobs/${rows[0].job_id}`
+      );
       return res.json({ ok: true });
     } catch (err: any) {
       return res.status(500).json({ message: err.message });

@@ -18,6 +18,14 @@ async function generateInvoiceNumber(): Promise<string> {
   return `INV-${String(rows[0].n).padStart(4, "0")}`;
 }
 
+function logAudit(actorId: string | null, eventType: string, description: string, link = "/invoices") {
+  pool.query(
+    `INSERT INTO activity_log (id, user_id, event_type, description, link, seen_by, created_at)
+     VALUES (gen_random_uuid(), $1, $2, $3, $4, '[]'::jsonb, now())`,
+    [actorId, eventType, description, link]
+  ).catch((e: any) => console.error(`[audit] ${eventType}:`, e.message));
+}
+
 /** Recalculate totals for an invoice from its line items + payments */
 async function syncInvoiceTotals(invoiceId: string) {
   // NULL-safe recompute. Wrapping discount_amount and tax_rate in COALESCE prevents
@@ -286,6 +294,13 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
         }
       }
 
+      const actor = req.user as any;
+      logAudit(
+        actor?.id ?? null,
+        "invoice_create",
+        `${actor?.name ?? "Staff"} created invoice ${final.rows[0].invoice_number} (total: $${Number(final.rows[0].total ?? 0).toFixed(2)})`,
+        `/invoices/${final.rows[0].id}`
+      );
       return res.status(201).json(final.rows[0]);
     } catch (err: any) {
       console.error("[invoices] POST /api/invoices:", err.message);
@@ -359,6 +374,13 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
       await syncInvoiceTotals(req.params.id);
       const { rows } = await pool.query(`SELECT * FROM invoices WHERE id=$1`, [req.params.id]);
       if (rows.length === 0) return res.status(404).json({ message: "Invoice not found" });
+      const actor = req.user as any;
+      logAudit(
+        actor?.id ?? null,
+        "invoice_edit",
+        `${actor?.name ?? "Staff"} edited invoice ${rows[0].invoice_number} (total: $${Number(rows[0].total ?? 0).toFixed(2)}, status: ${rows[0].status})`,
+        `/invoices/${req.params.id}`
+      );
       return res.json(rows[0]);
     } catch (err: any) {
       console.error("[invoices] PUT /api/invoices/:id:", err.message);
@@ -371,6 +393,9 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
     const { status } = req.body;
     if (!status) return res.status(400).json({ message: "status required" });
     try {
+      const oldInv = await pool.query(`SELECT status, invoice_number FROM invoices WHERE id=$1`, [req.params.id]);
+      const oldStatus = oldInv.rows[0]?.status ?? "unknown";
+      const invoiceNumber = oldInv.rows[0]?.invoice_number ?? req.params.id;
       const { rows } = await pool.query(
         `UPDATE invoices SET status=$1, updated_at=NOW(), amount_paid=CASE WHEN $2='paid' THEN total ELSE amount_paid END, balance_due=CASE WHEN $2='paid' THEN 0 ELSE balance_due END, paid_at=CASE WHEN $2='paid' AND paid_at IS NULL THEN NOW() ELSE paid_at END WHERE id=$3 RETURNING *`,
         [status, status, req.params.id]
@@ -378,6 +403,13 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
       if (rows.length === 0) return res.status(404).json({ message: "Not found" });
       await syncInvoiceTotals(req.params.id);
       const refreshed = await pool.query(`SELECT * FROM invoices WHERE id=$1`, [req.params.id]);
+      const actor = req.user as any;
+      logAudit(
+        actor?.id ?? null,
+        "invoice_status_change",
+        `${actor?.name ?? "Staff"} changed invoice ${invoiceNumber} status: ${oldStatus} → ${status}`,
+        `/invoices/${req.params.id}`
+      );
       return res.json(refreshed.rows[0]);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
@@ -387,9 +419,18 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   // ── DELETE (void) ─────────────────────────────────────────────────────────────
   app.delete("/api/invoices/:id", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     try {
+      const preVoid = await pool.query(`SELECT invoice_number, total FROM invoices WHERE id=$1`, [req.params.id]);
       await pool.query(
         `UPDATE invoices SET status='void', updated_at=NOW() WHERE id=$1`,
         [req.params.id]
+      );
+      const actor = req.user as any;
+      const inv = preVoid.rows[0];
+      logAudit(
+        actor?.id ?? null,
+        "invoice_void",
+        `${actor?.name ?? "Staff"} voided invoice ${inv?.invoice_number ?? req.params.id} (total: $${Number(inv?.total ?? 0).toFixed(2)})`,
+        `/invoices/${req.params.id}`
       );
       return res.json({ success: true });
     } catch (err: any) {
@@ -422,6 +463,13 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
 
       await syncInvoiceTotals(req.params.id);
       const updated = await pool.query(`SELECT * FROM invoices WHERE id=$1`, [req.params.id]);
+      const actor = req.user as any;
+      logAudit(
+        actor?.id ?? null,
+        "invoice_payment_add",
+        `${actor?.name ?? "Staff"} added $${Number(rows[0].amount).toFixed(2)} ${rows[0].payment_method} payment to invoice ${updated.rows[0].invoice_number}`,
+        `/invoices/${req.params.id}`
+      );
       return res.status(201).json({ payment: rows[0], invoice: updated.rows[0] });
     } catch (err: any) {
       console.error("[invoices] POST payments:", err.message);
@@ -432,11 +480,30 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   // ── DELETE PAYMENT ────────────────────────────────────────────────────────────
   app.delete("/api/payments/:paymentId", requireAuth, requireRole(...STAFF_ROLES), async (req, res) => {
     try {
+      const preDelete = await pool.query(
+        `SELECT p.amount, p.payment_method, p.invoice_id, i.invoice_number
+         FROM payments p
+         JOIN invoices i ON i.id = p.invoice_id
+         WHERE p.id = $1`,
+        [req.params.paymentId]
+      );
       const { rows } = await pool.query(
         `DELETE FROM payments WHERE id=$1 RETURNING invoice_id`,
         [req.params.paymentId]
       );
-      if (rows.length > 0) await syncInvoiceTotals(rows[0].invoice_id);
+      if (rows.length > 0) {
+        await syncInvoiceTotals(rows[0].invoice_id);
+        const pd = preDelete.rows[0];
+        if (pd) {
+          const actor = req.user as any;
+          logAudit(
+            actor?.id ?? null,
+            "invoice_payment_delete",
+            `${actor?.name ?? "Staff"} deleted $${Number(pd.amount).toFixed(2)} ${pd.payment_method} payment from invoice ${pd.invoice_number}`,
+            `/invoices/${pd.invoice_id}`
+          );
+        }
+      }
       return res.json({ success: true });
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
@@ -493,6 +560,13 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
       `, [req.params.id]);
       if (rows.length === 0) return res.status(404).json({ message: "Not found" });
       await checkAndFlipJobSold(req.params.id);
+      const actor = req.user as any;
+      logAudit(
+        actor?.id ?? null,
+        "invoice_mark_paid",
+        `${actor?.name ?? "Staff"} marked invoice ${rows[0].invoice_number} as paid (total: $${Number(rows[0].total ?? 0).toFixed(2)})`,
+        `/invoices/${req.params.id}`
+      );
       return res.json(rows[0]);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
