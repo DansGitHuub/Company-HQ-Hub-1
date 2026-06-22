@@ -385,7 +385,7 @@ export const allToolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = 
 const MODULE_ROUTES: Record<string, string> = {
   dashboard: "/",
   sops: "/sops",
-  inventory: "/inventory",
+  inventory: "/catalog",
   hiring: "/hiring",
   marketing: "/marketing",
   jobs: "/jobs",
