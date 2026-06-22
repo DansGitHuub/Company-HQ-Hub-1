@@ -148,6 +148,35 @@ import InquiryPage from "@/pages/Inquiry";
 import InquirySuccess from "@/pages/InquirySuccess";
 import BookingPage from "@/pages/BookingPage";
 
+const ADMIN_ONLY = ["Admin"];
+const ADMIN_OR_MANAGER = ["Admin", "Manager"];
+
+function AccessDenied() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-center px-4">
+      <h1 className="text-xl font-semibold">Access Denied</h1>
+      <p className="text-sm text-muted-foreground max-w-sm">
+        You don't have permission to view this page. Contact your administrator if you need access.
+      </p>
+      <a href="/" className="text-sm text-primary underline underline-offset-4">Return to Home</a>
+    </div>
+  );
+}
+
+function ProtectedRoute({
+  path,
+  component: Component,
+  allowedRoles,
+}: {
+  path: string;
+  component: React.ComponentType;
+  allowedRoles: string[];
+}) {
+  const { user } = useAuth();
+  const allowed = !!user && (allowedRoles.includes(user.role) || !!(user as any).isMasterAdmin);
+  return <Route path={path} component={allowed ? Component : AccessDenied} />;
+}
+
 function AppRoutes() {
   const { user, isLoading } = useAuth();
 
@@ -227,26 +256,26 @@ function AppRoutes() {
         </Route>
         <Route path="/customer-hub/:section?" component={CustomerHub} />
         <Route path="/applicant" component={ApplicantPortal} />
-        <Route path="/admin" component={AdminPanel} />
+        <ProtectedRoute path="/admin" component={AdminPanel} allowedRoles={ADMIN_ONLY} />
         <Route path="/sops" component={SOPs} />
         <Route path="/materials"><Redirect to="/catalog" /></Route>
-        <Route path="/hiring" component={Hiring} />
-        <Route path="/marketing" component={Marketing} />
+        <ProtectedRoute path="/hiring" component={Hiring} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/marketing" component={Marketing} allowedRoles={ADMIN_OR_MANAGER} />
         <Route path="/forms" component={Forms} />
         <Route path="/customer-resources" component={Education} />
         <Route path="/profile" component={Profile} />
-        <Route path="/employees" component={Employees} />
+        <ProtectedRoute path="/employees" component={Employees} allowedRoles={ADMIN_OR_MANAGER} />
         <Route path="/onboarding-forms/:formType?/:submissionId?" component={FormHub} />
         <Route path="/employee" component={EmployeePortal} />
         <Route path="/employee-portal" component={EmployeePortal} />
         <Route path="/hq" component={HQOverview} />
         <Route path="/jobs" component={JobList} />
         <Route path="/jobs/:id" component={JobDetail} />
-        <Route path="/invoices" component={InvoiceList} />
-        <Route path="/invoices/:id" component={InvoiceDetail} />
-        <Route path="/estimates" component={EstimateList} />
-        <Route path="/estimates/:id/preview" component={EstimatePreview} />
-        <Route path="/estimates/:id" component={EstimateDetail} />
+        <ProtectedRoute path="/invoices" component={InvoiceList} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/invoices/:id" component={InvoiceDetail} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/estimates" component={EstimateList} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/estimates/:id/preview" component={EstimatePreview} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/estimates/:id" component={EstimateDetail} allowedRoles={ADMIN_OR_MANAGER} />
         <Route path="/scheduling" component={SchedulingCalendar} />
         <Route path="/my-day" component={MyDayPage} />
         <Route path="/my-hours" component={MyHoursPage} />
@@ -260,27 +289,27 @@ function AppRoutes() {
         <Route path="/clock-out-review" component={ClockOutReviewPage} />
         <Route path="/worksheet-review/:id" component={WorksheetReviewDetail} />
         <Route path="/worksheet-review" component={WorksheetReviewList} />
-        <Route path="/admin/route-days/:routeDayId" component={RouteDayDetail} />
-        <Route path="/admin/work-areas" component={WorkAreasPage} />
-        <Route path="/admin/qbo-export" component={QBOExportPage} />
-        <Route path="/admin/archive" component={ArchivePage} />
-        <Route path="/admin/time" component={TimeAdminPage} />
-      <Route path="/admin/time-reports"><Redirect to="/admin/time?tab=reports" /></Route>
+        <ProtectedRoute path="/admin/route-days/:routeDayId" component={RouteDayDetail} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/work-areas" component={WorkAreasPage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/qbo-export" component={QBOExportPage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/archive" component={ArchivePage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/time" component={TimeAdminPage} allowedRoles={ADMIN_ONLY} />
+        <Route path="/admin/time-reports"><Redirect to="/admin/time?tab=reports" /></Route>
         <Route path="/admin/worksheet-review"><Redirect to="/admin/time?tab=worksheet" /></Route>
         <Route path="/admin/time-card-approval"><Redirect to="/admin/time?tab=approval" /></Route>
-        <Route path="/admin/service-types" component={ServiceTypesPage} />
-        <Route path="/admin/companycam-reconciliation" component={CompanyCamReconciliation} />
-        <Route path="/admin/customer-duplicates" component={CustomerDuplicates} />
-        <Route path="/admin/companycam-health" component={CompanyCamHealth} />
+        <ProtectedRoute path="/admin/service-types" component={ServiceTypesPage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/companycam-reconciliation" component={CompanyCamReconciliation} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/customer-duplicates" component={CustomerDuplicates} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/companycam-health" component={CompanyCamHealth} allowedRoles={ADMIN_ONLY} />
         <Route path="/budget-settings"><Redirect to="/mors-budget?tab=mark-up" /></Route>
         <Route path="/time" component={TimeTracking} />
-        <Route path="/reports" component={ReportsPage} />
-        <Route path="/consultations" component={ConsultationsPage} />
-        <Route path="/mors-budget" component={MorsBudget} />
+        <ProtectedRoute path="/reports" component={ReportsPage} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/consultations" component={ConsultationsPage} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/mors-budget" component={MorsBudget} allowedRoles={ADMIN_ONLY} />
         <Route path="/admin/employees"><Redirect to="/employees" /></Route>
         <Route path="/notifications" component={NotificationsPage} />
-        <Route path="/customers" component={CustomerList} />
-        <Route path="/customers/:id" component={CustomerDetail} />
+        <ProtectedRoute path="/customers" component={CustomerList} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/customers/:id" component={CustomerDetail} allowedRoles={ADMIN_OR_MANAGER} />
         <Route path="/tools/plow-mapper" component={() => <PlowSiteMapper />} />
         <Route path="/tools/process-auditor" component={ProcessAuditor} />
         <Route path="/tools/integration-wizard" component={IntegrationWizard} />
@@ -290,13 +319,13 @@ function AppRoutes() {
         <Route path="/tools" component={Tools} />
         <Route path="/calendar" component={CalendarPage} />
         <Route path="/training" component={TestingKnowledge} />
-        <Route path="/settings" component={SettingsPage} />
+        <ProtectedRoute path="/settings" component={SettingsPage} allowedRoles={ADMIN_OR_MANAGER} />
         <Route path="/messages" component={MessagesPage} />
         <Route path="/customer-messages" component={CustomerMessagesInbox} />
-        <Route path="/catalog/import" component={CatalogImport} />
-        <Route path="/catalog/:id" component={CatalogDetail} />
-        <Route path="/catalog" component={CatalogPage} />
-        <Route path="/plant-cards" component={PlantCards} />
+        <ProtectedRoute path="/catalog/import" component={CatalogImport} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/catalog/:id" component={CatalogDetail} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/catalog" component={CatalogPage} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/plant-cards" component={PlantCards} allowedRoles={ADMIN_ONLY} />
         <Route path="/work-orders" component={WorkOrders} />
         <Route path="/route"><Redirect to="/my-day" /></Route>
         <Route path="/daily-agenda"><Redirect to="/my-day" /></Route>
