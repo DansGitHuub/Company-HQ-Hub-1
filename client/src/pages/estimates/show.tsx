@@ -22,7 +22,7 @@ import { EstimateStatusBadge, ESTIMATE_TYPE_LABELS } from "./index";
 import {
   Calculator, ArrowLeft, Edit2, Send, CheckCircle2, XCircle,
   Briefcase, Building2, User, Calendar, Trash2, RefreshCw, Loader2, Eye, Globe, Copy, Check,
-  ChevronDown, ChevronRight, Pencil, RotateCcw, Upload, Plus, X,
+  ChevronDown, ChevronRight, Pencil, RotateCcw, Plus, X,
 } from "lucide-react";
 import { format, parseISO, isAfter } from "date-fns";
 import { fmtDateOnly } from "@/lib/utils";
@@ -140,10 +140,6 @@ export default function EstimateDetail() {
   const [tcDraft, setTcDraft] = useState("");
   const [depositDraft, setDepositDraft] = useState<number | "">("");
   const [savingTC, setSavingTC] = useState(false);
-  const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [uploadFileUrl, setUploadFileUrl] = useState("");
-  const [uploadSignerName, setUploadSignerName] = useState("");
-
   // ── Scope editing state ──────────────────────────────────────────────────────
   const [scopeEditing, setScopeEditing] = useState(false);
   const [localAreas, setLocalAreas] = useState<LocalWorkArea[]>([]);
@@ -388,25 +384,6 @@ export default function EstimateDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
     },
     onError: () => toast({ title: t("errorGeneratingPortal"), variant: "destructive" }),
-  });
-
-  const uploadSignedMutation = useMutation({
-    mutationFn: async (payload: { fileUrl: string; signerName: string }) => {
-      const res = await apiRequest("POST", `/api/estimates/${id}/upload-signed`, payload);
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message ?? "Failed"); }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/estimates", id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
-      setShowUploadDialog(false);
-      setUploadFileUrl("");
-      setUploadSignerName("");
-      toast({ title: t("signedCopyRecorded"), description: t("physicalSignatureSaved") });
-    },
-    onError: (err: any) => {
-      toast({ title: t("uploadFailed"), description: err.message, variant: "destructive" });
-    },
   });
 
   function copyPortalUrl() {
@@ -1096,13 +1073,6 @@ export default function EstimateDetail() {
           <CardContent className="p-4 space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground font-medium">{t("signature")}</p>
-              {!estimate.signedAt && (
-                <Button size="sm" variant="outline"
-                  onClick={() => setShowUploadDialog(true)}
-                  className="text-xs h-7 gap-1" data-testid="btn-upload-signed">
-                  <Upload className="h-3 w-3" />{t("uploadSignedCopy")}
-                </Button>
-              )}
             </div>
             {estimate.signedAt ? (
               <div className="space-y-1">
@@ -1133,11 +1103,6 @@ export default function EstimateDetail() {
                     {t("viewSignedDocument")}
                   </a>
                 )}
-                <Button size="sm" variant="ghost"
-                  onClick={() => setShowUploadDialog(true)}
-                  className="text-xs h-6 px-2 text-muted-foreground mt-1">
-                  {t("replaceSignedCopy")}
-                </Button>
               </div>
             ) : (
               <p className="text-xs text-muted-foreground italic">{t("noSignature")}</p>
@@ -1156,49 +1121,6 @@ export default function EstimateDetail() {
           </Card>
         </div>
       </div>
-
-      {/* Upload signed copy dialog */}
-      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-        <DialogContent className="max-w-md" data-testid="dialog-upload-signed">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />{t("recordPhysicalSignedCopy")}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-sm text-muted-foreground">
-              {t("recordSignedCopyHint")}
-            </p>
-            <div className="space-y-2">
-              <Label htmlFor="upload-signer-name">{t("signerName")}</Label>
-              <Input id="upload-signer-name" placeholder={t("signerNamePlaceholder")}
-                value={uploadSignerName}
-                onChange={(e) => setUploadSignerName(e.target.value)}
-                data-testid="input-upload-signer-name" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="upload-file-url">{t("documentUrl")}</Label>
-              <Input id="upload-file-url" placeholder="https://..."
-                value={uploadFileUrl}
-                onChange={(e) => setUploadFileUrl(e.target.value)}
-                data-testid="input-upload-file-url" />
-              <p className="text-xs text-muted-foreground">
-                {t("documentUrlHint")}
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>{t("cancel")}</Button>
-            <Button
-              disabled={!uploadSignerName.trim() || !uploadFileUrl.trim() || uploadSignedMutation.isPending}
-              onClick={() => uploadSignedMutation.mutate({ fileUrl: uploadFileUrl.trim(), signerName: uploadSignerName.trim() })}
-              data-testid="btn-confirm-upload-signed">
-              {uploadSignedMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              {t("saveSignedCopy")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Edit modal */}
       {showEdit && (
