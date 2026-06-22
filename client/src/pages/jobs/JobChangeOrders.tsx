@@ -416,7 +416,6 @@ export default function JobChangeOrders({ jobId, isAdminOrManager }: { jobId: st
                 className="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm">
                 <option value="verbal">Verbal</option>
                 <option value="written">Written</option>
-                <option value="digital_signature">Digital Signature</option>
               </select>
             </div>
             <div>
