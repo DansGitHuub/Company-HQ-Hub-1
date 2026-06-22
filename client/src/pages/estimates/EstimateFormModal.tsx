@@ -3,6 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandItem, CommandEmpty } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CatalogBrowser } from "@/components/CatalogBrowser";
 import type { CatalogItem } from "@/components/CatalogBrowser";
 import {
-  Plus, Trash2, ChevronDown, ChevronUp, Loader2, Calculator, Package, Hammer, Wrench, Search
+  Plus, Trash2, ChevronDown, ChevronUp, Loader2, Calculator, Package, Hammer, Wrench, Search, BookOpen,
 } from "lucide-react";
 import CalculatorRunner from "@/components/calculator/CalculatorRunner";
 
@@ -32,6 +34,7 @@ interface LineItem {
   is_optional: boolean;
   image_url?: string | null;
   image_hidden?: boolean | null;
+  catalog_item_id?: number | null;
 }
 
 interface WorkAreaDraft {
@@ -86,7 +89,7 @@ const ESTIMATE_TYPES = [
 ];
 
 function defaultLineItem(): LineItem {
-  return { _key: key(), item_type: "service", description: "", quantity: 1, unit: "", unit_price: 0, amount: 0, is_optional: false };
+  return { _key: key(), item_type: "service", description: "", quantity: 1, unit: "", unit_price: 0, amount: 0, is_optional: false, catalog_item_id: null };
 }
 
 function defaultArea(name = ""): WorkAreaDraft {
@@ -145,6 +148,7 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
 
   // Work areas
   const [catalogAreaKey, setCatalogAreaKey] = useState<string | null>(null);
+  const [catalogPickerKey, setCatalogPickerKey] = useState<string | null>(null);
   const [areas, setAreas] = useState<WorkAreaDraft[]>(() => {
     if (existing?.work_areas?.length) {
       return existing.work_areas.map((a: any) => ({
@@ -165,6 +169,7 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
           unit_price: parseFloat(li.unit_price ?? "0"),
           amount: parseFloat(li.amount ?? "0"),
           is_optional: li.is_optional ?? false,
+          catalog_item_id: li.catalog_item_id ?? null,
         })),
       }));
     }
@@ -182,6 +187,11 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
   });
   const staff = (allStaff as any[]).filter((u: any) => ["Admin","Manager","Master Admin"].includes(u.role));
   const { data: workAreaTypes = [] } = useQuery<WorkAreaType[]>({ queryKey: ["/api/work-area-types"] });
+  const { data: catalogItems = [] } = useQuery<CatalogItem[]>({
+    queryKey: ["/api/catalog"],
+    queryFn: () => fetch("/api/catalog", { credentials: "include" }).then(r => r.json()),
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Group work area types by division for the dropdown
   const workAreaTypesByDivision = workAreaTypes.reduce<Record<string, WorkAreaType[]>>((acc, wt) => {
@@ -276,6 +286,7 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
           unit_price: li.unit_price ?? 0,
           amount: 0,
           is_optional: false,
+          catalog_item_id: null,
         })),
       }));
       setAreas(newAreas);
@@ -325,9 +336,22 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
         amount: cost,
         is_optional: false,
         image_url: imageUrl ?? null,
+        catalog_item_id: item.id,
       }]
     } : a));
   };
+
+  function applyFromCatalog(aKey: string, iKey: string, item: CatalogItem) {
+    const cost = parseFloat((item.cost ?? "0").toString().replace(/[$,]/g, "")) || 0;
+    updateLineItem(aKey, iKey, {
+      item_type: catalogClassToItemType(item.class),
+      description: item.name,
+      unit: item.units ?? "",
+      unit_price: cost,
+      catalog_item_id: item.id,
+    });
+    setCatalogPickerKey(null);
+  }
 
   const removeLineItem = (aKey: string, iKey: string) =>
     setAreas(prev => prev.map(a => a._key === aKey
@@ -397,6 +421,7 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
           unit_price: li.unit_price,
           amount: lineAmount(li),
           is_optional: li.is_optional,
+          catalog_item_id: li.catalog_item_id ?? null,
         })),
       })),
     });
@@ -726,7 +751,7 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
                           </div>
                         </div>
                         {/* Column headers */}
-                        <div className="grid grid-cols-[90px_1fr_60px_70px_80px_70px_28px] gap-1 text-[10px] text-muted-foreground font-medium px-1">
+                        <div className="grid grid-cols-[90px_1fr_60px_70px_80px_70px_24px_28px] gap-1 text-[10px] text-muted-foreground font-medium px-1">
                           <span>{t("colClass")}</span>
                           <span>{t("colDescription")}</span>
                           <span>{t("colQty")}</span>
@@ -734,9 +759,10 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
                           <span>{t("colUnitPrice")}</span>
                           <span className="text-right">{t("colAmount")}</span>
                           <span />
+                          <span />
                         </div>
                         {area.line_items.map((li, iIdx) => (
-                          <div key={li._key} className="grid grid-cols-[90px_1fr_60px_70px_80px_70px_28px] gap-1 items-center">
+                          <div key={li._key} className="grid grid-cols-[90px_1fr_60px_70px_80px_70px_24px_28px] gap-1 items-center">
                             <Select value={li.item_type} onValueChange={v => updateLineItem(area._key, li._key, { item_type: v as any })}>
                               <SelectTrigger className="h-7 text-xs" data-testid={`select-item-type-${aIdx}-${iIdx}`}>
                                 <SelectValue />
@@ -776,6 +802,44 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
                             <div className="text-right text-xs font-medium pr-1 tabular-nums">
                               {fmtMoney(lineAmount(li))}
                             </div>
+                            {/* Per-line-item catalog picker */}
+                            <Popover
+                              open={catalogPickerKey === `${area._key}:${li._key}`}
+                              onOpenChange={open => setCatalogPickerKey(open ? `${area._key}:${li._key}` : null)}
+                            >
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  title="Pick from catalog"
+                                  className={`flex items-center justify-center rounded h-6 w-6 border transition-colors ${li.catalog_item_id ? "border-primary text-primary bg-primary/10" : "border-muted-foreground/30 text-muted-foreground hover:text-primary hover:border-primary"}`}
+                                  data-testid={`btn-catalog-pick-${aIdx}-${iIdx}`}
+                                >
+                                  <BookOpen className="h-3 w-3" />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-72 p-0" align="end" side="bottom">
+                                <Command>
+                                  <CommandInput placeholder="Search catalog…" className="h-8 text-xs" />
+                                  <CommandList className="max-h-56 overflow-y-auto">
+                                    <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">No items found.</CommandEmpty>
+                                    {(catalogItems as CatalogItem[]).map((ci: CatalogItem) => (
+                                      <CommandItem
+                                        key={ci.id}
+                                        value={`${ci.item_number} ${ci.name} ${ci.class ?? ""} ${ci.category ?? ""}`}
+                                        onSelect={() => applyFromCatalog(area._key, li._key, ci)}
+                                        className="flex flex-col items-start gap-0.5 py-1.5 cursor-pointer"
+                                        data-testid={`catalog-pick-item-${ci.id}`}
+                                      >
+                                        <span className="text-xs font-medium leading-tight">{ci.name}</span>
+                                        <span className="text-[10px] text-muted-foreground leading-tight">
+                                          {[ci.item_number, ci.class, ci.units ? `(${ci.units})` : null, ci.cost ? `$${parseFloat(ci.cost.toString()).toFixed(2)}` : null].filter(Boolean).join(" · ")}
+                                        </span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                             <button type="button" onClick={() => removeLineItem(area._key, li._key)}
                               className="text-muted-foreground hover:text-destructive" data-testid={`btn-remove-item-${aIdx}-${iIdx}`}>
                               <Trash2 className="h-3.5 w-3.5" />

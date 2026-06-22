@@ -3188,6 +3188,7 @@ export const estimateLineItems = pgTable("estimate_line_items", {
   imageUrl:           text("image_url"),
   imageHidden:        boolean("image_hidden").default(false),
   classId:            integer("class_id").references(() => classCodes.id),
+  catalogItemId:      integer("catalog_item_id").references(() => catalogItems.id),
 });
 export const insertEstimateLineItemSchema = createInsertSchema(estimateLineItems).omit({ id: true });
 export type InsertEstimateLineItem = z.infer<typeof insertEstimateLineItemSchema>;

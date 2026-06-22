@@ -37,5 +37,11 @@ export async function runCatalogExtendedMigration() {
     ON CONFLICT (class_id, year) DO NOTHING
   `);
 
+  // catalog_item_id FK on estimate_line_items so picked items are traceable
+  await pool.query(`
+    ALTER TABLE estimate_line_items
+      ADD COLUMN IF NOT EXISTS catalog_item_id INTEGER REFERENCES catalog_items(id)
+  `);
+
   console.log("[migration] Materials catalog columns ready (tax_rate, overhead_override, profit_margin_override, retired) + class_pricing_defaults seeded");
 }
