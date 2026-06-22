@@ -198,3 +198,9 @@ id = "KDKWFjgngczF0OD4uUBi-"
 uri = "file://.local/audits/group-37-notifications.md"
 type = "text"
 title = "Group 37 — Notifications Audit"
+
+[[outputs]]
+id = "2DHOnNzPnxeUuPhSy2NcZ"
+uri = "file://.local/audits/group-38-connectors-integrations.md"
+type = "text"
+title = "Group 38 — Connectors / Integrations Audit"
