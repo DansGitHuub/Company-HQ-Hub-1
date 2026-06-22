@@ -400,7 +400,6 @@ export async function registerRoutes(
       const userRole = role || "Crew";
       const hashedPassword = await hashPassword(password);
       
-      // Store plaintext password for staff (non-customer) so Master Admin can view it
       const isStaff = userRole !== "Customer";
       
       const user = await storage.createUser({
