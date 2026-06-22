@@ -399,7 +399,7 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
       const offset = (pageNum - 1) * limitNum;
 
       const params: any[] = [];
-      const conditions: string[] = ["te.clock_out IS NOT NULL"];
+      const conditions: string[] = ["te.clock_out IS NOT NULL", "te.approval_status = 'approved'"];
 
       if (dateFrom) { params.push(dateFrom); conditions.push(`te.clock_in >= $${params.length}::timestamptz`); }
       if (dateTo)   { params.push(dateTo + "T23:59:59"); conditions.push(`te.clock_in <= $${params.length}::timestamptz`); }
@@ -414,7 +414,7 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
       const q = `
         SELECT
           te.id, te.clock_in, te.clock_out, te.duration_minutes,
-          te.entry_type, te.work_area_name,
+          te.entry_type, te.work_area_name, te.approval_status,
           te.qbo_exported_at, te.qbo_time_activity_id, te.qbo_export_error,
           u.id AS user_id,
           COALESCE(u.first_name || ' ' || u.last_name, u.username) AS employee_name,
@@ -458,7 +458,16 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
       if (!Array.isArray(entryIds) || entryIds.length === 0) {
         return res.status(400).json({ error: "entryIds array is required" });
       }
-      const result = await exportTimeEntriesToQBO(entryIds.map(Number));
+      // Only export entries that have been approved — reject silently drops any that aren't
+      const { rows: approvedRows } = await pool.query(
+        `SELECT id FROM time_entries WHERE id = ANY($1::int[]) AND approval_status = 'approved'`,
+        [entryIds.map(Number)]
+      );
+      const approvedIds = approvedRows.map((r: any) => r.id);
+      if (approvedIds.length === 0) {
+        return res.status(400).json({ error: "No approved entries in selection — only approved time entries can be exported to payroll" });
+      }
+      const result = await exportTimeEntriesToQBO(approvedIds);
       res.json(result);
     } catch (err: any) {
       const status = err.message === "QuickBooks not connected" ? 503 : 500;
@@ -498,7 +507,8 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
       const { rows: pendingCounts } = await pool.query(
         `SELECT user_id, COUNT(*)::int AS pending_count
          FROM time_entries
-         WHERE clock_out IS NOT NULL AND qbo_exported_at IS NULL
+         WHERE clock_out IS NOT NULL AND approval_status = 'approved'
+           AND qbo_exported_at IS NULL
            AND (qbo_export_error IS NULL OR qbo_export_error = '')
          GROUP BY user_id`
       );

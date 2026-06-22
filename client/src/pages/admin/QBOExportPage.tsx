@@ -77,6 +77,30 @@ function StatusChip({ entry }: { entry: any }) {
   );
 }
 
+// ─── Approval status badge ────────────────────────────────────────────────────
+
+function ApprovalBadge({ status }: { status: string | null }) {
+  if (status === "approved") {
+    return (
+      <Badge className="bg-green-100 text-green-700 border-green-200 text-xs gap-1">
+        <CheckCircle2 className="w-3 h-3" /> Approved
+      </Badge>
+    );
+  }
+  if (status === "rejected") {
+    return (
+      <Badge className="bg-red-100 text-red-700 border-red-200 text-xs gap-1">
+        <AlertCircle className="w-3 h-3" /> Rejected
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="bg-gray-100 text-gray-500 border-gray-200 text-xs gap-1">
+      <Clock className="w-3 h-3" /> Pending
+    </Badge>
+  );
+}
+
 // ─── Tab: Time Entries ────────────────────────────────────────────────────────
 
 function TimeEntriesTab() {
@@ -261,14 +285,15 @@ function TimeEntriesTab() {
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Job</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Work Area</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Hours</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Status</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Approval</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 text-xs uppercase tracking-wide">Export Status</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i} className="border-b border-gray-50">
-                    {[...Array(7)].map((_, j) => (
+                    {[...Array(8)].map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 bg-gray-100 rounded animate-pulse" />
                       </td>
@@ -277,7 +302,7 @@ function TimeEntriesTab() {
                 ))
               ) : entries.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
+                  <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
                     No time entries found for this filter
                   </td>
                 </tr>
@@ -310,6 +335,9 @@ function TimeEntriesTab() {
                     </td>
                     <td className="px-4 py-3 text-gray-700 font-medium tabular-nums">
                       {formatDuration(entry.duration_minutes)}
+                    </td>
+                    <td className="px-4 py-3" data-testid={`approval-status-${entry.id}`}>
+                      <ApprovalBadge status={entry.approval_status} />
                     </td>
                     <td className="px-4 py-3">
                       <StatusChip entry={entry} />
