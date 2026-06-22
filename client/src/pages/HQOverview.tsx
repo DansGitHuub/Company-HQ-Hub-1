@@ -24,6 +24,8 @@ import {
   Archive,
   FileText,
   Pencil,
+  Plus,
+  Trash2,
   Check,
   X,
 } from "lucide-react";
@@ -35,7 +37,16 @@ import FileLibrary from "@/components/FileLibrary";
 
 type HQGoal = { text: string; target: string; status: string };
 type HQContent = { vision?: string; mission?: string; goals?: HQGoal[] };
-type Note = { date: string; title: string; attendees: string; content?: string };
+type MeetingNote = {
+  id: number;
+  meeting_date: string;
+  title: string;
+  attendees: string;
+  content: string;
+  created_by_name?: string;
+  created_at: string;
+  updated_at: string;
+};
 
 const GOAL_STATUSES = ["On Track", "In Progress", "Met", "Not Started"];
 
@@ -56,14 +67,25 @@ export default function HQOverview() {
   const { toast } = useToast();
   const { user } = useAuth();
   const isAdmin = !!(user as any)?.isMasterAdmin || user?.role === "Admin";
+  const canManageNotes = !!(user as any)?.isMasterAdmin || user?.role === "Admin" || user?.role === "Manager";
 
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [selectedNote, setSelectedNote] = useState<MeetingNote | null>(null);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
+  const [noteFormOpen, setNoteFormOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<MeetingNote | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const emptyForm = { meeting_date: "", title: "", attendees: "", content: "" };
+  const [noteForm, setNoteForm] = useState(emptyForm);
+
   const { data: companySettingsData } = useQuery<any>({
     queryKey: ["/api/company-settings"],
+  });
+
+  const { data: meetingNotes = [] } = useQuery<MeetingNote[]>({
+    queryKey: ["/api/meeting-notes"],
   });
 
   const hqContent = companySettingsData?.hqContent as HQContent | undefined;
@@ -87,6 +109,88 @@ export default function HQOverview() {
     },
   });
 
+  const createNote = useMutation({
+    mutationFn: async (body: typeof emptyForm) => {
+      const res = await apiRequest("POST", "/api/meeting-notes", body);
+      if (!res.ok) throw new Error("Failed to create");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/meeting-notes"] });
+      toast({ title: "Note added" });
+      setNoteFormOpen(false);
+      setNoteForm(emptyForm);
+    },
+    onError: () => toast({ title: "Failed to add note", variant: "destructive" }),
+  });
+
+  const updateNote = useMutation({
+    mutationFn: async ({ id, body }: { id: number; body: typeof emptyForm }) => {
+      const res = await apiRequest("PATCH", `/api/meeting-notes/${id}`, body);
+      if (!res.ok) throw new Error("Failed to update");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/meeting-notes"] });
+      toast({ title: "Note updated" });
+      setNoteFormOpen(false);
+      setEditingNote(null);
+      setNoteForm(emptyForm);
+    },
+    onError: () => toast({ title: "Failed to update note", variant: "destructive" }),
+  });
+
+  const deleteNote = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/meeting-notes/${id}`);
+      if (!res.ok) throw new Error("Failed to delete");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/meeting-notes"] });
+      toast({ title: "Note deleted" });
+      setDeleteConfirmId(null);
+    },
+    onError: () => toast({ title: "Failed to delete note", variant: "destructive" }),
+  });
+
+  const openAddNote = () => {
+    setEditingNote(null);
+    setNoteForm(emptyForm);
+    setNoteFormOpen(true);
+  };
+
+  const openEditNote = (note: MeetingNote) => {
+    setEditingNote(note);
+    setNoteForm({
+      meeting_date: note.meeting_date.split("T")[0],
+      title: note.title,
+      attendees: note.attendees,
+      content: note.content,
+    });
+    setNoteFormOpen(true);
+  };
+
+  const submitNoteForm = () => {
+    if (!noteForm.meeting_date || !noteForm.title.trim()) {
+      toast({ title: "Date and title are required", variant: "destructive" });
+      return;
+    }
+    if (editingNote) {
+      updateNote.mutate({ id: editingNote.id, body: noteForm });
+    } else {
+      createNote.mutate(noteForm);
+    }
+  };
+
+  const formatNoteDate = (dateStr: string) => {
+    const d = new Date(dateStr.split("T")[0] + "T12:00:00");
+    return {
+      mon: d.toLocaleString("en-US", { month: "short" }),
+      day: String(d.getDate()),
+    };
+  };
+
   const startEdit = (field: string, value: string) => {
     setEditingField(field);
     setEditValue(value);
@@ -109,20 +213,7 @@ export default function HQOverview() {
     saveMutation.mutate(updated);
   };
 
-  const notes: Note[] = [
-    { date: "Oct 24, 2025", title: "Quarterly Strategy Alignment", attendees: "All Management", content: "Reviewed Q4 goals and realigned priorities. Focus areas: customer retention, crew training, and equipment maintenance." },
-    { date: "Oct 17, 2025", title: "Safety Protocol Update", attendees: "All Hands", content: "Updated heat safety protocols for summer months. New hydration stations at all job sites. PPE compliance reminders." },
-    { date: "Oct 10, 2025", title: "New Material Supplier Review", attendees: "Ops & Purchasing", content: "Evaluated three new mulch suppliers. Selected GreenGrow Materials for better pricing and quality. Implementation starts Nov 1." },
-  ];
-
-  const archivedNotes: Note[] = [
-    { date: "Oct 3, 2025", title: "Fleet Maintenance Schedule", attendees: "Operations" },
-    { date: "Sep 26, 2025", title: "Fall Season Preparation", attendees: "All Crews" },
-    { date: "Sep 19, 2025", title: "Customer Feedback Review", attendees: "Management" },
-    { date: "Sep 12, 2025", title: "New Employee Orientation", attendees: "HR & Training" },
-    { date: "Sep 5, 2025", title: "Monthly Budget Review", attendees: "Finance & Ops" },
-    { date: "Aug 29, 2025", title: "Equipment Upgrade Discussion", attendees: "Operations" },
-  ];
+  const recentNotes = meetingNotes.slice(0, 5);
 
   return (
     <div className="space-y-4 max-w-5xl mx-auto pb-20">
@@ -349,84 +440,222 @@ export default function HQOverview() {
           <h2 className="text-3xl font-heading font-bold flex items-center gap-2">
             <MessageSquare className="w-8 h-8 text-primary" /> {t("hq.leadershipNotes")}
           </h2>
-          <Button variant="outline" onClick={() => setArchiveDialogOpen(true)} className="gap-2" data-testid="button-view-archives">
-            <Archive className="w-4 h-4" />
-            {t("hq.viewAllArchives")}
-          </Button>
+          <div className="flex items-center gap-2">
+            {canManageNotes && (
+              <Button size="sm" onClick={openAddNote} className="gap-2" data-testid="button-add-note">
+                <Plus className="w-4 h-4" /> Add Note
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setArchiveDialogOpen(true)} className="gap-2" data-testid="button-view-archives">
+              <Archive className="w-4 h-4" />
+              {t("hq.viewAllArchives")}
+            </Button>
+          </div>
         </div>
         <div className="space-y-4">
-          {notes.map((note, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between p-4 bg-card border rounded-lg hover:bg-accent transition-colors cursor-pointer"
-              onClick={() => setSelectedNote(note)}
-              data-testid={`card-note-${i}`}
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-secondary rounded-lg flex flex-col items-center justify-center text-[10px] font-bold">
-                  <span>{note.date.split(" ")[0]}</span>
-                  <span className="text-base leading-none">{note.date.split(" ")[1].replace(",", "")}</span>
-                </div>
-                <div>
-                  <h4 className="font-bold text-lg">{note.title}</h4>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Users className="w-3 h-3" /> {note.attendees}
+          {recentNotes.length === 0 && (
+            <div className="text-center py-10 text-muted-foreground text-sm border rounded-lg">
+              No meeting notes yet.{canManageNotes ? ' Click "Add Note" to create the first one.' : ""}
+            </div>
+          )}
+          {recentNotes.map((note) => {
+            const { mon, day } = formatNoteDate(note.meeting_date);
+            return (
+              <div
+                key={note.id}
+                className="flex items-center justify-between p-4 bg-card border rounded-lg hover:bg-accent transition-colors cursor-pointer group"
+                onClick={() => setSelectedNote(note)}
+                data-testid={`card-note-${note.id}`}
+              >
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className="w-12 h-12 bg-secondary rounded-lg flex flex-col items-center justify-center text-[10px] font-bold shrink-0">
+                    <span>{mon}</span>
+                    <span className="text-base leading-none">{day}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-lg truncate">{note.title}</h4>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Users className="w-3 h-3 shrink-0" /> {note.attendees}
+                    </div>
                   </div>
                 </div>
+                <div className="flex items-center gap-1 ml-3 shrink-0">
+                  {canManageNotes && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openEditNote(note); }}
+                        className="p-1.5 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
+                        data-testid={`button-edit-note-${note.id}`}
+                        title="Edit note"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(note.id); }}
+                        className="p-1.5 rounded hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                        data-testid={`button-delete-note-${note.id}`}
+                        title="Delete note"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                      </button>
+                    </>
+                  )}
+                  <ArrowRight className="text-muted-foreground ml-1" />
+                </div>
               </div>
-              <ArrowRight className="text-muted-foreground" />
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
+      {/* Archive / All Notes Dialog */}
       <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Archive className="w-5 h-5" />
-              Leadership Notes Archive
+              All Meeting Notes ({meetingNotes.length})
             </DialogTitle>
-            <DialogDescription>Browse past meeting notes and company updates.</DialogDescription>
+            <DialogDescription>Browse all meeting notes and company updates.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 max-h-[400px] overflow-y-auto">
-            {archivedNotes.map((note, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors cursor-pointer"
-                onClick={() => {
-                  toast({
-                    title: note.title,
-                    description: `Meeting notes from ${note.date} with ${note.attendees}.`,
-                  });
-                }}
-                data-testid={`card-archived-note-${i}`}
-              >
-                <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium text-sm">{note.title}</p>
-                    <p className="text-xs text-muted-foreground">{note.date} · {note.attendees}</p>
+          <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
+            {meetingNotes.length === 0 && (
+              <p className="text-center text-sm text-muted-foreground py-8">No notes yet.</p>
+            )}
+            {meetingNotes.map((note) => {
+              const { mon, day } = formatNoteDate(note.meeting_date);
+              return (
+                <div
+                  key={note.id}
+                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors cursor-pointer group"
+                  onClick={() => { setSelectedNote(note); setArchiveDialogOpen(false); }}
+                  data-testid={`card-archived-note-${note.id}`}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <FileText className="w-5 h-5 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{note.title}</p>
+                      <p className="text-xs text-muted-foreground">{mon} {day} · {note.attendees}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 ml-2 shrink-0">
+                    {canManageNotes && (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setArchiveDialogOpen(false); openEditNote(note); }}
+                          className="p-1 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Edit"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(note.id); }}
+                          className="p-1 rounded hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        </button>
+                      </>
+                    )}
+                    <ArrowRight className="w-4 h-4 text-muted-foreground ml-1" />
                   </div>
                 </div>
-                <ArrowRight className="w-4 h-4 text-muted-foreground" />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Add / Edit Note Form Dialog */}
+      <Dialog open={noteFormOpen} onOpenChange={(o) => { if (!o) { setNoteFormOpen(false); setEditingNote(null); setNoteForm(emptyForm); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingNote ? "Edit Meeting Note" : "Add Meeting Note"}</DialogTitle>
+            <DialogDescription>Fill in the details for this leadership note.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Date <span className="text-destructive">*</span></Label>
+                <Input type="date" value={noteForm.meeting_date}
+                  onChange={(e) => setNoteForm(f => ({ ...f, meeting_date: e.target.value }))}
+                  data-testid="input-note-date" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Attendees</Label>
+                <Input placeholder="e.g. All Management" value={noteForm.attendees}
+                  onChange={(e) => setNoteForm(f => ({ ...f, attendees: e.target.value }))}
+                  data-testid="input-note-attendees" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Title <span className="text-destructive">*</span></Label>
+              <Input placeholder="Meeting title" value={noteForm.title}
+                onChange={(e) => setNoteForm(f => ({ ...f, title: e.target.value }))}
+                data-testid="input-note-title" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Notes / Summary</Label>
+              <Textarea placeholder="Key decisions, action items, discussion points…" value={noteForm.content}
+                onChange={(e) => setNoteForm(f => ({ ...f, content: e.target.value }))}
+                className="min-h-[120px]" data-testid="input-note-content" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={() => { setNoteFormOpen(false); setEditingNote(null); setNoteForm(emptyForm); }}>
+              Cancel
+            </Button>
+            <Button onClick={submitNoteForm} disabled={createNote.isPending || updateNote.isPending} data-testid="button-save-note">
+              {createNote.isPending || updateNote.isPending ? "Saving…" : editingNote ? "Save Changes" : "Add Note"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmId !== null} onOpenChange={(o) => { if (!o) setDeleteConfirmId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Note</DialogTitle>
+            <DialogDescription>This meeting note will be permanently removed. Are you sure?</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => deleteConfirmId !== null && deleteNote.mutate(deleteConfirmId)}
+              disabled={deleteNote.isPending} data-testid="button-confirm-delete-note">
+              {deleteNote.isPending ? "Deleting…" : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Note Detail Dialog */}
       <Dialog open={!!selectedNote} onOpenChange={() => setSelectedNote(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{selectedNote?.title}</DialogTitle>
             <DialogDescription className="flex items-center gap-2">
-              <Calendar className="w-4 h-4" /> {selectedNote?.date} · {selectedNote?.attendees}
+              <Calendar className="w-4 h-4" />
+              {selectedNote && (() => { const { mon, day } = formatNoteDate(selectedNote.meeting_date); return `${mon} ${day}`; })()}
+              {selectedNote?.attendees ? ` · ${selectedNote.attendees}` : ""}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-muted-foreground">{selectedNote?.content}</p>
+            {selectedNote?.content
+              ? <p className="text-muted-foreground whitespace-pre-wrap">{selectedNote.content}</p>
+              : <p className="text-muted-foreground italic">No notes recorded.</p>
+            }
           </div>
+          {canManageNotes && selectedNote && (
+            <div className="flex justify-end gap-2 pt-1 border-t">
+              <Button size="sm" variant="outline" onClick={() => { setSelectedNote(null); openEditNote(selectedNote); }}>
+                <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => { setSelectedNote(null); setDeleteConfirmId(selectedNote.id); }}>
+                <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
