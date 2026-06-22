@@ -1,6 +1,16 @@
 import { pool } from "./db";
 import type { Express } from "express";
 
+const STAFF_ROLES = ["Admin", "Manager", "Master Admin"];
+
+function requireRole(...roles: string[]) {
+  return (req: any, res: any, next: any) => {
+    if (!req.user) return res.status(401).json({ message: "Authentication required" });
+    if (!roles.includes(req.user.role)) return res.status(403).json({ message: "Insufficient permissions" });
+    next();
+  };
+}
+
 export function registerCloseoutRoutes(app: Express, requireAuth: any) {
 
   // ── Get or create closeout for a job ─────────────────────────────────────
@@ -26,7 +36,7 @@ export function registerCloseoutRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Create closeout ──────────────────────────────────────────────────────
-  app.post("/api/jobs/:jobId/closeout", requireAuth, async (req: any, res) => {
+  app.post("/api/jobs/:jobId/closeout", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
     const jobId = req.params.jobId;
     const {
       final_scope_notes, materials_notes, remaining_issues,
@@ -64,7 +74,7 @@ export function registerCloseoutRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Update closeout ──────────────────────────────────────────────────────
-  app.patch("/api/jobs/:jobId/closeout", requireAuth, async (req: any, res) => {
+  app.patch("/api/jobs/:jobId/closeout", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
     const updates: Record<string, any> = {};
     const allowed = [
       "final_scope_confirmed", "final_scope_notes", "materials_used_confirmed",
@@ -92,7 +102,7 @@ export function registerCloseoutRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Submit for manager approval ──────────────────────────────────────────
-  app.post("/api/jobs/:jobId/closeout/submit", requireAuth, async (req: any, res) => {
+  app.post("/api/jobs/:jobId/closeout/submit", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
     try {
       const { rows } = await pool.query(
         `UPDATE job_closeouts SET status = 'pending_approval', submitted_by = $1, submitted_at = NOW(), updated_at = NOW()
@@ -107,7 +117,7 @@ export function registerCloseoutRoutes(app: Express, requireAuth: any) {
   });
 
   // ── Manager approve closeout ─────────────────────────────────────────────
-  app.post("/api/jobs/:jobId/closeout/approve", requireAuth, async (req: any, res) => {
+  app.post("/api/jobs/:jobId/closeout/approve", requireAuth, requireRole(...STAFF_ROLES), async (req: any, res) => {
     try {
       const { rows } = await pool.query(
         `UPDATE job_closeouts
