@@ -386,6 +386,54 @@ export async function sendSuggestionStatusUpdateEmail(
   `);
 }
 
+export async function sendWorksheetSubmittedEmail(
+  toEmail: string,
+  managerName: string,
+  employeeName: string,
+  worksheetDate: string,
+  worksheetId: string
+) {
+  const appUrl = getAppUrl();
+  const dateLabel = worksheetDate
+    ? new Date(worksheetDate + "T12:00:00").toLocaleDateString("en-US", {
+        weekday: "long", month: "long", day: "numeric", year: "numeric",
+      })
+    : worksheetDate;
+  return sendEmail(
+    toEmail,
+    `Worksheet Submitted — ${escapeHtml(employeeName)} (${worksheetDate})`,
+    `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #166534; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Company HQ</h1>
+        <p style="color: #bbf7d0; margin: 4px 0 0 0; font-size: 14px;">Daily Worksheet Submitted</p>
+      </div>
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937; margin: 0 0 16px 0;">Worksheet Ready for Review</h2>
+        <p style="color: #4b5563;">Hi ${escapeHtml(managerName || "there")},</p>
+        <p style="color: #4b5563; line-height: 1.6;">
+          <strong>${escapeHtml(employeeName)}</strong> has submitted their daily crew worksheet
+          for <strong>${escapeHtml(dateLabel)}</strong>.
+        </p>
+        <div style="background-color: #dcfce7; border: 1px solid #16a34a; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <p style="color: #166534; margin: 0; font-weight: 600;">Employee: ${escapeHtml(employeeName)}</p>
+          <p style="color: #166534; margin: 8px 0 0 0;">Date: ${escapeHtml(dateLabel)}</p>
+          <p style="color: #166534; margin: 8px 0 0 0;">Status: <strong>Submitted — Awaiting Approval</strong></p>
+        </div>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${appUrl}/admin/worksheets" style="background-color: #166534; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+            Review Worksheet
+          </a>
+        </div>
+      </div>
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; border-top: 1px solid #e5e7eb;">
+        <p>Chapin Landscapes · Company HQ</p>
+      </div>
+    </div>
+  `
+  );
+}
+
 export async function sendNewApplicationNotificationEmail(
   toEmail: string,
   applicantName: string,

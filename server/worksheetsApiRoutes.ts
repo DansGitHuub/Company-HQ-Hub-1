@@ -1,5 +1,9 @@
 import { Express } from "express";
 import { pool } from "./db";
+import { sendWorksheetSubmittedEmail } from "./email";
+import { escapeHtml } from "./emailService";
+
+const MANAGER_ROLES = ["Admin", "Manager", "Master Admin"];
 
 export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
 
@@ -23,6 +27,65 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
       expenses: exps.rows,
       teamMembers: team.rows,
     };
+  }
+
+  // ── Helper: notify all Admins + Managers (in-app + email) ───────────────────
+  async function notifyManagersWorksheetSubmitted(
+    worksheetId: string,
+    employeeName: string,
+    worksheetDate: string
+  ) {
+    try {
+      const { rows: managers } = await pool.query(
+        `SELECT id, name, email FROM users
+         WHERE (role = ANY($1) OR "is_master_admin" = true)
+           AND email IS NOT NULL
+         ORDER BY name`,
+        [MANAGER_ROLES]
+      );
+
+      const dateLabel = worksheetDate
+        ? new Date(worksheetDate + "T12:00:00").toLocaleDateString("en-US", {
+            month: "short", day: "numeric", year: "numeric",
+          })
+        : worksheetDate;
+
+      const notifTitle   = `Worksheet Submitted — ${employeeName}`;
+      const notifMessage = `${employeeName} submitted their daily worksheet for ${dateLabel}. Tap to review.`;
+
+      for (const mgr of managers) {
+        // In-app bell notification
+        await pool.query(
+          `INSERT INTO staff_notifications (id, user_id, type, title, message, link, metadata)
+           VALUES (gen_random_uuid(), $1, 'worksheet_submitted', $2, $3, '/admin/worksheets', $4)`,
+          [
+            mgr.id,
+            notifTitle,
+            notifMessage,
+            JSON.stringify({ worksheetId, employeeName, date: worksheetDate }),
+          ]
+        );
+
+        // Email (fire-and-forget, don't block response)
+        if (mgr.email) {
+          sendWorksheetSubmittedEmail(
+            mgr.email,
+            mgr.name || "Manager",
+            employeeName,
+            worksheetDate,
+            worksheetId
+          ).catch((err: any) =>
+            console.error(`[worksheets] Email to ${mgr.email} failed:`, err?.message)
+          );
+        }
+      }
+
+      console.log(
+        `[worksheets] Submit notifications sent to ${managers.length} manager(s) for worksheet ${worksheetId}`
+      );
+    } catch (err: any) {
+      console.error("[worksheets] notifyManagersWorksheetSubmitted error:", err?.message);
+    }
   }
 
   // ── GET /api/worksheets (admin list) ─────────────────────────────────────────
@@ -169,7 +232,6 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
   app.get("/api/worksheets/today", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
     try {
-      // Try to find today's worksheet for this user
       const existing = await pool.query(
         `SELECT id FROM worksheets WHERE user_id = $1 AND date = CURRENT_DATE LIMIT 1`,
         [userId]
@@ -179,7 +241,6 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
       if (existing.rows.length > 0) {
         worksheetId = existing.rows[0].id;
       } else {
-        // Auto-create
         const created = await pool.query(
           `INSERT INTO worksheets (user_id, date, status) VALUES ($1, CURRENT_DATE, 'draft') RETURNING id`,
           [userId]
@@ -206,14 +267,35 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
   });
 
   // ── PATCH /api/worksheets/:id ─────────────────────────────────────────────────
+  // Admins and Managers can always edit.
+  // Crew (and other non-manager roles) are blocked once status is submitted or approved.
   app.patch("/api/worksheets/:id", requireAuth, async (req, res) => {
-    const { notes, status, signature_url } = req.body;
-    // job_id: if key is present in body (even as null/empty), update it; otherwise keep existing
-    const hasJobId = "job_id" in req.body;
-    const jobIdValue = req.body.job_id || null;
+    const user = req.user as any;
+    const isManager = MANAGER_ROLES.includes(user.role) || user.isMasterAdmin;
+
     try {
+      // ── Status guard for non-managers ────────────────────────────────────
+      if (!isManager) {
+        const { rows } = await pool.query(
+          `SELECT status FROM worksheets WHERE id = $1`,
+          [req.params.id]
+        );
+        if (rows.length === 0) {
+          return res.status(404).json({ message: "Worksheet not found" });
+        }
+        const currentStatus = rows[0].status;
+        if (currentStatus === "submitted" || currentStatus === "approved") {
+          return res.status(403).json({
+            message: "This worksheet has already been submitted and cannot be edited.",
+          });
+        }
+      }
+
+      const { notes, status, signature_url } = req.body;
+      const hasJobId   = "job_id" in req.body;
+      const jobIdValue = req.body.job_id || null;
+
       if (hasJobId) {
-        // Include job_id with explicit cast so PostgreSQL knows the type even when null
         await pool.query(
           `UPDATE worksheets SET
             notes         = COALESCE($1::text, notes),
@@ -225,8 +307,6 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
           [notes ?? null, jobIdValue, status ?? null, req.params.id, signature_url ?? null]
         );
       } else {
-        // job_id not present in request body — leave it unchanged
-        // Only 4 params so no untyped null gaps
         await pool.query(
           `UPDATE worksheets SET
             notes         = COALESCE($1::text, notes),
@@ -237,6 +317,7 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
           [notes ?? null, status ?? null, req.params.id, signature_url ?? null]
         );
       }
+
       const full = await fetchWorksheetFull(req.params.id);
       return res.json(full);
     } catch (err: any) {
@@ -247,10 +328,33 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
   // ── POST /api/worksheets/:id/submit ──────────────────────────────────────────
   app.post("/api/worksheets/:id/submit", requireAuth, async (req, res) => {
     try {
+      // Fetch worksheet + submitter name before updating so we have the info for notifications
+      const { rows: wsRows } = await pool.query(
+        `SELECT w.id, w.date, w.user_id, COALESCE(u.name, u.username) AS employee_name
+         FROM worksheets w
+         LEFT JOIN users u ON u.id = w.user_id
+         WHERE w.id = $1`,
+        [req.params.id]
+      );
+
+      if (wsRows.length === 0) {
+        return res.status(404).json({ message: "Worksheet not found" });
+      }
+
+      const ws = wsRows[0];
+
+      // Mark as submitted
       await pool.query(
         `UPDATE worksheets SET status = 'submitted', updated_at = NOW() WHERE id = $1`,
         [req.params.id]
       );
+
+      // Fire notifications to all managers/admins (non-blocking)
+      const dateStr = ws.date
+        ? (ws.date instanceof Date ? ws.date.toISOString().slice(0, 10) : String(ws.date).slice(0, 10))
+        : "";
+      notifyManagersWorksheetSubmitted(ws.id, ws.employee_name || "An employee", dateStr).catch(() => {});
+
       const full = await fetchWorksheetFull(req.params.id);
       return res.json(full);
     } catch (err: any) {
@@ -346,8 +450,6 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
   });
 
   // ── GET /api/materials/catalog?q= ────────────────────────────────────────────
-  // Searches both the materials inventory and catalog_items tables.
-  // Returns: [{ id, name, unit, unit_cost, source }]
   app.get("/api/materials/catalog", requireAuth, async (req, res) => {
     const q = ((req.query.q as string) || "").trim();
     const pattern = `%${q}%`;
@@ -369,7 +471,6 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
         ),
       ]);
 
-      // Merge, dedupe by lowercase name, catalog takes priority
       const seen = new Set<string>();
       const results: any[] = [];
       for (const row of [...fromCatalog.rows, ...fromMaterials.rows]) {
