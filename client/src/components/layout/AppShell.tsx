@@ -436,13 +436,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (!isAdmin) {
       const base = sidebarSections.filter(s => s.label !== "ADMIN");
       if (!isManager) {
-        // Crew (and other non-manager roles): hide Work Orders from sidebar
-        // — WO is accessed via the Work Order tab inside each Job detail page.
-        return base.map(s =>
-          s.label === "OPERATIONS"
-            ? { ...s, items: s.items.filter(i => i !== "work_orders") }
-            : s
-        );
+        // Crew (and other non-manager roles): hide Work Orders from OPERATIONS,
+        // and hide Customers/Consultations/Estimates from SALES (Admin/Manager only).
+        return base.map(s => {
+          if (s.label === "OPERATIONS") return { ...s, items: s.items.filter(i => i !== "work_orders") };
+          if (s.label === "SALES") return { ...s, items: s.items.filter(i => !["customers", "consultations", "estimates"].includes(i)) };
+          return s;
+        });
       }
       return base;
     }
