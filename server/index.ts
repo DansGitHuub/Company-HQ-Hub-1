@@ -54,6 +54,7 @@ import { runJobPacketGateMigration } from "./jobPacketGateMigration";
 import { runChangeOrdersMigration } from "./migrations/changeOrders";
 import { runCheckpointsMigration } from "./migrations/checkpoints";
 import { runCloseoutMigration } from "./migrations/closeout";
+import { runCloseoutCleanupMigration } from "./migrations/closeoutCleanup";
 import { runWarrantyMigration } from "./migrations/warranty";
 import { runPhase4Migration } from "./migrations/phase4";
 import { runPhase6Migration } from "./migrations/phase6";
@@ -170,6 +171,7 @@ app.use((req, res, next) => {
   await runChangeOrdersMigration();
   await runCheckpointsMigration();
   await runCloseoutMigration();
+  await runCloseoutCleanupMigration();
   await runWarrantyMigration();
   await runPhase4Migration();
   await runPhase6Migration();
