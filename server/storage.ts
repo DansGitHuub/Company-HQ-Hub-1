@@ -23,10 +23,6 @@ import {
   threadMessages, type ThreadMessage, type InsertThreadMessage,
   workRequests, type WorkRequest, type InsertWorkRequest,
   accessRequests, type AccessRequest, type InsertAccessRequest,
-  customForms, type CustomForm, type InsertCustomForm,
-  formSubmissions, type FormSubmission, type InsertFormSubmission,
-  formFolders, type FormFolder, type InsertFormFolder,
-  formTemplates, type FormTemplate, type InsertFormTemplate,
   equipment, type Equipment, type InsertEquipment,
   maintenanceSchedules, type MaintenanceSchedule, type InsertMaintenanceSchedule,
   maintenanceLogs, type MaintenanceLog, type InsertMaintenanceLog,
@@ -71,6 +67,7 @@ import {
   sopQuizQuestions, type SopQuizQuestion, type InsertSopQuizQuestion,
   userQuizAttempts, type UserQuizAttempt, type InsertUserQuizAttempt,
   builderForms, type BuilderForm, type InsertBuilderForm,
+  builderFormSubmissions, type BuilderFormSubmission, type InsertBuilderFormSubmission,
   pdfForms, type PdfForm, type InsertPdfForm,
   conversations, chatMessages,
   hqFiles, type HqFile, type InsertHqFile,
@@ -230,37 +227,6 @@ export interface IStorage {
   getAccessRequestsByUser(userId: string): Promise<AccessRequest[]>;
   updateAccessRequest(id: string, updates: Partial<AccessRequest>): Promise<AccessRequest | undefined>;
   
-  getCustomForms(): Promise<CustomForm[]>;
-  getCustomForm(id: string): Promise<CustomForm | undefined>;
-  createCustomForm(form: InsertCustomForm): Promise<CustomForm>;
-  updateCustomForm(id: string, updates: Partial<CustomForm>): Promise<CustomForm | undefined>;
-  deleteCustomForm(id: string): Promise<boolean>;
-  
-  getFormSubmissions(formId?: string): Promise<FormSubmission[]>;
-  getFormSubmission(id: string): Promise<FormSubmission | undefined>;
-  createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
-  updateFormSubmission(id: string, updates: Partial<FormSubmission>): Promise<FormSubmission | undefined>;
-
-  // Job Applications (public hiring form)
-  getJobApplications(): Promise<JobApplication[]>;
-  getJobApplicationByToken(token: string): Promise<JobApplication | undefined>;
-  getJobApplicationById(id: string): Promise<JobApplication | undefined>;
-  getJobApplicationByCandidateId(candidateId: string): Promise<JobApplication | undefined>;
-  createJobApplication(application: Omit<InsertJobApplication, "token"> & { token: string }): Promise<JobApplication>;
-  updateJobApplication(id: string, updates: Partial<JobApplication>): Promise<JobApplication | undefined>;
-  
-  // Form Folders
-  getFormFolders(): Promise<FormFolder[]>;
-  createFormFolder(folder: InsertFormFolder): Promise<FormFolder>;
-  updateFormFolder(id: string, updates: Partial<FormFolder>): Promise<FormFolder | undefined>;
-  deleteFormFolder(id: string): Promise<boolean>;
-  
-  // Form Templates
-  getFormTemplates(): Promise<FormTemplate[]>;
-  getFormTemplate(id: string): Promise<FormTemplate | undefined>;
-  createFormTemplate(template: InsertFormTemplate): Promise<FormTemplate>;
-  updateFormTemplate(id: string, updates: Partial<FormTemplate>): Promise<FormTemplate | undefined>;
-  deleteFormTemplate(id: string): Promise<boolean>;
   
   // Builder Forms
   getBuilderForms(archived?: boolean): Promise<BuilderForm[]>;
@@ -268,6 +234,13 @@ export interface IStorage {
   createBuilderForm(form: InsertBuilderForm): Promise<BuilderForm>;
   updateBuilderForm(id: string, updates: Partial<BuilderForm>): Promise<BuilderForm | undefined>;
   deleteBuilderForm(id: string): Promise<boolean>;
+
+  // Builder Form Submissions
+  getBuilderFormSubmissions(formId: string): Promise<BuilderFormSubmission[]>;
+  getBuilderFormSubmission(id: string): Promise<BuilderFormSubmission | undefined>;
+  createBuilderFormSubmission(submission: InsertBuilderFormSubmission): Promise<BuilderFormSubmission>;
+  updateBuilderFormSubmission(id: string, updates: Partial<BuilderFormSubmission>): Promise<BuilderFormSubmission | undefined>;
+  deleteBuilderFormSubmission(id: string): Promise<boolean>;
 
   // PDF Forms
   getPdfForms(createdBy?: string): Promise<PdfForm[]>;
@@ -1235,96 +1208,6 @@ export class DatabaseStorage implements IStorage {
     return request || undefined;
   }
 
-  async getCustomForms(): Promise<CustomForm[]> {
-    return db.select().from(customForms);
-  }
-
-  async getCustomForm(id: string): Promise<CustomForm | undefined> {
-    const [form] = await db.select().from(customForms).where(eq(customForms.id, id));
-    return form || undefined;
-  }
-
-  async createCustomForm(form: InsertCustomForm): Promise<CustomForm> {
-    const [newForm] = await db.insert(customForms).values(form).returning();
-    return newForm;
-  }
-
-  async updateCustomForm(id: string, updates: Partial<CustomForm>): Promise<CustomForm | undefined> {
-    const [form] = await db.update(customForms).set({ ...updates, updatedAt: new Date() }).where(eq(customForms.id, id)).returning();
-    return form || undefined;
-  }
-
-  async deleteCustomForm(id: string): Promise<boolean> {
-    const result = await db.delete(customForms).where(eq(customForms.id, id)).returning();
-    return result.length > 0;
-  }
-
-  async getFormSubmissions(formId?: string): Promise<FormSubmission[]> {
-    if (formId) {
-      return db.select().from(formSubmissions).where(eq(formSubmissions.formId, formId));
-    }
-    return db.select().from(formSubmissions);
-  }
-
-  async getFormSubmission(id: string): Promise<FormSubmission | undefined> {
-    const [submission] = await db.select().from(formSubmissions).where(eq(formSubmissions.id, id));
-    return submission || undefined;
-  }
-
-  async createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission> {
-    const [newSubmission] = await db.insert(formSubmissions).values(submission).returning();
-    return newSubmission;
-  }
-
-  async updateFormSubmission(id: string, updates: Partial<FormSubmission>): Promise<FormSubmission | undefined> {
-    const [submission] = await db.update(formSubmissions).set(updates).where(eq(formSubmissions.id, id)).returning();
-    return submission || undefined;
-  }
-
-  // Form Folders
-  async getFormFolders(): Promise<FormFolder[]> {
-    return db.select().from(formFolders);
-  }
-
-  async createFormFolder(folder: InsertFormFolder): Promise<FormFolder> {
-    const [newFolder] = await db.insert(formFolders).values(folder).returning();
-    return newFolder;
-  }
-
-  async updateFormFolder(id: string, updates: Partial<FormFolder>): Promise<FormFolder | undefined> {
-    const [folder] = await db.update(formFolders).set(updates).where(eq(formFolders.id, id)).returning();
-    return folder || undefined;
-  }
-
-  async deleteFormFolder(id: string): Promise<boolean> {
-    await db.delete(formFolders).where(eq(formFolders.id, id));
-    return true;
-  }
-
-  // Form Templates
-  async getFormTemplates(): Promise<FormTemplate[]> {
-    return db.select().from(formTemplates);
-  }
-
-  async getFormTemplate(id: string): Promise<FormTemplate | undefined> {
-    const [template] = await db.select().from(formTemplates).where(eq(formTemplates.id, id));
-    return template || undefined;
-  }
-
-  async createFormTemplate(template: InsertFormTemplate): Promise<FormTemplate> {
-    const [newTemplate] = await db.insert(formTemplates).values(template).returning();
-    return newTemplate;
-  }
-
-  async updateFormTemplate(id: string, updates: Partial<FormTemplate>): Promise<FormTemplate | undefined> {
-    const [template] = await db.update(formTemplates).set(updates).where(eq(formTemplates.id, id)).returning();
-    return template || undefined;
-  }
-
-  async deleteFormTemplate(id: string): Promise<boolean> {
-    await db.delete(formTemplates).where(eq(formTemplates.id, id));
-    return true;
-  }
 
   // Builder Forms methods
   async getBuilderForms(archived?: boolean): Promise<BuilderForm[]> {
@@ -1351,6 +1234,36 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBuilderForm(id: string): Promise<boolean> {
     await db.delete(builderForms).where(eq(builderForms.id, id));
+    return true;
+  }
+
+  // Builder Form Submissions methods
+  async getBuilderFormSubmissions(formId: string): Promise<BuilderFormSubmission[]> {
+    return db.select().from(builderFormSubmissions)
+      .where(eq(builderFormSubmissions.formId, formId))
+      .orderBy(desc(builderFormSubmissions.createdAt));
+  }
+
+  async getBuilderFormSubmission(id: string): Promise<BuilderFormSubmission | undefined> {
+    const [row] = await db.select().from(builderFormSubmissions).where(eq(builderFormSubmissions.id, id));
+    return row || undefined;
+  }
+
+  async createBuilderFormSubmission(submission: InsertBuilderFormSubmission): Promise<BuilderFormSubmission> {
+    const [row] = await db.insert(builderFormSubmissions).values(submission).returning();
+    return row;
+  }
+
+  async updateBuilderFormSubmission(id: string, updates: Partial<BuilderFormSubmission>): Promise<BuilderFormSubmission | undefined> {
+    const [row] = await db.update(builderFormSubmissions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(builderFormSubmissions.id, id))
+      .returning();
+    return row || undefined;
+  }
+
+  async deleteBuilderFormSubmission(id: string): Promise<boolean> {
+    await db.delete(builderFormSubmissions).where(eq(builderFormSubmissions.id, id));
     return true;
   }
 

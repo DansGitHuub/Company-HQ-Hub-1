@@ -67,8 +67,6 @@ import OpenAI from "openai";
 import { 
   insertSopTemplateSchema, 
   insertSopExampleSchema, 
-  insertFormFolderSchema, 
-  insertFormTemplateSchema, 
   insertPlowSiteImageSchema,
   insertSitePhotoSchema,
   insertSitePhotoVariantSchema,
@@ -5996,182 +5994,6 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.get("/api/forms", requireAuth, async (req, res) => {
-    try {
-      const forms = await storage.getCustomForms();
-      res.json(forms);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching forms" });
-    }
-  });
-
-  app.get("/api/forms/:id", requireAuth, async (req, res) => {
-    try {
-      const form = await storage.getCustomForm(req.params.id as string);
-      if (!form) return res.status(404).json({ message: "Form not found" });
-      res.json(form);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching form" });
-    }
-  });
-
-  app.post("/api/forms", requireAdmin, async (req, res) => {
-    try {
-      const form = await storage.createCustomForm({
-        ...req.body,
-        createdBy: req.user!.id,
-      });
-      res.status(201).json(form);
-    } catch (err) {
-      res.status(500).json({ message: "Error creating form" });
-    }
-  });
-
-  app.patch("/api/forms/:id", requireAdmin, async (req, res) => {
-    try {
-      const form = await storage.updateCustomForm(req.params.id as string, req.body);
-      if (!form) return res.status(404).json({ message: "Form not found" });
-      res.json(form);
-    } catch (err) {
-      res.status(500).json({ message: "Error updating form" });
-    }
-  });
-
-  app.delete("/api/forms/:id", requireAdmin, async (req, res) => {
-    try {
-      await storage.deleteCustomForm(req.params.id as string);
-      res.sendStatus(204);
-    } catch (err) {
-      res.status(500).json({ message: "Error deleting form" });
-    }
-  });
-
-  app.get("/api/forms/:id/submissions", requireAdmin, async (req, res) => {
-    try {
-      const submissions = await storage.getFormSubmissions(req.params.id as string);
-      res.json(submissions);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching submissions" });
-    }
-  });
-
-  app.post("/api/forms/:id/submissions", requireAuth, async (req, res) => {
-    try {
-      const submission = await storage.createFormSubmission({
-        formId: req.params.id as string,
-        submittedBy: req.user!.id,
-        data: req.body.data,
-      });
-      res.status(201).json(submission);
-    } catch (err) {
-      res.status(500).json({ message: "Error submitting form" });
-    }
-  });
-
-  app.patch("/api/submissions/:id", requireAdmin, async (req, res) => {
-    try {
-      const submission = await storage.updateFormSubmission(req.params.id as string, {
-        ...req.body,
-        reviewedBy: req.user!.id,
-      });
-      if (!submission) return res.status(404).json({ message: "Submission not found" });
-      res.json(submission);
-    } catch (err) {
-      res.status(500).json({ message: "Error updating submission" });
-    }
-  });
-
-  // Form Folders
-  app.get("/api/form-folders", requireAuth, async (req, res) => {
-    try {
-      const folders = await storage.getFormFolders();
-      res.json(folders);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching folders" });
-    }
-  });
-
-  app.post("/api/form-folders", requireAdmin, async (req, res) => {
-    try {
-      const parsed = insertFormFolderSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid folder data", errors: parsed.error.flatten() });
-      }
-      const folder = await storage.createFormFolder(parsed.data);
-      res.status(201).json(folder);
-    } catch (err) {
-      res.status(500).json({ message: "Error creating folder" });
-    }
-  });
-
-  app.patch("/api/form-folders/:id", requireAdmin, async (req, res) => {
-    try {
-      const parsed = insertFormFolderSchema.partial().safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid folder data", errors: parsed.error.flatten() });
-      }
-      const folder = await storage.updateFormFolder(req.params.id as string, parsed.data);
-      if (!folder) return res.status(404).json({ message: "Folder not found" });
-      res.json(folder);
-    } catch (err) {
-      res.status(500).json({ message: "Error updating folder" });
-    }
-  });
-
-  app.delete("/api/form-folders/:id", requireAdmin, async (req, res) => {
-    try {
-      await storage.deleteFormFolder(req.params.id as string);
-      res.sendStatus(204);
-    } catch (err) {
-      res.status(500).json({ message: "Error deleting folder" });
-    }
-  });
-
-  // Form Templates
-  app.get("/api/form-templates", requireAuth, async (req, res) => {
-    try {
-      const templates = await storage.getFormTemplates();
-      res.json(templates);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching templates" });
-    }
-  });
-
-  app.post("/api/form-templates", requireAdmin, async (req, res) => {
-    try {
-      const parsed = insertFormTemplateSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid template data", errors: parsed.error.flatten() });
-      }
-      const template = await storage.createFormTemplate(parsed.data);
-      res.status(201).json(template);
-    } catch (err) {
-      res.status(500).json({ message: "Error creating template" });
-    }
-  });
-
-  app.patch("/api/form-templates/:id", requireAdmin, async (req, res) => {
-    try {
-      const parsed = insertFormTemplateSchema.partial().safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid template data", errors: parsed.error.flatten() });
-      }
-      const template = await storage.updateFormTemplate(req.params.id as string, parsed.data);
-      if (!template) return res.status(404).json({ message: "Template not found" });
-      res.json(template);
-    } catch (err) {
-      res.status(500).json({ message: "Error updating template" });
-    }
-  });
-
-  app.delete("/api/form-templates/:id", requireAdmin, async (req, res) => {
-    try {
-      await storage.deleteFormTemplate(req.params.id as string);
-      res.sendStatus(204);
-    } catch (err) {
-      res.status(500).json({ message: "Error deleting template" });
-    }
-  });
 
   // Form Builder Wizard - PDF parse
   const multerUpload = (await import("multer")).default;
@@ -6424,6 +6246,60 @@ SECTION GENERATION RULES:
       res.sendStatus(204);
     } catch (err) {
       res.status(500).json({ message: "Error deleting builder form" });
+    }
+  });
+
+  // Builder Form Submissions
+  app.get("/api/builder-forms/:id/submissions", requireAuth, async (req, res) => {
+    try {
+      const submissions = await storage.getBuilderFormSubmissions(req.params.id);
+      res.json(submissions);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching submissions" });
+    }
+  });
+
+  app.post("/api/builder-forms/:id/submissions", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const submission = await storage.createBuilderFormSubmission({
+        formId: req.params.id,
+        submittedBy: user.id,
+        submitterName: req.body.submitterName || null,
+        data: req.body.data || {},
+        status: "submitted",
+      });
+      res.status(201).json(submission);
+    } catch (err) {
+      res.status(500).json({ message: "Error submitting form" });
+    }
+  });
+
+  app.patch("/api/builder-form-submissions/:id", requireAdmin, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const updateSchema = z.object({
+        status: z.string().optional(),
+        reviewNotes: z.string().optional(),
+      });
+      const validated = updateSchema.parse(req.body);
+      const submission = await storage.updateBuilderFormSubmission(req.params.id, {
+        ...validated,
+        reviewedBy: user.id,
+      });
+      if (!submission) return res.status(404).json({ message: "Submission not found" });
+      res.json(submission);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating submission" });
+    }
+  });
+
+  app.delete("/api/builder-form-submissions/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteBuilderFormSubmission(req.params.id);
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting submission" });
     }
   });
 
