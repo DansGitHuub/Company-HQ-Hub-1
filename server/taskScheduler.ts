@@ -207,59 +207,10 @@ function calculateNextDate(config: any, lastCompleted: string | Date): Date | nu
   return next;
 }
 
-// ── 4. Todo reminder notifications ─────────────────────────────────────────
-async function checkTodoReminders() {
-  try {
-    const result = await pool.query(`
-      SELECT t.id, t.title, t.reminder_date, ta.user_id
-      FROM todos t
-      LEFT JOIN todo_assignments ta ON ta.todo_id = t.id
-      WHERE t.reminder_date IS NOT NULL
-        AND t.reminder_date <= NOW()
-        AND (t.reminder_sent = false OR t.reminder_sent IS NULL)
-        AND t.status NOT IN ('completed', 'archived')
-    `);
-
-    const todoIds = new Set<string>();
-    for (const row of result.rows) {
-      if (!todoIds.has(row.id)) {
-        todoIds.add(row.id);
-        await pool.query(
-          `UPDATE todos SET reminder_sent = true, updated_at = NOW() WHERE id = $1`,
-          [row.id]
-        );
-      }
-
-      if (!row.user_id) continue;
-
-      const user = await storage.getUser(row.user_id);
-      if (!user) continue;
-
-      await sendInAppNotification(
-        row.user_id,
-        "task_reminder",
-        `Reminder: ${row.title}`,
-        "You set a reminder for this to-do item.",
-        "/tasks",
-        { todoId: row.id }
-      );
-
-      console.log(`[TaskScheduler] Todo reminder notification sent: "${row.title}" → ${user.name}`);
-    }
-
-    if (todoIds.size > 0) {
-      console.log(`[TaskScheduler] Processed ${todoIds.size} todo reminder(s)`);
-    }
-  } catch (err) {
-    console.error("[TaskScheduler] Todo reminder check error:", err);
-  }
-}
-
 // ── Interval handles ────────────────────────────────────────────────────────
 let reminderInterval: ReturnType<typeof setInterval> | null = null;
 let overdueInterval: ReturnType<typeof setInterval> | null = null;
 let recurringInterval: ReturnType<typeof setInterval> | null = null;
-let todoReminderInterval: ReturnType<typeof setInterval> | null = null;
 
 export async function startTaskScheduler() {
   console.log("[TaskScheduler] Starting task scheduler...");
@@ -269,14 +220,12 @@ export async function startTaskScheduler() {
   reminderInterval    = setInterval(checkReminderTasks,      60 * 60 * 1000);
   overdueInterval     = setInterval(checkOverdueTasks,       60 * 60 * 1000);
   recurringInterval   = setInterval(generateRecurringTasks,  60 * 60 * 1000);
-  todoReminderInterval = setInterval(checkTodoReminders,     60 * 60 * 1000);
 
   // Initial run after 10 s to let the server finish booting
   setTimeout(() => {
     checkReminderTasks();
     checkOverdueTasks();
     generateRecurringTasks();
-    checkTodoReminders();
   }, 10_000);
 }
 
@@ -284,5 +233,4 @@ export function stopTaskScheduler() {
   if (reminderInterval)     clearInterval(reminderInterval);
   if (overdueInterval)      clearInterval(overdueInterval);
   if (recurringInterval)    clearInterval(recurringInterval);
-  if (todoReminderInterval) clearInterval(todoReminderInterval);
 }

@@ -315,12 +315,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     staleTime: 60000,
   });
 
-  const { data: todoActiveStatus } = useQuery<{ isActive: boolean; unreadCount: number }>({
-    queryKey: ["/api/todo-active-status"],
-    staleTime: 30000,
-    refetchInterval: 30000,
-  });
-
   const { data: unseenUpdates = [] } = useQuery<{ id: string }[]>({
     queryKey: ["/api/updates/unseen"],
     staleTime: 30000,
@@ -608,7 +602,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 const item = { id: itemId, ...internalNavItems[itemId] };
                 const isActive = getIsActive(item);
                 const helpContent = menuHelpContent[item.id];
-                const showTodoBadge = item.id === "todos" && todoActiveStatus?.isActive && todoActiveStatus.unreadCount > 0;
                 const showMessagesBadge = item.id === "messages" && (dmUnreadData?.count ?? 0) > 0;
                 const itemLabel = navLabels[itemId] || item.label;
                 return (
@@ -634,11 +627,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       >
                         <div className="relative" style={{ flexShrink: 0 }}>
                           <item.icon className="h-4 w-4" />
-                          {showTodoBadge && (
-                            <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                              {todoActiveStatus.unreadCount > 9 ? "9+" : todoActiveStatus.unreadCount}
-                            </span>
-                          )}
                           {showMessagesBadge && (
                             <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">
                               {(dmUnreadData?.count ?? 0) > 9 ? "9+" : dmUnreadData?.count}

@@ -179,23 +179,15 @@ export async function runTaskMigration() {
 
   const client2 = await pool.connect();
   try {
-    const cols = await client2.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'todos'`);
-    const colNames = cols.rows.map((r: any) => r.column_name);
-    if (!colNames.includes("reminder_date")) {
-      await client2.query(`ALTER TABLE todos ADD COLUMN reminder_date timestamp`);
-    }
-    if (!colNames.includes("reminder_sent")) {
-      await client2.query(`ALTER TABLE todos ADD COLUMN reminder_sent boolean DEFAULT false`);
-    }
-    if (!colNames.includes("linked_record_type")) {
-      await client2.query(`ALTER TABLE todos ADD COLUMN linked_record_type text`);
-    }
-    if (!colNames.includes("linked_record_id")) {
-      await client2.query(`ALTER TABLE todos ADD COLUMN linked_record_id varchar(36)`);
-    }
-    console.log("[migration] Todos table columns updated");
+    await client2.query(`
+      DROP TABLE IF EXISTS todo_active_users CASCADE;
+      DROP TABLE IF EXISTS todo_history CASCADE;
+      DROP TABLE IF EXISTS todo_assignments CASCADE;
+      DROP TABLE IF EXISTS todos CASCADE;
+    `);
+    console.log("[migration] Legacy todos tables dropped");
   } catch (err: any) {
-    console.error("[migration] Todos column migration error:", err.message);
+    console.error("[migration] Todos drop error:", err.message);
   } finally {
     client2.release();
   }

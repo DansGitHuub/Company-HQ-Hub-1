@@ -78,7 +78,6 @@ import {
   insertBuilderFormSchema,
   insertCampaignSchema,
   calendarEvents,
-  todoAssignments,
   users,
   type User,
   activityLog,
@@ -7340,388 +7339,6 @@ SECTION GENERATION RULES:
     }
   });
 
-  async function syncTodoCalendarEvent(todoId: string, todoTitle: string, dueDate: Date | null, createdBy: string, status?: string) {
-    try {
-      const existing = await db.select().from(calendarEvents)
-        .where(and(eq(calendarEvents.linkedRecordType, "todo"), eq(calendarEvents.linkedRecordId, todoId)));
-      
-      if (!dueDate || status === "completed") {
-        if (existing.length > 0) {
-          await db.delete(calendarEvents)
-            .where(and(eq(calendarEvents.linkedRecordType, "todo"), eq(calendarEvents.linkedRecordId, todoId)));
-        }
-        return;
-      }
-
-      const assignments = await db.select().from(todoAssignments).where(eq(todoAssignments.todoId, todoId));
-      const assignedTo = assignments.length > 0 ? assignments[0].userId : null;
-
-      const startDate = new Date(dueDate);
-      startDate.setHours(9, 0, 0, 0);
-      const endDate = new Date(dueDate);
-      endDate.setHours(17, 0, 0, 0);
-
-      if (existing.length > 0) {
-        await db.update(calendarEvents)
-          .set({ title: `Task: ${todoTitle}`, startDatetime: startDate, endDatetime: endDate, assignedTo, updatedAt: new Date() })
-          .where(eq(calendarEvents.id, existing[0].id));
-      } else {
-        await db.insert(calendarEvents).values({
-          title: `Task: ${todoTitle}`,
-          description: `Auto-created from task: ${todoTitle}`,
-          eventType: "task",
-          startDatetime: startDate,
-          endDatetime: endDate,
-          allDay: true,
-          createdBy,
-          assignedTo,
-          linkedRecordType: "todo",
-          linkedRecordId: todoId,
-        });
-      }
-    } catch (err) {
-      console.error("[TODO-CALENDAR] Error syncing calendar event:", err);
-    }
-  }
-
-  // To-Do System routes
-  app.get("/api/todos", requireAuth, async (req, res) => {
-    try {
-      const allTodos = await storage.getTodos();
-      const allUsers = await storage.getAllUsers();
-      const userMap = new Map(allUsers.map(u => [u.id, u.name]));
-
-      const todosWithAssignees = await Promise.all(allTodos.map(async (todo) => {
-        const assignments = await storage.getTodoAssignments(todo.id);
-        return {
-          ...todo,
-          assignedUsers: assignments.map(a => ({
-            userId: a.userId,
-            name: userMap.get(a.userId) || "Unknown",
-          })),
-          creatorName: todo.createdBy ? userMap.get(todo.createdBy) || "Unknown" : null,
-        };
-      }));
-      res.json(todosWithAssignees);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching todos" });
-    }
-  });
-
-  app.get("/api/todos/unread-count", requireAuth, async (req, res) => {
-    try {
-      const user = req.user as User;
-      const count = await storage.getUnreadTodoCount(user.id);
-      res.json({ count });
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching unread count" });
-    }
-  });
-
-  app.get("/api/todos/:id", requireAuth, async (req, res) => {
-    try {
-      const todo = await storage.getTodo(req.params.id as string);
-      if (!todo) return res.status(404).json({ message: "Todo not found" });
-      res.json(todo);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching todo" });
-    }
-  });
-
-  app.post("/api/todos", requireAuth, async (req, res) => {
-    try {
-      const user = req.user as User;
-      
-      if (!req.body.title || req.body.title.trim() === "") {
-        return res.status(400).json({ message: "Title is required" });
-      }
-      
-      const todoData = {
-        title: req.body.title,
-        description: req.body.description || null,
-        priority: req.body.priority || "medium",
-        status: req.body.status || "pending",
-        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
-      };
-      
-      const todo = await storage.createTodo(todoData, user.id);
-      
-      await storage.createTodoHistory({
-        todoId: todo.id,
-        changedBy: user.id,
-        changeType: "created",
-        newValue: JSON.stringify({ title: todo.title, description: todo.description, priority: todo.priority, dueDate: todo.dueDate }),
-      });
-
-      if (req.body.assignedUserIds && Array.isArray(req.body.assignedUserIds)) {
-        const uniqueIds = [...new Set(req.body.assignedUserIds as string[])];
-        for (const userId of uniqueIds) {
-          await storage.createTodoAssignment({ todoId: todo.id, userId });
-        }
-      }
-
-      if (todo.dueDate) {
-        await syncTodoCalendarEvent(todo.id, todo.title, todo.dueDate, user.id);
-      }
-
-      res.status(201).json(todo);
-    } catch (err) {
-      console.error("[TODO] Error creating todo:", err);
-      res.status(500).json({ message: "Error creating todo. Please try again.", errorCode: "TODO-001" });
-    }
-  });
-
-  app.patch("/api/todos/:id", requireAuth, async (req, res) => {
-    try {
-      const user = req.user as User;
-      const existingTodo = await storage.getTodo(req.params.id as string);
-      if (!existingTodo) return res.status(404).json({ message: "Todo not found" });
-
-      const isAssigned = (await storage.getTodoAssignments(req.params.id as string)).some(a => a.userId === user.id);
-      const isCreatorOrAdmin = existingTodo.createdBy === user.id || user.role === "Admin" || user.isMasterAdmin;
-      if (!isCreatorOrAdmin && !isAssigned) {
-        return res.status(403).json({ message: "You don't have permission to update this task" });
-      }
-
-      const allowedUpdates: Partial<Todo> = {};
-      if (isCreatorOrAdmin) {
-        if (req.body.title !== undefined) allowedUpdates.title = req.body.title;
-        if (req.body.description !== undefined) allowedUpdates.description = req.body.description;
-        if (req.body.priority !== undefined) allowedUpdates.priority = req.body.priority;
-        if (req.body.dueDate !== undefined) allowedUpdates.dueDate = req.body.dueDate ? new Date(req.body.dueDate) : null;
-      }
-      if (req.body.status !== undefined) allowedUpdates.status = req.body.status;
-
-      const changedFields: string[] = [];
-      for (const [key, val] of Object.entries(allowedUpdates)) {
-        const oldVal = (existingTodo as any)[key];
-        const oldStr = oldVal instanceof Date ? oldVal.toISOString() : String(oldVal ?? "");
-        const newStr = val instanceof Date ? val.toISOString() : String(val ?? "");
-        if (oldStr !== newStr) {
-          changedFields.push(key);
-          await storage.createTodoHistory({
-            todoId: existingTodo.id,
-            changedBy: user.id,
-            changeType: key === "status" ? "status_changed" : "updated",
-            fieldChanged: key,
-            oldValue: oldStr,
-            newValue: newStr,
-          });
-        }
-      }
-
-      const todo = await storage.updateTodo(req.params.id as string, allowedUpdates);
-      
-      await syncTodoCalendarEvent(todo.id, todo.title, todo.dueDate, todo.createdBy || user.id, todo.status || undefined);
-
-      res.json(todo);
-    } catch (err) {
-      res.status(500).json({ message: "Error updating todo" });
-    }
-  });
-
-  app.delete("/api/todos/:id", requireAuth, async (req, res) => {
-    try {
-      const user = req.user as User;
-      const todo = await storage.getTodo(req.params.id as string);
-      if (!todo) return res.status(404).json({ message: "Todo not found" });
-      if (todo.createdBy !== user.id && !user.isMasterAdmin) {
-        return res.status(403).json({ message: "Only the creator can delete this task" });
-      }
-      await db.delete(calendarEvents)
-        .where(and(eq(calendarEvents.linkedRecordType, "todo"), eq(calendarEvents.linkedRecordId, req.params.id as string)));
-      await storage.deleteTodo(req.params.id as string);
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ message: "Error deleting todo" });
-    }
-  });
-
-  app.patch("/api/todos/:id/archive", requireAuth, async (req, res) => {
-    try {
-      const user = req.user as User;
-      const todo = await storage.getTodo(req.params.id as string);
-      if (!todo) return res.status(404).json({ message: "Todo not found" });
-      if (todo.status !== "completed") {
-        return res.status(400).json({ message: "Only completed tasks can be archived" });
-      }
-      const updated = await storage.updateTodo(req.params.id as string, { status: "archived" });
-      await storage.createTodoHistory({
-        todoId: todo.id,
-        changedBy: user.id,
-        changeType: "archived",
-        fieldChanged: "status",
-        oldValue: "completed",
-        newValue: "archived",
-      });
-      res.json(updated);
-    } catch (err) {
-      res.status(500).json({ message: "Error archiving todo" });
-    }
-  });
-
-  app.patch("/api/todos/:id/restore", requireAuth, async (req, res) => {
-    try {
-      const user = req.user as User;
-      const todo = await storage.getTodo(req.params.id as string);
-      if (!todo) return res.status(404).json({ message: "Todo not found" });
-      if (todo.status !== "archived") {
-        return res.status(400).json({ message: "Only archived tasks can be restored" });
-      }
-      const updated = await storage.updateTodo(req.params.id as string, { status: "on_hold" });
-      await storage.createTodoHistory({
-        todoId: todo.id,
-        changedBy: user.id,
-        changeType: "status_change",
-        fieldChanged: "status",
-        oldValue: "archived",
-        newValue: "on_hold",
-      });
-      res.json(updated);
-    } catch (err) {
-      res.status(500).json({ message: "Error restoring todo" });
-    }
-  });
-
-  app.get("/api/todos/:id/history", requireAuth, async (req, res) => {
-    try {
-      const history = await storage.getTodoHistory(req.params.id as string);
-      const allUsers = await storage.getAllUsers();
-      const userMap = new Map(allUsers.map(u => [u.id, u.name]));
-      const enriched = history.map(h => ({
-        ...h,
-        changedByName: h.changedBy ? userMap.get(h.changedBy) || "Unknown" : null,
-      }));
-      res.json(enriched);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching todo history" });
-    }
-  });
-
-  // To-Do Assignments
-  app.get("/api/todos/:id/assignments", requireAuth, async (req, res) => {
-    try {
-      const assignments = await storage.getTodoAssignments(req.params.id as string);
-      res.json(assignments);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching assignments" });
-    }
-  });
-
-  app.get("/api/my-todos", requireAuth, async (req, res) => {
-    try {
-      const user = req.user as User;
-      const assignments = await storage.getUserTodoAssignments(user.id);
-      const allTodos = await storage.getTodos();
-      const allUsers = await storage.getAllUsers();
-      const userMap = new Map(allUsers.map(u => [u.id, u.name]));
-      const myTodos = allTodos.filter(t => assignments.some(a => a.todoId === t.id));
-
-      const todosWithDetails = await Promise.all(myTodos.map(async (t) => {
-        const todoAssignments = await storage.getTodoAssignments(t.id);
-        return {
-          ...t,
-          isRead: assignments.find(a => a.todoId === t.id)?.isRead || false,
-          assignedUsers: todoAssignments.map(a => ({
-            userId: a.userId,
-            name: userMap.get(a.userId) || "Unknown",
-          })),
-          creatorName: t.createdBy ? userMap.get(t.createdBy) || "Unknown" : null,
-        };
-      }));
-      res.json(todosWithDetails);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching your todos" });
-    }
-  });
-
-  app.post("/api/todos/:id/assignments", requireAuth, async (req, res) => {
-    try {
-      const existing = await storage.getTodoAssignments(req.params.id as string);
-      if (existing.some(a => a.userId === req.body.userId)) {
-        return res.status(409).json({ message: "User is already assigned to this task" });
-      }
-      const assignment = await storage.createTodoAssignment({
-        todoId: req.params.id as string,
-        userId: req.body.userId
-      });
-      res.status(201).json(assignment);
-    } catch (err) {
-      res.status(500).json({ message: "Error creating assignment" });
-    }
-  });
-
-  app.delete("/api/todo-assignments/:id", requireAuth, async (req, res) => {
-    try {
-      await storage.deleteTodoAssignment(req.params.id as string);
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ message: "Error deleting assignment" });
-    }
-  });
-
-  app.delete("/api/todos/:todoId/assignments/:userId", requireAuth, async (req, res) => {
-    try {
-      const assignments = await storage.getTodoAssignments(req.params.todoId as string);
-      const match = assignments.find(a => a.userId === req.params.userId);
-      if (!match) return res.status(404).json({ message: "Assignment not found" });
-      await storage.deleteTodoAssignment(match.id);
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ message: "Error removing assignment" });
-    }
-  });
-
-  app.post("/api/todos/:id/mark-read", requireAuth, async (req, res) => {
-    try {
-      const user = req.user as User;
-      await storage.markTodoAsRead(req.params.id as string, user.id);
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ message: "Error marking todo as read" });
-    }
-  });
-
-  // Active To-Do Users
-  app.get("/api/todo-active-users", requireAuth, async (req, res) => {
-    try {
-      const activeUsers = await storage.getTodoActiveUsers();
-      res.json(activeUsers);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching active todo users" });
-    }
-  });
-
-  app.get("/api/todo-active-status", requireAuth, async (req, res) => {
-    try {
-      const user = req.user as User;
-      const isActive = await storage.isUserTodoActive(user.id);
-      const unreadCount = isActive ? await storage.getUnreadTodoCount(user.id) : 0;
-      res.json({ isActive, unreadCount });
-    } catch (err) {
-      res.status(500).json({ message: "Error checking todo active status" });
-    }
-  });
-
-  app.post("/api/todo-active-users/:userId", requireAdmin, async (req, res) => {
-    try {
-      const admin = req.user as User;
-      const activeUser = await storage.activateTodoUser(req.params.userId as string, admin.id);
-      res.status(201).json(activeUser);
-    } catch (err) {
-      res.status(500).json({ message: "Error activating todo user" });
-    }
-  });
-
-  app.delete("/api/todo-active-users/:userId", requireAdmin, async (req, res) => {
-    try {
-      await storage.deactivateTodoUser(req.params.userId as string);
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ message: "Error deactivating todo user" });
-    }
-  });
-
   // Plow Site Maps - Tools section
   const requirePlowEditAccess = async (req: Request, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Not authenticated" });
@@ -9522,7 +9139,6 @@ Provide accurate information based on publicly available documentation.`;
         { key: "materials", query: "SELECT count(*)::int as c FROM materials" },
         { key: "candidates", query: "SELECT count(*)::int as c FROM candidates" },
         { key: "employees", query: "SELECT count(*)::int as c FROM employees" },
-        { key: "todos", query: "SELECT count(*)::int as c FROM todos" },
         { key: "tasks", query: "SELECT count(*)::int as c FROM tasks" },
         { key: "calendarEvents", query: "SELECT count(*)::int as c FROM calendar_events" },
         { key: "documents", query: "SELECT count(*)::int as c FROM documents" },
@@ -9625,8 +9241,6 @@ Provide accurate information based on publicly available documentation.`;
       const sops = await storage.getSops();
       const materials = await storage.getMaterials();
       const jobs = await storage.getJobs();
-      const todos = await storage.getTodos();
-      
       const report = {
         generatedAt: new Date().toISOString(),
         mode: "simple",
@@ -9641,7 +9255,6 @@ Provide accurate information based on publicly available documentation.`;
           totalSOPs: sops.filter((s: any) => !s.isArchived).length,
           totalMaterials: materials.length,
           activeJobs: jobs.filter((j: any) => j.status !== "Completed").length,
-          pendingTodos: todos.filter((t: any) => t.status === "pending").length,
         },
         recentIssues: recentErrors.slice(0, 5).map((e: any) => ({
           id: e.id,
@@ -9672,8 +9285,6 @@ Provide accurate information based on publicly available documentation.`;
       const candidates = await storage.getCandidates();
       const equipment = await storage.getEquipment();
       const forms = await storage.getCustomForms();
-      const todos = await storage.getTodos();
-      
       // Analyze error patterns
       const errorsByEndpoint: Record<string, number> = {};
       const errorsByTime: Record<string, number> = {};
@@ -9724,12 +9335,6 @@ Provide accurate information based on publicly available documentation.`;
             total: forms.length,
             published: forms.filter((f: any) => f.status === "published").length,
             draft: forms.filter((f: any) => f.status === "draft").length,
-          },
-          todos: {
-            total: todos.length,
-            pending: todos.filter((t: any) => t.status === "pending").length,
-            inProgress: todos.filter((t: any) => t.status === "in_progress").length,
-            completed: todos.filter((t: any) => t.status === "completed").length,
           },
         },
         errorAnalysis: {

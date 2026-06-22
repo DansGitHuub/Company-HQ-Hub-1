@@ -95,7 +95,6 @@ import AdminSetup from "@/pages/AdminSetup";
 import EquipmentTracker from "@/pages/EquipmentTracker";
 import Tasks from "@/pages/Tasks";
 import SearchPage from "@/pages/Search";
-import TodoList from "@/pages/TodoList";
 
 import ClockOutReviewPage from "@/pages/ClockOutReviewPage";
 import WorksheetReviewList from "@/pages/WorksheetReviewList";
@@ -255,7 +254,7 @@ function AppRoutes() {
         <Route path="/admin-setup" component={AdminSetup} />
         <Route path="/equipment" component={EquipmentTracker} />
         <Route path="/search" component={SearchPage} />
-        <Route path="/todos" component={TodoList} />
+        <Route path="/todos" component={Tasks} />
         <Route path="/tasks" component={Tasks} />
         <Route path="/daily-worksheet"><Redirect to="/my-day" /></Route>
         <Route path="/clock-out-review" component={ClockOutReviewPage} />
