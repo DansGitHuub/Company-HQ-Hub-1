@@ -854,6 +854,15 @@ export default function JobDetailPage() {
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
 
+  const { data: jobInvoices = [] } = useQuery<any[]>({
+    queryKey: ["/api/invoices", { job_id: id }],
+    queryFn: () => fetch(`/api/invoices?job_id=${id}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!id,
+  });
+  const invoicedTotal = jobInvoices
+    .filter((inv: any) => inv.status !== "void")
+    .reduce((s: number, inv: any) => s + Number(inv.total ?? 0), 0);
+
   const statusMutation = useMutation({
     mutationFn: async (newStatus: string) => {
       const res = await apiRequest("PATCH", `/api/jobs/${id}/status`, { status: newStatus });
@@ -1178,7 +1187,7 @@ export default function JobDetailPage() {
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
                     {group.label}
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex gap-1 w-full">
                     {visible.map((tile) => {
                       const TileIcon = tile.icon;
                       const isActive = activeSection === tile.value;
@@ -1188,14 +1197,14 @@ export default function JobDetailPage() {
                           data-testid={`tab-${tile.value}`}
                           onClick={() => setActiveSection(tile.value)}
                           className={[
-                            "inline-flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg border text-xs font-medium transition-all min-w-[78px]",
+                            "flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border text-xs font-medium transition-all overflow-hidden",
                             isActive
                               ? "bg-primary text-primary-foreground border-primary shadow-sm"
                               : "bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground",
                           ].join(" ")}
                         >
-                          <TileIcon className="h-4 w-4" />
-                          <span className="text-center leading-tight">{tile.label}</span>
+                          <TileIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                          <span className="truncate">{tile.label}</span>
                         </button>
                       );
                     })}
@@ -1208,70 +1217,119 @@ export default function JobDetailPage() {
           {/* Overview Panel */}
           {activeSection === "overview" && (
             <>
-            <div className="grid grid-cols-2 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <Timer className="h-4 w-4" />
-                    <span className="text-xs font-medium uppercase tracking-wide">{t("estimatedHours")}</span>
-                  </div>
-                  <p className="text-2xl font-bold" data-testid="stat-est-hours">
-                    {estimatedHours != null ? `${estimatedHours}h` : "—"}
+            {/* ── Metrics band ──────────────────────────────────────────────── */}
+            <div className="grid grid-cols-5 gap-1.5">
+              <div className="bg-muted/50 rounded-lg p-2.5 border">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Total Value</p>
+                <p className="text-sm font-bold tabular-nums truncate" data-testid="stat-price">
+                  {fmtMoney(job.price ?? job.value) ?? "—"}
+                </p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-2.5 border">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Est. Hours</p>
+                <p className="text-sm font-bold tabular-nums" data-testid="stat-est-hours">
+                  {estimatedHours != null ? `${estimatedHours}h` : "—"}
+                </p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-2.5 border">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Actual Hrs</p>
+                <p className="text-sm font-bold tabular-nums" data-testid="stat-actual-hours">
+                  {actualHours > 0 ? `${actualHours.toFixed(1)}h` : "—"}
+                </p>
+                {estimatedHours && actualHours > 0 && (
+                  <p className={`text-[10px] mt-0.5 leading-none ${actualHours > estimatedHours ? "text-red-500" : "text-green-600"}`}>
+                    {actualHours > estimatedHours
+                      ? `${(actualHours - estimatedHours).toFixed(1)}h over`
+                      : `${(estimatedHours - actualHours).toFixed(1)}h left`}
                   </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <Clock className="h-4 w-4" />
-                    <span className="text-xs font-medium uppercase tracking-wide">{t("actualHours")}</span>
-                  </div>
-                  <p className="text-2xl font-bold" data-testid="stat-actual-hours">
-                    {actualHours > 0 ? `${actualHours.toFixed(1)}h` : "—"}
+                )}
+              </div>
+              {isAdminOrManager ? (
+                <div className="bg-muted/50 rounded-lg p-2.5 border">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Invoiced</p>
+                  <p className="text-sm font-bold tabular-nums truncate" data-testid="stat-invoiced">
+                    {invoicedTotal > 0 ? fmtMoney(invoicedTotal) : "—"}
                   </p>
-                  {estimatedHours && actualHours > 0 && (
-                    <p className={`text-xs mt-1 ${actualHours > estimatedHours ? "text-red-500" : "text-green-600"}`}>
-                      {actualHours > estimatedHours
-                        ? `${(actualHours - estimatedHours).toFixed(1)}${t("hoursOver")}`
-                        : `${(estimatedHours - actualHours).toFixed(1)}${t("hoursRemaining")}`}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <DollarSign className="h-4 w-4" />
-                    <span className="text-xs font-medium uppercase tracking-wide">{t("jobValue")}</span>
-                  </div>
-                  <p className="text-2xl font-bold" data-testid="stat-price">
-                    {fmtMoney(job.price ?? job.value) ?? "—"}
+                </div>
+              ) : (
+                <div className="bg-muted/50 rounded-lg p-2.5 border">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Stage</p>
+                  <p className="text-sm font-bold capitalize truncate">
+                    {(job.stage || job.status || "—").replace(/_/g, " ")}
                   </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <Briefcase className="h-4 w-4" />
-                    <span className="text-xs font-medium uppercase tracking-wide">{t("timeEntries")}</span>
-                  </div>
-                  <p className="text-2xl font-bold" data-testid="stat-entries-count">
-                    {job.time_entries.length}
-                  </p>
-                </CardContent>
-              </Card>
+                </div>
+              )}
+              <div className="bg-muted/50 rounded-lg p-2.5 border">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Time Entries</p>
+                <p className="text-sm font-bold tabular-nums" data-testid="stat-entries-count">
+                  {job.time_entries.length}
+                </p>
+              </div>
             </div>
 
-            {/* Job Costing Card */}
+            {/* ── Hours progress bar ────────────────────────────────────────── */}
+            {estimatedHours != null && estimatedHours > 0 && (
+              <div className="mt-1">
+                <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                  <span>{actualHours.toFixed(1)}h used of {estimatedHours}h estimated</span>
+                  <span className={actualHours > estimatedHours ? "text-red-500 font-medium" : ""}>
+                    {Math.round((actualHours / estimatedHours) * 100)}%
+                  </span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${actualHours > estimatedHours ? "bg-red-500" : "bg-primary"}`}
+                    style={{ width: `${Math.min((actualHours / estimatedHours) * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ── Job Costing Card ──────────────────────────────────────────── */}
             {isAdminOrManager && <JobCostingCard jobId={id} job={job} actualHours={actualHours} />}
 
+            {/* ── Scope of Work ─────────────────────────────────────────────── */}
             {job.description && (
-              <Card className="mt-4">
-                <CardHeader className="pb-2 pt-4">
-                  <CardTitle className="text-sm">{t("scopeOfWork")}</CardTitle>
+              <Card className="mt-2">
+                <CardHeader className="pb-1 pt-3">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{t("scopeOfWork")}</CardTitle>
                 </CardHeader>
-                <CardContent className="pb-4">
+                <CardContent className="pb-3">
                   <p className="text-sm whitespace-pre-wrap text-muted-foreground">{job.description}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ── Work Areas ────────────────────────────────────────────────── */}
+            {jobWorkAreas.length > 0 && (
+              <Card className="mt-2">
+                <CardHeader className="pb-1 pt-3">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{t("workAreas")}</CardTitle>
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <div className="divide-y">
+                    {jobWorkAreas.map((area) => {
+                      const estH = area.estimated_hours ? parseFloat(area.estimated_hours) : null;
+                      const actH = parseFloat(area.actual_hours_computed ?? "0");
+                      const statusCls =
+                        area.status === "completed"   ? "bg-green-100 text-green-700" :
+                        area.status === "in_progress" ? "bg-blue-100 text-blue-700" :
+                                                         "bg-gray-100 text-gray-600";
+                      return (
+                        <div key={area.id} className="flex items-center justify-between gap-2 py-1.5">
+                          <p className="text-sm truncate flex-1">{area.area_description || area.name}</p>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${statusCls}`}>
+                              {area.status.replace("_", " ")}
+                            </span>
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              {actH.toFixed(1)}h{estH ? ` / ${estH}h` : ""}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </CardContent>
               </Card>
             )}
