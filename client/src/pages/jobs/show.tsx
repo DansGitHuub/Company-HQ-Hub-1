@@ -1132,17 +1132,19 @@ export default function JobDetailPage() {
         {/* ── Right Column ─────────────────────────────────────────────────── */}
         <div>
           {/* ── Tile navigation grid ─────────────────────────────────────── */}
-          <div className="mb-4 space-y-3">
+          <div className="mb-3 space-y-1">
             {(
               [
                 {
                   label: "Overview",
+                  color: { dot: "bg-green-500", lbl: "text-green-700", iBg: "bg-green-50", iBorder: "border-green-200", iIcon: "text-green-600", iText: "text-green-800", aSolid: "bg-green-600 border-green-600" },
                   tiles: [
                     { value: "overview", label: "Overview", icon: LayoutDashboard, show: true },
                   ],
                 },
                 {
                   label: "Field Work",
+                  color: { dot: "bg-blue-500", lbl: "text-blue-700", iBg: "bg-blue-50", iBorder: "border-blue-200", iIcon: "text-blue-600", iText: "text-blue-800", aSolid: "bg-blue-600 border-blue-600" },
                   tiles: [
                     { value: "work-order",  label: "Work Order",  icon: Wrench,        show: true },
                     { value: "tasks",       label: "Tasks",       icon: ClipboardList, show: true },
@@ -1154,6 +1156,7 @@ export default function JobDetailPage() {
                 },
                 {
                   label: "Time & Money",
+                  color: { dot: "bg-amber-500", lbl: "text-amber-700", iBg: "bg-amber-50", iBorder: "border-amber-200", iIcon: "text-amber-600", iText: "text-amber-800", aSolid: "bg-amber-600 border-amber-600" },
                   tiles: [
                     { value: "time",          label: "Time Entries",  icon: Clock,     show: true },
                     { value: "invoices",      label: "Invoices",      icon: FileText,  show: true },
@@ -1162,32 +1165,36 @@ export default function JobDetailPage() {
                 },
                 {
                   label: "Comms & Files",
+                  color: { dot: "bg-purple-500", lbl: "text-purple-700", iBg: "bg-purple-50", iBorder: "border-purple-200", iIcon: "text-purple-600", iText: "text-purple-800", aSolid: "bg-purple-600 border-purple-600" },
                   tiles: [
-                    { value: "messages",    label: "Messages",      icon: MessageSquare, show: true },
-                    { value: "notes",       label: "Notes",         icon: StickyNote,    show: true },
-                    { value: "daily-logs",  label: "Journal",       icon: BookOpen,      show: true },
-                    { value: "activity",    label: "Activity",      icon: Activity,      show: true },
-                    { value: "files-photos", label: "Files & Photos", icon: Camera,      show: true },
+                    { value: "messages",     label: "Messages",       icon: MessageSquare, show: true },
+                    { value: "notes",        label: "Notes",          icon: StickyNote,    show: true },
+                    { value: "daily-logs",   label: "Journal",        icon: BookOpen,      show: true },
+                    { value: "activity",     label: "Activity",       icon: Activity,      show: true },
+                    { value: "files-photos", label: "Files & Photos", icon: Camera,        show: true },
                   ],
                 },
                 {
                   label: "Completion",
+                  color: { dot: "bg-teal-500", lbl: "text-teal-700", iBg: "bg-teal-50", iBorder: "border-teal-200", iIcon: "text-teal-600", iText: "text-teal-800", aSolid: "bg-teal-600 border-teal-600" },
                   tiles: [
                     { value: "closeout",    label: "Closeout", icon: ClipboardCheck, show: isAdminOrManager },
                     { value: "warranty",    label: "Warranty", icon: Award,          show: isAdminOrManager },
                     { value: "packet-gate", label: "Job Gate", icon: ShieldCheck,    show: isAdminOrManager },
                   ],
                 },
-              ] as Array<{ label: string; tiles: Array<{ value: string; label: string; icon: React.ElementType; show: boolean }> }>
+              ] as Array<{ label: string; color: { dot: string; lbl: string; iBg: string; iBorder: string; iIcon: string; iText: string; aSolid: string }; tiles: Array<{ value: string; label: string; icon: React.ElementType; show: boolean }> }>
             ).map((group) => {
               const visible = group.tiles.filter((t) => t.show);
               if (visible.length === 0) return null;
+              const c = group.color;
               return (
                 <div key={group.label}>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
+                  <p className={`flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest mb-0.5 ${c.lbl}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${c.dot}`} />
                     {group.label}
                   </p>
-                  <div className="flex gap-1 w-full">
+                  <div className="flex gap-0.5 w-full">
                     {visible.map((tile) => {
                       const TileIcon = tile.icon;
                       const isActive = activeSection === tile.value;
@@ -1197,14 +1204,12 @@ export default function JobDetailPage() {
                           data-testid={`tab-${tile.value}`}
                           onClick={() => setActiveSection(tile.value)}
                           className={[
-                            "flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border text-xs font-medium transition-all overflow-hidden",
-                            isActive
-                              ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                              : "bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground",
+                            "flex-1 flex items-center justify-center gap-1 px-1.5 py-[3px] rounded border text-[11px] font-medium transition-all overflow-hidden",
+                            isActive ? c.aSolid : `${c.iBg} ${c.iBorder}`,
                           ].join(" ")}
                         >
-                          <TileIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                          <span className="truncate">{tile.label}</span>
+                          <TileIcon className={`h-3 w-3 flex-shrink-0 ${isActive ? "text-white" : c.iIcon}`} />
+                          <span className={`truncate ${isActive ? "text-white" : c.iText}`}>{tile.label}</span>
                         </button>
                       );
                     })}
@@ -1219,21 +1224,21 @@ export default function JobDetailPage() {
             <>
             {/* ── Metrics band ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-5 gap-1.5">
-              <div className="bg-muted/50 rounded-lg p-2.5 border">
+              <div className="bg-background rounded-lg p-2.5 border border-border border-l-4 border-l-green-500">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Total Value</p>
-                <p className="text-sm font-bold tabular-nums truncate" data-testid="stat-price">
+                <p className="text-sm font-bold tabular-nums truncate text-green-600" data-testid="stat-price">
                   {fmtMoney(job.price ?? job.value) ?? "—"}
                 </p>
               </div>
-              <div className="bg-muted/50 rounded-lg p-2.5 border">
+              <div className="bg-background rounded-lg p-2.5 border border-border border-l-4 border-l-blue-500">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Est. Hours</p>
-                <p className="text-sm font-bold tabular-nums" data-testid="stat-est-hours">
+                <p className="text-sm font-bold tabular-nums text-blue-600" data-testid="stat-est-hours">
                   {estimatedHours != null ? `${estimatedHours}h` : "—"}
                 </p>
               </div>
-              <div className="bg-muted/50 rounded-lg p-2.5 border">
+              <div className="bg-background rounded-lg p-2.5 border border-border border-l-4 border-l-amber-500">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Actual Hrs</p>
-                <p className="text-sm font-bold tabular-nums" data-testid="stat-actual-hours">
+                <p className="text-sm font-bold tabular-nums text-amber-600" data-testid="stat-actual-hours">
                   {actualHours > 0 ? `${actualHours.toFixed(1)}h` : "—"}
                 </p>
                 {estimatedHours && actualHours > 0 && (
@@ -1245,23 +1250,23 @@ export default function JobDetailPage() {
                 )}
               </div>
               {isAdminOrManager ? (
-                <div className="bg-muted/50 rounded-lg p-2.5 border">
+                <div className="bg-background rounded-lg p-2.5 border border-border border-l-4 border-l-purple-500">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Invoiced</p>
-                  <p className="text-sm font-bold tabular-nums truncate" data-testid="stat-invoiced">
+                  <p className="text-sm font-bold tabular-nums truncate text-purple-600" data-testid="stat-invoiced">
                     {invoicedTotal > 0 ? fmtMoney(invoicedTotal) : "—"}
                   </p>
                 </div>
               ) : (
-                <div className="bg-muted/50 rounded-lg p-2.5 border">
+                <div className="bg-background rounded-lg p-2.5 border border-border border-l-4 border-l-purple-500">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Stage</p>
-                  <p className="text-sm font-bold capitalize truncate">
+                  <p className="text-sm font-bold capitalize truncate text-purple-600">
                     {(job.stage || job.status || "—").replace(/_/g, " ")}
                   </p>
                 </div>
               )}
-              <div className="bg-muted/50 rounded-lg p-2.5 border">
+              <div className="bg-background rounded-lg p-2.5 border border-border border-l-4 border-l-teal-500">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Time Entries</p>
-                <p className="text-sm font-bold tabular-nums" data-testid="stat-entries-count">
+                <p className="text-sm font-bold tabular-nums text-teal-600" data-testid="stat-entries-count">
                   {job.time_entries.length}
                 </p>
               </div>
