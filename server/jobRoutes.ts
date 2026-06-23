@@ -80,6 +80,11 @@ const JOB_TYPES = [
 ];
 
 export function registerJobRoutes(app: Express, requireAuth: any) {
+  const requireNonCustomer = (req: any, res: any, next: any) => {
+    if (req.user?.role === "Customer") return res.status(403).json({ message: "Access denied" });
+    next();
+  };
+  app.use("/api/jobs", requireNonCustomer);
 
   // ── LIST ──────────────────────────────────────────────────────────────────────
   app.get("/api/jobs", requireAuth, async (req, res) => {

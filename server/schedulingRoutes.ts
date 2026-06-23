@@ -6,7 +6,14 @@ function requireAuth(req: any, res: any, next: any) {
   next();
 }
 
+function requireNonCustomer(req: any, res: any, next: any) {
+  if (req.user?.role === "Customer") return res.status(403).json({ message: "Access denied" });
+  next();
+}
+
 export function registerSchedulingRoutes(app: Express) {
+  app.use("/api/scheduling", requireNonCustomer);
+
   // ── GET /api/scheduling/calendar?start=YYYY-MM-DD&end=YYYY-MM-DD ──────────────
   // Returns jobs scheduled within the date range, with assigned crew
   app.get("/api/scheduling/calendar", requireAuth, async (req, res) => {

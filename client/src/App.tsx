@@ -150,6 +150,7 @@ import BookingPage from "@/pages/BookingPage";
 
 const ADMIN_ONLY = ["Admin"];
 const ADMIN_OR_MANAGER = ["Admin", "Manager"];
+const STAFF_ROLES = ["Admin", "Manager", "Crew"];
 
 function AccessDenied() {
   return (
@@ -269,14 +270,14 @@ function AppRoutes() {
         <Route path="/employee" component={EmployeePortal} />
         <Route path="/employee-portal" component={EmployeePortal} />
         <Route path="/hq" component={HQOverview} />
-        <Route path="/jobs" component={JobList} />
-        <Route path="/jobs/:id" component={JobDetail} />
+        <ProtectedRoute path="/jobs" component={JobList} allowedRoles={STAFF_ROLES} />
+        <ProtectedRoute path="/jobs/:id" component={JobDetail} allowedRoles={STAFF_ROLES} />
         <ProtectedRoute path="/invoices" component={InvoiceList} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/invoices/:id" component={InvoiceDetail} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/estimates" component={EstimateList} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/estimates/:id/preview" component={EstimatePreview} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/estimates/:id" component={EstimateDetail} allowedRoles={ADMIN_OR_MANAGER} />
-        <Route path="/scheduling" component={SchedulingCalendar} />
+        <ProtectedRoute path="/scheduling" component={SchedulingCalendar} allowedRoles={STAFF_ROLES} />
         <Route path="/my-day" component={MyDayPage} />
         <Route path="/my-hours" component={MyHoursPage} />
         <Route path="/help" component={Help} />
@@ -326,7 +327,7 @@ function AppRoutes() {
         <ProtectedRoute path="/catalog/:id" component={CatalogDetail} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/catalog" component={CatalogPage} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/plant-cards" component={PlantCards} allowedRoles={ADMIN_ONLY} />
-        <Route path="/work-orders" component={WorkOrders} />
+        <ProtectedRoute path="/work-orders" component={WorkOrders} allowedRoles={STAFF_ROLES} />
         <Route path="/route"><Redirect to="/my-day" /></Route>
         <Route path="/daily-agenda"><Redirect to="/my-day" /></Route>
         <Route component={NotFound} />

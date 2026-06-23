@@ -2,6 +2,11 @@ import { Router, Request, Response } from "express";
 import { pool } from "./db";
 
 export function registerWorkOrderRoutes(app: any, requireAuth: any) {
+  const requireNonCustomer = (req: any, res: any, next: any) => {
+    if (req.user?.role === "Customer") return res.status(403).json({ message: "Access denied" });
+    next();
+  };
+  app.use("/api/work-orders", requireNonCustomer);
 
   // ── Helper: load full detail for a WO ─────────────────────────────────────
   async function loadDetail(id: string | number) {
