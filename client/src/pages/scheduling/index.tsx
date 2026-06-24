@@ -16,6 +16,7 @@ import {
   parseISO,
 } from "date-fns";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/hooks/use-auth";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface CrewMember { id: string; first_name: string; last_name: string; }
@@ -99,6 +100,9 @@ const STATUS_CLS: Record<string, string> = {
 export default function SchedulingCalendar() {
   const { t } = useTranslation("scheduling");
   const { toast } = useToast();
+  const { user } = useAuth();
+  const effectiveRole = (user as any)?.effectiveRole ?? user?.role;
+  const isCrewReadOnly = effectiveRole === "Crew";
   const [weekBase, setWeekBase] = useState(() => new Date());
   const weekStart = startOfWeek(weekBase, { weekStartsOn: 1 });
   const weekDays  = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -437,7 +441,10 @@ export default function SchedulingCalendar() {
             <span className="text-sm font-semibold">{t("unscheduled")}</span>
             <Badge variant="secondary" className="ml-auto">{unscheduled.length}</Badge>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">{t("dragToSchedule")}</p>
+          {isCrewReadOnly
+            ? <p className="text-xs text-muted-foreground mt-1">View only — scheduling requires Manager access</p>
+            : <p className="text-xs text-muted-foreground mt-1">{t("dragToSchedule")}</p>
+          }
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
           {unschLoading && (
@@ -456,10 +463,10 @@ export default function SchedulingCalendar() {
             return (
               <div
                 key={job.id}
-                draggable
-                onDragStart={e => handleDragStart(e, job.id)}
+                draggable={!isCrewReadOnly}
+                onDragStart={!isCrewReadOnly ? (e => handleDragStart(e, job.id)) : undefined}
                 data-testid={`unscheduled-job-${job.id}`}
-                className="rounded-lg border bg-background px-2.5 py-2 cursor-grab active:cursor-grabbing hover:shadow-sm transition-shadow select-none"
+                className={`rounded-lg border bg-background px-2.5 py-2 hover:shadow-sm transition-shadow select-none ${isCrewReadOnly ? "cursor-default" : "cursor-grab active:cursor-grabbing"}`}
                 style={{ borderLeftColor: divColor, borderLeftWidth: 3 }}
               >
                 <div className="font-medium text-xs truncate">{job.title}</div>
@@ -603,8 +610,8 @@ export default function SchedulingCalendar() {
                         key={h}
                         className="border-b border-dashed border-muted-foreground/20 hover:bg-primary/5 transition-colors"
                         style={{ height: CELL_H }}
-                        onDragOver={handleDragOver}
-                        onDrop={e => handleDrop(e, day, h)}
+                        onDragOver={!isCrewReadOnly ? handleDragOver : undefined}
+                        onDrop={!isCrewReadOnly ? (e => handleDrop(e, day, h)) : undefined}
                         data-testid={`cell-${dayStr}-${h}`}
                       />
                     ))}
@@ -621,15 +628,16 @@ export default function SchedulingCalendar() {
                             {dayJobs.map((job, idx) => {
                               const bg = job.color ?? getDivisionColor(job.division);
                               return (
-                                <Draggable key={job.id} draggableId={job.id} index={idx}>
+                                <Draggable key={job.id} draggableId={job.id} index={idx} isDragDisabled={isCrewReadOnly}>
                                   {(dragProvided, snapshot) => (
                                     <div
                                       ref={dragProvided.innerRef}
                                       {...dragProvided.draggableProps}
-                                      {...dragProvided.dragHandleProps}
+                                      {...(!isCrewReadOnly ? dragProvided.dragHandleProps : {})}
                                       data-testid={`cal-job-${job.id}`}
                                       className={[
-                                        "rounded text-white text-[10px] px-1.5 py-1 overflow-hidden cursor-grab active:cursor-grabbing transition-all group select-none",
+                                        "rounded text-white text-[10px] px-1.5 py-1 overflow-hidden transition-all group select-none",
+                                        isCrewReadOnly ? "cursor-default" : "cursor-grab active:cursor-grabbing",
                                         snapshot.isDragging ? "shadow-lg opacity-90" : "hover:brightness-90",
                                       ].join(" ")}
                                       style={{ backgroundColor: bg, ...dragProvided.draggableProps.style }}
@@ -646,6 +654,7 @@ export default function SchedulingCalendar() {
                                             </div>
                                           )}
                                         </div>
+                                        {!isCrewReadOnly && (
                                         <button
                                           className="shrink-0 opacity-0 group-hover:opacity-100 bg-black/30 rounded p-0.5 transition-opacity"
                                           onClick={e => { e.stopPropagation(); unscheduleMutation.mutate(job.id); }}
@@ -654,6 +663,7 @@ export default function SchedulingCalendar() {
                                         >
                                           <X className="h-2.5 w-2.5" />
                                         </button>
+                                        )}
                                       </div>
                                     </div>
                                   )}
@@ -678,9 +688,9 @@ export default function SchedulingCalendar() {
                         return (
                           <div
                             key={job.id}
-                            draggable
-                            onDragStart={e => handleDragStart(e, job.id)}
-                            className="absolute left-0.5 right-0.5 rounded text-white text-[10px] px-1.5 py-0.5 overflow-hidden cursor-grab active:cursor-grabbing hover:brightness-90 transition-all group"
+                            draggable={!isCrewReadOnly}
+                            onDragStart={!isCrewReadOnly ? (e => handleDragStart(e, job.id)) : undefined}
+                            className={`absolute left-0.5 right-0.5 rounded text-white text-[10px] px-1.5 py-0.5 overflow-hidden hover:brightness-90 transition-all group ${isCrewReadOnly ? "cursor-default" : "cursor-grab active:cursor-grabbing"}`}
                             style={{ top, height, backgroundColor: bg }}
                             data-testid={`cal-job-${job.id}`}
                           >
@@ -693,6 +703,7 @@ export default function SchedulingCalendar() {
                                 {job.assigned_crew.map(c => c.first_name).join(", ")}
                               </div>
                             )}
+                            {!isCrewReadOnly && (
                             <button
                               className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 bg-black/30 rounded p-0.5 transition-opacity"
                               onClick={e => { e.stopPropagation(); unscheduleMutation.mutate(job.id); }}
@@ -701,6 +712,7 @@ export default function SchedulingCalendar() {
                             >
                               <X className="h-2.5 w-2.5" />
                             </button>
+                            )}
                           </div>
                         );
                       })
@@ -716,7 +728,7 @@ export default function SchedulingCalendar() {
       </div>
 
       {/* ── Floating Undo Button ── */}
-      {undoAction && (
+      {undoAction && !isCrewReadOnly && (
         <div
           className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 shadow-lg"
           data-testid="undo-container"

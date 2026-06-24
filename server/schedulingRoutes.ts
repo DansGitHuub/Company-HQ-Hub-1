@@ -11,6 +11,13 @@ function requireNonCustomer(req: any, res: any, next: any) {
   next();
 }
 
+function requireScheduleWrite(req: any, res: any, next: any) {
+  const role = req.user?.role;
+  const isMaster = req.user?.isMasterAdmin;
+  if (isMaster || role === "Admin" || role === "Manager") return next();
+  return res.status(403).json({ message: "Scheduling changes require Admin or Manager role" });
+}
+
 export function registerSchedulingRoutes(app: Express) {
   app.use("/api/scheduling", requireNonCustomer);
 
@@ -79,7 +86,7 @@ export function registerSchedulingRoutes(app: Express) {
 
   // ── PATCH /api/scheduling/jobs/:id/schedule ───────────────────────────────────
   // Schedule a job and assign crew members
-  app.patch("/api/scheduling/jobs/:id/schedule", requireAuth, async (req, res) => {
+  app.patch("/api/scheduling/jobs/:id/schedule", requireAuth, requireScheduleWrite, async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -158,7 +165,7 @@ export function registerSchedulingRoutes(app: Express) {
 
   // ── PATCH /api/scheduling/jobs/:id/unschedule ─────────────────────────────────
   // Remove a job from the schedule
-  app.patch("/api/scheduling/jobs/:id/unschedule", requireAuth, async (req, res) => {
+  app.patch("/api/scheduling/jobs/:id/unschedule", requireAuth, requireScheduleWrite, async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
