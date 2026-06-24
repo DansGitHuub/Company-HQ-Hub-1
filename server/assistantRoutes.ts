@@ -505,6 +505,25 @@ export function registerAssistantRoutes(app: Express) {
     }
   });
 
+  app.post("/api/assistant/voice-log", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as any;
+      const { transcript } = req.body;
+      if (!transcript || typeof transcript !== "string") {
+        return res.status(400).json({ error: "transcript is required" });
+      }
+      await pool.query(
+        `INSERT INTO voice_transcripts (id, external_id, transcript_text, source, recorded_at, recorded_by_email, transcript_format, created_at)
+         VALUES (gen_random_uuid(), $1, $2, 'assistant_voice_input', NOW(), $3, 'plain', NOW())`,
+        [crypto.randomUUID(), transcript.trim(), user.email || user.username || null]
+      );
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[assistant] Voice log error:", err);
+      return res.status(500).json({ error: "Failed to log voice transcript" });
+    }
+  });
+
   app.post("/api/assistant/transcribe", requireAuth, requireInternalRole, async (req: Request, res: Response) => {
     try {
       const { audio, format = "webm" } = req.body;

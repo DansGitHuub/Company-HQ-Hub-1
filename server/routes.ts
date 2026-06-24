@@ -4,7 +4,6 @@ import crypto from "crypto";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, requireRole, hashPassword, comparePasswords } from "./auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
-import { registerChatRoutes } from "./replit_integrations/chat/routes";
 import { registerCompanyCamRoutes } from "./companyCamRoutes";
 import { registerDuplicateCustomerRoutes } from "./duplicateCustomerRoutes";
 import { registerEstimateTranscriptRoutes } from "./estimateTranscriptRoutes";
@@ -9918,7 +9917,6 @@ Provide accurate information based on publicly available documentation.`;
   registerCalendarRoutes(app, requireAuth);
   registerTaskRoutes(app);
   registerObjectStorageRoutes(app, requireAuth);
-  registerChatRoutes(app);
   registerAssistantRoutes(app);
 
   await migrateNotesTable();

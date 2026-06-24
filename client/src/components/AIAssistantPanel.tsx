@@ -46,6 +46,7 @@ export default function AIAssistantPanel() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [speakingMessageIdx, setSpeakingMessageIdx] = useState<number | null>(null);
   const [silenceCountdown, setSilenceCountdown] = useState<number | null>(null);
+  const [voiceInputPending, setVoiceInputPending] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const silenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -65,7 +66,9 @@ export default function AIAssistantPanel() {
       setTimeout(() => {
         voice.startListening((text) => {
           if (text.trim()) {
-            sendMessage(text);
+            setInput(text);
+            setVoiceInputPending(true);
+            logVoiceTranscript(text);
           }
         });
       }, 500);
@@ -124,6 +127,7 @@ export default function AIAssistantPanel() {
       setMessages((prev) => [...prev, userMsg]);
     }
     setInput("");
+    setVoiceInputPending(false);
     setIsLoading(true);
     setSuggestions([]);
 
@@ -193,6 +197,12 @@ export default function AIAssistantPanel() {
     sendMessage("[Confirmed]", { confirmationGranted: true, confirmationToken });
   };
 
+  const logVoiceTranscript = useCallback(async (transcript: string) => {
+    try {
+      await apiRequest("POST", "/api/assistant/voice-log", { transcript });
+    } catch (_) {}
+  }, []);
+
   const handleCancel = (confirmationToken: string) => {
     setMessages((prev) =>
       prev.map((m, i) =>
@@ -209,7 +219,8 @@ export default function AIAssistantPanel() {
       voice.startListening((text) => {
         if (text.trim()) {
           setInput(text);
-          setTimeout(() => sendMessage(text), 100);
+          setVoiceInputPending(true);
+          logVoiceTranscript(text);
         }
       });
       setIsRecording(true);
@@ -270,7 +281,10 @@ export default function AIAssistantPanel() {
           const data = await res.json();
 
           if (data.transcript && data.transcript.trim()) {
-            setInput((prev) => (prev ? prev + " " + data.transcript.trim() : data.transcript.trim()));
+            const transcriptText = data.transcript.trim();
+            setInput((prev) => (prev ? prev + " " + transcriptText : transcriptText));
+            setVoiceInputPending(true);
+            logVoiceTranscript(transcriptText);
             setTimeout(() => inputRef.current?.focus(), 100);
           } else if (data.error) {
             setMessages((prev) => [...prev, { role: "assistant", content: `Transcription failed: ${data.error}`, type: "error" }]);
@@ -697,6 +711,12 @@ export default function AIAssistantPanel() {
             <div className="flex items-center gap-2 mb-2 px-1">
               <Loader2 className="h-3 w-3 animate-spin text-primary" />
               <span className="text-xs text-muted-foreground">Transcribing audio...</span>
+            </div>
+          )}
+          {voiceInputPending && !isLoading && (
+            <div className="flex items-center gap-2 mb-2 px-1 py-1 rounded-md bg-primary/10">
+              <Mic className="h-3 w-3 text-primary flex-shrink-0" />
+              <span className="text-xs text-primary font-medium">Voice captured — review and press Send</span>
             </div>
           )}
           <div className="flex items-center gap-2">

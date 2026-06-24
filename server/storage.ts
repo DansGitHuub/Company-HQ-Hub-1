@@ -69,7 +69,6 @@ import {
   builderForms, type BuilderForm, type InsertBuilderForm,
   builderFormSubmissions, type BuilderFormSubmission, type InsertBuilderFormSubmission,
   pdfForms, type PdfForm, type InsertPdfForm,
-  conversations, chatMessages,
   hqFiles, type HqFile, type InsertHqFile,
   qualifiedLeads, type QualifiedLead, type InsertQualifiedLead,
   applicantNotes, type ApplicantNote, type InsertApplicantNote,
