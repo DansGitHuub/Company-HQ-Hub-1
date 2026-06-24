@@ -16,7 +16,7 @@ const STATUS_REQUIRING_CONFIRMATION = ["completed", "cancelled"];
 
 export function shouldRequireConfirmation(toolName: string, toolArgs: any): boolean {
   if (TOOLS_REQUIRING_CONFIRMATION.includes(toolName)) return true;
-  if (toolName === "updateTaskStatus" && STATUS_REQUIRING_CONFIRMATION.includes(toolArgs?.status)) return true;
+  if (toolName === "updateTaskStatus") return true;
   return false;
 }
 
@@ -492,6 +492,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
       }
 
       case "searchGlobal": {
+        if (user.role === "Customer") return { result: null, error: "Global search is not available for customer accounts." };
         const query = `%${toolArgs.query}%`;
         const results: any = {};
 
@@ -533,6 +534,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
       }
 
       case "searchTasks": {
+        const isTaskAdmin = ["Admin", "Manager", "Master Admin"].includes(user.role);
         let sql = `SELECT t.id, t.task_id, t.title, t.status, t.priority, t.due_date,
                     creator.name as created_by_name, assignee.name as assigned_to_name
                     FROM tasks t
@@ -542,6 +544,11 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
         const params: any[] = [];
         let paramIdx = 1;
 
+        if (!isTaskAdmin) {
+          sql += ` AND (t.assigned_to_user_id = $${paramIdx} OR t.created_by_user_id = $${paramIdx})`;
+          params.push(user.id);
+          paramIdx++;
+        }
         if (toolArgs.assignedTo) {
           sql += ` AND (assignee.name ILIKE $${paramIdx} OR t.assigned_to_user_id = $${paramIdx})`;
           params.push(`%${toolArgs.assignedTo}%`);
@@ -648,10 +655,16 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
       }
 
       case "getJobs": {
+        if (user.role === "Customer") return { result: { jobs: [], count: 0, message: "Job information is not available for customer accounts." } };
+        const isJobAdmin = ["Admin", "Manager", "Master Admin"].includes(user.role);
         let jobSql = `SELECT id, client, type, category, stage, value, scheduled_date, completion_date, notes, zone FROM jobs WHERE 1=1`;
         const jobParams: any[] = [];
         let jobIdx = 1;
 
+        if (!isJobAdmin) {
+          jobSql += ` AND crew_lead_id = $${jobIdx++}`;
+          jobParams.push(user.id);
+        }
         if (toolArgs.stage) { jobSql += ` AND stage = $${jobIdx++}`; jobParams.push(toolArgs.stage); }
         if (toolArgs.category) { jobSql += ` AND category ILIKE $${jobIdx++}`; jobParams.push(toolArgs.category); }
         if (toolArgs.scheduledToday) { jobSql += ` AND scheduled_date::date = CURRENT_DATE`; }
@@ -721,6 +734,11 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
         if (taskRes.rows.length === 0) return { result: null, error: "Task not found." };
 
         const task = taskRes.rows[0];
+        const isStatusAdmin = ["Admin", "Manager", "Master Admin"].includes(user.role);
+        if (!isStatusAdmin) {
+          const isOwner = task.assigned_to_user_id === user.id || task.created_by_user_id === user.id;
+          if (!isOwner) return { result: null, error: "You can only update tasks that are assigned to you or that you created." };
+        }
         const oldStatus = task.status;
 
         await pool.query(`UPDATE tasks SET status = $1, updated_at = NOW() WHERE id = $2`, [toolArgs.status, task.id]);
@@ -879,7 +897,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
         });
         const hint = [toolArgs.commonName, toolArgs.botanicalName, toolArgs.plantType].filter(Boolean).join(" / ");
         const completion = await aiClient.chat.completions.create({
-          model: "gpt-5-mini",
+          model: "gpt-4o",
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: "You are a professional horticulturist. Return ONLY valid JSON. Be concise and accurate for northeastern USA (zones 5-7)." },
