@@ -389,7 +389,7 @@ export default function JobsPage() {
                   <TableHead className="hidden md:table-cell">{t("colType")}</TableHead>
                   <TableHead className="hidden md:table-cell">{t("colScheduled")}</TableHead>
                   <TableHead>{t("status")}</TableHead>
-                  <TableHead className="hidden sm:table-cell text-right">{t("colPrice")}</TableHead>
+                  {isAdminOrManager && <TableHead className="hidden sm:table-cell text-right">{t("colPrice")}</TableHead>}
                   {isAdminOrManager && <TableHead className="w-24 text-center">Contact</TableHead>}
                   <TableHead className="w-8" />
                 </TableRow>
@@ -420,9 +420,11 @@ export default function JobsPage() {
                     <TableCell>
                       <StatusBadge status={job.status || "lead"} />
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell text-sm font-medium text-right">
-                      {fmtMoney(job.price ?? job.value)}
-                    </TableCell>
+                    {isAdminOrManager && (
+                      <TableCell className="hidden sm:table-cell text-sm font-medium text-right">
+                        {fmtMoney(job.price ?? job.value)}
+                      </TableCell>
+                    )}
                     {isAdminOrManager && (
                       <TableCell
                         className="text-center"
