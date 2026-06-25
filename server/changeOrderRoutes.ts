@@ -23,7 +23,7 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
     try {
       const { rows } = await pool.query(
         `SELECT co.*,
-                u.first_name || ' ' || u.last_name AS created_by_name
+                u.name AS created_by_name
          FROM job_change_orders co
          LEFT JOIN users u ON u.id = co.created_by
          WHERE co.job_id = $1
@@ -40,7 +40,7 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
   app.get("/api/change-orders/:id", requireAuth, async (req: any, res) => {
     try {
       const { rows: coRows } = await pool.query(
-        `SELECT co.*, u.first_name || ' ' || u.last_name AS created_by_name
+        `SELECT co.*, u.name AS created_by_name
          FROM job_change_orders co
          LEFT JOIN users u ON u.id = co.created_by
          WHERE co.id = $1`,
