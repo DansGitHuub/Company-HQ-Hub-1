@@ -3263,6 +3263,7 @@ export const invoices = pgTable("invoices", {
   qbSyncedAt: timestamp("qb_synced_at", { withTimezone: true }),
   estimateId: text("estimate_id"),
   invoiceType: varchar("invoice_type", { length: 50 }).default("standard"),
+  overdueEmailSentAt: timestamp("overdue_email_sent_at", { withTimezone: true }),
 });
 
 export const invoiceLineItems = pgTable("invoice_line_items", {
