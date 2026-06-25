@@ -1,6 +1,7 @@
 import { Express } from "express";
 import { pool } from "./db";
 import { requireRole } from "./auth";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 const PAYMENT_METHODS = ["cash", "check", "card", "ach", "zelle", "other"];
 
@@ -560,6 +561,291 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
       );
       return res.json(rows[0]);
     } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── PDF GENERATION ────────────────────────────────────────────────────────────
+  app.get("/api/invoices/:id/pdf", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+    try {
+      let resolvedId = req.params.id;
+      if (/^INV-\d+$/i.test(resolvedId)) {
+        const { rows } = await pool.query(
+          `SELECT id FROM invoices WHERE invoice_number = $1 LIMIT 1`,
+          [resolvedId.toUpperCase()]
+        );
+        if (!rows.length) return res.status(404).json({ message: "Invoice not found" });
+        resolvedId = rows[0].id;
+      }
+
+      const [invRes, itemsRes] = await Promise.all([
+        pool.query(`
+          SELECT i.*,
+            TRIM(COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,'')) AS cust_name,
+            c.company_name  AS cust_company,
+            c.billing_address AS cust_address,
+            c.billing_city    AS cust_city,
+            c.billing_state   AS cust_state,
+            c.billing_zip     AS cust_zip,
+            j.title AS job_title
+          FROM invoices i
+          LEFT JOIN customers c ON c.id = i.customer_id
+          LEFT JOIN jobs j ON j.id = i.job_id
+          WHERE i.id = $1
+        `, [resolvedId]),
+        pool.query(
+          `SELECT * FROM invoice_line_items WHERE invoice_id=$1 ORDER BY sort_order, id`,
+          [resolvedId]
+        ),
+      ]);
+
+      if (!invRes.rows.length) return res.status(404).json({ message: "Invoice not found" });
+      const inv = invRes.rows[0];
+      const lineItems = itemsRes.rows;
+
+      // ── helpers ──────────────────────────────────────────────────────────────
+      const fmt$ = (v: any) =>
+        "$" + parseFloat(v ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      const fmtD = (d: string | null) => {
+        if (!d) return "—";
+        const [yr, mo, dy] = d.slice(0, 10).split("-").map(Number);
+        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        return `${months[mo - 1]} ${dy}, ${yr}`;
+      };
+
+      const wrapText = (text: string, font: any, size: number, maxW: number): string[] => {
+        const words = (text || "").split(" ");
+        const lines: string[] = [];
+        let cur = "";
+        for (const w of words) {
+          const test = cur ? `${cur} ${w}` : w;
+          if (font.widthOfTextAtSize(test, size) > maxW && cur) {
+            lines.push(cur);
+            cur = w;
+          } else {
+            cur = test;
+          }
+        }
+        if (cur) lines.push(cur);
+        return lines;
+      };
+
+      // ── create document ───────────────────────────────────────────────────────
+      const pdfDoc = await PDFDocument.create();
+      const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const bold    = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      const GREEN  = rgb(0.13, 0.31, 0.15);
+      const LGREY  = rgb(0.96, 0.96, 0.96);
+      const GREY   = rgb(0.48, 0.48, 0.48);
+      const BLACK  = rgb(0.10, 0.10, 0.10);
+      const WHITE  = rgb(1,    1,    1);
+      const RED    = rgb(0.72, 0.10, 0.10);
+
+      const PW = 612, PH = 792;
+      const ML = 48, MR = PW - 48, CW = MR - ML;
+
+      // Table column x positions
+      const cDesc = ML;
+      const cQty  = ML + CW * 0.55;
+      const cRate = ML + CW * 0.70;
+      const cAmt  = ML + CW * 0.84;
+
+      // ── page factory ─────────────────────────────────────────────────────────
+      let page = pdfDoc.addPage([PW, PH]);
+      let y = PH;
+
+      const ensureSpace = (needed: number) => {
+        if (y - needed < 80) {
+          // Footer on current page
+          page.drawRectangle({ x: 0, y: 0, width: PW, height: 30, color: GREEN });
+          const ft = "Chapin Landscapes  ·  chapinlandscapes.com";
+          page.drawText(ft, { x: (PW - regular.widthOfTextAtSize(ft, 8)) / 2, y: 10, size: 8, font: regular, color: WHITE });
+          page = pdfDoc.addPage([PW, PH]);
+          y = PH - 20;
+        }
+      };
+
+      // ── header band ──────────────────────────────────────────────────────────
+      page.drawRectangle({ x: 0, y: PH - 76, width: PW, height: 76, color: GREEN });
+
+      page.drawText("CHAPIN LANDSCAPES", { x: ML, y: PH - 34, size: 22, font: bold, color: WHITE });
+      page.drawText("Professional Landscape Installation & Maintenance", {
+        x: ML, y: PH - 50, size: 8.5, font: regular, color: rgb(0.75, 0.90, 0.76),
+      });
+
+      const invNumW  = regular.widthOfTextAtSize(inv.invoice_number, 10);
+      const invLblW  = bold.widthOfTextAtSize("INVOICE", 24);
+      page.drawText("INVOICE",           { x: MR - invLblW, y: PH - 38, size: 24, font: bold,    color: WHITE });
+      page.drawText(inv.invoice_number,  { x: MR - invNumW, y: PH - 54, size: 10, font: regular, color: rgb(0.78, 0.91, 0.79) });
+
+      y = PH - 96;
+
+      // ── Bill To / Invoice Details ────────────────────────────────────────────
+      const colMid = ML + CW * 0.50;
+
+      page.drawText("BILL TO",          { x: ML,      y, size: 7.5, font: bold, color: GREY });
+      page.drawText("INVOICE DETAILS",  { x: colMid,  y, size: 7.5, font: bold, color: GREY });
+      y -= 13;
+
+      const custDisplay = inv.cust_company || (inv.cust_name?.trim() || "—");
+      page.drawText(custDisplay, { x: ML, y, size: 10.5, font: bold, color: BLACK });
+
+      let billY = y;
+      if (inv.cust_company && inv.cust_name?.trim()) {
+        billY -= 13;
+        page.drawText(inv.cust_name.trim(), { x: ML, y: billY, size: 9, font: regular, color: GREY });
+      }
+      if (inv.cust_address) {
+        billY -= 12;
+        page.drawText(inv.cust_address, { x: ML, y: billY, size: 9, font: regular, color: BLACK });
+      }
+      const cityLine = [inv.cust_city, inv.cust_state, inv.cust_zip].filter(Boolean).join(", ");
+      if (cityLine) {
+        billY -= 12;
+        page.drawText(cityLine, { x: ML, y: billY, size: 9, font: regular, color: BLACK });
+      }
+
+      // Right column — details
+      const statusLabel = (inv.status as string)
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c: string) => c.toUpperCase());
+      const detRows: [string, string][] = [
+        ["Status",  statusLabel],
+        ["Issued",  fmtD(inv.issued_date)],
+      ];
+      if (inv.due_date)  detRows.push(["Due",  fmtD(inv.due_date)]);
+      if (inv.job_title) detRows.push(["Job",  inv.job_title]);
+
+      let detY = y;
+      for (const [lbl, val] of detRows) {
+        page.drawText(lbl + ":", { x: colMid,      y: detY, size: 8.5, font: bold,    color: GREY  });
+        page.drawText(val,        { x: colMid + 56, y: detY, size: 8.5, font: regular, color: BLACK });
+        detY -= 13;
+      }
+
+      y = Math.min(billY, detY) - 18;
+
+      // ── divider ──────────────────────────────────────────────────────────────
+      page.drawRectangle({ x: ML, y: y + 4, width: CW, height: 1, color: rgb(0.80, 0.80, 0.80) });
+      y -= 8;
+
+      // ── line items header ────────────────────────────────────────────────────
+      ensureSpace(22);
+      page.drawRectangle({ x: ML, y: y - 5, width: CW, height: 21, color: GREEN });
+      page.drawText("DESCRIPTION", { x: cDesc + 4, y: y + 3, size: 7.5, font: bold, color: WHITE });
+      page.drawText("QTY",          { x: cQty,      y: y + 3, size: 7.5, font: bold, color: WHITE });
+      page.drawText("UNIT PRICE",   { x: cRate,      y: y + 3, size: 7.5, font: bold, color: WHITE });
+      page.drawText("AMOUNT",       { x: cAmt,       y: y + 3, size: 7.5, font: bold, color: WHITE });
+      y -= 16;
+
+      // ── line items rows ──────────────────────────────────────────────────────
+      for (let i = 0; i < lineItems.length; i++) {
+        ensureSpace(18);
+        const li = lineItems[i];
+        const rowBg = i % 2 === 1 ? LGREY : WHITE;
+        page.drawRectangle({ x: ML, y: y - 5, width: CW, height: 18, color: rowBg });
+        const desc = (li.description ?? "").slice(0, 72);
+        page.drawText(desc,                 { x: cDesc + 4, y: y + 2, size: 8.5, font: regular, color: BLACK });
+        page.drawText(String(parseFloat(li.quantity ?? "1")), {
+          x: cQty, y: y + 2, size: 8.5, font: regular, color: BLACK,
+        });
+        page.drawText(fmt$(li.unit_price), { x: cRate, y: y + 2, size: 8.5, font: regular, color: BLACK });
+        const amtW = regular.widthOfTextAtSize(fmt$(li.amount), 8.5);
+        page.drawText(fmt$(li.amount), { x: MR - amtW, y: y + 2, size: 8.5, font: regular, color: BLACK });
+        y -= 17;
+      }
+
+      y -= 6;
+
+      // ── totals ────────────────────────────────────────────────────────────────
+      ensureSpace(100);
+      page.drawRectangle({ x: ML, y: y + 4, width: CW, height: 1, color: rgb(0.80, 0.80, 0.80) });
+      y -= 8;
+
+      const totL = MR - 200;
+
+      const totRow = (label: string, value: string, isBold = false, color = GREY) => {
+        ensureSpace(16);
+        const f = isBold ? bold : regular;
+        const vW = f.widthOfTextAtSize(value, 9);
+        page.drawText(label, { x: totL, y, size: 9, font: f, color: isBold ? BLACK : GREY });
+        page.drawText(value, { x: MR - vW, y, size: 9, font: f, color });
+        y -= 13;
+      };
+
+      totRow("Subtotal", fmt$(inv.subtotal));
+      if (parseFloat(inv.discount_amount ?? "0") > 0)
+        totRow("Discount", "−" + fmt$(inv.discount_amount), false, rgb(0.18, 0.55, 0.28));
+      if (parseFloat(inv.tax_amount ?? "0") > 0)
+        totRow(`Tax (${(parseFloat(inv.tax_rate ?? "0") * 100).toFixed(1)}%)`, fmt$(inv.tax_amount));
+
+      // Total row
+      y -= 2;
+      ensureSpace(22);
+      page.drawRectangle({ x: totL, y: y - 4, width: MR - totL, height: 1, color: GREEN });
+      y -= 8;
+      const totW  = bold.widthOfTextAtSize(fmt$(inv.total), 10.5);
+      page.drawText("TOTAL",         { x: totL, y, size: 10.5, font: bold, color: GREEN });
+      page.drawText(fmt$(inv.total), { x: MR - totW, y, size: 10.5, font: bold, color: GREEN });
+      y -= 14;
+
+      if (parseFloat(inv.amount_paid ?? "0") > 0)
+        totRow("Paid", "−" + fmt$(inv.amount_paid), false, rgb(0.18, 0.55, 0.28));
+
+      // Balance due band
+      y -= 2;
+      ensureSpace(26);
+      const balance = parseFloat(inv.balance_due ?? "0");
+      const bandColor = balance > 0 ? GREEN : rgb(0.18, 0.55, 0.28);
+      page.drawRectangle({ x: totL, y: y - 6, width: MR - totL, height: 24, color: bandColor });
+      const balStr = fmt$(inv.balance_due);
+      const balW   = bold.widthOfTextAtSize(balStr, 11);
+      page.drawText("BALANCE DUE", { x: totL + 6, y: y + 5, size: 9.5, font: bold, color: WHITE });
+      page.drawText(balStr,         { x: MR - balW, y: y + 5, size: 11,  font: bold, color: WHITE });
+      y -= 30;
+
+      // ── notes / terms ─────────────────────────────────────────────────────────
+      const noteSize = 8.5;
+      const noteMaxW = CW;
+
+      if (inv.notes) {
+        ensureSpace(30);
+        y -= 8;
+        page.drawText("Notes", { x: ML, y, size: 8.5, font: bold, color: GREY });
+        y -= 12;
+        for (const ln of wrapText(inv.notes.slice(0, 500), regular, noteSize, noteMaxW)) {
+          ensureSpace(12);
+          page.drawText(ln, { x: ML, y, size: noteSize, font: regular, color: BLACK });
+          y -= 12;
+        }
+      }
+
+      if (inv.terms) {
+        ensureSpace(30);
+        y -= 8;
+        page.drawText("Terms & Conditions", { x: ML, y, size: 8.5, font: bold, color: GREY });
+        y -= 12;
+        for (const ln of wrapText(inv.terms.slice(0, 500), regular, noteSize, noteMaxW)) {
+          ensureSpace(12);
+          page.drawText(ln, { x: ML, y, size: noteSize, font: regular, color: BLACK });
+          y -= 12;
+        }
+      }
+
+      // ── footer on last page ───────────────────────────────────────────────────
+      page.drawRectangle({ x: 0, y: 0, width: PW, height: 30, color: GREEN });
+      const ft = "Thank you for your business!  ·  Chapin Landscapes  ·  chapinlandscapes.com";
+      page.drawText(ft, { x: (PW - regular.widthOfTextAtSize(ft, 8)) / 2, y: 10, size: 8, font: regular, color: WHITE });
+
+      const pdfBytes = await pdfDoc.save();
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${inv.invoice_number}.pdf"`);
+      res.setHeader("Content-Length", String(pdfBytes.length));
+      return res.end(Buffer.from(pdfBytes));
+    } catch (err: any) {
+      console.error("[invoices] PDF generation error:", err.message);
       return res.status(500).json({ message: err.message });
     }
   });

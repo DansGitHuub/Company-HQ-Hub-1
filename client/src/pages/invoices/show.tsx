@@ -19,7 +19,7 @@ import {
 import {
   ChevronLeft, ChevronDown, Pencil, User, Briefcase,
   Calendar, Loader2, Trash2, Plus, CreditCard,
-  Send, CheckCircle2, XCircle, MessageSquare, BadgeDollarSign,
+  Send, CheckCircle2, XCircle, MessageSquare, BadgeDollarSign, Download,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -296,6 +296,11 @@ export default function InvoiceDetailPage() {
                 {t("markPaid")}
               </Button>
             )}
+            <a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="sm" data-testid="button-download-pdf">
+                <Download className="h-4 w-4 mr-1.5" /> Download PDF
+              </Button>
+            </a>
             <Button variant="outline" size="sm" onClick={() => setShowEdit(true)} data-testid="button-edit">
               <Pencil className="h-4 w-4 mr-1.5" /> {t("editInvoice")}
             </Button>
