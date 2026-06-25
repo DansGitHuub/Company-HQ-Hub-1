@@ -283,6 +283,11 @@ export function registerAssistantRoutes(app: Express) {
 
         const execResult = await executeTool(toolName, toolArgs, user);
 
+        if (execResult.isDenied) {
+          await logConversation(user.id, sid, "denied", `[Confirmed action] ${toolName}`, toolName, toolArgs,
+            { denied: true, reason: execResult.error || "Access restricted.", user_role: user.role, user_name: user.name });
+        }
+
         if (execResult.error) {
           await logConversation(user.id, sid, "assistant", `Error: ${execResult.error}`, toolName, toolArgs, { error: execResult.error });
           return res.json({
@@ -405,6 +410,11 @@ export function registerAssistantRoutes(app: Express) {
         }
 
         const execResult = await executeTool(toolName, toolArgs, user);
+
+        if (execResult.isDenied) {
+          await logConversation(user.id, sid, "denied", message, toolName, toolArgs,
+            { denied: true, reason: execResult.error || "Access restricted.", user_role: user.role, user_name: user.name });
+        }
 
         if (execResult.error) {
           const followUpMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -699,13 +709,37 @@ export function registerAssistantRoutes(app: Express) {
     }
   });
 
+  // ── Denied-request log ─────────────────────────────────────────────────────
+  app.get("/api/assistant/logs/denied", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId, startDate, endDate } = req.query;
+      let sql = `SELECT ac.id, ac.user_id, ac.session_id, ac.content, ac.tool_called, ac.tool_args, ac.tool_result, ac.created_at,
+                        u.name as user_name, u.username, u.role as user_role
+                 FROM assistant_conversations ac
+                 LEFT JOIN users u ON ac.user_id = u.id
+                 WHERE ac.role = 'denied'`;
+      const params: any[] = [];
+      let paramIdx = 1;
+      if (userId) { sql += ` AND ac.user_id = $${paramIdx++}`; params.push(userId); }
+      if (startDate) { sql += ` AND ac.created_at >= $${paramIdx++}`; params.push(new Date(startDate as string)); }
+      if (endDate) { sql += ` AND ac.created_at <= $${paramIdx++}`; params.push(new Date(endDate as string)); }
+      sql += ` ORDER BY ac.created_at DESC LIMIT 200`;
+      const result = await pool.query(sql, params);
+      return res.json(result.rows);
+    } catch (err) {
+      console.error("[assistant] Denied logs fetch error:", err);
+      return res.status(500).json({ error: "Failed to fetch denied request logs" });
+    }
+  });
+
   app.get("/api/assistant/logs/usage", requireAuth, requireAdmin, async (_req: Request, res: Response) => {
     try {
-      const [today, week, month, tools] = await Promise.all([
+      const [today, week, month, tools, denied30] = await Promise.all([
         pool.query(`SELECT COUNT(*) as count, SUM(tokens_used) as tokens FROM assistant_conversations WHERE created_at >= CURRENT_DATE`),
         pool.query(`SELECT COUNT(*) as count, SUM(tokens_used) as tokens FROM assistant_conversations WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'`),
         pool.query(`SELECT COUNT(*) as count, SUM(tokens_used) as tokens FROM assistant_conversations WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'`),
         pool.query(`SELECT tool_called, COUNT(*) as count FROM assistant_conversations WHERE tool_called IS NOT NULL GROUP BY tool_called ORDER BY count DESC LIMIT 10`),
+        pool.query(`SELECT COUNT(*) as count FROM assistant_conversations WHERE role = 'denied' AND created_at >= CURRENT_DATE - INTERVAL '30 days'`),
       ]);
 
       const GPT4O_COST_PER_TOKEN = 0.000005;
@@ -715,6 +749,7 @@ export function registerAssistantRoutes(app: Express) {
         week: { messages: parseInt(week.rows[0]?.count || "0"), tokens: parseInt(week.rows[0]?.tokens || "0") },
         month: { messages: parseInt(month.rows[0]?.count || "0"), tokens: parseInt(month.rows[0]?.tokens || "0") },
         topTools: tools.rows,
+        deniedRequests30d: parseInt(denied30.rows[0]?.count || "0"),
         estimatedCost: {
           today: ((parseInt(today.rows[0]?.tokens || "0")) * GPT4O_COST_PER_TOKEN).toFixed(4),
           week: ((parseInt(week.rows[0]?.tokens || "0")) * GPT4O_COST_PER_TOKEN).toFixed(4),

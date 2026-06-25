@@ -465,10 +465,10 @@ function checkPermission(user: any, toolName: string): { allowed: boolean; reaso
   return { allowed: true };
 }
 
-export async function executeTool(toolName: string, toolArgs: any, user: any): Promise<{ result: any; navigationTarget?: string; error?: string }> {
+export async function executeTool(toolName: string, toolArgs: any, user: any): Promise<{ result: any; navigationTarget?: string; error?: string; isDenied?: boolean }> {
   const permCheck = checkPermission(user, toolName);
   if (!permCheck.allowed) {
-    return { result: null, error: permCheck.reason || "Permission denied." };
+    return { result: null, error: permCheck.reason || "Permission denied.", isDenied: true };
   }
 
   try {
@@ -492,7 +492,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
       }
 
       case "searchGlobal": {
-        if (user.role === "Customer") return { result: null, error: "Global search is not available for customer accounts." };
+        if (user.role === "Customer") return { result: null, error: "Global search is not available for customer accounts.", isDenied: true };
         const query = `%${toolArgs.query}%`;
         const results: any = {};
 
@@ -655,7 +655,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
       }
 
       case "getJobs": {
-        if (user.role === "Customer") return { result: { jobs: [], count: 0, message: "Job information is not available for customer accounts." } };
+        if (user.role === "Customer") return { result: null, error: "Job information is not available for customer accounts.", isDenied: true };
         const isJobAdmin = ["Admin", "Manager", "Master Admin"].includes(user.role);
         let jobSql = `SELECT id, client, type, category, stage, value, scheduled_date, completion_date, notes, zone FROM jobs WHERE 1=1`;
         const jobParams: any[] = [];
@@ -707,7 +707,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
 
         const assignee = assigneeCheck.rows[0];
         const canAssign = checkTaskAssignment(user.role, assignee.role);
-        if (!canAssign.allowed) return { result: null, error: canAssign.reason || "You cannot assign tasks to this user." };
+        if (!canAssign.allowed) return { result: null, error: canAssign.reason || "You cannot assign tasks to this user.", isDenied: true };
 
         const taskIdRes = await pool.query(`SELECT task_id FROM tasks ORDER BY created_at DESC LIMIT 1`);
         const lastId = taskIdRes.rows[0]?.task_id || "TK-0000";
