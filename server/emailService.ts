@@ -1,17 +1,6 @@
-import sgMail from "@sendgrid/mail";
+import { Resend } from "resend";
 
-let initialized = false;
-
-function ensureInitialized() {
-  if (initialized) return;
-  const apiKey = process.env.SENDGRID_API_KEY;
-  if (!apiKey) {
-    console.error("[emailService] SENDGRID_API_KEY is not set");
-    return;
-  }
-  sgMail.setApiKey(apiKey);
-  initialized = true;
-}
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 function getFromEmail(): string {
   return process.env.FROM_EMAIL || "noreply@chapinlandscapes.com";
@@ -22,39 +11,70 @@ function getAppUrl(): string {
   return domain ? `https://${domain}` : "http://localhost:5000";
 }
 
+/**
+ * Resolve effective recipient and annotate body when in test/redirect mode.
+ *
+ * Rules:
+ *  - If RESEND_API_KEY is absent  → log "email skipped" and short-circuit.
+ *  - If EMAIL_SENDING_LIVE !== 'true' → redirect every outbound email to
+ *    EMAIL_TEST_REDIRECT (default: dan@chapinlandscapes.com) and prepend a
+ *    visible banner noting the original intended recipient.
+ */
+function resolveRecipient(
+  to: string,
+  body: string,
+): { actualTo: string; finalBody: string } {
+  const live = process.env.EMAIL_SENDING_LIVE === "true";
+  if (live) {
+    return { actualTo: to, finalBody: body };
+  }
+
+  const redirect = process.env.EMAIL_TEST_REDIRECT || "dan@chapinlandscapes.com";
+  const banner = `
+    <div style="background:#fef3c7;border:2px solid #f59e0b;padding:10px 14px;
+                margin-bottom:16px;border-radius:6px;font-family:Arial,sans-serif;
+                font-size:12px;color:#92400e;">
+      <strong>⚠ TEST / REDIRECT MODE</strong> — This email was redirected from its
+      intended recipient: <strong>${to}</strong>.
+      Set <code>EMAIL_SENDING_LIVE=true</code> to send to real addresses.
+    </div>`;
+
+  return { actualTo: redirect, finalBody: banner + body };
+}
+
+// ── core send ─────────────────────────────────────────────────────────────────
+
 export async function sendEmail(
   to: string,
   subject: string,
   body: string
 ): Promise<boolean> {
-  try {
-    if (process.env.NODE_ENV !== "production") {
-      console.log(`[emailService] DEV MODE — email suppressed. To: ${to}, Subject: "${subject}"`);
-      return true;
-    }
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log(`[emailService] email skipped (no API key) — To: ${to}, Subject: "${subject}"`);
+    return true;
+  }
 
-    ensureInitialized();
-    if (!initialized) {
-      console.error("[emailService] SendGrid not initialized — skipping email to:", to);
+  const { actualTo, finalBody } = resolveRecipient(to, body);
+
+  try {
+    const resend = new Resend(apiKey);
+    const { error } = await resend.emails.send({
+      from: `Company HQ <${getFromEmail()}>`,
+      to: [actualTo],
+      subject,
+      html: finalBody,
+    });
+
+    if (error) {
+      console.error(`[emailService] Resend error — To: ${actualTo}, Subject: "${subject}" | ${JSON.stringify(error)}`);
       return false;
     }
 
-    const msg = {
-      to,
-      from: getFromEmail(),
-      subject,
-      html: body,
-    };
-
-    await sgMail.send(msg);
-    console.log(`[emailService] Email sent to ${to}: "${subject}"`);
+    console.log(`[emailService] Email sent → ${actualTo} (intended: ${to}), Subject: "${subject}"`);
     return true;
   } catch (err: any) {
-    const responseBody = err?.response?.body;
-    const errorDetail = responseBody
-      ? JSON.stringify(responseBody, null, 2)
-      : err.message;
-    console.error(`[emailService] Failed to send email to ${to} | Subject: "${subject}" | Error: ${errorDetail}`);
+    console.error(`[emailService] Failed — To: ${actualTo}, Subject: "${subject}" | ${err.message}`);
     return false;
   }
 }

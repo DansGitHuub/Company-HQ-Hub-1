@@ -95,6 +95,12 @@ export async function runInvoicesMigration() {
         AND amount_paid > 0
     `);
 
+    // Idempotency column for overdue email notifications
+    await pool.query(`
+      ALTER TABLE invoices
+        ADD COLUMN IF NOT EXISTS overdue_email_sent_at TIMESTAMPTZ
+    `);
+
     console.log("[migration] Invoices tables ready");
   } catch (err: any) {
     console.error("[migration] Invoices migration error:", err.message);
