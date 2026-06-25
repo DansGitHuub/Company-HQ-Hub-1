@@ -67,6 +67,7 @@ import { syncCCProjectsFromApi } from "./companyCamRoutes";
 import { registerPublicPages } from "./publicPages";
 import { startLeadAlertScheduler } from "./consultationRoutes";
 import { startGpsPingCleanupScheduler } from "./gpsPingCleanupScheduler";
+import { startInvoiceOverdueScheduler } from "./invoiceOverdueScheduler";
 
 const app = express();
 const httpServer = createServer(app);
@@ -258,6 +259,7 @@ app.use((req, res, next) => {
       startNotificationScheduler();
       startLeadAlertScheduler();
       startGpsPingCleanupScheduler();
+      startInvoiceOverdueScheduler();
     },
   );
 })();

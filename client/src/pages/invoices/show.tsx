@@ -64,6 +64,7 @@ const STATUS_VALUE_KEYS: Record<string, string> = {
   changes_requested: "statusChangesRequested",
   paid:              "statusPaid",
   void:              "statusVoid",
+  overdue:           "overdue",
 };
 
 const PAYMENT_METHODS = ["cash", "check", "card", "ach", "zelle", "other"];
@@ -120,6 +121,7 @@ export default function InvoiceDetailPage() {
     { value: "sent",              label: t("statusSent") },
     { value: "viewed",            label: t("statusViewed") },
     { value: "accepted",          label: t("statusAccepted") },
+    { value: "overdue",           label: "Overdue" },
     { value: "declined",          label: t("statusDeclined") },
     { value: "changes_requested", label: t("statusChangesRequested") },
     { value: "paid",              label: t("statusPaid") },

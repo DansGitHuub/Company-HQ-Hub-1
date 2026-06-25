@@ -34,6 +34,7 @@ export const STATUS_MAP: Record<string, { cls: string }> = {
   changes_requested: { cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" },
   paid:              { cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
   void:              { cls: "bg-muted text-muted-foreground" },
+  overdue:           { cls: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 ring-1 ring-red-300 dark:ring-red-700" },
 };
 
 const STATUS_LABEL_KEY: Record<string, string> = {
@@ -45,6 +46,7 @@ const STATUS_LABEL_KEY: Record<string, string> = {
   changes_requested: "statusChangesRequested",
   paid:              "statusPaid",
   void:              "statusVoid",
+  overdue:           "overdue",
 };
 
 export function StatusBadge({ status }: { status: string }) {
@@ -90,6 +92,7 @@ export default function InvoicesPage() {
 
   const TABS = [
     { value: "all",               label: t("tabAll") },
+    { value: "overdue",           label: "Overdue" },
     { value: "draft",             label: t("statusDraft") },
     { value: "sent",              label: t("statusSent") },
     { value: "accepted",          label: t("statusAccepted") },

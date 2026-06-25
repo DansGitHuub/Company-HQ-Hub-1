@@ -56,7 +56,7 @@ async function syncInvoiceTotals(invoiceId: string) {
     WHERE id = $1
       AND balance_due <= 0
       AND amount_paid > 0
-      AND status IN ('accepted','sent','viewed')
+      AND status IN ('accepted','sent','viewed','overdue')
   `, [invoiceId]);
 
   // Inverse: if status is 'paid' but the books no longer agree (e.g. payment deleted),
