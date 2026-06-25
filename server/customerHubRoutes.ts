@@ -567,4 +567,81 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
       res.status(500).json({ message: err.message });
     }
   });
+
+  // ── CUSTOMER INVOICE HISTORY ──────────────────────────────────────────────
+
+  /** Link portal user → CRM customer via primary email match. */
+  async function resolveCustomerCrmId(userId: string): Promise<string | null> {
+    const { rows } = await pool.query(`
+      SELECT c.id
+      FROM customers c
+      JOIN customer_emails ce ON ce.customer_id = c.id AND ce.is_primary = true
+      JOIN users u ON lower(u.email) = lower(ce.email)
+      WHERE u.id = $1 AND c.is_active = true
+      LIMIT 1
+    `, [userId]);
+    return rows[0]?.id ?? null;
+  }
+
+  app.get("/api/customer-hub/invoices", requireAuth, requireCustomer, async (req: any, res) => {
+    try {
+      const crmId = await resolveCustomerCrmId(req.user.id);
+      if (!crmId) return res.json([]);
+
+      const { rows } = await pool.query(`
+        SELECT inv.id, inv.invoice_number, inv.status,
+               inv.issued_date, inv.due_date,
+               inv.subtotal, inv.tax_amount, inv.total,
+               inv.amount_paid, inv.balance_due, inv.created_at,
+               j.title AS job_title
+        FROM invoices inv
+        LEFT JOIN jobs j ON j.id = inv.job_id
+        WHERE inv.customer_id = $1
+          AND inv.status != 'void'
+        ORDER BY inv.issued_date DESC, inv.created_at DESC
+      `, [crmId]);
+
+      return res.json(rows);
+    } catch (err: any) {
+      console.error("[customer-hub] GET invoices:", err.message);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/customer-hub/invoices/:id", requireAuth, requireCustomer, async (req: any, res) => {
+    try {
+      const crmId = await resolveCustomerCrmId(req.user.id);
+      if (!crmId) return res.status(403).json({ message: "Not authorized" });
+
+      const ownerCheck = await pool.query(
+        `SELECT id FROM invoices WHERE id = $1 AND customer_id = $2 AND status != 'void'`,
+        [req.params.id, crmId]
+      );
+      if (ownerCheck.rows.length === 0) return res.status(403).json({ message: "Not authorized" });
+
+      const [invRes, itemsRes] = await Promise.all([
+        pool.query(`
+          SELECT inv.id, inv.invoice_number, inv.status,
+                 inv.issued_date, inv.due_date,
+                 inv.subtotal, inv.tax_rate, inv.tax_amount, inv.discount_amount,
+                 inv.total, inv.amount_paid, inv.balance_due,
+                 inv.notes, inv.terms, inv.customer_message, inv.created_at,
+                 j.title AS job_title
+          FROM invoices inv
+          LEFT JOIN jobs j ON j.id = inv.job_id
+          WHERE inv.id = $1
+        `, [req.params.id]),
+        pool.query(
+          `SELECT description, quantity, unit_price, amount, sort_order
+           FROM invoice_line_items WHERE invoice_id = $1 ORDER BY sort_order, id`,
+          [req.params.id]
+        ),
+      ]);
+
+      return res.json({ ...invRes.rows[0], line_items: itemsRes.rows });
+    } catch (err: any) {
+      console.error("[customer-hub] GET invoice/:id:", err.message);
+      return res.status(500).json({ message: err.message });
+    }
+  });
 }

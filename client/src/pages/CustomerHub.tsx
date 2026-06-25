@@ -15,7 +15,7 @@ import {
   ChevronRight, Download, Bookmark, BookmarkCheck, Search,
   Send, Clock, MapPin, Calendar, CheckCircle2, AlertCircle,
   Leaf, Sun, Snowflake, CloudRain, ArrowLeft, Eye, Star,
-  Lightbulb
+  Lightbulb, Receipt, AlertTriangle
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -43,7 +43,7 @@ const brandColors = {
   cream: "#F7F3EC",
 };
 
-type Section = "dashboard" | "jobs" | "documents" | "care-library" | "messages";
+type Section = "dashboard" | "jobs" | "documents" | "care-library" | "messages" | "invoices";
 
 export default function CustomerHub() {
   const { t } = useTranslation();
@@ -54,6 +54,7 @@ export default function CustomerHub() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedGuideId, setSelectedGuideId] = useState<string | null>(null);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
 
   const setSection = (s: Section, preserveSelection?: boolean) => {
     navigate(`/customer-hub/${s === "dashboard" ? "" : s}`);
@@ -61,12 +62,14 @@ export default function CustomerHub() {
       setSelectedJobId(null);
       setSelectedGuideId(null);
       setSelectedThreadId(null);
+      setSelectedInvoiceId(null);
     }
   };
 
   const navItems: { id: Section; label: string; icon: typeof Home }[] = [
     { id: "dashboard", label: "Home", icon: Home },
     { id: "jobs", label: "My Jobs", icon: Briefcase },
+    { id: "invoices", label: "Billing", icon: Receipt },
     { id: "documents", label: "Documents", icon: FileText },
     { id: "care-library", label: "Care Library", icon: BookOpen },
     { id: "messages", label: "Messages", icon: MessageSquare },
@@ -135,6 +138,11 @@ export default function CustomerHub() {
             selectedThreadId
               ? <ThreadDetail threadId={selectedThreadId} onBack={() => setSelectedThreadId(null)} />
               : <MessagesSection onSelectThread={setSelectedThreadId} />
+          )}
+          {section === "invoices" && (
+            selectedInvoiceId
+              ? <InvoiceDetailSection invoiceId={selectedInvoiceId} onBack={() => setSelectedInvoiceId(null)} />
+              : <InvoicesSection onSelectInvoice={setSelectedInvoiceId} />
           )}
         </main>
       </div>
@@ -1336,6 +1344,341 @@ function ThreadDetail({ threadId, onBack }: { threadId: string; onBack: () => vo
             <Send className="h-4 w-4" />
           </Button>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Invoice helpers ───────────────────────────────────────────────────────────
+
+const INV_STATUS_COLORS: Record<string, string> = {
+  draft:             "bg-gray-100 text-gray-600",
+  sent:              "bg-blue-100 text-blue-700",
+  viewed:            "bg-indigo-100 text-indigo-700",
+  accepted:          "bg-cyan-100 text-cyan-700",
+  paid:              "bg-green-100 text-green-700",
+  declined:          "bg-red-100 text-red-700",
+  changes_requested: "bg-orange-100 text-orange-700",
+};
+
+const INV_STATUS_LABELS: Record<string, string> = {
+  draft:             "Draft",
+  sent:              "Sent",
+  viewed:            "Viewed",
+  accepted:          "Accepted",
+  paid:              "Paid",
+  declined:          "Declined",
+  changes_requested: "Changes Requested",
+};
+
+function fmtInvMoney(v: any) {
+  const n = parseFloat(v ?? "0");
+  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtInvDate(d: string | null) {
+  if (!d) return "—";
+  const [y, m, day] = d.slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, day).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function isInvoiceOverdue(inv: any): boolean {
+  if (!inv.due_date) return false;
+  if (!["sent", "viewed", "accepted"].includes(inv.status)) return false;
+  if (parseFloat(inv.balance_due ?? "0") <= 0) return false;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return new Date(inv.due_date) < today;
+}
+
+// ── Invoices Section ─────────────────────────────────────────────────────────
+
+function InvoicesSection({ onSelectInvoice }: { onSelectInvoice: (id: string) => void }) {
+  const { data: invoices = [], isLoading } = useQuery({
+    queryKey: ["/api/customer-hub/invoices"],
+    queryFn: async () => (await apiRequest("GET", "/api/customer-hub/invoices")).json(),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3 max-w-3xl mx-auto animate-pulse">
+        {[1, 2, 3].map(i => <div key={i} className="h-20 bg-gray-200 rounded-lg" />)}
+      </div>
+    );
+  }
+
+  const openInvoices = invoices.filter((inv: any) => inv.status !== "paid");
+  const paidInvoices = invoices.filter((inv: any) => inv.status === "paid");
+
+  return (
+    <div className="space-y-6 max-w-3xl mx-auto" data-testid="invoices-section">
+      <h2 className="text-xl font-bold" style={{ color: brandColors.darkGreen }}>Billing &amp; Invoices</h2>
+
+      {invoices.length === 0 ? (
+        <EmptyState icon={Receipt} title="No invoices yet" description="Your invoices will appear here once your project is underway." />
+      ) : (
+        <>
+          {openInvoices.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Outstanding</h3>
+              {openInvoices.map((inv: any) => (
+                <InvoiceCard key={inv.id} invoice={inv} onClick={() => onSelectInvoice(inv.id)} />
+              ))}
+            </div>
+          )}
+          {paidInvoices.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Paid</h3>
+              {paidInvoices.map((inv: any) => (
+                <InvoiceCard key={inv.id} invoice={inv} onClick={() => onSelectInvoice(inv.id)} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function InvoiceCard({ invoice, onClick }: { invoice: any; onClick: () => void }) {
+  const overdue = isInvoiceOverdue(invoice);
+  const balance = parseFloat(invoice.balance_due ?? "0");
+  const statusLabel = overdue ? "Overdue" : (INV_STATUS_LABELS[invoice.status] ?? invoice.status);
+  const statusCls = overdue ? "bg-red-100 text-red-700" : (INV_STATUS_COLORS[invoice.status] ?? "bg-gray-100 text-gray-600");
+
+  return (
+    <Card
+      className={`cursor-pointer hover:shadow-md transition-shadow ${overdue ? "border-l-4 border-l-red-400" : ""}`}
+      onClick={onClick}
+      data-testid={`invoice-card-${invoice.id}`}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono font-semibold text-sm" style={{ color: brandColors.darkGreen }}>
+                {invoice.invoice_number}
+              </span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusCls}`}>
+                {statusLabel}
+              </span>
+              {overdue && <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+            </div>
+            {invoice.job_title && (
+              <p className="text-sm text-gray-500 mt-0.5 truncate">{invoice.job_title}</p>
+            )}
+            <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
+              <span>Issued {fmtInvDate(invoice.issued_date)}</span>
+              {invoice.due_date && (
+                <span className={overdue ? "text-red-500 font-medium" : ""}>
+                  Due {fmtInvDate(invoice.due_date)}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="font-semibold text-sm" style={{ color: brandColors.darkGreen }}>
+              {fmtInvMoney(invoice.total)}
+            </p>
+            {balance > 0 && (
+              <p className={`text-xs mt-0.5 ${overdue ? "text-red-500 font-medium" : "text-gray-500"}`}>
+                {fmtInvMoney(balance)} due
+              </p>
+            )}
+            {invoice.status === "paid" && (
+              <p className="text-xs text-green-600 mt-0.5 font-medium">Paid in full</p>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Invoice Detail Section ────────────────────────────────────────────────────
+
+function InvoiceDetailSection({ invoiceId, onBack }: { invoiceId: string; onBack: () => void }) {
+  const { data: invoice, isLoading, isError } = useQuery({
+    queryKey: [`/api/customer-hub/invoices/${invoiceId}`],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/customer-hub/invoices/${invoiceId}`);
+      if (!res.ok) throw new Error("Not found");
+      return res.json();
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 max-w-3xl mx-auto animate-pulse">
+        <div className="h-6 bg-gray-200 rounded w-32" />
+        <div className="h-32 bg-gray-200 rounded" />
+        <div className="h-48 bg-gray-200 rounded" />
+      </div>
+    );
+  }
+
+  if (isError || !invoice) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <button onClick={onBack} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
+          <ArrowLeft className="h-4 w-4" /> Back to Billing
+        </button>
+        <p className="text-gray-500 text-sm">Invoice not found.</p>
+      </div>
+    );
+  }
+
+  const overdue = isInvoiceOverdue(invoice);
+  const balance = parseFloat(invoice.balance_due ?? "0");
+  const subtotal = parseFloat(invoice.subtotal ?? "0");
+  const taxAmount = parseFloat(invoice.tax_amount ?? "0");
+  const discount = parseFloat(invoice.discount_amount ?? "0");
+  const total = parseFloat(invoice.total ?? "0");
+  const amountPaid = parseFloat(invoice.amount_paid ?? "0");
+  const statusLabel = overdue ? "Overdue" : (INV_STATUS_LABELS[invoice.status] ?? invoice.status);
+  const statusCls = overdue ? "bg-red-100 text-red-700" : (INV_STATUS_COLORS[invoice.status] ?? "bg-gray-100 text-gray-600");
+
+  return (
+    <div className="space-y-4 max-w-3xl mx-auto" data-testid="invoice-detail">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        data-testid="button-invoice-back"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back to Billing
+      </button>
+
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-xl font-bold font-mono" style={{ color: brandColors.darkGreen }}>
+            {invoice.invoice_number}
+          </h2>
+          {invoice.job_title && <p className="text-sm text-gray-500 mt-0.5">{invoice.job_title}</p>}
+        </div>
+        <span className={`text-sm px-3 py-1 rounded-full font-semibold ${statusCls}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      {/* Overdue banner */}
+      {overdue && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>This invoice is past due. Please contact us if you have questions.</span>
+        </div>
+      )}
+
+      {/* Dates */}
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div className="flex items-center gap-2 text-gray-600">
+          <Calendar className="h-4 w-4 text-gray-400" />
+          <span>Issued: {fmtInvDate(invoice.issued_date)}</span>
+        </div>
+        {invoice.due_date && (
+          <div className={`flex items-center gap-2 ${overdue ? "text-red-600 font-medium" : "text-gray-600"}`}>
+            <Clock className="h-4 w-4 text-gray-400" />
+            <span>Due: {fmtInvDate(invoice.due_date)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Customer message */}
+      {invoice.customer_message && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Message</p>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{invoice.customer_message}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Line items */}
+      {invoice.line_items?.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Invoice Details</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm" data-testid="invoice-line-items">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                    <th className="text-left px-4 py-2 font-medium">Description</th>
+                    <th className="text-right px-4 py-2 font-medium">Qty</th>
+                    <th className="text-right px-4 py-2 font-medium">Unit Price</th>
+                    <th className="text-right px-4 py-2 font-medium">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.line_items.map((item: any, idx: number) => (
+                    <tr key={idx} className="border-b last:border-0">
+                      <td className="px-4 py-3 text-gray-700">{item.description || "—"}</td>
+                      <td className="px-4 py-3 text-right text-gray-600">{parseFloat(item.quantity ?? 1).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right text-gray-600">{fmtInvMoney(item.unit_price)}</td>
+                      <td className="px-4 py-3 text-right font-medium">{fmtInvMoney(item.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Totals */}
+      <Card>
+        <CardContent className="p-4 space-y-2">
+          <div className="flex justify-between text-sm text-gray-600">
+            <span>Subtotal</span>
+            <span>{fmtInvMoney(subtotal)}</span>
+          </div>
+          {discount > 0 && (
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Discount</span>
+              <span className="text-green-600">−{fmtInvMoney(discount)}</span>
+            </div>
+          )}
+          {taxAmount > 0 && (
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Tax</span>
+              <span>{fmtInvMoney(taxAmount)}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-semibold text-base border-t pt-2 mt-1" style={{ color: brandColors.darkGreen }}>
+            <span>Total</span>
+            <span>{fmtInvMoney(total)}</span>
+          </div>
+          {amountPaid > 0 && (
+            <div className="flex justify-between text-sm text-green-600">
+              <span>Paid</span>
+              <span>−{fmtInvMoney(amountPaid)}</span>
+            </div>
+          )}
+          <div className={`flex justify-between font-bold text-base border-t pt-2 ${balance > 0 ? (overdue ? "text-red-600" : "text-gray-800") : "text-green-600"}`}>
+            <span>Balance Due</span>
+            <span>{fmtInvMoney(balance)}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Notes / Terms */}
+      {(invoice.notes || invoice.terms) && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            {invoice.notes && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Notes</p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{invoice.notes}</p>
+              </div>
+            )}
+            {invoice.terms && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Terms</p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{invoice.terms}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );
