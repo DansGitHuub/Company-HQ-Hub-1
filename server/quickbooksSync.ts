@@ -607,6 +607,103 @@ async function syncCustomers(tok: any) {
 }
 
 // ── Invoice sync ──────────────────────────────────────────────────────────────
+// ── QB invoice payload builder ────────────────────────────────────────────────
+/**
+ * Build the QuickBooks Invoice body for a PUSH.
+ *
+ * When invoice_line_items exist each line maps to a QB SalesItemLineDetail:
+ *   Description  → item.description
+ *   Qty          → item.quantity
+ *   UnitPrice    → item.unit_price
+ *   Amount       → item.amount  (qty × unit_price, pre-calculated)
+ *
+ * A negative-amount "Discount" line is appended when inv.discount_amount > 0.
+ *
+ * Falls back to a single summary line (original behaviour) when no line items
+ * are stored, so invoices created before this change still sync cleanly.
+ *
+ * Callers must still strip read-only QB fields before posting — the existing
+ * strip block in syncInvoices handles this unchanged.
+ *
+ * @param inv            Full invoice DB row (must include qb_customer_id)
+ * @param lineItems      Rows from invoice_line_items for this invoice
+ * @param qbServiceItemId  Fallback QB Item.Id used as ItemRef for every line
+ */
+export function buildQbInvoiceBody(
+  inv: any,
+  lineItems: any[],
+  qbServiceItemId: string
+): any {
+  let qbLines: any[];
+
+  if (lineItems.length > 0) {
+    // ── Per-line-item detail ───────────────────────────────────────────────
+    qbLines = lineItems
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((item) => ({
+        Amount:      parseFloat(item.amount    ?? 0),
+        Description: item.description || "",
+        DetailType:  "SalesItemLineDetail",
+        SalesItemLineDetail: {
+          ItemRef:   { value: qbServiceItemId },
+          UnitPrice: parseFloat(item.unit_price ?? 0),
+          Qty:       parseFloat(item.quantity   ?? 1),
+        },
+      }));
+
+    // Append a discount line when a header-level discount is present
+    const discountAmt = parseFloat(inv.discount_amount ?? 0);
+    if (discountAmt > 0) {
+      qbLines.push({
+        Amount:      -discountAmt,
+        Description: "Discount",
+        DetailType:  "SalesItemLineDetail",
+        SalesItemLineDetail: {
+          ItemRef:   { value: qbServiceItemId },
+          UnitPrice: -discountAmt,
+          Qty:       1,
+        },
+      });
+    }
+
+    console.log(
+      `[QB payload] Invoice ${inv.invoice_number}: ${qbLines.length} QB line(s)` +
+      ` (${lineItems.length} item line(s)${discountAmt > 0 ? " + 1 discount line" : ""})`
+    );
+  } else {
+    // ── Fallback: single summary line (original behaviour) ─────────────────
+    const subtotal = parseFloat(inv.subtotal ?? inv.total ?? 0);
+    qbLines = [
+      {
+        Amount:      subtotal,
+        Description: `Invoice ${inv.invoice_number}`,
+        DetailType:  "SalesItemLineDetail",
+        SalesItemLineDetail: {
+          ItemRef:   { value: qbServiceItemId },
+          UnitPrice: subtotal,
+          Qty:       1,
+        },
+      },
+    ];
+    console.log(
+      `[QB payload] Invoice ${inv.invoice_number}: no line items — single summary line (subtotal ${subtotal})`
+    );
+  }
+
+  const body: any = {
+    DocNumber:   inv.invoice_number,
+    CustomerRef: { value: inv.qb_customer_id },
+    TxnDate:     new Date(inv.issued_date ?? Date.now()).toISOString().slice(0, 10),
+    Line:        qbLines,
+  };
+
+  if (inv.due_date) body.DueDate      = new Date(inv.due_date).toISOString().slice(0, 10);
+  if (inv.notes)    body.CustomerMemo = { value: inv.notes };
+
+  return body;
+}
+
 async function syncInvoices(tok: any) {
   const logId = await startLog("invoices", "bidirectional");
   let synced = 0;
@@ -663,28 +760,12 @@ async function syncInvoices(tok: any) {
           continue;
         }
 
-        const qbBody: any = {
-          DocNumber: li.invoice_number,
-          CustomerRef: { value: li.qb_customer_id },
-          TxnDate: new Date(li.issued_date ?? Date.now()).toISOString().slice(0, 10),
-          Line: [
-            {
-              Amount: parseFloat(li.subtotal ?? li.total ?? 0),
-              DetailType: "SalesItemLineDetail",
-          Taxable: li.taxable ?? true,
-              SalesItemLineDetail: {
-                ItemRef: { value: qbServiceItemId },
-                UnitPrice: parseFloat(li.subtotal ?? li.total ?? 0),
-                Qty: 1,
-              },
-            },
-          ],
-          TxnTaxDetail: {
-            TotalTax: parseFloat(li.tax_amount ?? 0),
-          },
-        };
-        if (li.due_date) qbBody.DueDate = new Date(li.due_date).toISOString().slice(0, 10);
-        if (li.notes) qbBody.CustomerMemo = { value: li.notes };
+        // Fetch per-line-item detail for this invoice
+        const { rows: invLineItems } = await pool.query(
+          `SELECT * FROM invoice_line_items WHERE invoice_id = $1 ORDER BY sort_order ASC, id ASC`,
+          [li.id]
+        );
+        const qbBody: any = buildQbInvoiceBody(li, invLineItems, qbServiceItemId);
 
         // Strip QB read-only fields that cause 'invalid or unsupported property' rejections
         for (const k of ["TotalTax", "Balance", "TotalAmt", "MetaData", "SyncToken", "Id",

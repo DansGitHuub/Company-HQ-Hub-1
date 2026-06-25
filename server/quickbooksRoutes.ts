@@ -13,6 +13,7 @@ import {
   exportTimeEntriesToQBO,
   getQbAuthFailed,
   clearQbAuthFailed,
+  buildQbInvoiceBody,
 } from "./quickbooksSync";
 
 async function migrate() {
@@ -312,6 +313,55 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
         `SELECT * FROM quickbooks_sync_log ORDER BY started_at DESC LIMIT 50`,
       );
       res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/quickbooks/sync/invoices/preview/:invoiceId ─────────────────
+  // DRY-RUN ONLY — builds and returns the per-line-item QB payload for one
+  // invoice without calling qbPost or touching any QB account.
+  // Requires no live QB connection; uses ItemRef "1" as the fallback service item.
+  app.get("/api/quickbooks/sync/invoices/preview/:invoiceId", requireAuth, async (req, res) => {
+    try {
+      const { invoiceId } = req.params;
+
+      // Fetch invoice + customer QB ID
+      const { rows: invRows } = await pool.query(
+        `SELECT inv.*, c.qb_customer_id
+         FROM invoices inv
+         LEFT JOIN customers c ON c.id = inv.customer_id
+         WHERE inv.id = $1`,
+        [invoiceId]
+      );
+      if (!invRows[0]) return res.status(404).json({ error: "Invoice not found" });
+
+      // Fetch line items
+      const { rows: lineItems } = await pool.query(
+        `SELECT * FROM invoice_line_items WHERE invoice_id = $1 ORDER BY sort_order ASC, id ASC`,
+        [invoiceId]
+      );
+
+      // Build payload — no QB connection needed, ItemRef "1" is the fallback
+      const qbPayload = buildQbInvoiceBody(invRows[0], lineItems, "1");
+
+      console.log(
+        "[QB dry-run] Per-line-item payload for invoice",
+        invRows[0].invoice_number,
+        JSON.stringify(qbPayload, null, 2)
+      );
+
+      res.json({
+        dry_run: true,
+        invoice_number:   invRows[0].invoice_number,
+        invoice_status:   invRows[0].status,
+        subtotal:         invRows[0].subtotal,
+        discount_amount:  invRows[0].discount_amount,
+        tax_amount:       invRows[0].tax_amount,
+        total:            invRows[0].total,
+        line_items_count: lineItems.length,
+        qb_payload:       qbPayload,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
