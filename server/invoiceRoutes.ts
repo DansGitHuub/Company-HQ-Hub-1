@@ -604,18 +604,32 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
       const lineItems = itemsRes.rows;
 
       // ── helpers ──────────────────────────────────────────────────────────────
-      const fmt$ = (v: any) =>
-        "$" + parseFloat(v ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-      const fmtD = (d: string | null) => {
-        if (!d) return "—";
-        const [yr, mo, dy] = d.slice(0, 10).split("-").map(Number);
-        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-        return `${months[mo - 1]} ${dy}, ${yr}`;
+      // Coerce any value to a string safe for WinAnsi (Helvetica) in pdf-lib.
+      // Strips characters outside printable ASCII + Latin-1 supplement (0x20-0xFF).
+      const safe = (v: any): string => {
+        if (v == null) return "";
+        const s = v instanceof Date ? v.toISOString() : String(v);
+        return s.replace(/[^\x20-\x7E\xA0-\xFF]/g, "?");
+      };
+
+      const fmt$ = (v: any) =>
+        "$" + parseFloat(String(v ?? "0")).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      // pg returns DATE columns as JS Date objects when no type parser is set.
+      // Handle both Date objects and ISO strings.
+      const fmtD = (d: any) => {
+        if (!d) return "--";
+        try {
+          const iso = d instanceof Date ? d.toISOString() : String(d);
+          const [yr, mo, dy] = iso.slice(0, 10).split("-").map(Number);
+          const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+          return `${months[mo - 1]} ${dy}, ${yr}`;
+        } catch { return String(d); }
       };
 
       const wrapText = (text: string, font: any, size: number, maxW: number): string[] => {
-        const words = (text || "").split(" ");
+        const words = safe(text).split(" ");
         const lines: string[] = [];
         let cur = "";
         for (const w of words) {
@@ -675,10 +689,11 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
         x: ML, y: PH - 50, size: 8.5, font: regular, color: rgb(0.75, 0.90, 0.76),
       });
 
-      const invNumW  = regular.widthOfTextAtSize(inv.invoice_number, 10);
+      const safeInvNum = safe(inv.invoice_number);
+      const invNumW  = regular.widthOfTextAtSize(safeInvNum, 10);
       const invLblW  = bold.widthOfTextAtSize("INVOICE", 24);
-      page.drawText("INVOICE",           { x: MR - invLblW, y: PH - 38, size: 24, font: bold,    color: WHITE });
-      page.drawText(inv.invoice_number,  { x: MR - invNumW, y: PH - 54, size: 10, font: regular, color: rgb(0.78, 0.91, 0.79) });
+      page.drawText("INVOICE",    { x: MR - invLblW, y: PH - 38, size: 24, font: bold,    color: WHITE });
+      page.drawText(safeInvNum,   { x: MR - invNumW, y: PH - 54, size: 10, font: regular, color: rgb(0.78, 0.91, 0.79) });
 
       y = PH - 96;
 
@@ -689,26 +704,26 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
       page.drawText("INVOICE DETAILS",  { x: colMid,  y, size: 7.5, font: bold, color: GREY });
       y -= 13;
 
-      const custDisplay = inv.cust_company || (inv.cust_name?.trim() || "—");
+      const custDisplay = safe(inv.cust_company || inv.cust_name?.trim() || "Unknown");
       page.drawText(custDisplay, { x: ML, y, size: 10.5, font: bold, color: BLACK });
 
       let billY = y;
       if (inv.cust_company && inv.cust_name?.trim()) {
         billY -= 13;
-        page.drawText(inv.cust_name.trim(), { x: ML, y: billY, size: 9, font: regular, color: GREY });
+        page.drawText(safe(inv.cust_name), { x: ML, y: billY, size: 9, font: regular, color: GREY });
       }
       if (inv.cust_address) {
         billY -= 12;
-        page.drawText(inv.cust_address, { x: ML, y: billY, size: 9, font: regular, color: BLACK });
+        page.drawText(safe(inv.cust_address), { x: ML, y: billY, size: 9, font: regular, color: BLACK });
       }
-      const cityLine = [inv.cust_city, inv.cust_state, inv.cust_zip].filter(Boolean).join(", ");
+      const cityLine = [inv.cust_city, inv.cust_state, inv.cust_zip].filter(Boolean).map(safe).join(", ");
       if (cityLine) {
         billY -= 12;
         page.drawText(cityLine, { x: ML, y: billY, size: 9, font: regular, color: BLACK });
       }
 
       // Right column — details
-      const statusLabel = (inv.status as string)
+      const statusLabel = safe(inv.status ?? "")
         .replace(/_/g, " ")
         .replace(/\b\w/g, (c: string) => c.toUpperCase());
       const detRows: [string, string][] = [
@@ -716,7 +731,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
         ["Issued",  fmtD(inv.issued_date)],
       ];
       if (inv.due_date)  detRows.push(["Due",  fmtD(inv.due_date)]);
-      if (inv.job_title) detRows.push(["Job",  inv.job_title]);
+      if (inv.job_title) detRows.push(["Job",  safe(inv.job_title)]);
 
       let detY = y;
       for (const [lbl, val] of detRows) {
@@ -746,7 +761,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
         const li = lineItems[i];
         const rowBg = i % 2 === 1 ? LGREY : WHITE;
         page.drawRectangle({ x: ML, y: y - 5, width: CW, height: 18, color: rowBg });
-        const desc = (li.description ?? "").slice(0, 72);
+        const desc = safe(li.description).slice(0, 72);
         page.drawText(desc,                 { x: cDesc + 4, y: y + 2, size: 8.5, font: regular, color: BLACK });
         page.drawText(String(parseFloat(li.quantity ?? "1")), {
           x: cQty, y: y + 2, size: 8.5, font: regular, color: BLACK,
@@ -776,8 +791,8 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
       };
 
       totRow("Subtotal", fmt$(inv.subtotal));
-      if (parseFloat(inv.discount_amount ?? "0") > 0)
-        totRow("Discount", "−" + fmt$(inv.discount_amount), false, rgb(0.18, 0.55, 0.28));
+      if (parseFloat(String(inv.discount_amount ?? "0")) > 0)
+        totRow("Discount", "-" + fmt$(inv.discount_amount), false, rgb(0.18, 0.55, 0.28));
       if (parseFloat(inv.tax_amount ?? "0") > 0)
         totRow(`Tax (${(parseFloat(inv.tax_rate ?? "0") * 100).toFixed(1)}%)`, fmt$(inv.tax_amount));
 
@@ -791,8 +806,8 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
       page.drawText(fmt$(inv.total), { x: MR - totW, y, size: 10.5, font: bold, color: GREEN });
       y -= 14;
 
-      if (parseFloat(inv.amount_paid ?? "0") > 0)
-        totRow("Paid", "−" + fmt$(inv.amount_paid), false, rgb(0.18, 0.55, 0.28));
+      if (parseFloat(String(inv.amount_paid ?? "0")) > 0)
+        totRow("Paid", "-" + fmt$(inv.amount_paid), false, rgb(0.18, 0.55, 0.28));
 
       // Balance due band
       y -= 2;
@@ -815,7 +830,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
         y -= 8;
         page.drawText("Notes", { x: ML, y, size: 8.5, font: bold, color: GREY });
         y -= 12;
-        for (const ln of wrapText(inv.notes.slice(0, 500), regular, noteSize, noteMaxW)) {
+        for (const ln of wrapText(safe(inv.notes).slice(0, 500), regular, noteSize, noteMaxW)) {
           ensureSpace(12);
           page.drawText(ln, { x: ML, y, size: noteSize, font: regular, color: BLACK });
           y -= 12;
@@ -825,9 +840,9 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
       if (inv.terms) {
         ensureSpace(30);
         y -= 8;
-        page.drawText("Terms & Conditions", { x: ML, y, size: 8.5, font: bold, color: GREY });
+        page.drawText("Terms and Conditions", { x: ML, y, size: 8.5, font: bold, color: GREY });
         y -= 12;
-        for (const ln of wrapText(inv.terms.slice(0, 500), regular, noteSize, noteMaxW)) {
+        for (const ln of wrapText(safe(inv.terms).slice(0, 500), regular, noteSize, noteMaxW)) {
           ensureSpace(12);
           page.drawText(ln, { x: ML, y, size: noteSize, font: regular, color: BLACK });
           y -= 12;
