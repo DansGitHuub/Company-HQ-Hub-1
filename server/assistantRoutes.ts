@@ -242,6 +242,33 @@ General Rules:
   return prompt;
 }
 
+// ── Conversational-refusal detector ──────────────────────────────────────────
+// Returns true when the AI's response text looks like a natural-language refusal
+// rather than a helpful answer. Used to promote those responses from role='assistant'
+// to role='denied' so admins can review attempted over-reach by lower-privileged users.
+// Intentionally conservative — prefers false negatives over false positives.
+const REFUSAL_PATTERNS: RegExp[] = [
+  /\bi(?:'m| am) (?:not |un)?able to (?:share|provide|access|give|show|reveal|disclose|help with|assist with)\b/i,
+  /\bi can(?:'t| not) (?:provide|share|access|give|show|reveal|help with|assist with|do that)\b/i,
+  /\bnot (?:authorized|permitted|allowed) to\b/i,
+  /\byou (?:don't|do not|doesn't|does not) have (?:access|permission|the (?:access|permission))\b/i,
+  /\bdon't have (?:the )?(?:access|permission|authorization)\b/i,
+  /\boutside (?:of )?(?:my|what i can|your) (?:role|access|scope|permissions)\b/i,
+  /\b(?:not|isn't) (?:something|information) (?:i|that i) can (?:share|provide|access|give|show)\b/i,
+  /\bnot (?:available|accessible) (?:for|to) your (?:role|account)\b/i,
+  /\brestricted (?:to|for) (?:admin|manager|authorized)\b/i,
+  /\bonly help (?:you )?with (?:your )?(?:account|services|own)\b/i,
+  /\bonly assist (?:you )?with\b/i,
+  /\bwon't be able to (?:share|provide|access|give|show)\b/i,
+  /\byour (?:role|account) (?:does not|doesn't) (?:have|allow|permit)\b/i,
+  /\bthat(?:'s| is) (?:not|beyond) (?:something )?(?:i can|available to|accessible)\b/i,
+  /\b(?:sensitive|confidential|private|internal) (?:data|information|records|details)\b.*\b(?:can't|cannot|not able|won't)\b/i,
+];
+
+function isConversationalRefusal(text: string): boolean {
+  return REFUSAL_PATTERNS.some((re) => re.test(text));
+}
+
 async function logConversation(
   userId: string, sessionId: string, role: string, content: string,
   toolCalled?: string, toolArgs?: any, toolResult?: any, tokensUsed?: number
@@ -466,7 +493,26 @@ export function registerAssistantRoutes(app: Express) {
       }
 
       const responseText = choice.message?.content || "I'm not sure how to respond to that.";
-      await logConversation(user.id, sid, "assistant", responseText, undefined, undefined, undefined, tokensUsed);
+
+      // ── Conversational-refusal logging ──────────────────────────────────────
+      // When the AI declines in natural language (no tool block fired), promote
+      // the log entry to role='denied' so admins see it in the denied-request log.
+      // content = the original user request (consistent with tool-level denials).
+      // tool_result carries the AI's actual refusal text as `reason`.
+      if (isConversationalRefusal(responseText)) {
+        await logConversation(
+          user.id, sid, "denied", message,
+          undefined, undefined,
+          { denied: true, reason: responseText, user_role: user.role, user_name: user.name || user.username },
+          tokensUsed
+        );
+        console.log(
+          `[assistant] Conversational refusal logged — user=${user.id} role=${user.role} ` +
+          `request="${message.slice(0, 100)}"`
+        );
+      } else {
+        await logConversation(user.id, sid, "assistant", responseText, undefined, undefined, undefined, tokensUsed);
+      }
 
       return res.json({ response: responseText, type: "text" });
     } catch (err: any) {
