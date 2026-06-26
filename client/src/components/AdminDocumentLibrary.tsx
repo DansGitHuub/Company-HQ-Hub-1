@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,8 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Upload, Download, Trash2, File, Image, FileText, FileSpreadsheet,
-  Loader2, Search, FolderOpen, Eye, ExternalLink, Link2, Share2
+  Loader2, Search, FolderOpen, Eye, ExternalLink, Link2, Share2, RefreshCw
 } from "lucide-react";
 import DocumentDropZone from "@/components/DocumentDropZone";
 import { useAuth } from "@/hooks/use-auth";
@@ -90,6 +94,10 @@ function CompanyLibrary() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [shareDoc, setShareDoc] = useState<DocType | null>(null);
   const [shareModulesDoc, setShareModulesDoc] = useState<DocType | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DocType | null>(null);
+  const [replaceTarget, setReplaceTarget] = useState<DocType | null>(null);
+  const [isReplacing, setIsReplacing] = useState(false);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
 
   const { data: docs = [], isLoading } = useQuery<DocType[]>({
     queryKey: ["/api/documents", "company", "company-library"],
@@ -137,8 +145,39 @@ function CompanyLibrary() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/documents", "company", "company-library"] });
       toast({ title: "Document deleted" });
+      setDeleteTarget(null);
     },
   });
+
+  const handleReplaceClick = (doc: DocType) => {
+    setReplaceTarget(doc);
+    replaceInputRef.current?.click();
+  };
+
+  const handleReplaceFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !replaceTarget) return;
+    e.target.value = "";
+    setIsReplacing(true);
+    try {
+      const result = await uploadFile(file);
+      if (!result) throw new Error("Upload failed");
+      await apiRequest("PATCH", `/api/documents/${replaceTarget.id}`, {
+        fileName: file.name,
+        fileUrl: result.objectPath,
+        fileType: file.type || "application/octet-stream",
+        fileSizeKb: Math.round(file.size / 1024),
+        version: (replaceTarget.version ?? 1) + 1,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents", "company", "company-library"] });
+      toast({ title: "Document replaced", description: `Now at v${(replaceTarget.version ?? 1) + 1}` });
+    } catch (err: any) {
+      toast({ title: "Replace failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsReplacing(false);
+      setReplaceTarget(null);
+    }
+  };
 
   const filteredDocs = categoryFilter === "all"
     ? docs
@@ -146,6 +185,14 @@ function CompanyLibrary() {
 
   return (
     <div className="space-y-4">
+      <input
+        ref={replaceInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleReplaceFileSelected}
+        data-testid="input-replace-file"
+      />
+
       <DocumentDropZone
         onFilesSelected={handleDropZoneUpload}
         disabled={isUploading}
@@ -210,6 +257,7 @@ function CompanyLibrary() {
           <TableBody>
             {filteredDocs.map(doc => {
               const Icon = getFileIcon(doc.fileType);
+              const isBeingReplaced = isReplacing && replaceTarget?.id === doc.id;
               return (
                 <TableRow key={doc.id} data-testid={`company-doc-row-${doc.id}`}>
                   <TableCell className="font-medium">
@@ -231,8 +279,22 @@ function CompanyLibrary() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => window.open(doc.fileUrl, "_blank")} data-testid={`view-company-doc-${doc.id}`}>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => window.open(doc.fileUrl, "_blank")} data-testid={`view-company-doc-${doc.id}`} title="View">
                         <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() => handleReplaceClick(doc)}
+                        disabled={isBeingReplaced}
+                        title="Replace with new version"
+                        data-testid={`replace-company-doc-${doc.id}`}
+                      >
+                        {isBeingReplaced
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <RefreshCw className="h-3.5 w-3.5" />
+                        }
                       </Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShareModulesDoc(doc)} title="Share to Modules" data-testid={`share-modules-company-doc-${doc.id}`}>
                         <Share2 className="h-3.5 w-3.5" />
@@ -240,7 +302,7 @@ function CompanyLibrary() {
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShareDoc(doc)} title="Share Externally" data-testid={`share-company-doc-${doc.id}`}>
                         <ExternalLink className="h-3.5 w-3.5" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteMutation.mutate(doc.id)} data-testid={`delete-company-doc-${doc.id}`}>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteTarget(doc)} data-testid={`delete-company-doc-${doc.id}`} title="Delete">
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -251,6 +313,26 @@ function CompanyLibrary() {
           </TableBody>
         </Table>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{deleteTarget?.fileName}</strong> will be permanently removed. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {shareDoc && (
         <ShareExternallyDialog
@@ -276,11 +358,14 @@ function CompanyLibrary() {
 }
 
 function AllDocuments() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [entityTypeFilter, setEntityTypeFilter] = useState("all");
   const [shareDoc, setShareDoc] = useState<DocType | null>(null);
   const [shareModulesDoc, setShareModulesDoc] = useState<DocType | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DocType | null>(null);
 
   const { data: docs = [], isLoading } = useQuery<DocType[]>({
     queryKey: ["/api/documents", "search", searchQuery, categoryFilter, entityTypeFilter],
@@ -291,6 +376,20 @@ function AllDocuments() {
       if (entityTypeFilter !== "all") params.set("entityType", entityTypeFilter);
       const res = await apiRequest("GET", `/api/documents?${params.toString()}`);
       return res.json();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/documents/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/documents", "search"] });
+      toast({ title: "Document deleted" });
+      setDeleteTarget(null);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -380,7 +479,7 @@ function AllDocuments() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => window.open(doc.fileUrl, "_blank")} data-testid={`view-all-doc-${doc.id}`}>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => window.open(doc.fileUrl, "_blank")} data-testid={`view-all-doc-${doc.id}`} title="View">
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShareModulesDoc(doc)} title="Share to Modules" data-testid={`share-modules-all-doc-${doc.id}`}>
@@ -388,6 +487,16 @@ function AllDocuments() {
                       </Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShareDoc(doc)} title="Share Externally" data-testid={`share-all-doc-${doc.id}`}>
                         <ExternalLink className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-destructive"
+                        onClick={() => setDeleteTarget(doc)}
+                        title="Delete"
+                        data-testid={`delete-all-doc-${doc.id}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </TableCell>
@@ -397,6 +506,26 @@ function AllDocuments() {
           </TableBody>
         </Table>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{deleteTarget?.fileName}</strong> will be permanently removed from the system. If this document is attached to an employee, job, or equipment record, it will no longer appear there either.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {shareDoc && (
         <ShareExternallyDialog
