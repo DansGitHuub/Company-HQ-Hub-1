@@ -10073,7 +10073,7 @@ Provide accurate information based on publicly available documentation.`;
           metadata: { contentType: "application/pdf" },
         });
 
-        const fileUrl = `/objects/${objectId}`;
+        const fileUrl = `/objects/uploads/${objectId}`;
         const fileSizeKb = Math.ceil(req.file.buffer.length / 1024);
 
         let category = "form";

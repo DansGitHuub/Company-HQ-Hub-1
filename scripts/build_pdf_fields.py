@@ -119,6 +119,28 @@ def add_text(writer, page_num, name, tooltip, rect, fmt=None, nums_only=False, f
     page[NameObject("/Annots")].append(ref)
     writer._root_object[NameObject("/AcroForm")][NameObject("/Fields")].append(ref)
 
+def add_signature(writer, page_num, name, tooltip, rect):
+    """Create a PDF signature widget field (/FT /Sig).
+    In Acrobat/Reader this opens the Sign dialog. Browser PDF viewers
+    render it as a labelled signature placeholder box (not a type-in field).
+    """
+    page = writer.pages[page_num]
+    field = DictionaryObject()
+    field[NameObject("/Type")]    = NameObject("/Annot")
+    field[NameObject("/Subtype")] = NameObject("/Widget")
+    field[NameObject("/FT")]      = NameObject("/Sig")
+    field[NameObject("/T")]       = make_str(name)
+    field[NameObject("/TU")]      = make_str(tooltip)
+    field[NameObject("/Ff")]      = NumberObject(0)
+    field[NameObject("/Rect")]    = ArrayObject([NumberObject(x) for x in rect])
+    bs = DictionaryObject()
+    bs[NameObject("/W")] = NumberObject(1)
+    bs[NameObject("/S")] = NameObject("/S")
+    field[NameObject("/BS")] = bs
+    ref = writer._add_object(field)
+    page[NameObject("/Annots")].append(ref)
+    writer._root_object[NameObject("/AcroForm")][NameObject("/Fields")].append(ref)
+
 def add_checkbox(writer, page_num, name, tooltip, rect):
     page = writer.pages[page_num]
     w = rect[2] - rect[0]
@@ -185,6 +207,8 @@ for f in fields:
 
     if ftype in ("xmark", "checkbox"):
         add_checkbox(writer, page, name, name, rect)
+    elif ftype == "signature":
+        add_signature(writer, page, name, name, rect)
     elif ftype == "numerical":
         add_text(writer, page, name, name, rect, nums_only=True)
     elif ftype == "currency":
