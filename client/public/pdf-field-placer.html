@@ -1123,6 +1123,23 @@ document.addEventListener('keydown', e => {
   if ((e.key === 'd' || e.key === 'D') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); duplicateField(selectedId); return; }
   if (e.key === 'Delete' || e.key === 'Backspace') { deleteField(selectedId); return; }
 });
+
+// Document-level drag-and-drop: prevent browser navigation when dropping anywhere on the page
+document.addEventListener('dragenter', e => e.preventDefault());
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if (!files || files.length === 0) return;
+  const file = files[0];
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+    loadPdfFile({ target: { files: [file] } });
+  } else {
+    status('Please drop a PDF file.');
+  }
+});
+</script>
+
 <!-- SAVE MODAL -->
 <div id="save-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:999;align-items:center;justify-content:center">
   <div style="background:#111;border:1px solid #c8a96e;border-radius:8px;padding:28px;width:420px;max-width:95vw">
