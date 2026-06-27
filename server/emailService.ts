@@ -1,4 +1,4 @@
-import { Resend } from "resend";
+import sgMail from "@sendgrid/mail";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -15,7 +15,7 @@ function getAppUrl(): string {
  * Resolve effective recipient and annotate body when in test/redirect mode.
  *
  * Rules:
- *  - If RESEND_API_KEY is absent  → log "email skipped" and short-circuit.
+ *  - If SENDGRID_API_KEY is absent  → log "email skipped" and short-circuit.
  *  - If EMAIL_SENDING_LIVE !== 'true' → redirect every outbound email to
  *    EMAIL_TEST_REDIRECT (default: dan@chapinlandscapes.com) and prepend a
  *    visible banner noting the original intended recipient.
@@ -49,7 +49,7 @@ export async function sendEmail(
   subject: string,
   body: string
 ): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = process.env.SENDGRID_API_KEY;
   if (!apiKey) {
     console.log(`[emailService] email skipped (no API key) — To: ${to}, Subject: "${subject}"`);
     return true;
@@ -58,23 +58,19 @@ export async function sendEmail(
   const { actualTo, finalBody } = resolveRecipient(to, body);
 
   try {
-    const resend = new Resend(apiKey);
-    const { error } = await resend.emails.send({
-      from: `Company HQ <${getFromEmail()}>`,
-      to: [actualTo],
+    sgMail.setApiKey(apiKey);
+    await sgMail.send({
+      from: getFromEmail(),
+      to: actualTo,
       subject,
       html: finalBody,
     });
 
-    if (error) {
-      console.error(`[emailService] Resend error — To: ${actualTo}, Subject: "${subject}" | ${JSON.stringify(error)}`);
-      return false;
-    }
-
     console.log(`[emailService] Email sent → ${actualTo} (intended: ${to}), Subject: "${subject}"`);
     return true;
   } catch (err: any) {
-    console.error(`[emailService] Failed — To: ${actualTo}, Subject: "${subject}" | ${err.message}`);
+    const detail = err.response?.body ? JSON.stringify(err.response.body) : err.message;
+    console.error(`[emailService] Failed — To: ${actualTo}, Subject: "${subject}" | ${detail}`);
     return false;
   }
 }
