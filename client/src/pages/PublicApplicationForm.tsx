@@ -197,6 +197,7 @@ export default function PublicApplicationForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [certEntries, setCertEntries] = useState<CertEntry[]>([]);
+  const [showValidationDialog, setShowValidationDialog] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load application
@@ -274,6 +275,27 @@ export default function PublicApplicationForm() {
     setCertEntries(updated);
     handleChange("certEntries", JSON.stringify(updated));
   }
+
+  function scrollToField(key: string) {
+    const selectors = [
+      `[data-testid="input-${key}"]`,
+      `[data-testid="select-${key}"]`,
+      `[data-testid="radio-${key}"]`,
+    ];
+    for (const sel of selectors) {
+      const el = document.querySelector<HTMLElement>(sel);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.focus();
+        return;
+      }
+    }
+  }
+
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
 
   // Required field progress — filledRequired declared here (fixes "not defined" crash)
   const missingFields   = REQUIRED_FIELDS.filter(f => !(data[f.key] || "").trim());
@@ -519,7 +541,7 @@ export default function PublicApplicationForm() {
           </Row>
           <Field>
             <Label required>Date Available to Start</Label>
-            <Input name="dateAvailable" value={data.dateAvailable || ""} onChange={handleChange} type="date" min={new Date().toISOString().split("T")[0]} disabled={isDisabled} />
+            <Input name="dateAvailable" value={data.dateAvailable || ""} onChange={handleChange} type="date" min={todayStr} disabled={isDisabled} />
           </Field>
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-4">
@@ -864,24 +886,12 @@ export default function PublicApplicationForm() {
             <p className="font-semibold text-gray-700 mb-1">Disclaimer</p>
             <p>I certify that my answers are true and complete to the best of my knowledge. If this application leads to employment, I understand that false or misleading information in my application or interview may result in my release.</p>
           </div>
-          {!allFilled && (
-            <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <p className="text-amber-800 text-sm font-semibold mb-2">
-                Please complete these required fields before submitting:
-              </p>
-              <ul className="list-disc list-inside space-y-0.5">
-                {missingFields.map(f => (
-                  <li key={f.key} className="text-amber-700 text-sm">{f.label}</li>
-                ))}
-              </ul>
-            </div>
-          )}
           <button
             data-testid="button-submit-application"
-            onClick={() => setShowSubmitModal(true)}
-            disabled={!allFilled || isDisabled}
+            onClick={() => allFilled ? setShowSubmitModal(true) : setShowValidationDialog(true)}
+            disabled={isDisabled}
             className={`w-full py-3 rounded-lg font-bold text-base transition-all ${
-              allFilled && !isDisabled
+              !isDisabled
                 ? "bg-green-700 hover:bg-green-800 text-white shadow-md"
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }`}
@@ -892,6 +902,49 @@ export default function PublicApplicationForm() {
       </div>
 
       {/* Submit Confirmation Modal */}
+      {/* Validation Dialog */}
+      {showValidationDialog && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowValidationDialog(false)}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start gap-3 mb-4">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center mt-0.5">
+                <AlertCircle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-800">Required Fields Incomplete</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Click any item below to jump to that field.</p>
+              </div>
+            </div>
+            <ul className="space-y-1.5 mb-5 max-h-72 overflow-y-auto">
+              {missingFields.map(f => (
+                <li key={f.key}>
+                  <button
+                    type="button"
+                    onClick={() => { setShowValidationDialog(false); setTimeout(() => scrollToField(f.key), 120); }}
+                    className="w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-amber-800 font-medium bg-amber-50 hover:bg-amber-100 transition-colors"
+                    data-testid={`validation-link-${f.key}`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                    {f.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => setShowValidationDialog(false)}
+              className="w-full py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              data-testid="button-close-validation-dialog"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {showSubmitModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
