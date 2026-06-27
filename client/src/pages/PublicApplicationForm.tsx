@@ -49,6 +49,8 @@ const POSITIONS = [
   "Other",
 ];
 
+interface CertEntry { school: string; cityState: string; topic: string; yearCompleted: string; details: string; }
+
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
     <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -194,6 +196,7 @@ export default function PublicApplicationForm() {
   const [signatureName, setSignatureName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [certEntries, setCertEntries] = useState<CertEntry[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load application
@@ -255,6 +258,22 @@ export default function PublicApplicationForm() {
       return updated;
     });
   }, []);
+
+  function addCertEntry() {
+    const updated = [...certEntries, { school: "", cityState: "", topic: "", yearCompleted: "", details: "" }];
+    setCertEntries(updated);
+    handleChange("certEntries", JSON.stringify(updated));
+  }
+  function removeCertEntry(idx: number) {
+    const updated = certEntries.filter((_, i) => i !== idx);
+    setCertEntries(updated);
+    handleChange("certEntries", JSON.stringify(updated));
+  }
+  function updateCertEntry(idx: number, field: keyof CertEntry, value: string) {
+    const updated = certEntries.map((e, i) => i === idx ? { ...e, [field]: value } : e);
+    setCertEntries(updated);
+    handleChange("certEntries", JSON.stringify(updated));
+  }
 
   // Required field progress — filledRequired declared here (fixes "not defined" crash)
   const missingFields   = REQUIRED_FIELDS.filter(f => !(data[f.key] || "").trim());
@@ -581,6 +600,104 @@ export default function PublicApplicationForm() {
           ))}
         </SectionCard>
 
+        {/* CERTIFICATIONS & SPECIAL TRAINING */}
+        <SectionCard title="Certifications &amp; Special Training">
+          {certEntries.length === 0 && (
+            <p className="text-sm text-gray-400 italic text-center py-2">No entries yet. Click "Add Entry" to add certifications or training.</p>
+          )}
+          {certEntries.map((entry, idx) => (
+            <div key={idx} className="border border-gray-100 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-700 text-sm">Entry {idx + 1}</h3>
+                {!isDisabled && (
+                  <button
+                    type="button"
+                    onClick={() => removeCertEntry(idx)}
+                    className="text-xs text-red-500 hover:text-red-700 font-medium"
+                    data-testid={`btn-remove-cert-${idx}`}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              <Row>
+                <Field>
+                  <Label>School or Training Name</Label>
+                  <input
+                    data-testid={`cert-${idx}-school`}
+                    type="text"
+                    value={entry.school}
+                    onChange={e => updateCertEntry(idx, "school", e.target.value)}
+                    placeholder="e.g. Ohio State Extension, OSHA Training Center"
+                    disabled={isDisabled}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </Field>
+                <Field>
+                  <Label>City / State</Label>
+                  <input
+                    data-testid={`cert-${idx}-cityState`}
+                    type="text"
+                    value={entry.cityState}
+                    onChange={e => updateCertEntry(idx, "cityState", e.target.value)}
+                    placeholder="e.g. Columbus, OH"
+                    disabled={isDisabled}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </Field>
+              </Row>
+              <Row cols={3}>
+                <div className="col-span-2">
+                  <Label>Topic / Discipline</Label>
+                  <input
+                    data-testid={`cert-${idx}-topic`}
+                    type="text"
+                    value={entry.topic}
+                    onChange={e => updateCertEntry(idx, "topic", e.target.value)}
+                    placeholder="e.g. Pesticide Applicator License, First Aid / CPR"
+                    disabled={isDisabled}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <Field>
+                  <Label>Year Completed</Label>
+                  <input
+                    data-testid={`cert-${idx}-yearCompleted`}
+                    type="text"
+                    value={entry.yearCompleted}
+                    onChange={e => updateCertEntry(idx, "yearCompleted", e.target.value)}
+                    placeholder="e.g. 2023"
+                    disabled={isDisabled}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </Field>
+              </Row>
+              <Field>
+                <Label>Additional Details</Label>
+                <textarea
+                  data-testid={`cert-${idx}-details`}
+                  value={entry.details}
+                  onChange={e => updateCertEntry(idx, "details", e.target.value)}
+                  placeholder="License number, issuing body, expiration date, or other relevant details..."
+                  disabled={isDisabled}
+                  rows={2}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed resize-none"
+                />
+              </Field>
+            </div>
+          ))}
+          {!isDisabled && (
+            <button
+              type="button"
+              onClick={addCertEntry}
+              className="w-full py-2 border-2 border-dashed border-green-300 rounded-lg text-sm font-medium text-green-700 hover:border-green-500 hover:bg-green-50 transition-colors"
+              data-testid="btn-add-cert-entry"
+            >
+              + Add Entry
+            </button>
+          )}
+        </SectionCard>
+
         {/* REFERENCES */}
         <SectionCard title="References — Please list three professional references">
           {[1, 2, 3].map(n => (
@@ -593,7 +710,23 @@ export default function PublicApplicationForm() {
                 </Field>
                 <Field>
                   <Label>Relationship</Label>
-                  <Input name={`ref${n}Relationship`} value={data[`ref${n}Relationship`] || ""} onChange={handleChange} placeholder="e.g. Supervisor" disabled={isDisabled} />
+                  <div className="flex gap-6 mt-1" data-testid={`radio-ref${n}Relationship`}>
+                    {["Professional", "Personal"].map(opt => (
+                      <label key={opt} className={`flex items-center gap-2 cursor-pointer ${isDisabled ? "opacity-60 cursor-not-allowed" : ""}`}>
+                        <input
+                          type="radio"
+                          name={`ref${n}Relationship`}
+                          value={opt}
+                          checked={data[`ref${n}Relationship`] === opt}
+                          onChange={() => !isDisabled && handleChange(`ref${n}Relationship`, opt)}
+                          disabled={isDisabled}
+                          className="accent-green-700 w-4 h-4"
+                          data-testid={`radio-ref${n}Relationship-${opt.toLowerCase()}`}
+                        />
+                        <span className="text-sm font-medium text-gray-700">{opt}</span>
+                      </label>
+                    ))}
+                  </div>
                 </Field>
               </Row>
               <Row>
@@ -616,7 +749,21 @@ export default function PublicApplicationForm() {
 
         {/* PREVIOUS EMPLOYMENT */}
         <SectionCard title="Previous Employment">
-          {[1, 2, 3].map(n => (
+          <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+            <input
+              type="checkbox"
+              id="firstJob"
+              checked={data.firstJob === "yes"}
+              onChange={e => handleChange("firstJob", e.target.checked ? "yes" : "")}
+              disabled={isDisabled}
+              className="w-4 h-4 accent-green-700 cursor-pointer"
+              data-testid="checkbox-firstJob"
+            />
+            <label htmlFor="firstJob" className="text-sm font-semibold text-gray-700 cursor-pointer select-none">
+              This is my first job — I have no previous employment history
+            </label>
+          </div>
+          {data.firstJob !== "yes" && [1, 2, 3].map(n => (
             <div key={n} className="border border-gray-100 rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-gray-700 text-sm">Employer {n}</h3>
               <Row>
