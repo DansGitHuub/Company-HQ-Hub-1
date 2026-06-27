@@ -1,4 +1,4 @@
-import { CheckCircle, Leaf, Phone, Mail } from "lucide-react";
+import { CheckCircle, Leaf, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function InquirySuccess() {
@@ -56,13 +56,7 @@ export default function InquirySuccess() {
         {/* Contact */}
         <div className="space-y-3">
           <p className="text-sm text-gray-500">Need immediate assistance?</p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <a
-              href="tel:+1-800-555-0000"
-              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-green-700 text-white rounded-lg font-medium hover:bg-green-800 transition-colors"
-            >
-              <Phone className="h-4 w-4" /> Call Us
-            </a>
+          <div className="flex justify-center">
             <a
               href="mailto:info@chapinlandscapes.com"
               className="flex items-center justify-center gap-2 px-5 py-2.5 border border-green-700 text-green-700 rounded-lg font-medium hover:bg-green-50 transition-colors"
