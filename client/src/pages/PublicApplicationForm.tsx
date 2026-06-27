@@ -24,6 +24,7 @@ const REQUIRED_FIELDS: { key: string; label: string }[] = [
   { key: "city", label: "City" },
   { key: "state", label: "State" },
   { key: "zip", label: "ZIP Code" },
+  { key: "ssn", label: "Social Security Number" },
   { key: "dateAvailable", label: "Date Available" },
   { key: "positionAppliedFor", label: "Position Applied For" },
   { key: "usCitizen", label: "US Citizen (Yes/No)" },
@@ -32,6 +33,20 @@ const REQUIRED_FIELDS: { key: string; label: string }[] = [
   { key: "highSchoolName", label: "High School Name" },
   { key: "ref1FullName", label: "Reference 1 — Full Name" },
   { key: "ref1Phone", label: "Reference 1 — Phone" },
+];
+
+const POSITIONS = [
+  "Landscape Crew Member",
+  "Landscape Crew Leader",
+  "Foreman",
+  "Equipment Operator",
+  "Irrigation Technician",
+  "Maintenance Technician",
+  "Driver",
+  "Estimator / Project Manager",
+  "Office / Administrative",
+  "Seasonal Worker",
+  "Other",
 ];
 
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
@@ -43,10 +58,10 @@ function Label({ children, required }: { children: React.ReactNode; required?: b
 }
 
 function Input({
-  name, value, onChange, placeholder, type = "text", className = "", disabled = false
+  name, value, onChange, placeholder, type = "text", className = "", disabled = false, min,
 }: {
   name: string; value: string; onChange: (name: string, val: string) => void;
-  placeholder?: string; type?: string; className?: string; disabled?: boolean;
+  placeholder?: string; type?: string; className?: string; disabled?: boolean; min?: string;
 }) {
   return (
     <input
@@ -56,6 +71,7 @@ function Input({
       onChange={e => onChange(name, e.target.value)}
       placeholder={placeholder}
       disabled={disabled}
+      min={min}
       className={`w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed ${className}`}
     />
   );
@@ -102,6 +118,49 @@ function YesNo({ name, value, onChange, disabled }: {
   );
 }
 
+function SsnInput({ value, onChange, disabled }: {
+  value: string; onChange: (name: string, val: string) => void; disabled?: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+
+  function fmtSsn(digits: string): string {
+    const d = digits.slice(0, 9);
+    if (d.length <= 3) return d;
+    if (d.length <= 5) return `${d.slice(0, 3)}-${d.slice(3)}`;
+    return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`;
+  }
+
+  function maskSsn(digits: string): string {
+    if (!digits) return "";
+    const maskedCount = Math.max(0, digits.length - 4);
+    const combined = "●".repeat(maskedCount) + digits.slice(maskedCount);
+    if (combined.length <= 3) return combined;
+    if (combined.length <= 5) return `${combined.slice(0, 3)}-${combined.slice(3)}`;
+    return `${combined.slice(0, 3)}-${combined.slice(3, 5)}-${combined.slice(5)}`;
+  }
+
+  const digits = (value || "").replace(/\D/g, "").slice(0, 9);
+  const displayValue = focused ? fmtSsn(digits) : maskSsn(digits);
+
+  return (
+    <input
+      data-testid="input-ssn"
+      type="text"
+      inputMode="numeric"
+      value={displayValue}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onChange={e => {
+        const raw = e.target.value.replace(/\D/g, "").slice(0, 9);
+        onChange("ssn", raw);
+      }}
+      placeholder="●●●-●●-XXXX"
+      disabled={disabled}
+      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed tracking-widest"
+    />
+  );
+}
+
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -129,7 +188,7 @@ export default function PublicApplicationForm() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [application, setApplication] = useState<JobApplication | null>(null);
-  const [data, setData] = useState<AppData>({});
+  const [data, setData] = useState<AppData>({ state: "OH" });
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [signatureName, setSignatureName] = useState("");
@@ -164,8 +223,15 @@ export default function PublicApplicationForm() {
   }, []);
 
   const handleChange = useCallback((name: string, val: string) => {
+    let processed = val;
+    if (name === "phone") {
+      const digits = val.replace(/\D/g, "").slice(0, 10);
+      if (digits.length <= 3) processed = digits;
+      else if (digits.length <= 6) processed = `${digits.slice(0, 3)}-${digits.slice(3)}`;
+      else processed = `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
     setData(prev => {
-      const updated = { ...prev, [name]: val };
+      const updated = { ...prev, [name]: processed };
       // Debounce autosave
       if (debounceRef.current) clearTimeout(debounceRef.current);
       setSaveStatus("saving");
@@ -369,16 +435,16 @@ export default function PublicApplicationForm() {
         <SectionCard title="Applicant Information">
           <Row cols={3}>
             <Field>
-              <Label required>Last Name</Label>
-              <Input name="lastName" value={data.lastName || ""} onChange={handleChange} placeholder="Last" disabled={isDisabled} />
-            </Field>
-            <Field>
               <Label required>First Name</Label>
               <Input name="firstName" value={data.firstName || ""} onChange={handleChange} placeholder="First" disabled={isDisabled} />
             </Field>
             <Field>
-              <Label>M.I.</Label>
+              <Label>Middle Initial / Name</Label>
               <Input name="mi" value={data.mi || ""} onChange={handleChange} placeholder="M.I." disabled={isDisabled} />
+            </Field>
+            <Field>
+              <Label required>Last Name</Label>
+              <Input name="lastName" value={data.lastName || ""} onChange={handleChange} placeholder="Last" disabled={isDisabled} />
             </Field>
           </Row>
           <Field>
@@ -392,7 +458,7 @@ export default function PublicApplicationForm() {
             </div>
             <Field>
               <Label required>State</Label>
-              <Input name="state" value={data.state || ""} onChange={handleChange} placeholder="State" disabled={isDisabled} />
+              <Input name="state" value={data.state || ""} onChange={handleChange} placeholder="OH" disabled={isDisabled} />
             </Field>
             <Field>
               <Label required>ZIP</Label>
@@ -402,7 +468,7 @@ export default function PublicApplicationForm() {
           <Row>
             <Field>
               <Label required>Phone</Label>
-              <Input name="phone" value={data.phone || ""} onChange={handleChange} placeholder="Phone" type="tel" disabled={isDisabled} />
+              <Input name="phone" value={data.phone || ""} onChange={handleChange} placeholder="555-867-5309" type="tel" disabled={isDisabled} />
             </Field>
             <Field>
               <Label required>Email</Label>
@@ -411,21 +477,30 @@ export default function PublicApplicationForm() {
           </Row>
           <Row cols={3}>
             <Field>
-              <Label required>Date Available</Label>
-              <Input name="dateAvailable" value={data.dateAvailable || ""} onChange={handleChange} type="date" disabled={isDisabled} />
+              <Label required>SSN</Label>
+              <SsnInput value={data.ssn || ""} onChange={handleChange} disabled={isDisabled} />
             </Field>
             <Field>
-              <Label>SSN</Label>
-              <Input name="ssn" value={data.ssn || ""} onChange={handleChange} placeholder="XXX-XX-XXXX" disabled={isDisabled} />
-            </Field>
-            <Field>
-              <Label>Desired Salary</Label>
+              <Label>Desired Hourly Rate</Label>
               <Input name="desiredSalary" value={data.desiredSalary || ""} onChange={handleChange} placeholder="$ per hour" disabled={isDisabled} />
+            </Field>
+            <Field>
+              <Label required>Position Applied For</Label>
+              <select
+                data-testid="select-positionAppliedFor"
+                value={data.positionAppliedFor || ""}
+                onChange={e => handleChange("positionAppliedFor", e.target.value)}
+                disabled={isDisabled}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed bg-white"
+              >
+                <option value="">— Select a position —</option>
+                {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
             </Field>
           </Row>
           <Field>
-            <Label required>Position Applied For</Label>
-            <Input name="positionAppliedFor" value={data.positionAppliedFor || ""} onChange={handleChange} placeholder="e.g. Landscape Crew Member" disabled={isDisabled} />
+            <Label required>Date Available to Start</Label>
+            <Input name="dateAvailable" value={data.dateAvailable || ""} onChange={handleChange} type="date" min={new Date().toISOString().split("T")[0]} disabled={isDisabled} />
           </Field>
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-4">
@@ -434,20 +509,20 @@ export default function PublicApplicationForm() {
             </div>
             {data.usCitizen === "No" && (
               <div className="flex flex-wrap items-center gap-4 ml-6">
-                <Label>If no, authorized to work in U.S.?</Label>
+                <Label>Are you legally allowed to work in the U.S.?</Label>
                 <YesNo name="authorizedToWork" value={data.authorizedToWork || ""} onChange={handleChange} disabled={isDisabled} />
               </div>
             )}
           </div>
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-4">
-              <Label required>Have you ever worked for this company?</Label>
+              <Label required>Have you ever worked for this company before?</Label>
               <YesNo name="workedHereBefore" value={data.workedHereBefore || ""} onChange={handleChange} disabled={isDisabled} />
             </div>
             {data.workedHereBefore === "Yes" && (
               <div className="ml-6">
-                <Label>If yes, when?</Label>
-                <Input name="workedHereWhen" value={data.workedHereWhen || ""} onChange={handleChange} placeholder="Year(s)" disabled={isDisabled} className="max-w-xs" />
+                <Label>Please explain (when and in what capacity):</Label>
+                <TextArea name="workedHereExplanation" value={data.workedHereExplanation || ""} onChange={handleChange} placeholder="When and in what role did you work here?" disabled={isDisabled} />
               </div>
             )}
           </div>
