@@ -1257,6 +1257,73 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
       res.status(500).json({ message: err.message });
     }
   });
+
+  // Seed the three standalone letter templates — insert only if not already present
+  (async () => {
+    const defaults = [
+      {
+        stage: "Offer Letter",
+        subject: "Congratulations — Your Offer from Chapin Landscapes",
+        body: `<p>Dear {{firstName}},</p>
+<p>We are thrilled to extend an offer for the position of <strong>{{position}}</strong> at Chapin Landscapes!</p>
+<p><strong>Offer Details:</strong></p>
+<ul>
+  <li><strong>Position:</strong> {{position}}</li>
+  <li><strong>Pay Rate:</strong> {{payRate}}</li>
+  <li><strong>Start Date:</strong> {{startDate}}</li>
+</ul>
+<p>Please review this offer and reach out with any questions. We look forward to welcoming you to the team!</p>
+<p>Warm regards,<br>The Chapin Landscapes Team</p>`,
+      },
+      {
+        stage: "Decline Letter",
+        subject: "Your Application for {{position}} — Chapin Landscapes",
+        body: `<p>Dear {{firstName}},</p>
+<p>Thank you for taking the time to apply for the <strong>{{position}}</strong> position at Chapin Landscapes and for your interest in joining our team.</p>
+<p>After careful consideration, we have decided to move forward with other candidates whose experience more closely matches our current needs.</p>
+<p>We genuinely appreciate your effort and wish you the very best in your search.</p>
+<p>Sincerely,<br>The Chapin Landscapes Team</p>`,
+      },
+      {
+        stage: "Onboarding / Start Date",
+        subject: "Welcome to the Team — Your Start Date & What to Expect",
+        body: `<p>Dear {{firstName}},</p>
+<p>We are so excited to have you join us as our new <strong>{{position}}</strong>!</p>
+<p><strong>Start Date:</strong> {{startDate}}<br>
+<strong>Report to:</strong> {{address}}</p>
+<p><strong>What to bring on Day 1:</strong></p>
+<ul>
+  <li>Two forms of valid government-issued ID (for I-9 verification)</li>
+  <li>Voided check or banking information for direct deposit</li>
+  <li>Any certifications or licenses relevant to your role</li>
+</ul>
+<p><strong>What to expect:</strong></p>
+<ul>
+  <li>A brief orientation and paperwork review</li>
+  <li>A tour of our facility and introductions to the team</li>
+  <li>Overview of your role, responsibilities, and schedule</li>
+</ul>
+<p>If you have any questions before your first day, don't hesitate to reach out.</p>
+<p>We look forward to seeing you!<br>The Chapin Landscapes Team</p>`,
+      },
+    ];
+
+    for (const tpl of defaults) {
+      try {
+        const existing = await storage.getHiringEmailTemplate(tpl.stage);
+        if (!existing) {
+          await storage.upsertHiringEmailTemplate(tpl.stage, {
+            subject: tpl.subject,
+            body: tpl.body,
+            isEnabled: false,
+          });
+          console.log(`[hiring] Seeded email template: "${tpl.stage}"`);
+        }
+      } catch (err: any) {
+        console.error(`[hiring] Failed to seed template "${tpl.stage}":`, err.message);
+      }
+    }
+  })();
 }
 
 function convertTo24h(timeStr: string): string {

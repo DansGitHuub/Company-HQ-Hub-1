@@ -43,11 +43,33 @@ const STAGES = [
     description: "Optional rejection email when a candidate is moved to Declined.",
     icon: "📭",
   },
+  {
+    key: "Offer Letter",
+    label: "Offer Letter",
+    description: "A congratulatory letter with offer details. Send manually — not triggered automatically.",
+    icon: "🎁",
+  },
+  {
+    key: "Decline Letter",
+    label: "Decline Letter",
+    description: "A polite rejection for candidates who are not selected. Send manually — not triggered automatically.",
+    icon: "🚫",
+  },
+  {
+    key: "Onboarding / Start Date",
+    label: "Onboarding / Start Date",
+    description: "Welcome message covering what to bring and what to expect on day one. Send manually — not triggered automatically.",
+    icon: "🚀",
+  },
 ];
 
 const VARIABLE_GUIDE = [
   { var: "{{name}}", desc: "Applicant's full name" },
+  { var: "{{firstName}}", desc: "Applicant's first name" },
   { var: "{{position}}", desc: "Job role / position" },
+  { var: "{{payRate}}", desc: "Offered pay rate" },
+  { var: "{{startDate}}", desc: "Employment start date" },
+  { var: "{{address}}", desc: "Office / report-to address" },
   { var: "{{date}}", desc: "Interview date (if applicable)" },
   { var: "{{time}}", desc: "Interview time (if applicable)" },
   { var: "{{location}}", desc: "Interview location (if applicable)" },
