@@ -495,11 +495,21 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
         if (user.role === "Customer") return { result: null, error: "Global search is not available for customer accounts.", isDenied: true };
         const query = `%${toolArgs.query}%`;
         const results: any = {};
+        const isGlobalAdmin = ["Admin", "Manager", "Master Admin"].includes(user.role);
+
+        // Non-admin roles: scope tasks to own records only
+        const taskQuery = isGlobalAdmin
+          ? pool.query(`SELECT id, task_id, title, status, priority FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 LIMIT 5`, [query])
+          : pool.query(`SELECT id, task_id, title, status, priority FROM tasks WHERE (title ILIKE $1 OR description ILIKE $1) AND (assigned_to_user_id = $2 OR created_by_user_id = $2) LIMIT 5`, [query, user.id]);
+
+        // Non-admin roles: return only name + role, never username or email
+        const userSelectCols = isGlobalAdmin ? "id, name, username, role" : "id, name, role";
+        const userQuery = pool.query(`SELECT ${userSelectCols} FROM users WHERE (name ILIKE $1 OR username ILIKE $1 OR role ILIKE $1) AND role != 'Customer' AND (is_active IS NULL OR is_active = true) LIMIT 5`, [query]);
 
         const [tasks, equip, users, sops] = await Promise.all([
-          pool.query(`SELECT id, task_id, title, status, priority FROM tasks WHERE title ILIKE $1 OR description ILIKE $1 LIMIT 5`, [query]),
+          taskQuery,
           pool.query(`SELECT id, name, asset_id, make, model, status FROM equipment WHERE name ILIKE $1 OR make ILIKE $1 OR model ILIKE $1 OR asset_id ILIKE $1 LIMIT 5`, [query]),
-          pool.query(`SELECT id, name, username, role FROM users WHERE (name ILIKE $1 OR username ILIKE $1 OR role ILIKE $1) AND role != 'Customer' AND (is_active IS NULL OR is_active = true) LIMIT 5`, [query]),
+          userQuery,
           pool.query(`SELECT id, title, category FROM sops WHERE title ILIKE $1 OR category ILIKE $1 LIMIT 5`, [query]),
         ]);
 
@@ -512,6 +522,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
       }
 
       case "searchEquipment": {
+        if (user.role === "Customer") return { result: null, error: "Equipment search is not available for customer accounts.", isDenied: true };
         let sql = `SELECT e.id, e.name, e.asset_id, e.make, e.model, e.year, e.status, e.category, e.current_hours,
                     u.name as assigned_to_name
                     FROM equipment e LEFT JOIN users u ON e.assigned_to_user_id = u.id WHERE 1=1`;
@@ -566,9 +577,13 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
       }
 
       case "searchEmployees": {
+        if (user.role === "Customer") return { result: null, error: "Employee search is not available for customer accounts.", isDenied: true };
+        const isEmpAdmin = ["Admin", "Manager", "Master Admin"].includes(user.role);
+        // Non-admin roles: return only name + role; never expose email or username
+        const empSelectCols = isEmpAdmin ? "id, name, username, role, email" : "id, name, role";
         const query = `%${toolArgs.query}%`;
         const res = await pool.query(
-          `SELECT id, name, username, role, email FROM users WHERE (name ILIKE $1 OR username ILIKE $1 OR role ILIKE $1) AND role != 'Customer' AND (is_active IS NULL OR is_active = true) LIMIT 10`,
+          `SELECT ${empSelectCols} FROM users WHERE (name ILIKE $1 OR username ILIKE $1 OR role ILIKE $1) AND role != 'Customer' AND (is_active IS NULL OR is_active = true) LIMIT 10`,
           [query]
         );
         return { result: { employees: res.rows, count: res.rows.length } };
@@ -633,6 +648,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
       }
 
       case "getCalendarEvents": {
+        if (user.role === "Customer") return { result: null, error: "Calendar access is not available for customer accounts.", isDenied: true };
         let evtSql = `SELECT ce.id, ce.title, ce.description, ce.event_type, ce.start_datetime, ce.end_datetime, ce.all_day, ce.location,
                       u.name as created_by_name
                       FROM calendar_events ce
@@ -657,7 +673,11 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
       case "getJobs": {
         if (user.role === "Customer") return { result: null, error: "Job information is not available for customer accounts.", isDenied: true };
         const isJobAdmin = ["Admin", "Manager", "Master Admin"].includes(user.role);
-        let jobSql = `SELECT id, client, type, category, stage, value, scheduled_date, completion_date, notes, zone FROM jobs WHERE 1=1`;
+        // Non-admin roles: strip contract value and internal notes — these are admin-only in the UI
+        const jobSelectCols = isJobAdmin
+          ? "id, client, type, category, stage, value, scheduled_date, completion_date, notes, zone"
+          : "id, client, type, category, stage, scheduled_date, zone";
+        let jobSql = `SELECT ${jobSelectCols} FROM jobs WHERE 1=1`;
         const jobParams: any[] = [];
         let jobIdx = 1;
 
@@ -675,7 +695,16 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
       }
 
       case "getDailyBriefing": {
+        if (user.role === "Customer") return { result: null, error: "Daily briefing is not available for customer accounts.", isDenied: true };
         const userId = user.id;
+        const isBriefingAdmin = ["Admin", "Manager", "Master Admin"].includes(user.role);
+
+        // Non-admin roles: scope equipment maintenance alerts to assets assigned to that user only
+        const equipSql = isBriefingAdmin
+          ? `SELECT e.name, e.asset_id, ms.name as schedule_name FROM maintenance_schedules ms JOIN equipment e ON ms.equipment_id = e.id WHERE ms.is_active = true AND ms.next_due_date <= NOW() LIMIT 10`
+          : `SELECT e.name, e.asset_id, ms.name as schedule_name FROM maintenance_schedules ms JOIN equipment e ON ms.equipment_id = e.id WHERE ms.is_active = true AND ms.next_due_date <= NOW() AND e.assigned_to_user_id = $1 LIMIT 10`;
+        const equipParams = isBriefingAdmin ? [] : [userId];
+
         const [overdue, dueToday, p1Equip, unack] = await Promise.all([
           pool.query(
             `SELECT t.task_id, t.title, t.priority, t.due_date FROM tasks t WHERE (t.assigned_to_user_id = $1 OR t.created_by_user_id = $1) AND t.status NOT IN ('completed','confirmed','cancelled') AND t.due_date < NOW() ORDER BY t.due_date LIMIT 10`,
@@ -685,9 +714,7 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
             `SELECT t.task_id, t.title, t.priority FROM tasks t WHERE (t.assigned_to_user_id = $1 OR t.created_by_user_id = $1) AND t.status NOT IN ('completed','confirmed','cancelled') AND t.due_date::date = CURRENT_DATE LIMIT 10`,
             [userId]
           ),
-          pool.query(
-            `SELECT e.name, e.asset_id, ms.name as schedule_name FROM maintenance_schedules ms JOIN equipment e ON ms.equipment_id = e.id WHERE ms.is_active = true AND ms.next_due_date <= NOW() LIMIT 10`
-          ),
+          pool.query(equipSql, equipParams),
           pool.query(`SELECT COUNT(*) as count FROM tasks WHERE assigned_to_user_id = $1 AND status = 'assigned'`, [userId]),
         ]);
 
