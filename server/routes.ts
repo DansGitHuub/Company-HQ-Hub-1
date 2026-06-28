@@ -10367,12 +10367,34 @@ Provide accurate information based on publicly available documentation.`;
   });
 
   // ADMIN: List all applications
-  // Get the submitted job application for a specific candidate (Admin only)
+  // Get the submitted job application for a specific candidate (Admin only).
+  // Raw SSN digits are stripped from the response; only ssnLast4 is sent for masked display.
   app.get("/api/candidates/:id/application", requireAdmin, async (req, res) => {
     try {
       const app = await storage.getJobApplicationByCandidateId(req.params.id);
       if (!app) return res.status(404).json({ message: "No application found for this candidate" });
-      return res.json(app);
+      const safeData: Record<string, any> = { ...(app.data as Record<string, any> || {}) };
+      if (safeData.ssn) {
+        safeData.ssnLast4 = String(safeData.ssn).slice(-4);
+        delete safeData.ssn;
+      }
+      return res.json({ ...app, data: safeData });
+    } catch (err) {
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // ADMIN: Reveal full SSN for a submitted application — Admin / Master Admin only.
+  app.get("/api/candidates/:id/application/ssn", requireAdmin, async (req, res) => {
+    try {
+      const app = await storage.getJobApplicationByCandidateId(req.params.id);
+      if (!app) return res.status(404).json({ message: "No application found" });
+      const raw = String((app.data as Record<string, any>)?.ssn || "").replace(/\D/g, "");
+      if (raw.length < 4) return res.status(404).json({ message: "SSN not on file" });
+      const formatted = raw.length === 9
+        ? `${raw.slice(0, 3)}-${raw.slice(3, 5)}-${raw.slice(5)}`
+        : raw;
+      return res.json({ ssn: formatted });
     } catch (err) {
       return res.status(500).json({ message: "Server error" });
     }

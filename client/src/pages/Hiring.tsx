@@ -1619,6 +1619,9 @@ function ApplicationViewDialog({ candidateId, candidateName, open, onClose }: {
   open: boolean;
   onClose: () => void;
 }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "Admin" || user?.role === "Master Admin";
+
   const { data: appRecord, isLoading } = useQuery<any>({
     queryKey: [`/api/candidates/${candidateId}/application`],
     queryFn: async () => {
@@ -1628,6 +1631,19 @@ function ApplicationViewDialog({ candidateId, candidateName, open, onClose }: {
     },
     enabled: open,
   });
+
+  const [ssnRevealed, setSsnRevealed] = useState(false);
+  const [fullSsn, setFullSsn] = useState<string | null>(null);
+  const [ssnLoading, setSsnLoading] = useState(false);
+
+  const handleRevealSsn = async () => {
+    if (fullSsn) { setSsnRevealed(true); return; }
+    setSsnLoading(true);
+    try {
+      const res = await apiRequest("GET", `/api/candidates/${candidateId}/application/ssn`);
+      if (res.ok) { const body = await res.json(); setFullSsn(body.ssn); setSsnRevealed(true); }
+    } finally { setSsnLoading(false); }
+  };
 
   const d: Record<string, string> = appRecord?.data || {};
 
@@ -1684,7 +1700,27 @@ function ApplicationViewDialog({ candidateId, candidateName, open, onClose }: {
               <Field label="City" value={d.city} />
               <Field label="State" value={d.state} />
               <Field label="ZIP" value={d.zip} />
-              {d.ssn && <Field label="SSN" value={`***-**-${d.ssn.slice(-4)}`} />}
+              {d.ssnLast4 && (
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium">SSN</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground font-mono tracking-wider">
+                      {ssnRevealed && fullSsn ? fullSsn : `***-**-${d.ssnLast4}`}
+                    </p>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={ssnRevealed ? () => setSsnRevealed(false) : handleRevealSsn}
+                        disabled={ssnLoading}
+                        className="text-xs font-semibold text-green-700 hover:text-green-900 underline underline-offset-2 disabled:opacity-50"
+                        data-testid="button-toggle-ssn"
+                      >
+                        {ssnLoading ? "Loading…" : ssnRevealed ? "Hide" : "Reveal"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               <Field label="Position Applied For" value={d.positionAppliedFor} />
               <Field label="Date Available" value={d.dateAvailable} />
               {d.desiredSalary && <Field label="Desired Salary" value={`$${d.desiredSalary}/hr`} />}
