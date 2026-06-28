@@ -288,7 +288,11 @@ function EmployeeProfile({ employee, onBack }: { employee: any; onBack: () => vo
           <h2 className="font-semibold text-xl" data-testid="text-employee-name">{employee.firstName} {employee.lastName}</h2>
           <p className="text-sm text-muted-foreground">{employee.jobTitle || t("common.none")} {employee.department ? `\u00b7 ${employee.department}` : ""}</p>
         </div>
-        <Badge className="ml-auto" variant="outline">{employee.status}</Badge>
+        <Badge className={`ml-auto border ${
+          employee.status === "Active" ? "bg-green-100 text-green-800 border-green-300" :
+          employee.status === "On Leave" ? "bg-yellow-100 text-yellow-800 border-yellow-300" :
+          "bg-gray-100 text-gray-700 border-gray-300"
+        }`}>{employee.status || "Active"}</Badge>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -407,6 +411,8 @@ function PersonalInfoTab({ employee, onUpdate }: { employee: any; onUpdate: (dat
 }
 
 function EmploymentTab({ employee, onUpdate }: { employee: any; onUpdate: (data: any) => void }) {
+  const { user } = useAuth();
+  const isAdminOrManager = user?.role === "Admin" || user?.role === "Manager" || user?.isMasterAdmin;
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     jobTitle: employee.jobTitle || "", department: employee.department || "",
@@ -441,18 +447,20 @@ function EmploymentTab({ employee, onUpdate }: { employee: any; onUpdate: (data:
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Status</Label>
-                <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="On Leave">On Leave</SelectItem>
-                    <SelectItem value="Terminated">Terminated</SelectItem>
-                    <SelectItem value="Seasonal Off">Seasonal Off</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {isAdminOrManager && (
+                <div>
+                  <Label>Status</Label>
+                  <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
+                    <SelectTrigger data-testid="select-employee-status"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="On Leave">On Leave</SelectItem>
+                      <SelectItem value="Terminated">Terminated</SelectItem>
+                      <SelectItem value="Seasonal Off">Seasonal Off</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div><Label>Start Date</Label><Input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} /></div>
               <div><Label>End Date</Label><Input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} /></div>
               <div><Label>Supervisor</Label><Input value={form.supervisor} onChange={e => setForm({ ...form, supervisor: e.target.value })} /></div>
@@ -469,6 +477,16 @@ function EmploymentTab({ employee, onUpdate }: { employee: any; onUpdate: (data:
             {employee.endDate && <div><span className="text-muted-foreground">End:</span> {employee.endDate}</div>}
             <div><span className="text-muted-foreground">Supervisor:</span> {employee.supervisor || "\u2014"}</div>
             <div><span className="text-muted-foreground">Location:</span> {employee.workLocation || "\u2014"}</div>
+            {isAdminOrManager && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Status:</span>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                  employee.status === "Active" ? "bg-green-100 text-green-800" :
+                  employee.status === "On Leave" ? "bg-yellow-100 text-yellow-800" :
+                  "bg-gray-100 text-gray-700"
+                }`}>{employee.status || "Active"}</span>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
