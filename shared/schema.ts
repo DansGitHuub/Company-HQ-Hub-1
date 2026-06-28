@@ -335,6 +335,8 @@ export const candidates = pgTable("candidates", {
   offerAcceptanceExpiresAt: timestamp("offer_acceptance_expires_at"),
   offerAcceptedAt: timestamp("offer_accepted_at"),
   offerAcceptanceSignature: text("offer_acceptance_signature"),
+  grade: text("grade"),
+  candidateStatus: text("candidate_status").notNull().default("Active"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

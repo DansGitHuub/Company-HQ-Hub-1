@@ -1808,6 +1808,8 @@ function ApplicationViewDialog({ candidateId, candidateName, open, onClose }: {
 
 function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (data: any) => void }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const isAdminOrManager = user?.role === "Admin" || user?.role === "Master Admin" || user?.role === "Manager";
   const [editing, setEditing] = useState(false);
   const [viewAppOpen, setViewAppOpen] = useState(false);
 
@@ -1834,6 +1836,8 @@ function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (
     role: candidate.role,
     source: (candidate as any).source || "",
     rating: candidate.rating || "green",
+    grade: (candidate as any).grade || "",
+    candidateStatus: (candidate as any).candidateStatus || "Active",
   });
 
   return (
@@ -1894,6 +1898,33 @@ function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (
               <SelectContent>{SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
             </Select>
           </div>
+          {isAdminOrManager && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Grade</Label>
+                <Select value={form.grade} onValueChange={v => setForm({ ...form, grade: v })}>
+                  <SelectTrigger data-testid="select-grade"><SelectValue placeholder="— None —" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">— None —</SelectItem>
+                    <SelectItem value="A">A</SelectItem>
+                    <SelectItem value="B">B</SelectItem>
+                    <SelectItem value="C">C</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Candidate Status</Label>
+                <Select value={form.candidateStatus} onValueChange={v => setForm({ ...form, candidateStatus: v })}>
+                  <SelectTrigger data-testid="select-candidate-status"><SelectValue placeholder="Active" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Terminated">Terminated</SelectItem>
+                    <SelectItem value="Blacklist">Blacklist</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-2 text-sm">
@@ -1902,6 +1933,26 @@ function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (
           {candidate.address && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground" />{[candidate.address, candidate.city, candidate.state, candidate.zip].filter(Boolean).join(", ")}</div>}
           {(candidate as any).source && <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" />Source: {(candidate as any).source}</div>}
           <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground" />Applied: {candidate.appliedDate ? new Date(candidate.appliedDate).toLocaleDateString() : "N/A"}</div>
+          {isAdminOrManager && (candidate as any).grade && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Grade:</span>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
+                (candidate as any).grade === "A" ? "bg-green-100 text-green-800" :
+                (candidate as any).grade === "B" ? "bg-yellow-100 text-yellow-800" :
+                "bg-orange-100 text-orange-800"
+              }`}>{(candidate as any).grade}</span>
+            </div>
+          )}
+          {isAdminOrManager && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Status:</span>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                (candidate as any).candidateStatus === "Blacklist" ? "bg-red-100 text-red-800" :
+                (candidate as any).candidateStatus === "Terminated" ? "bg-gray-100 text-gray-700" :
+                "bg-green-100 text-green-800"
+              }`}>{(candidate as any).candidateStatus || "Active"}</span>
+            </div>
+          )}
         </div>
       )}
 
