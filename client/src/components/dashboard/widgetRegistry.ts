@@ -17,6 +17,7 @@ import {
   ClipboardList,
   Sparkles,
   StickyNote,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 
@@ -211,6 +212,15 @@ export const WIDGET_DEFINITIONS: WidgetDefinition[] = [
     roles: ["Admin", "Manager", "Crew", "HR", "Sales", "New Hire"],
     defaultSize: "medium",
     sizes: ["small", "medium", "large"],
+  },
+  {
+    type: "hiring",
+    label: "Hiring",
+    description: "New applications awaiting review",
+    icon: UserPlus,
+    roles: ["Admin", "Manager", "Master Admin"],
+    defaultSize: "small",
+    sizes: ["small", "medium"],
   },
 ];
 

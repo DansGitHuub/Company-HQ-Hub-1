@@ -1466,6 +1466,33 @@ function DailyAgendaWidget({ size }: WidgetProps) {
   );
 }
 
+export function HiringWidget({ size }: WidgetProps) {
+  const { data, isLoading } = useQuery<{ newApplications: number }>({
+    queryKey: ["/api/hiring-summary"],
+    refetchInterval: 60000,
+  });
+
+  const count = data?.newApplications ?? 0;
+
+  return (
+    <WidgetShell loading={isLoading} href="/hiring">
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-3xl font-bold text-foreground leading-none">{count}</span>
+          {count > 0 ? (
+            <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">needs review</Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs text-green-600 border-green-300">all clear</Badge>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {count === 1 ? "application" : "applications"} in "Application Received" stage
+        </p>
+      </div>
+    </WidgetShell>
+  );
+}
+
 export const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>> = {
   messages: MessagesWidget,
   todos: TodosWidget,
@@ -1486,4 +1513,5 @@ export const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>>
   soppipeline: SOPPipelineWidget,
   notes: NotesWidget,
   dailyagenda: DailyAgendaWidget,
+  hiring: HiringWidget,
 };

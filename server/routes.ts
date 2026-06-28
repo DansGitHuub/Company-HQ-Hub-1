@@ -4463,6 +4463,21 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
+  // Hiring summary for dashboard widget — Admin / Manager / Master Admin only
+  app.get("/api/hiring-summary", requireAuth, async (req, res) => {
+    const role = (req.user as any)?.role;
+    if (!["Admin", "Manager", "Master Admin"].includes(role) && !(req.user as any)?.isMasterAdmin) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const all = await storage.getCandidates();
+      const newApplications = all.filter((c: any) => c.stage === "Application Received").length;
+      return res.json({ newApplications });
+    } catch (err) {
+      return res.status(500).json({ message: "Error fetching hiring summary" });
+    }
+  });
+
   app.get("/api/my-application", requireAuth, async (req, res) => {
     try {
       const candidate = await storage.getCandidateByUserId(req.user!.id);
