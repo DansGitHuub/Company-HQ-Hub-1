@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, Mail, CheckCircle, Info } from "lucide-react";
+import { ChevronDown, ChevronRight, Mail, CheckCircle, Info, Bell, Plus, X } from "lucide-react";
 
 const STAGES = [
   {
@@ -222,6 +223,110 @@ function TemplateCard({ stage, existingTemplate, onSave }: {
   );
 }
 
+function NotificationRecipients() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [newEmail, setNewEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+  const isAdmin = user?.role === "Admin" || (user as any)?.isMasterAdmin;
+
+  const { data: setting } = useQuery<{ key: string; value: string } | null>({
+    queryKey: ["/api/settings/hiring_notification_emails"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/settings/hiring_notification_emails");
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!isAdmin,
+  });
+
+  const emails: string[] = React.useMemo(() => {
+    if (!setting?.value) return ["dan@chapinlandscapes.com"];
+    try { return JSON.parse(setting.value); } catch { return []; }
+  }, [setting]);
+
+  const save = async (updated: string[]) => {
+    setSaving(true);
+    try {
+      await apiRequest("PUT", "/api/settings/hiring_notification_emails", { value: JSON.stringify(updated) });
+      await queryClient.invalidateQueries({ queryKey: ["/api/settings/hiring_notification_emails"] });
+      toast({ title: "Recipients updated" });
+    } catch {
+      toast({ title: "Failed to save", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addEmail = () => {
+    const trimmed = newEmail.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes("@") || emails.includes(trimmed)) return;
+    save([...emails, trimmed]);
+    setNewEmail("");
+  };
+
+  const removeEmail = (email: string) => save(emails.filter((e) => e !== email));
+
+  if (!isAdmin) return null;
+
+  return (
+    <Card className="border-blue-100 bg-blue-50/30">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <Bell className="h-4 w-4 text-blue-600" />
+          <CardTitle className="text-sm font-medium">New Application Notification Recipients</CardTitle>
+        </div>
+        <CardDescription className="text-xs mt-0.5">
+          These addresses receive an email whenever a new job application is submitted. Add anyone who should be notified — e.g. Matt, Doug, Lindsey, or the Office inbox.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-3">
+        <div className="space-y-1.5">
+          {emails.map((email) => (
+            <div key={email} className="flex items-center justify-between bg-white border border-blue-100 rounded-md px-3 py-1.5">
+              <span className="text-sm font-mono text-gray-700">{email}</span>
+              <button
+                onClick={() => removeEmail(email)}
+                disabled={saving}
+                className="text-muted-foreground hover:text-destructive transition-colors ml-2 disabled:opacity-40"
+                data-testid={`button-remove-recipient-${email}`}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+          {emails.length === 0 && (
+            <p className="text-xs text-muted-foreground italic py-1">No recipients — add at least one address.</p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Input
+            type="email"
+            placeholder="name@chapinlandscapes.com"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addEmail(); } }}
+            className="h-8 text-sm"
+            data-testid="input-new-recipient"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={addEmail}
+            disabled={saving || !newEmail.trim().includes("@")}
+            className="h-8 shrink-0"
+            data-testid="button-add-recipient"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Add
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function HiringEmailTemplates() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -265,6 +370,8 @@ export default function HiringEmailTemplates() {
           {activeCount} of {STAGES.length} active
         </Badge>
       </div>
+
+      <NotificationRecipients />
 
       <div className="space-y-3">
         {STAGES.map((stage) => {

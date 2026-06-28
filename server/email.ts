@@ -438,7 +438,8 @@ export async function sendNewApplicationNotificationEmail(
   toEmail: string,
   applicantName: string,
   position: string,
-  appUrl: string
+  appUrl: string,
+  landscapingExperience?: string
 ) {
   return sendEmail(toEmail, `New Job Application Received — ${applicantName}`, `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -448,8 +449,11 @@ export async function sendNewApplicationNotificationEmail(
       </div>
       <div style="padding: 30px; background-color: #f9fafb;">
         <h2 style="color: #1f2937;">New Application from ${escapeHtml(applicantName)}</h2>
-        <p style="color: #4b5563;">A new job application has been submitted for the position of <strong>${escapeHtml(position)}</strong>.</p>
-        <div style="text-align: center; margin: 30px 0;">
+        <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <p style="margin: 0 0 8px 0; color: #374151;"><strong>Position Applied For:</strong> ${escapeHtml(position)}</p>
+          ${landscapingExperience ? `<p style="margin: 0; color: #374151;"><strong>Skills / Landscaping Experience:</strong> ${escapeHtml(landscapingExperience)}</p>` : ""}
+        </div>
+        <div style="text-align: center; margin: 24px 0;">
           <a href="${appUrl}/hiring" style="background-color: #166534; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">View in Company HQ</a>
         </div>
       </div>

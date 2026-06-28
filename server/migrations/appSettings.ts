@@ -26,6 +26,11 @@ export async function runAppSettingsMigration() {
       VALUES ('companycam.auto_create_projects', 'true')
       ON CONFLICT (key) DO NOTHING
     `);
+    await client.query(`
+      INSERT INTO app_settings (key, value)
+      VALUES ('hiring_notification_emails', '["dan@chapinlandscapes.com"]')
+      ON CONFLICT (key) DO NOTHING
+    `);
     await client.query("COMMIT");
     console.log("[migration] app_settings table ready");
   } catch (err) {

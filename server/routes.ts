@@ -10323,10 +10323,13 @@ Provide accurate information based on publicly available documentation.`;
       }
 
       // Notify all Admins and Managers
+      let notifyUsers: any[] = [];
       try {
         const allUsers = await storage.getUsers();
-        const notifyUsers = allUsers.filter(u => u.role === "Admin" || u.role === "Manager");
+        notifyUsers = allUsers.filter((u: any) => u.role === "Admin" || u.role === "Manager");
         const appUrl = process.env.APP_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+
+        // In-app activity log for all system Admin/Manager users
         for (const u of notifyUsers) {
           await logActivity(
             "new_application",
@@ -10334,8 +10337,20 @@ Provide accurate information based on publicly available documentation.`;
             "/hiring",
             u.id
           );
-          if (u.email) {
-            sendNewApplicationNotificationEmail(u.email, fullName || "an applicant", position, appUrl).catch(() => {});
+        }
+
+        // Email: send to the Admin-configured recipient list (Hiring → Email Templates)
+        const { rows: recipientRows } = await pool.query(
+          `SELECT value FROM app_settings WHERE key = 'hiring_notification_emails'`
+        );
+        let recipientEmails: string[] = ["dan@chapinlandscapes.com"];
+        if (recipientRows.length > 0 && recipientRows[0].value) {
+          try { recipientEmails = JSON.parse(recipientRows[0].value); } catch {}
+        }
+        const landscapingExperience = (data?.skills || "").trim();
+        for (const email of recipientEmails) {
+          if (email && typeof email === "string") {
+            sendNewApplicationNotificationEmail(email, fullName || "an applicant", position, appUrl, landscapingExperience).catch(() => {});
           }
         }
       } catch (notifyErr) {
