@@ -89,8 +89,12 @@ export default function InquiryPage() {
           if (res.ok) {
             const data = await res.json();
             photoUrls.push(data.url || data.objectUrl || "");
+          } else {
+            throw new Error(`Photo "${p.file.name}" upload failed (${res.status}). Please remove it and try again.`);
           }
-        } catch {}
+        } catch (uploadErr: any) {
+          throw uploadErr;
+        }
       }
 
       const res = await fetch("/api/inquiry/submit", {

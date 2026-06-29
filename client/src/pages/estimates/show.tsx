@@ -261,6 +261,7 @@ export default function EstimateDetail() {
         notes:                estimate.notes,
         customer_message:     estimate.customer_message,
         terms:                estimate.terms,
+        terms_and_conditions_override: (estimate as any).terms_and_conditions_override ?? null,
         work_areas: areas.map(a => ({
           name: a.name,
           line_items: a.line_items.map(li => ({

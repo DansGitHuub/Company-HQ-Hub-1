@@ -46,7 +46,7 @@ export function registerMyDayRoutes(app: Express) {
            AND ja.scheduled_date = j.scheduled_date::date
          LEFT JOIN job_work_areas jwa ON jwa.job_id = j.id AND jwa.is_active = true
          WHERE j.scheduled_date::date = CURRENT_DATE
-           AND j.status NOT IN ('cancelled', 'completed', 'invoiced')
+           AND j.status NOT IN ('cancelled', 'invoiced')
            AND ($1::text IS NULL OR ja.employee_id = $1)
          GROUP BY j.id, c.first_name, c.last_name, c.company_name, p.address, p.access_notes, p.gate_code, p.has_pets, cp.phone
          ORDER BY j.scheduled_start_time NULLS LAST, j.created_at`,

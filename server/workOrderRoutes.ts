@@ -308,6 +308,20 @@ export function registerWorkOrderRoutes(app: any, requireAuth: any) {
       const { status } = req.body;
       const valid = ["draft", "ready", "in_progress", "on_hold", "complete"];
       if (!valid.includes(status)) return res.status(400).json({ message: "Invalid status" });
+
+      // Enforce readiness before advancing to 'ready' or 'in_progress'
+      if (status === "ready" || status === "in_progress") {
+        const detail = await loadDetail(id);
+        if (!detail) return res.status(404).json({ message: "Work order not found" });
+        if (!detail.is_ready) {
+          const missing = Object.entries(detail.readiness as Record<string, boolean>)
+            .filter(([, v]) => !v)
+            .map(([k]) => k.replace(/_/g, " "))
+            .join(", ");
+          return res.status(422).json({ message: `Work order is not ready. Missing: ${missing}` });
+        }
+      }
+
       await pool.query(`UPDATE work_orders SET status=$1, updated_at=NOW() WHERE id=$2`, [status, id]);
       res.json({ ok: true });
     } catch (err) {

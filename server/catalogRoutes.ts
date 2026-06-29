@@ -226,8 +226,12 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  // POST /api/catalog/:id/image — upload primary photo
-  app.post("/api/catalog/:id/image", requireAuth, upload.single("file"), async (req, res) => {
+  // POST /api/catalog/:id/image — upload primary photo (Admin/Manager only)
+  app.post("/api/catalog/:id/image", requireAuth, upload.single("file"), async (req: any, res) => {
+    const role = req.user?.role ?? "";
+    if (!["Admin", "Manager", "MasterAdmin"].includes(role)) {
+      return res.status(403).json({ message: "Admin or Manager role required" });
+    }
     try {
       const id = parseInt(req.params.id);
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });

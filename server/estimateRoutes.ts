@@ -144,7 +144,7 @@ export function registerEstimateRoutes(app: Express) {
       let resolvedId = req.params.id;
       if (/^EST-\d+$/i.test(resolvedId)) {
         const { rows } = await pool.query(
-          `SELECT id FROM estimates WHERE estimate_number = $1 LIMIT 1`,
+          `SELECT id FROM sales_estimates WHERE estimate_number = $1 LIMIT 1`,
           [resolvedId.toUpperCase()]
         );
         if (!rows.length) return res.status(404).json({ message: "Estimate not found" });

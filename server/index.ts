@@ -63,6 +63,7 @@ import { runCandidateGradeStatusMigration } from "./migrations/candidateGradeSta
 import { runEmployeeStatusColumnMigration } from "./migrations/employeeStatusColumn";
 import { runOfferDeclineCounterMigration } from "./migrations/offerDeclineCounter";
 import { runQbSyncSkipMigration } from "./migrations/qbSyncSkip";
+import { runGpsPingsIndexMigration } from "./migrations/gpsPingsIndex";
 import { runResourcesSeasonMigration } from "./migrations/resourcesSeason";
 import { runCompanyCamPhotosPhase2Migration } from "./migrations/companyCamPhotosPhase2";
 import { runCompanyCamWave3Migration } from "./migrations/companyCamWave3";
@@ -185,6 +186,7 @@ app.use((req, res, next) => {
   await runEmployeeStatusColumnMigration();
   await runOfferDeclineCounterMigration();
   await runQbSyncSkipMigration();
+  await runGpsPingsIndexMigration();
 
   // Public pages must be registered BEFORE registerRoutes (which sets up the React catch-all)
   registerPublicPages(app);

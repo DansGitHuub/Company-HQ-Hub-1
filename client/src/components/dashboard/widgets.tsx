@@ -67,11 +67,19 @@ interface WidgetProps {
   size: WidgetSize;
 }
 
-function WidgetShell({ children, loading, href, emptyText }: { children: React.ReactNode; loading?: boolean; href?: string; emptyText?: string }) {
+function WidgetShell({ children, loading, error, href, emptyText }: { children: React.ReactNode; loading?: boolean; error?: boolean; href?: string; emptyText?: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[80px]">
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[80px] gap-1.5 text-xs text-destructive">
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        <span>Failed to load</span>
       </div>
     );
   }
@@ -354,7 +362,7 @@ export function TodosWidget({ size }: WidgetProps) {
 }
 
 export function PipelineWidget({ size }: WidgetProps) {
-  const { data: jobs = [], isLoading } = useQuery<any[]>({
+  const { data: jobs = [], isLoading, isError } = useQuery<any[]>({
     queryKey: ["/api/jobs"],
   });
 
@@ -366,7 +374,7 @@ export function PipelineWidget({ size }: WidgetProps) {
   const totalValue = jobs.reduce((sum: number, j: any) => sum + (j.value || 0), 0);
 
   return (
-    <WidgetShell loading={isLoading} href="/jobs">
+    <WidgetShell loading={isLoading} error={isError} href="/jobs">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-xs text-muted-foreground">{jobs.length} jobs</span>
         {totalValue > 0 && (
@@ -386,7 +394,7 @@ export function PipelineWidget({ size }: WidgetProps) {
 }
 
 export function EstimatesWidget({ size }: WidgetProps) {
-  const { data: estimates = [], isLoading } = useQuery<any[]>({
+  const { data: estimates = [], isLoading, isError } = useQuery<any[]>({
     queryKey: ["/api/estimates"],
   });
 
@@ -402,7 +410,7 @@ export function EstimatesWidget({ size }: WidgetProps) {
   }));
 
   return (
-    <WidgetShell loading={isLoading} href="/estimates">
+    <WidgetShell loading={isLoading} error={isError} href="/estimates">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-xs text-muted-foreground">{estimates.length} estimates</span>
       </div>

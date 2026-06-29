@@ -108,8 +108,11 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
       return res.status(400).json({ message: "time_entry_id is required" });
     }
 
+    const client = await pool.connect();
     try {
-      const result = await pool.query(
+      await client.query("BEGIN");
+
+      const result = await client.query(
         `UPDATE time_entries
          SET clock_out = NOW(),
              duration_minutes = EXTRACT(EPOCH FROM (NOW() - clock_in))::integer / 60,
@@ -119,10 +122,29 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
         [notes || null, time_entry_id, userId]
       );
       if (result.rows.length === 0) {
+        await client.query("ROLLBACK");
         return res.status(404).json({ message: "Active time entry not found" });
       }
 
-      // Audit log — clock out
+      // Update time_card and worksheet_session atomically with the time_entry close
+      const tcResult = await client.query(
+        `UPDATE time_cards
+         SET clock_out_time = NOW(),
+             total_minutes = ROUND(EXTRACT(EPOCH FROM (NOW() - clock_in_time))/60)
+         WHERE employee_id = $1 AND clock_out_time IS NULL
+         RETURNING session_id`,
+        [userId]
+      );
+      if (tcResult.rows.length > 0 && tcResult.rows[0].session_id) {
+        await client.query(
+          `UPDATE worksheet_sessions SET status = 'pending_review', updated_at = NOW() WHERE id = $1`,
+          [tcResult.rows[0].session_id]
+        );
+      }
+
+      await client.query("COMMIT");
+
+      // Audit log — fire-and-forget outside the transaction
       const durMin = result.rows[0].duration_minutes;
       const durDesc = durMin != null ? ` after ${durMin} minutes` : "";
       pool.query(
@@ -131,24 +153,12 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
         [userId, `Clocked out${durDesc}`]
       ).catch((e: any) => console.error("[timeRoutes] audit log clock-out:", e.message));
 
-    // Update time_card and worksheet_session on clock-out
-    try {
-      const tcResult = await pool.query(
-        `UPDATE time_cards SET clock_out_time = NOW(), total_minutes = ROUND(EXTRACT(EPOCH FROM (NOW() - clock_in_time))/60) WHERE employee_id = $1 AND clock_out_time IS NULL RETURNING session_id`,
-        [userId]
-      );
-      if (tcResult.rows.length > 0 && tcResult.rows[0].session_id) {
-        await pool.query(
-          `UPDATE worksheet_sessions SET status = 'pending_review', updated_at = NOW() WHERE id = $1`,
-          [tcResult.rows[0].session_id]
-        );
-      }
-    } catch (wsErr: any) {
-      console.error('Failed to update time_card/worksheet_session on clock-out:', wsErr.message);
-    }
       return res.json(result.rows[0]);
     } catch (err: any) {
+      await client.query("ROLLBACK").catch(() => {});
       return res.status(500).json({ message: err.message });
+    } finally {
+      client.release();
     }
   });
 
@@ -702,6 +712,17 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
     }
 
     try {
+      // Verify the time_entry_id belongs to this user and is still active
+      if (time_entry_id) {
+        const { rows: check } = await pool.query(
+          `SELECT id FROM time_entries WHERE id = $1 AND user_id = $2 AND clock_out IS NULL LIMIT 1`,
+          [time_entry_id, userId]
+        );
+        if (!check.length) {
+          return res.status(403).json({ message: "time_entry_id is not an active entry for this user" });
+        }
+      }
+
       const result = await pool.query(
         `INSERT INTO gps_pings (user_id, time_entry_id, lat, lng, accuracy, recorded_at)
          VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id`,

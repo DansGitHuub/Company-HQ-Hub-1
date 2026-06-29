@@ -345,6 +345,12 @@ export function registerTaskRoutes(app: Express) {
       const { fieldName, fieldValue } = req.body;
       if (!fieldName) return res.status(400).json({ message: "Field name is required" });
 
+      // Guard against duplicate field names on the same task
+      const existing = await storage.getTaskCustomFields(req.params.id);
+      if (existing.some((f: any) => f.fieldName === fieldName)) {
+        return res.status(409).json({ message: `A custom field named "${fieldName}" already exists on this task` });
+      }
+
       const field = await storage.createTaskCustomField({
         taskId: req.params.id,
         fieldName,
