@@ -83,10 +83,10 @@ export function registerJobCrewRoutes(app: Express, requireAuth: any) {
           ? new Date(job.scheduled_date).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
           : "TBD";
         const address = [job.address, job.city, job.state].filter(Boolean).join(", ");
-        await sendEmail({
-          to: recipientEmail,
-          subject: `You've been assigned to a job: ${job.title}`,
-          html: `
+        await sendEmail(
+          recipientEmail,
+          `You've been assigned to a job: ${job.title}`,
+          `
             <div style="font-family:sans-serif;max-width:520px;margin:auto">
               <h2 style="color:#2d5a27">Job Assignment</h2>
               <p>Hi ${emp.first_name},</p>
@@ -101,7 +101,7 @@ export function registerJobCrewRoutes(app: Express, requireAuth: any) {
               <p style="color:#666;font-size:0.85em;margin-top:24px">Chapin Landscapes · CompanyHQ</p>
             </div>
           `,
-        }).catch(() => {}); // don't fail the request if email fails
+        ).catch(() => {}); // don't fail the request if email fails
       }
 
       return res.status(201).json(inserted.rows[0]);

@@ -45,10 +45,10 @@ async function sendJobStatusEmail(jobId: string, newStatus: string) {
       : null;
     const location = [row.address, row.city, row.state].filter(Boolean).join(", ");
 
-    await sendEmail({
-      to: row.customer_email,
-      subject: `${label} — ${row.title}`,
-      html: `
+    await sendEmail(
+      row.customer_email,
+      `${label} — ${row.title}`,
+      `
         <div style="font-family:sans-serif;max-width:560px;margin:auto;color:#222">
           <div style="background:#2d5a27;padding:20px 24px;border-radius:8px 8px 0 0">
             <h1 style="color:#fff;margin:0;font-size:20px">Chapin Landscapes</h1>
@@ -66,7 +66,7 @@ async function sendJobStatusEmail(jobId: string, newStatus: string) {
           </div>
         </div>
       `,
-    });
+    );
   } catch {
     // don't block the response if email fails
   }
