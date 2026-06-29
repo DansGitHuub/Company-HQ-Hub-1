@@ -337,6 +337,10 @@ export const candidates = pgTable("candidates", {
   offerAcceptanceSignature: text("offer_acceptance_signature"),
   grade: text("grade"),
   candidateStatus: text("candidate_status").notNull().default("Active"),
+  offerDeclinedAt: timestamp("offer_declined_at"),
+  offerDeclineReason: text("offer_decline_reason"),
+  offerCounterNote: text("offer_counter_note"),
+  offerCounterSubmittedAt: timestamp("offer_counter_submitted_at"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -348,6 +352,8 @@ export const insertCandidateSchema = createInsertSchema(candidates).omit({
   offerAcceptanceExpiresAt: true,
   offerAcceptedAt: true,
   offerAcceptanceSignature: true,
+  offerDeclinedAt: true,
+  offerCounterSubmittedAt: true,
   updatedAt: true,
 });
 

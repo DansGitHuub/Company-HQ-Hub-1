@@ -2,7 +2,7 @@ import type { Express, RequestHandler } from "express";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
 import { sendHiringStageEmail, sendHiringWelcomeEmail, sendNewHireAccountEmail, sendZoomInterviewEmail, sendInPersonInterviewEmail, sendHiredNotificationEmail } from "./email";
-import { getAppUrl, sendOfferAcceptanceEmail } from "./emailService";
+import { getAppUrl, sendOfferAcceptanceEmail, sendEmail } from "./emailService";
 import { hashPassword } from "./auth";
 import { createZoomMeeting, isZoomConfigured } from "./zoomService";
 import { sendInterviewSms, sendStageSms, sendHireSms, isSmsConfigured } from "./smsService";
@@ -1203,6 +1203,9 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
         role: candidate.role,
         alreadyAccepted: !!candidate.offerAcceptedAt,
         acceptedAt: candidate.offerAcceptedAt,
+        alreadyDeclined: !!candidate.offerDeclinedAt,
+        declinedAt: candidate.offerDeclinedAt,
+        alreadyCountered: !!(candidate as any).offerCounterSubmittedAt,
         offerLetterUrl: offerLetterDoc?.url || null,
         expiresAt: candidate.offerAcceptanceExpiresAt,
         offerPay: candidate.offerPay || null,
@@ -1218,7 +1221,7 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
     }
   });
 
-  // POST /api/offer/:token/accept — candidate digitally accepts offer → triggers full hire flow
+  // POST /api/offer/:token/accept — candidate digitally accepts offer → moves to "Offer Accepted" (admin converts later)
   app.post("/api/offer/:token/accept", async (req, res) => {
     try {
       const { token } = req.params;
@@ -1236,24 +1239,176 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
       if (candidate.offerAcceptedAt) {
         return res.status(409).json({ message: "Offer has already been accepted." });
       }
+      if (candidate.offerDeclinedAt) {
+        return res.status(409).json({ message: "This offer has already been declined." });
+      }
 
-      // Save signature and mark accepted
+      // Save signature, mark accepted, move to "Offer Accepted" stage
       await storage.updateCandidate(candidate.id, {
         offerAcceptedAt: now,
         offerAcceptanceSignature: signature || null,
+        stage: "Offer Accepted",
       } as any);
 
-      // Run the full hire flow
-      const result = await executeHireFlow(candidate.id);
+      // Notify all Admin/Manager users in-app
+      await notifyHRAndManagers(
+        "offer_accepted",
+        `Offer Accepted: ${candidate.name}`,
+        `${candidate.name} has accepted the offer for ${candidate.role || "the position"}. Ready for employee conversion.`,
+        "/hiring",
+        { candidateId: candidate.id, candidateName: candidate.name }
+      );
+
+      // Email admin users
+      try {
+        const { pool } = await import("./db");
+        const admins = await pool.query(
+          `SELECT email, name, username FROM users WHERE role IN ('Admin', 'Master Admin') AND email IS NOT NULL`
+        );
+        for (const row of admins.rows) {
+          try {
+            await sendEmail(
+              row.email,
+              `Offer Accepted — ${candidate.name}`,
+              `<p>Hi ${row.name || row.username},</p>
+<p><strong>${candidate.name}</strong> has accepted the offer for the <strong>${candidate.role || "open"}</strong> position.</p>
+<p>They are now in the <strong>Offer Accepted</strong> stage. Head to the Hiring Pipeline to convert them to an employee.</p>
+<p><a href="${getAppUrl()}/hiring">Open Hiring Pipeline →</a></p>
+<p>— Company HQ</p>`
+            );
+          } catch {}
+        }
+      } catch {}
 
       res.json({
         success: true,
-        message: "Offer accepted! Your account credentials have been sent to your email.",
-        username: result.username,
-        accountCreated: result.accountCreated,
+        message: "Offer accepted! The hiring team will be in touch shortly with your onboarding information.",
       });
     } catch (err: any) {
       console.error("[hiring] offer-accept error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // POST /api/offer/:token/decline — candidate declines offer
+  app.post("/api/offer/:token/decline", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { reason } = req.body;
+
+      const candidates = await storage.getCandidates();
+      const candidate = candidates.find((c: any) => c.offerAcceptanceToken === token);
+      if (!candidate) return res.status(404).json({ message: "Offer link not found or expired." });
+
+      if (candidate.offerAcceptedAt) {
+        return res.status(409).json({ message: "This offer has already been accepted." });
+      }
+      if (candidate.offerDeclinedAt) {
+        return res.status(409).json({ message: "This offer has already been declined." });
+      }
+
+      const now = new Date();
+      await storage.updateCandidate(candidate.id, {
+        offerDeclinedAt: now,
+        offerDeclineReason: reason || null,
+        stage: "Offer Declined",
+      } as any);
+
+      await notifyHRAndManagers(
+        "offer_declined",
+        `Offer Declined: ${candidate.name}`,
+        `${candidate.name} has declined the offer for ${candidate.role || "the position"}${reason ? `: "${reason}"` : "."}`,
+        "/hiring",
+        { candidateId: candidate.id, candidateName: candidate.name, reason }
+      );
+
+      try {
+        const { pool } = await import("./db");
+        const admins = await pool.query(
+          `SELECT email, name, username FROM users WHERE role IN ('Admin', 'Master Admin') AND email IS NOT NULL`
+        );
+        for (const row of admins.rows) {
+          try {
+            await sendEmail(
+              row.email,
+              `Offer Declined — ${candidate.name}`,
+              `<p>Hi ${row.name || row.username},</p>
+<p><strong>${candidate.name}</strong> has declined the offer for the <strong>${candidate.role || "open"}</strong> position.</p>
+${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ""}
+<p><a href="${getAppUrl()}/hiring">View in Hiring Pipeline →</a></p>
+<p>— Company HQ</p>`
+            );
+          } catch {}
+        }
+      } catch {}
+
+      res.json({ success: true, message: "Your response has been recorded." });
+    } catch (err: any) {
+      console.error("[hiring] offer-decline error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // POST /api/offer/:token/counter — candidate submits counter-proposal
+  app.post("/api/offer/:token/counter", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { note } = req.body;
+
+      if (!note || !note.trim()) {
+        return res.status(400).json({ message: "Please describe what you would like to discuss." });
+      }
+
+      const candidates = await storage.getCandidates();
+      const candidate = candidates.find((c: any) => c.offerAcceptanceToken === token);
+      if (!candidate) return res.status(404).json({ message: "Offer link not found or expired." });
+
+      if (candidate.offerAcceptedAt) {
+        return res.status(409).json({ message: "This offer has already been accepted." });
+      }
+      if (candidate.offerDeclinedAt) {
+        return res.status(409).json({ message: "This offer has already been declined." });
+      }
+
+      const now = new Date();
+      await storage.updateCandidate(candidate.id, {
+        offerCounterNote: note.trim(),
+        offerCounterSubmittedAt: now,
+        stage: "Negotiating",
+      } as any);
+
+      await notifyHRAndManagers(
+        "offer_counter",
+        `Counter-Proposal: ${candidate.name}`,
+        `${candidate.name} submitted a counter-proposal for ${candidate.role || "the position"}: "${note.trim()}"`,
+        "/hiring",
+        { candidateId: candidate.id, candidateName: candidate.name, counterNote: note.trim() }
+      );
+
+      try {
+        const { pool } = await import("./db");
+        const admins = await pool.query(
+          `SELECT email, name, username FROM users WHERE role IN ('Admin', 'Master Admin') AND email IS NOT NULL`
+        );
+        for (const row of admins.rows) {
+          try {
+            await sendEmail(
+              row.email,
+              `Counter-Proposal — ${candidate.name}`,
+              `<p>Hi ${row.name || row.username},</p>
+<p><strong>${candidate.name}</strong> submitted a counter-proposal for the <strong>${candidate.role || "open"}</strong> position.</p>
+<p><strong>Their request:</strong> ${note.trim()}</p>
+<p>You can re-extend a revised offer from the Hiring Pipeline.</p>
+<p><a href="${getAppUrl()}/hiring">Open Hiring Pipeline →</a></p>
+<p>— Company HQ</p>`
+            );
+          } catch {}
+        }
+      } catch {}
+
+      res.json({ success: true, message: "Your request has been received." });
+    } catch (err: any) {
+      console.error("[hiring] offer-counter error:", err);
       res.status(500).json({ message: err.message });
     }
   });

@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Loader2, CheckCircle2, FileText, AlertCircle, XCircle, ArrowRight,
-  DollarSign, CalendarDays, Clock, Briefcase, Shield, StickyNote
+  Loader2, CheckCircle2, FileText, AlertCircle, XCircle, ThumbsDown, MessageSquare,
+  DollarSign, CalendarDays, Clock, Briefcase, Shield, StickyNote, ChevronDown, ChevronUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import SignaturePad from "@/components/forms/SignaturePad";
 
 interface OfferDetails {
@@ -16,6 +17,9 @@ interface OfferDetails {
   role: string;
   alreadyAccepted: boolean;
   acceptedAt?: string;
+  alreadyDeclined?: boolean;
+  declinedAt?: string;
+  alreadyCountered?: boolean;
   offerLetterUrl?: string | null;
   expiresAt?: string;
   offerPay?: string | null;
@@ -57,8 +61,18 @@ export default function OfferAcceptancePage() {
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [accepted, setAccepted] = useState(false);
-  const [acceptResult, setAcceptResult] = useState<{ username?: string; accountCreated?: boolean } | null>(null);
-  const [countdown, setCountdown] = useState(10);
+
+  // Decline flow
+  const [showDecline, setShowDecline] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
+  const [decliningOffer, setDecliningOffer] = useState(false);
+  const [declined, setDeclined] = useState(false);
+
+  // Counter-proposal flow
+  const [showCounter, setShowCounter] = useState(false);
+  const [counterNote, setCounterNote] = useState("");
+  const [submittingCounter, setSubmittingCounter] = useState(false);
+  const [countered, setCountered] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -72,17 +86,12 @@ export default function OfferAcceptancePage() {
         if (!res.ok) throw new Error(data.message || "Failed to load offer.");
         setOffer(data);
         if (data.alreadyAccepted) setAccepted(true);
+        if (data.alreadyDeclined) setDeclined(true);
+        if (data.alreadyCountered) setCountered(true);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [token]);
-
-  useEffect(() => {
-    if (!accepted) return;
-    if (countdown <= 0) { window.location.href = "/auth"; return; }
-    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [accepted, countdown]);
 
   const handleSignatureChange = useCallback((dataUrl: string) => {
     setSignature(dataUrl);
@@ -100,12 +109,48 @@ export default function OfferAcceptancePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to accept offer.");
-      setAcceptResult(data);
       setAccepted(true);
     } catch (err: any) {
       alert(err.message || "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleDecline() {
+    setDecliningOffer(true);
+    try {
+      const res = await fetch(`/api/offer/${token}/decline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: declineReason.trim() || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to submit response.");
+      setDeclined(true);
+    } catch (err: any) {
+      alert(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setDecliningOffer(false);
+    }
+  }
+
+  async function handleCounter() {
+    if (!counterNote.trim()) { alert("Please describe what you'd like to discuss or change."); return; }
+    setSubmittingCounter(true);
+    try {
+      const res = await fetch(`/api/offer/${token}/counter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: counterNote.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to submit request.");
+      setCountered(true);
+    } catch (err: any) {
+      alert(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setSubmittingCounter(false);
     }
   }
 
@@ -137,6 +182,48 @@ export default function OfferAcceptancePage() {
 
   if (!offer) return null;
 
+  if (declined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
+        <Card className="max-w-lg w-full shadow-xl">
+          <CardContent className="pt-10 pb-10 text-center space-y-5">
+            <div className="mx-auto w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center">
+              <ThumbsDown className="h-10 w-10 text-gray-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Response Recorded</h2>
+            <p className="text-gray-600 leading-relaxed">
+              Thank you for letting us know, <strong>{offer.name}</strong>. We've received your decision and wish you all the best.
+            </p>
+            <p className="text-sm text-gray-500">
+              If you change your mind or have any questions, please reach out to Chapin Landscapes directly.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (countered) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-amber-100 p-4">
+        <Card className="max-w-lg w-full shadow-xl">
+          <CardContent className="pt-10 pb-10 text-center space-y-5">
+            <div className="mx-auto w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center">
+              <MessageSquare className="h-10 w-10 text-amber-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Request Received</h2>
+            <p className="text-gray-600 leading-relaxed">
+              Thanks, <strong>{offer.name}</strong>! Your request has been sent to the Chapin Landscapes team. Someone will follow up with you shortly.
+            </p>
+            <p className="text-sm text-gray-500">
+              Please check your email for a response within 1–2 business days.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (accepted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 p-4">
@@ -147,32 +234,19 @@ export default function OfferAcceptancePage() {
             </div>
             <h2 className="text-2xl font-bold text-gray-900">Offer Accepted!</h2>
             <p className="text-gray-600 text-base leading-relaxed">
-              Congratulations, <strong>{offer.name}</strong>! Your offer for{" "}
-              <strong>{offer.role}</strong> at Chapin Landscapes has been accepted and recorded.
+              Congratulations, <strong>{offer.name}</strong>! Your acceptance for the{" "}
+              <strong>{offer.role}</strong> position at Chapin Landscapes has been recorded.
             </p>
             {offer.alreadyAccepted && offer.acceptedAt ? (
               <p className="text-sm text-gray-500">
                 Accepted on {new Date(offer.acceptedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
               </p>
             ) : (
-              acceptResult?.accountCreated && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left space-y-1">
-                  <p className="font-semibold text-green-800 text-sm">Your Account is Ready</p>
-                  <p className="text-sm text-green-700">Your login credentials have been sent to your email. Keep them safe!</p>
-                  {acceptResult.username && (
-                    <p className="text-sm text-green-700">Username: <strong>{acceptResult.username}</strong></p>
-                  )}
-                </div>
-              )
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left space-y-1">
+                <p className="font-semibold text-green-800 text-sm">What happens next?</p>
+                <p className="text-sm text-green-700">The team has been notified and will reach out with your onboarding details and login credentials by email before your start date.</p>
+              </div>
             )}
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-sm text-gray-600">
-                Redirecting to login in <span className="font-bold text-green-700">{countdown}</span> seconds…
-              </p>
-            </div>
-            <Button className="w-full bg-green-700 hover:bg-green-800 text-white" onClick={() => (window.location.href = "/auth")} data-testid="button-go-to-login">
-              Go to Login <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -219,7 +293,6 @@ export default function OfferAcceptancePage() {
 
           {hasOfferDetails && (
             <CardContent className="pt-5 pb-6 space-y-5">
-              {/* Pay & Employment grid */}
               {(payFormatted || startDateFormatted || offer.offerEmploymentType || offer.offerSchedule) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {payFormatted && (
@@ -269,7 +342,6 @@ export default function OfferAcceptancePage() {
                 </div>
               )}
 
-              {/* Benefits */}
               {offer.offerBenefits && offer.offerBenefits.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
@@ -286,7 +358,6 @@ export default function OfferAcceptancePage() {
                 </div>
               )}
 
-              {/* Notes */}
               {offer.offerNotes && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
@@ -307,7 +378,7 @@ export default function OfferAcceptancePage() {
           <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-blue-800">
             By accepting this offer, you are confirming your intent to join Chapin Landscapes as a{" "}
-            <strong>{offer.role}</strong>. You will receive your login credentials and onboarding information via email immediately after accepting.
+            <strong>{offer.role}</strong>. Your onboarding information and login credentials will be sent to your email before your start date.
           </p>
         </div>
 
@@ -369,6 +440,121 @@ export default function OfferAcceptancePage() {
             <p className="text-xs text-center text-gray-500">
               Clicking "I Accept This Offer" constitutes a legally binding digital signature. A record of your acceptance is stored securely.
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Decline section */}
+        <Card className="shadow-lg border-gray-200">
+          <CardContent className="pt-5 pb-5">
+            <button
+              className="w-full flex items-center justify-between text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+              onClick={() => { setShowDecline(v => !v); setShowCounter(false); }}
+              data-testid="button-toggle-decline"
+            >
+              <span className="flex items-center gap-2">
+                <ThumbsDown className="h-4 w-4" />
+                Decline This Offer
+              </span>
+              {showDecline ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+
+            {showDecline && (
+              <div className="mt-4 space-y-4 border-t pt-4">
+                <p className="text-sm text-gray-600">
+                  We're sorry to hear that. You can optionally share why you're declining — this helps the team.
+                </p>
+                <div>
+                  <Label htmlFor="decline-reason" className="text-sm">Reason (optional)</Label>
+                  <Textarea
+                    id="decline-reason"
+                    value={declineReason}
+                    onChange={e => setDeclineReason(e.target.value)}
+                    placeholder="e.g. Accepted another offer, compensation doesn't fit my needs, etc."
+                    rows={3}
+                    className="mt-1.5 text-sm"
+                    data-testid="textarea-decline-reason"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowDecline(false)}
+                    disabled={decliningOffer}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={handleDecline}
+                    disabled={decliningOffer}
+                    data-testid="button-confirm-decline"
+                  >
+                    {decliningOffer
+                      ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting…</>
+                      : "Confirm Decline"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Counter-proposal section */}
+        <Card className="shadow-lg border-gray-200">
+          <CardContent className="pt-5 pb-5">
+            <button
+              className="w-full flex items-center justify-between text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+              onClick={() => { setShowCounter(v => !v); setShowDecline(false); }}
+              data-testid="button-toggle-counter"
+            >
+              <span className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Request Changes / Negotiate
+              </span>
+              {showCounter ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+
+            {showCounter && (
+              <div className="mt-4 space-y-4 border-t pt-4">
+                <p className="text-sm text-gray-600">
+                  Interested but want to discuss the terms? Describe what you'd like to change and the team will follow up with you.
+                </p>
+                <div>
+                  <Label htmlFor="counter-note" className="text-sm">Your request <span className="text-red-500">*</span></Label>
+                  <Textarea
+                    id="counter-note"
+                    value={counterNote}
+                    onChange={e => setCounterNote(e.target.value)}
+                    placeholder="e.g. I'd like to discuss the pay rate, start date, or schedule…"
+                    rows={4}
+                    className="mt-1.5 text-sm"
+                    data-testid="textarea-counter-note"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowCounter(false)}
+                    disabled={submittingCounter}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-white"
+                    onClick={handleCounter}
+                    disabled={submittingCounter || !counterNote.trim()}
+                    data-testid="button-submit-counter"
+                  >
+                    {submittingCounter
+                      ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending…</>
+                      : "Send Request"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

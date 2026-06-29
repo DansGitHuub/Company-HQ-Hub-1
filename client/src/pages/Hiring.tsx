@@ -35,7 +35,10 @@ const STAGES = [
   "1st Interview",
   "2nd Interview",
   "Offer Extended",
+  "Negotiating",
+  "Offer Accepted",
   "Hired",
+  "Offer Declined",
   "Declined / Not a Fit",
 ] as const;
 
@@ -45,7 +48,10 @@ const STAGE_COLORS: Record<string, string> = {
   "1st Interview": "bg-amber-500",
   "2nd Interview": "bg-orange-500",
   "Offer Extended": "bg-emerald-500",
+  "Negotiating": "bg-amber-500",
+  "Offer Accepted": "bg-green-500",
   "Hired": "bg-green-600",
+  "Offer Declined": "bg-red-500",
   "Declined / Not a Fit": "bg-gray-400",
 };
 
@@ -95,6 +101,10 @@ export default function Hiring() {
   const [hireStartDate, setHireStartDate] = useState("");
   const [hiring, setHiring] = useState(false);
   const [hireResult, setHireResult] = useState<any>(null);
+  const [pendingConvert, setPendingConvert] = useState<{ candidateId: string; candidate: Candidate } | null>(null);
+  const [convertForm, setConvertForm] = useState({ startDate: "", employmentType: "Full-time", status: "Active", department: "" });
+  const [converting, setConverting] = useState(false);
+  const [convertResult, setConvertResult] = useState<any>(null);
   const [pendingStageChange, setPendingStageChange] = useState<{ candidateId: string; candidate: Candidate; newStage: string } | null>(null);
   const [stageConfirmSend, setStageConfirmSend] = useState(true);
   const [sendInterviewEmail, setSendInterviewEmail] = useState(true);
@@ -258,6 +268,25 @@ export default function Hiring() {
     }
   }
 
+  async function handleConvertConfirm() {
+    if (!pendingConvert) return;
+    setConverting(true);
+    try {
+      const res = await apiRequest("POST", `/api/candidates/${pendingConvert.candidateId}/hire`, {
+        startDate: convertForm.startDate || undefined,
+        sendNotification: true,
+      });
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
+      setConvertResult(data);
+    } catch (err: any) {
+      toast({ title: "Conversion failed", description: err.message || "Something went wrong", variant: "destructive" });
+      setConverting(false);
+    } finally {
+      setConverting(false);
+    }
+  }
+
   const filteredCandidates = sourceFilter === "all"
     ? candidates
     : candidates.filter(c => c.source === sourceFilter);
@@ -267,7 +296,7 @@ export default function Hiring() {
     return acc;
   }, {});
 
-  const visibleStages = STAGES.filter(s => s !== "Declined / Not a Fit" || showDeclined);
+  const visibleStages = STAGES.filter(s => (s !== "Declined / Not a Fit" && s !== "Offer Declined") || showDeclined);
 
   const isAdmin = user?.role === "Admin" || user?.role === "Master Admin";
 
@@ -410,9 +439,9 @@ export default function Hiring() {
               data-testid="button-toggle-declined"
             >
               {showDeclined ? "Hide Declined" : "Show Declined"}
-              {!showDeclined && candidatesByStage["Declined / Not a Fit"]?.length > 0 && (
+              {!showDeclined && ((candidatesByStage["Declined / Not a Fit"]?.length || 0) + (candidatesByStage["Offer Declined"]?.length || 0)) > 0 && (
                 <Badge variant="secondary" className="ml-1.5 text-xs h-4 px-1">
-                  {candidatesByStage["Declined / Not a Fit"].length}
+                  {(candidatesByStage["Declined / Not a Fit"]?.length || 0) + (candidatesByStage["Offer Declined"]?.length || 0)}
                 </Badge>
               )}
             </Button>
@@ -494,6 +523,38 @@ export default function Hiring() {
                                   {(candidate as any).hasOfferLetter && (
                                     <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-1.5 font-medium">
                                       <FileCheck className="h-3 w-3" /> Offer Letter Attached
+                                    </div>
+                                  )}
+                                  {/* Counter-proposal note on Negotiating cards */}
+                                  {stage === "Negotiating" && (candidate as any).offerCounterNote && (
+                                    <div className="mt-2 pt-2 border-t border-border">
+                                      <p className="text-[10px] text-amber-700 font-semibold uppercase tracking-wide mb-0.5">Counter Proposal</p>
+                                      <p className="text-xs text-gray-600 line-clamp-2">{(candidate as any).offerCounterNote}</p>
+                                    </div>
+                                  )}
+                                  {/* Offer Accepted badge + Convert button */}
+                                  {stage === "Offer Accepted" && (
+                                    <div className="mt-2 pt-2 border-t border-border space-y-1.5">
+                                      <div className="flex items-center gap-1.5 text-xs text-green-700 font-medium">
+                                        <CheckCircle2 className="h-3 w-3" /> Offer Accepted
+                                      </div>
+                                      <button
+                                        className="w-full text-xs bg-green-600 hover:bg-green-700 text-white rounded px-2 py-1 font-medium transition-colors flex items-center justify-center gap-1"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setPendingConvert({ candidateId: candidate.id, candidate });
+                                          setConvertForm({
+                                            startDate: (candidate as any).offerStartDate || "",
+                                            employmentType: (candidate as any).offerEmploymentType || "Full-time",
+                                            status: "Active",
+                                            department: "",
+                                          });
+                                          setConvertResult(null);
+                                        }}
+                                        data-testid={`button-convert-${candidate.id}`}
+                                      >
+                                        <UserCheck className="h-3 w-3" /> Convert to Employee
+                                      </button>
                                     </div>
                                   )}
                                   {/* Interview details on card */}
@@ -814,6 +875,118 @@ export default function Hiring() {
               </>
             ) : (
               <Button onClick={() => { setPendingHire(null); setHireResult(null); }} data-testid="button-hire-done">Done</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Convert to Employee Modal */}
+      <Dialog open={!!pendingConvert} onOpenChange={(open) => { if (!open && !converting && !convertResult) { setPendingConvert(null); setConvertResult(null); } }}>
+        <DialogContent className="max-w-lg" data-testid="dialog-convert-candidate">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-green-600" />
+              Convert to Employee
+            </DialogTitle>
+            {pendingConvert && !convertResult && (
+              <DialogDescription>
+                Creating an employee record for <strong>{pendingConvert.candidate.name}</strong>. Review the details below before confirming.
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          {!convertResult ? (
+            <div className="space-y-4 py-2">
+              {/* Preview of candidate info being carried over */}
+              <div className="bg-muted/40 rounded-lg p-4 space-y-2 text-sm border">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Carrying over from application</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                  <div><span className="text-muted-foreground">Name: </span><span className="font-medium">{pendingConvert?.candidate.name}</span></div>
+                  <div><span className="text-muted-foreground">Role: </span><span className="font-medium">{pendingConvert?.candidate.role || "—"}</span></div>
+                  {(pendingConvert?.candidate as any)?.email && (
+                    <div className="col-span-2"><span className="text-muted-foreground">Email: </span><span className="font-medium">{(pendingConvert?.candidate as any).email}</span></div>
+                  )}
+                  {(pendingConvert?.candidate as any)?.offerPay && (
+                    <div><span className="text-muted-foreground">Pay: </span><span className="font-medium">${(pendingConvert?.candidate as any).offerPay}/{(pendingConvert?.candidate as any).offerPayType === "Salary" ? "yr" : "hr"}</span></div>
+                  )}
+                </div>
+              </div>
+
+              {/* Editable fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Start Date</Label>
+                  <Input
+                    type="date"
+                    value={convertForm.startDate}
+                    onChange={e => setConvertForm(f => ({ ...f, startDate: e.target.value }))}
+                    data-testid="input-convert-start-date"
+                  />
+                  <p className="text-[10px] text-muted-foreground">Pre-filled from offer letter</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Employment Type</Label>
+                  <Select value={convertForm.employmentType} onValueChange={v => setConvertForm(f => ({ ...f, employmentType: v }))}>
+                    <SelectTrigger data-testid="select-convert-employment-type"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Full-time">Full-time</SelectItem>
+                      <SelectItem value="Part-time">Part-time</SelectItem>
+                      <SelectItem value="Seasonal">Seasonal</SelectItem>
+                      <SelectItem value="Contractor">Contractor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Initial Status</Label>
+                  <Select value={convertForm.status} onValueChange={v => setConvertForm(f => ({ ...f, status: v }))}>
+                    <SelectTrigger data-testid="select-convert-status"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="On Leave">On Leave</SelectItem>
+                      <SelectItem value="Seasonal Off">Seasonal Off</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Department (optional)</Label>
+                  <Input
+                    value={convertForm.department}
+                    onChange={e => setConvertForm(f => ({ ...f, department: e.target.value }))}
+                    placeholder="e.g. Field Crew, Office"
+                    data-testid="input-convert-department"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-700">
+                This will create an employee record, generate the onboarding checklist (I-9, W-4, NDA, etc.), and create a Crew login. A welcome email will be sent to the employee.
+              </div>
+            </div>
+          ) : (
+            <div className="py-4 space-y-3">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-2">
+                <p className="font-semibold text-emerald-800 flex items-center gap-2"><CheckCircle2 className="h-5 w-5" /> Employee record created!</p>
+                {convertResult.accountCreated && (
+                  <p className="text-sm text-emerald-700">Crew account created — username: <strong>{convertResult.username}</strong></p>
+                )}
+                {convertResult.emailSent && (
+                  <p className="text-sm text-emerald-700">Welcome email sent to employee.</p>
+                )}
+                <p className="text-sm text-emerald-700">{convertResult.onboardingItems} onboarding checklist items created.</p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            {!convertResult ? (
+              <>
+                <Button variant="outline" onClick={() => setPendingConvert(null)} disabled={converting}>Cancel</Button>
+                <Button onClick={handleConvertConfirm} disabled={converting} className="bg-green-600 hover:bg-green-700" data-testid="button-confirm-convert">
+                  {converting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating Employee…</> : <><UserCheck className="h-4 w-4 mr-2" />Create Employee Record</>}
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => { setPendingConvert(null); setConvertResult(null); }} data-testid="button-convert-done">Done</Button>
             )}
           </DialogFooter>
         </DialogContent>

@@ -3,3 +3,4 @@
 - [Phase 3 DB pattern](phase3-pattern.md) — All Phase 3 tables use raw SQL migrations registered in server/index.ts; route files import pool directly.
 - [Job detail tabs](job-detail-tabs.md) — show.tsx tab architecture: which tabs exist, which are admin-only, pattern for adding new feature tabs.
 - [Vite React dedupe fix](vite-react-dedupe-fix.md) — how to fix "Cannot read properties of null (reading 'useEffect')" duplicate-React crash; what to change in vite.config.ts and server/vite.ts.
+- [Offer accept behavior](offer-accept-behavior.md) — POST /api/offer/:token/accept no longer auto-hires; sets stage to "Offer Accepted" and notifies admin. Admin must explicitly click "Convert to Employee" to call /api/candidates/:id/hire.
