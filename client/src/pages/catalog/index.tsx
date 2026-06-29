@@ -22,6 +22,9 @@ type CatalogRow = {
   units: string | null;
   cost: string | null;
   markupPct: string | null;
+  effective_markup_pct?: number | null;
+  markup_source?: "item" | "class" | null;
+  sell_price?: number | null;
   taxable: boolean | null;
   description: string | null;
   sku: string | null;
@@ -150,8 +153,9 @@ export default function CatalogPage() {
         ["Item #", "Name", "Class", "Category", "Units", "Cost", "Markup %", "Sell Price", "Taxable", "SKU", "Tags", "Active"].join(","),
         ...filtered.map(item => {
           const c = item.cost != null ? parseFloat(item.cost) : NaN;
-          const m = item.markupPct != null ? parseFloat(item.markupPct) : 0;
-          const sellPrice = !isNaN(c) ? (c * (1 + m / 100)).toFixed(2) : "";
+          const effectiveMarkup = item.effective_markup_pct ?? (item.markupPct != null ? parseFloat(item.markupPct) : 0);
+          const sellPrice = item.sell_price != null ? item.sell_price.toFixed(2)
+            : (!isNaN(c) ? (c * (1 + effectiveMarkup / 100)).toFixed(2) : "");
           return [
             item.itemNumber,
             `"${(item.name ?? "").replace(/"/g, '""')}"`,
@@ -159,7 +163,7 @@ export default function CatalogPage() {
             item.category ?? "",
             item.units ?? "",
             item.cost ?? "",
-            m.toFixed(2),
+            effectiveMarkup.toFixed(2),
             sellPrice,
             item.taxable ? "TRUE" : "FALSE",
             item.sku ?? "",
@@ -188,8 +192,9 @@ export default function CatalogPage() {
   }
 
   function fmtSellPrice(item: CatalogRow) {
+    if (item.sell_price != null) return `$${item.sell_price.toFixed(2)}`;
     const c = item.cost != null ? parseFloat(item.cost) : NaN;
-    const m = item.markupPct != null ? parseFloat(item.markupPct) : 0;
+    const m = item.effective_markup_pct ?? (item.markupPct != null ? parseFloat(item.markupPct) : 0);
     if (isNaN(c)) return "—";
     return `$${(c * (1 + m / 100)).toFixed(2)}`;
   }
@@ -355,9 +360,16 @@ export default function CatalogPage() {
                     {fmtCost(item)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-muted-foreground" data-testid={`text-markup-${item.id}`}>
-                    {item.markupPct != null && parseFloat(item.markupPct) !== 0
+                    {item.effective_markup_pct != null && item.effective_markup_pct !== 0 ? (
+                      <span title={item.markup_source === "class" ? "From class default" : "Per-item markup"}>
+                        {item.effective_markup_pct.toFixed(1)}%
+                        {item.markup_source === "class" && (
+                          <span className="ml-1 text-[10px] text-muted-foreground/60">cls</span>
+                        )}
+                      </span>
+                    ) : (item.markupPct != null && parseFloat(item.markupPct) !== 0
                       ? `${parseFloat(item.markupPct).toFixed(1)}%`
-                      : "—"}
+                      : "—")}
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-green-700 dark:text-green-400 font-medium" data-testid={`text-sellprice-${item.id}`}>
                     {fmtSellPrice(item)}

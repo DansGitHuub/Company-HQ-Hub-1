@@ -204,10 +204,11 @@ export function registerEstimateRoutes(app: Express) {
         for (let iIdx = 0; iIdx < (area.line_items || []).length; iIdx++) {
           const item = area.line_items[iIdx];
           await client.query(
-            `INSERT INTO estimate_line_items (estimate_work_area_id, item_type, description, quantity, unit, unit_price, amount, sort_order, is_optional, image_url, image_hidden, class_id, catalog_item_id)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+            `INSERT INTO estimate_line_items (estimate_work_area_id, item_type, description, quantity, unit, unit_price, amount, sort_order, is_optional, image_url, image_hidden, class_id, catalog_item_id, markup_pct)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
             [areaId, item.item_type || "service", item.description, item.quantity ?? 1, item.unit || null,
-             item.unit_price ?? 0, item.amount ?? 0, iIdx, item.is_optional ?? false, item.image_url || null, item.image_hidden ?? false, item.class_id ?? null, item.catalog_item_id ?? null]
+             item.unit_price ?? 0, item.amount ?? 0, iIdx, item.is_optional ?? false, item.image_url || null, item.image_hidden ?? false, item.class_id ?? null, item.catalog_item_id ?? null,
+             item.markup_pct != null ? item.markup_pct : null]
           );
         }
       }
@@ -324,10 +325,11 @@ export function registerEstimateRoutes(app: Express) {
           for (let iIdx = 0; iIdx < (area.line_items || []).length; iIdx++) {
             const item = area.line_items[iIdx];
             await client.query(
-              `INSERT INTO estimate_line_items (estimate_work_area_id, item_type, description, quantity, unit, unit_price, amount, sort_order, is_optional, image_url, image_hidden, class_id, catalog_item_id)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+              `INSERT INTO estimate_line_items (estimate_work_area_id, item_type, description, quantity, unit, unit_price, amount, sort_order, is_optional, image_url, image_hidden, class_id, catalog_item_id, markup_pct)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
               [areaId, item.item_type || "service", item.description, item.quantity ?? 1, item.unit || null,
-               item.unit_price ?? 0, item.amount ?? 0, iIdx, item.is_optional ?? false, item.image_url || null, item.image_hidden ?? false, item.class_id ?? null, item.catalog_item_id ?? null]
+               item.unit_price ?? 0, item.amount ?? 0, iIdx, item.is_optional ?? false, item.image_url || null, item.image_hidden ?? false, item.class_id ?? null, item.catalog_item_id ?? null,
+               item.markup_pct != null ? item.markup_pct : null]
             );
           }
         }

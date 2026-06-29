@@ -939,18 +939,37 @@ export default function CatalogDetail() {
                 />
               </div>
 
-              {/* Sell Price */}
+              {/* Effective Markup + Sell Price */}
               {(() => {
-                const markupNum = parseFloat((form.markupPct as string) ?? "0") || 0;
-                const sellPrice = costNum * (1 + markupNum / 100);
-                return markupNum > 0 ? (
-                  <div className="flex justify-between items-center rounded-md bg-green-50 dark:bg-green-950/30 px-3 py-2">
-                    <span className="text-xs font-medium text-green-800 dark:text-green-300">Sell Price</span>
-                    <span className="text-sm font-bold text-green-700 dark:text-green-400" data-testid="pricing-sell-price">
-                      ${fmt(sellPrice)}
-                    </span>
+                const ownMarkup = parseFloat((form.markupPct as string) ?? "0") || 0;
+                let effectiveMarkup = ownMarkup;
+                let fromClassDefault = false;
+                if (ownMarkup === 0 && classDefaults) {
+                  const oh = parseFloat(classDefaults.overhead_pct) || 0;
+                  const pm = parseFloat(classDefaults.profit_margin_pct) || 0;
+                  effectiveMarkup = Math.round(((1 + oh) * (1 + pm) - 1) * 10000) / 100;
+                  fromClassDefault = true;
+                }
+                if (costNum <= 0 && effectiveMarkup === 0) return null;
+                const sellPrice = costNum * (1 + effectiveMarkup / 100);
+                return (
+                  <div className="space-y-1.5">
+                    {fromClassDefault && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Using <strong>{form.class}</strong> class default ({effectiveMarkup.toFixed(1)}% combined)
+                      </p>
+                    )}
+                    <div className="flex justify-between items-center rounded-md bg-green-50 dark:bg-green-950/30 px-3 py-2">
+                      <span className="text-xs font-medium text-green-800 dark:text-green-300">
+                        Sell Price
+                        {fromClassDefault && <span className="ml-1 text-[10px] opacity-70">(class default)</span>}
+                      </span>
+                      <span className="text-sm font-bold text-green-700 dark:text-green-400" data-testid="pricing-sell-price">
+                        ${fmt(sellPrice)}
+                      </span>
+                    </div>
                   </div>
-                ) : null;
+                );
               })()}
 
               {/* Taxable toggle */}

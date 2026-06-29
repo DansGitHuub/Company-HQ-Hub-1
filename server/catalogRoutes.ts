@@ -89,8 +89,52 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
     await pool.query(`ALTER TABLE estimate_line_items ADD COLUMN IF NOT EXISTS image_url TEXT`);
     await pool.query(`ALTER TABLE estimate_line_items ADD COLUMN IF NOT EXISTS image_hidden BOOLEAN DEFAULT FALSE`);
     await pool.query(`ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS markup_pct NUMERIC(5,2) DEFAULT 0`);
+    await pool.query(`ALTER TABLE estimate_line_items ADD COLUMN IF NOT EXISTS markup_pct NUMERIC(5,2) DEFAULT NULL`);
     console.log("[migration] Catalog tables ready");
   })();
+
+  // ── Helper: fetch class pricing defaults for current year ───────────────────
+  async function getClassPricingMap(): Promise<Record<string, { overhead_pct: number; profit_margin_pct: number }>> {
+    try {
+      const { rows } = await pool.query(
+        `SELECT cpd.overhead_pct, cpd.profit_margin_pct, cc.name AS class_name
+         FROM class_pricing_defaults cpd
+         JOIN class_codes cc ON cc.id = cpd.class_id
+         WHERE cpd.year = DATE_PART('year', NOW())`
+      );
+      const byClass: Record<string, { overhead_pct: number; profit_margin_pct: number }> = {};
+      for (const r of rows) {
+        byClass[r.class_name] = {
+          overhead_pct: parseFloat(r.overhead_pct) || 0,
+          profit_margin_pct: parseFloat(r.profit_margin_pct) || 0,
+        };
+      }
+      return byClass;
+    } catch {
+      return {};
+    }
+  }
+
+  function applyEffectiveMarkup(
+    item: Record<string, any>,
+    classPricingMap: Record<string, { overhead_pct: number; profit_margin_pct: number }>
+  ): Record<string, any> {
+    const ownMarkup = parseFloat(item.markup_pct ?? "0") || 0;
+    let effectiveMarkupPct: number;
+    let markupSource: "item" | "class" = "item";
+    if (ownMarkup > 0) {
+      effectiveMarkupPct = ownMarkup;
+    } else {
+      markupSource = "class";
+      const defaults = classPricingMap[item.class ?? ""] ?? { overhead_pct: 0, profit_margin_pct: 0 };
+      effectiveMarkupPct = Math.round(
+        ((1 + defaults.overhead_pct) * (1 + defaults.profit_margin_pct) - 1) * 10000
+      ) / 100;
+    }
+    const cost = parseFloat(item.cost ?? "0") || 0;
+    const sell_price = cost > 0 ? Math.round(cost * (1 + effectiveMarkupPct / 100) * 100) / 100 : 0;
+    return { ...item, effective_markup_pct: effectiveMarkupPct, markup_source: markupSource, sell_price };
+  }
 
   // GET /api/catalog
   app.get("/api/catalog", requireAuth, async (req, res) => {
@@ -118,7 +162,8 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
       }
       q += ` ORDER BY ci.item_number`;
       const result = await pool.query(q, params);
-      res.json(result.rows);
+      const classPricingMap = await getClassPricingMap();
+      res.json(result.rows.map(item => applyEffectiveMarkup(item, classPricingMap)));
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -187,7 +232,8 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
     try {
       const item = await getItemWithTags(parseInt(req.params.id));
       if (!item) return res.status(404).json({ message: "Not found" });
-      res.json(item);
+      const classPricingMap = await getClassPricingMap();
+      res.json(applyEffectiveMarkup(item, classPricingMap));
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

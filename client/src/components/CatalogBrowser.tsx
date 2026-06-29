@@ -16,6 +16,9 @@ export interface CatalogItem {
   units: string | null;
   cost: string | null;
   markupPct: string | null;
+  effective_markup_pct?: number | null;
+  markup_source?: "item" | "class" | null;
+  sell_price?: number | null;
   taxable: boolean | null;
   description: string | null;
   sku: string | null;

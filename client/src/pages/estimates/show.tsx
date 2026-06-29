@@ -37,6 +37,7 @@ interface LineItemDetail {
   id: string; item_type: string; description: string;
   quantity: string; unit: string; unit_price: string; amount: string; is_optional: boolean;
   image_url?: string | null; image_hidden?: boolean | null;
+  markup_pct?: string | null;
 }
 interface WorkAreaDetail {
   id: string; name: string; sort_order: number;
@@ -92,6 +93,7 @@ interface LocalLineItem {
   is_optional: boolean;
   image_url?: string | null;
   image_hidden?: boolean | null;
+  markup_pct?: string | null;
 }
 interface LocalWorkArea {
   key: string;
@@ -164,6 +166,7 @@ export default function EstimateDetail() {
           is_optional: li.is_optional,
           image_url: li.image_url ?? null,
           image_hidden: li.image_hidden ?? false,
+          markup_pct: li.markup_pct != null ? String(li.markup_pct) : null,
         })),
       }))
     );
@@ -272,6 +275,7 @@ export default function EstimateDetail() {
             unit_price:  parseFloat(li.unit_price) || 0,
             amount:      parseFloat(li.amount)     || 0,
             is_optional: li.is_optional,
+            markup_pct:  li.markup_pct != null ? parseFloat(li.markup_pct) : null,
           })),
         })),
       };
@@ -804,7 +808,14 @@ export default function EstimateDetail() {
                                           <span className="text-sm">{li.description}{li.is_optional && <Badge variant="outline" className="ml-2 text-[10px] py-0">Optional</Badge>}</span>
                                           <span className="text-right tabular-nums">{li.quantity}</span>
                                           <span className="text-muted-foreground text-xs">{li.unit || "—"}</span>
-                                          <span className="text-right tabular-nums">{fmtMoney(li.unit_price)}</span>
+                                          <span className="text-right tabular-nums">
+                                            {fmtMoney(li.unit_price)}
+                                            {li.markup_pct != null && parseFloat(String(li.markup_pct)) > 0 && (
+                                              <span className="block text-[10px] text-muted-foreground/70 font-normal tabular-nums">
+                                                +{parseFloat(String(li.markup_pct)).toFixed(1)}% mkup
+                                              </span>
+                                            )}
+                                          </span>
                                           <span className="text-right font-medium tabular-nums">{fmtMoney(li.amount)}</span>
                                         </div>
                                       ))}

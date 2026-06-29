@@ -35,6 +35,7 @@ interface LineItem {
   image_url?: string | null;
   image_hidden?: boolean | null;
   catalog_item_id?: number | null;
+  markup_pct?: number | null;
 }
 
 interface WorkAreaDraft {
@@ -170,6 +171,7 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
           amount: parseFloat(li.amount ?? "0"),
           is_optional: li.is_optional ?? false,
           catalog_item_id: li.catalog_item_id ?? null,
+          markup_pct: li.markup_pct != null ? parseFloat(li.markup_pct) : null,
         })),
       }));
     }
@@ -323,8 +325,9 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
   }
 
   function catalogSellPrice(item: CatalogItem): number {
+    if (item.sell_price != null && item.sell_price > 0) return item.sell_price;
     const cost = parseFloat((item.cost ?? "0").toString().replace(/[$,]/g, "")) || 0;
-    const markup = parseFloat((item.markupPct ?? "0").toString()) || 0;
+    const markup = parseFloat((item.effective_markup_pct ?? item.markupPct ?? "0").toString()) || 0;
     return cost * (1 + markup / 100);
   }
 
@@ -343,6 +346,7 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
         is_optional: false,
         image_url: imageUrl ?? null,
         catalog_item_id: item.id,
+        markup_pct: item.effective_markup_pct ?? null,
       }]
     } : a));
   };
@@ -355,6 +359,7 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
       unit: item.units ?? "",
       unit_price: price,
       catalog_item_id: item.id,
+      markup_pct: item.effective_markup_pct ?? null,
     });
     setCatalogPickerKey(null);
   }
@@ -428,6 +433,7 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
           amount: lineAmount(li),
           is_optional: li.is_optional,
           catalog_item_id: li.catalog_item_id ?? null,
+          markup_pct: li.markup_pct ?? null,
         })),
       })),
     });
