@@ -78,6 +78,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 import { Badge } from "@/components/ui/badge";
 import WorksheetWidget from "@/components/WorksheetWidget";
+import AdminLayout from "./AdminLayout";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation, effectiveRole, previewRole } = useAuth();
@@ -801,6 +802,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     </div>
     );
   };
+
+  const isAdminArea =
+    location.startsWith("/admin") ||
+    location.startsWith("/catalog") ||
+    location === "/plant-cards" ||
+    location.startsWith("/mors-budget");
+
+  if (isAdminArea) {
+    return (
+      <div className="h-screen overflow-hidden bg-background">
+        <AdminLayout>{children}</AdminLayout>
+        <WorksheetWidget />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">

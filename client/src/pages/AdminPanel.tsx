@@ -948,6 +948,12 @@ export default function AdminPanel() {
   useEffect(() => {
     const tab = new URLSearchParams(window.location.search).get("tab");
     if (tab) setActiveTab(tab);
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.tab) setActiveTab(detail.tab);
+    };
+    window.addEventListener("admin-set-tab", handler);
+    return () => window.removeEventListener("admin-set-tab", handler);
   }, []);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -1331,27 +1337,6 @@ export default function AdminPanel() {
       </div>
 
       <div className="flex gap-6 items-start">
-        {/* Left sidebar nav — hidden on home view and mobile */}
-        {activeTab !== "home" && (
-          <div className="hidden md:block w-48 shrink-0 sticky top-4">
-            <button
-              onClick={() => setActiveTab("home")}
-              data-testid="admin-nav-back-home"
-              className="w-full flex items-center gap-1.5 px-3 py-2 mb-3 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
-              <ChevronDown className="h-3 w-3 -rotate-90" />
-              Back to overview
-            </button>
-            <AdminSidebar
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              pendingRequests={pendingRequests}
-              isMasterAdmin={isMasterAdmin}
-              t={t}
-            />
-          </div>
-        )}
-
         {/* Main content */}
         <div className="flex-1 min-w-0">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
