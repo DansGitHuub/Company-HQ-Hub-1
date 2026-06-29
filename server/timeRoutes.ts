@@ -702,6 +702,50 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── Manager: Live Crew (all currently clocked-in employees) ─────────────────
+  app.get("/api/manager/live-crew", requireAuth, async (req: any, res) => {
+    const user = req.user;
+    const isAdmin = user?.role === "Admin" || user?.role === "Manager" || user?.isMasterAdmin;
+    if (!isAdmin) return res.status(403).json({ message: "Forbidden" });
+
+    try {
+      const { rows } = await pool.query(`
+        SELECT
+          te.id,
+          te.clock_in,
+          te.entry_type,
+          te.work_area_name,
+          te.job_id,
+          te.notes,
+          u.id         AS user_id,
+          u.name       AS employee_name,
+          u.username,
+          j.client     AS job_name,
+          j.title      AS job_title,
+          j.address    AS job_address,
+          gp.lat,
+          gp.lng,
+          gp.recorded_at AS last_ping_at
+        FROM time_entries te
+        JOIN users u ON u.id = te.user_id
+        LEFT JOIN jobs j ON j.id = te.job_id
+        LEFT JOIN LATERAL (
+          SELECT lat, lng, recorded_at
+          FROM gps_pings
+          WHERE time_entry_id = te.id
+          ORDER BY recorded_at DESC
+          LIMIT 1
+        ) gp ON true
+        WHERE te.clock_out IS NULL
+          AND u.role NOT IN ('Customer', 'Master Admin')
+        ORDER BY te.clock_in ASC
+      `);
+      return res.json(rows);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── GPS Ping ────────────────────────────────────────────────────────────────
   app.post("/api/gps/ping", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;

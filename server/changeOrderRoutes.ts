@@ -36,6 +36,33 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── Manager: All pending change orders across all jobs ────────────────────
+  app.get("/api/manager/pending-change-orders", requireAuth, async (req: any, res) => {
+    const user = req.user;
+    const isAdmin = user?.role === "Admin" || user?.role === "Manager" || user?.isMasterAdmin;
+    if (!isAdmin) return res.status(403).json({ message: "Forbidden" });
+
+    try {
+      const { rows } = await pool.query(`
+        SELECT
+          co.id, co.co_number, co.title, co.status, co.total_amount,
+          co.tax_rate, co.created_at, co.updated_at, co.job_id,
+          j.client   AS job_name,
+          j.title    AS job_title,
+          j.address  AS job_address,
+          u.name     AS created_by_name
+        FROM job_change_orders co
+        LEFT JOIN jobs j ON j.id = co.job_id
+        LEFT JOIN users u ON u.id = co.created_by
+        WHERE co.status IN ('pending_approval', 'sent')
+        ORDER BY co.created_at DESC
+      `);
+      return res.json(rows);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Get single change order with items ───────────────────────────────────
   app.get("/api/change-orders/:id", requireAuth, async (req: any, res) => {
     try {

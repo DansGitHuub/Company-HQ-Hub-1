@@ -408,12 +408,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     budget_settings: { icon: DollarSign, label: t("nav.budgetPricing"), href: "/mors-budget" },
     tools: { icon: Snowflake, label: t("nav.tools"), href: "/tools" },
   plow_mapper: { icon: Snowflake, label: t("nav.plowMapper"), href: "/tools/plow-mapper" },
+  manager_dashboard: { icon: BarChart2, label: "Manager Dashboard", href: "/manager-dashboard" },
   };
 
   type NavSection = { label: string; items: string[] };
 
   const sectionLabels: Record<string, string> = {
     "MY SPACE": t("nav.sections.mySpace"),
+    "MANAGER": "MANAGER",
     "SALES": t("nav.sections.sales"),
     "OPERATIONS": t("nav.sections.operations"),
     "RESOURCES": t("nav.sections.resources"),
@@ -422,6 +424,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarSections: NavSection[] = [
     { label: "MY SPACE", items: ["hq", "dashboard", "calendar", "my_hours", "my_day", "messages"] },
+    { label: "MANAGER", items: ["manager_dashboard"] },
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["todos", "work_orders", "scheduling", "time_tracking", "equipment", "forms"] },
     { label: "RESOURCES", items: ["sops", "education", "testing"] },
@@ -435,12 +438,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       const base = sidebarSections.filter(s => s.label !== "ADMIN");
       if (!isManager) {
         // Crew (and other non-manager roles): hide Work Orders from OPERATIONS,
-        // and hide Customers/Consultations/Estimates from SALES (Admin/Manager only).
-        return base.map(s => {
-          if (s.label === "OPERATIONS") return { ...s, items: s.items.filter(i => i !== "work_orders") };
-          if (s.label === "SALES") return { ...s, items: s.items.filter(i => !["customers", "consultations", "estimates"].includes(i)) };
-          return s;
-        });
+        // hide Customers/Consultations/Estimates from SALES, and hide MANAGER section.
+        return base
+          .filter(s => s.label !== "MANAGER")
+          .map(s => {
+            if (s.label === "OPERATIONS") return { ...s, items: s.items.filter(i => i !== "work_orders") };
+            if (s.label === "SALES") return { ...s, items: s.items.filter(i => !["customers", "consultations", "estimates"].includes(i)) };
+            return s;
+          });
       }
       return base;
     }
