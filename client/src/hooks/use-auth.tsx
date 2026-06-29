@@ -30,9 +30,22 @@ type RegisterData = { username: string; password: string; email: string; name: s
 
 export const AuthContext = createContext<AuthContextType | null>(null);
 
+const PREVIEW_ROLE_KEY = "adminPreviewRole";
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-  const [previewRole, setPreviewRole] = useState<Role | null>(null);
+  const [previewRole, setPreviewRoleState] = useState<Role | null>(() => {
+    try { return (sessionStorage.getItem(PREVIEW_ROLE_KEY) as Role) || null; }
+    catch { return null; }
+  });
+
+  const setPreviewRole = (role: Role | null) => {
+    setPreviewRoleState(role);
+    try {
+      role ? sessionStorage.setItem(PREVIEW_ROLE_KEY, role)
+           : sessionStorage.removeItem(PREVIEW_ROLE_KEY);
+    } catch {}
+  };
   
   const {
     data: user,
@@ -95,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
+      try { sessionStorage.removeItem(PREVIEW_ROLE_KEY); } catch {}
     },
     onError: (error: Error) => {
       toast({
