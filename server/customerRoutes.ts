@@ -697,6 +697,45 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   });
 
   // ─── Wave 2: Retry CompanyCam project creation ────────────────────────────
+  // ── GET /api/customers/:id/documents ─────────────────────────────────────────
+  app.get("/api/customers/:id/documents", requireAuth, async (req: any, res: any) => {
+    const { id } = req.params;
+    try {
+      const { rows } = await pool.query(
+        `SELECT d.id, d.name, d.folder, d.url, d.status, d.created_at,
+                u.name AS uploaded_by_name
+         FROM customer_documents d
+         LEFT JOIN users u ON u.id = d.uploaded_by
+         WHERE d.customer_id = $1
+         ORDER BY d.created_at DESC`,
+        [id]
+      );
+      return res.json(rows);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── GET /api/customers/:id/messages ──────────────────────────────────────────
+  app.get("/api/customers/:id/messages", requireAuth, async (req: any, res: any) => {
+    const { id } = req.params;
+    try {
+      const { rows } = await pool.query(
+        `SELECT m.id, m.subject, m.message, m.status, m.admin_reply,
+                m.replied_at, m.created_at,
+                rep.name AS replied_by_name
+         FROM customer_messages m
+         LEFT JOIN users rep ON rep.id = m.replied_by
+         WHERE m.customer_id = $1
+         ORDER BY m.created_at DESC`,
+        [id]
+      );
+      return res.json(rows);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post(
     "/api/admin/customers/:id/retry-companycam-project",
     requireAuth,

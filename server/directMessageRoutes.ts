@@ -371,6 +371,62 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── GET /api/dm/conversation/:userId/export ───────────────────────────────────
+  app.get("/api/dm/conversation/:userId/export", requireAuth, async (req, res) => {
+    try {
+      const me = req.user!.id;
+      const other = req.params.userId;
+
+      const { rows: msgs } = await pool.query(
+        `SELECT
+           m.sent_at, m.subject, m.body,
+           s.name AS sender_name,
+           r.name AS recipient_name
+         FROM direct_messages m
+         JOIN users s ON s.id = m.sender_id
+         JOIN users r ON r.id = m.recipient_id
+         WHERE (m.sender_id = $1 AND m.recipient_id = $2 AND m.deleted_by_sender = FALSE)
+            OR (m.sender_id = $2 AND m.recipient_id = $1 AND m.deleted_by_recipient = FALSE)
+         ORDER BY m.sent_at ASC`,
+        [me, other]
+      );
+
+      const { rows: userRows } = await pool.query(
+        `SELECT name FROM users WHERE id = $1`,
+        [other]
+      );
+      const otherName = userRows[0]?.name ?? "Unknown";
+
+      const lines: string[] = [
+        `Conversation with: ${otherName}`,
+        `Exported: ${new Date().toLocaleString()}`,
+        "=".repeat(60),
+        "",
+      ];
+
+      for (const m of msgs) {
+        const ts = new Date(m.sent_at).toLocaleString();
+        const subj = m.subject ? `[${m.subject}] ` : "";
+        lines.push(`${ts} — ${m.sender_name}`);
+        if (m.subject) lines.push(`Subject: ${m.subject}`);
+        const plainBody = (m.body as string)
+          .replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<[^>]+>/g, "")
+          .trim();
+        lines.push(plainBody);
+        lines.push("");
+      }
+
+      const filename = `conversation-${otherName.replace(/\s+/g, "-")}-${Date.now()}.txt`;
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+      res.send(lines.join("\n"));
+    } catch (err: any) {
+      console.error("[dm/export] error:", err.message);
+      if (!res.headersSent) res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── POST /api/dm ─────────────────────────────────────────────────────────────
   app.post("/api/dm", requireAuth, async (req, res) => {
     try {

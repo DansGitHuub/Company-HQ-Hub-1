@@ -132,7 +132,7 @@ export function registerPlantCardRoutes(app: Express, requireAuth: any, requireA
       const hint = [commonName, botanicalName, plantType].filter(Boolean).join(" / ");
 
       const completion = await getOpenAI().chat.completions.create({
-        model: "gpt-5-mini",
+        model: "gpt-4o-mini",
         response_format: { type: "json_object" },
         messages: [
           {

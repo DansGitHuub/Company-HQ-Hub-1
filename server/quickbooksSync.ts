@@ -338,6 +338,7 @@ async function syncCustomers(tok: any) {
         LIMIT 1
       ) ce ON true
       WHERE c.qb_customer_id IS NULL AND c.is_active = true
+        AND (c.qb_sync_skip IS NULL OR c.qb_sync_skip = false)
       LIMIT 500
     `);
 
@@ -490,6 +491,10 @@ async function syncCustomers(tok: any) {
                                 );
                                 if (dup5.length > 0) {
                                   console.log(`[Phase 1g Step 5] dup-link skipped: local ${lc.id} would link to QB ${candidate5} but local ${dup5[0].id} already owns it`);
+                                  await pool.query(
+                                    "UPDATE customers SET qb_sync_skip = true, qb_sync_skip_reason = $1 WHERE id = $2",
+                                    [`QB ID ${candidate5} already owned by local ${dup5[0].id} — merge duplicate customer records to resolve`, lc.id]
+                                  );
                                 } else {
                                   qbId = candidate5;
                                   console.log(`[Phase 1f Step 5] Linked '${displayName}' to QB customer ${qbId} via GivenName='${givenName5}' FamilyName='${familyName5}'`);
@@ -503,6 +508,10 @@ async function syncCustomers(tok: any) {
                               const detail = `push customer '${displayName}' (email=${email || "none"}): 6240 duplicate — name+email+givenFamily lookups all missed. Full QB error: ${JSON.stringify(errBody)}`;
                               errs.push(detail);
                               console.error(`[QB sync] ${detail}`);
+                              await pool.query(
+                                "UPDATE customers SET qb_sync_skip = true, qb_sync_skip_reason = $1 WHERE id = $2",
+                                ["6240 duplicate — all name/email/givenFamily lookups missed", lc.id]
+                              );
                             }
                           }
                         }
@@ -524,6 +533,10 @@ async function syncCustomers(tok: any) {
                             );
                             if (dup5.length > 0) {
                               console.log(`[Phase 1g Step 5] dup-link skipped: local ${lc.id} would link to QB ${candidate5} but local ${dup5[0].id} already owns it`);
+                              await pool.query(
+                                "UPDATE customers SET qb_sync_skip = true, qb_sync_skip_reason = $1 WHERE id = $2",
+                                [`QB ID ${candidate5} already owned by local ${dup5[0].id} — merge duplicate customer records to resolve`, lc.id]
+                              );
                             } else {
                               qbId = candidate5;
                               console.log(`[Phase 1f Step 5] Linked '${displayName}' to QB customer ${qbId} via GivenName='${givenName5}' FamilyName='${familyName5}' (no-email path)`);
@@ -537,6 +550,10 @@ async function syncCustomers(tok: any) {
                           const detail = `push customer '${displayName}' (no email): 6240 duplicate — DisplayName+givenFamily lookups all missed. Full QB error: ${JSON.stringify(errBody)}`;
                           errs.push(detail);
                           console.error(`[QB sync] ${detail}`);
+                          await pool.query(
+                            "UPDATE customers SET qb_sync_skip = true, qb_sync_skip_reason = $1 WHERE id = $2",
+                            ["6240 duplicate (no email) — all DisplayName/givenFamily lookups missed", lc.id]
+                          );
                         }
                       }
                       } // end if (!qbId) — Step 3 complete
