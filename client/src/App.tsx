@@ -44,6 +44,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/calendar": "Calendar",
   "/notifications": "Notifications",
   "/manager-dashboard": "Manager Dashboard",
+  "/overdue": "Overdue Items",
 };
 
 function DocumentTitleSetter() {
@@ -149,6 +150,7 @@ import InquiryPage from "@/pages/Inquiry";
 import InquirySuccess from "@/pages/InquirySuccess";
 import BookingPage from "@/pages/BookingPage";
 import ManagerDashboard from "@/pages/ManagerDashboard";
+import OverduePage from "@/pages/Overdue";
 
 const ADMIN_ONLY = ["Admin"];
 const ADMIN_OR_MANAGER = ["Admin", "Manager"];
@@ -307,6 +309,7 @@ function AppRoutes() {
         <Route path="/budget-settings"><Redirect to="/mors-budget?tab=mark-up" /></Route>
         <Route path="/time" component={TimeTracking} />
         <ProtectedRoute path="/manager-dashboard" component={ManagerDashboard} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/overdue" component={OverduePage} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/reports" component={ReportsPage} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/consultations" component={ConsultationsPage} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/mors-budget" component={MorsBudget} allowedRoles={ADMIN_ONLY} />

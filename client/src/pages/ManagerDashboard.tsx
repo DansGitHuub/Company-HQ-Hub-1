@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Link } from "wouter";
-import { format, subDays, formatDistanceToNow, differenceInMinutes } from "date-fns";
+import { format, subDays, formatDistanceToNow, differenceInMinutes, startOfDay, parseISO, isValid } from "date-fns";
 import {
   Users, Clock, Briefcase, FileText, RefreshCw, MapPin, CheckCircle,
   XCircle, AlertTriangle, ChevronRight, Activity, TrendingUp,
@@ -132,10 +132,10 @@ function elapsedMinutes(clockIn: string) {
 }
 
 function StatCard({
-  title, value, icon: Icon, color, sub,
-}: { title: string; value: number | string; icon: any; color: string; sub?: string }) {
-  return (
-    <Card className="flex-1 min-w-0">
+  title, value, icon: Icon, color, sub, href,
+}: { title: string; value: number | string; icon: any; color: string; sub?: string; href?: string }) {
+  const inner = (
+    <Card className={cn("flex-1 min-w-0", href && "cursor-pointer hover:shadow-md transition-shadow")}>
       <CardContent className="pt-6 pb-5">
         <div className="flex items-start justify-between">
           <div>
@@ -150,6 +150,8 @@ function StatCard({
       </CardContent>
     </Card>
   );
+  if (href) return <Link href={href} className="flex-1 min-w-0">{inner}</Link>;
+  return inner;
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -252,6 +254,13 @@ export default function ManagerDashboard() {
     ...new Map(safetyFlags.map(f => [f.user_id, f])).values()
   ];
 
+  const todayStart = startOfDay(new Date());
+  const overdueJobsCount = activeJobs.filter(j => {
+    if (!j.scheduled_date) return false;
+    const d = parseISO(j.scheduled_date);
+    return isValid(d) && startOfDay(d) < todayStart;
+  }).length;
+
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleRefresh = useCallback(() => {
@@ -311,6 +320,14 @@ export default function ManagerDashboard() {
           icon={FileText}
           color={pendingCOs.length > 0 ? "bg-orange-500" : "bg-slate-400"}
           sub="awaiting customer approval"
+        />
+        <StatCard
+          title="Overdue Jobs"
+          value={overdueJobsCount}
+          icon={AlertTriangle}
+          color={overdueJobsCount > 0 ? "bg-red-600" : "bg-slate-400"}
+          sub="past scheduled date → view all overdue"
+          href="/overdue"
         />
       </div>
 

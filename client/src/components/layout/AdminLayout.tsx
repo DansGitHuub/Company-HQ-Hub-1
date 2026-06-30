@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Upload,
   Archive,
+  AlertTriangle,
   Users,
   Megaphone,
   FileSignature,
@@ -58,6 +59,7 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
     label: "Daily Operations",
     labelColor: "text-green-600 dark:text-green-400",
     items: [
+      { value: "overdue", label: "Overdue Items", icon: AlertTriangle, href: "/overdue" },
       { value: "time-reports", label: "Time Reports", icon: ClipboardList, href: "/admin/time?tab=reports" },
       { value: "time-admin", label: "Time Admin", icon: Clock, href: "/admin/time" },
       { value: "worksheet-review", label: "Worksheet Review", icon: ClipboardCheck, href: "/admin/time?tab=worksheet" },
