@@ -3110,6 +3110,7 @@ export const estimateLineItems = pgTable("estimate_line_items", {
   imageHidden:        boolean("image_hidden").default(false),
   classId:            integer("class_id").references(() => classCodes.id),
   catalogItemId:      integer("catalog_item_id").references(() => catalogItems.id),
+  markupPct:          numeric("markup_pct", { precision: 5, scale: 2 }),
 });
 export const insertEstimateLineItemSchema = createInsertSchema(estimateLineItems).omit({ id: true });
 export type InsertEstimateLineItem = z.infer<typeof insertEstimateLineItemSchema>;
