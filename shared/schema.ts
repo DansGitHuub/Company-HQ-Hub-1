@@ -3634,12 +3634,15 @@ export const workOrders = pgTable("work_orders", {
   officeNotes:             text("office_notes"),
   assignedCrew:            jsonb("assigned_crew").default(sql`'[]'::jsonb`),
   createdBy:               text("created_by"),
-  woType:                  text("wo_type").notNull().default("maintenance"),
+  woType:                  text("wo_type").notNull().default("maintenance_visit"),
+  priority:                text("priority").notNull().default("normal"),
   serviceTypeId:           text("service_type_id"),
   crewLeaderId:            text("crew_leader_id"),
   estimatedDuration:       text("estimated_duration"),
+  estimatedHours:          numeric("estimated_hours"),
   propertyNotes:           text("property_notes"),
   siteAccessNotes:         text("site_access_notes"),
+  safetyNotes:             text("safety_notes"),
   customerName:            text("customer_name"),
   customerAddress:         text("customer_address"),
   customerPhone:           text("customer_phone"),
@@ -3677,6 +3680,19 @@ export const workOrderMaterials = pgTable("work_order_materials", {
   createdAt:     timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 export type WorkOrderMaterial = typeof workOrderMaterials.$inferSelect;
+
+export const workOrderTools = pgTable("work_order_tools", {
+  id:          serial("id").primaryKey(),
+  workOrderId: integer("work_order_id"),
+  areaId:      integer("area_id"),
+  itemName:    text("item_name").notNull(),
+  quantity:    numeric("quantity"),
+  unit:        text("unit"),
+  notes:       text("notes"),
+  status:      text("status").notNull().default("needed"),
+  createdAt:   timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type WorkOrderTool = typeof workOrderTools.$inferSelect;
 
 export const workOrderSteps = pgTable("work_order_steps", {
   id:             serial("id").primaryKey(),

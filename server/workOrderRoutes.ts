@@ -47,6 +47,12 @@ export function registerWorkOrderRoutes(app: any, requireAuth: any) {
       [id]
     );
 
+    // Tools (all — area_id may be null for WO-level)
+    const tools = await pool.query(
+      `SELECT * FROM work_order_tools WHERE work_order_id=$1 ORDER BY area_id NULLS FIRST, created_at`,
+      [id]
+    );
+
     // Checklists
     const checklists = await pool.query(
       `SELECT * FROM work_order_checklists WHERE work_order_id=$1 ORDER BY area_id NULLS FIRST, sort_order`,
@@ -109,6 +115,7 @@ export function registerWorkOrderRoutes(app: any, requireAuth: any) {
         ...a,
         tasks:       tasks.rows.filter((t: any) => t.area_id === a.id),
         materials:   materials.rows.filter((m: any) => m.area_id === a.id),
+        tools:       tools.rows.filter((t: any) => t.area_id === a.id),
         checklist:   checklists.rows.filter((c: any) => c.area_id === a.id),
         hold_points: holdPoints.rows.filter((h: any) => h.area_id === a.id),
       };
@@ -116,11 +123,12 @@ export function registerWorkOrderRoutes(app: any, requireAuth: any) {
 
     return {
       ...row,
-      areas:       Object.values(areaMap),
+      areas:        Object.values(areaMap),
       wo_materials: materials.rows.filter((m: any) => !m.area_id),
+      wo_tools:     tools.rows.filter((t: any) => !t.area_id),
       wo_checklist: checklists.rows.filter((c: any) => !c.area_id),
-      steps:       steps.rows,
-      daily_logs:  logs.rows,
+      steps:        steps.rows,
+      daily_logs:   logs.rows,
       time_entries: timeEntries,
       companycam_photos: ccPhotos,
     };
@@ -240,26 +248,28 @@ export function registerWorkOrderRoutes(app: any, requireAuth: any) {
       const user = (req as any).user;
       const {
         title, description, job_id, wo_type, scheduled_date, office_notes,
-        assigned_crew, service_type_id, crew_leader_id, estimated_duration,
-        property_notes, site_access_notes, customer_name, customer_address,
-        customer_phone, contract_value, estimated_completion_date, companycam_project_id
+        assigned_crew, service_type_id, crew_leader_id,
+        property_notes, site_access_notes, safety_notes, customer_name, customer_address,
+        customer_phone, contract_value, estimated_completion_date, companycam_project_id,
+        priority, estimated_hours,
       } = req.body;
       if (!title) return res.status(400).json({ message: "Title is required" });
       const result = await pool.query(
         `INSERT INTO work_orders
            (title, description, job_id, wo_type, scheduled_date, office_notes,
-            assigned_crew, service_type_id, crew_leader_id, estimated_duration,
-            property_notes, site_access_notes, customer_name, customer_address,
+            assigned_crew, service_type_id, crew_leader_id,
+            property_notes, site_access_notes, safety_notes, customer_name, customer_address,
             customer_phone, contract_value, estimated_completion_date,
-            companycam_project_id, created_by, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'draft')
+            companycam_project_id, created_by, priority, estimated_hours, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'draft')
          RETURNING *`,
-        [title, description||null, job_id||null, wo_type||'maintenance', scheduled_date||null,
+        [title, description||null, job_id||null, wo_type||'maintenance_visit', scheduled_date||null,
          office_notes||null, JSON.stringify(assigned_crew||[]),
-         service_type_id||null, crew_leader_id||null, estimated_duration||null,
-         property_notes||null, site_access_notes||null, customer_name||null,
+         service_type_id||null, crew_leader_id||null,
+         property_notes||null, site_access_notes||null, safety_notes||null, customer_name||null,
          customer_address||null, customer_phone||null, contract_value||null,
-         estimated_completion_date||null, companycam_project_id||null, user?.username||null]
+         estimated_completion_date||null, companycam_project_id||null, user?.username||null,
+         priority||'normal', estimated_hours||null]
       );
       res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -273,25 +283,27 @@ export function registerWorkOrderRoutes(app: any, requireAuth: any) {
       const { id } = req.params;
       const {
         title, description, job_id, wo_type, scheduled_date, office_notes,
-        assigned_crew, status, service_type_id, crew_leader_id, estimated_duration,
-        property_notes, site_access_notes, customer_name, customer_address,
-        customer_phone, contract_value, estimated_completion_date, companycam_project_id
+        assigned_crew, status, service_type_id, crew_leader_id,
+        property_notes, site_access_notes, safety_notes, customer_name, customer_address,
+        customer_phone, contract_value, estimated_completion_date, companycam_project_id,
+        priority, estimated_hours,
       } = req.body;
       const result = await pool.query(
         `UPDATE work_orders SET
            title=$1, description=$2, job_id=$3, wo_type=$4, scheduled_date=$5,
            office_notes=$6, assigned_crew=$7, status=$8, service_type_id=$9,
-           crew_leader_id=$10, estimated_duration=$11, property_notes=$12,
-           site_access_notes=$13, customer_name=$14, customer_address=$15,
+           crew_leader_id=$10, property_notes=$11,
+           site_access_notes=$12, safety_notes=$13, customer_name=$14, customer_address=$15,
            customer_phone=$16, contract_value=$17, estimated_completion_date=$18,
-           companycam_project_id=$19, updated_at=NOW()
-         WHERE id=$20 RETURNING *`,
-        [title, description||null, job_id||null, wo_type||'maintenance', scheduled_date||null,
+           companycam_project_id=$19, priority=$20, estimated_hours=$21, updated_at=NOW()
+         WHERE id=$22 RETURNING *`,
+        [title, description||null, job_id||null, wo_type||'maintenance_visit', scheduled_date||null,
          office_notes||null, JSON.stringify(assigned_crew||[]), status,
-         service_type_id||null, crew_leader_id||null, estimated_duration||null,
-         property_notes||null, site_access_notes||null, customer_name||null,
+         service_type_id||null, crew_leader_id||null,
+         property_notes||null, site_access_notes||null, safety_notes||null, customer_name||null,
          customer_address||null, customer_phone||null, contract_value||null,
-         estimated_completion_date||null, companycam_project_id||null, id]
+         estimated_completion_date||null, companycam_project_id||null,
+         priority||'normal', estimated_hours||null, id]
       );
       if (!result.rows.length) return res.status(404).json({ message: "Not found" });
       const detail = await loadDetail(id);
@@ -579,6 +591,57 @@ export function registerWorkOrderRoutes(app: any, requireAuth: any) {
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Failed to delete material" });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  TOOLS (WO-level or area-level)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  app.post("/api/work-orders/:id/tools", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { item_name, quantity, unit, notes, area_id } = req.body;
+      if (!item_name) return res.status(400).json({ message: "Item name is required" });
+      const result = await pool.query(
+        `INSERT INTO work_order_tools (work_order_id, item_name, quantity, unit, notes, area_id)
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        [id, item_name, quantity||null, unit||null, notes||null, area_id||null]
+      );
+      await pool.query(`UPDATE work_orders SET updated_at=NOW() WHERE id=$1`, [id]);
+      res.status(201).json(result.rows[0]);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Failed to add tool" });
+    }
+  });
+
+  app.patch("/api/work-orders/:id/tools/:toolId/status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { toolId, id } = req.params;
+      const { status } = req.body;
+      const valid = ["needed","loaded","used"];
+      if (!valid.includes(status)) return res.status(400).json({ message: "Invalid status" });
+      const result = await pool.query(
+        `UPDATE work_order_tools SET status=$1 WHERE id=$2 RETURNING *`,
+        [status, toolId]
+      );
+      if (!result.rows.length) return res.status(404).json({ message: "Not found" });
+      await pool.query(`UPDATE work_orders SET updated_at=NOW() WHERE id=$1`, [id]);
+      res.json(result.rows[0]);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Failed to update tool status" });
+    }
+  });
+
+  app.delete("/api/work-orders/:id/tools/:toolId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await pool.query(`DELETE FROM work_order_tools WHERE id=$1`, [req.params.toolId]);
+      res.json({ ok: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Failed to delete tool" });
     }
   });
 

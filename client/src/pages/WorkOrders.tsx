@@ -19,7 +19,7 @@ import {
   Edit2, X, Loader2, FileText, CheckSquare, Boxes, Clock, Image as ImageIcon,
   BookOpen, ChevronDown, ChevronRight, Wrench, HardHat, MapPin, Phone,
   User, Calendar, DollarSign, AlertTriangle, CheckCircle2, Circle,
-  Package, Shield
+  Package, Shield, Leaf, Zap, Snowflake, Settings,
 } from "lucide-react";
 import { format, parseISO, differenceInMinutes } from "date-fns";
 import {
@@ -28,9 +28,10 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type WOStatus = "draft" | "ready" | "in_progress" | "on_hold" | "complete";
-type WOType   = "maintenance" | "installation";
-type MatStatus = "needed" | "loaded" | "used";
+type WOStatus   = "draft" | "ready" | "in_progress" | "on_hold" | "complete";
+type WOType     = "maintenance_visit" | "landscape_project" | "hardscape_project" | "service_call" | "snow_ice" | "internal_shop";
+type WOPriority = "low" | "normal" | "high" | "urgent";
+type MatStatus  = "needed" | "loaded" | "used";
 
 interface WorkOrder {
   id: number;
@@ -40,12 +41,14 @@ interface WorkOrder {
   description: string | null;
   status: WOStatus;
   wo_type: WOType;
+  priority: WOPriority;
   scheduled_date: string | null;
   estimated_completion_date: string | null;
-  estimated_duration: string | null;
+  estimated_hours: number | null;
   office_notes: string | null;
   property_notes: string | null;
   site_access_notes: string | null;
+  safety_notes: string | null;
   customer_name: string | null;
   customer_address: string | null;
   customer_phone: string | null;
@@ -65,6 +68,7 @@ interface WorkOrder {
   total_materials?: number;
   areas?: Area[];
   wo_materials?: Material[];
+  wo_tools?: Tool[];
   wo_checklist?: ChecklistItem[];
   steps?: any[];
   daily_logs?: DailyLog[];
@@ -81,6 +85,7 @@ interface Area {
   sort_order: number;
   tasks: Task[];
   materials: Material[];
+  tools: Tool[];
   checklist: ChecklistItem[];
   hold_points: HoldPoint[];
 }
@@ -108,6 +113,17 @@ interface Material {
   status: MatStatus;
   notes: string | null;
   catalog_name: string | null;
+}
+
+interface Tool {
+  id: number;
+  work_order_id: number;
+  area_id: number | null;
+  item_name: string;
+  quantity: number | null;
+  unit: string | null;
+  status: MatStatus;
+  notes: string | null;
 }
 
 interface ChecklistItem {
@@ -178,6 +194,25 @@ const STATUS_CFG: Record<WOStatus, { label: string; color: string; bg: string }>
 };
 const STATUS_ORDER: WOStatus[] = ["draft", "ready", "in_progress", "on_hold", "complete"];
 
+const TYPE_CFG: Record<WOType, { label: string; color: string; bg: string; Icon: any }> = {
+  maintenance_visit:  { label: "Maintenance Visit",  color: "text-emerald-700", bg: "bg-emerald-100", Icon: Wrench },
+  landscape_project:  { label: "Landscape Project",  color: "text-green-700",   bg: "bg-green-100",   Icon: Leaf },
+  hardscape_project:  { label: "Hardscape Project",  color: "text-purple-700",  bg: "bg-purple-100",  Icon: HardHat },
+  service_call:       { label: "Service Call",        color: "text-blue-700",    bg: "bg-blue-100",    Icon: Zap },
+  snow_ice:           { label: "Snow & Ice",          color: "text-cyan-700",    bg: "bg-cyan-100",    Icon: Snowflake },
+  internal_shop:      { label: "Internal/Shop",       color: "text-slate-700",   bg: "bg-slate-100",   Icon: Settings },
+};
+
+const PRIORITY_CFG: Record<WOPriority, { label: string; color: string; bg: string }> = {
+  low:    { label: "Low",    color: "text-slate-500",  bg: "bg-slate-50 border border-slate-200" },
+  normal: { label: "Normal", color: "text-blue-600",   bg: "bg-blue-50 border border-blue-200" },
+  high:   { label: "High",   color: "text-orange-600", bg: "bg-orange-50 border border-orange-200" },
+  urgent: { label: "Urgent", color: "text-red-600 font-bold", bg: "bg-red-50 border border-red-300" },
+};
+
+// Project types that show contract/completion date and hold points
+const PROJECT_TYPES: WOType[] = ["landscape_project", "hardscape_project"];
+
 const MAT_STATUS_CYCLE: Record<MatStatus, MatStatus> = { needed: "loaded", loaded: "used", used: "needed" };
 const MAT_STATUS_CFG: Record<MatStatus, { label: string; cls: string }> = {
   needed: { label: "Needed", cls: "bg-red-100 text-red-700 border-red-200" },
@@ -193,9 +228,23 @@ function StatusBadge({ status }: { status: WOStatus }) {
 }
 
 function TypeBadge({ type }: { type: WOType }) {
-  return type === "installation"
-    ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700"><HardHat className="w-3 h-3" />Installation</span>
-    : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700"><Wrench className="w-3 h-3" />Maintenance</span>;
+  const cfg = TYPE_CFG[type] || TYPE_CFG.maintenance_visit;
+  const { Icon } = cfg;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.color}`}>
+      <Icon className="w-3 h-3" />{cfg.label}
+    </span>
+  );
+}
+
+function PriorityBadge({ priority }: { priority?: WOPriority | null }) {
+  if (!priority || priority === "normal") return null;
+  const cfg = PRIORITY_CFG[priority] || PRIORITY_CFG.normal;
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${cfg.bg} ${cfg.color}`}>
+      {priority === "urgent" ? "🚨 " : priority === "high" ? "⚡ " : ""}{cfg.label}
+    </span>
+  );
 }
 
 function fmtMinutes(mins: number | null) {
@@ -292,21 +341,24 @@ export default function WorkOrders() {
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search work orders…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" data-testid="input-search-wo" />
         </div>
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-1 flex-wrap items-center">
           {["all", ...STATUS_ORDER].map(s => (
             <button key={s} onClick={() => setStatusFilter(s)} data-testid={`filter-status-${s}`}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${statusFilter === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
               {s === "all" ? "All Status" : STATUS_CFG[s as WOStatus]?.label}
             </button>
           ))}
-          <button onClick={() => setTypeFilter(typeFilter === "maintenance" ? "all" : "maintenance")}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${typeFilter === "maintenance" ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
-            <Wrench className="w-3 h-3 inline mr-1" />Maint.
-          </button>
-          <button onClick={() => setTypeFilter(typeFilter === "installation" ? "all" : "installation")}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${typeFilter === "installation" ? "bg-purple-600 text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
-            <HardHat className="w-3 h-3 inline mr-1" />Install
-          </button>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="h-8 text-sm w-[170px]" data-testid="filter-type">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {(Object.entries(TYPE_CFG) as [WOType, any][]).map(([val, cfg]) => (
+                <SelectItem key={val} value={val}>{cfg.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -338,6 +390,7 @@ export default function WorkOrders() {
                   </div>
                   <div className="flex gap-1 flex-wrap mb-3">
                     <TypeBadge type={wo.wo_type} />
+                    <PriorityBadge priority={wo.priority} />
                     {wo.service_type_name && <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{wo.service_type_name}</span>}
                   </div>
                   <div className="space-y-1">
@@ -381,12 +434,14 @@ export default function WorkOrders() {
 
 function CreateWODialog({ onClose, onCreated }: { onClose: () => void; onCreated: (id: number) => void }) {
   const { toast } = useToast();
-  const [woType, setWoType] = useState<WOType>("maintenance");
+  const [woType, setWoType] = useState<WOType>("maintenance_visit");
   const [form, setForm] = useState({
     title: "", description: "", job_id: "none", service_type_id: "none",
-    crew_leader_id: "none", scheduled_date: "", estimated_duration: "",
-    property_notes: "", site_access_notes: "", customer_name: "", customer_address: "",
+    crew_leader_id: "none", scheduled_date: "", estimated_hours: "",
+    property_notes: "", site_access_notes: "", safety_notes: "",
+    customer_name: "", customer_address: "",
     customer_phone: "", office_notes: "", contract_value: "", estimated_completion_date: "",
+    priority: "normal" as WOPriority,
   });
   const [saving, setSaving] = useState(false);
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -406,6 +461,7 @@ function CreateWODialog({ onClose, onCreated }: { onClose: () => void; onCreated
         service_type_id: form.service_type_id !== "none" ? form.service_type_id : null,
         crew_leader_id: form.crew_leader_id !== "none" ? form.crew_leader_id : null,
         contract_value: form.contract_value ? Number(form.contract_value) : null,
+        estimated_hours: form.estimated_hours ? Number(form.estimated_hours) : null,
       });
       const data = await res.json();
       onCreated(data.id);
@@ -423,32 +479,45 @@ function CreateWODialog({ onClose, onCreated }: { onClose: () => void; onCreated
         </DialogHeader>
 
         <div className="space-y-5 mt-2">
-          {/* WO Type */}
+          {/* WO Type — 6-option grid */}
           <div>
             <Label className="mb-2 block">Work Order Type</Label>
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setWoType("maintenance")} data-testid="btn-type-maintenance"
-                className={`flex flex-col items-center gap-1.5 p-4 rounded-lg border-2 transition-colors ${woType === "maintenance" ? "border-emerald-500 bg-emerald-50" : "border-muted hover:border-muted-foreground/40"}`}>
-                <Wrench className={`w-6 h-6 ${woType === "maintenance" ? "text-emerald-600" : "text-muted-foreground"}`} />
-                <span className="font-semibold text-sm">Maintenance</span>
-                <span className="text-xs text-muted-foreground text-center">Recurring service, cleanups, mowing</span>
-              </button>
-              <button onClick={() => setWoType("installation")} data-testid="btn-type-installation"
-                className={`flex flex-col items-center gap-1.5 p-4 rounded-lg border-2 transition-colors ${woType === "installation" ? "border-purple-500 bg-purple-50" : "border-muted hover:border-muted-foreground/40"}`}>
-                <HardHat className={`w-6 h-6 ${woType === "installation" ? "text-purple-600" : "text-muted-foreground"}`} />
-                <span className="font-semibold text-sm">Installation</span>
-                <span className="text-xs text-muted-foreground text-center">Patios, walls, plantings, full projects</span>
-              </button>
+            <div className="grid grid-cols-3 gap-2">
+              {(Object.entries(TYPE_CFG) as [WOType, any][]).map(([type, cfg]) => {
+                const { Icon } = cfg;
+                const active = woType === type;
+                return (
+                  <button key={type} onClick={() => setWoType(type)} data-testid={`btn-type-${type}`}
+                    className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 text-xs font-medium transition-colors
+                      ${active ? `${cfg.bg} ${cfg.color} border-current` : "border-muted hover:border-muted-foreground/40"}`}>
+                    <Icon className="w-4 h-4" />
+                    <span className="text-center leading-tight">{cfg.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Title */}
           <div>
             <Label>Work Order Title *</Label>
-            <Input value={form.title} onChange={e => set("title", e.target.value)} placeholder={woType === "maintenance" ? "e.g. Spring Cleanup — Smith Residence" : "e.g. Back Patio Installation — Johnson Property"} data-testid="input-wo-title" />
+            <Input value={form.title} onChange={e => set("title", e.target.value)} placeholder="e.g. Spring Cleanup — Smith Residence" data-testid="input-wo-title" />
           </div>
 
+          {/* Priority + Service Type */}
           <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Priority</Label>
+              <Select value={form.priority} onValueChange={v => set("priority", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label>Service Type</Label>
               <Select value={form.service_type_id} onValueChange={v => set("service_type_id", v)}>
@@ -459,16 +528,18 @@ function CreateWODialog({ onClose, onCreated }: { onClose: () => void; onCreated
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Linked Job (optional)</Label>
-              <Select value={form.job_id} onValueChange={v => set("job_id", v)}>
-                <SelectTrigger data-testid="select-wo-job"><SelectValue placeholder="Select job" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {(jobs as any[]).map((j: any) => <SelectItem key={j.id} value={String(j.id)}>{j.title}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+          </div>
+
+          {/* Linked Job */}
+          <div>
+            <Label>Linked Job (optional)</Label>
+            <Select value={form.job_id} onValueChange={v => set("job_id", v)}>
+              <SelectTrigger data-testid="select-wo-job"><SelectValue placeholder="Select job" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {(jobs as any[]).map((j: any) => <SelectItem key={j.id} value={String(j.id)}>{j.title}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Customer info */}
@@ -494,6 +565,16 @@ function CreateWODialog({ onClose, onCreated }: { onClose: () => void; onCreated
             </div>
           </div>
 
+          {/* Safety Notes — prominent red section */}
+          <div className="border border-red-200 rounded-lg p-3 bg-red-50/50">
+            <Label className="text-red-700 font-semibold flex items-center gap-1.5 mb-1">
+              <AlertTriangle className="w-3.5 h-3.5" />Safety Notes
+            </Label>
+            <Textarea value={form.safety_notes} onChange={e => set("safety_notes", e.target.value)}
+              placeholder="Hazards, required PPE, unsafe areas, chemical warnings, electrical concerns…"
+              rows={2} className="border-red-200 focus:ring-red-300" />
+          </div>
+
           {/* Scheduling */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -501,13 +582,13 @@ function CreateWODialog({ onClose, onCreated }: { onClose: () => void; onCreated
               <Input type="date" value={form.scheduled_date} onChange={e => set("scheduled_date", e.target.value)} data-testid="input-wo-date" />
             </div>
             <div>
-              <Label>Est. Duration</Label>
-              <Input value={form.estimated_duration} onChange={e => set("estimated_duration", e.target.value)} placeholder="e.g. 6 hours, 2 days" />
+              <Label>Estimated Hours</Label>
+              <Input type="number" step="0.5" min="0" value={form.estimated_hours} onChange={e => set("estimated_hours", e.target.value)} placeholder="e.g. 4 or 8.5" />
             </div>
           </div>
 
-          {/* Installation-only fields */}
-          {woType === "installation" && (
+          {/* Project-type-only fields */}
+          {PROJECT_TYPES.includes(woType) && (
             <div className="border rounded-lg p-3 space-y-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Project Details</p>
               <div className="grid grid-cols-2 gap-3">
@@ -544,7 +625,7 @@ function CreateWODialog({ onClose, onCreated }: { onClose: () => void; onCreated
           </div>
           <div>
             <Label>Office Instructions to Crew</Label>
-            <Textarea value={form.office_notes} onChange={e => set("office_notes", e.target.value)} placeholder="Special instructions, safety notes, priority areas…" rows={2} />
+            <Textarea value={form.office_notes} onChange={e => set("office_notes", e.target.value)} placeholder="Special instructions, priority areas…" rows={2} />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
@@ -599,6 +680,7 @@ function DetailView({ id, detail, isLoading, isAdmin, user, activeTab, setActive
             <div className="flex items-center gap-2 flex-wrap">
               <TypeBadge type={detail.wo_type} />
               <StatusBadge status={detail.status} />
+              <PriorityBadge priority={detail.priority} />
             </div>
             <h1 className="text-xl font-bold mt-1">{detail.title}</h1>
             {detail.service_type_name && <p className="text-sm text-muted-foreground">{detail.service_type_name}</p>}
@@ -686,6 +768,18 @@ function DetailView({ id, detail, isLoading, isAdmin, user, activeTab, setActive
 function OverviewTab({ detail }: { detail: WorkOrder }) {
   return (
     <div className="space-y-4">
+      {/* Safety Notes — top, prominent red */}
+      {detail.safety_notes && (
+        <Card className="border-red-300 bg-red-50">
+          <CardContent className="p-4">
+            <p className="text-xs font-bold text-red-700 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4" />⚠ Safety Notes
+            </p>
+            <p className="text-sm whitespace-pre-wrap text-red-900">{detail.safety_notes}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Customer / Site card */}
       {(detail.customer_name || detail.customer_address || detail.customer_phone) && (
         <Card>
@@ -720,11 +814,15 @@ function OverviewTab({ detail }: { detail: WorkOrder }) {
       {/* Scheduling info */}
       <Card>
         <CardContent className="p-4 space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Schedule</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Schedule &amp; Details</p>
           <div className="grid grid-cols-2 gap-3 text-sm">
+            <div><span className="text-muted-foreground">Type:</span> <TypeBadge type={detail.wo_type} /></div>
+            {detail.priority && detail.priority !== "normal" && (
+              <div><span className="text-muted-foreground">Priority:</span> <PriorityBadge priority={detail.priority} /></div>
+            )}
             {detail.scheduled_date && <div><span className="text-muted-foreground">Date:</span> {format(parseISO(detail.scheduled_date), "MMMM d, yyyy")}</div>}
-            {detail.estimated_duration && <div><span className="text-muted-foreground">Duration:</span> {detail.estimated_duration}</div>}
-            {detail.wo_type === "installation" && detail.estimated_completion_date && (
+            {detail.estimated_hours && <div><span className="text-muted-foreground">Est. Hours:</span> {Number(detail.estimated_hours)}h</div>}
+            {PROJECT_TYPES.includes(detail.wo_type) && detail.estimated_completion_date && (
               <div><span className="text-muted-foreground">Est. Complete:</span> {format(parseISO(detail.estimated_completion_date), "MMMM d, yyyy")}</div>
             )}
             {detail.contract_value && (
@@ -791,6 +889,8 @@ function AreasTab({ detail, isAdmin, woId, onRefresh }: { detail: WorkOrder; isA
   const [addAreaOpen, setAddAreaOpen] = useState(false);
   const [areaForm, setAreaForm] = useState({ name: "", description: "", estimated_hours: "" });
   const [savingArea, setSavingArea] = useState(false);
+  const [addWoToolOpen, setAddWoToolOpen] = useState(false);
+  const [woToolForm, setWoToolForm] = useState({ item_name: "", quantity: "", unit: "", notes: "" });
 
   const addArea = async () => {
     if (!areaForm.name.trim()) { toast({ title: "Area name required", variant: "destructive" }); return; }
@@ -808,10 +908,28 @@ function AreasTab({ detail, isAdmin, woId, onRefresh }: { detail: WorkOrder; isA
     } finally { setSavingArea(false); }
   };
 
+  const addWoTool = async () => {
+    if (!woToolForm.item_name.trim()) return;
+    try {
+      await apiRequest("POST", `/api/work-orders/${woId}/tools`, { ...woToolForm, area_id: null });
+      setWoToolForm({ item_name: "", quantity: "", unit: "", notes: "" });
+      setAddWoToolOpen(false);
+      onRefresh();
+    } catch { toast({ title: "Failed to add tool", variant: "destructive" }); }
+  };
+
   const areas = detail.areas || [];
 
   return (
     <div className="space-y-4">
+      {/* Safety notes — top, red, prominent */}
+      {detail.safety_notes && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-300 text-sm">
+          <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+          <div><span className="font-bold text-red-700">Safety: </span><span className="text-red-800">{detail.safety_notes}</span></div>
+        </div>
+      )}
+
       {/* Site access reminder */}
       {detail.site_access_notes && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm">
@@ -840,13 +958,49 @@ function AreasTab({ detail, isAdmin, woId, onRefresh }: { detail: WorkOrder; isA
       ))}
 
       {/* WO-level materials (not scoped to an area) */}
-      {(detail.wo_materials || []).length > 0 && (
+      {((detail.wo_materials || []).length > 0 || isAdmin) && (
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">General Materials</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
+              <Package className="w-3.5 h-3.5" />General Materials
+            </p>
             <div className="space-y-2">
               {(detail.wo_materials || []).map(m => <MaterialRow key={m.id} mat={m} woId={woId} onRefresh={onRefresh} isAdmin={isAdmin} />)}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* WO-level tools */}
+      {((detail.wo_tools || []).length > 0 || isAdmin) && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
+              <Wrench className="w-3.5 h-3.5" />Tools Needed
+            </p>
+            <div className="space-y-2">
+              {(detail.wo_tools || []).map(t => <ToolRow key={t.id} tool={t} woId={woId} onRefresh={onRefresh} isAdmin={isAdmin} />)}
+            </div>
+            {isAdmin && (
+              addWoToolOpen ? (
+                <div className="space-y-2 pt-3 border-t mt-2">
+                  <Input value={woToolForm.item_name} onChange={e => setWoToolForm(f => ({ ...f, item_name: e.target.value }))} placeholder="Tool name (e.g. Skid Steer, Plate Compactor)" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input value={woToolForm.quantity} onChange={e => setWoToolForm(f => ({ ...f, quantity: e.target.value }))} placeholder="Qty" type="number" />
+                    <Input value={woToolForm.unit} onChange={e => setWoToolForm(f => ({ ...f, unit: e.target.value }))} placeholder="Unit" />
+                    <Input value={woToolForm.notes} onChange={e => setWoToolForm(f => ({ ...f, notes: e.target.value }))} placeholder="Notes" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={addWoTool}>Add</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setAddWoToolOpen(false)}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setAddWoToolOpen(true)} className="text-xs text-primary hover:underline flex items-center gap-1 mt-2">
+                  <Plus className="w-3 h-3" />Add tool
+                </button>
+              )
+            )}
           </CardContent>
         </Card>
       )}
@@ -884,192 +1038,236 @@ function AreaCard({ area, woId, isAdmin, woType, onRefresh }: { area: Area; woId
   const [open, setOpen] = useState(true);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [addMatOpen, setAddMatOpen] = useState(false);
+  const [addToolOpen, setAddToolOpen] = useState(false);
   const [addCheckOpen, setAddCheckOpen] = useState(false);
   const [addHoldOpen, setAddHoldOpen] = useState(false);
   const [taskForm, setTaskForm] = useState({ title: "", description: "", requires_photo: false });
   const [matForm, setMatForm] = useState({ item_name: "", quantity: "", unit: "", notes: "" });
+  const [toolForm, setToolForm] = useState({ item_name: "", quantity: "", unit: "", notes: "" });
   const [checkLabel, setCheckLabel] = useState("");
   const [holdForm, setHoldForm] = useState({ label: "", description: "" });
 
-  const done  = area.tasks.filter(t => t.is_complete).length;
-  const total = area.tasks.length;
-
-  const save = async (path: string, body: object) => {
-    await apiRequest("POST", path, body);
-    onRefresh();
+  const save = async (url: string, body: any) => {
+    try { await apiRequest("POST", url, body); onRefresh(); }
+    catch { toast({ title: "Failed to save", variant: "destructive" }); }
   };
 
   const deleteArea = async () => {
-    if (!confirm(`Delete area "${area.name}"?`)) return;
     try {
       await apiRequest("DELETE", `/api/work-orders/${woId}/areas/${area.id}`, {});
       onRefresh();
-    } catch { toast({ title: "Failed to delete area", variant: "destructive" }); }
+    } catch { toast({ title: "Failed to delete", variant: "destructive" }); }
   };
 
-  return (
-    <Card>
-      <div className="px-4 pt-4 pb-2">
-        {/* Area header */}
-        <div className="flex items-center justify-between">
-          <button onClick={() => setOpen(!open)} className="flex items-center gap-2 flex-1 text-left">
-            {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-            <span className="font-semibold">{area.name}</span>
-            {total > 0 && (
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${done === total ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{done}/{total}</span>
-            )}
-            {area.estimated_hours && (
-              <span className="text-xs text-muted-foreground flex items-center gap-0.5"><Clock className="w-3 h-3" />{area.estimated_hours}h est.</span>
-            )}
-          </button>
-          {isAdmin && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="w-3.5 h-3.5" /></Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem className="text-destructive" onClick={deleteArea}><Trash2 className="w-3.5 h-3.5 mr-2" />Delete Area</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-        {area.description && open && <p className="text-sm text-muted-foreground mt-1 ml-6">{area.description}</p>}
-      </div>
+  const totalTasks = area.tasks.length;
+  const doneTasks  = area.tasks.filter(t => t.is_complete).length;
+  const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
-      {open && (
-        <CardContent className="px-4 pb-4 pt-2 space-y-4">
-          {/* Tasks */}
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Tasks</p>
-            {area.tasks.length === 0 && <p className="text-sm text-muted-foreground italic">No tasks added</p>}
-            <div className="space-y-1">
-              {area.tasks.map(task => (
-                <TaskRow key={task.id} task={task} woId={woId} areaId={area.id} isAdmin={isAdmin} onRefresh={onRefresh} />
-              ))}
+  return (
+    <Card className={`border ${pct === 100 && totalTasks > 0 ? "border-green-200" : ""}`}>
+      <CardContent className="p-0">
+        {/* Area header */}
+        <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors rounded-t-lg">
+          <div className="flex items-center gap-2 min-w-0">
+            {open ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+            <div className="min-w-0">
+              <p className="font-semibold text-sm truncate">{area.name}</p>
+              {area.description && <p className="text-xs text-muted-foreground truncate">{area.description}</p>}
             </div>
-            {isAdmin && !addTaskOpen && (
-              <button onClick={() => setAddTaskOpen(true)} className="mt-2 text-xs text-primary hover:underline flex items-center gap-1" data-testid={`btn-add-task-${area.id}`}>
-                <Plus className="w-3 h-3" />Add task
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+            {area.estimated_hours && <span className="text-xs text-muted-foreground">{area.estimated_hours}h est.</span>}
+            {totalTasks > 0 && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-16 bg-muted rounded-full h-1.5">
+                  <div className={`h-1.5 rounded-full ${pct === 100 ? "bg-green-500" : "bg-amber-400"}`} style={{ width: `${pct}%` }} />
+                </div>
+                <span className="text-xs text-muted-foreground">{doneTasks}/{totalTasks}</span>
+              </div>
+            )}
+            {isAdmin && (
+              <button onClick={(e) => { e.stopPropagation(); deleteArea(); }} className="p-1 text-muted-foreground hover:text-destructive rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
-            {isAdmin && addTaskOpen && (
-              <div className="mt-2 space-y-2 p-3 bg-muted/40 rounded-lg">
-                <Input value={taskForm.title} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} placeholder="Task description…" data-testid="input-task-title" />
-                <Textarea value={taskForm.description} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))} placeholder="Additional details (optional)" rows={2} />
-                <div className="flex items-center gap-2">
-                  <Checkbox id="rp" checked={taskForm.requires_photo} onCheckedChange={c => setTaskForm(f => ({ ...f, requires_photo: !!c }))} />
-                  <label htmlFor="rp" className="text-xs cursor-pointer">Requires photo</label>
+          </div>
+        </button>
+
+        {open && (
+          <div className="px-4 pb-4 space-y-4">
+            {/* Tasks */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Tasks</p>
+              {area.tasks.length === 0 && <p className="text-xs text-muted-foreground italic">No tasks yet</p>}
+              <div className="space-y-1">
+                {area.tasks.map(task => (
+                  <TaskRow key={task.id} task={task} woId={woId} areaId={area.id} isAdmin={isAdmin} onRefresh={onRefresh} />
+                ))}
+              </div>
+              {isAdmin && !addTaskOpen && (
+                <button onClick={() => setAddTaskOpen(true)} className="mt-2 text-xs text-primary hover:underline flex items-center gap-1">
+                  <Plus className="w-3 h-3" />Add task
+                </button>
+              )}
+              {isAdmin && addTaskOpen && (
+                <div className="mt-2 space-y-2 p-3 bg-muted/40 rounded-lg">
+                  <Input value={taskForm.title} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} placeholder="Task title" data-testid="input-task-title" />
+                  <Input value={taskForm.description} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))} placeholder="Description (optional)" />
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox checked={taskForm.requires_photo} onCheckedChange={v => setTaskForm(f => ({ ...f, requires_photo: !!v }))} />
+                    Requires photo
+                  </label>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={async () => {
+                      if (!taskForm.title.trim()) return;
+                      await save(`/api/work-orders/${woId}/areas/${area.id}/tasks`, taskForm);
+                      setTaskForm({ title: "", description: "", requires_photo: false }); setAddTaskOpen(false);
+                    }}>Add</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setAddTaskOpen(false)}>Cancel</Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={async () => {
-                    if (!taskForm.title.trim()) return;
-                    await save(`/api/work-orders/${woId}/areas/${area.id}/tasks`, taskForm);
-                    setTaskForm({ title: "", description: "", requires_photo: false });
-                    setAddTaskOpen(false);
-                  }}>Add</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setAddTaskOpen(false)}>Cancel</Button>
+              )}
+            </div>
+
+            {/* Materials */}
+            {(area.materials.length > 0 || isAdmin) && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+                  <Package className="w-3 h-3" />Materials
+                </p>
+                <div className="space-y-2">
+                  {area.materials.map(m => (
+                    <MaterialRow key={m.id} mat={m} woId={woId} onRefresh={onRefresh} isAdmin={isAdmin} />
+                  ))}
                 </div>
+                {isAdmin && !addMatOpen && (
+                  <button onClick={() => setAddMatOpen(true)} className="mt-2 text-xs text-primary hover:underline flex items-center gap-1">
+                    <Plus className="w-3 h-3" />Add material
+                  </button>
+                )}
+                {isAdmin && addMatOpen && (
+                  <div className="mt-2 space-y-2 p-3 bg-muted/40 rounded-lg">
+                    <Input value={matForm.item_name} onChange={e => setMatForm(f => ({...f, item_name: e.target.value}))} placeholder="Material name" />
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input value={matForm.quantity} onChange={e => setMatForm(f => ({...f, quantity: e.target.value}))} placeholder="Qty" type="number" />
+                      <Input value={matForm.unit} onChange={e => setMatForm(f => ({...f, unit: e.target.value}))} placeholder="Unit" />
+                      <Input value={matForm.notes} onChange={e => setMatForm(f => ({...f, notes: e.target.value}))} placeholder="Notes" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={async () => {
+                        if (!matForm.item_name.trim()) return;
+                        await save(`/api/work-orders/${woId}/materials`, { ...matForm, area_id: area.id });
+                        setMatForm({ item_name: "", quantity: "", unit: "", notes: "" }); setAddMatOpen(false);
+                      }}>Add</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setAddMatOpen(false)}>Cancel</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tools */}
+            {((area.tools || []).length > 0 || isAdmin) && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+                  <Wrench className="w-3 h-3" />Tools
+                </p>
+                <div className="space-y-2">
+                  {(area.tools || []).map(t => (
+                    <ToolRow key={t.id} tool={t} woId={woId} onRefresh={onRefresh} isAdmin={isAdmin} />
+                  ))}
+                </div>
+                {isAdmin && !addToolOpen && (
+                  <button onClick={() => setAddToolOpen(true)} className="mt-2 text-xs text-primary hover:underline flex items-center gap-1">
+                    <Plus className="w-3 h-3" />Add tool
+                  </button>
+                )}
+                {isAdmin && addToolOpen && (
+                  <div className="mt-2 space-y-2 p-3 bg-muted/40 rounded-lg">
+                    <Input value={toolForm.item_name} onChange={e => setToolForm(f => ({...f, item_name: e.target.value}))} placeholder="Tool name (e.g. Skid Steer, Hand tamper)" />
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input value={toolForm.quantity} onChange={e => setToolForm(f => ({...f, quantity: e.target.value}))} placeholder="Qty" type="number" />
+                      <Input value={toolForm.unit} onChange={e => setToolForm(f => ({...f, unit: e.target.value}))} placeholder="Unit" />
+                      <Input value={toolForm.notes} onChange={e => setToolForm(f => ({...f, notes: e.target.value}))} placeholder="Notes" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={async () => {
+                        if (!toolForm.item_name.trim()) return;
+                        await save(`/api/work-orders/${woId}/tools`, { ...toolForm, area_id: area.id });
+                        setToolForm({ item_name: "", quantity: "", unit: "", notes: "" }); setAddToolOpen(false);
+                      }}>Add</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setAddToolOpen(false)}>Cancel</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Checklist */}
+            {(area.checklist.length > 0 || isAdmin) && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Checklist</p>
+                <div className="space-y-1.5">
+                  {area.checklist.map(item => (
+                    <ChecklistRow key={item.id} item={item} woId={woId} isAdmin={isAdmin} onRefresh={onRefresh} />
+                  ))}
+                </div>
+                {isAdmin && !addCheckOpen && (
+                  <button onClick={() => setAddCheckOpen(true)} className="mt-2 text-xs text-primary hover:underline flex items-center gap-1">
+                    <Plus className="w-3 h-3" />Add checklist item
+                  </button>
+                )}
+                {isAdmin && addCheckOpen && (
+                  <div className="mt-2 space-y-2 p-3 bg-muted/40 rounded-lg">
+                    <Input value={checkLabel} onChange={e => setCheckLabel(e.target.value)} placeholder="Checklist item label" />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={async () => {
+                        if (!checkLabel.trim()) return;
+                        await save(`/api/work-orders/${woId}/checklists`, { label: checkLabel, area_id: area.id });
+                        setCheckLabel(""); setAddCheckOpen(false);
+                      }}>Add</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setAddCheckOpen(false)}>Cancel</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Hold Points (project types only) */}
+            {PROJECT_TYPES.includes(woType) && (area.hold_points.length > 0 || isAdmin) && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+                  <Shield className="w-3 h-3" />Hold Points
+                </p>
+                <div className="space-y-2">
+                  {area.hold_points.map(hp => (
+                    <HoldPointRow key={hp.id} hp={hp} woId={woId} isAdmin={isAdmin} onRefresh={onRefresh} />
+                  ))}
+                </div>
+                {isAdmin && !addHoldOpen && (
+                  <button onClick={() => setAddHoldOpen(true)} className="mt-2 text-xs text-primary hover:underline flex items-center gap-1">
+                    <Plus className="w-3 h-3" />Add hold point
+                  </button>
+                )}
+                {isAdmin && addHoldOpen && (
+                  <div className="mt-2 space-y-2 p-3 bg-muted/40 rounded-lg">
+                    <Input value={holdForm.label} onChange={e => setHoldForm(f => ({ ...f, label: e.target.value }))} placeholder="Hold point label (e.g. Base compaction check)" />
+                    <Input value={holdForm.description} onChange={e => setHoldForm(f => ({ ...f, description: e.target.value }))} placeholder="Description (optional)" />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={async () => {
+                        if (!holdForm.label.trim()) return;
+                        await save(`/api/work-orders/${woId}/hold-points`, { ...holdForm, area_id: area.id });
+                        setHoldForm({ label: "", description: "" }); setAddHoldOpen(false);
+                      }}>Add</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setAddHoldOpen(false)}>Cancel</Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
-
-          {/* Materials */}
-          {(area.materials.length > 0 || isAdmin) && (
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Materials</p>
-              {area.materials.length === 0 && <p className="text-sm text-muted-foreground italic">No materials listed</p>}
-              <div className="space-y-1.5">
-                {area.materials.map(m => <MaterialRow key={m.id} mat={m} woId={woId} onRefresh={onRefresh} isAdmin={isAdmin} />)}
-              </div>
-              {isAdmin && !addMatOpen && (
-                <button onClick={() => setAddMatOpen(true)} className="mt-2 text-xs text-primary hover:underline flex items-center gap-1" data-testid={`btn-add-mat-${area.id}`}>
-                  <Plus className="w-3 h-3" />Add material
-                </button>
-              )}
-              {isAdmin && addMatOpen && (
-                <div className="mt-2 space-y-2 p-3 bg-muted/40 rounded-lg">
-                  <Input value={matForm.item_name} onChange={e => setMatForm(f => ({ ...f, item_name: e.target.value }))} placeholder="Item name" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input type="number" value={matForm.quantity} onChange={e => setMatForm(f => ({ ...f, quantity: e.target.value }))} placeholder="Qty" />
-                    <Input value={matForm.unit} onChange={e => setMatForm(f => ({ ...f, unit: e.target.value }))} placeholder="Unit (bags, sqft…)" />
-                  </div>
-                  <Input value={matForm.notes} onChange={e => setMatForm(f => ({ ...f, notes: e.target.value }))} placeholder="Notes (optional)" />
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={async () => {
-                      if (!matForm.item_name.trim()) return;
-                      await save(`/api/work-orders/${woId}/materials`, { ...matForm, area_id: area.id, quantity: matForm.quantity ? Number(matForm.quantity) : null });
-                      setMatForm({ item_name: "", quantity: "", unit: "", notes: "" });
-                      setAddMatOpen(false);
-                    }}>Add</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setAddMatOpen(false)}>Cancel</Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Quality Checklist */}
-          {(area.checklist.length > 0 || isAdmin) && (
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Quality Checklist</p>
-              {area.checklist.length === 0 && <p className="text-sm text-muted-foreground italic">No checklist items</p>}
-              <div className="space-y-1">
-                {area.checklist.map(item => (
-                  <ChecklistRow key={item.id} item={item} woId={woId} isAdmin={isAdmin} onRefresh={onRefresh} />
-                ))}
-              </div>
-              {isAdmin && !addCheckOpen && (
-                <button onClick={() => setAddCheckOpen(true)} className="mt-2 text-xs text-primary hover:underline flex items-center gap-1">
-                  <Plus className="w-3 h-3" />Add checklist item
-                </button>
-              )}
-              {isAdmin && addCheckOpen && (
-                <div className="mt-2 flex gap-2">
-                  <Input value={checkLabel} onChange={e => setCheckLabel(e.target.value)} placeholder="Checklist item…" className="flex-1" />
-                  <Button size="sm" onClick={async () => {
-                    if (!checkLabel.trim()) return;
-                    await save(`/api/work-orders/${woId}/checklists`, { label: checkLabel, area_id: area.id });
-                    setCheckLabel(""); setAddCheckOpen(false);
-                  }}>Add</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setAddCheckOpen(false)}>Cancel</Button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Hold Points (installation only) */}
-          {woType === "installation" && (area.hold_points.length > 0 || isAdmin) && (
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1"><Shield className="w-3 h-3" />Inspection Hold Points</p>
-              {area.hold_points.length === 0 && <p className="text-sm text-muted-foreground italic">No hold points</p>}
-              <div className="space-y-1.5">
-                {area.hold_points.map(hp => (
-                  <HoldPointRow key={hp.id} hp={hp} woId={woId} isAdmin={isAdmin} onRefresh={onRefresh} />
-                ))}
-              </div>
-              {isAdmin && !addHoldOpen && (
-                <button onClick={() => setAddHoldOpen(true)} className="mt-2 text-xs text-primary hover:underline flex items-center gap-1">
-                  <Plus className="w-3 h-3" />Add hold point
-                </button>
-              )}
-              {isAdmin && addHoldOpen && (
-                <div className="mt-2 space-y-2 p-3 bg-muted/40 rounded-lg">
-                  <Input value={holdForm.label} onChange={e => setHoldForm(f => ({ ...f, label: e.target.value }))} placeholder="Hold point label (e.g. Base compaction check)" />
-                  <Input value={holdForm.description} onChange={e => setHoldForm(f => ({ ...f, description: e.target.value }))} placeholder="Description (optional)" />
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={async () => {
-                      if (!holdForm.label.trim()) return;
-                      await save(`/api/work-orders/${woId}/hold-points`, { ...holdForm, area_id: area.id });
-                      setHoldForm({ label: "", description: "" }); setAddHoldOpen(false);
-                    }}>Add</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setAddHoldOpen(false)}>Cancel</Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      )}
+        )}
+      </CardContent>
     </Card>
   );
 }
@@ -1191,6 +1389,53 @@ function MaterialRow({ mat, woId, onRefresh, isAdmin }: { mat: Material; woId: n
       </button>
       {isAdmin && (
         <button onClick={deleteMat} className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive rounded transition-opacity">
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Tool Row ─────────────────────────────────────────────────────────────────
+
+function ToolRow({ tool, woId, onRefresh, isAdmin }: { tool: Tool; woId: number; onRefresh: () => void; isAdmin: boolean }) {
+  const { toast } = useToast();
+  const [cycling, setCycling] = useState(false);
+
+  const cycleStatus = async () => {
+    setCycling(true);
+    try {
+      await apiRequest("PATCH", `/api/work-orders/${woId}/tools/${tool.id}/status`, { status: MAT_STATUS_CYCLE[tool.status] });
+      onRefresh();
+    } catch { toast({ title: "Failed to update", variant: "destructive" }); }
+    finally { setCycling(false); }
+  };
+
+  const deleteTool = async () => {
+    try {
+      await apiRequest("DELETE", `/api/work-orders/${woId}/tools/${tool.id}`, {});
+      onRefresh();
+    } catch { toast({ title: "Failed to delete", variant: "destructive" }); }
+  };
+
+  const cfg = MAT_STATUS_CFG[tool.status];
+
+  return (
+    <div className="group flex items-center gap-2">
+      <Wrench className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <span className="text-sm">{tool.item_name}</span>
+        {(tool.quantity || tool.unit) && (
+          <span className="text-xs text-muted-foreground ml-1">· {tool.quantity}{tool.unit ? ` ${tool.unit}` : ""}</span>
+        )}
+        {tool.notes && <span className="text-xs text-muted-foreground ml-1">· {tool.notes}</span>}
+      </div>
+      <button onClick={cycleStatus} disabled={cycling} data-testid={`tool-status-${tool.id}`}
+        className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cfg.cls} cursor-pointer hover:opacity-80 transition-opacity`}>
+        {cycling ? <Loader2 className="w-3 h-3 animate-spin" /> : cfg.label}
+      </button>
+      {isAdmin && (
+        <button onClick={deleteTool} className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive rounded transition-opacity">
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       )}
@@ -1479,16 +1724,18 @@ function EditWODialog({ detail, onClose, onSaved }: { detail: WorkOrder; onClose
     service_type_id: detail.service_type_id ? String(detail.service_type_id) : "none",
     crew_leader_id: detail.crew_leader_id || "none",
     scheduled_date: detail.scheduled_date || "",
-    estimated_duration: detail.estimated_duration || "",
+    estimated_hours: detail.estimated_hours ? String(detail.estimated_hours) : "",
     estimated_completion_date: detail.estimated_completion_date || "",
     property_notes: detail.property_notes || "",
     site_access_notes: detail.site_access_notes || "",
+    safety_notes: detail.safety_notes || "",
     customer_name: detail.customer_name || "",
     customer_address: detail.customer_address || "",
     customer_phone: detail.customer_phone || "",
     office_notes: detail.office_notes || "",
     contract_value: detail.contract_value || "",
     companycam_project_id: detail.companycam_project_id || "",
+    priority: (detail.priority || "normal") as WOPriority,
   });
   const [saving, setSaving] = useState(false);
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -1506,6 +1753,7 @@ function EditWODialog({ detail, onClose, onSaved }: { detail: WorkOrder; onClose
         service_type_id: form.service_type_id !== "none" ? form.service_type_id : null,
         crew_leader_id: form.crew_leader_id !== "none" ? form.crew_leader_id : null,
         contract_value: form.contract_value ? Number(form.contract_value) : null,
+        estimated_hours: form.estimated_hours ? Number(form.estimated_hours) : null,
       });
       onSaved(); onClose();
       toast({ title: "Work order updated" });
@@ -1518,15 +1766,39 @@ function EditWODialog({ detail, onClose, onSaved }: { detail: WorkOrder; onClose
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Edit Work Order</DialogTitle></DialogHeader>
         <div className="space-y-4 mt-2">
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => setWoType("maintenance")} className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-sm font-medium transition-colors ${woType === "maintenance" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-muted"}`}><Wrench className="w-4 h-4" />Maintenance</button>
-            <button onClick={() => setWoType("installation")} className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-sm font-medium transition-colors ${woType === "installation" ? "border-purple-500 bg-purple-50 text-purple-700" : "border-muted"}`}><HardHat className="w-4 h-4" />Installation</button>
-          </div>
+          {/* WO Type — 6-option grid */}
           <div>
-            <Label>Title *</Label>
-            <Input value={form.title} onChange={e => set("title", e.target.value)} />
+            <Label className="mb-2 block">Work Order Type</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {(Object.entries(TYPE_CFG) as [WOType, any][]).map(([type, cfg]) => {
+                const { Icon } = cfg;
+                const active = woType === type;
+                return (
+                  <button key={type} onClick={() => setWoType(type)}
+                    className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 text-xs font-medium transition-colors
+                      ${active ? `${cfg.bg} ${cfg.color} border-current` : "border-muted hover:border-muted-foreground/40"}`}>
+                    <Icon className="w-4 h-4" />
+                    <span className="text-center leading-tight">{cfg.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Priority + Title */}
           <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Priority</Label>
+              <Select value={form.priority} onValueChange={v => set("priority", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label>Service Type</Label>
               <Select value={form.service_type_id} onValueChange={v => set("service_type_id", v)}>
@@ -1537,17 +1809,24 @@ function EditWODialog({ detail, onClose, onSaved }: { detail: WorkOrder; onClose
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Linked Job</Label>
-              <Select value={form.job_id} onValueChange={v => set("job_id", v)}>
-                <SelectTrigger><SelectValue placeholder="Select job" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {(jobs as any[]).map((j: any) => <SelectItem key={j.id} value={String(j.id)}>{j.title}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
+
+          <div>
+            <Label>Title *</Label>
+            <Input value={form.title} onChange={e => set("title", e.target.value)} />
+          </div>
+
+          <div>
+            <Label>Linked Job</Label>
+            <Select value={form.job_id} onValueChange={v => set("job_id", v)}>
+              <SelectTrigger><SelectValue placeholder="Select job" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {(jobs as any[]).map((j: any) => <SelectItem key={j.id} value={String(j.id)}>{j.title}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="border rounded-lg p-3 space-y-3">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Customer / Site</p>
             <div className="grid grid-cols-2 gap-3">
@@ -1557,16 +1836,32 @@ function EditWODialog({ detail, onClose, onSaved }: { detail: WorkOrder; onClose
             <div><Label>Address</Label><Input value={form.customer_address} onChange={e => set("customer_address", e.target.value)} /></div>
             <div><Label>Site Access Notes</Label><Textarea value={form.site_access_notes} onChange={e => set("site_access_notes", e.target.value)} rows={2} /></div>
           </div>
+
+          {/* Safety Notes */}
+          <div className="border border-red-200 rounded-lg p-3 bg-red-50/50">
+            <Label className="text-red-700 font-semibold flex items-center gap-1.5 mb-1">
+              <AlertTriangle className="w-3.5 h-3.5" />Safety Notes
+            </Label>
+            <Textarea value={form.safety_notes} onChange={e => set("safety_notes", e.target.value)}
+              placeholder="Hazards, required PPE, unsafe areas, chemical warnings, electrical concerns…"
+              rows={2} className="border-red-200" />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Scheduled Date</Label><Input type="date" value={form.scheduled_date} onChange={e => set("scheduled_date", e.target.value)} /></div>
-            <div><Label>Est. Duration</Label><Input value={form.estimated_duration} onChange={e => set("estimated_duration", e.target.value)} /></div>
+            <div>
+              <Label>Estimated Hours</Label>
+              <Input type="number" step="0.5" min="0" value={form.estimated_hours} onChange={e => set("estimated_hours", e.target.value)} placeholder="e.g. 4 or 8.5" />
+            </div>
           </div>
-          {woType === "installation" && (
+
+          {PROJECT_TYPES.includes(woType) && (
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Contract Value ($)</Label><Input type="number" value={form.contract_value} onChange={e => set("contract_value", e.target.value)} /></div>
               <div><Label>Est. Completion</Label><Input type="date" value={form.estimated_completion_date} onChange={e => set("estimated_completion_date", e.target.value)} /></div>
             </div>
           )}
+
           <div>
             <Label>Crew Leader</Label>
             <Select value={form.crew_leader_id} onValueChange={v => set("crew_leader_id", v)}>
@@ -1579,6 +1874,7 @@ function EditWODialog({ detail, onClose, onSaved }: { detail: WorkOrder; onClose
               </SelectContent>
             </Select>
           </div>
+
           <div><Label>Property Notes</Label><Textarea value={form.property_notes} onChange={e => set("property_notes", e.target.value)} rows={2} /></div>
           <div><Label>Office Instructions</Label><Textarea value={form.office_notes} onChange={e => set("office_notes", e.target.value)} rows={2} /></div>
           <div>

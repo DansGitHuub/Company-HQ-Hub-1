@@ -175,5 +175,76 @@ export async function runWorkOrdersMigration() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_wo_checklist_area ON work_order_checklists(area_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_wo_holdpts_area   ON work_order_hold_points(area_id)`);
 
+  // ── V3 columns: priority, estimated_hours, safety_notes ───────────────────
+  const v3Cols = [
+    `ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'normal'`,
+    `ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS estimated_hours DECIMAL(6,2)`,
+    `ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS safety_notes TEXT`,
+  ];
+  for (const sql of v3Cols) {
+    try { await pool.query(sql); } catch (_) {}
+  }
+
+  // ── Data migration: remap legacy wo_type values ───────────────────────────
+  // maintenance → maintenance_visit, installation → landscape_project
+  // Safe to run multiple times (WHERE clause is already-migrated-safe).
+  try {
+    await pool.query(`UPDATE work_orders SET wo_type='maintenance_visit' WHERE wo_type='maintenance'`);
+    await pool.query(`UPDATE work_orders SET wo_type='landscape_project'  WHERE wo_type='installation'`);
+  } catch (_) {}
+
+  // ── Data migration: estimated_duration text → estimated_hours numeric ──────
+  // Parse simple patterns: "4", "4.5", "4h", "4 hours", "4.5 hrs", etc.
+  // Only runs when estimated_hours is still NULL (idempotent).
+  try {
+    await pool.query(`
+      UPDATE work_orders
+      SET estimated_hours = CASE
+        WHEN estimated_duration ~ '^[0-9]+(\\.[0-9]+)?$'
+          THEN estimated_duration::numeric
+        WHEN estimated_duration ~* '^([0-9]+(\\.[0-9]+)?)\\s*(h|hr|hrs|hour|hours)\\b'
+          THEN (regexp_match(estimated_duration, '^([0-9]+(\\.[0-9]+)?)', 'i'))[1]::numeric
+        ELSE NULL
+      END
+      WHERE estimated_duration IS NOT NULL
+        AND estimated_duration != ''
+        AND estimated_hours IS NULL
+    `);
+  } catch (_) {}
+
+  // Preserve unparseable estimated_duration in office_notes (once only).
+  try {
+    await pool.query(`
+      UPDATE work_orders
+      SET office_notes = CASE
+        WHEN office_notes IS NOT NULL AND office_notes != ''
+          THEN 'Est. Duration (original): ' || estimated_duration || E'\\n' || office_notes
+        ELSE 'Est. Duration (original): ' || estimated_duration
+      END
+      WHERE estimated_duration IS NOT NULL
+        AND estimated_duration != ''
+        AND estimated_hours IS NULL
+        AND NOT (estimated_duration ~ '^[0-9]+(\\.[0-9]+)?$')
+        AND NOT (estimated_duration ~* '^[0-9]+(\\.[0-9]+)?\\s*(h|hr|hrs|hour|hours)\\b')
+        AND (office_notes IS NULL OR office_notes NOT LIKE 'Est. Duration (original):%')
+    `);
+  } catch (_) {}
+
+  // ── Tools table (parallel to work_order_materials) ─────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS work_order_tools (
+      id              SERIAL PRIMARY KEY,
+      work_order_id   INTEGER REFERENCES work_orders(id) ON DELETE CASCADE,
+      area_id         INTEGER,
+      item_name       TEXT NOT NULL,
+      quantity        DECIMAL(10,2),
+      unit            TEXT,
+      notes           TEXT,
+      status          TEXT NOT NULL DEFAULT 'needed',
+      created_at      TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_wo_tools_wo ON work_order_tools(work_order_id)`);
+
   console.log("[migration] Work orders tables ready");
 }
