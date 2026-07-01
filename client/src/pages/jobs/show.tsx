@@ -18,7 +18,7 @@ import {
   DollarSign, Briefcase, Timer, ChevronDown, Loader2, FileText,
   Plus, Trash2, HardHat, MessageSquare, ShieldCheck, GitMerge, CheckSquare, ClipboardCheck, Award, Truck, Users, Package,
   TrendingUp, TrendingDown, Camera, Image, ExternalLink, ClipboardList, Phone,
-  LayoutDashboard, BookOpen, Activity, StickyNote, Wrench,
+  LayoutDashboard, BookOpen, Activity, StickyNote, Wrench, AlertTriangle,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -1642,6 +1642,17 @@ function JobCostingCard({ jobId, job, actualHours }: { jobId: string; job: any; 
     queryFn: () => fetch(`/api/invoices?job_id=${jobId}`, { credentials: "include" }).then(r => r.json()),
   });
 
+  // Labor cost from time entries × employee pay_rate
+  const { data: laborData } = useQuery<{
+    labor_cost: number;
+    total_hours: number;
+    entry_count: number;
+    missing_rate_count: number;
+  }>({
+    queryKey: ["/api/jobs", jobId, "labor-cost"],
+    queryFn: () => fetch(`/api/jobs/${jobId}/labor-cost`, { credentials: "include" }).then(r => r.json()),
+  });
+
   const materialsCost = materials.reduce((s: number, m: any) =>
     s + (Number(m.quantity ?? 0) * Number(m.unit_cost ?? 0)), 0);
 
@@ -1649,10 +1660,16 @@ function JobCostingCard({ jobId, job, actualHours }: { jobId: string; job: any; 
     .filter((inv: any) => inv.status !== "void")
     .reduce((s: number, inv: any) => s + Number(inv.total ?? 0), 0);
 
+  const laborCost         = laborData?.labor_cost ?? 0;
+  const laborHours        = laborData?.total_hours ?? 0;
+  const laborEntries      = laborData?.entry_count ?? 0;
+  const missingRateCount  = laborData?.missing_rate_count ?? 0;
+
   const contractValue = Number(job.price ?? job.value ?? 0);
-  const grossProfit = contractValue - materialsCost;
+  // Gross margin includes both materials and labor as COGS
+  const grossProfit = contractValue - materialsCost - laborCost;
   const margin = contractValue > 0 ? (grossProfit / contractValue) * 100 : 0;
-  const hasData = materialsCost > 0 || invoiceTotal > 0 || contractValue > 0;
+  const hasData = materialsCost > 0 || invoiceTotal > 0 || contractValue > 0 || laborCost > 0;
 
   if (!hasData) return null;
 
@@ -1664,11 +1681,14 @@ function JobCostingCard({ jobId, job, actualHours }: { jobId: string; job: any; 
         </CardTitle>
       </CardHeader>
       <CardContent className="pb-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {/* Contract Value */}
           <div className="space-y-0.5">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Contract Value</p>
             <p className="text-lg font-bold">{contractValue > 0 ? fmt$(contractValue) : "—"}</p>
           </div>
+
+          {/* Materials Cost */}
           <div className="space-y-0.5">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Materials Cost</p>
             <p className="text-lg font-bold text-amber-600">{materialsCost > 0 ? fmt$(materialsCost) : "—"}</p>
@@ -1676,24 +1696,63 @@ function JobCostingCard({ jobId, job, actualHours }: { jobId: string; job: any; 
               <p className="text-xs text-muted-foreground">{materials.length} item{materials.length !== 1 ? "s" : ""}</p>
             )}
           </div>
+
+          {/* Labor Cost */}
+          <div className="space-y-0.5">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Labor Cost</p>
+            <p className="text-lg font-bold text-orange-600">
+              {laborCost > 0 ? fmt$(laborCost) : laborEntries > 0 ? "$0" : "—"}
+            </p>
+            {laborEntries > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {laborHours.toFixed(1)}h · {laborEntries} entr{laborEntries !== 1 ? "ies" : "y"}
+              </p>
+            )}
+            {missingRateCount > 0 && (
+              <p className="text-xs text-amber-600 flex items-center gap-0.5 mt-0.5">
+                <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                {missingRateCount} w/o pay rate
+              </p>
+            )}
+          </div>
+
+          {/* Invoiced */}
           <div className="space-y-0.5">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Invoiced</p>
             <p className="text-lg font-bold text-blue-600">{invoiceTotal > 0 ? fmt$(invoiceTotal) : "—"}</p>
             {invoices.filter((i: any) => i.status !== "void").length > 0 && (
-              <p className="text-xs text-muted-foreground">{invoices.filter((i: any) => i.status !== "void").length} invoice{invoices.filter((i: any) => i.status !== "void").length !== 1 ? "s" : ""}</p>
+              <p className="text-xs text-muted-foreground">
+                {invoices.filter((i: any) => i.status !== "void").length} invoice{invoices.filter((i: any) => i.status !== "void").length !== 1 ? "s" : ""}
+              </p>
             )}
           </div>
+
+          {/* Gross Margin */}
           <div className="space-y-0.5">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Gross Margin</p>
             <p className={`text-lg font-bold flex items-center gap-1 ${margin >= 30 ? "text-green-600" : margin >= 0 ? "text-amber-500" : "text-red-600"}`}>
               {margin >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
               {contractValue > 0 ? `${margin.toFixed(1)}%` : "—"}
             </p>
-            {contractValue > 0 && materialsCost > 0 && (
-              <p className={`text-xs ${grossProfit >= 0 ? "text-green-600" : "text-red-500"}`}>{fmt$(grossProfit)}</p>
+            {contractValue > 0 && (materialsCost > 0 || laborCost > 0) && (
+              <p className={`text-xs ${grossProfit >= 0 ? "text-green-600" : "text-red-500"}`}>
+                {fmt$(grossProfit)}
+              </p>
             )}
           </div>
         </div>
+
+        {/* Formula transparency note */}
+        {contractValue > 0 && (materialsCost > 0 || laborCost > 0) && (
+          <p className="text-[11px] text-muted-foreground mt-3">
+            Margin = (Contract − Materials − Labor) ÷ Contract
+            {missingRateCount > 0 && (
+              <span className="ml-2 text-amber-600">
+                · {missingRateCount} time entr{missingRateCount !== 1 ? "ies" : "y"} missing pay rate — labor cost may be understated
+              </span>
+            )}
+          </p>
+        )}
       </CardContent>
     </Card>
   );

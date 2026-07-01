@@ -205,6 +205,43 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── LABOR COST FOR JOB COSTING SUMMARY ───────────────────────────────────────
+  // Computes labor cost from completed, non-break/shop time entries × employee pay_rate.
+  // Mirrors the join used in /api/reports/job-profitability for consistency.
+  app.get("/api/jobs/:id/labor-cost", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    try {
+      const { rows } = await pool.query(
+        `SELECT
+           COALESCE(SUM(
+             EXTRACT(EPOCH FROM (te.clock_out - te.clock_in)) / 3600
+             * COALESCE(NULLIF(emp.pay_rate, '')::numeric, 0)
+           ), 0)::numeric AS labor_cost,
+           COALESCE(SUM(
+             EXTRACT(EPOCH FROM (te.clock_out - te.clock_in)) / 3600
+           ), 0)::numeric AS total_hours,
+           COUNT(te.id)::int AS entry_count,
+           COUNT(CASE WHEN (emp.pay_rate IS NULL OR emp.pay_rate = '') THEN 1 END)::int AS missing_rate_count
+         FROM time_entries te
+         LEFT JOIN employees emp ON emp.user_id = te.user_id
+         WHERE te.job_id = $1
+           AND te.clock_out IS NOT NULL
+           AND te.entry_type NOT IN ('break', 'shop_time', 'shop')`,
+        [id]
+      );
+      const r = rows[0];
+      return res.json({
+        labor_cost:          Math.round(Number(r.labor_cost) * 100) / 100,
+        total_hours:         Math.round(Number(r.total_hours) * 100) / 100,
+        entry_count:         Number(r.entry_count),
+        missing_rate_count:  Number(r.missing_rate_count),
+      });
+    } catch (err: any) {
+      console.error("[jobs/labor-cost]", err.message);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── CREATE ────────────────────────────────────────────────────────────────────
   app.post("/api/jobs", requireAuth, async (req, res) => {
     const {
