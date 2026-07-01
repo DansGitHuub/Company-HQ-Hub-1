@@ -294,6 +294,9 @@ export default function WorkOrders() {
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       apiRequest("PATCH", `/api/work-orders/${id}/status`, { status }),
     onSuccess: () => { invalidate(); toast({ title: "Status updated" }); },
+    onError: (err: any) => {
+      toast({ title: err?.message || "Failed to update status", variant: "destructive" });
+    },
   });
 
   const deleteMut = useMutation({
@@ -653,10 +656,37 @@ function DetailView({ id, detail, isLoading, isAdmin, user, activeTab, setActive
   const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [readinessBlocked, setReadinessBlocked] = useState<string[]>([]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["/api/work-orders", id] });
     onRefresh();
+  };
+
+  const handleStatusChange = (status: string) => {
+    if (status === "ready" && detail) {
+      const allMaterials = [
+        ...(detail.wo_materials || []),
+        ...(detail.areas || []).flatMap(a => a.materials || []),
+      ];
+      const allTools = [
+        ...(detail.wo_tools || []),
+        ...(detail.areas || []).flatMap(a => a.tools || []),
+      ];
+      const missing: string[] = [];
+      if (allMaterials.length === 0) missing.push("at least 1 Materials line item");
+      if (allTools.length === 0)     missing.push("at least 1 Tools line item");
+      const mNQ = allMaterials.filter(m => !m.quantity || Number(m.quantity) === 0).length;
+      if (mNQ > 0) missing.push(`quantity on ${mNQ} material item${mNQ !== 1 ? "s" : ""}`);
+      const tNQ = allTools.filter(t => !t.quantity || Number(t.quantity) === 0).length;
+      if (tNQ > 0) missing.push(`quantity on ${tNQ} tool item${tNQ !== 1 ? "s" : ""}`);
+      if (!detail.site_access_notes?.trim()) missing.push("Site Access Notes");
+      if (missing.length > 0) {
+        setReadinessBlocked(missing);
+        return;
+      }
+    }
+    onStatusChange(status);
   };
 
   if (isLoading || !detail) {
@@ -698,7 +728,7 @@ function DetailView({ id, detail, isLoading, isAdmin, user, activeTab, setActive
           <div className="flex items-center gap-2 flex-shrink-0">
             {isAdmin && (
               <>
-                <Select value={detail.status} onValueChange={onStatusChange}>
+                <Select value={detail.status} onValueChange={handleStatusChange}>
                   <SelectTrigger className="w-36 h-8 text-sm" data-testid="select-wo-status"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {STATUS_ORDER.map(s => <SelectItem key={s} value={s}>{STATUS_CFG[s].label}</SelectItem>)}
@@ -755,6 +785,32 @@ function DetailView({ id, detail, isLoading, isAdmin, user, activeTab, setActive
             <div className="flex justify-end gap-2 mt-4">
               <Button variant="outline" onClick={() => setConfirmDelete(false)}>Cancel</Button>
               <Button variant="destructive" onClick={() => { onDelete(); setConfirmDelete(false); }}>Delete</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {readinessBlocked.length > 0 && (
+        <Dialog open onOpenChange={() => setReadinessBlocked([])}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-700">
+                <AlertTriangle className="w-5 h-5" />Cannot Mark Ready
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground mb-3">
+              The following must be completed before this work order can be set to Ready:
+            </p>
+            <ul className="space-y-2">
+              {readinessBlocked.map((item, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm">
+                  <X className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end mt-5">
+              <Button onClick={() => setReadinessBlocked([])}>Got it</Button>
             </div>
           </DialogContent>
         </Dialog>

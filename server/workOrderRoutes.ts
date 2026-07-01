@@ -321,16 +321,26 @@ export function registerWorkOrderRoutes(app: any, requireAuth: any) {
       const valid = ["draft", "ready", "in_progress", "on_hold", "complete"];
       if (!valid.includes(status)) return res.status(400).json({ message: "Invalid status" });
 
-      // Enforce readiness before advancing to 'ready' or 'in_progress'
-      if (status === "ready" || status === "in_progress") {
-        const detail = await loadDetail(id);
-        if (!detail) return res.status(404).json({ message: "Work order not found" });
-        if (!detail.is_ready) {
-          const missing = Object.entries(detail.readiness as Record<string, boolean>)
-            .filter(([, v]) => !v)
-            .map(([k]) => k.replace(/_/g, " "))
-            .join(", ");
-          return res.status(422).json({ message: `Work order is not ready. Missing: ${missing}` });
+      // Gate: only "ready" requires prerequisite checks
+      if (status === "ready") {
+        const [woRes, matCnt, toolCnt, matNQ, toolNQ] = await Promise.all([
+          pool.query(`SELECT site_access_notes FROM work_orders WHERE id=$1`, [id]),
+          pool.query(`SELECT COUNT(*) AS cnt FROM work_order_materials WHERE work_order_id=$1`, [id]),
+          pool.query(`SELECT COUNT(*) AS cnt FROM work_order_tools       WHERE work_order_id=$1`, [id]),
+          pool.query(`SELECT COUNT(*) AS cnt FROM work_order_materials WHERE work_order_id=$1 AND (quantity IS NULL OR quantity::numeric = 0)`, [id]),
+          pool.query(`SELECT COUNT(*) AS cnt FROM work_order_tools       WHERE work_order_id=$1 AND (quantity IS NULL OR quantity::numeric = 0)`, [id]),
+        ]);
+        if (!woRes.rows.length) return res.status(404).json({ message: "Not found" });
+        const missing: string[] = [];
+        if (Number(matCnt.rows[0].cnt)  === 0) missing.push("at least 1 Materials line item");
+        if (Number(toolCnt.rows[0].cnt) === 0) missing.push("at least 1 Tools line item");
+        const mNQ = Number(matNQ.rows[0].cnt);
+        if (mNQ  > 0) missing.push(`quantity on ${mNQ} material item${mNQ  !== 1 ? "s" : ""}`);
+        const tNQ = Number(toolNQ.rows[0].cnt);
+        if (tNQ  > 0) missing.push(`quantity on ${tNQ} tool item${tNQ !== 1 ? "s" : ""}`);
+        if (!woRes.rows[0].site_access_notes?.trim()) missing.push("Site Access Notes");
+        if (missing.length > 0) {
+          return res.status(422).json({ message: `Cannot mark Ready — Missing: ${missing.join(", ")}`, missing });
         }
       }
 
