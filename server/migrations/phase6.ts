@@ -14,11 +14,20 @@ export async function runPhase6Migration() {
         quantity         NUMERIC(10,2) NOT NULL DEFAULT 1,
         unit_cost        NUMERIC(10,2),
         notes            TEXT,
-        created_by_id    INTEGER,
+        created_by_id    TEXT,
         created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_job_materials_job ON job_materials(job_id)`);
+
+    // Fix: created_by_id was originally INTEGER but users.id is VARCHAR (UUID).
+    // Safe to run multiple times — try/catch handles "already TEXT" case.
+    try {
+      await pool.query(`
+        ALTER TABLE job_materials
+        ALTER COLUMN created_by_id TYPE TEXT USING created_by_id::text
+      `);
+    } catch (_) {}
 
     // ── job_templates ─────────────────────────────────────────────────────────
     await pool.query(`

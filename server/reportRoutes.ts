@@ -130,22 +130,31 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
           COALESCE(j.price, 0)::numeric AS contract_value,
           COALESCE(j.estimated_hours, 0)::numeric AS est_hours,
           COALESCE(j.total_hours, 0)::numeric AS actual_hours,
+          COALESCE(mat.materials_cost, 0)::numeric AS materials_cost,
           c.first_name, c.last_name, c.company_name
         FROM jobs j
         LEFT JOIN customers c ON c.id::text = j.customer_id::text
+        LEFT JOIN (
+          SELECT job_id,
+                 ROUND(SUM(quantity * unit_cost)::numeric, 2) AS materials_cost
+          FROM job_materials
+          WHERE quantity IS NOT NULL AND unit_cost IS NOT NULL
+          GROUP BY job_id
+        ) mat ON mat.job_id = j.id::text
         ${where}
         ORDER BY j.scheduled_date DESC NULLS LAST
         LIMIT 200
       `, params);
 
       const rows = jobs.rows.map(r => {
-        const contract  = Number(r.contract_value);
-        const estCost   = contract * 0.60;   // mock: assume 60% cost ratio
-        const actualCst = contract * 0.60 * (r.actual_hours > 0 && r.est_hours > 0
+        const contract      = Number(r.contract_value);
+        const materialsCost = Number(r.materials_cost || 0);
+        const estCost       = contract * 0.60;   // mock: assume 60% cost ratio
+        const actualCst     = contract * 0.60 * (r.actual_hours > 0 && r.est_hours > 0
           ? Number(r.actual_hours) / Number(r.est_hours) : 1);
-        const profit    = contract - actualCst;
-        const margin    = contract > 0 ? (profit / contract) * 100 : 0;
-        const variance  = Number(r.actual_hours) - Number(r.est_hours);
+        const profit        = contract - actualCst;
+        const margin        = contract > 0 ? (profit / contract) * 100 : 0;
+        const variance      = Number(r.actual_hours) - Number(r.est_hours);
         return {
           id:             r.id,
           title:          r.title,
@@ -154,6 +163,7 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
           scheduled_date: r.scheduled_date,
           customer:       r.company_name || `${r.first_name || ""} ${r.last_name || ""}`.trim() || "—",
           contract_value: contract,
+          materials_cost: Math.round(materialsCost * 100) / 100,
           est_cost:       Math.round(estCost * 100) / 100,
           actual_cost:    Math.round(actualCst * 100) / 100,
           gross_profit:   Math.round(profit * 100) / 100,
