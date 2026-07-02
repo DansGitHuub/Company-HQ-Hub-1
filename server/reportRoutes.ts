@@ -521,13 +521,17 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
       const [revenueYtd, totalAR, winRate, utilization, jobsByStage, maintCompliance] =
         await Promise.all([
 
-          // 1. Revenue YTD — same statuses as the Revenue Report "Realized" preset
+          // 1. Revenue YTD — identical filter to the Revenue Report tab (case-sensitive
+          //    title-case values, same price guard, same year-of-scheduled_date scope).
+          //    Previously used LOWER(status) which matched lowercase DB values that the
+          //    Revenue Report's exact-case comparison misses, causing the two to diverge.
           pool.query(`
             SELECT COALESCE(SUM(price), 0)::numeric AS revenue_ytd
             FROM jobs
             WHERE EXTRACT(YEAR FROM scheduled_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+              AND price IS NOT NULL
               AND price > 0
-              AND LOWER(status) IN ('completed', 'invoiced', 'paid')
+              AND status = ANY(ARRAY['Completed', 'Invoiced', 'Paid'])
           `),
 
           // 2. Total AR — same WHERE as invoice-aging endpoint
@@ -626,7 +630,12 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
 
       const totalMin    = Number(utilization.rows[0]?.total_minutes    ?? 0);
       const billableMin = Number(utilization.rows[0]?.billable_minutes ?? 0);
-      const utilizationPct = totalMin > 0 ? (billableMin / totalMin) * 100 : null;
+      // Require at least 6 minutes of total time so the displayed hours value
+      // is >= 0.1 hrs (the minimum non-zero value at 1 decimal place).
+      // When totalMin < 6 the UI would show "0.0 hrs" for both figures yet the
+      // division could yield 100%, which is misleading — return null instead
+      // so the tile displays "—" (no meaningful data).
+      const utilizationPct = totalMin >= 6 ? (billableMin / totalMin) * 100 : null;
 
       const maintTotal   = Number(maintCompliance.rows[0]?.total_count     ?? 0);
       const maintBehind  = Number(maintCompliance.rows[0]?.behind_count     ?? 0);
