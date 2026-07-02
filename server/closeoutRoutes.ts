@@ -156,22 +156,29 @@ export function registerCloseoutRoutes(app: Express, requireAuth: any) {
 
       // 4. Auto-create warranty (uses duration and terms from closeout form)
       if ((closeout.warranty_duration_months ?? 0) > 0) {
-        const startDate = new Date().toISOString().slice(0, 10);
-        const endDate = new Date();
-        endDate.setMonth(endDate.getMonth() + closeout.warranty_duration_months);
-        await pool.query(
-          `INSERT INTO job_warranties
-             (job_id, customer_id, property_id, closeout_id, title, description,
-              duration_months, start_date, end_date, status, terms, created_by)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',$10,$11)
-           ON CONFLICT DO NOTHING`,
-          [jobId, job.customer_id || null, job.property_id || null, closeout.id,
-           `Warranty — ${job.title || jobId}`,
-           closeout.warranty_terms || `Standard ${closeout.warranty_duration_months}-month workmanship warranty`,
-           closeout.warranty_duration_months,
-           startDate, endDate.toISOString().slice(0, 10),
-           closeout.warranty_terms || null, req.user.id]
-        ).catch((e: any) => console.error("[closeout] warranty create:", e.message));
+        try {
+          const startDate = new Date().toISOString().slice(0, 10);
+          const endDate = new Date();
+          endDate.setMonth(endDate.getMonth() + closeout.warranty_duration_months);
+          // Use TEXT cast for closeout_id so node-postgres type binding is unambiguous.
+          // No ON CONFLICT clause — job_warranties has no unique constraint on job_id,
+          // so the old DO NOTHING was silently preventing the insert on some pg versions.
+          await pool.query(
+            `INSERT INTO job_warranties
+               (job_id, customer_id, property_id, closeout_id, title, description,
+                duration_months, start_date, end_date, status, terms, created_by)
+             VALUES ($1,$2,$3,$4::uuid,$5,$6,$7,$8,$9,'active',$10,$11)`,
+            [jobId, job.customer_id || null, job.property_id || null,
+             String(closeout.id),
+             `Warranty — ${job.title || jobId}`,
+             closeout.warranty_terms || `Standard ${closeout.warranty_duration_months}-month workmanship warranty`,
+             closeout.warranty_duration_months,
+             startDate, endDate.toISOString().slice(0, 10),
+             closeout.warranty_terms || null, req.user.id]
+          );
+        } catch (e: any) {
+          console.error("[closeout] warranty create failed:", e.message);
+        }
       }
 
       // 5. Auto-create invoice draft (once per job, sets invoice_created = true)

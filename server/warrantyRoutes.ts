@@ -15,7 +15,7 @@ export function registerWarrantyRoutes(app: Express, requireAuth: any) {
     const conditions: string[] = [];
     const params: any[] = [];
 
-    if (status) { params.push(status); conditions.push(`jw.status = $${params.length}`); }
+    if (status)      { params.push(status);      conditions.push(`jw.status = $${params.length}`); }
     if (customer_id) { params.push(customer_id); conditions.push(`jw.customer_id = $${params.length}`); }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -23,7 +23,7 @@ export function registerWarrantyRoutes(app: Express, requireAuth: any) {
       const { rows } = await pool.query(
         `SELECT jw.*,
                 j.title AS job_title, j.client AS job_client,
-                u.first_name || ' ' || u.last_name AS created_by_name
+                u.name AS created_by_name
          FROM job_warranties jw
          LEFT JOIN jobs j ON j.id = jw.job_id
          LEFT JOIN users u ON u.id = jw.created_by
@@ -43,7 +43,7 @@ export function registerWarrantyRoutes(app: Express, requireAuth: any) {
       const { rows } = await pool.query(
         `SELECT jw.*,
                 j.title AS job_title,
-                u.first_name || ' ' || u.last_name AS created_by_name
+                u.name AS created_by_name
          FROM job_warranties jw
          LEFT JOIN jobs j ON j.id = jw.job_id
          LEFT JOIN users u ON u.id = jw.created_by
@@ -72,7 +72,7 @@ export function registerWarrantyRoutes(app: Express, requireAuth: any) {
 
       const { rows: claims } = await pool.query(
         `SELECT wc.*,
-                u.first_name || ' ' || u.last_name AS resolved_by_name
+                u.name AS resolved_by_name
          FROM warranty_claims wc
          LEFT JOIN users u ON u.id = wc.resolved_by
          WHERE wc.warranty_id = $1
@@ -181,7 +181,7 @@ export function registerWarrantyRoutes(app: Express, requireAuth: any) {
         `SELECT wc.*,
                 jw.title AS warranty_title, jw.job_id,
                 j.title AS job_title,
-                u.first_name || ' ' || u.last_name AS resolved_by_name
+                u.name AS resolved_by_name
          FROM warranty_claims wc
          LEFT JOIN job_warranties jw ON jw.id = wc.warranty_id
          LEFT JOIN jobs j ON j.id = wc.job_id
