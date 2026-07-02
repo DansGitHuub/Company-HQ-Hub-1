@@ -1004,6 +1004,184 @@ function MaterialsSpend() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  At a Glance Panel
+// ═══════════════════════════════════════════════════════════════════════════════
+const STAGE_COLORS: Record<string, string> = {
+  lead:          "bg-slate-100 text-slate-700",
+  Lead:          "bg-slate-100 text-slate-700",
+  scheduled:     "bg-blue-100 text-blue-700",
+  Scheduled:     "bg-blue-100 text-blue-700",
+  in_progress:   "bg-yellow-100 text-yellow-700",
+  "In Progress": "bg-yellow-100 text-yellow-700",
+  on_hold:       "bg-orange-100 text-orange-700",
+  "On Hold":     "bg-orange-100 text-orange-700",
+  active:        "bg-green-100 text-green-700",
+  Active:        "bg-green-100 text-green-700",
+};
+
+function GlanceTile({
+  label, value, sub, icon: Icon, iconColor = "bg-primary/10 text-primary",
+}: {
+  label: string; value: string; sub?: string;
+  icon: React.ElementType; iconColor?: string;
+}) {
+  return (
+    <div className="flex items-start gap-3" data-testid={`glance-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+      <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${iconColor}`}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider leading-none">{label}</p>
+        <p className="text-xl font-bold mt-1 leading-none">{value}</p>
+        {sub && <p className="text-xs text-muted-foreground mt-1 leading-snug">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+function stageLabel(s: string) {
+  const map: Record<string, string> = {
+    lead: "Lead", scheduled: "Scheduled", in_progress: "In Progress",
+    on_hold: "On Hold", active: "Active", invoiced: "Invoiced",
+    completed: "Completed", cancelled: "Cancelled", paid: "Paid",
+  };
+  return map[s.toLowerCase()] ?? s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function AtAGlance() {
+  const { data, isLoading, isError } = useQuery<any>({
+    queryKey: ["/api/reports/at-a-glance"],
+    queryFn: () => fetch("/api/reports/at-a-glance", { credentials: "include" }).then(r => r.json()),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  return (
+    <Card className="mb-6" data-testid="at-a-glance-panel">
+      <CardHeader className="pb-3 pt-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Layers className="h-4 w-4 text-primary" />
+              At a Glance
+            </CardTitle>
+            <CardDescription className="text-xs mt-0.5">
+              Revenue &amp; AR: year-to-date &nbsp;·&nbsp; Win Rate: last 90 days &nbsp;·&nbsp; Utilization: last 30 days
+            </CardDescription>
+          </div>
+          {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0 mt-1" />}
+        </div>
+      </CardHeader>
+
+      <CardContent className="pb-5">
+        {isError && (
+          <div className="flex items-center gap-2 text-destructive text-sm">
+            <AlertCircle className="h-4 w-4" /> Failed to load summary
+          </div>
+        )}
+
+        {data && !isLoading && (
+          <div className="space-y-5">
+            {/* ── Five metric tiles ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-5">
+              <GlanceTile
+                label="Revenue YTD"
+                value={fmt$(data.revenue_ytd)}
+                sub="Completed · Invoiced · Paid"
+                icon={DollarSign}
+                iconColor="bg-green-100 text-green-700"
+              />
+              <GlanceTile
+                label="Total AR"
+                value={fmt$(data.total_ar)}
+                sub={
+                  data.ar_invoice_count > 0
+                    ? `${data.ar_invoice_count} open invoice${data.ar_invoice_count !== 1 ? "s" : ""}`
+                    : "No open invoices"
+                }
+                icon={FileText}
+                iconColor="bg-blue-100 text-blue-700"
+              />
+              <GlanceTile
+                label="Win Rate"
+                value={data.win_rate_pct != null ? fmtPct(data.win_rate_pct) : "—"}
+                sub={
+                  data.win_rate_total > 0
+                    ? `${data.win_rate_won} won of ${data.win_rate_total} finalized (90d)`
+                    : "No finalized estimates in 90 days"
+                }
+                icon={TrendingUp}
+                iconColor={
+                  data.win_rate_pct == null
+                    ? "bg-muted text-muted-foreground"
+                    : data.win_rate_pct >= 50
+                    ? "bg-green-100 text-green-700"
+                    : "bg-orange-100 text-orange-700"
+                }
+              />
+              <GlanceTile
+                label="Crew Utilization"
+                value={data.utilization_pct != null ? fmtPct(data.utilization_pct) : "—"}
+                sub={
+                  data.utilization_total_min > 0
+                    ? `${fmtHrs(data.utilization_billable_min / 60)} billable of ${fmtHrs(data.utilization_total_min / 60)} (30d)`
+                    : "No time logged in 30 days"
+                }
+                icon={Timer}
+                iconColor="bg-orange-100 text-orange-700"
+              />
+              <GlanceTile
+                label="Maint. Compliance"
+                value={data.maintenance_compliance_pct != null ? fmtPct(data.maintenance_compliance_pct) : "—"}
+                sub={
+                  data.maintenance_total > 0
+                    ? `${data.maintenance_behind} job${data.maintenance_behind !== 1 ? "s" : ""} behind schedule`
+                    : "No maintenance jobs this year"
+                }
+                icon={BarChart2}
+                iconColor={
+                  data.maintenance_compliance_pct == null
+                    ? "bg-muted text-muted-foreground"
+                    : data.maintenance_compliance_pct >= 80
+                    ? "bg-green-100 text-green-700"
+                    : data.maintenance_compliance_pct >= 60
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-red-100 text-red-600"
+                }
+              />
+            </div>
+
+            {/* ── Jobs by Stage ── */}
+            <div className="border-t pt-4">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <Briefcase className="h-3.5 w-3.5" /> Active Jobs by Stage
+              </p>
+              {data.jobs_by_stage && data.jobs_by_stage.length > 0 ? (
+                <div className="flex flex-wrap gap-2" data-testid="jobs-by-stage">
+                  {data.jobs_by_stage.map((item: any) => (
+                    <div
+                      key={item.status}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
+                        STAGE_COLORS[item.status] ?? "bg-muted text-muted-foreground"
+                      }`}
+                      data-testid={`stage-badge-${item.status}`}
+                    >
+                      <span className="font-bold tabular-nums">{item.cnt}</span>
+                      <span className="text-xs opacity-80">{stageLabel(item.status)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No active jobs.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  Main Reports Page
 // ═══════════════════════════════════════════════════════════════════════════════
 const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] = [
@@ -1020,12 +1198,14 @@ export default function Reports() {
 
   return (
     <div className="container max-w-6xl mx-auto py-6 px-4" data-testid="reports-page">
-      <div className="mb-6">
+      <div className="mb-4">
         <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-reports-title">
           <BarChart2 className="h-6 w-6" /> Reports
         </h1>
         <p className="text-muted-foreground mt-1">Financial and operational analytics for your business</p>
       </div>
+
+      <AtAGlance />
 
       <div className="flex flex-col md:flex-row gap-6">
         {/* Sidebar nav */}

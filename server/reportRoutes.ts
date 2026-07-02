@@ -510,4 +510,148 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // ── AT A GLANCE ─────────────────────────────────────────────────────────────
+  // Single endpoint — 6 parallel queries, sensible defaults (YTD / 90d / 30d).
+  // Win Rate uses sales_estimates.sent_at + customer_response ('accepted'/'declined').
+  // Crew Utilization uses time_entries.job_id IS NOT NULL as "billable".
+  // Maintenance Compliance uses jobs.division = 'Maintenance' + scheduled_date vs today.
+  app.get("/api/reports/at-a-glance", requireAuth, async (req: any, res) => {
+    try {
+      const [revenueYtd, totalAR, winRate, utilization, jobsByStage, maintCompliance] =
+        await Promise.all([
+
+          // 1. Revenue YTD — same statuses as the Revenue Report "Realized" preset
+          pool.query(`
+            SELECT COALESCE(SUM(price), 0)::numeric AS revenue_ytd
+            FROM jobs
+            WHERE EXTRACT(YEAR FROM scheduled_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+              AND price > 0
+              AND LOWER(status) IN ('completed', 'invoiced', 'paid')
+          `),
+
+          // 2. Total AR — same WHERE as invoice-aging endpoint
+          pool.query(`
+            SELECT
+              COALESCE(SUM(balance_due), 0)::numeric AS total_ar,
+              COUNT(*)::int AS invoice_count
+            FROM invoices
+            WHERE status NOT IN ('Paid', 'Void', 'Cancelled', 'draft')
+              AND balance_due > 0
+          `),
+
+          // 3. Win Rate (last 90 days)
+          //    "Sent" = sent_at IS NOT NULL within window
+          //    "Won"  = customer_response = 'accepted'
+          //    "Lost" = customer_response IN ('declined', 'rejected')
+          //    Rate   = won / (won + lost)  [excludes pending/no-response]
+          pool.query(`
+            SELECT
+              COUNT(*) FILTER (
+                WHERE LOWER(customer_response) = 'accepted'
+              )::int AS won,
+              COUNT(*) FILTER (
+                WHERE LOWER(customer_response) IN ('declined', 'rejected')
+              )::int AS lost
+            FROM sales_estimates
+            WHERE sent_at IS NOT NULL
+              AND sent_at >= NOW() - INTERVAL '90 days'
+          `),
+
+          // 4. Crew Utilization (last 30 days)
+          //    Billable = job_id IS NOT NULL; Total = all completed clock-outs
+          pool.query(`
+            SELECT
+              COALESCE(SUM(
+                COALESCE(
+                  duration_minutes,
+                  CASE WHEN clock_out IS NOT NULL
+                    THEN EXTRACT(EPOCH FROM (clock_out - clock_in)) / 60.0
+                    ELSE 0 END
+                )
+              ), 0)::numeric AS total_minutes,
+              COALESCE(SUM(
+                CASE WHEN job_id IS NOT NULL THEN
+                  COALESCE(
+                    duration_minutes,
+                    CASE WHEN clock_out IS NOT NULL
+                      THEN EXTRACT(EPOCH FROM (clock_out - clock_in)) / 60.0
+                      ELSE 0 END
+                  )
+                ELSE 0 END
+              ), 0)::numeric AS billable_minutes
+            FROM time_entries
+            WHERE clock_in >= NOW() - INTERVAL '30 days'
+              AND clock_out IS NOT NULL
+          `),
+
+          // 5. Active jobs grouped by status (excludes terminal statuses)
+          pool.query(`
+            SELECT status, COUNT(*)::int AS cnt
+            FROM jobs
+            WHERE LOWER(status) NOT IN ('completed', 'invoiced', 'paid', 'cancelled')
+              AND status IS NOT NULL
+            GROUP BY status
+            ORDER BY cnt DESC
+          `),
+
+          // 6. Maintenance Compliance (current year, division = Maintenance)
+          //    "Behind" = not completed AND scheduled_date has already passed
+          //    "On schedule" = completed OR scheduled_date is today/future
+          pool.query(`
+            SELECT
+              COUNT(*)::int AS total_count,
+              COUNT(*) FILTER (
+                WHERE LOWER(status) IN ('completed', 'invoiced', 'paid')
+              )::int AS completed_count,
+              COUNT(*) FILTER (
+                WHERE LOWER(status) NOT IN ('completed', 'invoiced', 'paid', 'cancelled')
+                  AND scheduled_date IS NOT NULL
+                  AND DATE(scheduled_date) < CURRENT_DATE
+              )::int AS behind_count,
+              COUNT(*) FILTER (
+                WHERE LOWER(status) NOT IN ('completed', 'invoiced', 'paid', 'cancelled')
+                  AND (scheduled_date IS NULL OR DATE(scheduled_date) >= CURRENT_DATE)
+              )::int AS on_schedule_count
+            FROM jobs
+            WHERE LOWER(division) = 'maintenance'
+              AND EXTRACT(YEAR FROM COALESCE(scheduled_date, created_at)) = EXTRACT(YEAR FROM CURRENT_DATE)
+          `),
+        ]);
+
+      const won       = Number(winRate.rows[0]?.won  ?? 0);
+      const lost      = Number(winRate.rows[0]?.lost ?? 0);
+      const finalized = won + lost;
+      const winRatePct = finalized > 0 ? (won / finalized) * 100 : null;
+
+      const totalMin    = Number(utilization.rows[0]?.total_minutes    ?? 0);
+      const billableMin = Number(utilization.rows[0]?.billable_minutes ?? 0);
+      const utilizationPct = totalMin > 0 ? (billableMin / totalMin) * 100 : null;
+
+      const maintTotal   = Number(maintCompliance.rows[0]?.total_count     ?? 0);
+      const maintBehind  = Number(maintCompliance.rows[0]?.behind_count     ?? 0);
+      const maintGood    = Number(maintCompliance.rows[0]?.completed_count  ?? 0)
+                         + Number(maintCompliance.rows[0]?.on_schedule_count ?? 0);
+      const maintPct     = maintTotal > 0 ? (maintGood / maintTotal) * 100 : null;
+
+      res.json({
+        revenue_ytd:                 Number(revenueYtd.rows[0]?.revenue_ytd ?? 0),
+        total_ar:                    Number(totalAR.rows[0]?.total_ar        ?? 0),
+        ar_invoice_count:            Number(totalAR.rows[0]?.invoice_count   ?? 0),
+        win_rate_pct:                winRatePct,
+        win_rate_won:                won,
+        win_rate_total:              finalized,
+        utilization_pct:             utilizationPct,
+        utilization_billable_min:    billableMin,
+        utilization_total_min:       totalMin,
+        jobs_by_stage:               jobsByStage.rows,
+        maintenance_compliance_pct:  maintPct,
+        maintenance_total:           maintTotal,
+        maintenance_behind:          maintBehind,
+      });
+    } catch (err: any) {
+      console.error("[reports/at-a-glance]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
 }
