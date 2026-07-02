@@ -42,7 +42,7 @@ export function registerDailyPlanRoutes(app: Express, requireAuth: any) {
           j.scheduled_start_time, j.scheduled_end_time,
           j.estimated_hours, j.crew_lead_id,
           j.crew_lead_name,
-          e.name AS crew_lead_display_name
+          TRIM(e.first_name || ' ' || COALESCE(e.last_name, '')) AS crew_lead_display_name
         FROM jobs j
         LEFT JOIN employees e ON e.id = j.crew_lead_id
         WHERE DATE(j.scheduled_date) = $1
@@ -56,7 +56,8 @@ export function registerDailyPlanRoutes(app: Express, requireAuth: any) {
       let crewRows: any[] = [];
       if (jobIds.length) {
         const { rows } = await pool.query(`
-          SELECT ja.job_id, ja.employee_id, ja.sort_order, e.name AS employee_name
+          SELECT ja.job_id, ja.employee_id, ja.sort_order,
+                 TRIM(e.first_name || ' ' || COALESCE(e.last_name, '')) AS employee_name
           FROM job_assignments ja
           JOIN employees e ON e.id = ja.employee_id
           WHERE ja.job_id = ANY($1)
@@ -101,7 +102,7 @@ export function registerDailyPlanRoutes(app: Express, requireAuth: any) {
         SELECT
           j.id, j.title, j.client, j.scheduled_date, j.status,
           j.address, j.city, j.division,
-          e.name AS crew_lead_display_name
+          TRIM(e.first_name || ' ' || COALESCE(e.last_name, '')) AS crew_lead_display_name
         FROM jobs j
         LEFT JOIN employees e ON e.id = j.crew_lead_id
         WHERE j.scheduled_date IS NOT NULL
