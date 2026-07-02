@@ -56,6 +56,7 @@ import {
   DollarSign,
   MessageSquare,
   Leaf,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -409,6 +410,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     tools: { icon: Snowflake, label: t("nav.tools"), href: "/tools" },
   plow_mapper: { icon: Snowflake, label: t("nav.plowMapper"), href: "/tools/plow-mapper" },
   manager_dashboard: { icon: BarChart2, label: "Manager Dashboard", href: "/manager-dashboard" },
+  daily_plan: { icon: CalendarDays, label: "Daily Plan", href: "/daily-plan" },
   };
 
   type NavSection = { label: string; items: string[] };
@@ -424,7 +426,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarSections: NavSection[] = [
     { label: "MY SPACE", items: ["hq", "dashboard", "calendar", "my_hours", "my_day", "messages"] },
-    { label: "MANAGER", items: ["manager_dashboard"] },
+    { label: "MANAGER", items: ["manager_dashboard", "daily_plan"] },
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["todos", "work_orders", "scheduling", "time_tracking", "equipment", "forms"] },
     { label: "RESOURCES", items: ["sops", "education", "testing"] },
