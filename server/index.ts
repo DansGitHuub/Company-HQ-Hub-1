@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { serveStatic } from "./static";
+import { serveStaticFiles, serveStaticCatchAll } from "./static";
 import { createServer } from "http";
 import { seedUsers, seedSampleData, seedDevelopmentTracker, cleanupGibberishRecords } from "./seed";
 import { startMaintenanceScheduler } from "./maintenanceScheduler";
@@ -132,6 +132,34 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const port = parseInt(process.env.PORT || "5000", 10);
+
+  // ── Step 1: Serve static files and bind port BEFORE migrations ─────────────
+  // The autoscale startup probe (GET /) fires within seconds of container start.
+  // Previously, listen() was called AFTER all 60+ migrations, meaning the probe
+  // saw 500 errors for ~2+ minutes and the deployment was marked failed even
+  // though the app eventually became healthy.
+  //
+  // Fix: register express.static (serves dist/public/index.html → 200 for GET /)
+  // and call listen() immediately. express.static() only intercepts requests for
+  // files that actually exist on disk; /api/* and any unknown path fall through
+  // via next() and reach the API routes registered further below.
+  // The React catch-all (which must come after API routes) is added in Step 5.
+  if (process.env.NODE_ENV === "production") {
+    serveStaticFiles(app);
+  } else {
+    const { setupVite } = await import("./vite");
+    await setupVite(httpServer, app);
+  }
+
+  httpServer.listen(
+    { port, host: "0.0.0.0", reusePort: true },
+    () => { log(`serving on port ${port}`); },
+  );
+
+  // ── Step 2: Run all migrations ─────────────────────────────────────────────
+  // Server is already accepting connections above; migrations run while the
+  // health probe receives 200 from the static file layer.
   await runEquipmentMigration();
   await runTaskMigration();
   await runAssistantMigration();
@@ -188,10 +216,10 @@ app.use((req, res, next) => {
   await runQbSyncSkipMigration();
   await runGpsPingsIndexMigration();
 
-  // Public pages must be registered BEFORE registerRoutes (which sets up the React catch-all)
+  // ── Step 3: Register routes and seeds ──────────────────────────────────────
+  // Public pages must come before registerRoutes (which sets up the catch-all).
   registerPublicPages(app);
 
-  // ── CompanyCam env validation (warnings only — secrets set after Phase 1 ships) ──
   const missingEnv: string[] = [];
   if (!process.env.COMPANYCAM_API_TOKEN)      missingEnv.push("COMPANYCAM_API_TOKEN");
   if (!process.env.COMPANYCAM_WEBHOOK_SECRET) missingEnv.push("COMPANYCAM_WEBHOOK_SECRET");
@@ -202,7 +230,6 @@ app.use((req, res, next) => {
 
   console.log('[boot] companycam v1.4.0 — Wave 3 reconciliation queue (sync + match + dismiss) ready');
 
-  // Wave 3: initial sync on boot + every 6 hours
   syncCCProjectsFromApi().catch((e) =>
     console.error("[companycam-sync] Boot sync failed:", e.message)
   );
@@ -211,9 +238,10 @@ app.use((req, res, next) => {
       console.error("[companycam-sync] Scheduled sync failed:", e.message)
     );
   }, 6 * 60 * 60 * 1000);
+
   registerNotificationPreferenceRoutes(app);
   await registerRoutes(httpServer, app);
-  
+
   await seedUsers();
   await cleanupGibberishRecords();
   await seedSampleData();
@@ -221,6 +249,7 @@ app.use((req, res, next) => {
   await seedDevelopmentTracker();
   await seedHiringEmailTemplates();
 
+  // ── Step 4: Error handler ───────────────────────────────────────────────────
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -234,42 +263,25 @@ app.use((req, res, next) => {
     return res.status(status).json({ message });
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // ── Step 5: React catch-all (MUST be after all API routes) ─────────────────
+  // Serves index.html for any path that didn't match an API route, enabling
+  // client-side React routing (/reports, /jobs, etc.).
   if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
+    serveStaticCatchAll(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-      runCustomerDataMigration().catch((err) =>
-        console.error("[customer-data] Background seed error:", err.message)
-      );
-      startMaintenanceScheduler();
-      startTaskScheduler();
-      startSopPipelineScheduler();
-      startProcessAuditScheduler();
-      startApplicationTokenScheduler();
-      startQuickBooksScheduler();
-      startNotificationScheduler();
-      startLeadAlertScheduler();
-      startGpsPingCleanupScheduler();
-      startInvoiceOverdueScheduler();
-    },
+  // ── Step 6: Start background schedulers ────────────────────────────────────
+  runCustomerDataMigration().catch((err) =>
+    console.error("[customer-data] Background seed error:", err.message)
   );
+  startMaintenanceScheduler();
+  startTaskScheduler();
+  startSopPipelineScheduler();
+  startProcessAuditScheduler();
+  startApplicationTokenScheduler();
+  startQuickBooksScheduler();
+  startNotificationScheduler();
+  startLeadAlertScheduler();
+  startGpsPingCleanupScheduler();
+  startInvoiceOverdueScheduler();
 })();
