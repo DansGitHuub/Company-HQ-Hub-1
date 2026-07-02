@@ -1,12 +1,10 @@
 import { pool } from "../db";
 
 export async function runCloseoutCleanupMigration() {
-  await pool.query(`
-    ALTER TABLE job_closeouts
-      DROP COLUMN IF EXISTS final_photos,
-      DROP COLUMN IF EXISTS invoice_created,
-      DROP COLUMN IF EXISTS review_requested_at,
-      DROP COLUMN IF EXISTS follow_up_task_id
-  `);
-  console.log("[migration] job_closeouts speculative columns removed (final_photos, invoice_created, review_requested_at, follow_up_task_id)");
+  // Previous version dropped these columns — now we add them back permanently.
+  await pool.query(`ALTER TABLE job_closeouts ADD COLUMN IF NOT EXISTS final_photos        JSONB     DEFAULT '[]'`);
+  await pool.query(`ALTER TABLE job_closeouts ADD COLUMN IF NOT EXISTS invoice_created     BOOLEAN   NOT NULL DEFAULT false`);
+  await pool.query(`ALTER TABLE job_closeouts ADD COLUMN IF NOT EXISTS review_requested_at TIMESTAMP`);
+  await pool.query(`ALTER TABLE job_closeouts ADD COLUMN IF NOT EXISTS follow_up_task_id   VARCHAR(36)`);
+  console.log("[migration] job_closeouts columns restored (final_photos, invoice_created, review_requested_at, follow_up_task_id)");
 }
