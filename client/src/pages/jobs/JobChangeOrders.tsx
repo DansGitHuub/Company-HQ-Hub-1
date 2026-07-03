@@ -18,9 +18,10 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Loader2, FileText, CheckCircle2, Clock, XCircle, Send,
-  Trash2, ChevronRight, DollarSign,
+  Trash2, ChevronRight, DollarSign, BookOpen,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { CatalogBrowser, type CatalogItem } from "@/components/CatalogBrowser";
 
 interface COItem {
   id?: string;
@@ -29,7 +30,9 @@ interface COItem {
   quantity: number;
   unit: string;
   unit_price: number;
+  markup_pct: number | null;
   amount: number;
+  catalog_item_id: number | null;
 }
 
 interface ChangeOrder {
@@ -63,9 +66,25 @@ function fmtMoney(v: number) {
   return `$${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-const emptyItem = (): COItem => ({
-  item_type: "labor", description: "", quantity: 1, unit: "hr", unit_price: 0, amount: 0,
-});
+function catalogClassToItemType(cls: string | undefined | null): string {
+  const c = (cls ?? "").toLowerCase();
+  if (c === "labor") return "labor";
+  if (c === "materials" || c === "material") return "material";
+  if (c === "equipment") return "equipment";
+  if (c === "subcontracting" || c === "subcontractor") return "subcontractor";
+  return "other";
+}
+
+function catalogSellPrice(item: CatalogItem): number {
+  if (item.sell_price != null && item.sell_price > 0) return item.sell_price;
+  const cost = parseFloat((item.cost ?? "0").toString().replace(/[$,]/g, "")) || 0;
+  const markup = parseFloat((item.effective_markup_pct ?? item.markupPct ?? "0").toString()) || 0;
+  return cost * (1 + markup / 100);
+}
+
+function lineAmount(item: COItem): number {
+  return Number(item.quantity ?? 0) * Number(item.unit_price ?? 0);
+}
 
 export default function JobChangeOrders({ jobId, isAdminOrManager }: { jobId: string; isAdminOrManager: boolean }) {
   const { toast } = useToast();
@@ -80,7 +99,8 @@ export default function JobChangeOrders({ jobId, isAdminOrManager }: { jobId: st
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<COItem[]>([emptyItem()]);
+  const [items, setItems] = useState<COItem[]>([]);
+  const [catalogTarget, setCatalogTarget] = useState<"add" | number | null>(null);
 
   const { data: changeOrders = [], isLoading } = useQuery<ChangeOrder[]>({
     queryKey: ["/api/jobs", jobId, "change-orders"],
@@ -163,7 +183,7 @@ export default function JobChangeOrders({ jobId, isAdminOrManager }: { jobId: st
 
   function resetForm() {
     setTitle(""); setDescription(""); setNotes("");
-    setItems([emptyItem()]);
+    setItems([]);
   }
 
   function updateItem(idx: number, field: keyof COItem, value: any) {
@@ -171,16 +191,47 @@ export default function JobChangeOrders({ jobId, isAdminOrManager }: { jobId: st
       const next = [...prev];
       next[idx] = { ...next[idx], [field]: value };
       if (field === "quantity" || field === "unit_price") {
-        next[idx].amount = Number(next[idx].quantity) * Number(next[idx].unit_price);
-      }
-      if (field === "amount") {
-        next[idx].amount = Number(value);
+        next[idx].amount = lineAmount(next[idx]);
       }
       return next;
     });
   }
 
-  const subtotal = items.reduce((s, i) => s + Number(i.amount), 0);
+  function handleCatalogSelect(_areaKey: string, item: CatalogItem) {
+    const price = catalogSellPrice(item);
+    if (catalogTarget === "add") {
+      setItems(prev => [...prev, {
+        item_type: catalogClassToItemType(item.class),
+        description: item.name,
+        quantity: 1,
+        unit: item.units ?? "",
+        unit_price: price,
+        markup_pct: item.effective_markup_pct ?? null,
+        amount: price,
+        catalog_item_id: item.id,
+      }]);
+    } else if (typeof catalogTarget === "number") {
+      const idx = catalogTarget;
+      setItems(prev => {
+        const next = [...prev];
+        const qty = Number(next[idx].quantity) || 1;
+        next[idx] = {
+          ...next[idx],
+          item_type: catalogClassToItemType(item.class),
+          description: item.name,
+          unit: item.units ?? "",
+          unit_price: price,
+          catalog_item_id: item.id,
+          markup_pct: item.effective_markup_pct ?? null,
+          amount: qty * price,
+        };
+        return next;
+      });
+    }
+    setCatalogTarget(null);
+  }
+
+  const subtotal = items.reduce((s, i) => s + lineAmount(i), 0);
 
   if (isLoading) {
     return <Card><CardContent className="py-12 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></CardContent></Card>;
@@ -265,38 +316,66 @@ export default function JobChangeOrders({ jobId, isAdminOrManager }: { jobId: st
             <div>
               <div className="flex items-center justify-between mb-2">
                 <Label>Line Items</Label>
-                <Button size="sm" variant="outline" onClick={() => setItems(p => [...p, emptyItem()])}>
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Item
+                <Button size="sm" variant="outline" onClick={() => setCatalogTarget("add")}
+                  data-testid="button-browse-catalog-co">
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Browse Catalog
                 </Button>
               </div>
-              <div className="space-y-2">
-                {items.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-[1fr,80px,90px,90px,90px,32px] gap-1.5 items-center">
-                    <Input placeholder="Description" value={item.description}
-                      onChange={e => updateItem(idx, "description", e.target.value)}
-                      data-testid={`input-co-item-desc-${idx}`} />
-                    <select value={item.item_type} onChange={e => updateItem(idx, "item_type", e.target.value)}
-                      className="h-9 rounded-md border border-input bg-background px-2 text-xs">
-                      {ITEM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                    <Input type="number" placeholder="Qty" value={item.quantity}
-                      onChange={e => updateItem(idx, "quantity", parseFloat(e.target.value) || 0)}
-                      className="text-right" />
-                    <Input type="number" placeholder="$/unit" value={item.unit_price}
-                      onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
-                      className="text-right" />
-                    <Input type="number" placeholder="Total" value={item.amount.toFixed(2)}
-                      onChange={e => updateItem(idx, "amount", parseFloat(e.target.value) || 0)}
-                      className="text-right font-medium" />
-                    <button onClick={() => setItems(p => p.filter((_, i) => i !== idx))}
-                      className="text-muted-foreground hover:text-red-500 flex items-center justify-center">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+              {items.length === 0 ? (
+                <div className="text-center text-xs text-muted-foreground py-6 border border-dashed rounded-md">
+                  No line items yet — add one from the catalog
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-[28px,1fr,90px,64px,80px,70px,80px,28px] gap-1.5 items-center px-0.5">
+                    <span />
+                    <span className="text-[11px] font-medium text-muted-foreground">Description</span>
+                    <span className="text-[11px] font-medium text-muted-foreground">Type</span>
+                    <span className="text-[11px] font-medium text-muted-foreground text-right">Qty</span>
+                    <span className="text-[11px] font-medium text-muted-foreground text-right">Unit Price</span>
+                    <span className="text-[11px] font-medium text-muted-foreground text-right">Markup %</span>
+                    <span className="text-[11px] font-medium text-muted-foreground text-right">Total</span>
+                    <span />
                   </div>
-                ))}
-              </div>
+                  {items.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-[28px,1fr,90px,64px,80px,70px,80px,28px] gap-1.5 items-center">
+                      <button type="button"
+                        onClick={() => setCatalogTarget(idx)}
+                        className="text-muted-foreground hover:text-foreground flex items-center justify-center h-9 w-7"
+                        title="Change catalog item"
+                        data-testid={`button-repick-catalog-${idx}`}>
+                        <BookOpen className="h-3.5 w-3.5" />
+                      </button>
+                      <Input placeholder="Description" value={item.description}
+                        onChange={e => updateItem(idx, "description", e.target.value)}
+                        data-testid={`input-co-item-desc-${idx}`} />
+                      <select value={item.item_type} onChange={e => updateItem(idx, "item_type", e.target.value)}
+                        className="h-9 rounded-md border border-input bg-background px-2 text-xs">
+                        {ITEM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <Input type="number" placeholder="Qty" value={item.quantity}
+                        onChange={e => updateItem(idx, "quantity", parseFloat(e.target.value) || 0)}
+                        className="text-right" data-testid={`input-co-item-qty-${idx}`} />
+                      <Input type="number" placeholder="$/unit" value={item.unit_price}
+                        onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
+                        className="text-right" data-testid={`input-co-item-price-${idx}`} />
+                      <Input type="number" placeholder="Markup %" value={item.markup_pct ?? ""}
+                        onChange={e => updateItem(idx, "markup_pct", e.target.value === "" ? null : parseFloat(e.target.value))}
+                        className="text-right" data-testid={`input-co-item-markup-${idx}`} />
+                      <span className="text-sm font-medium text-right tabular-nums pr-1" data-testid={`text-co-item-total-${idx}`}>
+                        {fmtMoney(lineAmount(item))}
+                      </span>
+                      <button onClick={() => setItems(p => p.filter((_, i) => i !== idx))}
+                        className="text-muted-foreground hover:text-red-500 flex items-center justify-center"
+                        data-testid={`button-remove-co-item-${idx}`}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex justify-end mt-2">
-                <p className="text-sm font-bold">Subtotal: {fmtMoney(subtotal)}</p>
+                <p className="text-sm font-bold" data-testid="text-co-subtotal">Subtotal: {fmtMoney(subtotal)}</p>
               </div>
             </div>
 
@@ -315,6 +394,13 @@ export default function JobChangeOrders({ jobId, isAdminOrManager }: { jobId: st
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CatalogBrowser
+        open={catalogTarget !== null}
+        areaKey="co"
+        onClose={() => setCatalogTarget(null)}
+        onSelect={handleCatalogSelect}
+      />
 
       {/* Detail Dialog */}
       {selectedCO && (

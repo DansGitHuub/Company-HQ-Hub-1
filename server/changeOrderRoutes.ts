@@ -126,10 +126,11 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
         const amt = Number(item.amount ?? (Number(item.quantity ?? 1) * Number(item.unit_price ?? 0)));
         await client.query(
           `INSERT INTO job_change_order_items
-             (change_order_id, item_type, description, quantity, unit, unit_price, amount, catalog_item_id, sort_order)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+             (change_order_id, item_type, description, quantity, unit, unit_price, amount, catalog_item_id, markup_pct, sort_order)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
           [coId, item.item_type || "labor", item.description, item.quantity ?? 1,
-           item.unit || null, item.unit_price ?? 0, amt, item.catalog_item_id || null, i]
+           item.unit || null, item.unit_price ?? 0, amt, item.catalog_item_id ?? null,
+           item.markup_pct != null ? item.markup_pct : null, i]
         );
       }
 
@@ -193,10 +194,11 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
           const amt = Number(item.amount ?? (Number(item.quantity ?? 1) * Number(item.unit_price ?? 0)));
           await client.query(
             `INSERT INTO job_change_order_items
-               (change_order_id, item_type, description, quantity, unit, unit_price, amount, catalog_item_id, sort_order)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+               (change_order_id, item_type, description, quantity, unit, unit_price, amount, catalog_item_id, markup_pct, sort_order)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
             [req.params.id, item.item_type || "labor", item.description, item.quantity ?? 1,
-             item.unit || null, item.unit_price ?? 0, amt, item.catalog_item_id || null, i]
+             item.unit || null, item.unit_price ?? 0, amt, item.catalog_item_id ?? null,
+             item.markup_pct != null ? item.markup_pct : null, i]
           );
         }
       }

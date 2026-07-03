@@ -38,9 +38,36 @@ export async function runChangeOrdersMigration() {
       unit VARCHAR(30),
       unit_price NUMERIC(12,2) DEFAULT 0,
       amount NUMERIC(12,2) DEFAULT 0,
-      catalog_item_id UUID,
+      catalog_item_id INTEGER REFERENCES catalog_items(id),
+      markup_pct NUMERIC(5,2),
       sort_order INTEGER DEFAULT 0
     )
+  `);
+
+  // Fix up databases created before catalog_item_id was corrected to INTEGER
+  // (it was originally mis-typed as UUID, which can never match catalog_items.id).
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'job_change_order_items' AND column_name = 'catalog_item_id' AND data_type = 'uuid'
+      ) THEN
+        ALTER TABLE job_change_order_items ALTER COLUMN catalog_item_id TYPE INTEGER USING NULL;
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'job_change_order_items' AND column_name = 'markup_pct'
+      ) THEN
+        ALTER TABLE job_change_order_items ADD COLUMN markup_pct NUMERIC(5,2);
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE table_name = 'job_change_order_items' AND constraint_name = 'job_change_order_items_catalog_item_id_fkey'
+      ) THEN
+        ALTER TABLE job_change_order_items ADD CONSTRAINT job_change_order_items_catalog_item_id_fkey FOREIGN KEY (catalog_item_id) REFERENCES catalog_items(id);
+      END IF;
+    END $$;
   `);
 
   await pool.query(`
