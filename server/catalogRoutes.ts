@@ -419,7 +419,7 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
       const text = req.file.buffer.toString("utf-8");
       const records: Record<string, string>[] = parse(text, { columns: true, skip_empty_lines: true, trim: true });
 
-      const results = { imported: 0, skipped: 0, errors: [] as string[] };
+      const results = { imported: 0, updated: 0, skipped: 0, errors: [] as string[] };
 
       for (const row of records) {
         try {
@@ -427,23 +427,38 @@ export function registerCatalogRoutes(app: Express, requireAuth: any) {
           if (!name) { results.skipped++; continue; }
           const rawCost = (row["Cost"] || row["cost"] || "0").replace(/[$,]/g, "");
           const cost = parseFloat(rawCost) || 0;
+          const rawMarkup = (row["Markup"] || row["markup"] || "").replace(/[$,%]/g, "");
+          const markupPct = rawMarkup ? parseFloat(rawMarkup) : null;
           const rawTaxable = (row["Taxable"] || row["taxable"] || "").toUpperCase();
           const taxable = rawTaxable === "TRUE" || rawTaxable === "YES" || rawTaxable === "1";
           const rawTags = row["Tags"] || row["tags"] || "";
           const tagNames = rawTags.split(/[,;]/).map((t: string) => t.trim()).filter(Boolean);
+          const sku = row["SKU"] || row["sku"] || null;
+          const cls = row["Class"] || row["class"] || null;
+          const category = row["Categories"] || row["Category"] || row["category"] || null;
+          const units = row["Units"] || row["units"] || row["Unit"] || row["unit"] || null;
+          const description = row["Description"] || row["description"] || null;
+          const otherOptions = row["OtherOptions"] || row["other_options"] || null;
+
+          if (sku) {
+            const existing = await pool.query<{ id: number }>(`SELECT id FROM catalog_items WHERE sku = $1`, [sku]);
+            if (existing.rows.length > 0) {
+              const id = existing.rows[0].id;
+              await pool.query(
+                `UPDATE catalog_items SET name=$1, class=$2, category=$3, units=$4, cost=$5, taxable=$6, description=$7, other_options=$8, markup_pct=COALESCE($9, markup_pct), updated_at=NOW() WHERE id=$10`,
+                [name, cls, category, units, cost, taxable, description, otherOptions, markupPct, id]
+              );
+              if (tagNames.length) await syncItemTags(id, tagNames);
+              results.updated++;
+              continue;
+            }
+          }
 
           const itemNumber = await nextItemNumber();
           const ins = await pool.query<{ id: number }>(
-            `INSERT INTO catalog_items (item_number, name, class, category, units, cost, taxable, description, sku, other_options)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-            [itemNumber, name,
-             row["Class"] || row["class"] || null,
-             row["Categories"] || row["Category"] || row["category"] || null,
-             row["Units"] || row["units"] || null,
-             cost, taxable,
-             row["Description"] || row["description"] || null,
-             row["SKU"] || row["sku"] || null,
-             row["OtherOptions"] || row["other_options"] || null]
+            `INSERT INTO catalog_items (item_number, name, class, category, units, cost, taxable, description, sku, other_options, markup_pct)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+            [itemNumber, name, cls, category, units, cost, taxable, description, sku, otherOptions, markupPct ?? 0]
           );
           const id = ins.rows[0].id;
           if (tagNames.length) await syncItemTags(id, tagNames);

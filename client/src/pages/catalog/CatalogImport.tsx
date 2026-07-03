@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, ArrowLeft, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 
-const EXPECTED_COLUMNS = ["sku", "name", "category", "class", "unit", "cost", "markup", "taxable", "description"];
+const EXPECTED_COLUMNS = ["sku", "name", "category", "class", "units", "cost", "markup", "taxable", "description"];
 
 type PreviewRow = Record<string, string>;
 type ImportResult = { imported: number; updated: number; skipped: number; errors: string[] };
@@ -61,7 +61,7 @@ export default function CatalogImport() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const resp = await fetch("/api/materials/import", {
+      const resp = await fetch("/api/catalog/import", {
         method: "POST",
         credentials: "include",
         body: formData,
