@@ -145,11 +145,16 @@ app.use((req, res, next) => {
   // files that actually exist on disk; /api/* and any unknown path fall through
   // via next() and reach the API routes registered further below.
   // The React catch-all (which must come after API routes) is added in Step 5.
+  //
+  // In development, setupVite() registers a wildcard catch-all (matches every
+  // path, including /api/*) as part of its Vite dev-server integration. Unlike
+  // express.static() above, it does NOT fall through for unmatched files — it
+  // unconditionally serves the SPA HTML. So it must NOT be called here in Step 1
+  // (before API routes exist); it is deferred to Step 5, after all API routes
+  // are registered, matching the ordering guarantee already used for
+  // serveStaticCatchAll() in production. See server/vite.ts for details.
   if (process.env.NODE_ENV === "production") {
     serveStaticFiles(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
   }
 
   httpServer.listen(
@@ -268,6 +273,13 @@ app.use((req, res, next) => {
   // client-side React routing (/reports, /jobs, etc.).
   if (process.env.NODE_ENV === "production") {
     serveStaticCatchAll(app);
+  } else {
+    // Dev: Vite's dev-server middleware + SPA catch-all. Deliberately deferred
+    // to here (rather than Step 1) so its wildcard fallback is registered
+    // AFTER registerRoutes()'s /api/* handlers — otherwise every API request
+    // would be intercepted and served the frontend HTML instead of JSON.
+    const { setupVite } = await import("./vite");
+    await setupVite(httpServer, app);
   }
 
   // ── Step 6: Start background schedulers ────────────────────────────────────

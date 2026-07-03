@@ -6,3 +6,5 @@
 - [Offer accept behavior](offer-accept-behavior.md) — POST /api/offer/:token/accept no longer auto-hires; sets stage to "Offer Accepted" and notifies admin. Admin must explicitly click "Convert to Employee" to call /api/candidates/:id/hire.
 - [Migration drift diagnosis](migration-drift-diagnosis.md) — recurring publish-time DROP/ALTER/CREATE diff traced to real dev-vs-prod catalog divergence on 10 specific tables, not a systemic UUID-column issue.
 - [No production DB credentials](no-prod-db-credentials.md) — only read-only SELECT access to prod exists (no connection string, no Neon branch API); drizzle-kit pull is also broken in this repo's toolchain.
+- [Vite catch-all ordering](vite-catchall-ordering.md) — setupVite() must register AFTER all API routes or every /api/* request silently returns SPA HTML instead of JSON.
+- [audit vs report routes naming trap](audit-vs-report-routes.md) — similarly-named route files can both plausibly "own" a feature; always grep the frontend's actual fetch URL before trusting a route file by name.
