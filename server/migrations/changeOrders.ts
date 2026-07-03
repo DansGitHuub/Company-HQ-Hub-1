@@ -46,6 +46,9 @@ export async function runChangeOrdersMigration() {
 
   // Fix up databases created before catalog_item_id was corrected to INTEGER
   // (it was originally mis-typed as UUID, which can never match catalog_items.id).
+  // The old uuid values were never valid catalog links (catalog IDs have always
+  // been integers), so USING NULL discards them in place without dropping the
+  // column; the foreign key is then added as its own guarded step.
   await pool.query(`
     DO $$
     BEGIN
@@ -55,17 +58,21 @@ export async function runChangeOrdersMigration() {
       ) THEN
         ALTER TABLE job_change_order_items ALTER COLUMN catalog_item_id TYPE INTEGER USING NULL;
       END IF;
+
       IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'job_change_order_items' AND column_name = 'markup_pct'
       ) THEN
         ALTER TABLE job_change_order_items ADD COLUMN markup_pct NUMERIC(5,2);
       END IF;
+
       IF NOT EXISTS (
         SELECT 1 FROM information_schema.table_constraints
         WHERE table_name = 'job_change_order_items' AND constraint_name = 'job_change_order_items_catalog_item_id_fkey'
       ) THEN
-        ALTER TABLE job_change_order_items ADD CONSTRAINT job_change_order_items_catalog_item_id_fkey FOREIGN KEY (catalog_item_id) REFERENCES catalog_items(id);
+        ALTER TABLE job_change_order_items
+          ADD CONSTRAINT job_change_order_items_catalog_item_id_fkey
+          FOREIGN KEY (catalog_item_id) REFERENCES catalog_items(id);
       END IF;
     END $$;
   `);
