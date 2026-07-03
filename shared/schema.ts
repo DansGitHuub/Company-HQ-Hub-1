@@ -3595,6 +3595,7 @@ export const consultations = pgTable("consultations", {
   projectType:        varchar("project_type"),
   desiredTimeline:    varchar("desired_timeline"),
   additionalNotes:    text("additional_notes"),
+  qualifiedLeadId:    varchar("qualified_lead_id"),
   createdAt:          timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:          timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

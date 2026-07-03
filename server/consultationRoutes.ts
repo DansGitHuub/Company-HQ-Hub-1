@@ -69,6 +69,11 @@ async function migrateConsultations() {
   await pool.query(`ALTER TABLE consultations ADD COLUMN IF NOT EXISTS lost_reason TEXT`);
   await pool.query(`ALTER TABLE consultations ADD COLUMN IF NOT EXISTS next_follow_up_date DATE`);
 
+  // Blocker #4: link consultations back to the qualified lead they were auto-created from
+  await pool.query(`ALTER TABLE consultations ADD COLUMN IF NOT EXISTS qualified_lead_id VARCHAR(36) REFERENCES qualified_leads(id) ON DELETE SET NULL`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultations_qualified_lead_id ON consultations(qualified_lead_id)`);
+  console.log("[migration] consultations.qualified_lead_id column ready (Lead Qualifier -> pipeline link)");
+
   // Fix assigned_to FK: drop any existing constraint (old or new) then re-add pointing to employees
   await pool.query(`ALTER TABLE consultations DROP CONSTRAINT IF EXISTS consultations_assigned_to_fkey`);
   await pool.query(`ALTER TABLE consultations DROP CONSTRAINT IF EXISTS consultations_assigned_to_employees_fkey`);

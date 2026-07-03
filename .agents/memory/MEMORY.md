@@ -9,3 +9,4 @@
 - [No production DB credentials](no-prod-db-credentials.md) — only read-only SELECT access to prod exists (no connection string, no Neon branch API); drizzle-kit pull is also broken in this repo's toolchain.
 - [Vite catch-all ordering](vite-catchall-ordering.md) — setupVite() must register AFTER all API routes or every /api/* request silently returns SPA HTML instead of JSON.
 - [audit vs report routes naming trap](audit-vs-report-routes.md) — similarly-named route files can both plausibly "own" a feature; always grep the frontend's actual fetch URL before trusting a route file by name.
+- [E2E wizard testing via API](e2e-wizard-testing-via-api.md) — for multi-step wizard forms, drive the action step via direct API call to the same endpoint instead of clicking through unfamiliar UI, then verify via DB + read-only browser check.

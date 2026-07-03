@@ -9197,7 +9197,8 @@ Provide accurate information based on publicly available documentation.`;
         qualifiedBy: req.user!.id,
       });
 
-      // Phase 2: auto-create a consultation (new_lead stage) from the qualified lead
+      // Blocker #4: auto-create a consultation (new_lead stage) from the qualified lead,
+      // linked back to it via qualified_lead_id so the pipeline record is traceable to its source.
       try {
         const leadScoreVal = typeof score === "number" && typeof maxScore === "number" && maxScore > 0
           ? Math.round((score / maxScore) * 100)
@@ -9205,12 +9206,14 @@ Provide accurate information based on publicly available documentation.`;
         const { rows } = await pool.query(`
           INSERT INTO consultations (
             contact_name, contact_phone, contact_email, pipeline_stage,
-            service_type, budget_range, desired_timeline, lead_source, lead_score, notes
-          ) VALUES ($1,$2,$3,'new_lead',$4,$5,$6,$7,$8,$9) RETURNING *
+            service_type, budget_range, desired_timeline, lead_source, lead_score, notes,
+            qualified_lead_id
+          ) VALUES ($1,$2,$3,'new_lead',$4,$5,$6,$7,$8,$9,$10) RETURNING *
         `, [
           contactName, contactPhone || null, contactEmail || null,
           serviceType || null, budget || null, timeline || null,
           source || "Lead Qualifier", leadScoreVal, notes || null,
+          lead.id,
         ]);
         const consultation = rows[0];
         // Notify admins about the new lead
