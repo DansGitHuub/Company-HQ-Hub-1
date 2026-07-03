@@ -31,6 +31,10 @@ import { CompanyCamSection } from "@/components/CompanyCamSection";
 import { TranscriptSection } from "@/components/TranscriptSection";
 import { AiDraftLineItems } from "@/components/AiDraftLineItems";
 import { ImageLightbox } from "@/components/ImageLightbox";
+import { CatalogBrowser, type CatalogItem } from "@/components/CatalogBrowser";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { BookOpen } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface LineItemDetail {
@@ -38,6 +42,7 @@ interface LineItemDetail {
   quantity: string; unit: string; unit_price: string; amount: string; is_optional: boolean;
   image_url?: string | null; image_hidden?: boolean | null;
   markup_pct?: string | null;
+  catalog_item_id?: number | null;
 }
 interface WorkAreaDetail {
   id: string; name: string; sort_order: number;
@@ -94,6 +99,7 @@ interface LocalLineItem {
   image_url?: string | null;
   image_hidden?: boolean | null;
   markup_pct?: string | null;
+  catalog_item_id?: number | null;
 }
 interface LocalWorkArea {
   key: string;
@@ -146,6 +152,8 @@ export default function EstimateDetail() {
   const [scopeEditing, setScopeEditing] = useState(false);
   const [localAreas, setLocalAreas] = useState<LocalWorkArea[]>([]);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [catalogAreaKey, setCatalogAreaKey] = useState<string | null>(null);
+  const [catalogPickerKey, setCatalogPickerKey] = useState<string | null>(null);
   // Always reflects the latest localAreas value — prevents stale-closure on Save
   const localAreasRef = useRef<LocalWorkArea[]>([]);
   localAreasRef.current = localAreas;
@@ -167,6 +175,7 @@ export default function EstimateDetail() {
           image_url: li.image_url ?? null,
           image_hidden: li.image_hidden ?? false,
           markup_pct: li.markup_pct != null ? String(li.markup_pct) : null,
+          catalog_item_id: li.catalog_item_id ?? null,
         })),
       }))
     );
@@ -188,7 +197,24 @@ export default function EstimateDetail() {
     setLocalAreas(prev => prev.map(a => a.key === key ? { ...a, name } : a));
   }
 
-  function addLineItem(areaKey: string) {
+  function catalogClassToItemType(cls: string | null | undefined): string {
+    const c = (cls ?? "").toLowerCase();
+    if (c === "labor") return "labor";
+    if (c === "materials" || c === "material") return "material";
+    if (c === "equipment") return "equipment";
+    if (c === "subcontracting" || c === "subcontract") return "subcontract";
+    return "service";
+  }
+
+  function catalogSellPrice(item: CatalogItem): number {
+    if (item.sell_price != null && item.sell_price > 0) return item.sell_price;
+    const cost = parseFloat((item.cost ?? "0").toString().replace(/[$,]/g, "")) || 0;
+    const markup = parseFloat((item.effective_markup_pct ?? item.markupPct ?? "0")?.toString() ?? "0") || 0;
+    return cost * (1 + markup / 100);
+  }
+
+  function addCatalogItem(areaKey: string, item: CatalogItem, imageUrl?: string) {
+    const price = catalogSellPrice(item);
     setLocalAreas(prev => prev.map(a =>
       a.key !== areaKey ? a : {
         ...a,
@@ -196,17 +222,45 @@ export default function EstimateDetail() {
           ...a.line_items,
           {
             key: `new-li-${Date.now()}-${Math.random()}`,
-            item_type: "service",
-            description: "",
+            item_type: catalogClassToItemType(item.class),
+            description: item.name,
             quantity: "1",
-            unit: "",
-            unit_price: "0",
-            amount: "0",
+            unit: item.units ?? "",
+            unit_price: String(price),
+            amount: price.toFixed(2),
             is_optional: false,
+            image_url: imageUrl ?? null,
+            image_hidden: false,
+            catalog_item_id: item.id,
+            markup_pct: item.effective_markup_pct != null ? String(item.effective_markup_pct) : null,
           },
         ],
       }
     ));
+  }
+
+  function applyFromCatalog(areaKey: string, liKey: string, item: CatalogItem) {
+    const price = catalogSellPrice(item);
+    setLocalAreas(prev => prev.map(a =>
+      a.key !== areaKey ? a : {
+        ...a,
+        line_items: a.line_items.map(li => {
+          if (li.key !== liKey) return li;
+          const qty = parseFloat(li.quantity) || 0;
+          return {
+            ...li,
+            item_type: catalogClassToItemType(item.class),
+            description: item.name,
+            unit: item.units ?? "",
+            unit_price: String(price),
+            amount: (qty * price).toFixed(2),
+            catalog_item_id: item.id,
+            markup_pct: item.effective_markup_pct != null ? String(item.effective_markup_pct) : null,
+          };
+        }),
+      }
+    ));
+    setCatalogPickerKey(null);
   }
 
   function removeLineItem(areaKey: string, liKey: string) {
@@ -275,7 +329,8 @@ export default function EstimateDetail() {
             unit_price:  parseFloat(li.unit_price) || 0,
             amount:      parseFloat(li.amount)     || 0,
             is_optional: li.is_optional,
-            markup_pct:  li.markup_pct != null ? parseFloat(li.markup_pct) : null,
+            markup_pct:  li.markup_pct != null && li.markup_pct !== "" ? parseFloat(li.markup_pct) : null,
+            catalog_item_id: li.catalog_item_id ?? null,
           })),
         })),
       };
@@ -294,6 +349,14 @@ export default function EstimateDetail() {
       toast({ title: "Scope of work saved" });
     },
     onError: (e: any) => toast({ title: "Save failed: " + e.message, variant: "destructive" }),
+  });
+
+  const { data: catalogItems } = useQuery<CatalogItem[]>({
+    queryKey: ["/api/catalog", { active_only: "true" }],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/catalog?active_only=true");
+      return res.json();
+    },
   });
 
   const { data: estimate, isLoading, error } = useQuery<EstimateDetail>({
@@ -582,14 +645,16 @@ export default function EstimateDetail() {
 
                         {/* Column headers */}
                         {area.line_items.length > 0 && (
-                          <div className="grid grid-cols-[48px_110px_1fr_70px_60px_96px_78px_32px] gap-2 text-[10px] text-muted-foreground font-medium px-1">
+                          <div className="grid grid-cols-[48px_100px_1fr_60px_56px_80px_66px_78px_28px_32px] gap-2 text-[10px] text-muted-foreground font-medium px-1">
                             <span />
                             <span>Class</span>
                             <span>Description</span>
                             <span className="text-right">Qty</span>
                             <span>Unit</span>
                             <span className="text-right">Unit Price</span>
+                            <span className="text-right">Markup %</span>
                             <span className="text-right">Amount</span>
+                            <span />
                             <span />
                           </div>
                         )}
@@ -597,7 +662,7 @@ export default function EstimateDetail() {
                         {/* Line item rows */}
                         <div className="space-y-1.5">
                           {area.line_items.map(li => (
-                            <div key={li.key} className="grid grid-cols-[48px_110px_1fr_70px_60px_96px_78px_32px] gap-2 items-center">
+                            <div key={li.key} className="grid grid-cols-[48px_100px_1fr_60px_56px_80px_66px_78px_28px_32px] gap-2 items-center">
                               {/* Thumbnail (read-only in edit mode) */}
                               {li.image_url && !li.image_hidden
                                 ? <img
@@ -655,10 +720,57 @@ export default function EstimateDetail() {
                                 className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
                                 data-testid="input-unit-price"
                               />
-                              {/* Computed Amount */}
+                              {/* Markup % (independent from Unit Price — editing one never recalculates the other) */}
+                              <input
+                                type="number" min="0" step="0.1"
+                                value={li.markup_pct ?? ""}
+                                onChange={e => setLIField(area.key, li.key, "markup_pct", e.target.value)}
+                                placeholder="0"
+                                className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
+                                data-testid="input-markup-pct"
+                              />
+                              {/* Computed Amount (always live: qty × unit price) */}
                               <div className="h-8 flex items-center justify-end text-sm tabular-nums font-medium text-muted-foreground pr-1">
                                 {fmtMoney(li.amount)}
                               </div>
+                              {/* Per-line-item catalog re-pick */}
+                              <Popover
+                                open={catalogPickerKey === `${area.key}:${li.key}`}
+                                onOpenChange={open => setCatalogPickerKey(open ? `${area.key}:${li.key}` : null)}
+                              >
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    title="Pick from catalog"
+                                    className={`h-8 w-8 flex items-center justify-center rounded-md border transition-colors ${li.catalog_item_id ? "border-primary text-primary bg-primary/10" : "border-input text-muted-foreground hover:text-primary hover:border-primary"}`}
+                                    data-testid="btn-catalog-pick"
+                                  >
+                                    <BookOpen className="h-3.5 w-3.5" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-72 p-0" align="end" side="bottom">
+                                  <Command>
+                                    <CommandInput placeholder="Search catalog…" className="h-8 text-xs" />
+                                    <CommandList className="max-h-56 overflow-y-auto">
+                                      <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">No items found.</CommandEmpty>
+                                      {(catalogItems ?? []).map(ci => (
+                                        <CommandItem
+                                          key={ci.id}
+                                          value={`${ci.itemNumber} ${ci.name} ${ci.class ?? ""} ${ci.category ?? ""}`}
+                                          onSelect={() => applyFromCatalog(area.key, li.key, ci)}
+                                          className="flex flex-col items-start gap-0.5 py-1.5 cursor-pointer"
+                                          data-testid={`catalog-pick-item-${ci.id}`}
+                                        >
+                                          <span className="text-xs font-medium leading-tight">{ci.name}</span>
+                                          <span className="text-[10px] text-muted-foreground leading-tight">
+                                            {[ci.itemNumber, ci.class, ci.units ? `(${ci.units})` : null, ci.cost ? `$${parseFloat(ci.cost.toString()).toFixed(2)}` : null].filter(Boolean).join(" · ")}
+                                          </span>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
                               {/* Delete */}
                               <button
                                 onClick={() => removeLineItem(area.key, li.key)}
@@ -672,13 +784,19 @@ export default function EstimateDetail() {
                           ))}
                         </div>
 
-                        {/* + Add Line Item */}
+                        {area.line_items.length === 0 && (
+                          <p className="text-xs text-muted-foreground italic px-1 py-1" data-testid="text-no-items-yet">
+                            No items yet — browse the catalog to add one.
+                          </p>
+                        )}
+
+                        {/* Browse Catalog (sole way to add a line item) */}
                         <button
-                          onClick={() => addLineItem(area.key)}
+                          onClick={() => setCatalogAreaKey(area.key)}
                           className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium h-7 px-1"
-                          data-testid="btn-add-line-item"
+                          data-testid="btn-browse-catalog"
                         >
-                          <Plus className="h-3.5 w-3.5" /> Add Line Item
+                          <BookOpen className="h-3.5 w-3.5" /> Browse Catalog
                         </button>
                       </div>
                     ))}
@@ -1213,6 +1331,12 @@ export default function EstimateDetail() {
         />
       )}
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      <CatalogBrowser
+        open={catalogAreaKey !== null}
+        areaKey={catalogAreaKey}
+        onClose={() => setCatalogAreaKey(null)}
+        onSelect={addCatalogItem}
+      />
       {estimate?.id && (
         <CompanyCamSection
           estimateId={estimate.id}

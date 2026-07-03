@@ -89,12 +89,8 @@ const ESTIMATE_TYPES = [
   { value: "other",                label: "Other" },
 ];
 
-function defaultLineItem(): LineItem {
-  return { _key: key(), item_type: "service", description: "", quantity: 1, unit: "", unit_price: 0, amount: 0, is_optional: false, catalog_item_id: null };
-}
-
 function defaultArea(name = ""): WorkAreaDraft {
-  return { _key: key(), name, work_area_type_id: "", cost_code: "", category: "", area_description: "", line_items: [defaultLineItem()], collapsed: false };
+  return { _key: key(), name, work_area_type_id: "", cost_code: "", category: "", area_description: "", line_items: [], collapsed: false };
 }
 
 function lineAmount(item: LineItem) {
@@ -313,9 +309,6 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
 
   const updateArea = (aKey: string, patch: Partial<WorkAreaDraft>) =>
     setAreas(prev => prev.map(a => a._key === aKey ? { ...a, ...patch } : a));
-
-  const addLineItem = (aKey: string) =>
-    setAreas(prev => prev.map(a => a._key === aKey ? { ...a, line_items: [...a.line_items, defaultLineItem()] } : a));
 
   function catalogClassToItemType(cls: string | undefined): "service" | "material" | "labor" {
     const c = (cls ?? "").toLowerCase();
@@ -763,18 +756,21 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
                           </div>
                         </div>
                         {/* Column headers */}
-                        <div className="grid grid-cols-[90px_1fr_60px_70px_80px_70px_24px_28px] gap-1 text-[10px] text-muted-foreground font-medium px-1">
-                          <span>{t("colClass")}</span>
-                          <span>{t("colDescription")}</span>
-                          <span>{t("colQty")}</span>
-                          <span>{t("colUnit")}</span>
-                          <span>{t("colUnitPrice")}</span>
-                          <span className="text-right">{t("colAmount")}</span>
-                          <span />
-                          <span />
-                        </div>
+                        {area.line_items.length > 0 && (
+                          <div className="grid grid-cols-[90px_1fr_60px_70px_80px_70px_70px_24px_28px] gap-1 text-[10px] text-muted-foreground font-medium px-1">
+                            <span>{t("colClass")}</span>
+                            <span>{t("colDescription")}</span>
+                            <span>{t("colQty")}</span>
+                            <span>{t("colUnit")}</span>
+                            <span>{t("colUnitPrice")}</span>
+                            <span>{t("colMarkupPct")}</span>
+                            <span className="text-right">{t("colAmount")}</span>
+                            <span />
+                            <span />
+                          </div>
+                        )}
                         {area.line_items.map((li, iIdx) => (
-                          <div key={li._key} className="grid grid-cols-[90px_1fr_60px_70px_80px_70px_24px_28px] gap-1 items-center">
+                          <div key={li._key} className="grid grid-cols-[90px_1fr_60px_70px_80px_70px_70px_24px_28px] gap-1 items-center">
                             <Select value={li.item_type} onValueChange={v => updateLineItem(area._key, li._key, { item_type: v as any })}>
                               <SelectTrigger className="h-7 text-xs" data-testid={`select-item-type-${aIdx}-${iIdx}`}>
                                 <SelectValue />
@@ -810,6 +806,14 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
                               onChange={e => updateLineItem(area._key, li._key, { unit_price: parseFloat(e.target.value) || 0 })}
                               className="h-7 text-xs"
                               data-testid={`input-uprice-${aIdx}-${iIdx}`}
+                            />
+                            <Input
+                              type="number" min="0" step="0.1"
+                              value={li.markup_pct ?? ""}
+                              onChange={e => updateLineItem(area._key, li._key, { markup_pct: e.target.value === "" ? null : (parseFloat(e.target.value) || 0) })}
+                              className="h-7 text-xs"
+                              placeholder="0"
+                              data-testid={`input-markup-${aIdx}-${iIdx}`}
                             />
                             <div className="text-right text-xs font-medium pr-1 tabular-nums">
                               {fmtMoney(lineAmount(li))}
@@ -858,13 +862,14 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
                             </button>
                           </div>
                         ))}
+                        {area.line_items.length === 0 && (
+                          <p className="text-xs text-muted-foreground italic px-1 py-1" data-testid={`text-no-items-${aIdx}`}>
+                            {t("noItemsYet")}
+                          </p>
+                        )}
                         <Button type="button" size="sm" variant="outline" onClick={() => setCatalogAreaKey(area._key)}
-                          className="h-7 text-xs gap-1">
+                          className="h-7 text-xs gap-1" data-testid={`btn-browse-catalog-${aIdx}`}>
                           <Search className="h-3 w-3" /> {t("browseCatalog")}
-                        </Button>
-                        <Button type="button" size="sm" variant="ghost" onClick={() => addLineItem(area._key)}
-                          className="h-7 text-xs" data-testid={`btn-add-item-${aIdx}`}>
-                          <Plus className="h-3 w-3 mr-1" /> {t("addLineItem")}
                         </Button>
                       </div>
                     )}

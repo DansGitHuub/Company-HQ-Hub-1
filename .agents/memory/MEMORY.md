@@ -4,6 +4,7 @@
 - [Job detail tabs](job-detail-tabs.md) — show.tsx tab architecture: which tabs exist, which are admin-only, pattern for adding new feature tabs.
 - [Vite React dedupe fix](vite-react-dedupe-fix.md) — how to fix "Cannot read properties of null (reading 'useEffect')" duplicate-React crash; what to change in vite.config.ts and server/vite.ts.
 - [Offer accept behavior](offer-accept-behavior.md) — POST /api/offer/:token/accept no longer auto-hires; sets stage to "Offer Accepted" and notifies admin. Admin must explicitly click "Convert to Employee" to call /api/candidates/:id/hire.
+- [Testing auth & sequence quirks](testing-auth-and-sequences.md) — how to get a test login via scrypt hash reset, and a recurring sequence is_called=false bug pattern causing duplicate-key errors.
 - [Migration drift diagnosis](migration-drift-diagnosis.md) — recurring publish-time DROP/ALTER/CREATE diff traced to real dev-vs-prod catalog divergence on 10 specific tables, not a systemic UUID-column issue.
 - [No production DB credentials](no-prod-db-credentials.md) — only read-only SELECT access to prod exists (no connection string, no Neon branch API); drizzle-kit pull is also broken in this repo's toolchain.
 - [Vite catch-all ordering](vite-catchall-ordering.md) — setupVite() must register AFTER all API routes or every /api/* request silently returns SPA HTML instead of JSON.
