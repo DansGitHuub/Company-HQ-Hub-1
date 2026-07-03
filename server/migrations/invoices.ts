@@ -66,15 +66,28 @@ export async function runInvoicesMigration() {
     // its actual line_items + payments. Catches the INV-1002 / INV-1005 class of bug
     // where balance_due drifted out of sync. Safe to run on every boot — the math
     // is deterministic.
+    //
+    // Invoices auto-created outside the standard line-item flow (e.g. closeoutRoutes.ts'
+    // job-closeout invoice, estimateRoutes.ts' down-payment invoice) set `total` directly
+    // and never get invoice_line_items rows. For those, a line-item-derived total is 0,
+    // which used to zero out balance_due on every boot even with $0 paid (the INV-1011 /
+    // INV-1014 class of bug). Only trust the line-item-derived total when line items
+    // actually produce a non-zero total; otherwise fall back to the invoice's stored total.
     await pool.query(`
       UPDATE invoices i SET
         amount_paid = COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=i.id), 0),
         balance_due = GREATEST(
                         0,
-                        ROUND(
-                          (COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=i.id), 0)
-                           - COALESCE(i.discount_amount, 0)
-                          ) * (1 + COALESCE(i.tax_rate, 0)), 2)
+                        COALESCE(
+                          NULLIF(
+                            ROUND(
+                              (COALESCE((SELECT SUM(amount) FROM invoice_line_items WHERE invoice_id=i.id), 0)
+                               - COALESCE(i.discount_amount, 0)
+                              ) * (1 + COALESCE(i.tax_rate, 0)), 2),
+                            0
+                          ),
+                          i.total
+                        )
                         - COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id=i.id), 0)
                       ),
         updated_at  = NOW()
