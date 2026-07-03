@@ -3189,6 +3189,35 @@ export const jobWorkAreas = pgTable("job_work_areas", {
   isActive: boolean("is_active").notNull().default(true),
 });
 
+// ── Job Line Items (copied from estimate at conversion time) ─────────────────
+// Additive-only, separate from job_materials (the pre-existing ad-hoc Job
+// Materials feature). Structured scope/material records linked back to the
+// source estimate line item. No inventory/stock fields by design.
+export const jobLineItems = pgTable("job_line_items", {
+  id:                       varchar("id", { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
+  jobId:                    varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  jobWorkAreaId:            varchar("job_work_area_id", { length: 36 }).references(() => jobWorkAreas.id, { onDelete: "set null" }),
+  sourceEstimateId:         uuid("source_estimate_id"),
+  sourceEstimateLineItemId: uuid("source_estimate_line_item_id").references(() => estimateLineItems.id, { onDelete: "set null" }),
+  itemType:                 varchar("item_type", { length: 20 }).notNull().default("service"),
+  catalogItemId:            integer("catalog_item_id").references(() => catalogItems.id, { onDelete: "set null" }),
+  classId:                  integer("class_id").references(() => classCodes.id, { onDelete: "set null" }),
+  itemName:                 text("item_name").notNull(),
+  quantity:                 numeric("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
+  unit:                     varchar("unit", { length: 30 }),
+  unitPrice:                numeric("unit_price", { precision: 10, scale: 2 }).notNull().default("0"),
+  lineTotal:                numeric("line_total", { precision: 10, scale: 2 }).notNull().default("0"),
+  sortOrder:                integer("sort_order").notNull().default(0),
+  isOptional:               boolean("is_optional").notNull().default(false),
+  notes:                    text("notes"),
+  createdById:              varchar("created_by_id", { length: 36 }),
+  createdAt:                timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:                timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const insertJobLineItemSchema = createInsertSchema(jobLineItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertJobLineItem = z.infer<typeof insertJobLineItemSchema>;
+export type JobLineItem = typeof jobLineItems.$inferSelect;
+
 export const timeEntries = pgTable("time_entries", {
   id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => randomUUID()),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),

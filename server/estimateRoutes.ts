@@ -409,17 +409,53 @@ export function registerEstimateRoutes(app: Express) {
       );
       const jobId = jobRows[0].id;
 
-      // Copy estimate work areas → job work areas
-      const waInsert = await client.query(`
-        INSERT INTO job_work_areas
-          (job_id, name, sort_order, status, is_active, estimated_hours)
-        SELECT $1, name, sort_order, 'pending', true, 0
-        FROM estimate_work_areas
-        WHERE estimate_id = $2
-      `, [jobId, req.params.id]);
+      // Copy estimate work areas → job work areas, one at a time so we can
+      // capture the id mapping needed to link line items to the new job
+      // work area they belong to.
+      const workAreas: any[] = est.work_areas || [];
 
-      // Fallback: if no work areas on the estimate, create one synthetic row from the totals
-      if ((waInsert.rowCount ?? 0) === 0) {
+      if (workAreas.length > 0) {
+        for (const wa of workAreas) {
+          const { rows: jwaRows } = await client.query(`
+            INSERT INTO job_work_areas
+              (job_id, name, sort_order, status, is_active, estimated_hours)
+            VALUES ($1, $2, $3, 'pending', true, 0)
+            RETURNING id
+          `, [jobId, wa.name, wa.sort_order ?? 0]);
+          const jobWorkAreaId = jwaRows[0].id;
+
+          // Copy this work area's line items into structured job line items.
+          // Reads only from estimate_line_items — never writes back to it.
+          for (const li of (wa.line_items || [])) {
+            await client.query(`
+              INSERT INTO job_line_items
+                (job_id, job_work_area_id, source_estimate_id, source_estimate_line_item_id,
+                 item_type, catalog_item_id, class_id, item_name, quantity, unit,
+                 unit_price, line_total, sort_order, is_optional, created_by_id)
+              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+            `, [
+              jobId,
+              jobWorkAreaId,
+              req.params.id,
+              li.id,
+              li.item_type || 'service',
+              li.catalog_item_id || null,
+              li.class_id || null,
+              li.description,
+              li.quantity,
+              li.unit || null,
+              li.unit_price,
+              li.amount,
+              li.sort_order ?? 0,
+              !!li.is_optional,
+              (req as any).user?.id ?? null,
+            ]);
+          }
+        }
+      } else {
+        // Fallback: if no work areas on the estimate, create one synthetic row from the totals.
+        // There are no line items to copy in this case (estimate_line_items always
+        // belongs to a work area).
         await client.query(`
           INSERT INTO job_work_areas
             (job_id, name, sort_order, notes, status, is_active, estimated_hours)

@@ -41,6 +41,7 @@ import JobWarranty from "./JobWarranty";
 import JobEquipment from "./JobEquipment";
 import JobCrew from "./JobCrew";
 import JobMaterials from "./JobMaterials";
+import JobLineItems from "./JobLineItems";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TimeEntry {
@@ -1202,6 +1203,7 @@ export default function JobDetailPage() {
                     { value: "crew",        label: "Crew",        icon: Users,         show: isAdminOrManager },
                     { value: "equipment",   label: "Equipment",   icon: Truck,         show: isAdminOrManager },
                     { value: "materials",   label: "Materials",   icon: Package,       show: isAdminOrManager },
+                    { value: "scope-items", label: "Scope & Materials", icon: ClipboardList, show: true },
                   ],
                 },
                 {
@@ -1533,6 +1535,11 @@ export default function JobDetailPage() {
           {/* Materials Panel */}
           {isAdminOrManager && activeSection === "materials" && (
             <JobMaterials jobId={id} isAdminOrManager={isAdminOrManager} />
+          )}
+
+          {/* Scope & Materials (from converted estimate) Panel */}
+          {activeSection === "scope-items" && (
+            <JobLineItems jobId={id} isAdminOrManager={isAdminOrManager} />
           )}
 
           {/* Crew Panel */}
