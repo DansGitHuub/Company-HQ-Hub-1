@@ -76,7 +76,9 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
       if (!coRows.length) return res.status(404).json({ message: "Change order not found" });
 
       const { rows: items } = await pool.query(
-        `SELECT * FROM job_change_order_items WHERE change_order_id = $1 ORDER BY sort_order`,
+        `SELECT id, change_order_id, item_type, description, quantity, unit, unit_price, amount,
+                catalog_item_id_int AS catalog_item_id, markup_pct, sort_order
+         FROM job_change_order_items WHERE change_order_id = $1 ORDER BY sort_order`,
         [req.params.id]
       );
       return res.json({ ...coRows[0], items });
@@ -126,7 +128,7 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
         const amt = Number(item.amount ?? (Number(item.quantity ?? 1) * Number(item.unit_price ?? 0)));
         await client.query(
           `INSERT INTO job_change_order_items
-             (change_order_id, item_type, description, quantity, unit, unit_price, amount, catalog_item_id, markup_pct, sort_order)
+             (change_order_id, item_type, description, quantity, unit, unit_price, amount, catalog_item_id_int, markup_pct, sort_order)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
           [coId, item.item_type || "labor", item.description, item.quantity ?? 1,
            item.unit || null, item.unit_price ?? 0, amt, item.catalog_item_id ?? null,
@@ -140,7 +142,9 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
         `SELECT * FROM job_change_orders WHERE id = $1`, [coId]
       );
       const { rows: fullItems } = await pool.query(
-        `SELECT * FROM job_change_order_items WHERE change_order_id = $1 ORDER BY sort_order`, [coId]
+        `SELECT id, change_order_id, item_type, description, quantity, unit, unit_price, amount,
+                catalog_item_id_int AS catalog_item_id, markup_pct, sort_order
+         FROM job_change_order_items WHERE change_order_id = $1 ORDER BY sort_order`, [coId]
       );
       logAudit(
         (req.user as any).id,
@@ -194,7 +198,7 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
           const amt = Number(item.amount ?? (Number(item.quantity ?? 1) * Number(item.unit_price ?? 0)));
           await client.query(
             `INSERT INTO job_change_order_items
-               (change_order_id, item_type, description, quantity, unit, unit_price, amount, catalog_item_id, markup_pct, sort_order)
+               (change_order_id, item_type, description, quantity, unit, unit_price, amount, catalog_item_id_int, markup_pct, sort_order)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
             [req.params.id, item.item_type || "labor", item.description, item.quantity ?? 1,
              item.unit || null, item.unit_price ?? 0, amt, item.catalog_item_id ?? null,
@@ -222,7 +226,9 @@ export function registerChangeOrderRoutes(app: Express, requireAuth: any) {
 
       const { rows: full } = await pool.query(`SELECT * FROM job_change_orders WHERE id = $1`, [req.params.id]);
       const { rows: fullItems } = await pool.query(
-        `SELECT * FROM job_change_order_items WHERE change_order_id = $1 ORDER BY sort_order`, [req.params.id]
+        `SELECT id, change_order_id, item_type, description, quantity, unit, unit_price, amount,
+                catalog_item_id_int AS catalog_item_id, markup_pct, sort_order
+         FROM job_change_order_items WHERE change_order_id = $1 ORDER BY sort_order`, [req.params.id]
       );
       logAudit(
         (req.user as any).id,
