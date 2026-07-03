@@ -14,7 +14,6 @@ export async function runActivityLogMigration() {
         created_at TIMESTAMP DEFAULT now()
       )
     `);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at DESC)`);
     console.log("[migration] Activity log table ready");
   } finally {
     client.release();
