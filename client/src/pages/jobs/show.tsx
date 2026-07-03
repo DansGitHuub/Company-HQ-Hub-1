@@ -789,8 +789,11 @@ export default function JobDetailPage() {
 
   // Work Areas modal state
   const [showAddArea, setShowAddArea] = useState(false);
+  const [editingArea, setEditingArea] = useState<{ id: string } | null>(null);
   const [addAreaTypeId, setAddAreaTypeId] = useState("");
   const [addAreaHours, setAddAreaHours] = useState("");
+  const [addAreaName, setAddAreaName] = useState("");
+  const [addAreaNotes, setAddAreaNotes] = useState("");
 
   const { data: job, isLoading, error } = useQuery<JobDetail>({
     queryKey: ["/api/jobs", id],
@@ -815,7 +818,7 @@ export default function JobDetailPage() {
 
   // Job work areas
   const { data: jobWorkAreas = [], refetch: refetchAreas } = useQuery<Array<{
-    id: string; name: string; estimated_hours: string | null; actual_hours_computed: string; status: string; area_description: string | null;
+    id: string; name: string; estimated_hours: string | null; actual_hours_computed: string; status: string; area_description: string | null; notes: string | null;
   }>>({
     queryKey: ["/api/jobs", id, "work-areas"],
     queryFn: async () => {
@@ -825,22 +828,59 @@ export default function JobDetailPage() {
     enabled: !!id,
   });
 
+  const closeAreaDialog = () => {
+    setShowAddArea(false);
+    setEditingArea(null);
+    setAddAreaTypeId("");
+    setAddAreaHours("");
+    setAddAreaName("");
+    setAddAreaNotes("");
+  };
+
+  const openEditArea = (area: { id: string; name: string; estimated_hours: string | null; notes: string | null }) => {
+    setEditingArea({ id: area.id });
+    setAddAreaName(area.name ?? "");
+    setAddAreaHours(area.estimated_hours ?? "");
+    setAddAreaNotes(area.notes ?? "");
+    setShowAddArea(true);
+  };
+
   const addAreaMutation = useMutation({
     mutationFn: async () => {
       if (!addAreaTypeId) throw new Error("Please select a work area type");
       const res = await apiRequest("POST", `/api/jobs/${id}/work-areas`, {
         work_area_type_id: addAreaTypeId,
+        name: addAreaName.trim() ? addAreaName.trim() : undefined,
         estimated_hours: addAreaHours ? parseFloat(addAreaHours) : undefined,
+        notes: addAreaNotes.trim() ? addAreaNotes.trim() : undefined,
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       return res.json();
     },
     onSuccess: () => {
       refetchAreas();
-      setShowAddArea(false);
-      setAddAreaTypeId("");
-      setAddAreaHours("");
+      closeAreaDialog();
       toast({ title: t("workAreaAdded") });
+    },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
+  const editAreaMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingArea) throw new Error("No work area selected");
+      if (!addAreaName.trim()) throw new Error("Name is required");
+      const res = await apiRequest("PATCH", `/api/jobs/${id}/work-areas/${editingArea.id}`, {
+        name: addAreaName.trim(),
+        estimated_hours: addAreaHours ? parseFloat(addAreaHours) : null,
+        notes: addAreaNotes.trim() ? addAreaNotes.trim() : null,
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchAreas();
+      closeAreaDialog();
+      toast({ title: t("workAreaUpdated") });
     },
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
@@ -1110,15 +1150,25 @@ export default function JobDetailPage() {
                           </div>
                         </div>
                         {isAdminOrManager && (
-                          <button
-                            onClick={() => deleteAreaMutation.mutate(area.id)}
-                            disabled={deleteAreaMutation.isPending}
-                            className="text-muted-foreground hover:text-red-500 transition-colors flex-shrink-0"
-                            title={t("removeWorkArea")}
-                            data-testid={`button-delete-area-${area.id}`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => openEditArea(area)}
+                              className="text-muted-foreground hover:text-primary transition-colors"
+                              title={t("editWorkArea")}
+                              data-testid={`button-edit-area-${area.id}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => deleteAreaMutation.mutate(area.id)}
+                              disabled={deleteAreaMutation.isPending}
+                              className="text-muted-foreground hover:text-red-500 transition-colors"
+                              title={t("removeWorkArea")}
+                              data-testid={`button-delete-area-${area.id}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     );
@@ -1532,36 +1582,48 @@ export default function JobDetailPage() {
         </div>
       </div>
 
-      {/* Add Work Area Dialog */}
-      <Dialog open={showAddArea} onOpenChange={(o) => { if (!o) { setShowAddArea(false); setAddAreaTypeId(""); setAddAreaHours(""); } }}>
+      {/* Add / Edit Work Area Dialog */}
+      <Dialog open={showAddArea} onOpenChange={(o) => { if (!o) closeAreaDialog(); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{t("addWorkArea")}</DialogTitle>
+            <DialogTitle>{editingArea ? t("editWorkArea") : t("addWorkArea")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-1">
+            {!editingArea && (
+              <div className="space-y-1">
+                <Label className="text-xs">{t("workAreaType")}</Label>
+                <select
+                  value={addAreaTypeId}
+                  onChange={(e) => setAddAreaTypeId(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  data-testid="select-add-area-type"
+                >
+                  <option value="">{t("selectType")}</option>
+                  {Object.entries(
+                    workAreaTypes.reduce<Record<string, typeof workAreaTypes>>((acc, wt) => {
+                      const div = wt.division ?? "Other";
+                      (acc[div] = acc[div] ?? []).push(wt);
+                      return acc;
+                    }, {})
+                  ).map(([div, types]) => (
+                    <optgroup key={div} label={div}>
+                      {types.map((wt) => (
+                        <option key={wt.id} value={wt.id}>{wt.name}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="space-y-1">
-              <Label className="text-xs">{t("workAreaType")}</Label>
-              <select
-                value={addAreaTypeId}
-                onChange={(e) => setAddAreaTypeId(e.target.value)}
-                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                data-testid="select-add-area-type"
-              >
-                <option value="">{t("selectType")}</option>
-                {Object.entries(
-                  workAreaTypes.reduce<Record<string, typeof workAreaTypes>>((acc, wt) => {
-                    const div = wt.division ?? "Other";
-                    (acc[div] = acc[div] ?? []).push(wt);
-                    return acc;
-                  }, {})
-                ).map(([div, types]) => (
-                  <optgroup key={div} label={div}>
-                    {types.map((wt) => (
-                      <option key={wt.id} value={wt.id}>{wt.name}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+              <Label className="text-xs">{t("workAreaNameLabel")}</Label>
+              <Input
+                type="text"
+                placeholder={t("workAreaNamePlaceholder") ?? undefined}
+                value={addAreaName}
+                onChange={(e) => setAddAreaName(e.target.value)}
+                data-testid="input-area-name"
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">{t("estimatedHoursOptional")}</Label>
@@ -1575,13 +1637,32 @@ export default function JobDetailPage() {
                 data-testid="input-area-hours"
               />
             </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t("workAreaNotesLabel")}</Label>
+              <Textarea
+                placeholder={t("workAreaNotesPlaceholder") ?? undefined}
+                value={addAreaNotes}
+                onChange={(e) => setAddAreaNotes(e.target.value)}
+                rows={3}
+                data-testid="textarea-area-notes"
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddArea(false)}>{t("cancel")}</Button>
-            <Button onClick={() => addAreaMutation.mutate()} disabled={addAreaMutation.isPending || !addAreaTypeId}>
-              {addAreaMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-              {t("addWorkArea")}
-            </Button>
+            <Button variant="outline" onClick={closeAreaDialog}>{t("cancel")}</Button>
+            {editingArea ? (
+              <Button onClick={() => editAreaMutation.mutate()} disabled={editAreaMutation.isPending || !addAreaName.trim()}
+                data-testid="button-save-area">
+                {editAreaMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+                {t("saveChanges")}
+              </Button>
+            ) : (
+              <Button onClick={() => addAreaMutation.mutate()} disabled={addAreaMutation.isPending || !addAreaTypeId}
+                data-testid="button-save-area">
+                {addAreaMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+                {t("addWorkArea")}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
