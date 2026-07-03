@@ -649,37 +649,6 @@ export function QuizzesWidget({ size }: WidgetProps) {
   );
 }
 
-export function MaterialsWidget({ size }: WidgetProps) {
-  const { data: materials = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/materials"],
-  });
-
-  const lowStock = materials.filter((m: any) => m.stockQuantity !== undefined && m.stockQuantity <= (m.reorderPoint || 5));
-
-  return (
-    <WidgetShell loading={isLoading} href="/materials">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{materials.length} items</span>
-          {lowStock.length > 0 && (
-            <Badge variant="destructive" className="text-xs">{lowStock.length} low stock</Badge>
-          )}
-        </div>
-        {lowStock.length > 0 && size !== "small" && (
-          <div className="space-y-1">
-            {lowStock.slice(0, 3).map((m: any) => (
-              <div key={m.id} className="flex items-center justify-between text-xs">
-                <span className="truncate text-amber-600">{m.name}</span>
-                <span className="text-[10px] text-muted-foreground">Qty: {m.stockQuantity ?? 0}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </WidgetShell>
-  );
-}
-
 export function SuggestionsWidget({ size }: WidgetProps) {
   const { data: suggestions = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/suggestions"],
@@ -1512,7 +1481,6 @@ export const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>>
   employees: EmployeesWidget,
   sops: SOPsWidget,
   quizzes: QuizzesWidget,
-  materials: MaterialsWidget,
   suggestions: SuggestionsWidget,
   tools: ToolsWidget,
   companyhq: CompanyHQWidget,
