@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import {
   DollarSign, Briefcase, TrendingUp, TrendingDown, Clock, Users,
-  AlertCircle, BarChart2, Layers, FileText, Timer, PieChart, ChevronDown, ChevronUp,
+  AlertCircle, AlertTriangle, BarChart2, Layers, FileText, Timer, PieChart, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Loader2 } from "lucide-react";
 
@@ -666,10 +666,23 @@ function ProfitabilityReport() {
                     <TableRow key={r.id} data-testid={`row-profit-${r.id}`}>
                       <TableCell>
                         <div>
-                          <p className="font-medium text-sm truncate max-w-[200px]">{r.title}</p>
+                          <p className="font-medium text-sm truncate max-w-[200px] flex items-center gap-1">
+                            {r.title}
+                            {Number(r.missing_rate_count ?? 0) > 0 && (
+                              <AlertTriangle
+                                className="h-3.5 w-3.5 text-amber-600 flex-shrink-0"
+                                data-testid={`icon-missing-rate-${r.id}`}
+                              />
+                            )}
+                          </p>
                           <p className="text-xs text-muted-foreground truncate max-w-[200px]">{r.client}</p>
                           {r.division && (
                             <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{r.division}</span>
+                          )}
+                          {Number(r.missing_rate_count ?? 0) > 0 && (
+                            <p className="text-xs text-amber-600 mt-0.5" data-testid={`text-missing-rate-${r.id}`}>
+                              {r.missing_rate_count} entr{r.missing_rate_count !== 1 ? "ies" : "y"} w/o pay rate — margin may be overstated
+                            </p>
                           )}
                         </div>
                       </TableCell>

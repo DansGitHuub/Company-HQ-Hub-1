@@ -101,9 +101,9 @@ export function registerAuditRoutes(app: Express, requireAuth: any) {
              )
              FROM time_entries te
              WHERE te.job_id = j.id AND te.clock_out IS NOT NULL
-               AND te.entry_type NOT IN ('break', 'shop')
+               AND te.entry_type NOT IN ('break', 'shop_time', 'shop')
            ), 0) AS actual_hours,
-           -- Labor cost: hours × avg employee pay rate
+           -- Labor cost: hours × employee pay rate (mirrors /api/jobs/:id/labor-cost)
            COALESCE((
              SELECT SUM(
                EXTRACT(EPOCH FROM (te.clock_out - te.clock_in)) / 3600
@@ -112,14 +112,23 @@ export function registerAuditRoutes(app: Express, requireAuth: any) {
              FROM time_entries te
              LEFT JOIN employees emp ON emp.user_id = te.user_id
              WHERE te.job_id = j.id AND te.clock_out IS NOT NULL
-               AND te.entry_type NOT IN ('break', 'shop')
+               AND te.entry_type NOT IN ('break', 'shop_time', 'shop')
            ), 0) AS labor_cost,
-           -- Material cost from worksheets
+           -- Time entries on this job with no employee pay rate on file (labor cost may be understated)
            COALESCE((
-             SELECT SUM(wm.quantity * COALESCE(wm.unit_cost, 0))
-             FROM worksheet_materials wm
-             JOIN worksheets ws ON ws.id = wm.worksheet_id
-             WHERE ws.job_id = j.id
+             SELECT COUNT(*)
+             FROM time_entries te
+             LEFT JOIN employees emp ON emp.user_id = te.user_id
+             WHERE te.job_id = j.id AND te.clock_out IS NOT NULL
+               AND te.entry_type NOT IN ('break', 'shop_time', 'shop')
+               AND (emp.pay_rate IS NULL OR emp.pay_rate = '')
+           ), 0) AS missing_rate_count,
+           -- Material cost from job_materials (mirrors the Job Costing Summary card)
+           COALESCE((
+             SELECT SUM(jm.quantity * jm.unit_cost)
+             FROM job_materials jm
+             WHERE jm.job_id = j.id::text
+               AND jm.quantity IS NOT NULL AND jm.unit_cost IS NOT NULL
            ), 0) AS material_cost
          FROM jobs j
          LEFT JOIN sales_estimates se ON se.id::text = j.source_estimate_id
@@ -136,7 +145,8 @@ export function registerAuditRoutes(app: Express, requireAuth: any) {
         const gross_profit = sold - cogs;
         const margin_pct = sold > 0 ? (gross_profit / sold) * 100 : 0;
         const variance_from_estimate = sold - Number(r.estimate_value);
-        return { ...r, cogs, gross_profit, margin_pct, variance_from_estimate };
+        const missing_rate_count = Number(r.missing_rate_count || 0);
+        return { ...r, cogs, gross_profit, margin_pct, variance_from_estimate, missing_rate_count };
       });
 
       return res.json(enriched);
