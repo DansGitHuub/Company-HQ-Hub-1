@@ -4834,7 +4834,7 @@ Generate detailed information for this landscaping material.`;
       // Fetch existing bypasses for this job
       const { rows: bypasses } = await pool.query(
         `SELECT jpb.gate_item, jpb.reason, jpb.created_at,
-                u.first_name, u.last_name
+                u.name
          FROM job_packet_bypasses jpb
          LEFT JOIN users u ON u.id = jpb.bypassed_by
          WHERE jpb.job_id = $1`,
@@ -4844,7 +4844,7 @@ Generate detailed information for this landscaping material.`;
       for (const b of bypasses) {
         bypassMap[b.gate_item] = {
           reason: b.reason,
-          by_name: [b.first_name, b.last_name].filter(Boolean).join(" ") || "Admin",
+          by_name: b.name || "Admin",
           at: b.created_at,
         };
       }
