@@ -2183,7 +2183,14 @@
     "dismiss": "Dismiss",
     "jobCount_one": "{{count}} job",
     "jobCount_other": "{{count}} jobs",
-    "jobCount": "{{count}} job"
+    "jobCount": "{{count}} job",
+    "doubleBookingWarning": "Double-booking warning",
+    "crewConflictWithTime": "{{name}} is already assigned to \"{{job}}\" from {{start}}–{{end}}",
+    "crewConflictNoTime": "{{name}} is already assigned to \"{{job}}\" that day (no time set — possible overlap)",
+    "scheduleAnyway": "Schedule Anyway",
+    "equipmentConflictWithTime": "{{name}} is already assigned to \"{{job}}\" from {{start}}–{{end}}",
+    "equipmentConflictNoTime": "{{name}} is already assigned to \"{{job}}\" that day (no time set — possible overlap)",
+    "assignAnyway": "Assign Anyway"
   },
   "timeTracking": {
     "title": "Time Tracking",

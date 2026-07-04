@@ -11,7 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Plus, Loader2, Truck, Trash2, Pencil, Clock,
+  Plus, Loader2, Truck, Trash2, Pencil, Clock, AlertTriangle,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
@@ -24,6 +24,26 @@ interface EquipmentItem {
   year: number | null;
   asset_id: string | null;
   status: string;
+}
+
+interface EquipConflict {
+  equipment_id: string;
+  equipment_name: string;
+  job_id: string;
+  job_title: string;
+  start_time: string | null;
+  end_time: string | null;
+}
+
+function formatTimeDisplay(t: string | null | undefined): string | null {
+  if (!t) return null;
+  const parts = t.split(":");
+  const h = parseInt(parts[0], 10);
+  if (isNaN(h)) return null;
+  const minutes = parts[1] ?? "00";
+  const suffix = h < 12 ? "AM" : "PM";
+  const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${displayHour}:${minutes} ${suffix}`;
 }
 
 interface Assignment {
@@ -48,6 +68,7 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingEquipmentId, setEditingEquipmentId] = useState<string | null>(null);
 
   // Form state
   const [selectedEquipId, setSelectedEquipId] = useState("");
@@ -55,6 +76,8 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
   const [hoursUsed, setHoursUsed] = useState("");
   const [operatorName, setOperatorName] = useState("");
   const [notes, setNotes] = useState("");
+  const [equipConflicts, setEquipConflicts] = useState<EquipConflict[] | null>(null);
+  const [checkingEquipOverlap, setCheckingEquipOverlap] = useState(false);
 
   const { data: assignments = [], isLoading } = useQuery<Assignment[]>({
     queryKey: ["/api/jobs", jobId, "equipment"],
@@ -80,6 +103,17 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
     setOperatorName("");
     setNotes("");
     setEditingId(null);
+    setEditingEquipmentId(null);
+    setEquipConflicts(null);
+  }
+
+  async function checkEquipOverlap(equipmentId: string, date: string): Promise<EquipConflict[]> {
+    const res = await apiRequest("POST", `/api/jobs/${jobId}/equipment/check-overlap`, {
+      equipment_id: equipmentId,
+      date,
+    });
+    const data = await res.json();
+    return data.conflicts ?? [];
   }
 
   const addMutation = useMutation({
@@ -103,6 +137,27 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
 
+  async function handleAssignClick() {
+    if (!selectedEquipId) return;
+    if (equipConflicts && equipConflicts.length > 0) {
+      addMutation.mutate();
+      return;
+    }
+    setCheckingEquipOverlap(true);
+    try {
+      const conflicts = await checkEquipOverlap(selectedEquipId, assignedDate);
+      if (conflicts.length > 0) {
+        setEquipConflicts(conflicts);
+        return;
+      }
+    } catch {
+      // If the check itself fails, don't block the assignment — fall through to save.
+    } finally {
+      setCheckingEquipOverlap(false);
+    }
+    addMutation.mutate();
+  }
+
   const updateMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await apiRequest("PATCH", `/api/jobs/${jobId}/equipment/${id}`, {
@@ -122,6 +177,29 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
 
+  async function handleUpdateClick() {
+    if (!editingId) return;
+    if (equipConflicts && equipConflicts.length > 0) {
+      updateMutation.mutate(editingId);
+      return;
+    }
+    if (editingEquipmentId) {
+      setCheckingEquipOverlap(true);
+      try {
+        const conflicts = await checkEquipOverlap(editingEquipmentId, assignedDate);
+        if (conflicts.length > 0) {
+          setEquipConflicts(conflicts);
+          return;
+        }
+      } catch {
+        // If the check itself fails, don't block the update — fall through to save.
+      } finally {
+        setCheckingEquipOverlap(false);
+      }
+    }
+    updateMutation.mutate(editingId);
+  }
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await apiRequest("DELETE", `/api/jobs/${jobId}/equipment/${id}`);
@@ -135,10 +213,12 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
 
   function startEdit(a: Assignment) {
     setEditingId(a.id);
+    setEditingEquipmentId(a.equipment_id);
     setAssignedDate(a.assigned_date?.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
     setHoursUsed(String(a.hours_used ?? ""));
     setOperatorName(a.operator_name ?? "");
     setNotes(a.notes ?? "");
+    setEquipConflicts(null);
   }
 
   const totalHours = assignments.reduce((s, a) => s + Number(a.hours_used ?? 0), 0);
@@ -230,7 +310,8 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
           <div className="space-y-3">
             <div>
               <Label>Equipment <span className="text-red-500">*</span></Label>
-              <select value={selectedEquipId} onChange={e => setSelectedEquipId(e.target.value)}
+              <select value={selectedEquipId}
+                onChange={e => { setSelectedEquipId(e.target.value); setEquipConflicts(null); }}
                 className="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm"
                 data-testid="select-equipment">
                 <option value="">— Select equipment —</option>
@@ -244,7 +325,8 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label>Date</Label>
-                <Input type="date" value={assignedDate} onChange={e => setAssignedDate(e.target.value)}
+                <Input type="date" value={assignedDate}
+                  onChange={e => { setAssignedDate(e.target.value); setEquipConflicts(null); }}
                   data-testid="input-equip-date" />
               </div>
               <div>
@@ -264,13 +346,39 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
               <Textarea value={notes} onChange={e => setNotes(e.target.value)}
                 rows={2} placeholder="Any notes…" className="resize-none mt-1" />
             </div>
+            {equipConflicts && equipConflicts.length > 0 && (
+              <div
+                className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3 space-y-1.5"
+                data-testid="warning-equipment-overlap"
+              >
+                <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-400 text-sm font-medium">
+                  <AlertTriangle className="h-4 w-4" /> Double-booking warning
+                </div>
+                <ul className="text-xs text-amber-800 dark:text-amber-400 space-y-1 pl-1">
+                  {equipConflicts.map((c, i) => {
+                    const start = formatTimeDisplay(c.start_time);
+                    const end = formatTimeDisplay(c.end_time);
+                    return (
+                      <li key={i} data-testid={`conflict-equipment-${c.equipment_id}-${i}`}>
+                        {start && end
+                          ? `${c.equipment_name} is already assigned to "${c.job_title}" from ${start}–${end}`
+                          : `${c.equipment_name} is already assigned to "${c.job_title}" that day (no time set — possible overlap)`}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowAdd(false); resetForm(); }}>Cancel</Button>
-            <Button disabled={!selectedEquipId || addMutation.isPending} onClick={() => addMutation.mutate()}
+            <Button
+              disabled={!selectedEquipId || addMutation.isPending || checkingEquipOverlap}
+              variant={equipConflicts && equipConflicts.length > 0 ? "destructive" : "default"}
+              onClick={handleAssignClick}
               data-testid="button-confirm-assign">
-              {addMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-              Assign
+              {(addMutation.isPending || checkingEquipOverlap) ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              {equipConflicts && equipConflicts.length > 0 ? "Assign Anyway" : "Assign"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -284,7 +392,8 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label>Date</Label>
-                <Input type="date" value={assignedDate} onChange={e => setAssignedDate(e.target.value)} />
+                <Input type="date" value={assignedDate}
+                  onChange={e => { setAssignedDate(e.target.value); setEquipConflicts(null); }} />
               </div>
               <div>
                 <Label>Hours Used</Label>
@@ -301,12 +410,39 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
               <Textarea value={notes} onChange={e => setNotes(e.target.value)}
                 rows={2} className="resize-none mt-1" />
             </div>
+            {equipConflicts && equipConflicts.length > 0 && (
+              <div
+                className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3 space-y-1.5"
+                data-testid="warning-equipment-overlap-edit"
+              >
+                <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-400 text-sm font-medium">
+                  <AlertTriangle className="h-4 w-4" /> Double-booking warning
+                </div>
+                <ul className="text-xs text-amber-800 dark:text-amber-400 space-y-1 pl-1">
+                  {equipConflicts.map((c, i) => {
+                    const start = formatTimeDisplay(c.start_time);
+                    const end = formatTimeDisplay(c.end_time);
+                    return (
+                      <li key={i} data-testid={`conflict-equipment-edit-${c.equipment_id}-${i}`}>
+                        {start && end
+                          ? `${c.equipment_name} is already assigned to "${c.job_title}" from ${start}–${end}`
+                          : `${c.equipment_name} is already assigned to "${c.job_title}" that day (no time set — possible overlap)`}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={resetForm}>Cancel</Button>
-            <Button disabled={updateMutation.isPending} onClick={() => editingId && updateMutation.mutate(editingId)}>
-              {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-              Save Changes
+            <Button
+              disabled={updateMutation.isPending || checkingEquipOverlap}
+              variant={equipConflicts && equipConflicts.length > 0 ? "destructive" : "default"}
+              onClick={handleUpdateClick}
+            >
+              {(updateMutation.isPending || checkingEquipOverlap) ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              {equipConflicts && equipConflicts.length > 0 ? "Save Anyway" : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

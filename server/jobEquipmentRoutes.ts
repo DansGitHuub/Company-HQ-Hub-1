@@ -2,6 +2,31 @@ import { pool } from "./db";
 import type { Express } from "express";
 import { logChange } from "./auditLog";
 
+// ── Overlap-check helpers ──────────────────────────────────────────────────
+// Duplicated from server/dailyPlanRoutes.ts's conflict-detection algorithm
+// (same codebase convention: this small helper pair is intentionally
+// duplicated rather than shared, so this read-only check route never has to
+// modify or depend on the daily-plan module).
+function timeToMinutesLocal(t: string | null | undefined): number | null {
+  if (!t) return null;
+  const parts = t.split(":");
+  if (parts.length < 2) return null;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+function rangesOverlapLocal(
+  s1: number | null, e1: number | null,
+  s2: number | null, e2: number | null
+): boolean {
+  if (s1 === null || s2 === null) return true; // no time info → treat as potential conflict
+  const end1 = e1 ?? s1 + 480;
+  const end2 = e2 ?? s2 + 480;
+  return s1 < end2 && s2 < end1;
+}
+
 export function registerJobEquipmentRoutes(app: Express, requireAuth: any) {
 
   // ── List equipment assigned to a job ─────────────────────────────────────
@@ -11,7 +36,7 @@ export function registerJobEquipmentRoutes(app: Express, requireAuth: any) {
         `SELECT jea.*,
                 e.name AS equipment_name, e.type AS equipment_type,
                 e.make, e.model, e.year, e.asset_id, e.status AS equipment_status,
-                u.first_name || ' ' || u.last_name AS created_by_name
+                u.name AS created_by_name
          FROM job_equipment_assignments jea
          LEFT JOIN equipment e ON e.id = jea.equipment_id
          LEFT JOIN users u ON u.id = jea.created_by
@@ -82,6 +107,58 @@ export function registerJobEquipmentRoutes(app: Express, requireAuth: any) {
 
       return res.status(201).json(rows[0]);
     } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── POST /api/jobs/:jobId/equipment/check-overlap ────────────────────────
+  // Read-only pre-save check: would assigning this equipment to this job on
+  // this date overlap with any of the equipment's OTHER existing job
+  // assignments (using this job's own scheduled start/end time)? Does not
+  // write anything — the caller decides what to do with the result.
+  app.post("/api/jobs/:jobId/equipment/check-overlap", requireAuth, async (req: any, res) => {
+    try {
+      const { equipment_id, date } = req.body ?? {};
+      if (!equipment_id || !date) return res.json({ conflicts: [] });
+
+      const { rows: jobRows } = await pool.query(
+        `SELECT scheduled_start_time, scheduled_end_time FROM jobs WHERE id = $1`,
+        [req.params.jobId]
+      );
+      const thisJob = jobRows[0] ?? {};
+      const newStart = timeToMinutesLocal(thisJob.scheduled_start_time);
+      const newEnd = timeToMinutesLocal(thisJob.scheduled_end_time);
+
+      const { rows } = await pool.query(
+        `SELECT jea.equipment_id, eq.name AS equipment_name,
+                j.id AS job_id, j.title AS job_title,
+                j.scheduled_start_time, j.scheduled_end_time
+         FROM job_equipment_assignments jea
+         JOIN jobs j ON j.id = jea.job_id
+         JOIN equipment eq ON eq.id = jea.equipment_id
+         WHERE jea.equipment_id = $1
+           AND jea.assigned_date = $2
+           AND j.id IS DISTINCT FROM $3`,
+        [equipment_id, date, req.params.jobId]
+      );
+
+      const conflicts = rows
+        .filter((r: any) => rangesOverlapLocal(
+          newStart, newEnd,
+          timeToMinutesLocal(r.scheduled_start_time), timeToMinutesLocal(r.scheduled_end_time)
+        ))
+        .map((r: any) => ({
+          equipment_id: r.equipment_id,
+          equipment_name: r.equipment_name,
+          job_id: r.job_id,
+          job_title: r.job_title,
+          start_time: r.scheduled_start_time,
+          end_time: r.scheduled_end_time,
+        }));
+
+      return res.json({ conflicts });
+    } catch (err: any) {
+      console.error("[jobs/equipment/check-overlap]", err);
       return res.status(500).json({ message: err.message });
     }
   });

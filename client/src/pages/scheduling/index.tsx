@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ChevronLeft, ChevronRight, CalendarCheck, X, Users, Briefcase, RotateCcw } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, CalendarCheck, X, Users, Briefcase, RotateCcw, AlertTriangle } from "lucide-react";
 import {
   format, addWeeks, subWeeks, startOfWeek, addDays, isToday,
   parseISO,
@@ -57,6 +57,15 @@ interface UndoAction {
   timestamp: number;
 }
 
+interface CrewConflict {
+  employee_id: string;
+  employee_name: string;
+  job_id: string;
+  job_title: string;
+  start_time: string | null;
+  end_time: string | null;
+}
+
 // ── Constants ────────────────────────────────────────────────────────────────
 const HOURS = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
 const CELL_H = 64;
@@ -87,6 +96,16 @@ function hourTo12(h: number) {
 
 function hourToTime(h: number) {
   return `${String(h).padStart(2, "0")}:00`;
+}
+
+function formatTimeDisplay(t: string | null | undefined): string | null {
+  if (!t) return null;
+  const h = parseHour(t);
+  if (h === null) return null;
+  const minutes = t.split(":")[1] ?? "00";
+  const suffix = h < 12 ? "AM" : "PM";
+  const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${displayHour}:${minutes} ${suffix}`;
 }
 
 const STATUS_CLS: Record<string, string> = {
@@ -267,6 +286,8 @@ export default function SchedulingCalendar() {
   const [modalDivision,  setModalDivision]  = useState("Maintenance");
   const [modalColor,     setModalColor]     = useState("#22c55e");
   const [selectedEmpIds, setSelectedEmpIds] = useState<string[]>([]);
+  const [crewConflicts, setCrewConflicts] = useState<CrewConflict[] | null>(null);
+  const [checkingCrewOverlap, setCheckingCrewOverlap] = useState(false);
 
   // ── Undo state ────────────────────────────────────────────────────────────
   const UNDO_DURATION = 300;
@@ -338,6 +359,7 @@ export default function SchedulingCalendar() {
     setModalDivision(defaultDiv);
     setModalColor(defaultColor);
     setSelectedEmpIds([]);
+    setCrewConflicts(null);
     setPendingDrop({ jobId, date: format(day, "yyyy-MM-dd"), hour });
   }, [calJobs, unscheduled]);
 
@@ -349,9 +371,11 @@ export default function SchedulingCalendar() {
     setSelectedEmpIds(prev =>
       prev.includes(empId) ? prev.filter(id => id !== empId) : [...prev, empId]
     );
+    // Selection changed — any previously-shown warning is now stale.
+    setCrewConflicts(null);
   }
 
-  function confirmSchedule() {
+  function doSchedule() {
     if (!pendingDrop) return;
     scheduleMutation.mutate({
       jobId:           pendingDrop.jobId,
@@ -362,6 +386,45 @@ export default function SchedulingCalendar() {
       color:           modalColor,
       employee_ids:    selectedEmpIds,
     });
+    setCrewConflicts(null);
+  }
+
+  async function confirmSchedule() {
+    if (!pendingDrop) return;
+
+    // If a warning is already showing, the user is confirming "schedule
+    // anyway" — go straight to save.
+    if (crewConflicts && crewConflicts.length > 0) {
+      doSchedule();
+      return;
+    }
+
+    if (selectedEmpIds.length === 0) {
+      doSchedule();
+      return;
+    }
+
+    setCheckingCrewOverlap(true);
+    try {
+      const res = await apiRequest("POST", "/api/scheduling/check-crew-overlap", {
+        employee_ids:   selectedEmpIds,
+        date:           pendingDrop.date,
+        start_time:     hourToTime(modalStartHour),
+        end_time:       hourToTime(modalEndHour),
+        exclude_job_id: pendingDrop.jobId,
+      });
+      const data = await res.json();
+      if (data.conflicts && data.conflicts.length > 0) {
+        setCrewConflicts(data.conflicts);
+        return;
+      }
+    } catch {
+      // If the check itself fails, don't block scheduling — fall through to save.
+    } finally {
+      setCheckingCrewOverlap(false);
+    }
+
+    doSchedule();
   }
 
   // ── Local sort-order state (optimistic reorder within day columns) ──────────
@@ -795,7 +858,7 @@ export default function SchedulingCalendar() {
                   <Label className="text-xs">{t("startTime")}</Label>
                   <Select
                     value={String(modalStartHour)}
-                    onValueChange={v => setModalStartHour(Number(v))}
+                    onValueChange={v => { setModalStartHour(Number(v)); setCrewConflicts(null); }}
                   >
                     <SelectTrigger className="mt-1" data-testid="select-start-hour">
                       <SelectValue />
@@ -811,7 +874,7 @@ export default function SchedulingCalendar() {
                   <Label className="text-xs">{t("endTime")}</Label>
                   <Select
                     value={String(modalEndHour)}
-                    onValueChange={v => setModalEndHour(Number(v))}
+                    onValueChange={v => { setModalEndHour(Number(v)); setCrewConflicts(null); }}
                   >
                     <SelectTrigger className="mt-1" data-testid="select-end-hour">
                       <SelectValue />
@@ -879,6 +942,30 @@ export default function SchedulingCalendar() {
                   </div>
                 </div>
               )}
+
+              {crewConflicts && crewConflicts.length > 0 && (
+                <div
+                  className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3 space-y-1.5"
+                  data-testid="warning-crew-overlap"
+                >
+                  <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-400 text-sm font-medium">
+                    <AlertTriangle className="h-4 w-4" /> {t("doubleBookingWarning")}
+                  </div>
+                  <ul className="text-xs text-amber-800 dark:text-amber-400 space-y-1 pl-1">
+                    {crewConflicts.map((c, i) => {
+                      const start = formatTimeDisplay(c.start_time);
+                      const end = formatTimeDisplay(c.end_time);
+                      return (
+                        <li key={i} data-testid={`conflict-crew-${c.employee_id}-${i}`}>
+                          {start && end
+                            ? t("crewConflictWithTime", { name: c.employee_name, job: c.job_title, start, end })
+                            : t("crewConflictNoTime", { name: c.employee_name, job: c.job_title })}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
 
@@ -888,11 +975,12 @@ export default function SchedulingCalendar() {
             </Button>
             <Button
               onClick={confirmSchedule}
-              disabled={scheduleMutation.isPending}
+              disabled={scheduleMutation.isPending || checkingCrewOverlap}
+              variant={crewConflicts && crewConflicts.length > 0 ? "destructive" : "default"}
               data-testid="btn-confirm-schedule"
             >
-              {scheduleMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {t("confirmSchedule")}
+              {(scheduleMutation.isPending || checkingCrewOverlap) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {crewConflicts && crewConflicts.length > 0 ? t("scheduleAnyway") : t("confirmSchedule")}
             </Button>
           </DialogFooter>
         </DialogContent>

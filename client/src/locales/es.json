@@ -2183,7 +2183,14 @@
     "dismiss": "Descartar",
     "jobCount_one": "{{count}} trabajo",
     "jobCount_other": "{{count}} trabajos",
-    "jobCount": "{{count}} trabajo"
+    "jobCount": "{{count}} trabajo",
+    "doubleBookingWarning": "Advertencia de doble reserva",
+    "crewConflictWithTime": "{{name}} ya está asignado a \"{{job}}\" de {{start}} a {{end}}",
+    "crewConflictNoTime": "{{name}} ya está asignado a \"{{job}}\" ese día (sin hora definida — posible solapamiento)",
+    "scheduleAnyway": "Programar de todos modos",
+    "equipmentConflictWithTime": "{{name}} ya está asignado a \"{{job}}\" de {{start}} a {{end}}",
+    "equipmentConflictNoTime": "{{name}} ya está asignado a \"{{job}}\" ese día (sin hora definida — posible solapamiento)",
+    "assignAnyway": "Asignar de todos modos"
   },
   "timeTracking": {
     "title": "Seguimiento de Tiempo",

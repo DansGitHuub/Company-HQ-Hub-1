@@ -1,6 +1,31 @@
 import type { Express } from "express";
 import { pool } from "./db";
 
+// ── Overlap-check helpers ──────────────────────────────────────────────────
+// Duplicated from server/dailyPlanRoutes.ts's conflict-detection algorithm
+// (same codebase convention: this small helper pair is intentionally
+// duplicated rather than shared, so this read-only check route never has to
+// modify or depend on the daily-plan module).
+function timeToMinutesLocal(t: string | null | undefined): number | null {
+  if (!t) return null;
+  const parts = t.split(":");
+  if (parts.length < 2) return null;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+function rangesOverlapLocal(
+  s1: number | null, e1: number | null,
+  s2: number | null, e2: number | null
+): boolean {
+  if (s1 === null || s2 === null) return true; // no time info → treat as potential conflict
+  const end1 = e1 ?? s1 + 480;
+  const end2 = e2 ?? s2 + 480;
+  return s1 < end2 && s2 < end1;
+}
+
 function requireAuth(req: any, res: any, next: any) {
   if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
   next();
@@ -217,6 +242,56 @@ export function registerSchedulingRoutes(app: Express) {
     } catch (err: any) {
       console.error("[scheduling/sort-order]", err.message);
       res.status(500).json({ message: "Error updating sort order" });
+    }
+  });
+
+  // ── POST /api/scheduling/check-crew-overlap ──────────────────────────────────
+  // Read-only pre-save check: does assigning these employees to a job on this
+  // date/time window overlap with any of their OTHER existing assignments?
+  // Does not write anything. Non-blocking — the caller decides what to do
+  // with the returned conflicts.
+  app.post("/api/scheduling/check-crew-overlap", requireAuth, async (req, res) => {
+    try {
+      const { employee_ids = [], date, start_time, end_time, exclude_job_id } = req.body ?? {};
+      if (!Array.isArray(employee_ids) || employee_ids.length === 0 || !date) {
+        return res.json({ conflicts: [] });
+      }
+
+      const { rows } = await pool.query(
+        `SELECT ja.employee_id,
+                TRIM(e.first_name || ' ' || COALESCE(e.last_name, '')) AS employee_name,
+                j.id AS job_id, j.title AS job_title,
+                j.scheduled_start_time, j.scheduled_end_time
+         FROM job_assignments ja
+         JOIN jobs j ON j.id = ja.job_id
+         JOIN employees e ON e.id = ja.employee_id
+         WHERE ja.employee_id = ANY($1::varchar[])
+           AND ja.scheduled_date = $2
+           AND j.id IS DISTINCT FROM $3`,
+        [employee_ids, date, exclude_job_id || null]
+      );
+
+      const newStart = timeToMinutesLocal(start_time);
+      const newEnd = timeToMinutesLocal(end_time);
+
+      const conflicts = rows
+        .filter((r: any) => rangesOverlapLocal(
+          newStart, newEnd,
+          timeToMinutesLocal(r.scheduled_start_time), timeToMinutesLocal(r.scheduled_end_time)
+        ))
+        .map((r: any) => ({
+          employee_id: r.employee_id,
+          employee_name: r.employee_name,
+          job_id: r.job_id,
+          job_title: r.job_title,
+          start_time: r.scheduled_start_time,
+          end_time: r.scheduled_end_time,
+        }));
+
+      res.json({ conflicts });
+    } catch (err) {
+      console.error("[scheduling/check-crew-overlap]", err);
+      res.status(500).json({ message: "Error checking crew overlap" });
     }
   });
 
