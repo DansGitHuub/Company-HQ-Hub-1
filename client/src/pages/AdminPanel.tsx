@@ -126,6 +126,7 @@ import { Switch } from "@/components/ui/switch";
 import ArticleReportsCenter from "@/components/ArticleReportsCenter";
 import DiagnosticReport from "@/components/DiagnosticReport";
 import AdminDocumentLibrary from "@/components/AdminDocumentLibrary";
+import SecurityAuditLogPanel from "@/components/admin/SecurityAuditLogPanel";
 
 // ─── Constants & types for Company Settings in-panel sections ─────────────────
 const DIVISIONS_LIST = ["Maintenance", "Install", "Snow", "General"] as const;
@@ -741,6 +742,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "customer-duplicates", label: "Customer Duplicates", icon: GitMerge, href: "/admin/customer-duplicates" },
         { value: "app-testing", label: "App Testing", icon: Eye },
         { value: "system-status", label: "System Status", icon: AlertCircle },
+        { value: "security-audit-log", label: "Security Audit Log", icon: AlertTriangle },
         ...(isMasterAdmin ? [{ value: "diagnostics", label: "Diagnostics", icon: Wrench }] : []),
       ],
     },
@@ -2266,6 +2268,10 @@ export default function AdminPanel() {
               <SystemStatusReport />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="security-audit-log" className="mt-6">
+          <SecurityAuditLogPanel />
         </TabsContent>
 
         {user?.isMasterAdmin && (

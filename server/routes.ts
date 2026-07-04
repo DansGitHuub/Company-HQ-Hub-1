@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, requireRole, hashPassword, comparePasswords } from "./auth";
+import { logAuditEvent, queryAuditLog } from "./securityAuditLog";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerCompanyCamRoutes } from "./companyCamRoutes";
 import { registerDuplicateCustomerRoutes } from "./duplicateCustomerRoutes";
@@ -478,9 +479,55 @@ export async function registerRoutes(
         );
       }
 
+      // Security audit log — structured permission-change record (additive, separate from activity_log)
+      if (role !== undefined && role !== targetUser.role) {
+        await logAuditEvent({
+          eventType: "permission_change",
+          actorUserId: actorId,
+          actorName: actorName,
+          targetUserId: targetUser.id,
+          targetLabel: targetUser.name,
+          description: `${actorName} changed ${targetUser.name}'s role from "${targetUser.role}" to "${role}"`,
+          oldValue: { role: targetUser.role },
+          newValue: { role },
+          ipAddress: req.ip,
+        });
+      }
+      if (isActive !== undefined && Boolean(isActive) !== Boolean(targetUser.isActive)) {
+        await logAuditEvent({
+          eventType: "permission_change",
+          actorUserId: actorId,
+          actorName: actorName,
+          targetUserId: targetUser.id,
+          targetLabel: targetUser.name,
+          description: `${actorName} ${Boolean(isActive) ? "activated" : "deactivated"} ${targetUser.name}'s account`,
+          oldValue: { isActive: Boolean(targetUser.isActive) },
+          newValue: { isActive: Boolean(isActive) },
+          ipAddress: req.ip,
+        });
+      }
+
       res.json(safeUser);
     } catch (err) {
       res.status(500).json({ message: "Error updating user" });
+    }
+  });
+
+  // ── GET /api/admin/security-audit-log — filterable read-only audit trail ──
+  app.get("/api/admin/security-audit-log", requireAdmin, async (req, res) => {
+    try {
+      const { eventType, search, startDate, endDate, limit, offset } = req.query;
+      const result = await queryAuditLog({
+        eventType: eventType as string | undefined,
+        search: search as string | undefined,
+        startDate: startDate as string | undefined,
+        endDate: endDate as string | undefined,
+        limit: limit ? Number(limit) : undefined,
+        offset: offset ? Number(offset) : undefined,
+      });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
     }
   });
 

@@ -2666,6 +2666,31 @@ export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLog.$inferSelect;
 
+export const auditLog = pgTable("audit_log", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  eventType: varchar("event_type", { length: 50 }).notNull(),
+  actorUserId: varchar("actor_user_id", { length: 36 }).references(() => users.id),
+  actorName: varchar("actor_name", { length: 255 }),
+  targetUserId: varchar("target_user_id", { length: 36 }).references(() => users.id),
+  targetLabel: varchar("target_label", { length: 255 }),
+  description: text("description").notNull(),
+  oldValue: jsonb("old_value"),
+  newValue: jsonb("new_value"),
+  ipAddress: varchar("ip_address", { length: 64 }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("idx_audit_log_created_at").on(t.createdAt),
+  index("idx_audit_log_event_type").on(t.eventType),
+]);
+
+export const insertAuditLogSchema = createInsertSchema(auditLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLog.$inferSelect;
+
 export const sopPipeline = pgTable("sop_pipeline", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),

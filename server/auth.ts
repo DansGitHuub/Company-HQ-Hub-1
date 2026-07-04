@@ -7,6 +7,7 @@ import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 import { sendPasswordRecoveryEmail } from "./email";
+import { logAuditEvent } from "./securityAuditLog";
 
 declare global {
   namespace Express {
@@ -121,14 +122,39 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
+    const attemptedUsername = req.body?.username;
     passport.authenticate("local", (err: any, user: SelectUser | false, info: any) => {
       if (err) return next(err);
       if (!user) {
+        (async () => {
+          let existingUser: SelectUser | undefined;
+          try {
+            existingUser = await storage.getUserByUsername(attemptedUsername);
+          } catch {
+            // best-effort lookup only
+          }
+          await logAuditEvent({
+            eventType: "login_failure",
+            actorUserId: existingUser?.id ?? null,
+            actorName: existingUser?.name || attemptedUsername || "Unknown",
+            targetUserId: existingUser?.id ?? null,
+            targetLabel: existingUser?.name || attemptedUsername || null,
+            description: `Failed login attempt for username "${attemptedUsername}"${existingUser?.name ? ` (${existingUser.name})` : ""} — ${info?.message || "Login failed"}`,
+            ipAddress: req.ip,
+          });
+        })();
         return res.status(401).json({ message: info?.message || "Login failed", errorCode: "AUTH-001" });
       }
       req.login(user, (loginErr) => {
         if (loginErr) return next(loginErr);
         const { password: _, ...safeUser } = user;
+        logAuditEvent({
+          eventType: "login_success",
+          actorUserId: user.id,
+          actorName: user.name || user.username,
+          description: `${user.name || user.username} logged in successfully`,
+          ipAddress: req.ip,
+        });
         res.status(200).json(safeUser);
       });
     })(req, res, next);
