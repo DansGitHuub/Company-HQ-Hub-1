@@ -121,7 +121,7 @@ export function registerWorksheetPhotoRoutes(app: Express, requireAuth: any) {
         `SELECT wp.id,
                 wp.photo_type,
                 wp.created_at,
-                COALESCE(u.first_name || ' ' || u.last_name, 'Unknown') AS employee_name
+                COALESCE(u.name, 'Unknown') AS employee_name
          FROM   worksheet_photos wp
          JOIN   worksheet_sessions ws ON ws.id = wp.session_id
          LEFT   JOIN users u ON u.id::text = ws.employee_id::text

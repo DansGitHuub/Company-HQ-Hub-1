@@ -12,3 +12,4 @@
 - [E2E wizard testing via API](e2e-wizard-testing-via-api.md) — for multi-step wizard forms, drive the action step via direct API call to the same endpoint instead of clicking through unfamiliar UI, then verify via DB + read-only browser check.
 - [Scheduler testing pattern](scheduler-testing-pattern.md) — new server/*Scheduler.ts files can't be tested via standalone tsx script (EADDRINUSE); test through the real running workflow instead.
 - [Manager notification convention](manager-notification-convention.md) — no employee->manager FK exists; "managers" = users with role Admin/Manager or isMasterAdmin, per existing notificationScheduler.ts precedent.
+- [Users table has no first_name/last_name](users-table-name-column.md) — routes joining users on first_name/last_name throw and get silently swallowed into empty 200 responses; check server logs, not just DOM, when an endpoint returns empty.

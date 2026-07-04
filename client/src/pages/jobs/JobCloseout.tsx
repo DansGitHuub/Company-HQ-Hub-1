@@ -9,9 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 import {
   CheckCircle2, Clock, FileCheck, Loader2, Plus, Star,
-  ShieldCheck, Send, ThumbsUp,
+  ShieldCheck, Send, ThumbsUp, Camera, Image as ImageIcon,
+  Package, GitMerge, ClipboardList,
 } from "lucide-react";
 
 interface Closeout {
@@ -37,11 +40,266 @@ interface Closeout {
   created_at: string;
 }
 
+interface TimeEntry {
+  id: string;
+  employee_name: string | null;
+  clock_in: string;
+  clock_out: string | null;
+  duration_minutes: number | null;
+  entry_type: string | null;
+}
+
+interface LineItem {
+  id: string;
+  item_name: string;
+  quantity: string;
+  unit: string | null;
+  unit_price: string;
+  line_total: string;
+  class_label: string | null;
+}
+
+interface ChangeOrder {
+  id: string;
+  co_number: string;
+  title: string;
+  status: string;
+  total: string | number;
+  created_by_name: string | null;
+  created_at: string;
+}
+
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   draft:            { label: "Draft",            color: "bg-gray-100 text-gray-700",   icon: FileCheck },
   pending_approval: { label: "Pending Approval", color: "bg-amber-100 text-amber-700", icon: Clock },
   approved:         { label: "Approved",         color: "bg-green-100 text-green-700", icon: CheckCircle2 },
 };
+
+const CO_STATUS_COLOR: Record<string, string> = {
+  draft:            "bg-gray-100 text-gray-700",
+  pending_approval: "bg-amber-100 text-amber-700",
+  sent:             "bg-blue-100 text-blue-700",
+  approved:         "bg-green-100 text-green-700",
+  rejected:         "bg-red-100 text-red-700",
+};
+
+const fmt$ = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+
+function minutesToHours(mins: number | null) {
+  if (!mins) return 0;
+  return mins / 60;
+}
+
+// ── Job Data Summary — pulls in real photos, time entries, materials, and
+// change orders already recorded for this job so the closeout doesn't
+// require re-typing data that already exists elsewhere in the app. ──────────
+function JobDataSummary({ jobId }: { jobId: string }) {
+  const { data: job } = useQuery<any>({
+    queryKey: ["/api/jobs", jobId],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/jobs/${jobId}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+  const timeEntries: TimeEntry[] = job?.time_entries ?? [];
+
+  const { data: lineItems = [] } = useQuery<LineItem[]>({
+    queryKey: ["/api/jobs", jobId, "line-items"],
+    queryFn: () => fetch(`/api/jobs/${jobId}/line-items`, { credentials: "include" })
+      .then(r => r.json()).then(d => Array.isArray(d) ? d : []),
+  });
+
+  const { data: changeOrders = [] } = useQuery<ChangeOrder[]>({
+    queryKey: ["/api/jobs", jobId, "change-orders"],
+    queryFn: () => fetch(`/api/jobs/${jobId}/change-orders`, { credentials: "include" })
+      .then(r => r.json()).then(d => Array.isArray(d) ? d : []),
+  });
+
+  const { data: ccData } = useQuery<any>({
+    queryKey: ["/api/jobs", jobId, "companycam-photos"],
+    queryFn: () => fetch(`/api/jobs/${jobId}/companycam-photos`, { credentials: "include" }).then(r => r.json()),
+  });
+  const { data: wsPhotos = [] } = useQuery<any[]>({
+    queryKey: ["/api/jobs", jobId, "worksheet-photos"],
+    queryFn: () => fetch(`/api/jobs/${jobId}/worksheet-photos`, { credentials: "include" })
+      .then(r => r.json()).then(d => Array.isArray(d) ? d : []),
+  });
+  const ccPhotos: any[] = ccData?.photos ?? [];
+  const totalPhotos = ccPhotos.length + wsPhotos.length;
+
+  const totalHours = timeEntries.reduce((sum, te) => sum + minutesToHours(te.duration_minutes), 0);
+  const approvedCOs = changeOrders.filter(co => co.status === "approved");
+  const approvedCOTotal = approvedCOs.reduce((sum, co) => sum + Number(co.total || 0), 0);
+  const materialsTotal = lineItems.reduce((sum, li) => sum + Number(li.line_total || 0), 0);
+
+  return (
+    <Card>
+      <CardHeader className="pb-2 pt-4">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <ClipboardList className="h-4 w-4 text-muted-foreground" />
+          Job Data Summary
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Pulled automatically from this job — review below, no need to re-type it.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {/* Time entries */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" /> Time Logged
+            </p>
+            <span className="text-xs font-medium" data-testid="text-closeout-total-hours">
+              {totalHours.toFixed(1)}h total
+            </span>
+          </div>
+          {timeEntries.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-2 text-center border rounded-md">
+              No time entries logged for this job yet
+            </p>
+          ) : (
+            <div className="border rounded-md divide-y max-h-48 overflow-y-auto" data-testid="list-closeout-time-entries">
+              {timeEntries.map((te) => (
+                <div key={te.id} className="flex items-center justify-between px-3 py-1.5 text-xs" data-testid={`row-closeout-time-${te.id}`}>
+                  <div className="min-w-0">
+                    <span className="font-medium">{te.employee_name || "Unknown"}</span>
+                    <span className="text-muted-foreground ml-2">
+                      {format(new Date(te.clock_in), "MMM d")} · {format(new Date(te.clock_in), "h:mm a")}
+                      {te.clock_out ? ` – ${format(new Date(te.clock_out), "h:mm a")}` : " (in progress)"}
+                    </span>
+                    {te.entry_type && te.entry_type !== "job" && (
+                      <Badge variant="secondary" className="ml-2 text-[10px] capitalize">{te.entry_type}</Badge>
+                    )}
+                  </div>
+                  <span className="font-medium whitespace-nowrap ml-2">
+                    {minutesToHours(te.duration_minutes).toFixed(1)}h
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        {/* Materials / line items */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <Package className="h-3.5 w-3.5" /> Materials / Line Items Used
+            </p>
+            {lineItems.length > 0 && (
+              <span className="text-xs font-medium" data-testid="text-closeout-materials-total">
+                {fmt$(materialsTotal)}
+              </span>
+            )}
+          </div>
+          {lineItems.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-2 text-center border rounded-md">
+              No line items recorded for this job
+            </p>
+          ) : (
+            <div className="border rounded-md divide-y max-h-48 overflow-y-auto" data-testid="list-closeout-line-items">
+              {lineItems.map((li) => (
+                <div key={li.id} className="flex items-center justify-between px-3 py-1.5 text-xs" data-testid={`row-closeout-material-${li.id}`}>
+                  <div className="min-w-0 flex-1">
+                    <span className="font-medium">{li.item_name}</span>
+                    <span className="text-muted-foreground ml-2">
+                      {li.quantity} {li.unit || ""}
+                    </span>
+                  </div>
+                  <span className="font-medium whitespace-nowrap ml-2">{fmt$(Number(li.line_total || 0))}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        {/* Change orders */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <GitMerge className="h-3.5 w-3.5" /> Change Orders
+            </p>
+            {approvedCOs.length > 0 && (
+              <span className="text-xs font-medium" data-testid="text-closeout-co-total">
+                {fmt$(approvedCOTotal)} approved
+              </span>
+            )}
+          </div>
+          {changeOrders.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-2 text-center border rounded-md">
+              No change orders on this job
+            </p>
+          ) : (
+            <div className="border rounded-md divide-y" data-testid="list-closeout-change-orders">
+              {changeOrders.map((co) => (
+                <div key={co.id} className="flex items-center justify-between px-3 py-1.5 text-xs" data-testid={`row-closeout-co-${co.id}`}>
+                  <div className="min-w-0 flex-1">
+                    <span className="font-medium">{co.co_number}</span>
+                    <span className="text-muted-foreground ml-2 truncate">{co.title}</span>
+                  </div>
+                  <div className="flex items-center gap-2 whitespace-nowrap ml-2">
+                    <Badge className={`text-[10px] px-1.5 py-0 ${CO_STATUS_COLOR[co.status] || "bg-gray-100 text-gray-700"}`}>
+                      {co.status.replace("_", " ")}
+                    </Badge>
+                    <span className="font-medium">{fmt$(Number(co.total || 0))}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        {/* Photos */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <Camera className="h-3.5 w-3.5" /> Photos
+            </p>
+            <span className="text-xs font-medium" data-testid="text-closeout-photo-count">
+              {totalPhotos} photo{totalPhotos !== 1 ? "s" : ""}
+            </span>
+          </div>
+          {totalPhotos === 0 ? (
+            <p className="text-xs text-muted-foreground py-2 text-center border rounded-md">
+              No photos attached to this job yet
+            </p>
+          ) : (
+            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5" data-testid="grid-closeout-photos">
+              {ccPhotos.map((photo: any) => (
+                <a key={`cc-${photo.companycam_photo_id}`}
+                  href={photo.companycam_app_url || photo.photo_url_web || photo.photo_url_original}
+                  target="_blank" rel="noreferrer"
+                  className="block group" data-testid={`img-closeout-cc-${photo.companycam_photo_id}`}>
+                  <div className="aspect-square rounded-md overflow-hidden bg-muted border">
+                    <img src={photo.photo_url_web || photo.photo_url_original} alt={photo.description || "Site photo"}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                  </div>
+                </a>
+              ))}
+              {wsPhotos.map((photo: any) => (
+                <a key={`ws-${photo.id}`} href={photo.photo_url} target="_blank" rel="noreferrer"
+                  className="block group" data-testid={`img-closeout-ws-${photo.id}`}>
+                  <div className="aspect-square rounded-md overflow-hidden bg-muted border">
+                    <img src={photo.photo_url} alt={`${photo.photo_type} photo`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function JobCloseout({ jobId, isAdminOrManager }: { jobId: string; isAdminOrManager: boolean }) {
   const { toast } = useToast();
@@ -144,21 +402,24 @@ export default function JobCloseout({ jobId, isAdminOrManager }: { jobId: string
   // No closeout yet — show start button
   if (!closeout && !editing) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <FileCheck className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
-          <p className="text-sm font-medium">No closeout record yet</p>
-          <p className="text-xs text-muted-foreground mt-1 mb-4">
-            Create a closeout record when the job is complete to capture final details,
-            approve warranty, and trigger invoicing.
-          </p>
-          {isAdminOrManager && (
-            <Button onClick={() => setEditing(true)} data-testid="button-start-closeout">
-              <Plus className="h-4 w-4 mr-1.5" /> Start Closeout
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <JobDataSummary jobId={jobId} />
+        <Card>
+          <CardContent className="py-12 text-center">
+            <FileCheck className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+            <p className="text-sm font-medium">No closeout record yet</p>
+            <p className="text-xs text-muted-foreground mt-1 mb-4">
+              Create a closeout record when the job is complete to capture final details,
+              approve warranty, and trigger invoicing.
+            </p>
+            {isAdminOrManager && (
+              <Button onClick={() => setEditing(true)} data-testid="button-start-closeout">
+                <Plus className="h-4 w-4 mr-1.5" /> Start Closeout
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -198,6 +459,9 @@ export default function JobCloseout({ jobId, isAdminOrManager }: { jobId: string
         </Card>
       )}
 
+      {/* Pulled-in job data — always visible so it can be reviewed before finalizing */}
+      <JobDataSummary jobId={jobId} />
+
       {/* Form */}
       {(editing || !closeout) && (
         <Card>
@@ -225,8 +489,11 @@ export default function JobCloseout({ jobId, isAdminOrManager }: { jobId: string
                 <Switch checked={materialsConfirmed} onCheckedChange={setMaterialsConfirmed}
                   data-testid="switch-materials-confirmed" />
               </div>
+              <p className="text-xs text-muted-foreground">
+                Review the materials list in the Job Data Summary above, then confirm it's accurate.
+              </p>
               <Textarea value={materialsNotes} onChange={e => setMaterialsNotes(e.target.value)}
-                placeholder="Any notes on materials used or deviations…" rows={2} className="resize-none" />
+                placeholder="Only needed if materials used differ from what's listed above…" rows={2} className="resize-none" />
             </div>
 
             <Separator />
