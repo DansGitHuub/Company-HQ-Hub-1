@@ -74,6 +74,7 @@ import { registerPublicPages } from "./publicPages";
 import { startLeadAlertScheduler } from "./consultationRoutes";
 import { startGpsPingCleanupScheduler } from "./gpsPingCleanupScheduler";
 import { startInvoiceOverdueScheduler } from "./invoiceOverdueScheduler";
+import { startWorksheetAlertScheduler } from "./worksheetAlertScheduler";
 
 const app = express();
 const httpServer = createServer(app);
@@ -298,4 +299,5 @@ app.use((req, res, next) => {
   startLeadAlertScheduler();
   startGpsPingCleanupScheduler();
   startInvoiceOverdueScheduler();
+  startWorksheetAlertScheduler();
 })();

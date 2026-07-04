@@ -10,3 +10,5 @@
 - [Vite catch-all ordering](vite-catchall-ordering.md) — setupVite() must register AFTER all API routes or every /api/* request silently returns SPA HTML instead of JSON.
 - [audit vs report routes naming trap](audit-vs-report-routes.md) — similarly-named route files can both plausibly "own" a feature; always grep the frontend's actual fetch URL before trusting a route file by name.
 - [E2E wizard testing via API](e2e-wizard-testing-via-api.md) — for multi-step wizard forms, drive the action step via direct API call to the same endpoint instead of clicking through unfamiliar UI, then verify via DB + read-only browser check.
+- [Scheduler testing pattern](scheduler-testing-pattern.md) — new server/*Scheduler.ts files can't be tested via standalone tsx script (EADDRINUSE); test through the real running workflow instead.
+- [Manager notification convention](manager-notification-convention.md) — no employee->manager FK exists; "managers" = users with role Admin/Manager or isMasterAdmin, per existing notificationScheduler.ts precedent.
