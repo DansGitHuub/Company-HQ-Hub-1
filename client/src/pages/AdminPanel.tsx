@@ -33,6 +33,7 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  AlertTriangle,
   Upload,
   Image,
   Building2,
@@ -978,6 +979,21 @@ export default function AdminPanel() {
     enabled: user?.role === "Admin",
   });
 
+  type DailyPulseSection = { count: number; items: any[] };
+  type DailyPulse = {
+    date: string;
+    missingWorksheets: DailyPulseSection;
+    readyForInvoice: DailyPulseSection;
+    overdueJobs: DailyPulseSection;
+    scheduleConflicts: DailyPulseSection;
+    openWorkRequests: DailyPulseSection;
+  };
+  const { data: dailyPulse, isLoading: dailyPulseLoading } = useQuery<DailyPulse>({
+    queryKey: ["/api/admin/daily-pulse"],
+    enabled: user?.role === "Admin",
+    refetchInterval: 5 * 60 * 1000,
+  });
+
   const [logoUrl, setLogoUrl] = useState("");
   const [logoShape, setLogoShape] = useState<string>("square");
   const [logoCornerRadius, setLogoCornerRadius] = useState(0);
@@ -1344,6 +1360,82 @@ export default function AdminPanel() {
         {/* ── Home overview card grid ── */}
         <TabsContent value="home" className="mt-0">
           <div className="space-y-4">
+
+            {/* Daily Pulse — read-only pane of glass */}
+            <div className="rounded-xl border border-red-500/20 bg-card overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-3 border-b bg-red-500/5">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                <div className="flex-1">
+                  <span className="text-sm font-semibold text-foreground">Daily Pulse</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">Things that need attention today, at a glance</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-px bg-border/30" data-testid="daily-pulse-cards">
+                {([
+                  {
+                    key: "missingWorksheets",
+                    label: "Missing Worksheets",
+                    desc: "Crew who haven't submitted today",
+                    icon: ClipboardCheck,
+                    href: "/worksheet-review",
+                  },
+                  {
+                    key: "readyForInvoice",
+                    label: "Ready to Invoice",
+                    desc: "Completed, not yet invoiced",
+                    icon: FileSignature,
+                    href: "/jobs?status=completed",
+                  },
+                  {
+                    key: "overdueJobs",
+                    label: "Overdue Jobs",
+                    desc: "Behind schedule",
+                    icon: Clock,
+                    href: "/overdue",
+                  },
+                  {
+                    key: "scheduleConflicts",
+                    label: "Schedule Conflicts",
+                    desc: "Crew/equipment double-booked today",
+                    icon: AlertTriangle,
+                    href: `/daily-plan?date=${new Date().toISOString().slice(0, 10)}`,
+                  },
+                  {
+                    key: "openWorkRequests",
+                    label: "Open Work Requests",
+                    desc: "Awaiting review",
+                    icon: MessageSquare,
+                    href: "/admin/inbox",
+                  },
+                ] as { key: keyof DailyPulse; label: string; desc: string; icon: any; href: string }[]).map((item) => {
+                  const count = dailyPulse?.[item.key]?.count ?? 0;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => navigate(item.href)}
+                      data-testid={`daily-pulse-card-${item.key}`}
+                      className="flex flex-col gap-1.5 px-4 py-3 text-left transition-colors bg-card hover:bg-red-500/5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        {dailyPulseLoading ? (
+                          <span className="text-lg font-bold text-muted-foreground">…</span>
+                        ) : (
+                          <span
+                            className={`text-2xl font-bold ${count > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}
+                            data-testid={`daily-pulse-count-${item.key}`}
+                          >
+                            {count}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs font-medium text-foreground">{item.label}</div>
+                      <div className="text-[11px] text-muted-foreground">{item.desc}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Daily Operations */}
             <div className="rounded-xl border border-green-500/20 bg-card overflow-hidden">
