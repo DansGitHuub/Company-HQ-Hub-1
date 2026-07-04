@@ -123,8 +123,11 @@ export function registerWarrantyRoutes(app: Express, requireAuth: any) {
 
   // ── Create warranty claim ────────────────────────────────────────────────
   app.post("/api/warranties/:id/claims", requireAuth, async (req: any, res) => {
-    const { title, description, reported_by, priority = "normal" } = req.body;
+    const { title, description, reported_by, priority = "normal", photos } = req.body;
     if (!title || !description) return res.status(400).json({ message: "title and description required" });
+    if (photos !== undefined && !Array.isArray(photos)) {
+      return res.status(400).json({ message: "photos must be an array" });
+    }
     try {
       const { rows: wRows } = await pool.query(
         `SELECT job_id, customer_id FROM job_warranties WHERE id = $1`, [req.params.id]
@@ -135,13 +138,39 @@ export function registerWarrantyRoutes(app: Express, requireAuth: any) {
       const { rows } = await pool.query(
         `INSERT INTO warranty_claims
            (warranty_id, job_id, customer_id, claim_number, title, description,
-            reported_by, priority, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'open')
+            reported_by, priority, status, photos)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'open',$9::jsonb)
          RETURNING *`,
         [req.params.id, wRows[0].job_id, wRows[0].customer_id || null,
-         claimNum, title, description, reported_by || null, priority]
+         claimNum, title, description, reported_by || null, priority,
+         JSON.stringify(photos || [])]
       );
       return res.status(201).json(rows[0]);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Add photo(s) to an existing claim ───────────────────────────────────
+  // Body: { photos: [{ url, name, uploadedAt, uploadedBy }] }
+  // Appends to the existing photos JSONB array — open to any authenticated
+  // user (same access level as filing a claim) so evidence can be added later.
+  app.post("/api/warranty-claims/:id/photos", requireAuth, async (req: any, res) => {
+    const { photos } = req.body;
+    if (!Array.isArray(photos) || photos.length === 0) {
+      return res.status(400).json({ message: "photos must be a non-empty array" });
+    }
+    try {
+      const { rows } = await pool.query(
+        `UPDATE warranty_claims
+         SET photos = COALESCE(photos, '[]'::jsonb) || $1::jsonb,
+             updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [JSON.stringify(photos), req.params.id]
+      );
+      if (!rows.length) return res.status(404).json({ message: "Claim not found" });
+      return res.json(rows[0]);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
     }

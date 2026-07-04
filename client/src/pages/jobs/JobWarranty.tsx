@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useUpload } from "@/hooks/use-upload";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +18,16 @@ import {
 } from "@/components/ui/select";
 import {
   ShieldCheck, Plus, Loader2, AlertTriangle, CheckCircle2,
-  Clock, ChevronRight, Flag,
+  Clock, ChevronRight, Flag, Camera, X,
 } from "lucide-react";
 import { format, parseISO, isPast } from "date-fns";
+
+interface ClaimPhoto {
+  url: string;
+  name: string;
+  uploadedAt?: string;
+  uploadedBy?: string;
+}
 
 interface Warranty {
   id: string;
@@ -48,6 +57,7 @@ interface Claim {
   resolution: string | null;
   resolved_at: string | null;
   resolved_by_name: string | null;
+  photos?: ClaimPhoto[];
 }
 
 interface WarrantyWithClaims extends Warranty {
@@ -70,7 +80,9 @@ const PRIORITY_COLOR: Record<string, string> = {
 
 export default function JobWarranty({ jobId, isAdminOrManager }: { jobId: string; isAdminOrManager: boolean }) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { uploadFile } = useUpload();
   const [showCreate, setShowCreate] = useState(false);
   const [showClaim, setShowClaim] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
@@ -86,6 +98,11 @@ export default function JobWarranty({ jobId, isAdminOrManager }: { jobId: string
   const [claimDesc, setClaimDesc] = useState("");
   const [claimReporter, setClaimReporter] = useState("");
   const [claimPriority, setClaimPriority] = useState("normal");
+  const [claimPhotos, setClaimPhotos] = useState<ClaimPhoto[]>([]);
+  const [isUploadingClaimPhoto, setIsUploadingClaimPhoto] = useState(false);
+
+  // Add photo to an existing claim
+  const [uploadingForClaimId, setUploadingForClaimId] = useState<string | null>(null);
 
   // Resolve claim
   const [resolvingClaimId, setResolvingClaimId] = useState<string | null>(null);
@@ -130,6 +147,7 @@ export default function JobWarranty({ jobId, isAdminOrManager }: { jobId: string
       const res = await apiRequest("POST", `/api/warranties/${warranty!.id}/claims`, {
         title: claimTitle, description: claimDesc,
         reported_by: claimReporter || null, priority: claimPriority,
+        photos: claimPhotos,
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       return res.json();
@@ -138,10 +156,73 @@ export default function JobWarranty({ jobId, isAdminOrManager }: { jobId: string
       queryClient.invalidateQueries({ queryKey: ["/api/warranties", warranty?.id] });
       toast({ title: "Claim submitted" });
       setShowClaim(false);
-      setClaimTitle(""); setClaimDesc(""); setClaimReporter(""); setClaimPriority("normal");
+      setClaimTitle(""); setClaimDesc(""); setClaimReporter(""); setClaimPriority("normal"); setClaimPhotos([]);
     },
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
+
+  const addPhotoToClaimMutation = useMutation({
+    mutationFn: async ({ claimId, photos }: { claimId: string; photos: ClaimPhoto[] }) => {
+      const res = await apiRequest("POST", `/api/warranty-claims/${claimId}/photos`, { photos });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/warranties", warranty?.id] });
+      toast({ title: "Photo added" });
+    },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
+  const uploadPhotosForNewClaim = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setIsUploadingClaimPhoto(true);
+    try {
+      const uploaded: ClaimPhoto[] = [];
+      for (const file of Array.from(files)) {
+        const result = await uploadFile(file);
+        if (result) {
+          uploaded.push({
+            url: result.objectPath,
+            name: file.name,
+            uploadedAt: new Date().toISOString(),
+            uploadedBy: user?.name,
+          });
+        }
+      }
+      setClaimPhotos(prev => [...prev, ...uploaded]);
+    } catch (err: any) {
+      toast({ title: "Photo upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUploadingClaimPhoto(false);
+    }
+  };
+
+  const uploadPhotosForExistingClaim = async (claimId: string, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploadingForClaimId(claimId);
+    try {
+      const uploaded: ClaimPhoto[] = [];
+      for (const file of Array.from(files)) {
+        const result = await uploadFile(file);
+        if (result) {
+          uploaded.push({
+            url: result.objectPath,
+            name: file.name,
+            uploadedAt: new Date().toISOString(),
+            uploadedBy: user?.name,
+          });
+        }
+      }
+      if (uploaded.length > 0) {
+        addPhotoToClaimMutation.mutate({ claimId, photos: uploaded });
+      }
+    } catch (err: any) {
+      toast({ title: "Photo upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingForClaimId(null);
+    }
+  };
 
   const resolveMutation = useMutation({
     mutationFn: async (claimId: string) => {
@@ -271,6 +352,30 @@ export default function JobWarranty({ jobId, isAdminOrManager }: { jobId: string
                           Resolution: {claim.resolution}
                         </p>
                       )}
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {claim.photos?.map((photo, i) => (
+                          <a key={i} href={photo.url} target="_blank" rel="noreferrer"
+                            className="block group" data-testid={`img-claim-photo-${claim.id}-${i}`}>
+                            <div className="w-14 h-14 rounded-md overflow-hidden bg-muted border">
+                              <img src={photo.url} alt={photo.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                            </div>
+                          </a>
+                        ))}
+                        <label
+                          className="w-14 h-14 rounded-md border border-dashed flex items-center justify-center cursor-pointer text-muted-foreground hover:bg-muted flex-shrink-0"
+                          data-testid={`label-add-photo-claim-${claim.id}`}>
+                          {uploadingForClaimId === claim.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Camera className="h-4 w-4" />
+                          )}
+                          <input type="file" accept="image/*" multiple className="hidden"
+                            disabled={uploadingForClaimId === claim.id}
+                            onChange={e => { uploadPhotosForExistingClaim(claim.id, e.target.files); e.target.value = ""; }}
+                            data-testid={`input-add-photo-claim-${claim.id}`} />
+                        </label>
+                      </div>
                     </div>
                     {isAdminOrManager && (claim.status === "open" || claim.status === "in_progress") && (
                       <Button size="sm" variant="outline" className="flex-shrink-0"
@@ -364,10 +469,35 @@ export default function JobWarranty({ jobId, isAdminOrManager }: { jobId: string
                 </select>
               </div>
             </div>
+            <div>
+              <Label>Photos (optional)</Label>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {claimPhotos.map((photo, i) => (
+                  <div key={i} className="relative w-16 h-16 rounded-md overflow-hidden border bg-muted"
+                    data-testid={`img-new-claim-photo-${i}`}>
+                    <img src={photo.url} alt={photo.name} className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => setClaimPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                      className="absolute top-0 right-0 bg-black/60 text-white rounded-bl p-0.5"
+                      data-testid={`button-remove-new-claim-photo-${i}`}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                <label
+                  className="w-16 h-16 rounded-md border border-dashed flex items-center justify-center cursor-pointer text-muted-foreground hover:bg-muted"
+                  data-testid="label-add-new-claim-photo">
+                  {isUploadingClaimPhoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                  <input type="file" accept="image/*" multiple className="hidden"
+                    disabled={isUploadingClaimPhoto}
+                    onChange={e => { uploadPhotosForNewClaim(e.target.files); e.target.value = ""; }}
+                    data-testid="input-new-claim-photo" />
+                </label>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowClaim(false)}>Cancel</Button>
-            <Button disabled={!claimTitle.trim() || !claimDesc.trim() || claimMutation.isPending}
+            <Button disabled={!claimTitle.trim() || !claimDesc.trim() || claimMutation.isPending || isUploadingClaimPhoto}
               onClick={() => claimMutation.mutate()} data-testid="button-submit-claim">
               {claimMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
               Submit Claim
