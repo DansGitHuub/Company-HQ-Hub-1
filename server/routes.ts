@@ -8413,32 +8413,6 @@ Provide accurate information based on publicly available documentation.`;
 
   // ==================== GOOGLE CALENDAR INTEGRATION (PER-USER) ====================
   
-  // Check if current user has Google Calendar connected
-  app.get("/api/google-calendar/status", requireAuth, async (req, res) => {
-    try {
-      const connection = await storage.getCalendarConnectionByProvider(req.user!.id, "google");
-      const connected = connection?.isConnected === true && !!connection.accessToken;
-      res.json({ 
-        connected,
-        hasCredentials: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
-      });
-    } catch (err) {
-      res.json({ connected: false, hasCredentials: false });
-    }
-  });
-  
-  // Start OAuth flow - redirect to Google
-  app.get("/api/auth/google/connect", requireAuth, async (req, res) => {
-    try {
-      const { getAuthUrl } = await import("./googleOAuth");
-      const authUrl = getAuthUrl(req.user!.id);
-      res.json({ url: authUrl });
-    } catch (err: any) {
-      console.error("Error generating auth URL:", err);
-      res.status(500).json({ message: err.message || "Failed to generate auth URL" });
-    }
-  });
-  
   // OAuth callback - exchange code for tokens (at /auth/google/callback, no /api prefix)
   // This matches the GOOGLE_REDIRECT_URI for production (companyhq.app/auth/google/callback)
   app.get("/auth/google/callback", async (req, res) => {
@@ -8501,19 +8475,6 @@ Provide accurate information based on publicly available documentation.`;
     } catch (err: any) {
       console.error("[google-oauth] Callback error:", err);
       res.redirect("/calendar?google_error=auth_failed");
-    }
-  });
-  
-  // Disconnect Google Calendar
-  app.delete("/api/google-calendar/disconnect", requireAuth, async (req, res) => {
-    try {
-      const connection = await storage.getCalendarConnectionByProvider(req.user!.id, "google");
-      if (connection) {
-        await storage.deleteCalendarConnection(connection.id);
-      }
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ message: "Failed to disconnect calendar" });
     }
   });
   
@@ -8585,112 +8546,6 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
   
-  // Create event in user's Google Calendar
-  app.post("/api/google-calendar/events", requireAuth, async (req, res) => {
-    try {
-      const connection = await storage.getCalendarConnectionByProvider(req.user!.id, "google");
-      
-      if (!connection || !connection.accessToken) {
-        return res.status(401).json({ message: "Google Calendar not connected" });
-      }
-      
-      const { isTokenExpired, refreshAccessToken, createCalendarEvent } = await import("./googleOAuth");
-      
-      let accessToken = connection.accessToken;
-      
-      if (isTokenExpired(connection.tokenExpiry)) {
-        if (!connection.refreshToken) {
-          return res.status(401).json({ message: "Token expired, please reconnect" });
-        }
-        const newTokens = await refreshAccessToken(connection.refreshToken);
-        accessToken = newTokens.access_token!;
-        await storage.updateCalendarConnection(connection.id, {
-          accessToken: newTokens.access_token!,
-          tokenExpiry: newTokens.expiry_date ? new Date(newTokens.expiry_date) : null
-        });
-      }
-      
-      const { title, description, location, start, end, allDay } = req.body;
-      
-      if (!title || !start || !end) {
-        return res.status(400).json({ message: "Title, start, and end are required" });
-      }
-      
-      const eventData = {
-        summary: title,
-        description: description || "",
-        location: location || "",
-        start: allDay 
-          ? { date: start.split("T")[0] }
-          : { dateTime: start, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-        end: allDay 
-          ? { date: end.split("T")[0] }
-          : { dateTime: end, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }
-      };
-      
-      const event = await createCalendarEvent(accessToken, eventData, connection.calendarId || "primary");
-      
-      res.json({
-        id: event.id,
-        title: event.summary,
-        start: event.start?.dateTime || event.start?.date,
-        end: event.end?.dateTime || event.end?.date,
-        location: event.location
-      });
-    } catch (err: any) {
-      console.error("Error creating calendar event:", err);
-      res.status(500).json({ message: "Failed to create event" });
-    }
-  });
-  
-  // Check for conflicts in user's Google Calendar
-  app.post("/api/google-calendar/check-conflicts", requireAuth, async (req, res) => {
-    try {
-      const connection = await storage.getCalendarConnectionByProvider(req.user!.id, "google");
-      
-      if (!connection || !connection.accessToken) {
-        return res.status(401).json({ message: "Google Calendar not connected" });
-      }
-      
-      const { isTokenExpired, refreshAccessToken, checkForConflicts } = await import("./googleOAuth");
-      
-      let accessToken = connection.accessToken;
-      
-      if (isTokenExpired(connection.tokenExpiry)) {
-        if (!connection.refreshToken) {
-          return res.status(401).json({ message: "Token expired, please reconnect" });
-        }
-        const newTokens = await refreshAccessToken(connection.refreshToken);
-        accessToken = newTokens.access_token!;
-        await storage.updateCalendarConnection(connection.id, {
-          accessToken: newTokens.access_token!,
-          tokenExpiry: newTokens.expiry_date ? new Date(newTokens.expiry_date) : null
-        });
-      }
-      
-      const { start, end } = req.body;
-      
-      if (!start || !end) {
-        return res.status(400).json({ message: "Start and end times are required" });
-      }
-      
-      const conflicts = await checkForConflicts(
-        accessToken, 
-        new Date(start), 
-        new Date(end), 
-        connection.calendarId || "primary"
-      );
-      
-      res.json({
-        hasConflicts: !!conflicts,
-        conflicts: conflicts || []
-      });
-    } catch (err: any) {
-      console.error("Error checking conflicts:", err);
-      res.status(500).json({ message: "Failed to check conflicts" });
-    }
-  });
-
   // ==================== CALENDAR CONNECTIONS ====================
   
   // Get user's calendar connections

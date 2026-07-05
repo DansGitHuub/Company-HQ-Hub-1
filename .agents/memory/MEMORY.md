@@ -20,3 +20,4 @@
 - [Double-booking buffer duplication](double-booking-buffer-duplication.md) — the 480min conflict-check constant is duplicated in 4 route files; only schedulingRoutes.ts reads the admin-configurable business_rules setting.
 - [Soft-delete conventions](soft-delete-no-hard-delete-conventions.md) — job/invoice DELETE routes only cancel/void, never remove; customers have no delete route, only archive (blocked by open jobs/unpaid invoices).
 - [Verify against git log after compression](verify-git-log-after-compression.md) — a progress summary can omit work already committed pre-compression; grep exists before re-searching for "missing" code.
+- [Google Calendar dual-system trap](google-calendar-dual-system.md) — a shared OAuth callback lives inside a seemingly-orphaned per-user calendar code block; verify callers by grep, not by file/comment placement.
