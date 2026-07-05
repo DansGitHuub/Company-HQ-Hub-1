@@ -121,8 +121,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     },
     materials: {
       title: t("nav.materials"),
-      description: "Track inventory, stock levels, pricing, and supplier info.",
-      tips: ["Set minimum stock levels", "Track costs for estimates", "Categorize for easy search"]
+      description: "Browse the materials catalog with pricing and supplier info.",
+      tips: ["Track costs for estimates", "Categorize for easy search", "Keep supplier details up to date"]
     },
     equipment: {
       title: t("nav.equipment"),

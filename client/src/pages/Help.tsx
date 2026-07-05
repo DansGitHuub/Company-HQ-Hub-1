@@ -80,13 +80,13 @@ const adminWalkthrough: WalkthroughStep[] = [
   },
   {
     title: "Materials Catalog",
-    description: "Track your inventory of materials, equipment, and supplies. Monitor stock levels, pricing, and supplier information all in one place.",
+    description: "Browse your catalog of materials, equipment, and supplies. Manage pricing and supplier information all in one place.",
     icon: <Package className="h-8 w-8" />,
-    path: "/materials",
+    path: "/catalog",
     tips: [
-      "Set minimum stock levels for alerts",
       "Track costs and pricing for estimates",
-      "Categorize materials for easy searching"
+      "Categorize materials for easy searching",
+      "Keep supplier information up to date"
     ]
   },
   {

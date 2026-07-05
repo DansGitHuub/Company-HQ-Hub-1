@@ -19,3 +19,4 @@
 - [Blob download testing](blob-download-testing.md) — verify client-side Blob file downloads (e.g. CSV export) by intercepting anchor.click + fetching the blob: URL, since Playwright download.text()/path() fail here.
 - [Double-booking buffer duplication](double-booking-buffer-duplication.md) — the 480min conflict-check constant is duplicated in 4 route files; only schedulingRoutes.ts reads the admin-configurable business_rules setting.
 - [Soft-delete conventions](soft-delete-no-hard-delete-conventions.md) — job/invoice DELETE routes only cancel/void, never remove; customers have no delete route, only archive (blocked by open jobs/unpaid invoices).
+- [Verify against git log after compression](verify-git-log-after-compression.md) — a progress summary can omit work already committed pre-compression; grep exists before re-searching for "missing" code.
