@@ -29,6 +29,16 @@ const EXCLUSION_SQL = `
   AND COALESCE(c.company_name, '') NOT ILIKE '%Test Test%'
 `;
 
+// Exclude pairs the admin has explicitly marked as "not a duplicate" (shared with
+// the /admin/customer-duplicates review queue's dismissal table).
+const DISMISSAL_EXCLUSION_SQL = `
+  AND NOT EXISTS (
+    SELECT 1 FROM customer_duplicate_dismissals d
+    WHERE (d.customer_id_a = $1 AND d.customer_id_b = c.id)
+       OR (d.customer_id_a = c.id AND d.customer_id_b = $1)
+  )
+`;
+
 export async function findCustomerDuplicates(
   customerId: string
 ): Promise<CustomerDuplicate[]> {
@@ -61,6 +71,7 @@ export async function findCustomerDuplicates(
       AND  ce_target.email IS NOT NULL
       AND  ce_target.email <> ''
       ${EXCLUSION_SQL}
+      ${DISMISSAL_EXCLUSION_SQL}
   `, [customerId]);
 
   for (const row of emailRows) merge(row, "email");
@@ -80,6 +91,7 @@ export async function findCustomerDuplicates(
     WHERE  cp_target.customer_id = $1
       AND  LENGTH(REGEXP_REPLACE(cp_target.phone, '[^0-9]', '', 'g')) >= 10
       ${EXCLUSION_SQL}
+      ${DISMISSAL_EXCLUSION_SQL}
   `, [customerId]);
 
   for (const row of phoneRows) merge(row, "phone");

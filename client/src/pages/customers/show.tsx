@@ -638,6 +638,8 @@ export default function CustomerDetailPage() {
   const [showInviteConfirm, setShowInviteConfirm] = useState(false);
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
   const [cannotArchiveBlockers, setCannotArchiveBlockers] = useState<Blocker[] | null>(null);
+  const [mergeDialogDup, setMergeDialogDup] = useState<{ id: string; label: string } | null>(null);
+  const [mergeKeep, setMergeKeep] = useState<"current" | "other">("current");
 
   // ── Queries ──
   const { data: customer, isLoading, isError } = useQuery<CustomerDetail>({
@@ -790,6 +792,58 @@ export default function CustomerDetailPage() {
     }
   };
 
+  // ── A27: Duplicate banner actions (dismiss / merge) ──
+  const [dismissingDupId, setDismissingDupId] = useState<string | null>(null);
+  const dismissDupMutation = useMutation({
+    mutationFn: async (dupId: string) => {
+      const res = await apiRequest("POST", "/api/admin/customers/duplicate-pairs/dismiss", {
+        customer_id_a: id, customer_id_b: dupId,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to dismiss");
+      }
+      return res.json();
+    },
+    onMutate: (dupId) => setDismissingDupId(dupId),
+    onSuccess: () => {
+      toast({ title: "Marked as not a duplicate" });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", id, "duplicates"] });
+    },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+    onSettled: () => setDismissingDupId(null),
+  });
+
+  const mergeDupMutation = useMutation({
+    mutationFn: async ({ keepId, mergeId }: { keepId: string; mergeId: string }) => {
+      const res = await apiRequest("POST", "/api/admin/customers/merge", { keep_id: keepId, merge_id: mergeId });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Merge failed");
+      }
+      return res.json();
+    },
+    onSuccess: (_data, variables) => {
+      toast({ title: "Customers merged successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", id, "duplicates"] });
+      if (variables.mergeId === id) {
+        // The current customer record was merged away — redirect to the surviving record.
+        setLocation(`/customers/${variables.keepId}`);
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["/api/customers", id] });
+      }
+    },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
+  const confirmMergeDup = () => {
+    if (!mergeDialogDup) return;
+    const keepId = mergeKeep === "current" ? (id as string) : mergeDialogDup.id;
+    const mergeId = mergeKeep === "current" ? mergeDialogDup.id : (id as string);
+    mergeDupMutation.mutate({ keepId, mergeId });
+    setMergeDialogDup(null);
+  };
+
   // ── Delete property ──
   const deleteProp = async (propId: string) => {
     if (!confirm(t("removePropertyConfirm"))) return;
@@ -881,26 +935,104 @@ export default function CustomerDetailPage() {
           data-testid="banner-duplicate-customers"
         >
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-yellow-600" />
-          <div className="flex-1">
-            <span className="font-semibold">Possible duplicate {duplicates.length === 1 ? "record" : "records"} detected.&nbsp;</span>
-            {duplicates.map((d, i) => (
-              <span key={d.id}>
-                {i > 0 && ", "}
-                <a
-                  href={`/customers/${d.id}`}
-                  className="underline underline-offset-2 font-medium hover:text-yellow-700"
-                  data-testid={`link-duplicate-customer-${d.id}`}
-                >
-                  {d.label}
-                </a>
-                <span className="text-yellow-700 text-xs ml-1">
-                  ({d.matched_on.join(" & ")})
-                </span>
-              </span>
-            ))}
+          <div className="flex-1 space-y-2">
+            <span className="font-semibold">Possible duplicate {duplicates.length === 1 ? "record" : "records"} detected.</span>
+            <div className="space-y-1.5">
+              {duplicates.map((d) => (
+                <div key={d.id} className="flex flex-wrap items-center gap-2">
+                  <a
+                    href={`/customers/${d.id}`}
+                    className="underline underline-offset-2 font-medium hover:text-yellow-700"
+                    data-testid={`link-duplicate-customer-${d.id}`}
+                  >
+                    {d.label}
+                  </a>
+                  <span className="text-yellow-700 text-xs">
+                    ({d.matched_on.join(" & ")})
+                  </span>
+                  {isAdminOrManager && (
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-xs bg-white"
+                        disabled={dismissingDupId === d.id}
+                        onClick={() => dismissDupMutation.mutate(d.id)}
+                        data-testid={`button-dismiss-duplicate-${d.id}`}
+                      >
+                        {dismissingDupId === d.id ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : null}
+                        Not a duplicate
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-xs bg-white"
+                        onClick={() => { setMergeKeep("current"); setMergeDialogDup(d); }}
+                        data-testid={`button-merge-duplicate-${d.id}`}
+                      >
+                        Merge
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
+
+      {/* A27: Merge confirmation dialog for banner-initiated merges */}
+      <Dialog open={!!mergeDialogDup} onOpenChange={(open) => { if (!open) setMergeDialogDup(null); }}>
+        <DialogContent data-testid="dialog-merge-duplicate">
+          <DialogHeader>
+            <DialogTitle>Merge Duplicate Customer</DialogTitle>
+            <DialogDescription>
+              Choose which record to keep. All jobs, estimates, invoices, and other records linked to the
+              other record will be reassigned, and the other record will be deactivated. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {mergeDialogDup && (
+            <div className="space-y-2 py-2">
+              <button
+                type="button"
+                onClick={() => setMergeKeep("current")}
+                className={`w-full text-left rounded-lg border-2 p-3 text-sm transition-all ${
+                  mergeKeep === "current" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                }`}
+                data-testid="option-keep-current"
+              >
+                <div className="font-medium">Keep: {customer.company_name?.trim() || `${customer.first_name} ${customer.last_name}`}</div>
+                <div className="text-xs text-muted-foreground">This record — {mergeDialogDup.label} will be merged into it</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMergeKeep("other")}
+                className={`w-full text-left rounded-lg border-2 p-3 text-sm transition-all ${
+                  mergeKeep === "other" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                }`}
+                data-testid="option-keep-other"
+              >
+                <div className="font-medium">Keep: {mergeDialogDup.label}</div>
+                <div className="text-xs text-muted-foreground">This record will be merged into it</div>
+              </button>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setMergeDialogDup(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={mergeDupMutation.isPending}
+              onClick={confirmMergeDup}
+              data-testid="button-confirm-merge-duplicate"
+            >
+              {mergeDupMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Yes, merge customers
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Two-column layout */}
       <div className="flex flex-col xl:flex-row gap-6 items-start">
