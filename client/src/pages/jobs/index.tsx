@@ -15,12 +15,13 @@ import {
 } from "@/components/ui/table";
 import {
   Plus, Search, Briefcase, ChevronRight, Calendar,
-  Mail, MessageSquare, Send, Loader2, AlertCircle, CheckCircle2,
+  Mail, MessageSquare, Send, Loader2, AlertCircle, CheckCircle2, Download,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { JobFormModal, EMPTY_JOB } from "./JobFormModal";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { downloadCsv } from "@/lib/csv-export";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface JobRow {
@@ -266,6 +267,24 @@ export default function JobsPage() {
     },
   });
 
+  function handleExportCsv() {
+    const headers = [
+      "Job Title", "Customer", "Property", "Type", "Scheduled Date", "Status",
+      ...(isAdminOrManager ? ["Price"] : []),
+    ];
+    const rows = jobs.map((job) => [
+      job.title || job.client || t("untitledJob"),
+      custName(job),
+      propAddr(job),
+      job.job_type || job.type || "—",
+      fmtDate(job.scheduled_date),
+      job.status || "lead",
+      ...(isAdminOrManager ? [fmtMoney(job.price ?? job.value)] : []),
+    ]);
+    const dateStamp = format(new Date(), "yyyy-MM-dd");
+    downloadCsv(`jobs-export-${dateStamp}.csv`, headers, rows);
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
@@ -291,6 +310,15 @@ export default function JobsPage() {
               Not Accepted
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCsv}
+            disabled={jobs.length === 0}
+            data-testid="button-export-jobs"
+          >
+            <Download className="w-3.5 h-3.5 mr-1.5" /> Export
+          </Button>
           {isAdminOrManager && (
             <Button onClick={() => setShowModal(true)} className="bg-primary" data-testid="button-new-job">
               <Plus className="h-4 w-4 mr-1.5" /> {t("newJob")}

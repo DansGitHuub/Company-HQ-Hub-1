@@ -13,8 +13,10 @@ import {
 import {
   DollarSign, Briefcase, TrendingUp, TrendingDown, Clock, Users,
   AlertCircle, AlertTriangle, BarChart2, Layers, FileText, Timer, PieChart, ChevronDown, ChevronUp,
+  Download,
 } from "lucide-react";
 import { Loader2 } from "lucide-react";
+import { downloadCsv } from "@/lib/csv-export";
 
 type Tab = "revenue" | "invoice-aging" | "crew-hours" | "profitability" | "time-by-division" | "materials-spend";
 
@@ -157,6 +159,15 @@ function RevenueReport() {
               data-testid="btn-apply-revenue-filters">
               Apply Filters
             </Button>
+            <Button size="sm" variant="outline" className="h-8" disabled={!data?.by_division?.length}
+              onClick={() => downloadCsv(
+                `revenue-by-division-${new Date().toISOString().split("T")[0]}.csv`,
+                ["Division", "Revenue", "Jobs", "% of Total"],
+                (data?.by_division ?? []).map((row: any) => [row.division, row.revenue, row.job_count, row.pct?.toFixed(1)]),
+              )}
+              data-testid="btn-export-revenue">
+              <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -294,6 +305,20 @@ function InvoiceAging() {
               data-testid="btn-apply-aging-filters">
               Apply
             </Button>
+            <Button size="sm" variant="outline" className="h-8" disabled={!filtered.length}
+              onClick={() => downloadCsv(
+                `invoice-aging-${new Date().toISOString().split("T")[0]}.csv`,
+                ["Invoice #", "Customer", "Status", "Issued", "Due", "Balance Due", "Aging Bucket"],
+                filtered.map((inv: any) => [
+                  inv.invoice_number, inv.customer, inv.status,
+                  inv.issued_date ? new Date(inv.issued_date).toLocaleDateString() : "",
+                  inv.due_date ? new Date(inv.due_date).toLocaleDateString() : "",
+                  inv.balance_due, inv.bucket,
+                ]),
+              )}
+              data-testid="btn-export-aging">
+              <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -420,6 +445,19 @@ function CrewHours() {
             <Button size="sm" className="h-8" onClick={() => setApplied(filters)}
               data-testid="btn-apply-crew-filters">
               Apply Filters
+            </Button>
+            <Button size="sm" variant="outline" className="h-8" disabled={!data?.by_employee?.length}
+              onClick={() => downloadCsv(
+                `crew-hours-${new Date().toISOString().split("T")[0]}.csv`,
+                ["Employee", "Days Worked", "Total Hours", "Regular Hours", "OT Hours", "Avg / Day"],
+                (data?.by_employee ?? []).map((emp: any) => [
+                  emp.employee_name, emp.days_worked, emp.total_hours?.toFixed?.(2) ?? emp.total_hours,
+                  emp.regular_hours?.toFixed?.(2) ?? emp.regular_hours, emp.ot_hours?.toFixed?.(2) ?? emp.ot_hours,
+                  emp.avg_per_day?.toFixed?.(2) ?? emp.avg_per_day,
+                ]),
+              )}
+              data-testid="btn-export-crew-hours">
+              <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
             </Button>
           </div>
         </CardContent>
@@ -586,6 +624,18 @@ function ProfitabilityReport() {
             <Button size="sm" onClick={() => setApplied({ year, division })} data-testid="button-apply-profit-filter">
               Apply
             </Button>
+            <Button size="sm" variant="outline" disabled={!sorted.length}
+              onClick={() => downloadCsv(
+                `job-profitability-${new Date().toISOString().split("T")[0]}.csv`,
+                ["Job", "Client", "Division", "Sold Value", "Actual Hours", "Labor Cost", "Material Cost", "Gross Profit", "Margin %"],
+                sorted.map((r: any) => [
+                  r.title, r.client, r.division ?? "", r.sold_value, Number(r.actual_hours).toFixed(2),
+                  r.labor_cost, r.material_cost, r.gross_profit, Number(r.margin_pct).toFixed(1),
+                ]),
+              )}
+              data-testid="btn-export-profitability">
+              <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -747,6 +797,15 @@ function TimeByDivision() {
             <Button size="sm" className="h-8" onClick={() => setApplied(filters)} data-testid="btn-apply-tbd-filters">
               Apply Filters
             </Button>
+            <Button size="sm" variant="outline" className="h-8" disabled={!data?.by_employee?.length}
+              onClick={() => downloadCsv(
+                `time-by-division-${new Date().toISOString().split("T")[0]}.csv`,
+                ["Employee", "Division", "Hours"],
+                (data?.by_employee ?? []).map((r: any) => [r.employee_name, r.division, r.total_hours?.toFixed?.(2) ?? r.total_hours]),
+              )}
+              data-testid="btn-export-tbd">
+              <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -904,6 +963,15 @@ function MaterialsSpend() {
             </div>
             <Button size="sm" className="h-8" onClick={() => setApplied(filters)} data-testid="btn-apply-ms-filters">
               Apply Filters
+            </Button>
+            <Button size="sm" variant="outline" className="h-8" disabled={!data?.by_item?.length}
+              onClick={() => downloadCsv(
+                `materials-spend-${new Date().toISOString().split("T")[0]}.csv`,
+                ["Item", "Item Number", "Qty", "Spend"],
+                (data?.by_item ?? []).map((r: any) => [r.item_name, r.item_number ?? "", r.total_qty, r.total_spend]),
+              )}
+              data-testid="btn-export-materials-spend">
+              <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
             </Button>
           </div>
         </CardContent>
