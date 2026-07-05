@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,23 @@ export default function Vendors() {
     queryKey: ["/api/vendors"],
     queryFn: async () => (await apiRequest("GET", "/api/vendors")).json(),
   });
+
+  // Deep-link support: auto-open a vendor's edit dialog when navigated here from Global Search
+  useEffect(() => {
+    if (isLoading || vendors.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const targetId = params.get("editVendorId");
+    if (targetId) {
+      const target = vendors.find(v => v.id === targetId);
+      if (target) {
+        openEdit(target);
+        params.delete("editVendorId");
+        const newSearch = params.toString();
+        window.history.replaceState({}, "", window.location.pathname + (newSearch ? `?${newSearch}` : ""));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, vendors]);
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof emptyForm) => (await apiRequest("POST", "/api/vendors", data)).json(),

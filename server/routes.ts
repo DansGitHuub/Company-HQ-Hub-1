@@ -209,7 +209,7 @@ export async function registerRoutes(
         });
       }
 
-      // Search Jobs — SQL ILIKE on title/client, include customer name
+      // Search Jobs — SQL ILIKE on title/client/address/customer name
       if (userRole !== "Customer") {
         const likeParam = `%${query}%`;
         const { rows: jobRows } = await pool.query<{
@@ -219,7 +219,9 @@ export async function registerRoutes(
                   COALESCE(c.company_name, c.first_name || ' ' || c.last_name) AS customer_name
            FROM jobs j
            LEFT JOIN customers c ON c.id = j.customer_id
-           WHERE j.title ILIKE $1 OR j.client ILIKE $1
+           WHERE j.title ILIKE $1 OR j.client ILIKE $1 OR j.address ILIKE $1
+             OR c.first_name ILIKE $1 OR c.last_name ILIKE $1 OR c.company_name ILIKE $1
+             OR (c.first_name || ' ' || c.last_name) ILIKE $1
            LIMIT 10`,
           [likeParam]
         );
@@ -233,7 +235,7 @@ export async function registerRoutes(
         });
       }
 
-      // Search Estimates — SQL ILIKE on title / estimate_number (sales_estimates table)
+      // Search Estimates — SQL ILIKE on title / estimate_number / customer name (sales_estimates table)
       if (userRole !== "Customer") {
         const likeParam = `%${query}%`;
         const { rows: estRows } = await pool.query<{
@@ -244,6 +246,8 @@ export async function registerRoutes(
            FROM sales_estimates e
            LEFT JOIN customers c ON c.id = e.customer_id
            WHERE e.title ILIKE $1 OR e.estimate_number ILIKE $1
+             OR c.first_name ILIKE $1 OR c.last_name ILIKE $1 OR c.company_name ILIKE $1
+             OR (c.first_name || ' ' || c.last_name) ILIKE $1
            LIMIT 10`,
           [likeParam]
         );
@@ -257,7 +261,7 @@ export async function registerRoutes(
         });
       }
 
-      // Search Invoices — SQL ILIKE on invoice_number, show job title + customer name
+      // Search Invoices — SQL ILIKE on invoice_number / customer name, show job title + customer name
       if (userRole !== "Customer") {
         const likeParam = `%${query}%`;
         const { rows: invRows } = await pool.query<{
@@ -271,6 +275,8 @@ export async function registerRoutes(
            LEFT JOIN customers c ON c.id = i.customer_id
            LEFT JOIN jobs j ON j.id = i.job_id
            WHERE i.invoice_number ILIKE $1
+             OR c.first_name ILIKE $1 OR c.last_name ILIKE $1 OR c.company_name ILIKE $1
+             OR (c.first_name || ' ' || c.last_name) ILIKE $1
            LIMIT 10`,
           [likeParam]
         );
@@ -281,6 +287,55 @@ export async function registerRoutes(
             title: r.invoice_number,
             description: desc || undefined,
             href: `/invoices/${r.id}`,
+          });
+        });
+      }
+
+      // Search Vendors — Admin/Manager only (matches vendor list access control)
+      if (userRole === "Admin" || userRole === "Manager" || req.user?.isMasterAdmin) {
+        const likeParam = `%${query}%`;
+        const { rows: vendorRows } = await pool.query<{
+          id: string; name: string; contact_name: string | null; category: string | null;
+        }>(
+          `SELECT id, name, contact_name, category
+           FROM vendors
+           WHERE name ILIKE $1 OR contact_name ILIKE $1 OR email ILIKE $1
+             OR phone ILIKE $1 OR category ILIKE $1
+           LIMIT 10`,
+          [likeParam]
+        );
+        vendorRows.forEach((r) => {
+          results.push({
+            type: "vendor", id: r.id, title: r.name,
+            description: r.contact_name || undefined, category: r.category || undefined,
+            href: `/vendors?editVendorId=${r.id}`,
+          });
+        });
+      }
+
+      // Search Employees — Admin/Manager only (matches employee list access control)
+      if (userRole === "Admin" || userRole === "Manager" || req.user?.isMasterAdmin) {
+        const likeParam = `%${query}%`;
+        const { rows: employeeRows } = await pool.query<{
+          id: string; first_name: string; last_name: string;
+          job_title: string | null; department: string | null; status: string | null;
+        }>(
+          `SELECT id, first_name, last_name, job_title, department, status
+           FROM employees
+           WHERE first_name ILIKE $1 OR last_name ILIKE $1
+             OR (first_name || ' ' || last_name) ILIKE $1
+             OR personal_email ILIKE $1 OR personal_phone ILIKE $1
+             OR employee_number ILIKE $1 OR job_title ILIKE $1
+           LIMIT 10`,
+          [likeParam]
+        );
+        employeeRows.forEach((r) => {
+          const name = [r.first_name, r.last_name].filter(Boolean).join(" ");
+          results.push({
+            type: "employee", id: r.id, title: name,
+            description: r.job_title || r.department || undefined,
+            category: r.status || undefined,
+            href: `/employees?employeeId=${r.id}`,
           });
         });
       }
@@ -299,15 +354,17 @@ export async function registerRoutes(
         });
       }
 
-      // Search Forms (Admin only) - NEW
+      // Search Forms (Admin only)
       if (userRole === "Admin") {
-        const forms = await storage.getCustomForms();
+        const forms = await storage.getBuilderForms();
         forms.filter((f: any) => 
-          f.title.toLowerCase().includes(query) ||
-          (f.description && f.description.toLowerCase().includes(query)) ||
-          (f.category && f.category.toLowerCase().includes(query))
+          !f.archived && (
+            (f.name && f.name.toLowerCase().includes(query)) ||
+            (f.purpose && f.purpose.toLowerCase().includes(query)) ||
+            (f.category && f.category.toLowerCase().includes(query))
+          )
         ).slice(0, 5).forEach((f: any) => {
-          results.push({ type: "form", id: f.id, title: f.title, description: f.description, category: f.category });
+          results.push({ type: "form", id: f.id, title: f.name, description: f.purpose, category: f.category });
         });
       }
 

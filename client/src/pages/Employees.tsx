@@ -52,6 +52,23 @@ export default function Employees() {
     },
   });
 
+  // Deep-link support: auto-open an employee's profile when navigated here from Global Search
+  React.useEffect(() => {
+    if (isLoading || employees.length === 0 || selectedEmployee) return;
+    const params = new URLSearchParams(window.location.search);
+    const targetId = params.get("employeeId");
+    if (targetId) {
+      const target = employees.find((e: any) => e.id === targetId);
+      if (target) {
+        setSelectedEmployee(target.id);
+        params.delete("employeeId");
+        const newSearch = params.toString();
+        window.history.replaceState({}, "", window.location.pathname + (newSearch ? `?${newSearch}` : ""));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, employees]);
+
   const isAdmin = user?.role === "Admin" || user?.role === "Manager" || user?.isMasterAdmin;
 
   const createMutation = useMutation({

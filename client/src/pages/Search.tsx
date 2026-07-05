@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Loader2, Search as SearchIcon, FileText, Users, Hammer,
   BookOpen, Briefcase, User, Truck, Megaphone, GraduationCap,
-  Receipt, ClipboardList,
+  Receipt, ClipboardList, Building2, UserCog,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -14,7 +14,7 @@ type SearchResult = {
   type:
     | "sop" | "material" | "candidate" | "job" | "user"
     | "form" | "equipment" | "campaign" | "resource"
-    | "customer" | "estimate" | "invoice";
+    | "customer" | "estimate" | "invoice" | "vendor" | "employee";
   id: string;
   title: string;
   description?: string;
@@ -33,6 +33,8 @@ const GROUPS: GroupDef[] = [
   { type: "job",       label: "Jobs",       Icon: Briefcase },
   { type: "estimate",  label: "Estimates",  Icon: ClipboardList },
   { type: "invoice",   label: "Invoices",   Icon: Receipt },
+  { type: "vendor",    label: "Vendors",    Icon: Building2 },
+  { type: "employee",  label: "Employees",  Icon: UserCog },
   { type: "material",  label: "Materials",  Icon: Hammer },
   { type: "sop",       label: "SOPs",       Icon: BookOpen },
   { type: "equipment", label: "Equipment",  Icon: Truck },
@@ -50,6 +52,8 @@ function getLink(result: SearchResult): string {
     case "job":       return `/jobs/${result.id}`;
     case "estimate":  return `/estimates/${result.id}`;
     case "invoice":   return `/invoices/${result.id}`;
+    case "vendor":    return `/vendors?editVendorId=${result.id}`;
+    case "employee":  return `/employees?employeeId=${result.id}`;
     case "sop":       return "/sops";
     case "material":  return "/materials";
     case "candidate": return "/hiring";
