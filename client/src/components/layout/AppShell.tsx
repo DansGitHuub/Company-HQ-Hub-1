@@ -337,6 +337,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     enabled: !!user && user.role !== "Customer",
   });
 
+  const { data: publicFeatureFlags } = useQuery<Record<string, boolean>>({
+    queryKey: ["/api/feature-flags/public"],
+    staleTime: 60000,
+    enabled: !!user,
+  });
+
+  const isAdminUser = effectiveRole === "Admin" || (user as any)?.isMasterAdmin;
+  const showLanguageToggle = isAdminUser || !!publicFeatureFlags?.translation_toggle;
+
   const totalBellCount = (unseenUpdates.length || 0) + (staffNotifCount?.count || 0) + (activityUnseenCount?.count || 0);
 
   const getLogoClasses = () => {
@@ -933,47 +942,52 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </Tooltip>
             </TooltipProvider>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-md shadow-teal-500/20 hover:shadow-lg hover:shadow-teal-500/30 hover:scale-105 active:scale-95 transition-all duration-200">
-                  <Languages className="h-[22px] w-[22px] drop-shadow-sm" strokeWidth={2.25} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-32">
-                <DropdownMenuLabel>{t("profile.language")}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  className={cn("cursor-pointer justify-between", i18n.language === "en" && "bg-muted font-bold")}
-                  onClick={async () => {
-                    i18n.changeLanguage("en");
-                    try {
-                      await apiRequest("PATCH", "/api/profile", { language: "en" });
-                      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-                      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
-                    } catch {
-                      toast({ variant: "destructive", description: "Could not save language preference." });
-                    }
-                  }}
-                >
-                  English {i18n.language === "en" && <CheckSquare className="h-3 w-3" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  className={cn("cursor-pointer justify-between", i18n.language === "es" && "bg-muted font-bold")}
-                  onClick={async () => {
-                    i18n.changeLanguage("es");
-                    try {
-                      await apiRequest("PATCH", "/api/profile", { language: "es" });
-                      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-                      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
-                    } catch {
-                      toast({ variant: "destructive", description: "Could not save language preference." });
-                    }
-                  }}
-                >
-                  Español {i18n.language === "es" && <CheckSquare className="h-3 w-3" />}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {showLanguageToggle && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-md shadow-teal-500/20 hover:shadow-lg hover:shadow-teal-500/30 hover:scale-105 active:scale-95 transition-all duration-200"
+                    data-testid="btn-language-toggle"
+                  >
+                    <Languages className="h-[22px] w-[22px] drop-shadow-sm" strokeWidth={2.25} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-32">
+                  <DropdownMenuLabel>{t("profile.language")}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    className={cn("cursor-pointer justify-between", i18n.language === "en" && "bg-muted font-bold")}
+                    onClick={async () => {
+                      i18n.changeLanguage("en");
+                      try {
+                        await apiRequest("PATCH", "/api/profile", { language: "en" });
+                        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                        queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+                      } catch {
+                        toast({ variant: "destructive", description: "Could not save language preference." });
+                      }
+                    }}
+                  >
+                    English {i18n.language === "en" && <CheckSquare className="h-3 w-3" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className={cn("cursor-pointer justify-between", i18n.language === "es" && "bg-muted font-bold")}
+                    onClick={async () => {
+                      i18n.changeLanguage("es");
+                      try {
+                        await apiRequest("PATCH", "/api/profile", { language: "es" });
+                        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                        queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+                      } catch {
+                        toast({ variant: "destructive", description: "Could not save language preference." });
+                      }
+                    }}
+                  >
+                    Español {i18n.language === "es" && <CheckSquare className="h-3 w-3" />}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <NotificationBell />
 
           </div>
