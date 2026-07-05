@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -34,6 +35,7 @@ function getInitials(name: string) {
 
 export default function Employees() {
   const { t } = useTranslation();
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
@@ -98,13 +100,23 @@ export default function Employees() {
           </p>
         </div>
         {isAdmin && (
-          <Button
-            onClick={() => setShowAddDialog(true)}
-            data-testid="button-add-employee"
-            className="bg-white/15 border border-white/30 text-white hover:bg-white/25 hover:text-white"
-          >
-            <Plus className="h-4 w-4 mr-2" /> {t("employees.addEmployee")}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate("/employees/import")}
+              data-testid="btn-import-csv"
+              className="bg-white/15 border border-white/30 text-white hover:bg-white/25 hover:text-white"
+            >
+              <Upload className="h-4 w-4 mr-2" /> Import CSV
+            </Button>
+            <Button
+              onClick={() => setShowAddDialog(true)}
+              data-testid="button-add-employee"
+              className="bg-white/15 border border-white/30 text-white hover:bg-white/25 hover:text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" /> {t("employees.addEmployee")}
+            </Button>
+          </div>
         )}
       </div>
 

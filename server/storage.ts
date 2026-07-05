@@ -24,6 +24,7 @@ import {
   workRequests, type WorkRequest, type InsertWorkRequest,
   accessRequests, type AccessRequest, type InsertAccessRequest,
   equipment, type Equipment, type InsertEquipment,
+  vendors, type Vendor, type InsertVendor,
   maintenanceSchedules, type MaintenanceSchedule, type InsertMaintenanceSchedule,
   maintenanceLogs, type MaintenanceLog, type InsertMaintenanceLog,
   equipmentUploads, type EquipmentUpload, type InsertEquipmentUpload,
@@ -247,6 +248,13 @@ export interface IStorage {
   createPdfForm(form: InsertPdfForm): Promise<PdfForm>;
   deletePdfForm(id: string): Promise<boolean>;
   
+  // Vendors
+  getVendors(): Promise<Vendor[]>;
+  getVendor(id: string): Promise<Vendor | undefined>;
+  createVendor(vendor: InsertVendor): Promise<Vendor>;
+  updateVendor(id: string, updates: Partial<Vendor>): Promise<Vendor | undefined>;
+  deleteVendor(id: string): Promise<boolean>;
+
   // Equipment
   getEquipment(): Promise<Equipment[]>;
   getEquipmentById(id: string): Promise<Equipment | undefined>;
@@ -1311,6 +1319,31 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEquipment(id: string): Promise<boolean> {
     const result = await db.delete(equipment).where(eq(equipment.id, id));
+    return true;
+  }
+
+  // Vendor methods
+  async getVendors(): Promise<Vendor[]> {
+    return await db.select().from(vendors).orderBy(vendors.name);
+  }
+
+  async getVendor(id: string): Promise<Vendor | undefined> {
+    const [v] = await db.select().from(vendors).where(eq(vendors.id, id));
+    return v || undefined;
+  }
+
+  async createVendor(vendor: InsertVendor): Promise<Vendor> {
+    const [created] = await db.insert(vendors).values(vendor).returning();
+    return created;
+  }
+
+  async updateVendor(id: string, updates: Partial<Vendor>): Promise<Vendor | undefined> {
+    const [updated] = await db.update(vendors).set({ ...updates, updatedAt: new Date() }).where(eq(vendors.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteVendor(id: string): Promise<boolean> {
+    await db.delete(vendors).where(eq(vendors.id, id));
     return true;
   }
 

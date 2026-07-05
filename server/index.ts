@@ -70,6 +70,7 @@ import { runCompanyCamWave3Migration } from "./migrations/companyCamWave3";
 import { runWave4Migration } from "./migrations/wave4";
 import { runJobLineItemsMigration } from "./migrations/jobLineItems";
 import { runAuditLogMigration } from "./migrations/auditLog";
+import { runVendorsMigration } from "./migrations/vendors";
 import { syncCCProjectsFromApi } from "./companyCamRoutes";
 import { registerPublicPages } from "./publicPages";
 import { startLeadAlertScheduler } from "./consultationRoutes";
@@ -225,6 +226,7 @@ app.use((req, res, next) => {
   await runGpsPingsIndexMigration();
   await runJobLineItemsMigration();
   await runAuditLogMigration();
+  await runVendorsMigration();
 
   // ── Step 3: Register routes and seeds ──────────────────────────────────────
   // Public pages must come before registerRoutes (which sets up the catch-all).

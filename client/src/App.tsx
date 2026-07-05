@@ -24,6 +24,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/scheduling": "Scheduling",
   "/time": "Time Tracking",
   "/equipment": "Equipment",
+  "/vendors": "Vendors",
   "/forms": "Forms",
   "/sops": "SOP Library",
   "/customer-resources": "Customer Resources",
@@ -80,6 +81,9 @@ import Forms from "@/pages/Forms";
 import Education from "@/pages/Education";
 import EmployeePortal from "@/pages/EmployeePortal";
 import Employees from "@/pages/Employees";
+import EmployeesImport from "@/pages/EmployeesImport";
+import Vendors from "@/pages/Vendors";
+import VendorsImport from "@/pages/VendorsImport";
 import FormHub from "@/pages/FormHub";
 import HQOverview from "@/pages/HQOverview";
 import JobList from "@/pages/jobs/index";
@@ -96,6 +100,7 @@ import Help from "@/pages/Help";
 import Profile from "@/pages/Profile";
 import AdminSetup from "@/pages/AdminSetup";
 import EquipmentTracker from "@/pages/EquipmentTracker";
+import EquipmentImport from "@/pages/EquipmentImport";
 import Tasks from "@/pages/Tasks";
 import SearchPage from "@/pages/Search";
 
@@ -272,7 +277,10 @@ function AppRoutes() {
         <Route path="/forms" component={Forms} />
         <Route path="/customer-resources" component={Education} />
         <Route path="/profile" component={Profile} />
+        <ProtectedRoute path="/employees/import" component={EmployeesImport} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/employees" component={Employees} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/vendors/import" component={VendorsImport} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/vendors" component={Vendors} allowedRoles={ADMIN_OR_MANAGER} />
         <Route path="/onboarding-forms/:formType?/:submissionId?" component={FormHub} />
         <Route path="/employee" component={EmployeePortal} />
         <Route path="/employee-portal" component={EmployeePortal} />
@@ -289,6 +297,7 @@ function AppRoutes() {
         <Route path="/my-hours" component={MyHoursPage} />
         <Route path="/help" component={Help} />
         <Route path="/admin-setup" component={AdminSetup} />
+        <ProtectedRoute path="/equipment/import" component={EquipmentImport} allowedRoles={ADMIN_OR_MANAGER} />
         <Route path="/equipment" component={EquipmentTracker} />
         <Route path="/search" component={SearchPage} />
         <Route path="/todos" component={Tasks} />

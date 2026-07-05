@@ -15,3 +15,4 @@
 - [Users table has no first_name/last_name](users-table-name-column.md) — routes joining users on first_name/last_name throw and get silently swallowed into empty 200 responses; check server logs, not just DOM, when an endpoint returns empty.
 - [Warranty Create dialog bug](warranty-create-dialog-bug.md) — pre-existing bug, "Create Warranty" button on empty-state doesn't open its dialog; not caused by claim-photos work.
 - [Audit log actor/target labeling](audit-log-actor-labeling.md) — always write the resolved display name (not raw input) into actor/target fields on every event path or search filters silently miss rows.
+- [Employee delete FK chain](employee-delete-fk-chain.md) — deleting an employees row can fail on onboarding_items FK; new-hire creation auto-generates ~16 onboarding_items rows that must be deleted first.

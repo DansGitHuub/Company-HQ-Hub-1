@@ -375,6 +375,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     todos: { icon: CheckSquare, label: t("nav.tasks"), href: "/todos" },
     hiring: { icon: Users, label: t("nav.hiring"), href: "/hiring" },
     employees: { icon: User, label: t("nav.employees"), href: "/employees" },
+    vendors: { icon: Building2, label: "Vendors", href: "/vendors" },
     my_profile: { icon: User, label: t("nav.myProfile"), href: "/employees/me" },
     jobs: { icon: Briefcase, label: t("nav.jobs"), href: "/jobs" },
     scheduling: { icon: CalendarCheck, label: t("nav.scheduling"), href: "/scheduling" },
@@ -430,7 +431,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["todos", "work_orders", "scheduling", "time_tracking", "equipment", "forms"] },
     { label: "RESOURCES", items: ["sops", "education", "testing"] },
-    { label: "ADMIN", items: ["admin", "employees", "hiring", "invoices", "reports", "budget_settings", "customer_messages"] },
+    { label: "ADMIN", items: ["admin", "employees", "vendors", "hiring", "invoices", "reports", "budget_settings", "customer_messages"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {

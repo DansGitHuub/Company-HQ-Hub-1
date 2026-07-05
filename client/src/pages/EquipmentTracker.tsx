@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
@@ -112,6 +113,7 @@ function FleetDashboard({
   setSearch: (v: string) => void;
 }) {
   const { t } = useTranslation();
+  const [, navigate] = useLocation();
   const { data: stats } = useQuery<any>({
     queryKey: ["/api/fleet/dashboard"],
     queryFn: async () => (await apiRequest("GET", "/api/fleet/dashboard")).json(),
@@ -169,9 +171,14 @@ function FleetDashboard({
           <h1 className="text-2xl font-heading font-bold" data-testid="text-page-title">{t("equipment.fleetManagement")}</h1>
           <p className="text-muted-foreground">{t("equipment.fleetDesc")}</p>
         </div>
-        <Button onClick={onAddNew} data-testid="button-add-equipment">
-          <Plus className="h-4 w-4 mr-2" /> {t("equipment.addEquipment")}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate("/equipment/import")} data-testid="btn-import-csv">
+            <Upload className="h-4 w-4 mr-2" /> Import CSV
+          </Button>
+          <Button onClick={onAddNew} data-testid="button-add-equipment">
+            <Plus className="h-4 w-4 mr-2" /> {t("equipment.addEquipment")}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

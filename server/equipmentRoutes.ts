@@ -2,6 +2,10 @@ import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import { recalculateAssetPriorities, calculateNextDue } from "./priorityEngine";
 import { requireRole } from "./auth";
+import multer from "multer";
+import { parse } from "csv-parse/sync";
+
+const equipmentImportUpload = multer({ storage: multer.memoryStorage() });
 
 type AuthMiddleware = (req: Request, res: Response, next: () => void) => void;
 
@@ -73,6 +77,64 @@ export function registerEquipmentRoutes(app: Express, requireAuth: AuthMiddlewar
         await autoAssignTemplates(asset.id, asset.make, asset.category, asset.currentHours ?? 0);
       }
       res.status(201).json(asset);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/fleet/assets/import", ...requireManager, equipmentImportUpload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const text = req.file.buffer.toString("utf-8");
+      const records: Record<string, string>[] = parse(text, { columns: true, skip_empty_lines: true, trim: true });
+
+      const results = { imported: 0, updated: 0, skipped: 0, errors: [] as string[] };
+      const existing = await storage.getEquipment();
+
+      for (const row of records) {
+        try {
+          const name = row["Name"] || row["name"];
+          if (!name) { results.skipped++; continue; }
+
+          const type = row["Type"] || row["type"] || null;
+          const nickname = row["Nickname"] || row["nickname"] || null;
+          const category = row["Category"] || row["category"] || null;
+          const year = row["Year"] || row["year"] || null;
+          const make = row["Make"] || row["make"] || null;
+          const model = row["Model"] || row["model"] || null;
+          const vin = row["VIN"] || row["Vin"] || row["vin"] || null;
+          const serialNumber = row["SerialNumber"] || row["Serial Number"] || row["serialNumber"] || null;
+          const licensePlate = row["LicensePlate"] || row["License Plate"] || row["licensePlate"] || null;
+          const status = row["Status"] || row["status"] || "Active";
+          const notes = row["Notes"] || row["notes"] || null;
+          const primaryLocation = row["Location"] || row["PrimaryLocation"] || row["primaryLocation"] || null;
+
+          const match = (vin && existing.find(e => e.vin && e.vin.trim().toLowerCase() === vin.trim().toLowerCase()))
+            || (serialNumber && existing.find(e => e.serialNumber && e.serialNumber.trim().toLowerCase() === serialNumber.trim().toLowerCase()))
+            || undefined;
+
+          const payload: any = {
+            name, type, nickname, category, year, make, model, vin, serialNumber,
+            licensePlate, status, notes, primaryLocation,
+          };
+
+          if (match) {
+            const updated = await storage.updateEquipment(match.id, payload);
+            if (updated) Object.assign(match, updated);
+            results.updated++;
+            continue;
+          }
+
+          const assetId = await storage.getNextAssetId();
+          const created = await storage.createEquipment({ ...payload, assetId });
+          existing.push(created);
+          results.imported++;
+        } catch (rowErr: any) {
+          results.errors.push(`Row "${row["Name"] || row["name"] || "?"}": ${rowErr.message}`);
+          results.skipped++;
+        }
+      }
+      res.json(results);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

@@ -1,5 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import { randomBytes } from "crypto";
+import multer from "multer";
+import { parse } from "csv-parse/sync";
 import { storage } from "./storage";
 import { sendHiringStageEmail, sendHiringWelcomeEmail, sendNewHireAccountEmail, sendZoomInterviewEmail, sendInPersonInterviewEmail, sendHiredNotificationEmail } from "./email";
 import { getAppUrl, sendOfferAcceptanceEmail, sendEmail } from "./emailService";
@@ -667,6 +669,63 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
       const emp = await storage.createEmployee(req.body);
       await createOnboardingChecklist(emp.id);
       res.status(201).json(emp);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  const employeeImportUpload = multer({ storage: multer.memoryStorage() });
+
+  app.post("/api/employees/import", requireAuth, requireManagerAccess, employeeImportUpload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const text = req.file.buffer.toString("utf-8");
+      const records: Record<string, string>[] = parse(text, { columns: true, skip_empty_lines: true, trim: true });
+
+      const results = { imported: 0, updated: 0, skipped: 0, errors: [] as string[] };
+      const existing = await storage.getEmployees();
+
+      for (const row of records) {
+        try {
+          const firstName = row["FirstName"] || row["First Name"] || row["firstName"];
+          const lastName = row["LastName"] || row["Last Name"] || row["lastName"];
+          if (!firstName || !lastName) { results.skipped++; continue; }
+
+          const personalEmail = row["Email"] || row["PersonalEmail"] || row["Personal Email"] || row["personalEmail"] || null;
+          const personalPhone = row["Phone"] || row["PersonalPhone"] || row["Personal Phone"] || row["personalPhone"] || null;
+          const jobTitle = row["JobTitle"] || row["Job Title"] || row["jobTitle"] || null;
+          const department = row["Department"] || row["department"] || null;
+          const employmentType = row["EmploymentType"] || row["Employment Type"] || row["employmentType"] || null;
+          const startDate = row["StartDate"] || row["Start Date"] || row["startDate"] || null;
+          const workLocation = row["WorkLocation"] || row["Work Location"] || row["workLocation"] || null;
+          const status = row["Status"] || row["status"] || "Active";
+
+          const match = personalEmail
+            ? existing.find(e => (e.personalEmail || "").trim().toLowerCase() === personalEmail.trim().toLowerCase())
+            : undefined;
+
+          const payload: any = {
+            firstName, lastName, personalEmail, personalPhone, jobTitle, department,
+            employmentType, startDate, workLocation, status,
+          };
+
+          if (match) {
+            const updated = await storage.updateEmployee(match.id, payload);
+            if (updated) Object.assign(match, updated);
+            results.updated++;
+            continue;
+          }
+
+          const created = await storage.createEmployee(payload);
+          await createOnboardingChecklist(created.id);
+          existing.push(created);
+          results.imported++;
+        } catch (rowErr: any) {
+          results.errors.push(`Row "${row["FirstName"] || ""} ${row["LastName"] || ""}": ${rowErr.message}`);
+          results.skipped++;
+        }
+      }
+      res.json(results);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
