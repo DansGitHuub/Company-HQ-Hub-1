@@ -109,10 +109,9 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
     label: "System & Advanced",
     labelColor: "text-muted-foreground/60",
     items: [
-      { value: "mors-budget", label: "MORS Budget", icon: DollarSign, href: "/mors-budget" },
       { value: "todos", label: "To-Do User Management", icon: CheckCircle, tab: "todos" },
-      { value: "assistant-agents", label: "AI Assistant", icon: Sparkles, tab: "assistant-agents" },
-      { value: "ai-logs", label: "AI Logs", icon: Bot, tab: "ai-logs" },
+      { value: "assistant-agents", label: "Assistant Agents", icon: Sparkles, tab: "assistant-agents" },
+      { value: "ai-logs", label: "Usage Summary", icon: Bot, tab: "ai-logs" },
       { value: "ai-agents", label: "AI Agents", icon: Bot, tab: "ai-agents" },
       { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle, tab: "integration-wizard" },
       { value: "process-auditor", label: "Process Auditor", icon: ClipboardCheck, tab: "process-auditor" },

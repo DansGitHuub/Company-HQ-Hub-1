@@ -738,8 +738,8 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
       items: [
         { value: "admin-tools", label: "Admin Tools", icon: Wrench, href: "/tools" },
         { value: "todos", label: "To-Do User Management", icon: CheckCircle },
-        { value: "assistant-agents", label: "AI Assistant", icon: Sparkles },
-        { value: "ai-logs", label: "AI Logs", icon: Bot },
+        { value: "assistant-agents", label: "Assistant Agents", icon: Sparkles },
+        { value: "ai-logs", label: "Usage Summary", icon: Bot },
         ...(isMasterAdmin ? [{ value: "ai-agents", label: "AI Agents", icon: Bot }] : []),
         { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle },
         { value: "process-auditor", label: "Process Auditor", icon: ClipboardCheck },
@@ -1351,8 +1351,8 @@ export default function AdminPanel() {
               <SelectLabel>System &amp; Advanced</SelectLabel>
               <SelectItem value="admin-tools">Admin Tools</SelectItem>
               <SelectItem value="todos">To-Do User Management</SelectItem>
-              <SelectItem value="assistant-agents">AI Assistant</SelectItem>
-              <SelectItem value="ai-logs">AI Logs</SelectItem>
+              <SelectItem value="assistant-agents">Assistant Agents</SelectItem>
+              <SelectItem value="ai-logs">Usage Summary</SelectItem>
               {isMasterAdmin && <SelectItem value="ai-agents">AI Agents</SelectItem>}
               <SelectItem value="integration-wizard">Integration Wizard</SelectItem>
               <SelectItem value="process-auditor">Process Auditor</SelectItem>
@@ -1606,8 +1606,8 @@ export default function AdminPanel() {
                   {([
                     { label: "Admin Tools", desc: "Form builder & admin utilities", icon: Wrench, href: "/tools" },
                     { label: "To-Do User Management", desc: "Who can see tasks", icon: CheckCircle, tab: "todos" },
-                    { label: "AI Assistant", desc: "AI assistant configuration", icon: Sparkles, tab: "assistant-agents" },
-                    { label: "AI Logs", desc: "AI usage history", icon: Bot, tab: "ai-logs" },
+                    { label: "Assistant Agents", desc: "AI assistant configuration", icon: Sparkles, tab: "assistant-agents" },
+                    { label: "Usage Summary", desc: "AI usage history", icon: Bot, tab: "ai-logs" },
                     { label: "Integration Wizard", desc: "Connect services", icon: Puzzle, tab: "integration-wizard" },
                     { label: "Process Auditor", desc: "Run process audits", icon: ClipboardCheck, tab: "process-auditor" },
                     { label: "Article Reports", desc: "Reported help articles", icon: HelpCircle, tab: "help-reports" },
