@@ -410,7 +410,42 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
     if (!status) return res.status(400).json({ message: "status is required" });
     try {
       const before = await pool.query(`SELECT status, title FROM jobs WHERE id = $1`, [req.params.id]);
+      if (before.rows.length === 0) return res.status(404).json({ message: "Job not found" });
       const oldStatus = before.rows[0]?.status ?? "";
+
+      // Required before/after photo enforcement (Business Rules toggle, defaults ON)
+      if (status.toLowerCase() === "completed" && oldStatus.toLowerCase() !== "completed") {
+        try {
+          const ruleRes = await pool.query(
+            `SELECT value FROM business_rules WHERE key = 'require_before_after_photos'`
+          );
+          const enforceOn = ruleRes.rows.length === 0 || (ruleRes.rows[0].value ?? "On").toLowerCase() !== "off";
+          if (enforceOn) {
+            const photoRes = await pool.query(
+              `SELECT wp.photo_type, COUNT(*)::int AS count
+               FROM worksheet_photos wp
+               JOIN worksheet_sessions ws ON ws.id = wp.session_id
+               WHERE ws.job_id = $1 AND wp.photo_type IN ('before','after')
+               GROUP BY wp.photo_type`,
+              [req.params.id]
+            );
+            const counts: Record<string, number> = {};
+            for (const r of photoRes.rows) counts[r.photo_type] = r.count;
+            const missing: string[] = [];
+            if (!counts.before) missing.push("a before photo");
+            if (!counts.after) missing.push("an after photo");
+            if (missing.length > 0) {
+              return res.status(400).json({
+                message: `Cannot mark job Completed — missing ${missing.join(" and ")}. Attach the required photo(s) under Worksheet Photos before completing this job.`,
+              });
+            }
+          }
+        } catch (ruleErr: any) {
+          console.error("[jobs] required-photo check error:", ruleErr.message);
+          // Fail open on unexpected errors so completion isn't permanently blocked by an infra issue
+        }
+      }
+
       const result = await pool.query(
         `UPDATE jobs SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
         [status, req.params.id]

@@ -77,6 +77,16 @@ const BUSINESS_RULE_SEED: BusinessRuleSeed[] = [
     value_type: "currency",
     sort_order: 7,
   },
+  {
+    key: "require_before_after_photos",
+    label: "Require Before/After Photos to Complete Jobs",
+    description: "When On, a job cannot be marked Completed unless it has at least one before photo and one after photo attached. Turn Off to allow overriding this for an edge case.",
+    category: "Workflow",
+    value: "On",
+    value_type: "select",
+    options: "On,Off",
+    sort_order: 8,
+  },
 ];
 
 async function migrateBusinessRules() {
@@ -96,16 +106,15 @@ async function migrateBusinessRules() {
     )
   `);
 
-  const { rows } = await pool.query("SELECT COUNT(*) AS n FROM business_rules");
-  if (parseInt(rows[0].n, 10) === 0) {
-    for (const r of BUSINESS_RULE_SEED) {
-      await pool.query(
-        `INSERT INTO business_rules (key, label, description, category, value, value_type, options, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (key) DO NOTHING`,
-        [r.key, r.label, r.description, r.category, r.value, r.value_type, r.options ?? null, r.sort_order]
-      );
-    }
-    console.log("[migration] business_rules seeded with", BUSINESS_RULE_SEED.length, "entries");
+  // Insert any seed rules that don't exist yet (ON CONFLICT DO NOTHING keeps
+  // existing rows — including any admin-edited values — untouched). This lets
+  // new rules be added over time without re-running a one-time seed.
+  for (const r of BUSINESS_RULE_SEED) {
+    await pool.query(
+      `INSERT INTO business_rules (key, label, description, category, value, value_type, options, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (key) DO NOTHING`,
+      [r.key, r.label, r.description, r.category, r.value, r.value_type, r.options ?? null, r.sort_order]
+    );
   }
   console.log("[migration] business_rules table ready");
 }
