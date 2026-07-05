@@ -206,7 +206,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             <span className="text-sm font-bold text-sidebar-foreground">Admin Panel</span>
           </div>
-          <Link href="/dashboard">
+          <Link href="/">
             <button
               className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
               data-testid="admin-exit-button"

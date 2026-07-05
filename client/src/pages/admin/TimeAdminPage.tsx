@@ -1,6 +1,5 @@
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useTranslation } from "react-i18next";
-import { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Clock } from "lucide-react";
 import TimeReports from "./TimeReports";
@@ -10,9 +9,8 @@ import WorksheetReview from "./WorksheetReview";
 const VALID_TABS = ["reports", "approval", "worksheet"] as const;
 type TabKey = (typeof VALID_TABS)[number];
 
-function readTabFromUrl(): TabKey {
-  if (typeof window === "undefined") return "reports";
-  const params = new URLSearchParams(window.location.search);
+function readTabFromSearch(search: string): TabKey {
+  const params = new URLSearchParams(search);
   const candidate = params.get("tab");
   return (VALID_TABS as readonly string[]).includes(candidate || "")
     ? (candidate as TabKey)
@@ -22,18 +20,11 @@ function readTabFromUrl(): TabKey {
 export default function TimeAdminPage() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
-  const [tab, setTab] = useState<TabKey>(() => readTabFromUrl());
-
-  // Keep state in sync if user uses browser back/forward.
-  useEffect(() => {
-    const handler = () => setTab(readTabFromUrl());
-    window.addEventListener("popstate", handler);
-    return () => window.removeEventListener("popstate", handler);
-  }, []);
+  const search = useSearch();
+  const tab = readTabFromSearch(search);
 
   const handleTabChange = (next: string) => {
     if (!(VALID_TABS as readonly string[]).includes(next)) return;
-    setTab(next as TabKey);
     setLocation(`/admin/time?tab=${next}`);
   };
 
