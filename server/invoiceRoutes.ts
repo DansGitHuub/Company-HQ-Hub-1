@@ -139,6 +139,74 @@ async function checkAndFlipJobSold(invoiceId: string) {
   }
 }
 
+/**
+ * Marks an invoice as sent and notifies the business owner (never the
+ * customer directly). Extracted from PATCH /api/invoices/:id/send so it can
+ * be reused by the Automation Center's "job completed -> send invoice"
+ * automation without duplicating logic. Behavior is unchanged from the
+ * original inline route handler.
+ */
+export async function sendInvoiceById(invoiceId: string) {
+  const { rows } = await pool.query(`
+    UPDATE invoices
+    SET status='sent', sent_at=COALESCE(sent_at, NOW()), updated_at=NOW()
+    WHERE id=$1 RETURNING *
+  `, [invoiceId]);
+  if (rows.length === 0) return null;
+
+  // Notify business owner that this invoice has been sent (goes through
+  // emailService redirect/API-key safety layer — no real customer email needed)
+  const inv = rows[0];
+  pool.query(
+    `SELECT COALESCE(NULLIF(TRIM(c.company_name),''),
+                     NULLIF(TRIM(c.first_name || ' ' || c.last_name),''),
+                     'Unknown Customer') AS cust_name
+     FROM customers c WHERE c.id = $1`,
+    [inv.customer_id]
+  ).then(({ rows: cr }) => {
+    const custName = cr[0]?.cust_name ?? "Unknown Customer";
+    const notifyTo = process.env.FROM_EMAIL || "dan@chapinlandscapes.com";
+    const balance = `$${parseFloat(inv.balance_due ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+    const total   = `$${parseFloat(inv.total ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+    const due = inv.due_date
+      ? new Date(inv.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      : "No due date";
+
+    sendEmail(
+      notifyTo,
+      `Invoice Sent — ${escapeHtml(inv.invoice_number)} · ${escapeHtml(custName)}`,
+      `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+        <div style="background:#166534;padding:20px;text-align:center;">
+          <h1 style="color:white;margin:0;font-size:20px;">Company HQ</h1>
+          <p style="color:#bbf7d0;margin:4px 0 0;font-size:13px;">Invoice Sent Confirmation</p>
+        </div>
+        <div style="padding:28px;background:#f9fafb;">
+          <h2 style="color:#1f2937;margin:0 0 12px;">Invoice Marked as Sent</h2>
+          <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin:16px 0;">
+            <table style="width:100%;border-collapse:collapse;font-size:14px;">
+              <tr><td style="padding:5px 0;color:#6b7280;width:130px;">Invoice #</td>
+                  <td style="padding:5px 0;color:#1f2937;font-weight:600;">${escapeHtml(inv.invoice_number)}</td></tr>
+              <tr><td style="padding:5px 0;color:#6b7280;">Customer</td>
+                  <td style="padding:5px 0;color:#1f2937;">${escapeHtml(custName)}</td></tr>
+              <tr><td style="padding:5px 0;color:#6b7280;">Total</td>
+                  <td style="padding:5px 0;color:#1f2937;">${escapeHtml(total)}</td></tr>
+              <tr><td style="padding:5px 0;color:#6b7280;">Balance Due</td>
+                  <td style="padding:5px 0;color:#1f2937;font-weight:600;">${escapeHtml(balance)}</td></tr>
+              <tr><td style="padding:5px 0;color:#6b7280;">Due Date</td>
+                  <td style="padding:5px 0;color:#1f2937;">${escapeHtml(due)}</td></tr>
+            </table>
+          </div>
+        </div>
+        <div style="padding:16px;text-align:center;color:#9ca3af;font-size:12px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;">Company HQ · Chapin Landscapes</p>
+        </div>
+      </div>`
+    ).catch(() => {}); // fire-and-forget
+  }).catch(() => {});
+
+  return inv;
+}
+
 export function registerInvoiceRoutes(app: Express, requireAuth: any) {
 
   // ── LIST ──────────────────────────────────────────────────────────────────────
@@ -506,64 +574,9 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   // ── SEND ──────────────────────────────────────────────────────────────────────
   app.patch("/api/invoices/:id/send", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
-      const { rows } = await pool.query(`
-        UPDATE invoices
-        SET status='sent', sent_at=COALESCE(sent_at, NOW()), updated_at=NOW()
-        WHERE id=$1 RETURNING *
-      `, [req.params.id]);
-      if (rows.length === 0) return res.status(404).json({ message: "Not found" });
-
-      // Notify business owner that this invoice has been sent (goes through
-      // emailService redirect/API-key safety layer — no real customer email needed)
-      const inv = rows[0];
-      pool.query(
-        `SELECT COALESCE(NULLIF(TRIM(c.company_name),''),
-                         NULLIF(TRIM(c.first_name || ' ' || c.last_name),''),
-                         'Unknown Customer') AS cust_name
-         FROM customers c WHERE c.id = $1`,
-        [inv.customer_id]
-      ).then(({ rows: cr }) => {
-        const custName = cr[0]?.cust_name ?? "Unknown Customer";
-        const notifyTo = process.env.FROM_EMAIL || "dan@chapinlandscapes.com";
-        const balance = `$${parseFloat(inv.balance_due ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-        const total   = `$${parseFloat(inv.total ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-        const due = inv.due_date
-          ? new Date(inv.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-          : "No due date";
-
-        sendEmail(
-          notifyTo,
-          `Invoice Sent — ${escapeHtml(inv.invoice_number)} · ${escapeHtml(custName)}`,
-          `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-            <div style="background:#166534;padding:20px;text-align:center;">
-              <h1 style="color:white;margin:0;font-size:20px;">Company HQ</h1>
-              <p style="color:#bbf7d0;margin:4px 0 0;font-size:13px;">Invoice Sent Confirmation</p>
-            </div>
-            <div style="padding:28px;background:#f9fafb;">
-              <h2 style="color:#1f2937;margin:0 0 12px;">Invoice Marked as Sent</h2>
-              <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin:16px 0;">
-                <table style="width:100%;border-collapse:collapse;font-size:14px;">
-                  <tr><td style="padding:5px 0;color:#6b7280;width:130px;">Invoice #</td>
-                      <td style="padding:5px 0;color:#1f2937;font-weight:600;">${escapeHtml(inv.invoice_number)}</td></tr>
-                  <tr><td style="padding:5px 0;color:#6b7280;">Customer</td>
-                      <td style="padding:5px 0;color:#1f2937;">${escapeHtml(custName)}</td></tr>
-                  <tr><td style="padding:5px 0;color:#6b7280;">Total</td>
-                      <td style="padding:5px 0;color:#1f2937;">${escapeHtml(total)}</td></tr>
-                  <tr><td style="padding:5px 0;color:#6b7280;">Balance Due</td>
-                      <td style="padding:5px 0;color:#1f2937;font-weight:600;">${escapeHtml(balance)}</td></tr>
-                  <tr><td style="padding:5px 0;color:#6b7280;">Due Date</td>
-                      <td style="padding:5px 0;color:#1f2937;">${escapeHtml(due)}</td></tr>
-                </table>
-              </div>
-            </div>
-            <div style="padding:16px;text-align:center;color:#9ca3af;font-size:12px;border-top:1px solid #e5e7eb;">
-              <p style="margin:0;">Company HQ · Chapin Landscapes</p>
-            </div>
-          </div>`
-        ).catch(() => {}); // fire-and-forget; HTTP response already sent
-      }).catch(() => {});
-
-      return res.json(rows[0]);
+      const invoice = await sendInvoiceById(req.params.id);
+      if (!invoice) return res.status(404).json({ message: "Not found" });
+      return res.json(invoice);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
     }

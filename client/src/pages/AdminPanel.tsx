@@ -718,6 +718,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "catalog-link", label: "Materials Catalog", icon: BookOpen, href: "/catalog" },
         { value: "plant-cards-link", label: "Plant Library", icon: Leaf, href: "/plant-cards" },
         { value: "business-rules", label: "Business Rules", icon: SlidersHorizontal, href: "/admin/business-rules" },
+        { value: "automation-center", label: "Automation Center", icon: Zap, href: "/admin/automation-center" },
       ],
     },
     {
@@ -1332,6 +1333,7 @@ export default function AdminPanel() {
               <SelectItem value="catalog-link">Materials Catalog</SelectItem>
               <SelectItem value="plant-cards-link">Plant Library</SelectItem>
               <SelectItem value="business-rules">Business Rules</SelectItem>
+              <SelectItem value="automation-center">Automation Center</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>Content &amp; SOPs</SelectLabel>
@@ -1531,6 +1533,7 @@ export default function AdminPanel() {
                   { label: "Materials Catalog", desc: "Materials & labor catalog", icon: BookOpen, href: "/catalog" },
                   { label: "Plant Library", desc: "Plant card database", icon: Leaf, href: "/plant-cards" },
                   { label: "Business Rules", desc: "Financial, scheduling & workflow settings", icon: SlidersHorizontal, href: "/admin/business-rules" },
+                  { label: "Automation Center", desc: "Turn on job, invoice & recurring job automations", icon: Zap, href: "/admin/automation-center" },
                 ] as { label: string; desc: string; icon: any; tab?: string; href?: string }[]).map((item) => (
                   <button key={item.label} onClick={() => item.href ? navigate(item.href) : setActiveTab(item.tab!)} data-testid={`admin-home-${item.tab ?? item.label.toLowerCase().replace(/\s+/g, "-")}`}
                     className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">

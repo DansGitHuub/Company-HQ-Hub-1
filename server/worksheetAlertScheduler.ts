@@ -152,13 +152,26 @@ export async function checkMissingWorksheetAlerts(force = false): Promise<{ noti
 
 let worksheetAlertInterval: ReturnType<typeof setInterval> | null = null;
 
+async function runIfAutomationEnabled(): Promise<void> {
+  // Gated by the Automation Center's "missing_worksheet_daily_check" toggle
+  // (default OFF). Does not modify checkMissingWorksheetAlerts() itself.
+  try {
+    const { isAutomationEnabled } = await import("./automationEngine");
+    if (await isAutomationEnabled("missing_worksheet_daily_check")) {
+      await checkMissingWorksheetAlerts();
+    }
+  } catch (err: any) {
+    log(`Worksheet alert scheduler gate error: ${err.message}`, "scheduler");
+  }
+}
+
 export function startWorksheetAlertScheduler(): void {
   if (worksheetAlertInterval) clearInterval(worksheetAlertInterval);
 
-  log(`Worksheet alert scheduler started (checking every hour, fires once daily after 6:00 PM ${COMPANY_TIMEZONE})`, "scheduler");
+  log(`Worksheet alert scheduler started (checking every hour, fires once daily after 6:00 PM ${COMPANY_TIMEZONE}, gated by Automation Center)`, "scheduler");
 
-  setTimeout(() => { checkMissingWorksheetAlerts(); }, 30_000);
-  worksheetAlertInterval = setInterval(() => { checkMissingWorksheetAlerts(); }, CHECK_INTERVAL_MS);
+  setTimeout(() => { runIfAutomationEnabled(); }, 30_000);
+  worksheetAlertInterval = setInterval(() => { runIfAutomationEnabled(); }, CHECK_INTERVAL_MS);
 }
 
 export function stopWorksheetAlertScheduler(): void {

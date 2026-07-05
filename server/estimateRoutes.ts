@@ -46,6 +46,108 @@ async function getEstimateFull(id: string) {
   return estimate;
 }
 
+/**
+ * Converts an approved estimate into a job (job row + copied work areas +
+ * copied line items) and marks the estimate as converted. Extracted from
+ * PATCH /api/estimates/:id/convert so it can be reused by the Automation
+ * Center's "estimate approved -> auto-create job" automation without
+ * duplicating logic. Behavior is unchanged from the original inline route
+ * handler. Returns null if the estimate does not exist.
+ */
+export async function convertEstimateToJob(estimateId: string, userId: string | null) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const est = await getEstimateFull(estimateId);
+    if (!est) { await client.query("ROLLBACK"); return null; }
+
+    const { rows: jobRows } = await client.query(
+      `INSERT INTO jobs (title, client, type, customer_id, property_id, status, stage, price, description, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 'lead', 'Lead', $6, $7, NOW(), NOW()) RETURNING id`,
+      [
+        est.title || `Estimate ${est.estimate_number}`,
+        est.customer_name || est.title || 'Unknown',
+        est.estimate_type || 'Other',
+        est.customer_id || null,
+        est.property_id || null,
+        est.total,
+        `Converted from estimate ${est.estimate_number}`,
+      ]
+    );
+    const jobId = jobRows[0].id;
+
+    // Copy estimate work areas → job work areas, one at a time so we can
+    // capture the id mapping needed to link line items to the new job
+    // work area they belong to.
+    const workAreas: any[] = est.work_areas || [];
+
+    if (workAreas.length > 0) {
+      for (const wa of workAreas) {
+        const { rows: jwaRows } = await client.query(`
+          INSERT INTO job_work_areas
+            (job_id, name, sort_order, status, is_active, estimated_hours)
+          VALUES ($1, $2, $3, 'pending', true, 0)
+          RETURNING id
+        `, [jobId, wa.name, wa.sort_order ?? 0]);
+        const jobWorkAreaId = jwaRows[0].id;
+
+        // Copy this work area's line items into structured job line items.
+        // Reads only from estimate_line_items — never writes back to it.
+        for (const li of (wa.line_items || [])) {
+          await client.query(`
+            INSERT INTO job_line_items
+              (job_id, job_work_area_id, source_estimate_id, source_estimate_line_item_id,
+               item_type, catalog_item_id, class_id, item_name, quantity, unit,
+               unit_price, line_total, sort_order, is_optional, created_by_id)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+          `, [
+            jobId,
+            jobWorkAreaId,
+            estimateId,
+            li.id,
+            li.item_type || 'service',
+            li.catalog_item_id || null,
+            li.class_id || null,
+            li.description,
+            li.quantity,
+            li.unit || null,
+            li.unit_price,
+            li.amount,
+            li.sort_order ?? 0,
+            !!li.is_optional,
+            userId,
+          ]);
+        }
+      }
+    } else {
+      // Fallback: if no work areas on the estimate, create one synthetic row from the totals.
+      // There are no line items to copy in this case (estimate_line_items always
+      // belongs to a work area).
+      await client.query(`
+        INSERT INTO job_work_areas
+          (job_id, name, sort_order, notes, status, is_active, estimated_hours)
+        VALUES ($1, $2, 0, $3, 'pending', true, 0)
+      `, [
+        jobId,
+        est.estimate_type || est.title || 'Work',
+        est.total ? `$${est.total} × 1` : '',
+      ]);
+    }
+
+    await client.query(
+      `UPDATE sales_estimates SET status='converted', converted_at=NOW(), converted_job_id=$2, updated_at=NOW() WHERE id=$1`,
+      [estimateId, jobId]
+    );
+    await client.query("COMMIT");
+    return { job_id: jobId, estimate: await getEstimateFull(estimateId) };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export function registerEstimateRoutes(app: Express) {
   // ------ Templates ------
   // ?all=true returns inactive templates too (settings page)
@@ -369,6 +471,8 @@ export function registerEstimateRoutes(app: Express) {
         [req.params.id]
       );
       res.json(await getEstimateFull(req.params.id));
+      const { onEstimateApproved } = await import("./automationEngine");
+      onEstimateApproved(req.params.id, (req as any).user?.id ?? null).catch(() => {});
     } catch (err) {
       res.status(500).json({ message: "Error approving estimate" });
     }
@@ -388,97 +492,13 @@ export function registerEstimateRoutes(app: Express) {
 
   // ------ Convert to Job ------
   app.patch("/api/estimates/:id/convert", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
-    const client = await pool.connect();
     try {
-      await client.query("BEGIN");
-      const est = await getEstimateFull(req.params.id);
-      if (!est) { await client.query("ROLLBACK"); return res.status(404).json({ message: "Not found" }); }
-
-      const { rows: jobRows } = await client.query(
-        `INSERT INTO jobs (title, client, type, customer_id, property_id, status, stage, price, description, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, 'lead', 'Lead', $6, $7, NOW(), NOW()) RETURNING id`,
-        [
-          est.title || `Estimate ${est.estimate_number}`,
-          est.customer_name || est.title || 'Unknown',
-          est.estimate_type || 'Other',
-          est.customer_id || null,
-          est.property_id || null,
-          est.total,
-          `Converted from estimate ${est.estimate_number}`,
-        ]
-      );
-      const jobId = jobRows[0].id;
-
-      // Copy estimate work areas → job work areas, one at a time so we can
-      // capture the id mapping needed to link line items to the new job
-      // work area they belong to.
-      const workAreas: any[] = est.work_areas || [];
-
-      if (workAreas.length > 0) {
-        for (const wa of workAreas) {
-          const { rows: jwaRows } = await client.query(`
-            INSERT INTO job_work_areas
-              (job_id, name, sort_order, status, is_active, estimated_hours)
-            VALUES ($1, $2, $3, 'pending', true, 0)
-            RETURNING id
-          `, [jobId, wa.name, wa.sort_order ?? 0]);
-          const jobWorkAreaId = jwaRows[0].id;
-
-          // Copy this work area's line items into structured job line items.
-          // Reads only from estimate_line_items — never writes back to it.
-          for (const li of (wa.line_items || [])) {
-            await client.query(`
-              INSERT INTO job_line_items
-                (job_id, job_work_area_id, source_estimate_id, source_estimate_line_item_id,
-                 item_type, catalog_item_id, class_id, item_name, quantity, unit,
-                 unit_price, line_total, sort_order, is_optional, created_by_id)
-              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-            `, [
-              jobId,
-              jobWorkAreaId,
-              req.params.id,
-              li.id,
-              li.item_type || 'service',
-              li.catalog_item_id || null,
-              li.class_id || null,
-              li.description,
-              li.quantity,
-              li.unit || null,
-              li.unit_price,
-              li.amount,
-              li.sort_order ?? 0,
-              !!li.is_optional,
-              (req as any).user?.id ?? null,
-            ]);
-          }
-        }
-      } else {
-        // Fallback: if no work areas on the estimate, create one synthetic row from the totals.
-        // There are no line items to copy in this case (estimate_line_items always
-        // belongs to a work area).
-        await client.query(`
-          INSERT INTO job_work_areas
-            (job_id, name, sort_order, notes, status, is_active, estimated_hours)
-          VALUES ($1, $2, 0, $3, 'pending', true, 0)
-        `, [
-          jobId,
-          est.estimate_type || est.title || 'Work',
-          est.total ? `$${est.total} × 1` : '',
-        ]);
-      }
-
-      await client.query(
-        `UPDATE sales_estimates SET status='converted', converted_at=NOW(), converted_job_id=$2, updated_at=NOW() WHERE id=$1`,
-        [req.params.id, jobId]
-      );
-      await client.query("COMMIT");
-      res.json({ job_id: jobId, estimate: await getEstimateFull(req.params.id) });
+      const result = await convertEstimateToJob(req.params.id, (req as any).user?.id ?? null);
+      if (!result) return res.status(404).json({ message: "Not found" });
+      res.json(result);
     } catch (err) {
-      await client.query("ROLLBACK");
       console.error(err);
       res.status(500).json({ message: "Error converting estimate" });
-    } finally {
-      client.release();
     }
   });
 
@@ -687,6 +707,11 @@ export function registerEstimateRoutes(app: Express) {
       }
 
       res.json({ success: true, status });
+
+      if (action === "approved") {
+        const { onEstimateApproved } = await import("./automationEngine");
+        onEstimateApproved(estimate.id, null).catch(() => {});
+      }
     } catch (err: any) {
       console.error(err);
       res.status(500).json({ message: "Error saving response" });

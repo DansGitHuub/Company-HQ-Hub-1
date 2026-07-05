@@ -431,6 +431,12 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
         });
         // Fire-and-forget customer notification email
         sendJobStatusEmail(req.params.id, status);
+
+        if (status.toLowerCase() === "completed") {
+          import("./automationEngine").then(({ onJobCompleted }) => {
+            onJobCompleted(req.params.id).catch(() => {});
+          }).catch(() => {});
+        }
       }
       return res.json(result.rows[0]);
     } catch (err: any) {

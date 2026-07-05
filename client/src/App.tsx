@@ -146,6 +146,7 @@ import MessagesPage from "@/pages/Messages";
 import TimeReports from "@/pages/admin/TimeReports";
 import ServiceTypesPage from "@/pages/admin/ServiceTypesPage";
 import BusinessRulesPage from "@/pages/admin/BusinessRulesPage";
+import AutomationCenterPage from "@/pages/admin/AutomationCenterPage";
 import WorksheetReview from "@/pages/admin/WorksheetReview";
 import RouteDayDetail from "@/pages/admin/RouteDayDetail";
 import TimeCardApproval from "@/pages/admin/TimeCardApproval";
@@ -317,6 +318,7 @@ function AppRoutes() {
         <Route path="/admin/time-card-approval"><Redirect to="/admin/time?tab=approval" /></Route>
         <ProtectedRoute path="/admin/service-types" component={ServiceTypesPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/business-rules" component={BusinessRulesPage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/automation-center" component={AutomationCenterPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/companycam-reconciliation" component={CompanyCamReconciliation} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/customer-duplicates" component={CustomerDuplicates} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/companycam-health" component={CompanyCamHealth} allowedRoles={ADMIN_ONLY} />
