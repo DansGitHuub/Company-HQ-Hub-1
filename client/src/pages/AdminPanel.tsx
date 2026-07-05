@@ -94,6 +94,7 @@ import {
   BarChart2,
   SlidersHorizontal,
   FlagTriangleRight,
+  MessageSquareWarning,
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
@@ -721,6 +722,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "business-rules", label: "Business Rules", icon: SlidersHorizontal, href: "/admin/business-rules" },
         { value: "automation-center", label: "Automation Center", icon: Zap, href: "/admin/automation-center" },
         { value: "feature-flags", label: "Feature Flags", icon: FlagTriangleRight, href: "/admin/feature-flags" },
+        { value: "feedback-reports", label: "Bug Reports & Feedback", icon: MessageSquareWarning, href: "/admin/feedback" },
       ],
     },
     {
@@ -1337,6 +1339,7 @@ export default function AdminPanel() {
               <SelectItem value="business-rules">Business Rules</SelectItem>
               <SelectItem value="automation-center">Automation Center</SelectItem>
               <SelectItem value="feature-flags">Feature Flags</SelectItem>
+              <SelectItem value="feedback-reports">Bug Reports & Feedback</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>Content &amp; SOPs</SelectLabel>
@@ -1538,6 +1541,7 @@ export default function AdminPanel() {
                   { label: "Business Rules", desc: "Financial, scheduling & workflow settings", icon: SlidersHorizontal, href: "/admin/business-rules" },
                   { label: "Automation Center", desc: "Turn on job, invoice & recurring job automations", icon: Zap, href: "/admin/automation-center" },
                   { label: "Feature Flags", desc: "Hide unfinished modules from regular users during alpha", icon: FlagTriangleRight, href: "/admin/feature-flags" },
+                  { label: "Bug Reports & Feedback", desc: "Review bugs & suggestions submitted by staff", icon: MessageSquareWarning, href: "/admin/feedback" },
                 ] as { label: string; desc: string; icon: any; tab?: string; href?: string }[]).map((item) => (
                   <button key={item.label} onClick={() => item.href ? navigate(item.href) : setActiveTab(item.tab!)} data-testid={`admin-home-${item.tab ?? item.label.toLowerCase().replace(/\s+/g, "-")}`}
                     className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">

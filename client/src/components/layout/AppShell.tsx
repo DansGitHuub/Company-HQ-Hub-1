@@ -7,6 +7,7 @@ import type { CompanySettings } from "@shared/schema";
 import AIAssistantPanel from "@/components/AIAssistantPanel";
 import UpdatesPopup from "@/components/UpdatesPopup";
 import GlobalMicButton from "@/components/GlobalMicButton";
+import FeedbackButton from "@/components/FeedbackButton";
 import TimeClock from "@/components/TimeClock";
 import CalendarPage from "@/pages/Calendar";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -905,6 +906,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-1.5 lg:gap-2">
             <GlobalMicButton />
+            <FeedbackButton />
             <TimeClock />
 
             <TooltipProvider>
