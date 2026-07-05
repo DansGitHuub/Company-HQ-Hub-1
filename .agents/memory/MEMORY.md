@@ -17,3 +17,4 @@
 - [Audit log actor/target labeling](audit-log-actor-labeling.md) — always write the resolved display name (not raw input) into actor/target fields on every event path or search filters silently miss rows.
 - [Employee delete FK chain](employee-delete-fk-chain.md) — deleting an employees row can fail on onboarding_items FK; new-hire creation auto-generates ~16 onboarding_items rows that must be deleted first.
 - [Blob download testing](blob-download-testing.md) — verify client-side Blob file downloads (e.g. CSV export) by intercepting anchor.click + fetching the blob: URL, since Playwright download.text()/path() fail here.
+- [Double-booking buffer duplication](double-booking-buffer-duplication.md) — the 480min conflict-check constant is duplicated in 4 route files; only schedulingRoutes.ts reads the admin-configurable business_rules setting.

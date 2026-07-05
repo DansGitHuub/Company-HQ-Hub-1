@@ -92,6 +92,7 @@ import {
   CalendarCheck,
   Timer,
   BarChart2,
+  SlidersHorizontal,
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
@@ -716,6 +717,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "quickbooks", label: "QuickBooks Settings", icon: DollarSign },
         { value: "catalog-link", label: "Materials Catalog", icon: BookOpen, href: "/catalog" },
         { value: "plant-cards-link", label: "Plant Library", icon: Leaf, href: "/plant-cards" },
+        { value: "business-rules", label: "Business Rules", icon: SlidersHorizontal, href: "/admin/business-rules" },
       ],
     },
     {
@@ -1329,6 +1331,7 @@ export default function AdminPanel() {
               <SelectItem value="quickbooks">QuickBooks Settings</SelectItem>
               <SelectItem value="catalog-link">Materials Catalog</SelectItem>
               <SelectItem value="plant-cards-link">Plant Library</SelectItem>
+              <SelectItem value="business-rules">Business Rules</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>Content &amp; SOPs</SelectLabel>
@@ -1527,6 +1530,7 @@ export default function AdminPanel() {
                   { label: "QuickBooks Settings", desc: "QB connection settings", icon: DollarSign, tab: "quickbooks" },
                   { label: "Materials Catalog", desc: "Materials & labor catalog", icon: BookOpen, href: "/catalog" },
                   { label: "Plant Library", desc: "Plant card database", icon: Leaf, href: "/plant-cards" },
+                  { label: "Business Rules", desc: "Financial, scheduling & workflow settings", icon: SlidersHorizontal, href: "/admin/business-rules" },
                 ] as { label: string; desc: string; icon: any; tab?: string; href?: string }[]).map((item) => (
                   <button key={item.label} onClick={() => item.href ? navigate(item.href) : setActiveTab(item.tab!)} data-testid={`admin-home-${item.tab ?? item.label.toLowerCase().replace(/\s+/g, "-")}`}
                     className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">

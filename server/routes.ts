@@ -37,6 +37,7 @@ import { registerInvoiceRoutes } from "./invoiceRoutes";
 import { registerReportRoutes } from "./reportRoutes";
 import { registerConsultationRoutes } from "./consultationRoutes";
 import { registerServiceTypesRoutes } from "./serviceTypesRoutes";
+import { registerBusinessRulesRoutes } from "./businessRulesRoutes";
 import { registerPricingRoutes } from "./pricingRoutes";
 import { registerCalculatorRoutes } from "./calculatorRoutes";
 import { registerUserAvailabilityRoutes } from "./userAvailabilityRoutes";
@@ -113,6 +114,7 @@ export async function registerRoutes(
   registerReportRoutes(app, requireAuth);
   await registerConsultationRoutes(app, requireAuth);
   await registerServiceTypesRoutes(app, requireAuth, requireAdmin);
+  await registerBusinessRulesRoutes(app, requireAuth, requireAdmin);
   await registerUserAvailabilityRoutes(app, requireAuth);
   registerPublicInquiryRoutes(app);
   registerPublicBookingRoutes(app);

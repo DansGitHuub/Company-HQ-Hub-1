@@ -18,12 +18,27 @@ function timeToMinutesLocal(t: string | null | undefined): number | null {
 
 function rangesOverlapLocal(
   s1: number | null, e1: number | null,
-  s2: number | null, e2: number | null
+  s2: number | null, e2: number | null,
+  bufferMinutes = 480
 ): boolean {
   if (s1 === null || s2 === null) return true; // no time info → treat as potential conflict
-  const end1 = e1 ?? s1 + 480;
-  const end2 = e2 ?? s2 + 480;
+  const end1 = e1 ?? s1 + bufferMinutes;
+  const end2 = e2 ?? s2 + bufferMinutes;
   return s1 < end2 && s2 < end1;
+}
+
+// Reads the admin-configurable "Double-Booking Warning Buffer" business rule
+// (falls back to the historical 480-minute default if unset).
+async function getDoubleBookingBufferMinutes(): Promise<number> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT value FROM business_rules WHERE key = 'double_booking_buffer_minutes'`
+    );
+    const parsed = rows[0] ? Number(rows[0].value) : NaN;
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 480;
+  } catch {
+    return 480;
+  }
 }
 
 function requireAuth(req: any, res: any, next: any) {
@@ -273,11 +288,13 @@ export function registerSchedulingRoutes(app: Express) {
 
       const newStart = timeToMinutesLocal(start_time);
       const newEnd = timeToMinutesLocal(end_time);
+      const bufferMinutes = await getDoubleBookingBufferMinutes();
 
       const conflicts = rows
         .filter((r: any) => rangesOverlapLocal(
           newStart, newEnd,
-          timeToMinutesLocal(r.scheduled_start_time), timeToMinutesLocal(r.scheduled_end_time)
+          timeToMinutesLocal(r.scheduled_start_time), timeToMinutesLocal(r.scheduled_end_time),
+          bufferMinutes
         ))
         .map((r: any) => ({
           employee_id: r.employee_id,
