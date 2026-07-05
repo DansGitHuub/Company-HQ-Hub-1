@@ -74,7 +74,6 @@ import CustomerHub from "@/pages/CustomerHub";
 import CareGuideManager from "@/pages/CareGuideManager";
 import ApplicantPortal from "@/pages/ApplicantPortal";
 import SOPs from "@/pages/SOPs";
-import Materials from "@/pages/Materials";
 import Hiring from "@/pages/Hiring";
 import Marketing from "@/pages/Marketing";
 import Forms from "@/pages/Forms";
