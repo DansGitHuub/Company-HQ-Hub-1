@@ -308,9 +308,10 @@ export default function MyDayPage() {
           <div className="max-w-lg mx-auto px-4 pb-12 pt-4 space-y-6">
             {/* ── Header ─────────────────────────────────────────────────────── */}
       <div>
-        <h1 data-testid="my-day-greeting" className="text-2xl font-bold text-gray-900">
+        <h1 data-testid="my-day-title" className="text-2xl font-bold text-gray-900">My Day</h1>
+        <p data-testid="my-day-greeting" className="text-base font-medium text-gray-700 mt-0.5">
           {t(greetingKey, { name: firstName })}
-        </h1>
+        </p>
         <p className="text-sm text-gray-500 mt-0.5">{formatDate(new Date())}</p>
       </div>
 

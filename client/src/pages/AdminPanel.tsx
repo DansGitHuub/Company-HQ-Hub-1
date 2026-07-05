@@ -702,22 +702,22 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
       label: "People",
       items: [
         { value: "users", label: t("nav.employees"), icon: Users },
-        { value: "requests", label: "HR Communications", icon: Megaphone, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
+        { value: "requests", label: "Access Requests", icon: Megaphone, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
         { value: "agreements", label: "Agreement Templates", icon: FileSignature },
-        { value: "suggestions", label: "Suggestions", icon: Lightbulb },
+        { value: "suggestions", label: "Customer Suggestions", icon: Lightbulb },
       ],
     },
     {
       label: "Settings",
       items: [
         { value: "company", label: "Company Info & Branding", icon: Building2 },
-        { value: "divisions", label: "Divisions", icon: Layers },
+        { value: "divisions", label: "Division Colors", icon: Layers },
         { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
         { value: "service-types", label: "Service Types", icon: Tag, href: "/admin/service-types" },
         { value: "estimate-templates", label: "Estimate Templates", icon: FileText },
         { value: "terms", label: "Terms & Conditions", icon: FileSignature },
-        { value: "quickbooks", label: "QuickBooks Settings", icon: DollarSign },
-        { value: "catalog-link", label: "Materials Catalog", icon: BookOpen, href: "/catalog" },
+        { value: "quickbooks", label: "QuickBooks Online", icon: DollarSign },
+        { value: "catalog-link", label: "Item Catalog", icon: BookOpen, href: "/catalog" },
         { value: "plant-cards-link", label: "Plant Library", icon: Leaf, href: "/plant-cards" },
         { value: "business-rules", label: "Business Rules", icon: SlidersHorizontal, href: "/admin/business-rules" },
         { value: "automation-center", label: "Automation Center", icon: Zap, href: "/admin/automation-center" },
@@ -729,23 +729,23 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
       label: "Content & SOPs",
       items: [
         { value: "sop-pipeline", label: "SOP Pipeline", icon: Zap },
-        { value: "documents", label: "Documents", icon: FileText },
-        { value: "shared-links", label: "Shared Links", icon: ExternalLink },
+        { value: "documents", label: "Document Library", icon: FileText },
+        { value: "shared-links", label: "External Share Links", icon: ExternalLink },
       ],
     },
     {
       label: "System & Advanced",
       items: [
         { value: "admin-tools", label: "Admin Tools", icon: Wrench, href: "/tools" },
-        { value: "todos", label: "Task Access", icon: CheckCircle },
+        { value: "todos", label: "To-Do User Management", icon: CheckCircle },
         { value: "assistant-agents", label: "AI Assistant", icon: Sparkles },
         { value: "ai-logs", label: "AI Logs", icon: Bot },
         ...(isMasterAdmin ? [{ value: "ai-agents", label: "AI Agents", icon: Bot }] : []),
         { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle },
         { value: "process-auditor", label: "Process Auditor", icon: ClipboardCheck },
-        { value: "help-reports", label: "Help Reports", icon: HelpCircle },
-        { value: "cc-reconciliation", label: "CC Reconciliation", icon: Camera, href: "/admin/companycam-reconciliation" },
-        { value: "cc-health", label: "CC Webhook Health", icon: Activity, href: "/admin/companycam-health" },
+        { value: "help-reports", label: "Article Reports", icon: HelpCircle },
+        { value: "cc-reconciliation", label: "CompanyCam Reconciliation Queue", icon: Camera, href: "/admin/companycam-reconciliation" },
+        { value: "cc-health", label: "CompanyCam Webhook Health", icon: Activity, href: "/admin/companycam-health" },
         { value: "customer-duplicates", label: "Customer Duplicates", icon: GitMerge, href: "/admin/customer-duplicates" },
         { value: "app-testing", label: "App Testing", icon: Eye },
         { value: "system-status", label: "System Status", icon: AlertCircle },
@@ -1026,7 +1026,7 @@ export default function AdminPanel() {
     { id: "jobs", label: "Jobs", icon: LayoutDashboard },
     { id: "todos", label: "Tasks", icon: CheckSquare },
     { id: "scheduling", label: "Scheduling", icon: CalendarCheck },
-    { id: "time_tracking", label: "Clock In/Out", icon: Timer },
+    { id: "time_tracking", label: "Time Tracking", icon: Timer },
     { id: "equipment", label: "Equipment", icon: Truck },
     { id: "forms", label: "Forms", icon: FileText },
     { id: "sops", label: "SOP Library", icon: BookOpen },
@@ -1321,20 +1321,20 @@ export default function AdminPanel() {
             <SelectGroup>
               <SelectLabel>People</SelectLabel>
               <SelectItem value="users">{t("nav.employees")}</SelectItem>
-              <SelectItem value="requests">HR Communications</SelectItem>
+              <SelectItem value="requests">Access Requests</SelectItem>
               <SelectItem value="agreements">Agreement Templates</SelectItem>
-              <SelectItem value="suggestions">Suggestions</SelectItem>
+              <SelectItem value="suggestions">Customer Suggestions</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>Settings</SelectLabel>
               <SelectItem value="company">Company Info &amp; Branding</SelectItem>
-              <SelectItem value="divisions">Divisions</SelectItem>
+              <SelectItem value="divisions">Division Colors</SelectItem>
               <SelectItem value="work-areas">Work Areas</SelectItem>
               <SelectItem value="service-types">Service Types</SelectItem>
               <SelectItem value="estimate-templates">Estimate Templates</SelectItem>
               <SelectItem value="terms">Terms &amp; Conditions</SelectItem>
-              <SelectItem value="quickbooks">QuickBooks Settings</SelectItem>
-              <SelectItem value="catalog-link">Materials Catalog</SelectItem>
+              <SelectItem value="quickbooks">QuickBooks Online</SelectItem>
+              <SelectItem value="catalog-link">Item Catalog</SelectItem>
               <SelectItem value="plant-cards-link">Plant Library</SelectItem>
               <SelectItem value="business-rules">Business Rules</SelectItem>
               <SelectItem value="automation-center">Automation Center</SelectItem>
@@ -1344,19 +1344,19 @@ export default function AdminPanel() {
             <SelectGroup>
               <SelectLabel>Content &amp; SOPs</SelectLabel>
               <SelectItem value="sop-pipeline">SOP Pipeline</SelectItem>
-              <SelectItem value="documents">Documents</SelectItem>
-              <SelectItem value="shared-links">Shared Links</SelectItem>
+              <SelectItem value="documents">Document Library</SelectItem>
+              <SelectItem value="shared-links">External Share Links</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>System &amp; Advanced</SelectLabel>
               <SelectItem value="admin-tools">Admin Tools</SelectItem>
-              <SelectItem value="todos">Task Access</SelectItem>
+              <SelectItem value="todos">To-Do User Management</SelectItem>
               <SelectItem value="assistant-agents">AI Assistant</SelectItem>
               <SelectItem value="ai-logs">AI Logs</SelectItem>
               {isMasterAdmin && <SelectItem value="ai-agents">AI Agents</SelectItem>}
               <SelectItem value="integration-wizard">Integration Wizard</SelectItem>
               <SelectItem value="process-auditor">Process Auditor</SelectItem>
-              <SelectItem value="help-reports">Help Reports</SelectItem>
+              <SelectItem value="help-reports">Article Reports</SelectItem>
               <SelectItem value="app-testing">App Testing</SelectItem>
               <SelectItem value="system-status">System Status</SelectItem>
               {isMasterAdmin && <SelectItem value="diagnostics">Diagnostics</SelectItem>}
@@ -1502,9 +1502,9 @@ export default function AdminPanel() {
               <div className="grid grid-cols-2 gap-px bg-border/30">
                 {([
                   { label: "User Management", desc: "Roles, access & permissions", icon: Users, tab: "users" },
-                  { label: "HR Communications", desc: "Messages & requests", icon: Megaphone, tab: "requests" },
+                  { label: "Access Requests", desc: "Messages & requests", icon: Megaphone, tab: "requests" },
                   { label: "Agreement Templates", desc: "Position-based agreements", icon: FileSignature, tab: "agreements" },
-                  { label: "Suggestions", desc: "Customer improvement ideas", icon: Lightbulb, tab: "suggestions" },
+                  { label: "Customer Suggestions", desc: "Customer improvement ideas", icon: Lightbulb, tab: "suggestions" },
                 ] as { label: string; desc: string; icon: any; tab: string }[]).map((item) => (
                   <button key={item.label} onClick={() => setActiveTab(item.tab)} data-testid={`admin-home-${item.tab}`}
                     className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">
@@ -1530,13 +1530,13 @@ export default function AdminPanel() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-border/30">
                 {([
                   { label: "Company Info & Branding", desc: "Name, logo, colors", icon: Building2, tab: "company" },
-                  { label: "Divisions", desc: "Business divisions", icon: Layers, tab: "divisions" },
+                  { label: "Division Colors", desc: "Business divisions", icon: Layers, tab: "divisions" },
                   { label: "Work Areas", desc: "Service zones", icon: Layers, href: "/admin/work-areas" },
                   { label: "Service Types", desc: "Job service categories", icon: Tag, href: "/admin/service-types" },
                   { label: "Estimate Templates", desc: "Default estimate types", icon: FileText, tab: "estimate-templates" },
                   { label: "Terms & Conditions", desc: "Legal terms", icon: FileSignature, tab: "terms" },
-                  { label: "QuickBooks Settings", desc: "QB connection settings", icon: DollarSign, tab: "quickbooks" },
-                  { label: "Materials Catalog", desc: "Materials & labor catalog", icon: BookOpen, href: "/catalog" },
+                  { label: "QuickBooks Online", desc: "QB connection settings", icon: DollarSign, tab: "quickbooks" },
+                  { label: "Item Catalog", desc: "Materials & labor catalog", icon: BookOpen, href: "/catalog" },
                   { label: "Plant Library", desc: "Plant card database", icon: Leaf, href: "/plant-cards" },
                   { label: "Business Rules", desc: "Financial, scheduling & workflow settings", icon: SlidersHorizontal, href: "/admin/business-rules" },
                   { label: "Automation Center", desc: "Turn on job, invoice & recurring job automations", icon: Zap, href: "/admin/automation-center" },
@@ -1567,8 +1567,8 @@ export default function AdminPanel() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-border/30">
                 {([
                   { label: "SOP Pipeline", desc: "Create & schedule SOPs", icon: Zap, tab: "sop-pipeline" },
-                  { label: "Documents", desc: "Shared file library", icon: FileText, tab: "documents" },
-                  { label: "Shared Links", desc: "External resource links", icon: ExternalLink, tab: "shared-links" },
+                  { label: "Document Library", desc: "Shared file library", icon: FileText, tab: "documents" },
+                  { label: "External Share Links", desc: "External resource links", icon: ExternalLink, tab: "shared-links" },
                 ] as { label: string; desc: string; icon: any; tab: string }[]).map((item) => (
                   <button key={item.label} onClick={() => setActiveTab(item.tab)} data-testid={`admin-home-${item.tab}`}
                     className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">
@@ -1605,14 +1605,14 @@ export default function AdminPanel() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-border/30">
                   {([
                     { label: "Admin Tools", desc: "Form builder & admin utilities", icon: Wrench, href: "/tools" },
-                    { label: "Task Access", desc: "Who can see tasks", icon: CheckCircle, tab: "todos" },
+                    { label: "To-Do User Management", desc: "Who can see tasks", icon: CheckCircle, tab: "todos" },
                     { label: "AI Assistant", desc: "AI assistant configuration", icon: Sparkles, tab: "assistant-agents" },
                     { label: "AI Logs", desc: "AI usage history", icon: Bot, tab: "ai-logs" },
                     { label: "Integration Wizard", desc: "Connect services", icon: Puzzle, tab: "integration-wizard" },
                     { label: "Process Auditor", desc: "Run process audits", icon: ClipboardCheck, tab: "process-auditor" },
-                    { label: "Help Reports", desc: "Reported help articles", icon: HelpCircle, tab: "help-reports" },
-                    { label: "CC Reconciliation", desc: "CompanyCam sync", icon: Camera, href: "/admin/companycam-reconciliation" },
-                    { label: "CC Webhook Health", desc: "Webhook status", icon: Activity, href: "/admin/companycam-health" },
+                    { label: "Article Reports", desc: "Reported help articles", icon: HelpCircle, tab: "help-reports" },
+                    { label: "CompanyCam Reconciliation Queue", desc: "CompanyCam sync", icon: Camera, href: "/admin/companycam-reconciliation" },
+                    { label: "CompanyCam Webhook Health", desc: "Webhook status", icon: Activity, href: "/admin/companycam-health" },
                     { label: "Customer Duplicates", desc: "Find duplicate records", icon: GitMerge, href: "/admin/customer-duplicates" },
                     { label: "App Testing", desc: "Internal testing tools", icon: Eye, tab: "app-testing" },
                     { label: "System Status", desc: "System diagnostics", icon: AlertCircle, tab: "system-status" },
