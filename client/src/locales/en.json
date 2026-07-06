@@ -38,7 +38,7 @@
     "estimates": "Estimates",
     "invoices": "Invoices",
     "dailyWorksheet": "Daily Worksheet",
-    "clockInOut": "Time Tracking",
+    "clockInOut": "Team Time Tracking",
     "consultations": "Consultations",
     "reports": "Reports",
     "morsBudget": "MORS Budget",
@@ -2194,7 +2194,7 @@
     "assignAnyway": "Assign Anyway"
   },
   "timeTracking": {
-    "title": "Time Tracking",
+    "title": "Team Time Tracking",
     "timeEntries": "Time Entries",
     "clockIn": "Clock In",
     "clockOut": "Clock Out",

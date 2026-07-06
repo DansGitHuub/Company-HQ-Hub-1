@@ -38,7 +38,7 @@
     "estimates": "Estimados",
     "invoices": "Facturas",
     "dailyWorksheet": "Hoja de Trabajo Diaria",
-    "clockInOut": "Marcar Entrada / Salida",
+    "clockInOut": "Seguimiento de Tiempo del Equipo",
     "consultations": "Consultas",
     "reports": "Reportes",
     "morsBudget": "Presupuesto MORS",
@@ -2194,7 +2194,7 @@
     "assignAnyway": "Asignar de todos modos"
   },
   "timeTracking": {
-    "title": "Seguimiento de Tiempo",
+    "title": "Seguimiento de Tiempo del Equipo",
     "timeEntries": "Entradas de Tiempo",
     "clockIn": "Entrada",
     "clockOut": "Salida",

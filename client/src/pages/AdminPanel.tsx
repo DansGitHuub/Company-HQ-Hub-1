@@ -1026,7 +1026,7 @@ export default function AdminPanel() {
     { id: "jobs", label: "Jobs", icon: LayoutDashboard },
     { id: "todos", label: "Tasks", icon: CheckSquare },
     { id: "scheduling", label: "Scheduling", icon: CalendarCheck },
-    { id: "time_tracking", label: "Time Tracking", icon: Timer },
+    { id: "time_tracking", label: "Team Time Tracking", icon: Timer },
     { id: "equipment", label: "Equipment", icon: Truck },
     { id: "forms", label: "Forms", icon: FileText },
     { id: "sops", label: "SOP Library", icon: BookOpen },
