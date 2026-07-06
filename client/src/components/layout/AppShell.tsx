@@ -428,7 +428,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sectionLabels: Record<string, string> = {
     "MY SPACE": t("nav.sections.mySpace"),
-    "MANAGER": "MANAGER",
     "SALES": t("nav.sections.sales"),
     "OPERATIONS": t("nav.sections.operations"),
     "RESOURCES": t("nav.sections.resources"),
@@ -437,9 +436,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarSections: NavSection[] = [
     { label: "MY SPACE", items: ["hq", "dashboard", "my_hours", "my_day", "messages"] },
-    { label: "MANAGER", items: ["manager_dashboard", "daily_plan"] },
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
-    { label: "OPERATIONS", items: ["todos", "work_orders", "scheduling", "time_tracking", "equipment"] },
+    { label: "OPERATIONS", items: ["manager_dashboard", "todos", "work_orders", "daily_plan", "scheduling", "time_tracking", "equipment"] },
     { label: "RESOURCES", items: ["sops", "education", "testing", "tools"] },
     { label: "ADMIN", items: ["admin", "employees", "vendors", "hiring", "invoices", "reports", "budget_settings", "customer_messages"] },
   ];
@@ -450,12 +448,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (!isAdmin) {
       const base = sidebarSections.filter(s => s.label !== "ADMIN");
       if (!isManager) {
-        // Crew (and other non-manager roles): hide Work Orders from OPERATIONS,
-        // hide Customers/Consultations/Estimates from SALES, and hide MANAGER section.
+        // Crew (and other non-manager roles): hide Work Orders, Manager Dashboard,
+        // and Daily Plan from OPERATIONS, and hide Customers/Consultations/Estimates from SALES.
         return base
-          .filter(s => s.label !== "MANAGER")
           .map(s => {
-            if (s.label === "OPERATIONS") return { ...s, items: s.items.filter(i => i !== "work_orders") };
+            if (s.label === "OPERATIONS") return { ...s, items: s.items.filter(i => !["work_orders", "manager_dashboard", "daily_plan"].includes(i)) };
             if (s.label === "SALES") return { ...s, items: s.items.filter(i => !["customers", "consultations", "estimates"].includes(i)) };
             return s;
           });
