@@ -219,7 +219,7 @@ export default function HQOverview() {
   return (
     <div className="space-y-4 max-w-5xl mx-auto pb-20">
       <section className="text-center space-y-4">
-        <h1 className="text-2xl font-heading font-bold text-foreground">{t("nav.companyHQ")}</h1>
+        <h1 className="text-2xl font-heading font-bold text-foreground">{t("nav.hqOverview")}</h1>
         <p className="text-sm text-muted-foreground max-w-2xl mx-auto">{t("hq.subtitle")}</p>
       </section>
 

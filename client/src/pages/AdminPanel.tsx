@@ -1350,6 +1350,9 @@ export default function AdminPanel() {
           if (v === "catalog-link") { navigate("/catalog"); return; }
           if (v === "plant-cards-link") { navigate("/plant-cards"); return; }
           if (v === "admin-tools") { navigate("/tools"); return; }
+          if (v === "business-rules") { navigate("/admin/business-rules"); return; }
+          if (v === "automation-center") { navigate("/admin/automation-center"); return; }
+          if (v === "feature-flags") { navigate("/admin/feature-flags"); return; }
           setActiveTab(v);
         }}>
           <SelectTrigger className="w-full" data-testid="admin-mobile-nav">
@@ -1384,9 +1387,13 @@ export default function AdminPanel() {
               <SelectItem value="catalog-link">Item Catalog</SelectItem>
               <SelectItem value="plant-cards-link">Plant Library</SelectItem>
               <SelectItem value="business-rules">Business Rules</SelectItem>
+              <SelectItem value="feedback-reports">Bug Reports & Feedback</SelectItem>
+              <SelectItem value="admin-tools">Admin Tools</SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>Automation &amp; Flags</SelectLabel>
               <SelectItem value="automation-center">Automation Center</SelectItem>
               <SelectItem value="feature-flags">Feature Flags</SelectItem>
-              <SelectItem value="feedback-reports">Bug Reports & Feedback</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>Content &amp; SOPs</SelectLabel>
@@ -1395,13 +1402,15 @@ export default function AdminPanel() {
               <SelectItem value="shared-links">External Share Links</SelectItem>
             </SelectGroup>
             <SelectGroup>
-              <SelectLabel>System &amp; Advanced</SelectLabel>
-              <SelectItem value="admin-tools">Admin Tools</SelectItem>
-              <SelectItem value="todos">To-Do User Management</SelectItem>
+              <SelectLabel>AI &amp; Automation Tools</SelectLabel>
               <SelectItem value="assistant-agents">Assistant Agents</SelectItem>
               <SelectItem value="ai-logs">Usage Summary</SelectItem>
               {isMasterAdmin && <SelectItem value="ai-agents">AI Agents</SelectItem>}
               <SelectItem value="integration-wizard">Integration Wizard</SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>System Health &amp; Data Quality</SelectLabel>
+              <SelectItem value="todos">To-Do User Management</SelectItem>
               <SelectItem value="process-auditor">Process Auditor</SelectItem>
               <SelectItem value="help-reports">Article Reports</SelectItem>
               <SelectItem value="app-testing">App Testing</SelectItem>
