@@ -173,13 +173,14 @@ export const allToolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = 
     type: "function",
     function: {
       name: "getJobs",
-      description: "Get jobs/pipeline records. Use when the user asks about jobs, projects, estimates, sold jobs, or scheduled work.",
+      description: "Get jobs/pipeline records. Use when the user asks about jobs, projects, estimates, sold jobs, or scheduled work. For questions about overdue jobs specifically, always set overdueOnly: true instead of trying to filter by stage.",
       parameters: {
         type: "object",
         properties: {
-          stage: { type: "string", description: "Filter by stage: Lead, Estimate, Sold, In Progress, Complete, Invoiced, Cancelled" },
+          stage: { type: "string", description: "Filter by sales-pipeline stage: Lead, Estimate, Sold, In Progress, Complete, Invoiced, Cancelled. Note: this is a legacy pipeline field and is often stale for jobs already in execution — do NOT use this to determine if a job is overdue." },
           scheduledToday: { type: "boolean", description: "If true, only return jobs scheduled for today." },
           category: { type: "string", description: "Filter by category: Install, Maintenance, Project, Service" },
+          overdueOnly: { type: "boolean", description: "If true, only return jobs that are overdue: scheduled_date is in the past and the job's operational status is scheduled, in_progress, sold, or active. This is the correct and only way to answer 'how many overdue jobs' questions — it matches the count shown on the admin Daily Pulse widget." },
         },
       },
     },
@@ -675,8 +676,8 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
         const isJobAdmin = ["Admin", "Manager", "Master Admin"].includes(user.role);
         // Non-admin roles: strip contract value and internal notes — these are admin-only in the UI
         const jobSelectCols = isJobAdmin
-          ? "id, client, type, category, stage, value, scheduled_date, completion_date, notes, zone"
-          : "id, client, type, category, stage, scheduled_date, zone";
+          ? "id, client, type, category, stage, status, value, scheduled_date, completion_date, notes, zone"
+          : "id, client, type, category, stage, status, scheduled_date, zone";
         let jobSql = `SELECT ${jobSelectCols} FROM jobs WHERE 1=1`;
         const jobParams: any[] = [];
         let jobIdx = 1;
@@ -688,6 +689,13 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
         if (toolArgs.stage) { jobSql += ` AND stage = $${jobIdx++}`; jobParams.push(toolArgs.stage); }
         if (toolArgs.category) { jobSql += ` AND category ILIKE $${jobIdx++}`; jobParams.push(toolArgs.category); }
         if (toolArgs.scheduledToday) { jobSql += ` AND scheduled_date::date = CURRENT_DATE`; }
+        if (toolArgs.overdueOnly) {
+          // Mirrors the "Overdue Jobs" definition used by the admin Daily Pulse widget
+          // (server/adminDashboardRoutes.ts) and Overdue.tsx/ManagerDashboard.tsx: uses the
+          // operational "status" column (not the legacy sales-pipeline "stage" column), which
+          // is often stale/unmaintained once a job moves into execution.
+          jobSql += ` AND scheduled_date IS NOT NULL AND DATE(scheduled_date) < CURRENT_DATE AND status IN ('scheduled', 'in_progress', 'sold', 'active')`;
+        }
 
         jobSql += ` ORDER BY scheduled_date ASC NULLS LAST, created_at DESC LIMIT 20`;
         const jobRes = await pool.query(jobSql, jobParams);

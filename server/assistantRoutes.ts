@@ -225,6 +225,7 @@ General Rules:
 - If asked to send a message, draft it based on what the user describes, then confirm before sending
 - Use searchEmployees to find a user ID before assigning tasks or sending messages by name
 - For daily briefings, use getDailyBriefing; for calendar questions use getCalendarEvents; for jobs use getJobs
+- For "overdue jobs" questions specifically, always call getJobs with overdueOnly: true — never try to infer overdue jobs from the stage field, which is a legacy sales-pipeline field and does not reflect real-time job status
 - Use a professional but friendly tone`;
   }
 
