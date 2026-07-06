@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { serveStaticFiles, serveStaticCatchAll } from "./static";
 import { createServer } from "http";
@@ -82,6 +83,10 @@ import { startAutomationScheduler } from "./automationScheduler";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Gzip-compress responses (JS/CSS/JSON/etc). Fixes missing content-encoding
+// on the ~6MB JS bundle and 300KB+ CSS bundle served to the browser.
+app.use(compression());
 
 declare module "http" {
   interface IncomingMessage {

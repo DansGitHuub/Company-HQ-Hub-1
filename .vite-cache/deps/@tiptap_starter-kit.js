@@ -1,12 +1,12 @@
 import {
+  Underline
+} from "./chunk-6HYXL3KM.js";
+import {
   BulletList,
   ListItem,
   ListKeymap,
   OrderedList
 } from "./chunk-45UJZLFL.js";
-import {
-  Underline
-} from "./chunk-6HYXL3KM.js";
 import {
   Decoration,
   DecorationSet,

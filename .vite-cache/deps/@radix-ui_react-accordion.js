@@ -1,16 +1,16 @@
 "use client";
 import {
-  createCollection
-} from "./chunk-XFNSWN4O.js";
-import {
-  useDirection
-} from "./chunk-TXGOA365.js";
-import {
   Content,
   Root,
   Trigger,
   createCollapsibleScope
 } from "./chunk-QTG3JFGT.js";
+import {
+  createCollection
+} from "./chunk-XFNSWN4O.js";
+import {
+  useDirection
+} from "./chunk-TXGOA365.js";
 import {
   useId
 } from "./chunk-WZMBE6OY.js";
