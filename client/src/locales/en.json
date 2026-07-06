@@ -2333,6 +2333,7 @@
     "undoFailed": "Undo failed",
     "undo": "Undo",
     "scheduleJob": "Schedule Job",
+    "scheduleAction": "Schedule",
     "dateLabel": "Date",
     "startTime": "Start Time",
     "endTime": "End Time",

@@ -2333,6 +2333,7 @@
     "undoFailed": "Error al deshacer",
     "undo": "Deshacer",
     "scheduleJob": "Programar Trabajo",
+    "scheduleAction": "Programar",
     "dateLabel": "Fecha",
     "startTime": "Hora de Inicio",
     "endTime": "Hora de Fin",

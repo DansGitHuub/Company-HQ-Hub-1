@@ -39,7 +39,7 @@ interface UnscheduledJob {
 }
 interface Employee { id: string; first_name: string; last_name: string; position?: string; }
 
-interface PendingDrop { jobId: string; date: string; hour: number; }
+interface PendingDrop { jobId: string; date: string; hour: number; viaClick?: boolean; }
 
 interface UndoPreviousState {
   was_scheduled: boolean;
@@ -289,6 +289,13 @@ export default function SchedulingCalendar() {
   const [crewConflicts, setCrewConflicts] = useState<CrewConflict[] | null>(null);
   const [checkingCrewOverlap, setCheckingCrewOverlap] = useState(false);
 
+  // ── Click-to-schedule day picker state ───────────────────────────────────
+  // Independent "week" cursor for the in-modal day picker, so navigating it
+  // never changes the week shown on the main calendar behind the dialog.
+  const [pickerWeekBase, setPickerWeekBase] = useState<Date>(() => new Date());
+  const pickerWeekStart = startOfWeek(pickerWeekBase, { weekStartsOn: 1 });
+  const pickerWeekDays  = Array.from({ length: 7 }, (_, i) => addDays(pickerWeekStart, i));
+
   // ── Undo state ────────────────────────────────────────────────────────────
   const UNDO_DURATION = 300;
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
@@ -366,6 +373,40 @@ export default function SchedulingCalendar() {
   const pendingJob = pendingDrop
     ? (calJobs.find(j => j.id === pendingDrop.jobId) ?? unscheduled.find(j => j.id === pendingDrop.jobId))
     : null;
+
+  // ── Click-to-schedule: opens the same "Schedule Job" dialog used by
+  // drag-and-drop, but with an editable day picker since there is no drop
+  // target to infer the date/hour from. Everything downstream (time/division/
+  // crew selects, confirmSchedule, doSchedule, scheduleMutation) is shared
+  // verbatim with the drag flow so behavior is identical either way.
+  const handleScheduleClick = useCallback((jobId: string) => {
+    const job = unscheduled.find(j => j.id === jobId) ?? null;
+
+    // Unscheduled jobs are, by definition, not currently scheduled — mirrors
+    // the "else" branch of handleDrop's previousStateRef setup.
+    previousStateRef.current = {
+      was_scheduled: false,
+      scheduled_date: null, scheduled_start_time: null,
+      scheduled_end_time: null, division: null, color: null, employee_ids: [],
+    };
+
+    const defaultDiv   = job?.division ?? "Maintenance";
+    const defaultColor = job?.color    ?? getDivisionColor(defaultDiv);
+
+    // Default the picker to the same week currently shown on the calendar,
+    // and preselect today if it falls within that week, else the week's Monday.
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const defaultDay = weekDays.find(d => format(d, "yyyy-MM-dd") === todayStr) ?? weekStart;
+
+    setPickerWeekBase(weekBase);
+    setModalStartHour(8);
+    setModalEndHour(10);
+    setModalDivision(defaultDiv);
+    setModalColor(defaultColor);
+    setSelectedEmpIds([]);
+    setCrewConflicts(null);
+    setPendingDrop({ jobId, date: format(defaultDay, "yyyy-MM-dd"), hour: 8, viaClick: true });
+  }, [unscheduled, weekBase, weekStart, weekDays]);
 
   function toggleEmp(empId: string) {
     setSelectedEmpIds(prev =>
@@ -549,6 +590,16 @@ export default function SchedulingCalendar() {
                     <span className="text-[10px] text-muted-foreground">{job.division}</span>
                   )}
                 </div>
+                {!isCrewReadOnly && (
+                  <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); handleScheduleClick(job.id); }}
+                    className="mt-1.5 w-full flex items-center justify-center gap-1 text-[10px] font-medium text-primary border border-primary/30 rounded-md py-1 hover:bg-primary/10 transition-colors"
+                    data-testid={`btn-schedule-${job.id}`}
+                  >
+                    <CalendarCheck className="h-3 w-3" /> {t("scheduleAction")}
+                  </button>
+                )}
               </div>
             );
           })}
@@ -846,12 +897,57 @@ export default function SchedulingCalendar() {
                 )}
               </div>
 
-              <div>
-                <Label className="text-xs">{t("dateLabel")}</Label>
-                <div className="mt-1 text-sm font-medium">
-                  {pendingDrop && format(parseISO(pendingDrop.date), "EEEE, MMMM d, yyyy")}
+              {pendingDrop?.viaClick ? (
+                <div>
+                  <Label className="text-xs">{t("dateLabel")}</Label>
+                  <div className="flex items-center justify-between mt-1 mb-2">
+                    <Button
+                      type="button" size="icon" variant="ghost" className="h-7 w-7"
+                      onClick={() => setPickerWeekBase(w => subWeeks(w, 1))}
+                      data-testid="btn-picker-prev-week"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {format(pickerWeekStart, "MMM d")} – {format(addDays(pickerWeekStart, 6), "MMM d, yyyy")}
+                    </span>
+                    <Button
+                      type="button" size="icon" variant="ghost" className="h-7 w-7"
+                      onClick={() => setPickerWeekBase(w => addWeeks(w, 1))}
+                      data-testid="btn-picker-next-week"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {pickerWeekDays.map(day => {
+                      const dayStr = format(day, "yyyy-MM-dd");
+                      const selected = pendingDrop.date === dayStr;
+                      return (
+                        <button
+                          key={dayStr}
+                          type="button"
+                          onClick={() => setPendingDrop(prev => prev ? { ...prev, date: dayStr } : prev)}
+                          className={`flex flex-col items-center rounded-md border py-1.5 text-xs transition-colors ${
+                            selected ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"
+                          }`}
+                          data-testid={`picker-day-${dayStr}`}
+                        >
+                          <span className="uppercase text-[9px] opacity-80">{format(day, "EEE")}</span>
+                          <span className="font-semibold">{format(day, "d")}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <Label className="text-xs">{t("dateLabel")}</Label>
+                  <div className="mt-1 text-sm font-medium">
+                    {pendingDrop && format(parseISO(pendingDrop.date), "EEEE, MMMM d, yyyy")}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
