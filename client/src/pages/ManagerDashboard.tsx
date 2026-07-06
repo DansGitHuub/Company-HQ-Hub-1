@@ -189,6 +189,17 @@ export default function ManagerDashboard() {
       fetch("/api/jobs?status=active,scheduled", { credentials: "include" }).then(r => r.json()),
   });
 
+  // Separate, broader fetch used only for the "Overdue Jobs" stat card below —
+  // matches the status set used by Overdue.tsx and the admin Daily Pulse widget
+  // (scheduled, in_progress, sold, active), which is wider than the "Active Jobs"
+  // stat/list above (active, scheduled only). Kept isolated so it doesn't affect
+  // the "Active Jobs" count or the job list section.
+  const { data: overdueScopeJobs = [] } = useQuery<Job[]>({
+    queryKey: ["/api/jobs", "scheduled,in_progress,sold,active"],
+    queryFn: () =>
+      fetch("/api/jobs?status=scheduled,in_progress,sold,active", { credentials: "include" }).then(r => r.json()),
+  });
+
   const { data: pendingCOs = [], isLoading: cosLoading } = useQuery<PendingCO[]>({
     queryKey: ["/api/manager/pending-change-orders"],
     refetchInterval: 120_000,
@@ -255,7 +266,7 @@ export default function ManagerDashboard() {
   ];
 
   const todayStart = startOfDay(new Date());
-  const overdueJobsCount = activeJobs.filter(j => {
+  const overdueJobsCount = overdueScopeJobs.filter(j => {
     if (!j.scheduled_date) return false;
     const d = parseISO(j.scheduled_date);
     return isValid(d) && startOfDay(d) < todayStart;
