@@ -321,7 +321,7 @@ export default function Home() {
                                   )}
                                   <Icon className="h-4 w-4 text-primary shrink-0" />
                                   <CardTitle className="text-sm truncate">
-                                    {def.label}
+                                    {t(def.labelKey)}
                                   </CardTitle>
                                 </div>
                                 {isEditing && (
@@ -401,9 +401,9 @@ export default function Home() {
                       <Icon className="h-4 w-4 text-primary" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">{def.label}</p>
+                      <p className="text-sm font-medium">{t(def.labelKey)}</p>
                       <p className="text-xs text-muted-foreground">
-                        {def.description}
+                        {t(def.descriptionKey)}
                       </p>
                     </div>
                     <Plus className="h-4 w-4 text-muted-foreground shrink-0" />

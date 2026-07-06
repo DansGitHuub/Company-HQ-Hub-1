@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,7 @@ interface WidgetProps {
 }
 
 function WidgetShell({ children, loading, error, href, emptyText }: { children: React.ReactNode; loading?: boolean; error?: boolean; href?: string; emptyText?: string }) {
+  const { t } = useTranslation();
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[80px]">
@@ -79,7 +81,7 @@ function WidgetShell({ children, loading, error, href, emptyText }: { children: 
     return (
       <div className="flex items-center justify-center h-full min-h-[80px] gap-1.5 text-xs text-destructive">
         <AlertTriangle className="h-4 w-4 shrink-0" />
-        <span>Failed to load</span>
+        <span>{t("dashboard.widgets.failedToLoad")}</span>
       </div>
     );
   }
@@ -89,7 +91,7 @@ function WidgetShell({ children, loading, error, href, emptyText }: { children: 
       {href && (
         <Link href={href}>
           <div className="flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer mt-2 pt-2 border-t" data-testid="widget-view-all">
-            View all <ArrowRight className="h-3 w-3" />
+            {t("dashboard.widgets.viewAll")} <ArrowRight className="h-3 w-3" />
           </div>
         </Link>
       )}
@@ -98,6 +100,7 @@ function WidgetShell({ children, loading, error, href, emptyText }: { children: 
 }
 
 export function MessagesWidget({ size }: WidgetProps) {
+  const { t } = useTranslation();
   // Use the same endpoint as the /messages page — /api/dm/conversations?folder=inbox
   const { data: threads = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/dm/conversations"],
@@ -117,11 +120,11 @@ export function MessagesWidget({ size }: WidgetProps) {
     <WidgetShell loading={isLoading} href="/messages">
       {unreadCount > 0 && (
         <div className="flex items-center gap-2 mb-2">
-          <Badge variant="destructive" className="text-xs">{unreadCount} unread</Badge>
+          <Badge variant="destructive" className="text-xs">{t("dashboard.widgets.messages.unreadCount", { count: unreadCount })}</Badge>
         </div>
       )}
       {recentThreads.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No messages yet</p>
+        <p className="text-sm text-muted-foreground">{t("dashboard.widgets.messages.noMessagesYet")}</p>
       ) : (
         <div className="space-y-2">
           {recentThreads.map((thread: any) => (
@@ -165,6 +168,7 @@ const KANBAN_COLUMNS = [
 ];
 
 function TaskCard({ task }: { task: any }) {
+  const { t } = useTranslation();
   const isOverdue = task.dueDate && task.status !== "completed" && task.status !== "cancelled"
     && new Date(task.dueDate) < new Date();
 
@@ -177,13 +181,13 @@ function TaskCard({ task }: { task: any }) {
       <div className="flex flex-wrap items-center gap-1.5">
         {task.priority && (
           <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold text-white ${PRIORITY_COLORS[task.priority] || "bg-gray-400"}`}>
-            {PRIORITY_LABELS[task.priority] || task.priority}
+            {t(`dashboard.widgets.tasks.priority.${task.priority}`, { defaultValue: PRIORITY_LABELS[task.priority] || task.priority })}
           </span>
         )}
         {task.dueDate && (
           <span className={`flex items-center gap-0.5 text-[10px] ${isOverdue ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
             <Clock className="h-2.5 w-2.5" />
-            {isOverdue ? "Overdue" : new Date(task.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            {isOverdue ? t("dashboard.widgets.tasks.overdueLabel") : new Date(task.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           </span>
         )}
       </div>
@@ -198,6 +202,7 @@ function TaskCard({ task }: { task: any }) {
 }
 
 function TasksBoardPanel() {
+  const { t } = useTranslation();
   // /api/tasks/assigned returns only tasks assigned to the current user (server-side filtered).
   const { data: assignedTasks = [], isLoading: loadingAssigned } = useQuery<any[]>({ queryKey: ["/api/tasks/assigned"] });
   const { user } = useAuth();
@@ -221,16 +226,16 @@ function TasksBoardPanel() {
   return (
     <div className="h-full flex flex-col gap-3 p-4 overflow-hidden">
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-sm text-muted-foreground">{allTasks.length} total tasks</span>
+        <span className="text-sm text-muted-foreground">{t("dashboard.widgets.tasks.totalTasksCount", { count: allTasks.length })}</span>
         {overdueTasks.length > 0 && (
           <Badge variant="destructive" className="text-xs gap-1">
-            <AlertTriangle className="h-3 w-3" /> {overdueTasks.length} overdue
+            <AlertTriangle className="h-3 w-3" /> {t("dashboard.widgets.tasks.overdueCount", { count: overdueTasks.length })}
           </Badge>
         )}
         <div className="ml-auto">
           <Link href="/todos">
             <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7" data-testid="open-full-tasks-page">
-              <ExternalLink className="h-3 w-3" /> Open Full Tasks Page
+              <ExternalLink className="h-3 w-3" /> {t("dashboard.widgets.tasks.openFullTasksPage")}
             </Button>
           </Link>
         </div>
@@ -245,14 +250,14 @@ function TasksBoardPanel() {
               <div key={col.id} className={`flex flex-col rounded-xl border-t-2 ${col.color} ${col.bg} flex-1 min-w-[200px] overflow-hidden`}>
                 <div className="px-3 pt-3 pb-2 flex items-center gap-2">
                   <Icon className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{col.label}</span>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t(`dashboard.widgets.tasks.columns.${col.id}`, { defaultValue: col.label })}</span>
                   <Badge variant="secondary" className="ml-auto text-[10px] h-4 min-w-[18px] flex items-center justify-center px-1">
                     {colTasks.length}
                   </Badge>
                 </div>
                 <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-2">
                   {colTasks.length === 0 ? (
-                    <p className="text-[11px] text-muted-foreground text-center py-4 italic">No tasks</p>
+                    <p className="text-[11px] text-muted-foreground text-center py-4 italic">{t("dashboard.widgets.tasks.noTasks")}</p>
                   ) : (
                     colTasks.map(task => <TaskCard key={task.id} task={task} />)
                   )}
@@ -267,6 +272,7 @@ function TasksBoardPanel() {
 }
 
 export function TodosWidget({ size }: WidgetProps) {
+  const { t } = useTranslation();
   const [boardOpen, setBoardOpen] = useState(false);
   const { user } = useAuth();
 
@@ -290,20 +296,20 @@ export function TodosWidget({ size }: WidgetProps) {
     <>
       <div className="h-full flex flex-col gap-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-muted-foreground font-medium">{active.length} active</span>
+          <span className="text-xs text-muted-foreground font-medium">{t("dashboard.widgets.tasks.activeCount", { count: active.length })}</span>
           {inProgress.length > 0 && (
             <Badge className="text-[10px] gap-0.5 px-1.5 h-4 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20" variant="outline">
-              <Play className="h-2.5 w-2.5" /> {inProgress.length} in progress
+              <Play className="h-2.5 w-2.5" /> {t("dashboard.widgets.tasks.inProgressCount", { count: inProgress.length })}
             </Badge>
           )}
           {overdue.length > 0 && (
             <Badge variant="destructive" className="text-[10px] gap-0.5 px-1.5 h-4">
-              <AlertTriangle className="h-2.5 w-2.5" /> {overdue.length} overdue
+              <AlertTriangle className="h-2.5 w-2.5" /> {t("dashboard.widgets.tasks.overdueCount", { count: overdue.length })}
             </Badge>
           )}
           {dueToday.length > 0 && overdue.length === 0 && (
             <Badge className="text-[10px] gap-0.5 px-1.5 h-4 bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20" variant="outline">
-              <Clock className="h-2.5 w-2.5" /> {dueToday.length} due today
+              <Clock className="h-2.5 w-2.5" /> {t("dashboard.widgets.tasks.dueTodayCount", { count: dueToday.length })}
             </Badge>
           )}
         </div>
@@ -313,7 +319,7 @@ export function TodosWidget({ size }: WidgetProps) {
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         ) : previewTasks.length === 0 ? (
-          <p className="text-sm text-muted-foreground flex-1 flex items-center">All caught up!</p>
+          <p className="text-sm text-muted-foreground flex-1 flex items-center">{t("dashboard.widgets.tasks.allCaughtUp")}</p>
         ) : (
           <div className="flex-1 space-y-1 min-h-0 overflow-hidden">
             {previewTasks.map((task: any) => {
@@ -339,7 +345,7 @@ export function TodosWidget({ size }: WidgetProps) {
           className="flex items-center justify-center gap-1.5 w-full mt-1 pt-2 border-t text-xs text-primary hover:text-primary/80 transition-colors font-medium"
           data-testid="open-tasks-board"
         >
-          <Maximize2 className="h-3 w-3" /> Open Task Board
+          <Maximize2 className="h-3 w-3" /> {t("dashboard.widgets.tasks.openTaskBoard")}
         </button>
       </div>
 
@@ -350,7 +356,7 @@ export function TodosWidget({ size }: WidgetProps) {
         >
           <DialogHeader className="px-5 py-3 border-b shrink-0 flex-row items-center gap-3">
             <ListChecks className="h-5 w-5 text-primary shrink-0" />
-            <DialogTitle className="text-base font-semibold">Task Board</DialogTitle>
+            <DialogTitle className="text-base font-semibold">{t("dashboard.widgets.tasks.taskBoardTitle")}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-hidden">
             <TasksBoardPanel />
@@ -362,6 +368,7 @@ export function TodosWidget({ size }: WidgetProps) {
 }
 
 export function PipelineWidget({ size }: WidgetProps) {
+  const { t } = useTranslation();
   const { data: jobs = [], isLoading, isError } = useQuery<any[]>({
     queryKey: ["/api/jobs"],
   });
@@ -376,7 +383,7 @@ export function PipelineWidget({ size }: WidgetProps) {
   return (
     <WidgetShell loading={isLoading} error={isError} href="/jobs">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-xs text-muted-foreground">{jobs.length} jobs</span>
+        <span className="text-xs text-muted-foreground">{t("dashboard.widgets.pipeline.jobsCount", { count: jobs.length })}</span>
         {totalValue > 0 && (
           <span className="text-xs font-medium text-green-600">${totalValue.toLocaleString()}</span>
         )}
@@ -384,7 +391,7 @@ export function PipelineWidget({ size }: WidgetProps) {
       <div className="space-y-1.5">
         {stageCounts.filter(s => s.count > 0 || size !== "small").slice(0, size === "small" ? 4 : 5).map((s) => (
           <div key={s.stage} className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">{s.stage}</span>
+            <span className="text-muted-foreground">{t(`dashboard.widgets.pipeline.stages.${s.stage}`, { defaultValue: s.stage })}</span>
             <Badge variant="secondary" className="text-xs px-1.5 min-w-[24px] justify-center">{s.count}</Badge>
           </div>
         ))}
@@ -394,25 +401,22 @@ export function PipelineWidget({ size }: WidgetProps) {
 }
 
 export function EstimatesWidget({ size }: WidgetProps) {
+  const { t } = useTranslation();
   const { data: estimates = [], isLoading, isError } = useQuery<any[]>({
     queryKey: ["/api/estimates"],
   });
 
   const statuses = ["draft", "sent", "viewed", "approved", "declined", "converted"];
-  const statusLabels: Record<string, string> = {
-    draft: "Draft", sent: "Sent", viewed: "Viewed",
-    approved: "Approved", declined: "Declined", converted: "Converted",
-  };
   const statusCounts = statuses.map(status => ({
     status,
-    label: statusLabels[status] ?? status,
+    label: t(`dashboard.widgets.estimates.status.${status}`, { defaultValue: status }),
     count: estimates.filter((e: any) => e.status === status).length,
   }));
 
   return (
     <WidgetShell loading={isLoading} error={isError} href="/estimates">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-xs text-muted-foreground">{estimates.length} estimates</span>
+        <span className="text-xs text-muted-foreground">{t("dashboard.widgets.estimates.estimatesCount", { count: estimates.length })}</span>
       </div>
       <div className="space-y-1.5">
         {statusCounts.filter(s => s.count > 0 || size !== "small").slice(0, size === "small" ? 4 : 6).map((s) => (
@@ -430,6 +434,7 @@ export function EstimatesWidget({ size }: WidgetProps) {
 // drawer uses; filter + limit client-side.  Falls back to empty silently when
 // Google Calendar is not connected (HTTP 401).
 export function CalendarWidget({ size }: WidgetProps) {
+  const { t } = useTranslation();
   const limit = size === "small" ? 3 : size === "medium" ? 5 : 8;
 
   // Stable day-granularity key so the query doesn't re-fire on every render.
@@ -462,7 +467,7 @@ export function CalendarWidget({ size }: WidgetProps) {
   return (
     <WidgetShell loading={isLoading} href="/calendar">
       {upcoming.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No upcoming events</p>
+        <p className="text-sm text-muted-foreground">{t("dashboard.widgets.calendar.noUpcomingEvents")}</p>
       ) : (
         <div className="space-y-2">
           {upcoming.map((event: any) => {
@@ -472,11 +477,11 @@ export function CalendarWidget({ size }: WidgetProps) {
               <div key={event?.id} className="flex items-start gap-2 text-sm">
                 <Calendar className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-medium">{event?.title ?? "Event"}</p>
+                  <p className="truncate text-xs font-medium">{event?.title ?? t("dashboard.widgets.calendar.event")}</p>
                   <p className="text-[10px] text-muted-foreground">
                     {valid
                       ? `${start.toLocaleDateString()} ${start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                      : "All day"}
+                      : t("dashboard.widgets.calendar.allDay")}
                   </p>
                 </div>
               </div>
@@ -956,14 +961,14 @@ const COLOR_SWATCHES: Record<string, string> = {
   teal:    "bg-teal-500",
 };
 
-function formatReminderDate(dt: string | null): string {
+function formatReminderDate(dt: string | null, t: (key: string, opts?: any) => string): string {
   if (!dt) return "";
   const d = new Date(dt);
   const now = new Date();
   const diff = d.getTime() - now.getTime();
-  if (diff < 0) return "Past reminder";
-  if (diff < 60 * 60 * 1000) return `In ${Math.round(diff / 60000)}m`;
-  if (diff < 24 * 60 * 60 * 1000) return `In ${Math.round(diff / 3600000)}h`;
+  if (diff < 0) return t("dashboard.widgets.notes.pastReminder");
+  if (diff < 60 * 60 * 1000) return t("dashboard.widgets.notes.inMinutes", { count: Math.round(diff / 60000) });
+  if (diff < 24 * 60 * 60 * 1000) return t("dashboard.widgets.notes.inHours", { count: Math.round(diff / 3600000) });
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
@@ -980,6 +985,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }: {
   onDelete: () => void;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   const [title, setTitle]     = useState(note?.title || "");
   const [body, setBody]       = useState(note?.body || "");
   const [color, setColor]     = useState(note?.color || "default");
@@ -1011,24 +1017,24 @@ function NoteEditor({ note, onSave, onDelete, onBack }: {
           {Object.entries(COLOR_SWATCHES).map(([key, cls]) => (
             <button key={key} onClick={() => setColor(key)}
               className={`h-5 w-5 rounded-full ${cls} transition-all ${color === key ? "ring-2 ring-offset-1 ring-foreground scale-110" : "hover:scale-105"}`}
-              title={NOTE_COLORS[key]?.label} data-testid={`color-swatch-${key}`} />
+              title={t(`dashboard.widgets.notes.colors.${key}`, { defaultValue: NOTE_COLORS[key]?.label })} data-testid={`color-swatch-${key}`} />
           ))}
         </div>
         <div className="ml-auto flex items-center gap-1">
           <button onClick={() => setIsPinned(!isPinned)}
             className={`p-1.5 rounded hover:bg-muted transition-colors ${isPinned ? "text-primary" : "text-muted-foreground"}`}
-            title={isPinned ? "Unpin" : "Pin"} data-testid="note-pin-toggle">
+            title={isPinned ? t("dashboard.widgets.notes.unpin") : t("dashboard.widgets.notes.pin")} data-testid="note-pin-toggle">
             {isPinned ? <Pin className="h-3.5 w-3.5" /> : <PinOff className="h-3.5 w-3.5" />}
           </button>
           {note?.id && (
             <button onClick={onDelete}
               className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-              title="Delete note" data-testid="note-delete">
+              title={t("dashboard.widgets.notes.deleteNote")} data-testid="note-delete">
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
           <Button size="sm" className="h-7 gap-1 text-xs" onClick={handleSave} data-testid="note-save">
-            <Save className="h-3 w-3" /> Save
+            <Save className="h-3 w-3" /> {t("dashboard.widgets.notes.save")}
           </Button>
         </div>
       </div>
@@ -1037,7 +1043,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }: {
         <input
           value={title}
           onChange={e => setTitle(e.target.value)}
-          placeholder="Title"
+          placeholder={t("dashboard.widgets.notes.titlePlaceholder")}
           className="w-full bg-transparent text-lg font-semibold border-none outline-none placeholder:text-muted-foreground/60"
           data-testid="note-title-input"
         />
@@ -1045,7 +1051,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }: {
           <RichTextEditor
             value={body}
             onChange={setBody}
-            placeholder="Write your note…"
+            placeholder={t("dashboard.widgets.notes.bodyPlaceholder")}
             minHeight="200px"
           />
         </div>
@@ -1080,7 +1086,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }: {
                 value={tagInput}
                 onChange={e => setTagInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(); } }}
-                placeholder="Add tag…"
+                placeholder={t("dashboard.widgets.notes.addTagPlaceholder")}
                 className="text-xs bg-transparent border-none outline-none placeholder:text-muted-foreground/50 min-w-[60px] flex-1"
                 data-testid="note-tag-input"
               />
@@ -1099,6 +1105,7 @@ function NoteCard({ note, onClick, onPin, onArchive, onDelete }: {
   onArchive: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
   const colors = NOTE_COLORS[note.color] || NOTE_COLORS.default;
   const isPast = note.reminderAt && new Date(note.reminderAt) < new Date();
@@ -1129,7 +1136,7 @@ function NoteCard({ note, onClick, onPin, onArchive, onDelete }: {
         <div className="flex flex-wrap items-center gap-1 mt-2">
           {note.reminderAt && (
             <span className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${isPast ? "bg-destructive/10 text-destructive" : "bg-blue-500/10 text-blue-600 dark:text-blue-400"}`}>
-              <AlarmClock className="h-2.5 w-2.5" /> {formatReminderDate(note.reminderAt)}
+              <AlarmClock className="h-2.5 w-2.5" /> {formatReminderDate(note.reminderAt, t)}
             </span>
           )}
           {note.tags.slice(0, 3).map(t => (
@@ -1141,13 +1148,13 @@ function NoteCard({ note, onClick, onPin, onArchive, onDelete }: {
       {hovered && (
         <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-background/90 backdrop-blur-sm rounded-lg shadow px-1 py-0.5 border"
           onClick={e => e.stopPropagation()}>
-          <button onClick={onPin} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors" title={note.isPinned ? "Unpin" : "Pin"}>
+          <button onClick={onPin} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors" title={note.isPinned ? t("dashboard.widgets.notes.unpin") : t("dashboard.widgets.notes.pin")}>
             {note.isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
           </button>
-          <button onClick={onArchive} className="p-1 rounded hover:bg-muted text-muted-foreground transition-colors" title="Archive">
+          <button onClick={onArchive} className="p-1 rounded hover:bg-muted text-muted-foreground transition-colors" title={t("dashboard.widgets.notes.archive")}>
             <Archive className="h-3 w-3" />
           </button>
-          <button onClick={onDelete} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-colors" title="Delete">
+          <button onClick={onDelete} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-colors" title={t("dashboard.widgets.notes.delete")}>
             <Trash2 className="h-3 w-3" />
           </button>
         </div>
@@ -1157,6 +1164,7 @@ function NoteCard({ note, onClick, onPin, onArchive, onDelete }: {
 }
 
 function NotesPanel() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [search, setSearch]   = useState("");
   const [filter, setFilter]   = useState<"all" | "pinned" | "reminders" | "archived">("all");
@@ -1210,10 +1218,10 @@ function NotesPanel() {
   };
 
   const FILTERS = [
-    { id: "all",       label: "All"       },
-    { id: "pinned",    label: "Pinned"    },
-    { id: "reminders", label: "Reminders" },
-    { id: "archived",  label: "Archived"  },
+    { id: "all",       label: t("dashboard.widgets.notes.filters.all")       },
+    { id: "pinned",    label: t("dashboard.widgets.notes.filters.pinned")    },
+    { id: "reminders", label: t("dashboard.widgets.notes.filters.reminders") },
+    { id: "archived",  label: t("dashboard.widgets.notes.filters.archived") },
   ] as const;
 
   if (editing !== null) {
@@ -1236,13 +1244,13 @@ function NotesPanel() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search notes…"
+              placeholder={t("dashboard.widgets.notes.searchPlaceholder")}
               className="w-full pl-8 pr-3 py-1.5 text-sm bg-muted/50 border border-border rounded-lg outline-none focus:ring-1 focus:ring-primary"
               data-testid="notes-search"
             />
           </div>
           <Button size="sm" className="h-8 gap-1.5 shrink-0" onClick={() => setEditing("new")} data-testid="new-note-button">
-            <Plus className="h-3.5 w-3.5" /> New Note
+            <Plus className="h-3.5 w-3.5" /> {t("dashboard.widgets.notes.newNote")}
           </Button>
         </div>
         <div className="flex gap-1">
@@ -1264,7 +1272,7 @@ function NotesPanel() {
         ) : displayNotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2">
             <StickyNote className="h-8 w-8 opacity-30" />
-            <p className="text-sm">{search ? "No notes match your search" : filter === "archived" ? "No archived notes" : "No notes yet — create your first!"}</p>
+            <p className="text-sm">{search ? t("dashboard.widgets.notes.noSearchResults") : filter === "archived" ? t("dashboard.widgets.notes.noArchivedNotes") : t("dashboard.widgets.notes.noNotesYet")}</p>
           </div>
         ) : (
           <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-3 space-y-3">
@@ -1275,7 +1283,7 @@ function NotesPanel() {
                   onClick={() => setEditing(note)}
                   onPin={() => updateMutation.mutate({ id: note.id, data: { isPinned: !note.isPinned } })}
                   onArchive={() => updateMutation.mutate({ id: note.id, data: { isArchived: true } })}
-                  onDelete={() => { if (confirm("Delete this note?")) deleteMutation.mutate(note.id); }}
+                  onDelete={() => { if (confirm(t("dashboard.widgets.notes.deleteConfirm"))) deleteMutation.mutate(note.id); }}
                 />
               </div>
             ))}
@@ -1287,6 +1295,7 @@ function NotesPanel() {
 }
 
 export function NotesWidget({ size }: WidgetProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -1307,15 +1316,15 @@ export function NotesWidget({ size }: WidgetProps) {
     <>
       <div className="h-full flex flex-col gap-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-muted-foreground font-medium">{notes.filter((n: Note) => !n.isArchived).length} notes</span>
+          <span className="text-xs text-muted-foreground font-medium">{t("dashboard.widgets.notes.notesCount", { count: notes.filter((n: Note) => !n.isArchived).length })}</span>
           {pinned.length > 0 && (
             <Badge variant="outline" className="text-[10px] gap-0.5 px-1.5 h-4">
-              <Pin className="h-2.5 w-2.5" /> {pinned.length} pinned
+              <Pin className="h-2.5 w-2.5" /> {t("dashboard.widgets.notes.pinnedCount", { count: pinned.length })}
             </Badge>
           )}
           {reminders.length > 0 && (
             <Badge className="text-[10px] gap-0.5 px-1.5 h-4 bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20" variant="outline">
-              <AlarmClock className="h-2.5 w-2.5" /> {reminders.length} reminder{reminders.length > 1 ? "s" : ""}
+              <AlarmClock className="h-2.5 w-2.5" /> {t("dashboard.widgets.notes.reminderCount", { count: reminders.length })}
             </Badge>
           )}
         </div>
@@ -1327,7 +1336,7 @@ export function NotesWidget({ size }: WidgetProps) {
         ) : previewNotes.length === 0 ? (
           <button onClick={() => setOpen(true)} className="flex-1 flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground transition-colors group">
             <StickyNote className="h-6 w-6 opacity-40 group-hover:opacity-60" />
-            <p className="text-xs">Tap to add your first note</p>
+            <p className="text-xs">{t("dashboard.widgets.notes.tapToAddFirst")}</p>
           </button>
         ) : (
           <div className="flex-1 space-y-1.5 min-h-0 overflow-hidden">
@@ -1339,7 +1348,7 @@ export function NotesWidget({ size }: WidgetProps) {
                   data-testid={`notepad-preview-${note.id}`}>
                   <div className="flex items-center gap-1.5">
                     {note.isPinned && <Pin className="h-2.5 w-2.5 text-primary shrink-0" />}
-                    <p className="text-xs font-medium truncate flex-1">{note.title || note.body?.slice(0, 40) || "Empty note"}</p>
+                    <p className="text-xs font-medium truncate flex-1">{note.title || note.body?.slice(0, 40) || t("dashboard.widgets.notes.emptyNote")}</p>
                     {note.reminderAt && <AlarmClock className="h-2.5 w-2.5 text-blue-500 shrink-0" />}
                   </div>
                 </button>
@@ -1353,7 +1362,7 @@ export function NotesWidget({ size }: WidgetProps) {
           className="flex items-center justify-center gap-1.5 w-full mt-1 pt-2 border-t text-xs text-primary hover:text-primary/80 transition-colors font-medium"
           data-testid="open-notepad"
         >
-          <Maximize2 className="h-3 w-3" /> Open Notepad
+          <Maximize2 className="h-3 w-3" /> {t("dashboard.widgets.notes.openNotepad")}
         </button>
       </div>
 
@@ -1361,7 +1370,7 @@ export function NotesWidget({ size }: WidgetProps) {
         <DialogContent className="max-w-[97vw] w-[97vw] h-[93vh] max-h-[93vh] p-0 flex flex-col gap-0 overflow-hidden" data-testid="notepad-dialog">
           <DialogHeader className="px-5 py-3 border-b shrink-0 flex-row items-center gap-3">
             <StickyNote className="h-5 w-5 text-primary shrink-0" />
-            <DialogTitle className="text-base font-semibold">My Notepad</DialogTitle>
+            <DialogTitle className="text-base font-semibold">{t("dashboard.widgets.notes.myNotepad")}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-hidden">
             <NotesPanel />

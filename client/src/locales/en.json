@@ -352,7 +352,164 @@
     "recentMessages": "Recent Messages",
     "openTasks": "Open Tasks",
     "viewCalendar": "View Calendar",
-    "viewMessages": "View Messages"
+    "viewMessages": "View Messages",
+    "widgets": {
+      "viewAll": "View all",
+      "failedToLoad": "Failed to load",
+      "titles": {
+        "messages": "Messages",
+        "todos": "Tasks",
+        "pipeline": "Work Pipeline",
+        "estimates": "Estimates",
+        "calendar": "Calendar",
+        "equipment": "Equipment",
+        "marketing": "Marketing",
+        "employees": "Team",
+        "sops": "SOPs",
+        "quizzes": "Quizzes",
+        "suggestions": "Suggestions",
+        "tools": "Quick Links",
+        "companyhq": "Company HQ",
+        "help": "Help Center",
+        "devtracker": "Dev Tracker",
+        "soppipeline": "SOP Pipeline",
+        "notes": "Quick Notes",
+        "dailyagenda": "Daily Agenda",
+        "hiring": "Hiring"
+      },
+      "descriptions": {
+        "messages": "Recent inbox messages",
+        "todos": "Live task board — click to open full Kanban view",
+        "pipeline": "Sold jobs by stage",
+        "estimates": "Estimate pipeline summary",
+        "calendar": "Upcoming events and schedule",
+        "equipment": "Fleet status and alerts",
+        "marketing": "Campaign performance stats",
+        "employees": "Employee quick view",
+        "sops": "Standard operating procedures",
+        "quizzes": "Training and knowledge tests",
+        "suggestions": "Customer improvement ideas",
+        "tools": "Shortcuts to tools and pages",
+        "companyhq": "Mission, vision and goals",
+        "help": "FAQs and support links",
+        "devtracker": "Development status and feature tracker",
+        "soppipeline": "AI-generated SOP pipeline status and queue",
+        "notes": "Personal notepad with reminders — voice or type to add notes",
+        "dailyagenda": "Plan your day — to-dos, calls, leads, delegate, equipment, and more",
+        "hiring": "New applications awaiting review"
+      },
+      "messages": {
+        "noMessagesYet": "No messages yet",
+        "unreadCount_one": "{{count}} unread",
+        "unreadCount_other": "{{count}} unread"
+      },
+      "tasks": {
+        "activeCount_one": "{{count}} active",
+        "activeCount_other": "{{count}} active",
+        "inProgressCount_one": "{{count}} in progress",
+        "inProgressCount_other": "{{count}} in progress",
+        "overdueCount_one": "{{count}} overdue",
+        "overdueCount_other": "{{count}} overdue",
+        "dueTodayCount_one": "{{count}} due today",
+        "dueTodayCount_other": "{{count}} due today",
+        "allCaughtUp": "All caught up!",
+        "openTaskBoard": "Open Task Board",
+        "taskBoardTitle": "Task Board",
+        "totalTasksCount_one": "{{count}} total task",
+        "totalTasksCount_other": "{{count}} total tasks",
+        "openFullTasksPage": "Open Full Tasks Page",
+        "noTasks": "No tasks",
+        "overdueLabel": "Overdue",
+        "columns": {
+          "todo": "To Do",
+          "assigned": "Assigned",
+          "acknowledged": "Acknowledged",
+          "in_progress": "In Progress",
+          "on_hold": "On Hold",
+          "completed": "Completed"
+        },
+        "priority": {
+          "p1_urgent": "Urgent",
+          "p2_high": "High",
+          "p3_normal": "Normal",
+          "p4_low": "Low"
+        }
+      },
+      "pipeline": {
+        "jobsCount_one": "{{count}} job",
+        "jobsCount_other": "{{count}} jobs",
+        "stages": {
+          "Lead": "Lead",
+          "Proposed": "Proposed",
+          "Approved": "Approved",
+          "In Progress": "In Progress",
+          "Completed": "Completed"
+        }
+      },
+      "estimates": {
+        "estimatesCount_one": "{{count}} estimate",
+        "estimatesCount_other": "{{count}} estimates",
+        "status": {
+          "draft": "Draft",
+          "sent": "Sent",
+          "viewed": "Viewed",
+          "approved": "Approved",
+          "declined": "Declined",
+          "converted": "Converted"
+        }
+      },
+      "calendar": {
+        "noUpcomingEvents": "No upcoming events",
+        "event": "Event",
+        "allDay": "All day"
+      },
+      "notes": {
+        "pinnedCount_one": "{{count}} pinned",
+        "pinnedCount_other": "{{count}} pinned",
+        "reminderCount_one": "{{count}} reminder",
+        "reminderCount_other": "{{count}} reminders",
+        "tapToAddFirst": "Tap to add your first note",
+        "emptyNote": "Empty note",
+        "openNotepad": "Open Notepad",
+        "myNotepad": "My Notepad",
+        "notesCount_one": "{{count}} note",
+        "notesCount_other": "{{count}} notes",
+        "newNote": "New Note",
+        "searchPlaceholder": "Search notes…",
+        "noSearchResults": "No notes match your search",
+        "noArchivedNotes": "No archived notes",
+        "noNotesYet": "No notes yet — create your first!",
+        "deleteConfirm": "Delete this note?",
+        "filters": {
+          "all": "All",
+          "pinned": "Pinned",
+          "reminders": "Reminders",
+          "archived": "Archived"
+        },
+        "titlePlaceholder": "Title",
+        "bodyPlaceholder": "Write your note…",
+        "addTagPlaceholder": "Add tag…",
+        "unpin": "Unpin",
+        "pin": "Pin",
+        "deleteNote": "Delete note",
+        "archive": "Archive",
+        "delete": "Delete",
+        "save": "Save",
+        "pastReminder": "Past reminder",
+        "inMinutes": "In {{count}}m",
+        "inHours": "In {{count}}h",
+        "colors": {
+          "default": "Default",
+          "yellow": "Yellow",
+          "green": "Green",
+          "blue": "Blue",
+          "purple": "Purple",
+          "red": "Red",
+          "orange": "Orange",
+          "teal": "Teal"
+        }
+      }
+    }
   },
   "profile": {
     "title": "My Profile",

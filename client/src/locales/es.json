@@ -352,7 +352,164 @@
     "recentMessages": "Mensajes Recientes",
     "openTasks": "Tareas Abiertas",
     "viewCalendar": "Ver Calendario",
-    "viewMessages": "Ver Mensajes"
+    "viewMessages": "Ver Mensajes",
+    "widgets": {
+      "viewAll": "Ver todo",
+      "failedToLoad": "Error al cargar",
+      "titles": {
+        "messages": "Mensajes",
+        "todos": "Tareas",
+        "pipeline": "Flujo de Trabajo",
+        "estimates": "Presupuestos",
+        "calendar": "Calendario",
+        "equipment": "Equipos",
+        "marketing": "Marketing",
+        "employees": "Equipo",
+        "sops": "POEs",
+        "quizzes": "Cuestionarios",
+        "suggestions": "Sugerencias",
+        "tools": "Enlaces Rápidos",
+        "companyhq": "Central de la Empresa",
+        "help": "Centro de Ayuda",
+        "devtracker": "Seguimiento de Desarrollo",
+        "soppipeline": "Flujo de POEs",
+        "notes": "Notas Rápidas",
+        "dailyagenda": "Agenda Diaria",
+        "hiring": "Contratación"
+      },
+      "descriptions": {
+        "messages": "Mensajes recientes de la bandeja de entrada",
+        "todos": "Tablero de tareas en vivo — haga clic para abrir la vista Kanban completa",
+        "pipeline": "Trabajos vendidos por etapa",
+        "estimates": "Resumen del flujo de presupuestos",
+        "calendar": "Próximos eventos y horario",
+        "equipment": "Estado y alertas de la flota",
+        "marketing": "Estadísticas de rendimiento de campañas",
+        "employees": "Vista rápida de empleados",
+        "sops": "Procedimientos operativos estándar",
+        "quizzes": "Pruebas de capacitación y conocimiento",
+        "suggestions": "Ideas de mejora de los clientes",
+        "tools": "Accesos directos a herramientas y páginas",
+        "companyhq": "Misión, visión y objetivos",
+        "help": "Preguntas frecuentes y enlaces de soporte",
+        "devtracker": "Estado de desarrollo y seguimiento de funciones",
+        "soppipeline": "Estado y cola del flujo de POEs generado por IA",
+        "notes": "Bloc de notas personal con recordatorios — hable o escriba para agregar notas",
+        "dailyagenda": "Planifique su día — tareas, llamadas, clientes potenciales, delegar, equipos y más",
+        "hiring": "Nuevas solicitudes pendientes de revisión"
+      },
+      "messages": {
+        "noMessagesYet": "Aún no hay mensajes",
+        "unreadCount_one": "{{count}} sin leer",
+        "unreadCount_other": "{{count}} sin leer"
+      },
+      "tasks": {
+        "activeCount_one": "{{count}} activa",
+        "activeCount_other": "{{count}} activas",
+        "inProgressCount_one": "{{count}} en progreso",
+        "inProgressCount_other": "{{count}} en progreso",
+        "overdueCount_one": "{{count}} vencida",
+        "overdueCount_other": "{{count}} vencidas",
+        "dueTodayCount_one": "{{count}} vence hoy",
+        "dueTodayCount_other": "{{count}} vencen hoy",
+        "allCaughtUp": "¡Todo al día!",
+        "openTaskBoard": "Abrir Tablero de Tareas",
+        "taskBoardTitle": "Tablero de Tareas",
+        "totalTasksCount_one": "{{count}} tarea en total",
+        "totalTasksCount_other": "{{count}} tareas en total",
+        "openFullTasksPage": "Abrir Página Completa de Tareas",
+        "noTasks": "Sin tareas",
+        "overdueLabel": "Vencida",
+        "columns": {
+          "todo": "Por Hacer",
+          "assigned": "Asignada",
+          "acknowledged": "Confirmada",
+          "in_progress": "En Progreso",
+          "on_hold": "En Espera",
+          "completed": "Completada"
+        },
+        "priority": {
+          "p1_urgent": "Urgente",
+          "p2_high": "Alta",
+          "p3_normal": "Normal",
+          "p4_low": "Baja"
+        }
+      },
+      "pipeline": {
+        "jobsCount_one": "{{count}} trabajo",
+        "jobsCount_other": "{{count}} trabajos",
+        "stages": {
+          "Lead": "Prospecto",
+          "Proposed": "Propuesto",
+          "Approved": "Aprobado",
+          "In Progress": "En Progreso",
+          "Completed": "Completado"
+        }
+      },
+      "estimates": {
+        "estimatesCount_one": "{{count}} presupuesto",
+        "estimatesCount_other": "{{count}} presupuestos",
+        "status": {
+          "draft": "Borrador",
+          "sent": "Enviado",
+          "viewed": "Visto",
+          "approved": "Aprobado",
+          "declined": "Rechazado",
+          "converted": "Convertido"
+        }
+      },
+      "calendar": {
+        "noUpcomingEvents": "No hay eventos próximos",
+        "event": "Evento",
+        "allDay": "Todo el día"
+      },
+      "notes": {
+        "pinnedCount_one": "{{count}} fijada",
+        "pinnedCount_other": "{{count}} fijadas",
+        "reminderCount_one": "{{count}} recordatorio",
+        "reminderCount_other": "{{count}} recordatorios",
+        "tapToAddFirst": "Toque para agregar su primera nota",
+        "emptyNote": "Nota vacía",
+        "openNotepad": "Abrir Bloc de Notas",
+        "myNotepad": "Mi Bloc de Notas",
+        "notesCount_one": "{{count}} nota",
+        "notesCount_other": "{{count}} notas",
+        "newNote": "Nueva Nota",
+        "searchPlaceholder": "Buscar notas…",
+        "noSearchResults": "Ninguna nota coincide con su búsqueda",
+        "noArchivedNotes": "No hay notas archivadas",
+        "noNotesYet": "Aún no hay notas — ¡cree la primera!",
+        "deleteConfirm": "¿Eliminar esta nota?",
+        "filters": {
+          "all": "Todas",
+          "pinned": "Fijadas",
+          "reminders": "Recordatorios",
+          "archived": "Archivadas"
+        },
+        "titlePlaceholder": "Título",
+        "bodyPlaceholder": "Escriba su nota…",
+        "addTagPlaceholder": "Agregar etiqueta…",
+        "unpin": "Desfijar",
+        "pin": "Fijar",
+        "deleteNote": "Eliminar nota",
+        "archive": "Archivar",
+        "delete": "Eliminar",
+        "save": "Guardar",
+        "pastReminder": "Recordatorio pasado",
+        "inMinutes": "En {{count}}m",
+        "inHours": "En {{count}}h",
+        "colors": {
+          "default": "Predeterminado",
+          "yellow": "Amarillo",
+          "green": "Verde",
+          "blue": "Azul",
+          "purple": "Morado",
+          "red": "Rojo",
+          "orange": "Naranja",
+          "teal": "Turquesa"
+        }
+      }
+    }
   },
   "profile": {
     "title": "Mi Perfil",
