@@ -686,7 +686,8 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
   t: any;
 }) {
   const [, navigate] = useLocation();
-  const [systemExpanded, setSystemExpanded] = useState(false);
+  const [aiExpanded, setAiExpanded] = useState(false);
+  const [healthExpanded, setHealthExpanded] = useState(false);
   const groups = [
     {
       label: "Daily Operations",
@@ -716,6 +717,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "terms", label: "Terms & Conditions", icon: FileSignature },
         { value: "business-rules", label: "Business Rules", icon: SlidersHorizontal, href: "/admin/business-rules" },
         { value: "feedback-reports", label: "Bug Reports & Feedback", icon: MessageSquareWarning, href: "/admin/feedback" },
+        { value: "admin-tools", label: "Admin Tools", icon: Wrench, href: "/tools" },
       ],
     },
     {
@@ -746,14 +748,18 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
       ],
     },
     {
-      label: "System & Advanced",
+      label: "AI & Automation Tools",
       items: [
-        { value: "admin-tools", label: "Admin Tools", icon: Wrench, href: "/tools" },
-        { value: "todos", label: "To-Do User Management", icon: CheckCircle },
         { value: "assistant-agents", label: "Assistant Agents", icon: Sparkles },
         { value: "ai-logs", label: "Usage Summary", icon: Bot },
         ...(isMasterAdmin ? [{ value: "ai-agents", label: "AI Agents", icon: Bot }] : []),
         { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle },
+      ],
+    },
+    {
+      label: "System Health & Data Quality",
+      items: [
+        { value: "todos", label: "To-Do User Management", icon: CheckCircle },
         { value: "process-auditor", label: "Process Auditor", icon: ClipboardCheck },
         { value: "help-reports", label: "Article Reports", icon: HelpCircle },
         { value: "customer-duplicates", label: "Customer Duplicates", icon: GitMerge, href: "/admin/customer-duplicates" },
@@ -773,7 +779,8 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
       case "Catalogs & Integrations": return "text-teal-600 dark:text-teal-400";
       case "Automation & Flags": return "text-indigo-600 dark:text-indigo-400";
       case "Content & SOPs": return "text-amber-600 dark:text-amber-400";
-      case "System & Advanced": return "text-muted-foreground/60";
+      case "AI & Automation Tools": return "text-fuchsia-600 dark:text-fuchsia-400";
+      case "System Health & Data Quality": return "text-slate-600 dark:text-slate-400";
       default: return "text-muted-foreground/60";
     }
   };
@@ -813,19 +820,23 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
   return (
     <nav className="flex flex-col gap-1 py-1" data-testid="admin-sidebar">
       {groups.map((group) => {
-        const isSystem = group.label === "System & Advanced";
+        const isAi = group.label === "AI & Automation Tools";
+        const isHealth = group.label === "System Health & Data Quality";
+        const isCollapsible = isAi || isHealth;
+        const expanded = isAi ? aiExpanded : healthExpanded;
+        const setExpanded = isAi ? setAiExpanded : setHealthExpanded;
         return (
           <div key={group.label} className="mb-3">
-            {isSystem ? (
+            {isCollapsible ? (
               <button
-                onClick={() => setSystemExpanded(v => !v)}
+                onClick={() => setExpanded((v: boolean) => !v)}
                 className="w-full flex items-center justify-between px-3 mb-1 hover:opacity-80 transition-opacity"
-                data-testid="admin-nav-system-toggle"
+                data-testid={`admin-nav-${isAi ? "ai" : "health"}-toggle`}
               >
                 <span className={`text-[10px] font-semibold uppercase tracking-widest select-none ${groupLabelColor(group.label)}`}>
                   {group.label}
                 </span>
-                {systemExpanded
+                {expanded
                   ? <ChevronUp className="h-3 w-3 text-muted-foreground/60" />
                   : <ChevronDown className="h-3 w-3 text-muted-foreground/60" />}
               </button>
@@ -834,7 +845,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
                 {group.label}
               </p>
             )}
-            {(!isSystem || systemExpanded) && group.items.map(navItemRow)}
+            {(!isCollapsible || expanded) && group.items.map(navItemRow)}
           </div>
         );
       })}
@@ -963,7 +974,8 @@ export default function AdminPanel() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("home");
-  const [homeSystemExpanded, setHomeSystemExpanded] = useState(false);
+  const [homeAiExpanded, setHomeAiExpanded] = useState(false);
+  const [homeHealthExpanded, setHomeHealthExpanded] = useState(false);
 
   // On mount: honour ?tab= param so OAuth callbacks (e.g. QuickBooks) land on
   // the correct section rather than defaulting to "users".
@@ -1547,6 +1559,7 @@ export default function AdminPanel() {
                   { label: "Terms & Conditions", desc: "Legal terms", icon: FileSignature, tab: "terms" },
                   { label: "Business Rules", desc: "Financial, scheduling & workflow settings", icon: SlidersHorizontal, href: "/admin/business-rules" },
                   { label: "Bug Reports & Feedback", desc: "Review bugs & suggestions submitted by staff", icon: MessageSquareWarning, href: "/admin/feedback" },
+                  { label: "Admin Tools", desc: "Form builder & admin utilities", icon: Wrench, href: "/tools" },
                 ] as { label: string; desc: string; icon: any; tab?: string; href?: string }[]).map((item) => (
                   <button key={item.label} onClick={() => item.href ? navigate(item.href) : setActiveTab(item.tab!)} data-testid={`admin-home-${item.tab ?? item.label.toLowerCase().replace(/\s+/g, "-")}`}
                     className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">
@@ -1644,41 +1657,78 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            {/* System & Advanced — collapsible */}
+            {/* AI & Automation Tools — collapsible */}
+            <div className="rounded-xl border border-fuchsia-500/20 bg-card overflow-hidden opacity-80">
+              <button
+                onClick={() => setHomeAiExpanded(v => !v)}
+                className="w-full flex items-center gap-3 px-5 py-3 border-b bg-fuchsia-500/5 hover:bg-fuchsia-500/10 transition-colors"
+                data-testid="admin-home-ai-toggle"
+              >
+                <div className="w-2.5 h-2.5 rounded-full bg-fuchsia-500 shrink-0" />
+                <div className="flex-1 text-left">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-foreground">AI &amp; Automation Tools</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-fuchsia-500/10 text-fuchsia-500 dark:text-fuchsia-400 border border-fuchsia-500/20">🔒 Advanced</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">AI features & automation tooling — rarely needed</p>
+                </div>
+                {homeAiExpanded
+                  ? <ChevronUp className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+                  : <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">▼ expand</span>}
+              </button>
+              {homeAiExpanded && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-border/30">
+                  {([
+                    { label: "Assistant Agents", desc: "AI assistant configuration", icon: Sparkles, tab: "assistant-agents" },
+                    { label: "Usage Summary", desc: "AI usage history", icon: Bot, tab: "ai-logs" },
+                    ...(isMasterAdmin ? [{ label: "AI Agents", desc: "Manage AI agent definitions", icon: Bot, tab: "ai-agents" }] : []),
+                    { label: "Integration Wizard", desc: "Connect services", icon: Puzzle, tab: "integration-wizard" },
+                  ] as { label: string; desc: string; icon: any; tab?: string; href?: string }[]).map((item) => (
+                    <button key={item.label} onClick={() => item.href ? navigate(item.href) : setActiveTab(item.tab!)} data-testid={`admin-home-ai-${item.tab ?? item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                      className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">
+                      <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div>
+                        <div className="text-xs font-medium text-foreground">{item.label}</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">{item.desc}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* System Health & Data Quality — collapsible */}
             <div className="rounded-xl border border-slate-500/20 bg-card overflow-hidden opacity-80">
               <button
-                onClick={() => setHomeSystemExpanded(v => !v)}
+                onClick={() => setHomeHealthExpanded(v => !v)}
                 className="w-full flex items-center gap-3 px-5 py-3 border-b bg-slate-500/5 hover:bg-slate-500/10 transition-colors"
-                data-testid="admin-home-system-toggle"
+                data-testid="admin-home-health-toggle"
               >
                 <div className="w-2.5 h-2.5 rounded-full bg-slate-500 shrink-0" />
                 <div className="flex-1 text-left">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-foreground">System &amp; Advanced</span>
+                    <span className="text-sm font-semibold text-foreground">System Health &amp; Data Quality</span>
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20">🔒 Advanced</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">Technical tools — rarely needed</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Diagnostics, logs & data integrity — rarely needed</p>
                 </div>
-                {homeSystemExpanded
+                {homeHealthExpanded
                   ? <ChevronUp className="h-4 w-4 text-muted-foreground/60 shrink-0" />
                   : <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">▼ expand</span>}
               </button>
-              {homeSystemExpanded && (
+              {homeHealthExpanded && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-border/30">
                   {([
-                    { label: "Admin Tools", desc: "Form builder & admin utilities", icon: Wrench, href: "/tools" },
                     { label: "To-Do User Management", desc: "Who can see tasks", icon: CheckCircle, tab: "todos" },
-                    { label: "Assistant Agents", desc: "AI assistant configuration", icon: Sparkles, tab: "assistant-agents" },
-                    { label: "Usage Summary", desc: "AI usage history", icon: Bot, tab: "ai-logs" },
-                    { label: "Integration Wizard", desc: "Connect services", icon: Puzzle, tab: "integration-wizard" },
                     { label: "Process Auditor", desc: "Run process audits", icon: ClipboardCheck, tab: "process-auditor" },
                     { label: "Article Reports", desc: "Reported help articles", icon: HelpCircle, tab: "help-reports" },
                     { label: "Customer Duplicates", desc: "Find duplicate records", icon: GitMerge, href: "/admin/customer-duplicates" },
                     { label: "App Testing", desc: "Internal testing tools", icon: Eye, tab: "app-testing" },
                     { label: "System Status", desc: "System diagnostics", icon: AlertCircle, tab: "system-status" },
+                    { label: "Security Audit Log", desc: "Security event history", icon: AlertTriangle, tab: "security-audit-log" },
                     ...(isMasterAdmin ? [{ label: "Diagnostics", desc: "Deep diagnostics", icon: Wrench, tab: "diagnostics" }] : []),
                   ] as { label: string; desc: string; icon: any; tab?: string; href?: string }[]).map((item) => (
-                    <button key={item.label} onClick={() => item.href ? navigate(item.href) : setActiveTab(item.tab!)} data-testid={`admin-home-sys-${item.tab ?? item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                    <button key={item.label} onClick={() => item.href ? navigate(item.href) : setActiveTab(item.tab!)} data-testid={`admin-home-health-${item.tab ?? item.label.toLowerCase().replace(/\s+/g, "-")}`}
                       className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">
                       <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <div>
