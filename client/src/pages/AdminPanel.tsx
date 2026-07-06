@@ -708,21 +708,33 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
       ],
     },
     {
-      label: "Settings",
+      label: "Company Settings",
       items: [
         { value: "company", label: "Company Info & Branding", icon: Building2 },
         { value: "divisions", label: "Division Colors", icon: Layers },
-        { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
-        { value: "service-types", label: "Service Types", icon: Tag, href: "/admin/service-types" },
         { value: "estimate-templates", label: "Estimate Templates", icon: FileText },
         { value: "terms", label: "Terms & Conditions", icon: FileSignature },
+        { value: "business-rules", label: "Business Rules", icon: SlidersHorizontal, href: "/admin/business-rules" },
+        { value: "feedback-reports", label: "Bug Reports & Feedback", icon: MessageSquareWarning, href: "/admin/feedback" },
+      ],
+    },
+    {
+      label: "Catalogs & Integrations",
+      items: [
+        { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
+        { value: "service-types", label: "Service Types", icon: Tag, href: "/admin/service-types" },
         { value: "quickbooks", label: "QuickBooks Online", icon: DollarSign },
         { value: "catalog-link", label: "Item Catalog", icon: BookOpen, href: "/catalog" },
         { value: "plant-cards-link", label: "Plant Library", icon: Leaf, href: "/plant-cards" },
-        { value: "business-rules", label: "Business Rules", icon: SlidersHorizontal, href: "/admin/business-rules" },
+        { value: "cc-reconciliation", label: "CompanyCam Reconciliation Queue", icon: Camera, href: "/admin/companycam-reconciliation" },
+        { value: "cc-health", label: "CompanyCam Webhook Health", icon: Activity, href: "/admin/companycam-health" },
+      ],
+    },
+    {
+      label: "Automation & Flags",
+      items: [
         { value: "automation-center", label: "Automation Center", icon: Zap, href: "/admin/automation-center" },
         { value: "feature-flags", label: "Feature Flags", icon: FlagTriangleRight, href: "/admin/feature-flags" },
-        { value: "feedback-reports", label: "Bug Reports & Feedback", icon: MessageSquareWarning, href: "/admin/feedback" },
       ],
     },
     {
@@ -744,8 +756,6 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle },
         { value: "process-auditor", label: "Process Auditor", icon: ClipboardCheck },
         { value: "help-reports", label: "Article Reports", icon: HelpCircle },
-        { value: "cc-reconciliation", label: "CompanyCam Reconciliation Queue", icon: Camera, href: "/admin/companycam-reconciliation" },
-        { value: "cc-health", label: "CompanyCam Webhook Health", icon: Activity, href: "/admin/companycam-health" },
         { value: "customer-duplicates", label: "Customer Duplicates", icon: GitMerge, href: "/admin/customer-duplicates" },
         { value: "app-testing", label: "App Testing", icon: Eye },
         { value: "system-status", label: "System Status", icon: AlertCircle },
@@ -759,7 +769,9 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
     switch (label) {
       case "Daily Operations": return "text-green-600 dark:text-green-400";
       case "People": return "text-blue-600 dark:text-blue-400";
-      case "Settings": return "text-purple-600 dark:text-purple-400";
+      case "Company Settings": return "text-purple-600 dark:text-purple-400";
+      case "Catalogs & Integrations": return "text-teal-600 dark:text-teal-400";
+      case "Automation & Flags": return "text-indigo-600 dark:text-indigo-400";
       case "Content & SOPs": return "text-amber-600 dark:text-amber-400";
       case "System & Advanced": return "text-muted-foreground/60";
       default: return "text-muted-foreground/60";
@@ -1518,30 +1530,80 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            {/* Settings */}
+            {/* Company Settings */}
             <div className="rounded-xl border border-purple-500/20 bg-card overflow-hidden">
               <div className="flex items-center gap-3 px-5 py-3 border-b bg-purple-500/5">
                 <div className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
                 <div className="flex-1">
-                  <span className="text-sm font-semibold text-foreground">Settings</span>
-                  <p className="text-xs text-muted-foreground mt-0.5">Company info, divisions &amp; integrations</p>
+                  <span className="text-sm font-semibold text-foreground">Company Settings</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">Company profile, business rules &amp; core config</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-border/30">
                 {([
                   { label: "Company Info & Branding", desc: "Name, logo, colors", icon: Building2, tab: "company" },
                   { label: "Division Colors", desc: "Business divisions", icon: Layers, tab: "divisions" },
-                  { label: "Work Areas", desc: "Service zones", icon: Layers, href: "/admin/work-areas" },
-                  { label: "Service Types", desc: "Job service categories", icon: Tag, href: "/admin/service-types" },
                   { label: "Estimate Templates", desc: "Default estimate types", icon: FileText, tab: "estimate-templates" },
                   { label: "Terms & Conditions", desc: "Legal terms", icon: FileSignature, tab: "terms" },
+                  { label: "Business Rules", desc: "Financial, scheduling & workflow settings", icon: SlidersHorizontal, href: "/admin/business-rules" },
+                  { label: "Bug Reports & Feedback", desc: "Review bugs & suggestions submitted by staff", icon: MessageSquareWarning, href: "/admin/feedback" },
+                ] as { label: string; desc: string; icon: any; tab?: string; href?: string }[]).map((item) => (
+                  <button key={item.label} onClick={() => item.href ? navigate(item.href) : setActiveTab(item.tab!)} data-testid={`admin-home-${item.tab ?? item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                    className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">
+                    <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div>
+                      <div className="text-xs font-medium text-foreground">{item.label}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{item.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Catalogs & Integrations */}
+            <div className="rounded-xl border border-teal-500/20 bg-card overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-3 border-b bg-teal-500/5">
+                <div className="w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0" />
+                <div className="flex-1">
+                  <span className="text-sm font-semibold text-foreground">Catalogs &amp; Integrations</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">Reference data, catalogs &amp; third-party connections</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-border/30">
+                {([
+                  { label: "Work Areas", desc: "Service zones", icon: Layers, href: "/admin/work-areas" },
+                  { label: "Service Types", desc: "Job service categories", icon: Tag, href: "/admin/service-types" },
                   { label: "QuickBooks Online", desc: "QB connection settings", icon: DollarSign, tab: "quickbooks" },
                   { label: "Item Catalog", desc: "Materials & labor catalog", icon: BookOpen, href: "/catalog" },
                   { label: "Plant Library", desc: "Plant card database", icon: Leaf, href: "/plant-cards" },
-                  { label: "Business Rules", desc: "Financial, scheduling & workflow settings", icon: SlidersHorizontal, href: "/admin/business-rules" },
+                  { label: "CompanyCam Reconciliation Queue", desc: "CompanyCam sync", icon: Camera, href: "/admin/companycam-reconciliation" },
+                  { label: "CompanyCam Webhook Health", desc: "Webhook status", icon: Activity, href: "/admin/companycam-health" },
+                ] as { label: string; desc: string; icon: any; tab?: string; href?: string }[]).map((item) => (
+                  <button key={item.label} onClick={() => item.href ? navigate(item.href) : setActiveTab(item.tab!)} data-testid={`admin-home-${item.tab ?? item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                    className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">
+                    <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div>
+                      <div className="text-xs font-medium text-foreground">{item.label}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{item.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Automation & Flags */}
+            <div className="rounded-xl border border-indigo-500/20 bg-card overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-3 border-b bg-indigo-500/5">
+                <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0" />
+                <div className="flex-1">
+                  <span className="text-sm font-semibold text-foreground">Automation &amp; Flags</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">Automation rules &amp; feature flags</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-border/30">
+                {([
                   { label: "Automation Center", desc: "Turn on job, invoice & recurring job automations", icon: Zap, href: "/admin/automation-center" },
                   { label: "Feature Flags", desc: "Hide unfinished modules from regular users during alpha", icon: FlagTriangleRight, href: "/admin/feature-flags" },
-                  { label: "Bug Reports & Feedback", desc: "Review bugs & suggestions submitted by staff", icon: MessageSquareWarning, href: "/admin/feedback" },
                 ] as { label: string; desc: string; icon: any; tab?: string; href?: string }[]).map((item) => (
                   <button key={item.label} onClick={() => item.href ? navigate(item.href) : setActiveTab(item.tab!)} data-testid={`admin-home-${item.tab ?? item.label.toLowerCase().replace(/\s+/g, "-")}`}
                     className="flex items-center gap-3 px-4 py-3 text-left transition-colors bg-card border-l-2 border-l-transparent hover:bg-muted/50">
@@ -1611,8 +1673,6 @@ export default function AdminPanel() {
                     { label: "Integration Wizard", desc: "Connect services", icon: Puzzle, tab: "integration-wizard" },
                     { label: "Process Auditor", desc: "Run process audits", icon: ClipboardCheck, tab: "process-auditor" },
                     { label: "Article Reports", desc: "Reported help articles", icon: HelpCircle, tab: "help-reports" },
-                    { label: "CompanyCam Reconciliation Queue", desc: "CompanyCam sync", icon: Camera, href: "/admin/companycam-reconciliation" },
-                    { label: "CompanyCam Webhook Health", desc: "Webhook status", icon: Activity, href: "/admin/companycam-health" },
                     { label: "Customer Duplicates", desc: "Find duplicate records", icon: GitMerge, href: "/admin/customer-duplicates" },
                     { label: "App Testing", desc: "Internal testing tools", icon: Eye, tab: "app-testing" },
                     { label: "System Status", desc: "System diagnostics", icon: AlertCircle, tab: "system-status" },

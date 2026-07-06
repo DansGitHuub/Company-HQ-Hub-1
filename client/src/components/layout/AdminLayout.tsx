@@ -36,6 +36,9 @@ import {
   Eye,
   AlertCircle,
   ChevronRight,
+  SlidersHorizontal,
+  FlagTriangleRight,
+  MessageSquareWarning,
 } from "lucide-react";
 
 type AdminNavItem = {
@@ -79,19 +82,39 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
-    id: "settings",
-    label: "Settings",
+    id: "company-settings",
+    label: "Company Settings",
     labelColor: "text-purple-600 dark:text-purple-400",
     items: [
       { value: "company", label: "Company Branding", icon: Building2, tab: "company" },
       { value: "divisions", label: "Division Colors", icon: Layers, tab: "divisions" },
-      { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
-      { value: "service-types", label: "Service Types", icon: Tag, href: "/admin/service-types" },
       { value: "estimate-templates", label: "Estimate Templates", icon: FileText, tab: "estimate-templates" },
       { value: "terms", label: "Terms & Conditions", icon: FileSignature, tab: "terms" },
+      { value: "business-rules", label: "Business Rules", icon: SlidersHorizontal, href: "/admin/business-rules" },
+      { value: "feedback-reports", label: "Bug Reports & Feedback", icon: MessageSquareWarning, href: "/admin/feedback" },
+    ],
+  },
+  {
+    id: "catalogs-integrations",
+    label: "Catalogs & Integrations",
+    labelColor: "text-teal-600 dark:text-teal-400",
+    items: [
+      { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
+      { value: "service-types", label: "Service Types", icon: Tag, href: "/admin/service-types" },
       { value: "quickbooks", label: "QuickBooks Online", icon: DollarSign, tab: "quickbooks" },
       { value: "catalog-link", label: "Item Catalog", icon: BookOpen, href: "/catalog" },
       { value: "plant-cards-link", label: "Plant Library", icon: Leaf, href: "/plant-cards" },
+      { value: "cc-reconciliation", label: "CompanyCam Reconciliation Queue", icon: Camera, href: "/admin/companycam-reconciliation" },
+      { value: "cc-health", label: "CompanyCam Webhook Health", icon: Activity, href: "/admin/companycam-health" },
+    ],
+  },
+  {
+    id: "automation-flags",
+    label: "Automation & Flags",
+    labelColor: "text-indigo-600 dark:text-indigo-400",
+    items: [
+      { value: "automation-center", label: "Automation Center", icon: Zap, href: "/admin/automation-center" },
+      { value: "feature-flags", label: "Feature Flags", icon: FlagTriangleRight, href: "/admin/feature-flags" },
     ],
   },
   {
@@ -116,8 +139,6 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
       { value: "integration-wizard", label: "Integration Wizard", icon: Puzzle, tab: "integration-wizard" },
       { value: "process-auditor", label: "Process Auditor", icon: ClipboardCheck, tab: "process-auditor" },
       { value: "help-reports", label: "Article Reports", icon: HelpCircle, tab: "help-reports" },
-      { value: "cc-reconciliation", label: "CompanyCam Reconciliation Queue", icon: Camera, href: "/admin/companycam-reconciliation" },
-      { value: "cc-health", label: "CompanyCam Webhook Health", icon: Activity, href: "/admin/companycam-health" },
       { value: "customer-duplicates", label: "Customer Duplicates", icon: GitMerge, href: "/admin/customer-duplicates" },
       { value: "app-testing", label: "App Testing", icon: Eye, tab: "app-testing" },
       { value: "system-status", label: "System Status", icon: AlertCircle, tab: "system-status" },
