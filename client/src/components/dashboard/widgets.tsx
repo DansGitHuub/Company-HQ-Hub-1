@@ -707,7 +707,7 @@ export function CompanyHQWidget({ size }: WidgetProps) {
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Building2 className="h-4 w-4 text-primary" />
-          <span className="text-xs font-medium">Company HQ</span>
+          <span className="text-xs font-medium">HQ Overview</span>
         </div>
         <p className="text-xs text-muted-foreground">
           View company mission, vision, goals and team info

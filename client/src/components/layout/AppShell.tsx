@@ -160,7 +160,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       tips: ["Start interactive walkthrough", "Browse FAQs", "Role-specific guidance"]
     },
     hq: {
-      title: t("nav.companyHQ"),
+      title: t("nav.hqOverview"),
       description: "Overview of your company's central hub and settings.",
       tips: ["View company stats", "Access key metrics", "Central information hub"]
     },
@@ -402,7 +402,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     mors_budget: { icon: TrendingUp, label: t("nav.morsBudget"), href: "/mors-budget" },
     education: { icon: GraduationCap, label: t("nav.resourceLibrary"), href: "/customer-resources" },
     help: { icon: LifeBuoy, label: t("nav.help"), href: "/help" },
-    hq: { icon: Building2, label: t("nav.companyHQ"), href: "/hq" },
+    hq: { icon: Building2, label: t("nav.hqOverview"), href: "/hq" },
     marketing: { icon: Megaphone, label: t("nav.marketing"), href: "/marketing" },
     forms: { icon: FileText, label: t("nav.forms"), href: "/forms" },
     inbox: { icon: Mail, label: "Customer Inbox", href: "/inbox" },
@@ -520,7 +520,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       mors_budget: tNav("nav.morsBudget"),
       education: tNav("nav.resourceLibrary"),
       help: tNav("nav.help"),
-      hq: tNav("nav.companyHQ"),
+      hq: tNav("nav.hqOverview"),
       marketing: tNav("nav.marketing"),
       forms: tNav("nav.forms"),
       inbox: "Customer Inbox",
@@ -742,7 +742,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 className="p-1 rounded-lg hover:bg-white/10 text-sidebar-foreground transition-colors"
                 onClick={() => setIsMobileOpen(false)}
-                title="CompanyHQ"
+                title="HQ Overview"
                 data-testid="link-hq-mobile"
               >
                 <Building2 className="h-5 w-5 opacity-70" />
@@ -792,7 +792,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/hq">
               <button
                 className="p-1 rounded-lg hover:bg-white/10 text-sidebar-foreground transition-colors shrink-0"
-                title="CompanyHQ"
+                title="HQ Overview"
                 data-testid="link-hq"
               >
                 <Building2 className="h-5 w-5 opacity-40 shrink-0" />
