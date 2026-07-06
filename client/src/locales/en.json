@@ -1096,7 +1096,10 @@
     "integrationWizard": "Integration Wizard",
     "integrationWizardDesc": "Connect third-party tools and services to streamline your workflow.",
     "leadQualifier": "Lead Qualifier",
-    "leadQualifierDesc": "Score and qualify incoming prospects to focus on the best opportunities."
+    "leadQualifierDesc": "Score and qualify incoming prospects to focus on the best opportunities.",
+    "forms": "Forms",
+    "formsDesc": "Build custom forms for applications, surveys, and data collection.",
+    "noneAvailable": "No tools are available for your role yet."
   },
   "customerHub": {
     "title": "Customer Hub",

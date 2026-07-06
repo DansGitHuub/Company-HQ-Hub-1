@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
+import { canAccessTool } from "@/lib/toolAccess";
 import {
   Circle,
   Mail,
@@ -676,13 +677,18 @@ export function SuggestionsWidget({ size }: WidgetProps) {
 }
 
 export function ToolsWidget({ size }: WidgetProps) {
-  const links = [
-    { label: "Plow Mapper", href: "/tools/plow-mapper", icon: MapPin },
-    { label: "Calculator", href: "/tools/calculator", icon: Calculator },
-    { label: "Lead Qualifier", href: "/tools/lead-qualifier", icon: Zap },
-    { label: "Forms", href: "/forms", icon: FileText },
-    { label: "Process Auditor", href: "/tools/process-auditor", icon: Wrench },
+  const { user, effectiveRole } = useAuth();
+  const isMasterAdmin = !!(user as any)?.isMasterAdmin;
+  const allLinks = [
+    { toolId: "plow-mapper", label: "Plow Mapper", href: "/tools/plow-mapper", icon: MapPin },
+    { toolId: "calculator", label: "Calculator", href: "/tools/calculator", icon: Calculator },
+    { toolId: "lead-qualifier", label: "Lead Qualifier", href: "/tools/lead-qualifier", icon: Zap },
+    { toolId: "forms", label: "Forms", href: "/forms", icon: FileText },
+    { toolId: "process-auditor", label: "Process Auditor", href: "/tools/process-auditor", icon: Wrench },
   ];
+  const links = allLinks.filter((link) =>
+    link.toolId === "process-auditor" ? true : canAccessTool(link.toolId, effectiveRole, isMasterAdmin)
+  );
 
   return (
     <WidgetShell>

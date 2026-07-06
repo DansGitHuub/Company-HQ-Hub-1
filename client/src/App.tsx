@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppShell from "@/components/layout/AppShell";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
+import { TOOL_ROLES } from "@/lib/toolAccess";
 
 const ROUTE_TITLES: Record<string, string> = {
   "/": "Home",
@@ -166,6 +167,10 @@ import AdminInbox from "@/pages/AdminInbox";
 const ADMIN_ONLY = ["Admin"];
 const ADMIN_OR_MANAGER = ["Admin", "Manager"];
 const STAFF_ROLES = ["Admin", "Manager", "Crew"];
+const TOOL_CALCULATOR_ROLES = TOOL_ROLES["calculator"];
+const TOOL_PLOW_MAPPER_ROLES = TOOL_ROLES["plow-mapper"];
+const TOOL_LEAD_QUALIFIER_ROLES = TOOL_ROLES["lead-qualifier"];
+const TOOL_FORMS_ROLES = TOOL_ROLES["forms"];
 
 function AccessDenied() {
   return (
@@ -277,7 +282,7 @@ function AppRoutes() {
         <Route path="/materials"><Redirect to="/catalog" /></Route>
         <ProtectedRoute path="/hiring" component={Hiring} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/marketing" component={Marketing} allowedRoles={ADMIN_OR_MANAGER} />
-        <Route path="/forms" component={Forms} />
+        <ProtectedRoute path="/forms" component={Forms} allowedRoles={TOOL_FORMS_ROLES} />
         <Route path="/customer-resources" component={Education} />
         <Route path="/profile" component={Profile} />
         <ProtectedRoute path="/employees/import" component={EmployeesImport} allowedRoles={ADMIN_OR_MANAGER} />
@@ -338,13 +343,13 @@ function AppRoutes() {
         <Route path="/notifications" component={NotificationsPage} />
         <ProtectedRoute path="/customers" component={CustomerList} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/customers/:id" component={CustomerDetail} allowedRoles={ADMIN_OR_MANAGER} />
-        <Route path="/tools/plow-mapper" component={() => <PlowSiteMapper />} />
+        <ProtectedRoute path="/tools/plow-mapper" component={() => <PlowSiteMapper />} allowedRoles={TOOL_PLOW_MAPPER_ROLES} />
         <Route path="/tools/process-auditor" component={ProcessAuditor} />
         <Route path="/tools/integration-wizard" component={IntegrationWizard} />
-        <Route path="/tools/calculator" component={() => <CalculatorPage />} />
-        <Route path="/tools/lead-qualifier" component={() => <LeadQualifier />} />
+        <ProtectedRoute path="/tools/calculator" component={() => <CalculatorPage />} allowedRoles={TOOL_CALCULATOR_ROLES} />
+        <ProtectedRoute path="/tools/lead-qualifier" component={() => <LeadQualifier />} allowedRoles={TOOL_LEAD_QUALIFIER_ROLES} />
         <Route path="/care-guides" component={CareGuideManager} />
-        <Route path="/tools" component={Tools} />
+        <ProtectedRoute path="/tools" component={Tools} allowedRoles={STAFF_ROLES} />
         <Route path="/calendar" component={CalendarPage} />
         <Route path="/training" component={TestingKnowledge} />
         <ProtectedRoute path="/settings" component={SettingsPage} allowedRoles={ADMIN_OR_MANAGER} />

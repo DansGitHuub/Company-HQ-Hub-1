@@ -22,3 +22,5 @@
 - [Verify against git log after compression](verify-git-log-after-compression.md) — a progress summary can omit work already committed pre-compression; grep exists before re-searching for "missing" code.
 - [Google Calendar dual-system trap](google-calendar-dual-system.md) — a shared OAuth callback lives inside a seemingly-orphaned per-user calendar code block; verify callers by grep, not by file/comment placement.
 - [Admin nav dual config](admin-nav-dual-config.md) — Admin Panel group labels live in 2 files (AdminPanel.tsx + AdminLayout.tsx) with no shared source of truth; href vs tab items need different test URLs.
+- [Test account cleanup: audit_log columns](test-account-cleanup-audit-log.md) — audit_log has no user_id column; use actor_user_id/target_user_id when deleting disposable test-account rows.
+- [Tool route/grid role gating](tool-route-role-gating.md) — Tools page cards and their underlying routes share one role map (client/src/lib/toolAccess.ts) so grid visibility and route access never drift apart.

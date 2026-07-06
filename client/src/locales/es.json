@@ -1096,7 +1096,10 @@
     "integrationWizard": "Asistente de Integración",
     "integrationWizardDesc": "Conecte herramientas y servicios de terceros para optimizar su flujo de trabajo.",
     "leadQualifier": "Calificador de Prospectos",
-    "leadQualifierDesc": "Califique y evalúe prospectos entrantes para enfocarse en las mejores oportunidades."
+    "leadQualifierDesc": "Califique y evalúe prospectos entrantes para enfocarse en las mejores oportunidades.",
+    "forms": "Formularios",
+    "formsDesc": "Cree formularios personalizados para solicitudes, encuestas y recopilación de datos.",
+    "noneAvailable": "Aún no hay herramientas disponibles para su rol."
   },
   "customerHub": {
     "title": "Portal de Clientes",

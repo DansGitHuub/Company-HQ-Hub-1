@@ -1,8 +1,11 @@
 import { useState, lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Snowflake, Calculator, Target, FileText, ClipboardList, X, Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { TOOL_ROLES, canAccessTool } from "@/lib/toolAccess";
 
 const PropertyReportCard = lazy(() => import("@/tools/property-report-card/PropertyReportCard"));
 const CalculatorPage = lazy(() => import("@/pages/Calculator"));
@@ -16,6 +19,8 @@ type ToolDef = {
   icon: any;
   component: string;
   iframeModal?: { src: string; allow?: string };
+  href?: string;
+  roles: string[];
 };
 
 const toolDefs: ToolDef[] = [
@@ -25,6 +30,7 @@ const toolDefs: ToolDef[] = [
     descKey: "tools.propertyReportCardDesc",
     icon: ClipboardList,
     component: "PropertyReportCard",
+    roles: TOOL_ROLES["property-report-card"],
   },
   {
     id: "pdf-field-placer",
@@ -33,6 +39,7 @@ const toolDefs: ToolDef[] = [
     icon: FileText,
     component: "PdfFieldPlacer",
     iframeModal: { src: "/pdf-field-placer.html", allow: "clipboard-write" },
+    roles: TOOL_ROLES["pdf-field-placer"],
   },
   {
     id: "calculator",
@@ -40,6 +47,7 @@ const toolDefs: ToolDef[] = [
     descKey: "tools.calculatorDesc",
     icon: Calculator,
     component: "Calculator",
+    roles: TOOL_ROLES["calculator"],
   },
   {
     id: "plow-mapper",
@@ -47,6 +55,7 @@ const toolDefs: ToolDef[] = [
     descKey: "tools.plowMapperDesc",
     icon: Snowflake,
     component: "PlowSiteMapper",
+    roles: TOOL_ROLES["plow-mapper"],
   },
   {
     id: "lead-qualifier",
@@ -54,14 +63,35 @@ const toolDefs: ToolDef[] = [
     descKey: "tools.leadQualifierDesc",
     icon: Target,
     component: "LeadQualifier",
+    roles: TOOL_ROLES["lead-qualifier"],
+  },
+  {
+    id: "forms",
+    titleKey: "tools.forms",
+    descKey: "tools.formsDesc",
+    icon: FileText,
+    component: "Forms",
+    href: "/forms",
+    roles: TOOL_ROLES["forms"],
   },
 ];
 
 export default function Tools() {
   const { t } = useTranslation();
+  const { user, effectiveRole } = useAuth();
+  const [, navigate] = useLocation();
   const [activeTool, setActiveTool] = useState<ToolDef | null>(null);
 
-  const openTool = (tool: ToolDef) => setActiveTool(tool);
+  const isMasterAdmin = !!(user as any)?.isMasterAdmin;
+  const visibleTools = toolDefs.filter((tool) => canAccessTool(tool.id, effectiveRole, isMasterAdmin));
+
+  const openTool = (tool: ToolDef) => {
+    if (tool.href) {
+      navigate(tool.href);
+      return;
+    }
+    setActiveTool(tool);
+  };
   const closeTool = () => setActiveTool(null);
 
   const renderToolContent = (tool: ToolDef) => {
@@ -100,8 +130,14 @@ export default function Tools() {
         <p className="text-muted-foreground mt-1">{t("tools.subtitle")}</p>
       </div>
 
+      {visibleTools.length === 0 && (
+        <p className="text-sm text-muted-foreground" data-testid="text-no-tools">
+          {t("tools.noneAvailable")}
+        </p>
+      )}
+
       <div className="grid md:grid-cols-2 gap-4">
-        {toolDefs.map((tool) => {
+        {visibleTools.map((tool) => {
           const Icon = tool.icon;
           return (
             <Card
