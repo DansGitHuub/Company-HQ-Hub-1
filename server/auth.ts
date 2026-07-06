@@ -8,6 +8,7 @@ import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 import { sendPasswordRecoveryEmail } from "./email";
 import { logAuditEvent } from "./securityAuditLog";
+import { looksLikeTestAccount } from "./testAccountHeuristic";
 
 declare global {
   namespace Express {
@@ -109,6 +110,7 @@ export function setupAuth(app: Express) {
         email,
         name,
         role: "Customer",
+        isTestAccount: looksLikeTestAccount(username, email),
       });
 
       req.login(user, (err) => {

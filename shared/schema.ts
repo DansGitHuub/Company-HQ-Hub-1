@@ -16,6 +16,7 @@ export const users = pgTable("users", {
   isActive: boolean("is_active").notNull().default(true),
   isMasterAdmin: boolean("is_master_admin").notNull().default(false),
   isApplicant: boolean("is_applicant").notNull().default(false),
+  isTestAccount: boolean("is_test_account").notNull().default(false),
   recoveryToken: text("recovery_token"),
   recoveryExpires: timestamp("recovery_expires"),
   bio: text("bio"),
@@ -42,6 +43,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
   name: true,
   role: true,
+  isTestAccount: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

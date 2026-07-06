@@ -68,7 +68,8 @@ import { registerWorkOrderRoutes } from "./workOrderRoutes";
 import { registerDailyPlanRoutes } from "./dailyPlanRoutes";
 import { registerAdminDashboardRoutes } from "./adminDashboardRoutes";
 import { searchProductImages } from "./imageSearchService";
-import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail, sendApplicationLinkEmail } from "./email";
+import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail, sendApplicationLinkEmail, sendPasswordResetNotificationEmail } from "./email";
+import { looksLikeTestAccount } from "./testAccountHeuristic";
 import { logActivity } from "./activityLogger";
 import { checkAndSendReminders } from "./maintenanceScheduler";
 import OpenAI from "openai";
@@ -455,7 +456,7 @@ export async function registerRoutes(
 
   app.post("/api/admin/users", requireAdmin, async (req, res) => {
     try {
-      const { username, password, email, name, role } = req.body;
+      const { username, password, email, name, role, isTestAccount } = req.body;
       
       if (role === "Admin" && !req.user?.isMasterAdmin) {
         return res.status(403).json({ message: "Only the master admin can create Admin users" });
@@ -470,6 +471,11 @@ export async function registerRoutes(
       const hashedPassword = await hashPassword(password);
       
       const isStaff = userRole !== "Customer";
+
+      // Accounts are auto-flagged test if they match the known disposable-test
+      // naming convention; admins can also explicitly mark an account as a test
+      // account (e.g. "ZZZ Safe to Delete") even if the naming doesn't match.
+      const flaggedTestAccount = Boolean(isTestAccount) || looksLikeTestAccount(username, email);
       
       const user = await storage.createUser({
         username,
@@ -477,6 +483,7 @@ export async function registerRoutes(
         email,
         name,
         role: userRole,
+        isTestAccount: flaggedTestAccount,
       });
       
       const { password: _, ...safeUser } = user;
@@ -489,7 +496,7 @@ export async function registerRoutes(
   app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
     try {
       const id = req.params.id as string;
-      const { name, email, role, isActive, password } = req.body;
+      const { name, email, role, isActive, password, isTestAccount, confirmRealAccountPasswordReset } = req.body;
       
       const targetUser = await storage.getUser(id);
       if (!targetUser) {
@@ -503,6 +510,18 @@ export async function registerRoutes(
       if (role === "Admin" && !req.user?.isMasterAdmin) {
         return res.status(403).json({ message: "Only the master admin can grant Admin access" });
       }
+
+      // Password-reset safeguard: by default this route refuses to reset the
+      // password of any account that isn't explicitly marked as a disposable
+      // test account. A human admin can still reset a real user's password,
+      // but only by passing an explicit confirmation flag — this can't happen
+      // silently or by accident (e.g. during automated testing).
+      if (password && !targetUser.isTestAccount && !confirmRealAccountPasswordReset) {
+        return res.status(409).json({
+          message: `"${targetUser.name}" is a real user account, not a test account. Confirm you intend to reset a real user's password — they will be emailed immediately.`,
+          requiresConfirmation: true,
+        });
+      }
       
       const updates: Record<string, any> = {};
       if (name !== undefined) updates.name = name;
@@ -511,6 +530,7 @@ export async function registerRoutes(
         updates.role = role;
       }
       if (isActive !== undefined) updates.isActive = Boolean(isActive);
+      if (isTestAccount !== undefined) updates.isTestAccount = Boolean(isTestAccount);
       if (password) {
         updates.password = await hashPassword(password);
       }
@@ -571,6 +591,37 @@ export async function registerRoutes(
           newValue: { isActive: Boolean(isActive) },
           ipAddress: req.ip,
         });
+      }
+
+      // Password reset — always audit-logged. Real (non-test) accounts also
+      // get an immediate email notification to the affected user; test
+      // account resets are logged only, no email is sent.
+      if (password) {
+        await logAuditEvent({
+          eventType: "password_reset",
+          actorUserId: actorId,
+          actorName: actorName,
+          targetUserId: targetUser.id,
+          targetLabel: targetUser.name,
+          description: `${actorName} reset ${targetUser.name}'s password${targetUser.isTestAccount ? " (test account)" : " (real account — confirmed)"}`,
+          ipAddress: req.ip,
+        });
+
+        await pool.query(
+          `INSERT INTO activity_log (id, user_id, event_type, description, link, seen_by, created_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, '/admin', '[]'::jsonb, now())`,
+          [actorId, "password_reset", `${actorName} reset ${targetUser.name}'s password`]
+        );
+
+        if (!targetUser.isTestAccount && targetUser.email) {
+          try {
+            await sendPasswordResetNotificationEmail(targetUser.email, targetUser.name);
+          } catch (emailErr) {
+            console.error("[password-reset] Failed to send notification email:", emailErr);
+          }
+        } else if (targetUser.isTestAccount) {
+          console.log(`[password-reset] Skipped email — "${targetUser.username}" is a test account`);
+        }
       }
 
       res.json(safeUser);

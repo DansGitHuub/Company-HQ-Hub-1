@@ -2,6 +2,7 @@ import { storage } from "./storage";
 import { pool } from "./db";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
+import { REAL_USERNAMES, looksLikeTestAccount } from "./testAccountHeuristic";
 
 const scryptAsync = promisify(scrypt);
 
@@ -78,14 +79,9 @@ export async function seedUsers(): Promise<void> {
     }
 
     // Clean up test accounts created by automated tests
-    const REAL_USERNAMES = ["Chapin123", "Matt H"];
-    const testPrefixes = ["e2e", "testadmin", "testcustomer", "tester", "profile_test_", "calc_", "quiztest_", "soptype_", "tools_", "TestCustomer"];
     for (const user of allUsers) {
       if (REAL_USERNAMES.includes(user.username)) continue;
-      const isTestAccount = testPrefixes.some(prefix => user.username.startsWith(prefix)) ||
-        (user.email?.includes("@test.com")) ||
-        (user.email?.includes("@example.com"));
-      if (isTestAccount) {
+      if (looksLikeTestAccount(user.username, user.email)) {
         const deleted = await storage.deleteUser(user.id);
         if (deleted) console.log(`[seed] Removed test account: ${user.username}`);
       }

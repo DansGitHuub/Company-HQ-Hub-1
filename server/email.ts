@@ -31,6 +31,26 @@ export async function sendPasswordRecoveryEmail(toEmail: string, recoveryToken: 
   `);
 }
 
+export async function sendPasswordResetNotificationEmail(toEmail: string, userName: string) {
+  console.log("[email] Sending password reset notification to:", toEmail);
+  return sendEmail(toEmail, "Your Company HQ password was just reset", `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #166534; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Company HQ</h1>
+      </div>
+      <div style="padding: 30px; background-color: #f9fafb;">
+        <h2 style="color: #1f2937;">Your password was reset</h2>
+        <p style="color: #4b5563;">Hi ${escapeHtml(userName || "there")},</p>
+        <p style="color: #4b5563;">An administrator just reset the password on your Company HQ account. If you requested this or expected it, no action is needed — just log in with your new password.</p>
+        <p style="color: #4b5563;"><strong>If you did not expect this change</strong>, please contact your administrator right away.</p>
+      </div>
+      <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+        <p>Company HQ — Automated security notification</p>
+      </div>
+    </div>
+  `);
+}
+
 export async function sendSOPEmail(
   toEmail: string,
   sopTitle: string,

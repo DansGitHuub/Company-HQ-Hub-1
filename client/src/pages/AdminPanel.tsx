@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -95,6 +96,7 @@ import {
   SlidersHorizontal,
   FlagTriangleRight,
   MessageSquareWarning,
+  FlaskConical,
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
@@ -993,6 +995,7 @@ export default function AdminPanel() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [resetPasswordUser, setResetPasswordUser] = useState<SafeUser | null>(null);
   const [newPassword, setNewPassword] = useState("");
+  const [confirmRealAccountReset, setConfirmRealAccountReset] = useState(false);
   const isMasterAdmin = user?.isMasterAdmin === true;
 
   const { data: users = [], isLoading } = useQuery<SafeUser[]>({
@@ -1190,8 +1193,8 @@ export default function AdminPanel() {
   });
 
   const resetPasswordMutation = useMutation({
-    mutationFn: async ({ id, password }: { id: string; password: string }) => {
-      const res = await apiRequest("PATCH", `/api/admin/users/${id}`, { password });
+    mutationFn: async ({ id, password, confirmRealAccountPasswordReset }: { id: string; password: string; confirmRealAccountPasswordReset?: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${id}`, { password, confirmRealAccountPasswordReset });
       return res.json();
     },
     onSuccess: () => {
@@ -1199,9 +1202,29 @@ export default function AdminPanel() {
       toast({ title: "Password reset", description: "The user's password has been updated" });
       setResetPasswordUser(null);
       setNewPassword("");
+      setConfirmRealAccountReset(false);
     },
     onError: (error) => {
       showErrorToast(error, "Failed to reset password");
+    },
+  });
+
+  const toggleTestAccountMutation = useMutation({
+    mutationFn: async ({ id, isTestAccount }: { id: string; isTestAccount: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${id}`, { isTestAccount });
+      return res.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: variables.isTestAccount ? "Marked as test account" : "Unmarked as test account",
+        description: variables.isTestAccount
+          ? "Password resets on this account will no longer require confirmation or send an email."
+          : "This account is now treated as a real user — password resets require confirmation.",
+      });
+    },
+    onError: (error) => {
+      showErrorToast(error, "Failed to update test account status");
     },
   });
 
@@ -1813,11 +1836,18 @@ export default function AdminPanel() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {u.isActive ? (
-                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Active</Badge>
-                          ) : (
-                            <Badge variant="destructive">Deactivated</Badge>
-                          )}
+                          <div className="flex items-center gap-1.5">
+                            {u.isActive ? (
+                              <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Active</Badge>
+                            ) : (
+                              <Badge variant="destructive">Deactivated</Badge>
+                            )}
+                            {u.isTestAccount && (
+                              <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-50" data-testid={`badge-test-account-${u.id}`}>
+                                Test
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
                           {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "N/A"}
@@ -1859,6 +1889,15 @@ export default function AdminPanel() {
                                 {u.role === "Customer" && (
                                   <DropdownMenuItem disabled className="text-muted-foreground">
                                     <Key className="w-4 h-4 mr-2" /> Customer uses recovery
+                                  </DropdownMenuItem>
+                                )}
+                                {!u.isMasterAdmin && (
+                                  <DropdownMenuItem
+                                    data-testid={`button-toggle-test-account-${u.id}`}
+                                    onClick={() => toggleTestAccountMutation.mutate({ id: u.id, isTestAccount: !u.isTestAccount })}
+                                  >
+                                    <FlaskConical className="w-4 h-4 mr-2" />
+                                    {u.isTestAccount ? "Unmark as test account" : "Mark as test account"}
                                   </DropdownMenuItem>
                                 )}
                                 {/* Send Crew Portal Invite — staff (non-Customer, non-MasterAdmin) */}
@@ -2463,14 +2502,33 @@ export default function AdminPanel() {
             <p className="text-sm text-muted-foreground">
               This will immediately change the user's password. Make sure to share the new password with them securely.
             </p>
+            {resetPasswordUser && !resetPasswordUser.isTestAccount && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
+                <p className="text-sm text-amber-900">
+                  This is a <strong>real user account</strong>, not marked as a test account. Resetting this
+                  password will email {resetPasswordUser.name || resetPasswordUser.username} to notify them.
+                </p>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="confirm-real-reset"
+                    checked={confirmRealAccountReset}
+                    onCheckedChange={(checked) => setConfirmRealAccountReset(checked === true)}
+                    data-testid="checkbox-confirm-real-account-reset"
+                  />
+                  <Label htmlFor="confirm-real-reset" className="text-sm font-normal leading-snug">
+                    I confirm I intend to reset this real user's password.
+                  </Label>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setResetPasswordUser(null)}>
+            <Button variant="outline" onClick={() => { setResetPasswordUser(null); setConfirmRealAccountReset(false); }}>
               Cancel
             </Button>
             <Button
-              onClick={() => resetPasswordUser && resetPasswordMutation.mutate({ id: resetPasswordUser.id, password: newPassword })}
-              disabled={!newPassword || resetPasswordMutation.isPending}
+              onClick={() => resetPasswordUser && resetPasswordMutation.mutate({ id: resetPasswordUser.id, password: newPassword, confirmRealAccountPasswordReset: confirmRealAccountReset })}
+              disabled={!newPassword || resetPasswordMutation.isPending || (!resetPasswordUser?.isTestAccount && !confirmRealAccountReset)}
               data-testid="button-confirm-reset-password"
             >
               {resetPasswordMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
@@ -2906,11 +2964,12 @@ function CreateUserDialog({ open, onOpenChange, isMasterAdmin }: { open: boolean
     email: "",
     name: "",
     role: "Crew",
+    isTestAccount: false,
   });
 
   useEffect(() => {
     if (open) {
-      setFormData({ username: "", password: "", email: "", name: "", role: "Crew" });
+      setFormData({ username: "", password: "", email: "", name: "", role: "Crew", isTestAccount: false });
     }
   }, [open]);
 
@@ -2988,6 +3047,18 @@ function CreateUserDialog({ open, onOpenChange, isMasterAdmin }: { open: boolean
                 <SelectItem value="Customer">Customer</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="flex items-start gap-2 pt-1">
+            <Checkbox
+              id="create-user-is-test"
+              checked={formData.isTestAccount}
+              onCheckedChange={(checked) => setFormData({ ...formData, isTestAccount: checked === true })}
+              data-testid="checkbox-create-user-test-account"
+            />
+            <Label htmlFor="create-user-is-test" className="text-sm font-normal leading-snug">
+              This is a test account (use "TEST TEST" or "ZZZ Safe to Delete" in the name). Test accounts
+              can have their password reset without confirmation and never receive reset emails.
+            </Label>
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
