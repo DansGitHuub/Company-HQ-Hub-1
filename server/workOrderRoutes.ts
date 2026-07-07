@@ -469,7 +469,58 @@ export function registerWorkOrderRoutes(app: any, requireAuth: any) {
         [!!is_complete, is_complete ? (user.name || user.username) : null, taskId]
       );
       if (!result.rows.length) return res.status(404).json({ message: "Not found" });
-      await pool.query(`UPDATE work_orders SET updated_at=NOW() WHERE id=$1`, [id]);
+
+      // ── Progress calculation ────────────────────────────────────────────────
+      const { rows: woRows } = await pool.query(
+        `SELECT job_id, title, closeout_ready_at FROM work_orders WHERE id=$1`, [id]
+      );
+      const jobId       = woRows[0]?.job_id ?? null;
+      const woTitle     = woRows[0]?.title ?? String(id);
+      const alreadyFlag = !!woRows[0]?.closeout_ready_at;
+
+      const { rows: pr } = await pool.query(
+        `SELECT COUNT(*) FILTER (WHERE is_complete = true) AS done,
+                COUNT(*) AS total
+         FROM work_order_area_tasks WHERE work_order_id=$1`, [id]
+      );
+      const done  = Number(pr[0]?.done  ?? 0);
+      const total = Number(pr[0]?.total ?? 0);
+      const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
+
+      if (jobId) {
+        await pool.query(
+          `UPDATE jobs SET progress=$1, updated_at=NOW() WHERE id::text=$2::text`,
+          [pct, String(jobId)]
+        );
+      }
+
+      if (pct === 100 && total > 0 && !alreadyFlag) {
+        await pool.query(
+          `UPDATE work_orders SET closeout_ready_at=NOW(), updated_at=NOW() WHERE id=$1`, [id]
+        );
+        const { rows: recipients } = await pool.query(
+          `SELECT id FROM users WHERE role IN ('Admin', 'Manager') OR is_master_admin = true`
+        );
+        for (const r of recipients) {
+          await pool.query(
+            `INSERT INTO staff_notifications (user_id, type, title, message, link, metadata)
+             VALUES ($1, 'wo_closeout_ready', $2, $3, '/work-orders', $4)`,
+            [
+              r.id,
+              "Work Order Ready for Closeout Review",
+              `All tasks complete on work order "${woTitle}". Ready for closeout review.`,
+              JSON.stringify({ work_order_id: Number(id), job_id: jobId }),
+            ]
+          );
+        }
+      } else if (pct < 100 && alreadyFlag) {
+        await pool.query(
+          `UPDATE work_orders SET closeout_ready_at=NULL, updated_at=NOW() WHERE id=$1`, [id]
+        );
+      } else {
+        await pool.query(`UPDATE work_orders SET updated_at=NOW() WHERE id=$1`, [id]);
+      }
+
       res.json(result.rows[0]);
     } catch (err) {
       console.error(err);

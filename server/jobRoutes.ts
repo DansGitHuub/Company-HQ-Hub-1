@@ -3,6 +3,7 @@ import { pool } from "./db";
 import { sendEmail, escapeHtml } from "./emailService";
 import { sendSms, isSmsConfigured } from "./smsService";
 import { logChange } from "./auditLog";
+import { autoCreateDraftWorkOrder } from "./workOrderAutoCreate";
 
 // Statuses that trigger a customer notification email
 const NOTIFY_STATUSES: Record<string, string> = {
@@ -288,7 +289,10 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
         stage || "Lead",
         value || (price ? Math.round(Number(price)) : 0),
       ]);
-      return res.status(201).json(result.rows[0]);
+      const newJob = result.rows[0];
+      autoCreateDraftWorkOrder(newJob.id, newJob.title || newJob.client, newJob.category)
+        .catch((e: any) => console.error("[jobs] autoCreateDraftWorkOrder:", e.message));
+      return res.status(201).json(newJob);
     } catch (err: any) {
       console.error("[jobs] POST /api/jobs error:", err.message);
       return res.status(500).json({ message: err.message });

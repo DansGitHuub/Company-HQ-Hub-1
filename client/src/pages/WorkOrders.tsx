@@ -74,6 +74,7 @@ interface WorkOrder {
   daily_logs?: DailyLog[];
   time_entries?: TimeEntry[];
   companycam_photos?: CcPhoto[];
+  closeout_ready_at?: string | null;
 }
 
 interface Area {
@@ -749,6 +750,16 @@ function DetailView({ id, detail, isLoading, isAdmin, user, activeTab, setActive
         </div>
       </div>
 
+      {detail.closeout_ready_at && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-300 text-sm mb-4" data-testid="banner-closeout-ready">
+          <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+          <div>
+            <span className="font-semibold text-green-700">All Tasks Complete</span>
+            <span className="text-green-700"> — Ready for closeout review</span>
+          </div>
+        </div>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4 flex-wrap h-auto gap-1">
           <TabsTrigger value="areas" data-testid="tab-areas"><CheckSquare className="w-3.5 h-3.5 mr-1" />Work Areas</TabsTrigger>
@@ -940,6 +951,14 @@ function OverviewTab({ detail }: { detail: WorkOrder }) {
 
 // ─── Areas Tab ────────────────────────────────────────────────────────────────
 
+interface ExpectedItem {
+  id: number;
+  name: string;
+  quantity: string;
+  unit: string | null;
+  work_area_name: string | null;
+}
+
 function AreasTab({ detail, isAdmin, woId, onRefresh }: { detail: WorkOrder; isAdmin: boolean; woId: number; onRefresh: () => void }) {
   const { toast } = useToast();
   const [addAreaOpen, setAddAreaOpen] = useState(false);
@@ -947,6 +966,13 @@ function AreasTab({ detail, isAdmin, woId, onRefresh }: { detail: WorkOrder; isA
   const [savingArea, setSavingArea] = useState(false);
   const [addWoToolOpen, setAddWoToolOpen] = useState(false);
   const [woToolForm, setWoToolForm] = useState({ item_name: "", quantity: "", unit: "", notes: "" });
+
+  const { data: expectedItemsData } = useQuery<{ equipment: ExpectedItem[]; materials: ExpectedItem[] }>({
+    queryKey: ["/api/my-day/jobs", detail.job_id, "expected-items"],
+    queryFn: () => fetch(`/api/my-day/jobs/${detail.job_id}/expected-items`).then(r => r.json()),
+    enabled: !!detail.job_id,
+  });
+  const allExpectedEquipment: ExpectedItem[] = expectedItemsData?.equipment || [];
 
   const addArea = async () => {
     if (!areaForm.name.trim()) { toast({ title: "Area name required", variant: "destructive" }); return; }
@@ -1010,7 +1036,8 @@ function AreasTab({ detail, isAdmin, woId, onRefresh }: { detail: WorkOrder; isA
       )}
 
       {areas.map(area => (
-        <AreaCard key={area.id} area={area} woId={woId} isAdmin={isAdmin} woType={detail.wo_type} onRefresh={onRefresh} />
+        <AreaCard key={area.id} area={area} woId={woId} isAdmin={isAdmin} woType={detail.wo_type} onRefresh={onRefresh}
+          areaEquipment={allExpectedEquipment.filter(e => (e.work_area_name || "").toLowerCase().trim() === area.name.toLowerCase().trim())} />
       ))}
 
       {/* WO-level materials (not scoped to an area) */}
@@ -1089,7 +1116,10 @@ function AreasTab({ detail, isAdmin, woId, onRefresh }: { detail: WorkOrder; isA
 
 // ─── Area Card ────────────────────────────────────────────────────────────────
 
-function AreaCard({ area, woId, isAdmin, woType, onRefresh }: { area: Area; woId: number; isAdmin: boolean; woType: WOType; onRefresh: () => void }) {
+function AreaCard({ area, woId, isAdmin, woType, onRefresh, areaEquipment = [] }: {
+  area: Area; woId: number; isAdmin: boolean; woType: WOType; onRefresh: () => void;
+  areaEquipment?: ExpectedItem[];
+}) {
   const { toast } = useToast();
   const [open, setOpen] = useState(true);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
@@ -1184,6 +1214,25 @@ function AreaCard({ area, woId, isAdmin, woType, onRefresh }: { area: Area; woId
                 </div>
               )}
             </div>
+
+            {/* Expected Equipment (from job line items — read-only) */}
+            {areaEquipment.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+                  <HardHat className="w-3 h-3" />Expected Equipment
+                </p>
+                <div className="space-y-1">
+                  {areaEquipment.map((item, i) => (
+                    <div key={item.id ?? i} className="flex items-center justify-between text-sm px-2 py-1.5 rounded bg-muted/30">
+                      <span>{item.name}</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {item.quantity}{item.unit ? ` ${item.unit}` : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Materials */}
             {(area.materials.length > 0 || isAdmin) && (

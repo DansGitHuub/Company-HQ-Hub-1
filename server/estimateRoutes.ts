@@ -139,6 +139,9 @@ export async function convertEstimateToJob(estimateId: string, userId: string | 
       [estimateId, jobId]
     );
     await client.query("COMMIT");
+    const { autoCreateDraftWorkOrder } = await import("./workOrderAutoCreate");
+    autoCreateDraftWorkOrder(jobId, est.title || `Estimate ${est.estimate_number}`, est.estimate_type || "Install")
+      .catch((e: any) => console.error("[convertEstimateToJob] autoCreateDraftWorkOrder:", e.message));
     return { job_id: jobId, estimate: await getEstimateFull(estimateId) };
   } catch (err) {
     await client.query("ROLLBACK");
