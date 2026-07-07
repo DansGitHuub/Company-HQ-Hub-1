@@ -356,6 +356,7 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
       pipeline_stage, budget_range, project_description, best_time_to_reach,
       utilities_marked, permit_required, permit_status, service_type,
       photo_urls, how_heard, project_type, desired_timeline, additional_notes,
+      next_follow_up_date,
     } = req.body;
     try {
       // Get previous stage
@@ -392,8 +393,9 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
           project_type        = COALESCE($26, project_type),
           desired_timeline    = COALESCE($27, desired_timeline),
           additional_notes    = COALESCE($28, additional_notes),
+          next_follow_up_date = $29,
           updated_at          = NOW()
-        WHERE id = $29
+        WHERE id = $30
         RETURNING *
       `, [
         customer_id || null, contact_name ?? null, contact_phone ?? null, contact_email ?? null,
@@ -404,6 +406,7 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
         utilities_marked ?? null, permit_required ?? null, permit_status ?? null, service_type ?? null,
         photo_urls ? JSON.stringify(photo_urls) : null,
         how_heard ?? null, project_type ?? null, desired_timeline ?? null, additional_notes ?? null,
+        next_follow_up_date ?? null,
         id,
       ]);
       if (!rows[0]) return res.status(404).json({ error: "Not found" });

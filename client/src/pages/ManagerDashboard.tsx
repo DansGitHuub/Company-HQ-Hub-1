@@ -7,7 +7,7 @@ import {
   Users, Clock, Briefcase, FileText, RefreshCw, MapPin, CheckCircle,
   XCircle, AlertTriangle, ChevronRight, Activity, TrendingUp,
   ShieldAlert, GraduationCap, Timer, Car, HardHat, Coffee, Building2,
-  Check, X, MoreHorizontal, ExternalLink
+  Check, X, MoreHorizontal, ExternalLink, CalendarClock,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,6 +77,13 @@ interface BehindScheduleJob {
   scheduled_date: string | null;
   scheduled_start_time: string | null;
   scheduled_end_time: string | null;
+}
+
+interface OverdueFollowUp {
+  id: string;
+  name: string;
+  next_follow_up_date: string;
+  type: "customer" | "lead";
 }
 
 interface PendingCO {
@@ -215,6 +222,12 @@ export default function ManagerDashboard() {
     queryKey: ["/api/jobs", "behind_schedule"],
     queryFn: () =>
       fetch("/api/jobs?behind_schedule=true", { credentials: "include" }).then(r => r.json()),
+    refetchInterval: 120_000,
+  });
+
+  const { data: overdueFollowUps = [], isLoading: followUpsLoading } = useQuery<OverdueFollowUp[]>({
+    queryKey: ["/api/follow-ups/overdue"],
+    queryFn: () => fetch("/api/follow-ups/overdue", { credentials: "include" }).then(r => r.json()),
     refetchInterval: 120_000,
   });
 
@@ -365,6 +378,14 @@ export default function ManagerDashboard() {
           color={behindScheduleJobs.length > 0 ? "bg-red-700" : "bg-slate-400"}
           sub="in-progress past end · scheduled past start"
           href="/jobs?behind_schedule=true"
+        />
+        <StatCard
+          title="Overdue Follow-ups"
+          value={overdueFollowUps.length}
+          icon={CalendarClock}
+          color={overdueFollowUps.length > 0 ? "bg-teal-600" : "bg-slate-400"}
+          sub="customers & leads needing follow-up"
+          href="/overdue"
         />
       </div>
 
@@ -559,6 +580,63 @@ export default function ManagerDashboard() {
 
         {/* ── Right column ────────────────────────────────────────────────── */}
         <div className="space-y-6">
+
+          {/* ── Overdue Follow-ups ───────────────────────────────────────── */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CalendarClock className="h-4 w-4 text-teal-500" />
+                Overdue Follow-ups
+                {overdueFollowUps.length > 0 && (
+                  <Badge variant="destructive" className="ml-auto">{overdueFollowUps.length}</Badge>
+                )}
+                {overdueFollowUps.length === 0 && (
+                  <Badge variant="secondary" className="ml-auto">0</Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {followUpsLoading ? (
+                <div className="p-6 text-sm text-muted-foreground text-center">Loading…</div>
+              ) : overdueFollowUps.length === 0 ? (
+                <div className="p-6 flex flex-col items-center gap-2">
+                  <CheckCircle className="h-8 w-8 text-green-500" />
+                  <p className="text-sm font-medium">All follow-ups are current!</p>
+                  <p className="text-xs text-muted-foreground">No customers or leads have overdue follow-up dates.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {overdueFollowUps.slice(0, 8).map(fu => (
+                    <Link key={`${fu.type}-${fu.id}`} href={fu.type === "customer" ? `/customers/${fu.id}` : "/consultations"}>
+                      <div className="flex items-center gap-3 px-4 py-3 hover:bg-teal-50/50 dark:hover:bg-teal-950/20 transition-colors cursor-pointer">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{fu.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            <span className="capitalize">{fu.type}</span>
+                            {fu.next_follow_up_date && (
+                              <span className="ml-1 opacity-70">
+                                · was {format(new Date(fu.next_follow_up_date), "MMM d, yyyy")}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-teal-400 flex-shrink-0" />
+                      </div>
+                    </Link>
+                  ))}
+                  {overdueFollowUps.length > 8 && (
+                    <div className="px-4 py-3">
+                      <Link href="/overdue">
+                        <span className="text-xs text-primary hover:underline cursor-pointer">
+                          View all {overdueFollowUps.length} overdue follow-ups →
+                        </span>
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* ── Quick Time Approval ──────────────────────────────────────── */}
           <Card>

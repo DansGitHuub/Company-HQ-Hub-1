@@ -113,6 +113,11 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
     )
     .catch(() => {});
 
+  // ─── Schema migration: next follow-up date ──────────────────────────────────
+  pool
+    .query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS next_follow_up_date DATE`)
+    .catch(() => {});
+
   // ─── LIST ────────────────────────────────────────────────────────────────────
   app.get("/api/customers", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
@@ -278,6 +283,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
       billing_zip,
       source,
       notes,
+      next_follow_up_date,
       phones = [],
       emails = [],
     } = req.body;
@@ -294,8 +300,8 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
         `UPDATE customers
          SET first_name=$1, last_name=$2, company_name=$3, billing_address=$4,
              billing_city=$5, billing_state=$6, billing_zip=$7, source=$8,
-             notes=$9, updated_at=now()
-         WHERE id=$10 RETURNING *`,
+             notes=$9, next_follow_up_date=$10, updated_at=now()
+         WHERE id=$11 RETURNING *`,
         [
           first_name.trim(),
           last_name.trim(),
@@ -306,6 +312,7 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
           billing_zip || null,
           source || null,
           notes || null,
+          next_follow_up_date || null,
           id,
         ],
       );
@@ -340,6 +347,22 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
       return res.status(500).json({ message: err.message });
     } finally {
       client.release();
+    }
+  });
+
+  // ─── QUICK PATCH: next follow-up date ────────────────────────────────────────
+  app.patch("/api/customers/:id/follow-up-date", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+    const { id } = req.params;
+    const { next_follow_up_date } = req.body;
+    try {
+      const { rows } = await pool.query(
+        `UPDATE customers SET next_follow_up_date=$1, updated_at=now() WHERE id=$2 RETURNING id, next_follow_up_date`,
+        [next_follow_up_date || null, id],
+      );
+      if (!rows[0]) return res.status(404).json({ message: "Customer not found" });
+      return res.json(rows[0]);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
     }
   });
 

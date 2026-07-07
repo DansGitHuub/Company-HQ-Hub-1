@@ -1024,6 +1024,7 @@ export default function AdminPanel() {
     scheduleConflicts: DailyPulseSection;
     openWorkRequests: DailyPulseSection;
     behindScheduleJobs: DailyPulseSection;
+    overdueFollowUps: DailyPulseSection;
   };
   const { data: dailyPulse, isLoading: dailyPulseLoading } = useQuery<DailyPulse>({
     queryKey: ["/api/admin/daily-pulse"],
@@ -1440,7 +1441,7 @@ export default function AdminPanel() {
                   <p className="text-xs text-muted-foreground mt-0.5">Things that need attention today, at a glance</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-px bg-border/30" data-testid="daily-pulse-cards">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-px bg-border/30" data-testid="daily-pulse-cards">
                 {([
                   {
                     key: "missingWorksheets",
@@ -1483,6 +1484,13 @@ export default function AdminPanel() {
                     desc: "In-progress past end · scheduled past start",
                     icon: Timer,
                     href: "/jobs?behind_schedule=true",
+                  },
+                  {
+                    key: "overdueFollowUps",
+                    label: "Overdue Follow-ups",
+                    desc: "Customers & leads past follow-up date",
+                    icon: CalendarClock,
+                    href: "/overdue",
                   },
                 ] as { key: keyof DailyPulse; label: string; desc: string; icon: any; href: string }[]).map((item) => {
                   const count = dailyPulse?.[item.key]?.count ?? 0;

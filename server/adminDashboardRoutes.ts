@@ -214,6 +214,28 @@ export function registerAdminDashboardRoutes(app: Express, requireAuth: any) {
         ORDER BY scheduled_date ASC
       `);
 
+      // ── 7. Overdue follow-ups (customers + leads) ──
+      const { rows: overdueFollowUpRows } = await pool.query(`
+        SELECT id,
+               COALESCE(company_name, first_name || ' ' || last_name) AS name,
+               next_follow_up_date,
+               'customer' AS type
+        FROM customers
+        WHERE next_follow_up_date IS NOT NULL
+          AND next_follow_up_date < CURRENT_DATE
+          AND is_active = true
+        UNION ALL
+        SELECT id,
+               COALESCE(contact_name, 'Unknown Lead') AS name,
+               next_follow_up_date,
+               'lead' AS type
+        FROM consultations
+        WHERE next_follow_up_date IS NOT NULL
+          AND next_follow_up_date < CURRENT_DATE
+          AND pipeline_stage NOT IN ('closed_won', 'closed_lost', 'closed')
+        ORDER BY next_follow_up_date ASC
+      `);
+
       res.json({
         date: today,
         missingWorksheets: { count: missingWorksheets.length, items: missingWorksheets },
@@ -222,6 +244,7 @@ export function registerAdminDashboardRoutes(app: Express, requireAuth: any) {
         scheduleConflicts: { count: conflicts.length, items: conflicts },
         openWorkRequests: { count: openWorkRequests.length, items: openWorkRequests },
         behindScheduleJobs: { count: behindScheduleJobs.length, items: behindScheduleJobs },
+        overdueFollowUps: { count: overdueFollowUpRows.length, items: overdueFollowUpRows },
       });
     } catch (err: any) {
       console.error("[admin/daily-pulse]", err.message);

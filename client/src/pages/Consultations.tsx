@@ -173,6 +173,7 @@ function emptyForm() {
     notes:               "",
     follow_up_required:  false,
     follow_up_date:      "",
+    next_follow_up_date: "",
     assigned_to:         "",
     estimated_value:     "",
     lead_source:         "",
@@ -223,6 +224,7 @@ function ConsultationModal({
           notes:               editing.notes ?? "",
           follow_up_required:  editing.follow_up_required ?? false,
           follow_up_date:      editing.follow_up_date ?? "",
+          next_follow_up_date: (editing as any).next_follow_up_date ?? "",
           assigned_to:         editing.assigned_to ?? "",
           estimated_value:     editing.estimated_value != null ? String(editing.estimated_value) : "",
           lead_source:         editing.lead_source ?? "",
@@ -289,7 +291,8 @@ function ConsultationModal({
       customer_id:     form.customer_id || null,
       assigned_to:     form.assigned_to || null,
       estimated_value: form.estimated_value ? parseFloat(form.estimated_value) : null,
-      follow_up_date:  form.follow_up_date || null,
+      follow_up_date:      form.follow_up_date || null,
+      next_follow_up_date: (form as any).next_follow_up_date || null,
       lead_source:     form.lead_source || null,
       budget_range:    form.budget_range || null,
       permit_status:   form.permit_status || null,
@@ -544,6 +547,15 @@ function ConsultationModal({
                   value={form.follow_up_date} onChange={e => f("follow_up_date", e.target.value)} />
               </div>
             )}
+          </div>
+
+          {/* Next Follow-up Date (CRM) */}
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold">Next Follow-up Date</Label>
+            <Input type="date" className="max-w-xs" data-testid="input-next-followup-date"
+              value={(form as any).next_follow_up_date ?? ""}
+              onChange={e => f("next_follow_up_date" as any, e.target.value)} />
+            <p className="text-xs text-muted-foreground">Set to track when this lead needs a follow-up call or email. Overdue dates appear on the Overdue page.</p>
           </div>
         </div>
 

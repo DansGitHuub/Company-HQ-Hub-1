@@ -9,7 +9,7 @@ import {
 } from "date-fns";
 import {
   Briefcase, DollarSign, CheckSquare, Wrench,
-  AlertTriangle, ChevronRight, CheckCircle, ExternalLink,
+  AlertTriangle, ChevronRight, CheckCircle, ExternalLink, CalendarClock, Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +54,13 @@ interface RawAsset {
   status: string;
   nextServiceDate: string | null;
   nextServiceTask: string | null;
+}
+
+interface RawFollowUp {
+  id: string;
+  name: string;
+  next_follow_up_date: string;
+  type: "customer" | "lead";
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -153,7 +160,13 @@ export default function OverduePage() {
     staleTime: 60_000,
   });
 
-  const isLoading = jobsLoading || invoicesLoading || tasksLoading || assetsLoading;
+  const { data: rawFollowUps = [], isLoading: followUpsLoading } = useQuery<RawFollowUp[]>({
+    queryKey: ["/api/follow-ups/overdue"],
+    queryFn: () => fetch("/api/follow-ups/overdue", { credentials: "include" }).then(r => r.json()),
+    staleTime: 60_000,
+  });
+
+  const isLoading = jobsLoading || invoicesLoading || tasksLoading || assetsLoading || followUpsLoading;
 
   // ── Compute overdue items ────────────────────────────────────────────────
 
@@ -191,7 +204,11 @@ export default function OverduePage() {
     .map(a => ({ ...a, daysOverdue: differenceInCalendarDays(today, parseDateSafe(a.nextServiceDate)!) }))
     .sort((a, b) => b.daysOverdue - a.daysOverdue);
 
-  const totalCount = overdueJobs.length + overdueInvoices.length + overdueTasks.length + overdueAssets.length;
+  const overdueFollowUps = rawFollowUps
+    .map(f => ({ ...f, daysOverdue: differenceInCalendarDays(today, parseDateSafe(f.next_follow_up_date)!) }))
+    .sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+  const totalCount = overdueJobs.length + overdueInvoices.length + overdueTasks.length + overdueAssets.length + overdueFollowUps.length;
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -209,7 +226,7 @@ export default function OverduePage() {
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Jobs, invoices, tasks, and maintenance past their due date · as of {format(today, "MMM d, yyyy")}
+            Jobs, invoices, tasks, maintenance, and follow-ups past their due date · as of {format(today, "MMM d, yyyy")}
           </p>
         </div>
       </div>
@@ -408,6 +425,56 @@ export default function OverduePage() {
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full border", daysBadgeClass(asset.daysOverdue))}>
                         {daysLabel(asset.daysOverdue)}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Group 5: Overdue Follow-ups ─────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-normal">
+            <SectionHeader
+              icon={CalendarClock}
+              title="Overdue Follow-ups"
+              count={overdueFollowUps.length}
+              accentClass="bg-teal-600"
+            />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {followUpsLoading ? (
+            <div className="px-4 py-5 text-sm text-muted-foreground">Loading…</div>
+          ) : overdueFollowUps.length === 0 ? (
+            <div className="px-4 pb-4">
+              <AllClear label="No customers or leads have overdue follow-up dates." />
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {overdueFollowUps.map(fu => (
+                <Link key={`${fu.type}-${fu.id}`} href={fu.type === "customer" ? `/customers/${fu.id}` : "/consultations"}>
+                  <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 cursor-pointer group">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{fu.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        <span className="capitalize">{fu.type}</span>
+                        {fu.next_follow_up_date && (
+                          <span className="ml-2 opacity-70">
+                            · Follow-up was {format(parseDateSafe(fu.next_follow_up_date)!, "MMM d, yyyy")}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full border", daysBadgeClass(fu.daysOverdue))}>
+                        {daysLabel(fu.daysOverdue)}
                       </span>
                       <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                     </div>

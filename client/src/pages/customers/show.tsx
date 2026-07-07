@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -24,7 +24,7 @@ import {
   Loader2, Pencil, Plus, Trash2, CheckCircle2, XCircle,
   Briefcase, DollarSign, CalendarDays, Clock, Home, LayoutGrid, Calculator,
   AlertTriangle, Archive, ArchiveRestore, Link2,
-  ClipboardList, FolderOpen, MessageSquare, ExternalLink, Download,
+  ClipboardList, FolderOpen, MessageSquare, ExternalLink, Download, CalendarClock, Save,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -620,6 +620,90 @@ function PropertyModal({ open, onClose, customerId, editing, onSaved }:
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Follow-up Date Card ────────────────────────────────────────────────────────
+function FollowUpDateCard({
+  customerId,
+  currentDate,
+  isAdminOrManager,
+}: {
+  customerId: string;
+  currentDate: string | null;
+  isAdminOrManager: boolean;
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [dateVal, setDateVal] = useState(currentDate ?? "");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setDateVal(currentDate ?? "");
+  }, [currentDate]);
+
+  const mut = useMutation({
+    mutationFn: (date: string) =>
+      fetch(`/api/customers/${customerId}/follow-up-date`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ next_follow_up_date: date || null }),
+      }).then(r => { if (!r.ok) throw new Error("Save failed"); return r.json(); }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/customers", customerId] });
+      qc.invalidateQueries({ queryKey: ["/api/follow-ups/overdue"] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      toast({ title: "Follow-up date saved" });
+    },
+    onError: () => toast({ title: "Failed to save follow-up date", variant: "destructive" }),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <CalendarClock className="h-4 w-4 text-teal-500" />
+          Next Follow-up Date
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isAdminOrManager ? (
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              className="max-w-[180px] text-sm"
+              value={dateVal}
+              data-testid="input-customer-follow-up-date"
+              onChange={e => setDateVal(e.target.value)}
+              onBlur={e => { if (e.target.value !== (currentDate ?? "")) mut.mutate(e.target.value); }}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              data-testid="btn-save-follow-up-date"
+              disabled={mut.isPending}
+              onClick={() => mut.mutate(dateVal)}
+              className={saved ? "border-green-500 text-green-600" : ""}
+            >
+              {saved ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
+            </Button>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {currentDate ? format(new Date(currentDate), "MMMM d, yyyy") : "Not set"}
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground mt-1.5">
+          {currentDate ? (
+            new Date(currentDate) < new Date(new Date().toDateString())
+              ? <span className="text-amber-600 font-medium">Overdue — follow-up was {format(new Date(currentDate), "MMM d, yyyy")}</span>
+              : `Follow-up scheduled for ${format(new Date(currentDate), "MMMM d, yyyy")}`
+          ) : "No follow-up date set"}
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1323,6 +1407,9 @@ export default function CustomerDetailPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Next Follow-up Date */}
+              <FollowUpDateCard customerId={customer.id} currentDate={(customer as any).next_follow_up_date ?? null} isAdminOrManager={isAdminOrManager} />
 
               {/* Recent jobs preview */}
               {jobs.length > 0 && (

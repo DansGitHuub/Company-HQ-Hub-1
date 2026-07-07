@@ -36,6 +36,7 @@ import { registerJobRoutes } from "./jobRoutes";
 import { registerInvoiceRoutes } from "./invoiceRoutes";
 import { registerReportRoutes } from "./reportRoutes";
 import { registerConsultationRoutes } from "./consultationRoutes";
+import { registerFollowUpRoutes } from "./followUpRoutes";
 import { registerServiceTypesRoutes } from "./serviceTypesRoutes";
 import { registerBusinessRulesRoutes } from "./businessRulesRoutes";
 import { registerAutomationRoutes } from "./automationRoutes";
@@ -117,6 +118,7 @@ export async function registerRoutes(
   registerInvoiceRoutes(app, requireAuth);
   registerReportRoutes(app, requireAuth);
   await registerConsultationRoutes(app, requireAuth);
+  registerFollowUpRoutes(app, requireAuth);
   await registerServiceTypesRoutes(app, requireAuth, requireAdmin);
   await registerBusinessRulesRoutes(app, requireAuth, requireAdmin);
   await registerAutomationRoutes(app, requireAuth, requireAdmin);
