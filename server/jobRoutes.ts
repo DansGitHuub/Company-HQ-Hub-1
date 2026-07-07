@@ -89,13 +89,14 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
 
   // ── LIST ──────────────────────────────────────────────────────────────────────
   app.get("/api/jobs", requireAuth, async (req, res) => {
-    const { status, customer_id, date_from, date_to, search } = req.query as Record<string, string>;
+    const { status, customer_id, date_from, date_to, search, behind_schedule } = req.query as Record<string, string>;
 
     try {
       let q = `
         SELECT
           j.id, j.title, j.client, j.status, j.job_type, j.type,
           j.stage, j.category, j.price, j.value,
+          j.progress,
           j.scheduled_date, j.scheduled_start_time, j.scheduled_end_time,
           j.completion_date, j.estimated_hours, j.address, j.city, j.state,
           j.customer_id, j.property_id, j.created_at,
@@ -104,7 +105,20 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
           c.company_name AS cust_company,
           p.address     AS prop_address,
           p.city        AS prop_city,
-          p.state       AS prop_state
+          p.state       AS prop_state,
+          CASE WHEN (
+            (j.status = 'in_progress' AND COALESCE(j.progress, 0) < 100
+             AND j.scheduled_date IS NOT NULL
+             AND (CASE WHEN j.scheduled_end_time IS NOT NULL
+                       THEN (j.scheduled_date::date::text || ' ' || j.scheduled_end_time)::timestamp < NOW()
+                       ELSE j.scheduled_date::date < CURRENT_DATE END))
+            OR
+            (j.status = 'scheduled'
+             AND j.scheduled_date IS NOT NULL
+             AND (CASE WHEN j.scheduled_start_time IS NOT NULL
+                       THEN (j.scheduled_date::date::text || ' ' || j.scheduled_start_time)::timestamp < NOW()
+                       ELSE j.scheduled_date::date < CURRENT_DATE END))
+          ) THEN true ELSE false END AS is_behind_schedule
         FROM jobs j
         LEFT JOIN customers c ON c.id = j.customer_id
         LEFT JOIN properties p ON p.id = j.property_id
@@ -134,6 +148,19 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
         const idx = params.length;
         q += ` AND (j.title ILIKE $${idx} OR j.client ILIKE $${idx} OR j.address ILIKE $${idx}
                     OR c.first_name ILIKE $${idx} OR c.last_name ILIKE $${idx} OR c.company_name ILIKE $${idx})`;
+      }
+
+      if (behind_schedule === "true") {
+        q += ` AND ((j.status = 'in_progress' AND COALESCE(j.progress, 0) < 100
+               AND j.scheduled_date IS NOT NULL
+               AND (CASE WHEN j.scheduled_end_time IS NOT NULL
+                         THEN (j.scheduled_date::date::text || ' ' || j.scheduled_end_time)::timestamp < NOW()
+                         ELSE j.scheduled_date::date < CURRENT_DATE END))
+              OR (j.status = 'scheduled'
+               AND j.scheduled_date IS NOT NULL
+               AND (CASE WHEN j.scheduled_start_time IS NOT NULL
+                         THEN (j.scheduled_date::date::text || ' ' || j.scheduled_start_time)::timestamp < NOW()
+                         ELSE j.scheduled_date::date < CURRENT_DATE END)))`;
       }
 
       q += ` ORDER BY j.created_at DESC`;

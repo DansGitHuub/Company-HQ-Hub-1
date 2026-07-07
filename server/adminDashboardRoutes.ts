@@ -193,6 +193,27 @@ export function registerAdminDashboardRoutes(app: Express, requireAuth: any) {
         ORDER BY wr.created_at ASC
       `);
 
+      // ── 6. Behind-schedule jobs ──
+      const { rows: behindScheduleJobs } = await pool.query(`
+        SELECT id, client, title, scheduled_date, status, progress,
+               scheduled_start_time, scheduled_end_time
+        FROM jobs
+        WHERE (
+          (status = 'in_progress' AND COALESCE(progress, 0) < 100
+           AND scheduled_date IS NOT NULL
+           AND (CASE WHEN scheduled_end_time IS NOT NULL
+                     THEN (scheduled_date::date::text || ' ' || scheduled_end_time)::timestamp < NOW()
+                     ELSE scheduled_date::date < CURRENT_DATE END))
+          OR
+          (status = 'scheduled'
+           AND scheduled_date IS NOT NULL
+           AND (CASE WHEN scheduled_start_time IS NOT NULL
+                     THEN (scheduled_date::date::text || ' ' || scheduled_start_time)::timestamp < NOW()
+                     ELSE scheduled_date::date < CURRENT_DATE END))
+        )
+        ORDER BY scheduled_date ASC
+      `);
+
       res.json({
         date: today,
         missingWorksheets: { count: missingWorksheets.length, items: missingWorksheets },
@@ -200,6 +221,7 @@ export function registerAdminDashboardRoutes(app: Express, requireAuth: any) {
         overdueJobs: { count: overdueJobs.length, items: overdueJobs },
         scheduleConflicts: { count: conflicts.length, items: conflicts },
         openWorkRequests: { count: openWorkRequests.length, items: openWorkRequests },
+        behindScheduleJobs: { count: behindScheduleJobs.length, items: behindScheduleJobs },
       });
     } catch (err: any) {
       console.error("[admin/daily-pulse]", err.message);

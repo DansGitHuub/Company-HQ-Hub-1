@@ -28,6 +28,10 @@ interface JobRow {
   id: string; title: string; client: string; status: string;
   job_type: string | null; type: string | null;
   scheduled_date: string | null;
+  scheduled_start_time: string | null;
+  scheduled_end_time: string | null;
+  progress: number | null;
+  is_behind_schedule: boolean;
   price: string | null; value: number | null;
   customer_id: string | null;
   cust_first: string | null; cust_last: string | null; cust_company: string | null;
@@ -51,6 +55,15 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${s.cls}`}>
       {s.labelKey ? t(s.labelKey) : status}
+    </span>
+  );
+}
+
+function BehindScheduleBadge() {
+  return (
+    <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 ml-1">
+      <AlertCircle className="w-3 h-3" />
+      Behind Schedule
     </span>
   );
 }
@@ -237,15 +250,22 @@ export default function JobsPage() {
   const isAdminOrManager = ["Admin", "Manager", "Master Admin"].includes(effectiveRole ?? "");
 
   const STATUS_TABS = [
-    { value: "all",         label: tJobs("all") },
-    { value: "lead",        label: "Not Accepted" },
-    { value: "scheduled",   label: tJobs("scheduled") },
-    { value: "in_progress", label: tJobs("inProgress") },
-    { value: "completed",   label: tJobs("completed") },
-    { value: "invoiced",    label: tJobs("invoiced") },
+    { value: "all",             label: tJobs("all") },
+    { value: "lead",            label: "Not Accepted" },
+    { value: "scheduled",       label: tJobs("scheduled") },
+    { value: "in_progress",     label: tJobs("inProgress") },
+    { value: "completed",       label: tJobs("completed") },
+    { value: "invoiced",        label: tJobs("invoiced") },
+    { value: "behind_schedule", label: "Behind Schedule" },
   ];
 
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("behind_schedule") === "true") return "behind_schedule";
+    const s = sp.get("status");
+    if (s && s !== "all") return s;
+    return "all";
+  });
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -254,7 +274,11 @@ export default function JobsPage() {
 
   // Build query params
   const params = new URLSearchParams();
-  if (activeTab !== "all") params.set("status", activeTab);
+  if (activeTab === "behind_schedule") {
+    params.set("behind_schedule", "true");
+  } else if (activeTab !== "all") {
+    params.set("status", activeTab);
+  }
   if (search.trim()) params.set("search", search.trim());
   if (dateFrom) params.set("date_from", dateFrom);
   if (dateTo) params.set("date_to", dateTo);
@@ -337,6 +361,8 @@ export default function JobsPage() {
               activeTab === tab.value
                 ? tab.value === "lead"
                   ? "bg-amber-500 text-white"
+                  : tab.value === "behind_schedule"
+                  ? "bg-red-600 text-white"
                   : "bg-primary text-primary-foreground"
                 : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
@@ -446,7 +472,10 @@ export default function JobsPage() {
                       {fmtDate(job.scheduled_date)}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={job.status || "lead"} />
+                      <div className="flex items-center flex-wrap gap-y-1">
+                        <StatusBadge status={job.status || "lead"} />
+                        {job.is_behind_schedule && <BehindScheduleBadge />}
+                      </div>
                     </TableCell>
                     {isAdminOrManager && (
                       <TableCell className="hidden sm:table-cell text-sm font-medium text-right">

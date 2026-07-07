@@ -68,6 +68,17 @@ interface Job {
   scheduled_date: string | null;
 }
 
+interface BehindScheduleJob {
+  id: string;
+  title: string;
+  client: string;
+  status: string;
+  progress: number | null;
+  scheduled_date: string | null;
+  scheduled_start_time: string | null;
+  scheduled_end_time: string | null;
+}
+
 interface PendingCO {
   id: string;
   co_number: string;
@@ -198,6 +209,13 @@ export default function ManagerDashboard() {
     queryKey: ["/api/jobs", "scheduled,in_progress,sold,active"],
     queryFn: () =>
       fetch("/api/jobs?status=scheduled,in_progress,sold,active", { credentials: "include" }).then(r => r.json()),
+  });
+
+  const { data: behindScheduleJobs = [], isLoading: behindScheduleLoading } = useQuery<BehindScheduleJob[]>({
+    queryKey: ["/api/jobs", "behind_schedule"],
+    queryFn: () =>
+      fetch("/api/jobs?behind_schedule=true", { credentials: "include" }).then(r => r.json()),
+    refetchInterval: 120_000,
   });
 
   const { data: pendingCOs = [], isLoading: cosLoading } = useQuery<PendingCO[]>({
@@ -340,6 +358,14 @@ export default function ManagerDashboard() {
           sub="past scheduled date → view all overdue"
           href="/overdue"
         />
+        <StatCard
+          title="Behind Schedule"
+          value={behindScheduleJobs.length}
+          icon={Timer}
+          color={behindScheduleJobs.length > 0 ? "bg-red-700" : "bg-slate-400"}
+          sub="in-progress past end · scheduled past start"
+          href="/jobs?behind_schedule=true"
+        />
       </div>
 
       {/* Main 2-col grid */}
@@ -454,6 +480,73 @@ export default function ManagerDashboard() {
                       <Link href="/jobs?status=active">
                         <span className="text-xs text-primary hover:underline cursor-pointer">
                           View all {activeJobs.length} jobs →
+                        </span>
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── Behind Schedule Jobs ────────────────────────────────────── */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Timer className="h-4 w-4 text-red-500" />
+                Behind Schedule
+                {behindScheduleJobs.length > 0 && (
+                  <Badge variant="destructive" className="ml-auto">{behindScheduleJobs.length}</Badge>
+                )}
+                {behindScheduleJobs.length === 0 && (
+                  <Badge variant="secondary" className="ml-auto">0</Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {behindScheduleLoading ? (
+                <div className="p-6 text-sm text-muted-foreground text-center">Loading…</div>
+              ) : behindScheduleJobs.length === 0 ? (
+                <div className="p-6 flex flex-col items-center gap-2">
+                  <CheckCircle className="h-8 w-8 text-green-500" />
+                  <p className="text-sm font-medium">All jobs on track!</p>
+                  <p className="text-xs text-muted-foreground">No jobs are behind schedule right now.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {behindScheduleJobs.slice(0, 10).map(job => (
+                    <Link key={job.id} href={`/jobs/${job.id}`}>
+                      <div className="flex items-center gap-4 px-6 py-3 hover:bg-red-50/50 dark:hover:bg-red-950/20 transition-colors cursor-pointer">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm text-foreground truncate max-w-[200px]">
+                              {job.client || job.title || "Unnamed Job"}
+                            </span>
+                            <Badge variant="outline" className="text-xs border-red-400 text-red-600 dark:text-red-400">
+                              {job.status === "in_progress" ? "In Progress" : "Scheduled"}
+                            </Badge>
+                            {job.progress !== null && job.progress !== undefined && (
+                              <span className="text-xs text-muted-foreground">{job.progress}%</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {job.status === "in_progress"
+                              ? `End: ${job.scheduled_end_time ?? "—"}`
+                              : `Start: ${job.scheduled_start_time ?? "—"}`}
+                            {job.scheduled_date
+                              ? ` · ${format(new Date(job.scheduled_date), "MMM d")}`
+                              : ""}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-red-400 flex-shrink-0" />
+                      </div>
+                    </Link>
+                  ))}
+                  {behindScheduleJobs.length > 10 && (
+                    <div className="px-6 py-3">
+                      <Link href="/jobs?behind_schedule=true">
+                        <span className="text-xs text-primary hover:underline cursor-pointer">
+                          View all {behindScheduleJobs.length} behind-schedule jobs →
                         </span>
                       </Link>
                     </div>
