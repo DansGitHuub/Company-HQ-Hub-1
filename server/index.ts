@@ -74,6 +74,7 @@ import { runAuditLogMigration } from "./migrations/auditLog";
 import { runVendorsMigration } from "./migrations/vendors";
 import { runTestAccountFlagMigration } from "./migrations/testAccountFlag";
 import { runCrewTimeTrackingMigration } from "./migrations/crewTimeTracking";
+import { runWorksheetChecklistMigration } from "./migrations/worksheetChecklist";
 import { syncCCProjectsFromApi } from "./companyCamRoutes";
 import { registerPublicPages } from "./publicPages";
 import { startLeadAlertScheduler } from "./consultationRoutes";
@@ -237,6 +238,7 @@ app.use((req, res, next) => {
   await runVendorsMigration();
   await runTestAccountFlagMigration();
   await runCrewTimeTrackingMigration();
+  await runWorksheetChecklistMigration();
 
   // ── Step 3: Register routes and seeds ──────────────────────────────────────
   // Public pages must come before registerRoutes (which sets up the catch-all).

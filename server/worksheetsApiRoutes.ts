@@ -328,9 +328,9 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
   // ── POST /api/worksheets/:id/submit ──────────────────────────────────────────
   app.post("/api/worksheets/:id/submit", requireAuth, async (req, res) => {
     try {
-      // Fetch worksheet + submitter name before updating so we have the info for notifications
+      // Fetch worksheet + submitter name + job_id before updating
       const { rows: wsRows } = await pool.query(
-        `SELECT w.id, w.date, w.user_id, COALESCE(u.name, u.username) AS employee_name
+        `SELECT w.id, w.date, w.job_id, w.user_id, COALESCE(u.name, u.username) AS employee_name
          FROM worksheets w
          LEFT JOIN users u ON u.id = w.user_id
          WHERE w.id = $1`,
@@ -343,13 +343,125 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
 
       const ws = wsRows[0];
 
-      // Mark as submitted
+      // Extract the 4 checklist answers from the request body (all optional for backward compat)
+      const {
+        checklist_work_order_changed  = false,
+        checklist_work_order_note     = null,
+        checklist_materials_needed    = false,
+        checklist_materials_note      = null,
+        checklist_change_order_needed = false,
+        checklist_change_order_note   = null,
+        checklist_issue_reported      = false,
+        checklist_issue_note          = null,
+      } = req.body ?? {};
+
+      // Mark as submitted and save checklist answers atomically
       await pool.query(
-        `UPDATE worksheets SET status = 'submitted', updated_at = NOW() WHERE id = $1`,
-        [req.params.id]
+        `UPDATE worksheets SET
+           status                       = 'submitted',
+           updated_at                   = NOW(),
+           checklist_work_order_changed  = $2,
+           checklist_work_order_note     = $3,
+           checklist_materials_needed    = $4,
+           checklist_materials_note      = $5,
+           checklist_change_order_needed = $6,
+           checklist_change_order_note   = $7,
+           checklist_issue_reported      = $8,
+           checklist_issue_note          = $9
+         WHERE id = $1`,
+        [
+          req.params.id,
+          !!checklist_work_order_changed,  checklist_work_order_note  || null,
+          !!checklist_materials_needed,    checklist_materials_note   || null,
+          !!checklist_change_order_needed, checklist_change_order_note|| null,
+          !!checklist_issue_reported,      checklist_issue_note       || null,
+        ]
       );
 
-      // Fire notifications to all managers/admins (non-blocking)
+      // ── Q1: Work order changed → append highlighted note to worksheet ──────────
+      if (checklist_work_order_changed && checklist_work_order_note?.trim()) {
+        await pool.query(
+          `UPDATE worksheets
+             SET notes = COALESCE(notes || E'\\n\\n', '') || $2
+           WHERE id = $1`,
+          [req.params.id, `⚠️ FIELD FLAG — Work Order Changed:\n${checklist_work_order_note.trim()}`]
+        ).catch((e: any) => console.error("[worksheets] Q1 note append:", e.message));
+      }
+
+      // ── Q2: Materials needed → insert worksheet_materials row ─────────────────
+      if (checklist_materials_needed && checklist_materials_note?.trim()) {
+        await pool.query(
+          `INSERT INTO worksheet_materials (worksheet_id, material_name, notes)
+           VALUES ($1, '⚠️ Additional Materials Needed', $2)`,
+          [req.params.id, checklist_materials_note.trim()]
+        ).catch((e: any) => console.error("[worksheets] Q2 material insert:", e.message));
+      }
+
+      // ── Q3: Change order needed → create draft change order (requires job) ────
+      if (checklist_change_order_needed && checklist_change_order_note?.trim() && ws.job_id) {
+        try {
+          const { rows: jobRows } = await pool.query(
+            `SELECT customer_id FROM jobs WHERE id = $1`,
+            [ws.job_id]
+          );
+          if (jobRows.length) {
+            const { rows: seqRows } = await pool.query(`SELECT nextval('co_number_seq') AS n`);
+            const coNum = `CO-${String(Number(seqRows[0].n)).padStart(5, "0")}`;
+            await pool.query(
+              `INSERT INTO job_change_orders
+                 (job_id, customer_id, co_number, title, description, status,
+                  subtotal, tax_rate, tax_amount, total, created_by)
+               VALUES ($1, $2, $3, $4, $5, 'draft', 0, 0, 0, 0, $6)`,
+              [
+                ws.job_id,
+                jobRows[0].customer_id || null,
+                coNum,
+                "Possible Change Order — Field Flag",
+                checklist_change_order_note.trim(),
+                ws.user_id,
+              ]
+            );
+            console.log(`[worksheets] Draft CO ${coNum} created for job ${ws.job_id}`);
+          }
+        } catch (coErr: any) {
+          console.error("[worksheets] Q3 draft CO creation:", coErr.message);
+        }
+      }
+
+      // ── Q4: Issue reported → append to job notes + notify all managers ────────
+      if (checklist_issue_reported && checklist_issue_note?.trim()) {
+        const issueText = `⚠️ FIELD ISSUE (${ws.employee_name || "Crew"}): ${checklist_issue_note.trim()}`;
+
+        if (ws.job_id) {
+          pool.query(
+            `UPDATE jobs SET notes = COALESCE(notes || E'\\n\\n', '') || $2 WHERE id = $1`,
+            [ws.job_id, issueText]
+          ).catch((e: any) => console.error("[worksheets] Q4 job notes append:", e.message));
+        }
+
+        // Notify all Admins + Managers (in-app bell only — no email for field alerts)
+        pool.query(
+          `SELECT id FROM users WHERE (role = ANY($1) OR "is_master_admin" = true)`,
+          [MANAGER_ROLES]
+        ).then(({ rows: managers }) => {
+          const link = ws.job_id ? `/jobs/${ws.job_id}` : "/admin/worksheets";
+          return Promise.all(managers.map((mgr: any) =>
+            pool.query(
+              `INSERT INTO staff_notifications (id, user_id, type, title, message, link, metadata)
+               VALUES (gen_random_uuid(), $1, 'field_issue_report', $2, $3, $4, $5)`,
+              [
+                mgr.id,
+                `Field Issue — ${ws.employee_name || "Crew Member"}`,
+                `${ws.employee_name || "A crew member"} reported a damage/delay/customer issue on their worksheet.`,
+                link,
+                JSON.stringify({ worksheetId: ws.id, jobId: ws.job_id || null, note: checklist_issue_note.trim() }),
+              ]
+            )
+          ));
+        }).catch((e: any) => console.error("[worksheets] Q4 issue notify:", e.message));
+      }
+
+      // Fire standard worksheet-submitted notifications to all managers/admins
       const dateStr = ws.date
         ? (ws.date instanceof Date ? ws.date.toISOString().slice(0, 10) : String(ws.date).slice(0, 10))
         : "";

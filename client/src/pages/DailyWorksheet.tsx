@@ -18,10 +18,18 @@ import {
   ClipboardList, Plus, Trash2, Send, Save, Loader2, PackageOpen,
   Receipt, Users, StickyNote, Briefcase, ChevronDown, ChevronRight,
   ImagePlus, X, HardHat, Sun, Coffee, Car, Wrench, LogOut as ClockOutIcon,
-  CheckCircle2, MapPin, Clock,
+  CheckCircle2, MapPin, Clock, AlertTriangle, ClipboardCheck,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type ChecklistAnswer = "yes" | "no" | null;
+interface ChecklistState {
+  q1: ChecklistAnswer; q1note: string;
+  q2: ChecklistAnswer; q2note: string;
+  q3: ChecklistAnswer; q3note: string;
+  q4: ChecklistAnswer; q4note: string;
+}
 
 interface Material {
   id: number;
@@ -708,12 +716,35 @@ export default function DailyWorksheet() {
 
   // ── Submit worksheet ──────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const handleSubmit = async () => {
+  const [showChecklist, setShowChecklist] = useState(false);
+
+  const emptyChecklist = (): ChecklistState => ({
+    q1: null, q1note: "", q2: null, q2note: "",
+    q3: null, q3note: "", q4: null, q4note: "",
+  });
+  const [cl, setCl] = useState<ChecklistState>(emptyChecklist());
+
+  const openChecklist = () => {
+    setCl(emptyChecklist());
+    setShowChecklist(true);
+  };
+
+  const handleSubmit = async (checklist: ChecklistState) => {
     if (!ws) return;
     setIsSubmitting(true);
+    setShowChecklist(false);
     try {
       await apiRequest("PATCH", `/api/worksheets/${ws.id}`, { notes });
-      await apiRequest("POST", `/api/worksheets/${ws.id}/submit`, {});
+      await apiRequest("POST", `/api/worksheets/${ws.id}/submit`, {
+        checklist_work_order_changed:  checklist.q1 === "yes",
+        checklist_work_order_note:     checklist.q1 === "yes" ? checklist.q1note : null,
+        checklist_materials_needed:    checklist.q2 === "yes",
+        checklist_materials_note:      checklist.q2 === "yes" ? checklist.q2note : null,
+        checklist_change_order_needed: checklist.q3 === "yes",
+        checklist_change_order_note:   checklist.q3 === "yes" ? checklist.q3note : null,
+        checklist_issue_reported:      checklist.q4 === "yes",
+        checklist_issue_note:          checklist.q4 === "yes" ? checklist.q4note : null,
+      });
       qc.invalidateQueries({ queryKey: ["/api/worksheets/today"] });
       toast({ title: "Worksheet submitted!", description: "Your worksheet has been submitted." });
     } catch (err: any) {
@@ -1321,7 +1352,7 @@ export default function DailyWorksheet() {
               {isSavingNotes ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
               {t("saveDraft")}
             </Button>
-            <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-1 h-10 bg-green-700 hover:bg-green-800" data-testid="btn-submit-worksheet">
+            <Button onClick={openChecklist} disabled={isSubmitting} className="flex-1 h-10 bg-green-700 hover:bg-green-800" data-testid="btn-submit-worksheet">
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
               {t("submitWorksheet")}
             </Button>
@@ -1335,6 +1366,17 @@ export default function DailyWorksheet() {
             ✓ Worksheet submitted for {formatDate(ws.date)}
           </p>
         </div>
+      )}
+
+      {/* ── Pre-Submit Checklist Dialog ── */}
+      {showChecklist && (
+        <ChecklistDialog
+          cl={cl}
+          setCl={setCl}
+          onConfirm={() => handleSubmit(cl)}
+          onCancel={() => setShowChecklist(false)}
+          isPending={isSubmitting}
+        />
       )}
 
       {/* ── Work Area Picker Dialog ── */}
@@ -1388,5 +1430,132 @@ export default function DailyWorksheet() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// ─── Pre-Submit Checklist Dialog ──────────────────────────────────────────────
+function ChecklistDialog({
+  cl, setCl, onConfirm, onCancel, isPending,
+}: {
+  cl: ChecklistState;
+  setCl: React.Dispatch<React.SetStateAction<ChecklistState>>;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  const QUESTIONS: {
+    key: keyof Pick<ChecklistState, "q1" | "q2" | "q3" | "q4">;
+    noteKey: keyof Pick<ChecklistState, "q1note" | "q2note" | "q3note" | "q4note">;
+    label: string;
+    icon: React.ReactNode;
+    placeholder: string;
+  }[] = [
+    {
+      key: "q1", noteKey: "q1note",
+      label: "Did anything change from the work order?",
+      icon: <ClipboardCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />,
+      placeholder: "Briefly describe what changed…",
+    },
+    {
+      key: "q2", noteKey: "q2note",
+      label: "Are more materials needed?",
+      icon: <PackageOpen className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />,
+      placeholder: "What materials and roughly how much?",
+    },
+    {
+      key: "q3", noteKey: "q3note",
+      label: "Might a change order be needed?",
+      icon: <Receipt className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />,
+      placeholder: "Briefly describe the scope change…",
+    },
+    {
+      key: "q4", noteKey: "q4note",
+      label: "Was there any damage, delay, or customer issue?",
+      icon: <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />,
+      placeholder: "Describe what happened…",
+    },
+  ];
+
+  const allAnswered = QUESTIONS.every((q) => cl[q.key] !== null);
+  const notesValid = QUESTIONS.every(
+    (q) => cl[q.key] !== "yes" || cl[q.noteKey].trim().length > 0
+  );
+  const canSubmit = allAnswered && notesValid && !isPending;
+
+  return (
+    <Dialog open={true} onOpenChange={(o) => { if (!o) onCancel(); }}>
+      <DialogContent className="max-w-sm mx-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-gray-800">
+            <Send className="w-4 h-4" />
+            Before You Submit
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-1">
+          <p className="text-xs text-gray-500">Answer all 4 questions — quick yes or no. A note is only required if you answer yes.</p>
+
+          {QUESTIONS.map((q, idx) => (
+            <div key={q.key} className="space-y-1.5">
+              <div className="flex items-start gap-2">
+                {q.icon}
+                <span className="text-sm font-medium text-gray-800 leading-snug">{idx + 1}. {q.label}</span>
+              </div>
+              <div className="flex gap-2 ml-6">
+                <button
+                  type="button"
+                  data-testid={`checklist-${q.key}-no`}
+                  onClick={() => setCl((prev) => ({ ...prev, [q.key]: "no", [q.noteKey]: "" }))}
+                  className={`flex-1 h-8 rounded-md text-sm font-medium border transition-colors ${
+                    cl[q.key] === "no"
+                      ? "bg-gray-700 text-white border-gray-700"
+                      : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  No
+                </button>
+                <button
+                  type="button"
+                  data-testid={`checklist-${q.key}-yes`}
+                  onClick={() => setCl((prev) => ({ ...prev, [q.key]: "yes" }))}
+                  className={`flex-1 h-8 rounded-md text-sm font-medium border transition-colors ${
+                    cl[q.key] === "yes"
+                      ? "bg-amber-500 text-white border-amber-500"
+                      : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  Yes
+                </button>
+              </div>
+              {cl[q.key] === "yes" && (
+                <Textarea
+                  data-testid={`checklist-${q.key}-note`}
+                  value={cl[q.noteKey]}
+                  onChange={(e) => setCl((prev) => ({ ...prev, [q.noteKey]: e.target.value }))}
+                  placeholder={q.placeholder}
+                  rows={2}
+                  className="ml-6 resize-none text-sm"
+                />
+              )}
+            </div>
+          ))}
+        </div>
+
+        <DialogFooter className="gap-2 pt-1">
+          <Button variant="outline" onClick={onCancel} disabled={isPending} className="flex-1">
+            Cancel
+          </Button>
+          <Button
+            data-testid="checklist-confirm-submit"
+            onClick={onConfirm}
+            disabled={!canSubmit}
+            className="flex-1 bg-green-700 hover:bg-green-800 text-white"
+          >
+            {isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Send className="w-4 h-4 mr-1" />}
+            Confirm & Submit
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

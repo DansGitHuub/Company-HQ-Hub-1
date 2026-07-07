@@ -3049,6 +3049,14 @@ export const worksheets = pgTable("worksheets", {
   signatureUrl: text("signature_url"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  checklistWorkOrderChanged: boolean("checklist_work_order_changed").notNull().default(false),
+  checklistWorkOrderNote: text("checklist_work_order_note"),
+  checklistMaterialsNeeded: boolean("checklist_materials_needed").notNull().default(false),
+  checklistMaterialsNote: text("checklist_materials_note"),
+  checklistChangeOrderNeeded: boolean("checklist_change_order_needed").notNull().default(false),
+  checklistChangeOrderNote: text("checklist_change_order_note"),
+  checklistIssueReported: boolean("checklist_issue_reported").notNull().default(false),
+  checklistIssueNote: text("checklist_issue_note"),
 }, (t) => ({
   userDateUniq: unique("worksheets_user_date_uidx").on(t.userId, t.date),
 }));
