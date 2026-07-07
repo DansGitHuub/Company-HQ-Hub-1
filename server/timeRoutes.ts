@@ -144,21 +144,118 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
 
       await client.query("COMMIT");
 
-      // Audit log — fire-and-forget outside the transaction
-      const durMin = result.rows[0].duration_minutes;
+      const entryRow = result.rows[0];
+      const durMin = entryRow.duration_minutes;
       const durDesc = durMin != null ? ` after ${durMin} minutes` : "";
+
+      // Audit log — fire-and-forget outside the transaction
       pool.query(
         `INSERT INTO activity_log (id, user_id, event_type, description, link, seen_by, created_at)
          VALUES (gen_random_uuid(), $1, 'time_entry_clock_out', $2, '/admin/time-reports', '[]'::jsonb, now())`,
         [userId, `Clocked out${durDesc}`]
       ).catch((e: any) => console.error("[timeRoutes] audit log clock-out:", e.message));
 
-      return res.json(result.rows[0]);
+      // ── Flag detection (runs outside the transaction) ───────────────────────
+      let flagInfo: any = null;
+      if (durMin != null) {
+        const durH = durMin / 60;
+        let flagType: string | null = null;
+        let flagMessage = "";
+        let flagThresholdHours = 0;
+        let flagActualHours = Math.round(durH * 100) / 100;
+
+        // Too short: < 15 min for billable entries
+        if (!flagType && entryRow.entry_type === "billable" && durMin < 15) {
+          flagType = "too_short";
+          flagMessage = `Billable session was only ${durMin} min — please confirm this is correct.`;
+          flagThresholdHours = 0.25;
+        }
+
+        // Too long: > max(estimated_hours × 1.5, 10 h)
+        if (!flagType) {
+          let threshold = 10;
+          if (entryRow.job_id) {
+            try {
+              const jobR = await pool.query(
+                `SELECT estimated_hours FROM jobs WHERE id = $1`,
+                [entryRow.job_id]
+              );
+              const est = jobR.rows[0]?.estimated_hours;
+              if (est) threshold = Math.max(threshold, Math.round(est * 1.5 * 100) / 100);
+            } catch { /* non-fatal */ }
+          }
+          if (durH > threshold) {
+            flagType = "too_long";
+            flagMessage = `Session lasted ${durH.toFixed(1)}h — over the ${threshold}h threshold.`;
+            flagThresholdHours = threshold;
+          }
+        }
+
+        // Daily total > 12 h
+        if (!flagType) {
+          try {
+            const dailyR = await pool.query(
+              `SELECT COALESCE(SUM(duration_minutes), 0) AS total_min
+               FROM time_entries
+               WHERE user_id = $1 AND clock_in::date = CURRENT_DATE AND clock_out IS NOT NULL`,
+              [userId]
+            );
+            const todayMin = Number(dailyR.rows[0].total_min);
+            if (todayMin > 720) {
+              const todayH = todayMin / 60;
+              flagType = "daily_limit";
+              flagMessage = `You've logged ${todayH.toFixed(1)}h today — over the 12h daily limit.`;
+              flagThresholdHours = 12;
+              flagActualHours = Math.round(todayH * 100) / 100;
+            }
+          } catch { /* non-fatal */ }
+        }
+
+        if (flagType) {
+          pool.query(
+            `UPDATE time_entries SET is_flagged = true WHERE id = $1`,
+            [entryRow.id]
+          ).catch(() => {});
+          flagInfo = {
+            flagged: true,
+            type: flagType,
+            message: flagMessage,
+            threshold_hours: flagThresholdHours,
+            actual_hours: flagActualHours,
+          };
+        }
+      }
+
+      const response: any = { ...entryRow };
+      if (flagInfo) response._flag = flagInfo;
+      return res.json(response);
     } catch (err: any) {
       await client.query("ROLLBACK").catch(() => {});
       return res.status(500).json({ message: err.message });
     } finally {
       client.release();
+    }
+  });
+
+  // ── PATCH /api/time/entries/:id/flag-reason — store crew reason for flagged session ──
+  app.patch("/api/time/entries/:id/flag-reason", requireAuth, async (req, res) => {
+    const userId = (req.user as any).id;
+    const { id } = req.params;
+    const { flag_reason } = req.body;
+    if (!flag_reason?.trim()) {
+      return res.status(400).json({ message: "flag_reason is required" });
+    }
+    try {
+      const result = await pool.query(
+        `UPDATE time_entries SET flag_reason = $1 WHERE id = $2 AND user_id = $3 RETURNING id`,
+        [flag_reason.trim(), id, userId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Entry not found" });
+      }
+      return res.json({ ok: true });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
     }
   });
 

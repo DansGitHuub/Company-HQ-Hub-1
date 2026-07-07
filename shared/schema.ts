@@ -647,6 +647,7 @@ export const jobs = pgTable("jobs", {
   estimateId: varchar("estimate_id"),
   sourceEstimateId: varchar("source_estimate_id"),
   crewLeadId: varchar("crew_lead_id"),
+  safetyNotes: text("safety_notes"),
   // CompanyCam link (Phase 2 addition)
   companycamProjectId: varchar("companycam_project_id"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -3286,6 +3287,9 @@ export const timeEntries = pgTable("time_entries", {
   worksheetSessionId: integer("worksheet_session_id"),
   updatedAt: timestamp("updated_at", { withTimezone: true }),
   editedBy: varchar("edited_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+  isFlagged: boolean("is_flagged").notNull().default(false),
+  flagReason: text("flag_reason"),
+  clockedInByUserId: varchar("clocked_in_by_user_id", { length: 36 }),
 });
 
 export const gpsPings = pgTable("gps_pings", {

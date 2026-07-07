@@ -33,7 +33,11 @@ import {
   Shield,
   Package,
   AlertCircle,
+  AlertTriangle,
+  Users,
+  Zap,
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "react-i18next";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DailyAgenda from "@/pages/DailyAgenda";
@@ -65,6 +69,10 @@ interface MyDayJob {
   gate_code: string | null;
   has_pets: boolean | null;
   work_areas: WorkArea[];
+  safety_notes: string | null;
+  is_crew_lead: boolean;
+  estimated_hours: number | null;
+  crew_lead_id: string | null;
 }
 
 interface TimeEntry {
@@ -192,6 +200,8 @@ export default function MyDayPage() {
   const [pending, setPending] = useState<PendingClockIn | null>(null);
   const [gpsChecking, setGpsChecking] = useState(false);
   const [pickerJob, setPickerJob] = useState<PickerJob | null>(null);
+  const [flagResult, setFlagResult] = useState<any | null>(null);
+  const [bulkClockInJob, setBulkClockInJob] = useState<MyDayJob | null>(null);
 
   // ── Data ───────────────────────────────────────────────────────────────────
   const { data: user } = useQuery<any>({
@@ -272,6 +282,9 @@ export default function MyDayPage() {
       return result;
     },
     onSuccess: (result: any) => {
+      if (result?.entry?._flag?.flagged) {
+        setFlagResult({ ...result.entry._flag, entry_id: result.entry.id });
+      }
       const title = result?.offline ? t("clockedOutOffline") : t("clockedOutMsg");
       toast({ title });
       queryClient.invalidateQueries({ queryKey: ["/api/time/active"] });
@@ -325,6 +338,38 @@ export default function MyDayPage() {
       { enableHighAccuracy: false, timeout: 10000 }
     );
   };
+
+  // ── Direct one-tap area switch (Feature 2) ──────────────────────────────
+  const handleDirectSwitch = (p: PendingClockIn) => {
+    if (!navigator.geolocation) {
+      clockInMutation.mutate(p);
+      return;
+    }
+    setGpsChecking(true);
+    navigator.geolocation.getCurrentPosition(
+      () => { setGpsChecking(false); clockInMutation.mutate(p); },
+      () => { setGpsChecking(false); clockInMutation.mutate(p); },
+      { enableHighAccuracy: false, timeout: 10000 }
+    );
+  };
+
+  // ── Flag reason submission (Feature 3) ──────────────────────────────────
+  const flagReasonMutation = useMutation({
+    mutationFn: async ({ entryId, reason }: { entryId: string; reason: string }) => {
+      const res = await apiRequest("PATCH", `/api/time/entries/${entryId}/flag-reason`, { flag_reason: reason });
+      if (!res.ok) throw new Error("Failed to save reason");
+    },
+    onSuccess: () => {
+      setFlagResult(null);
+      toast({ title: "Reason saved", description: "Your note has been recorded for manager review." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Could not save reason. Please try again.", variant: "destructive" });
+    },
+  });
+
+  // ── Bulk clock-in trigger (Feature 1) ────────────────────────────────────
+  const handleBulkClockIn = (job: MyDayJob) => setBulkClockInJob(job);
 
   const firstName = user?.firstName || "there";
 
@@ -429,6 +474,8 @@ export default function MyDayPage() {
               isAdminOrManager={isAdminOrManager}
               onChipTap={(p) => setPending(p)}
               onPickerOpen={(picker) => setPickerJob(picker)}
+              onDirectSwitch={handleDirectSwitch}
+              onBulkClockIn={handleBulkClockIn}
             />
           </>
         ) : (
@@ -445,6 +492,8 @@ export default function MyDayPage() {
                   isAdminOrManager={isAdminOrManager}
                   onChipTap={(p) => setPending(p)}
                   onPickerOpen={(picker) => setPickerJob(picker)}
+                  onDirectSwitch={handleDirectSwitch}
+                  onBulkClockIn={handleBulkClockIn}
                 />
               ))}
             </div>
@@ -482,6 +531,27 @@ export default function MyDayPage() {
           activeEntry={activeEntry ?? null}
           onClose={() => setPickerJob(null)}
           onConfirm={handlePickerConfirm}
+        />
+      )}
+
+      {/* ── Feature 3: Flag Reason Dialog ───────────────────────────────── */}
+      {flagResult && (
+        <FlagReasonDialog
+          flagResult={flagResult}
+          onSubmit={(reason) => flagReasonMutation.mutate({ entryId: flagResult.entry_id, reason })}
+          isPending={flagReasonMutation.isPending}
+        />
+      )}
+
+      {/* ── Feature 1: Bulk Crew Clock-In Dialog ────────────────────────── */}
+      {bulkClockInJob && (
+        <BulkClockInDialog
+          job={bulkClockInJob}
+          onClose={() => setBulkClockInJob(null)}
+          onSuccess={() => {
+            setBulkClockInJob(null);
+            queryClient.invalidateQueries({ queryKey: ["/api/time/active"] });
+          }}
         />
       )}
 
@@ -685,12 +755,16 @@ function JobCard({
   isAdminOrManager,
   onChipTap,
   onPickerOpen,
+  onDirectSwitch,
+  onBulkClockIn,
 }: {
   job: MyDayJob;
   activeEntry: TimeEntry | null;
   isAdminOrManager: boolean;
   onChipTap: (p: PendingClockIn) => void;
   onPickerOpen: (picker: PickerJob) => void;
+  onDirectSwitch: (p: PendingClockIn) => void;
+  onBulkClockIn: (job: MyDayJob) => void;
 }) {
   const { t } = useTranslation("myDay");
   const [, nav] = useLocation();
@@ -801,6 +875,20 @@ function JobCard({
             {job.access_notes && (
               <p className="text-sm text-amber-900 leading-snug">{job.access_notes}</p>
             )}
+          </div>
+        )}
+
+        {/* Feature 4: Safety & Do Not Touch section */}
+        {job.safety_notes && (
+          <div
+            data-testid={`safety-section-${job.id}`}
+            className="rounded-lg border-2 border-red-300 bg-red-50 px-3 py-2.5 space-y-1"
+          >
+            <p className="text-xs font-bold text-red-800 uppercase tracking-wide flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              Safety &amp; Do Not Touch
+            </p>
+            <p className="text-sm text-red-900 leading-snug whitespace-pre-line">{job.safety_notes}</p>
           </div>
         )}
 
@@ -939,6 +1027,39 @@ function JobCard({
                     </div>
                   )}
 
+                  {/* Feature 2: One-tap area switch when clocked into this job */}
+                  {activeEntry?.job_id === job.id && !activeEntry?.clock_out && openAreas.length > 1 && (
+                    <div className="mt-1 space-y-1">
+                      <p className="text-xs text-indigo-500 font-semibold flex items-center gap-1">
+                        <Zap className="w-3 h-3" />
+                        Switch to:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {openAreas
+                          .filter((wa) => wa.id !== activeEntry?.job_work_area_id)
+                          .map((wa) => (
+                            <button
+                              key={`switch-${wa.id}`}
+                              data-testid={`quick-switch-${wa.id}`}
+                              onClick={() =>
+                                onDirectSwitch({
+                                  jobId: job.id,
+                                  jobTitle: job.title || job.client || "",
+                                  workAreaId: wa.id,
+                                  workAreaName: wa.name,
+                                  entryType: "billable",
+                                })
+                              }
+                              className="px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors min-h-[30px] flex items-center gap-1"
+                            >
+                              <Zap className="w-2.5 h-2.5" />
+                              {wa.name}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
                   {doneAreas.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {doneAreas.map((wa) => (
@@ -1006,6 +1127,18 @@ function JobCard({
           </p>
         )}
 
+        {/* Feature 1: Crew lead bulk clock-in button */}
+        {job.is_crew_lead && (
+          <button
+            data-testid={`crew-clock-in-${job.id}`}
+            onClick={() => onBulkClockIn(job)}
+            className="w-full flex items-center justify-center gap-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg px-3 py-2 transition-colors"
+          >
+            <Users className="w-3.5 h-3.5" />
+            Clock in Crew
+          </button>
+        )}
+
         {/* Quick chips: Drive Time / Shop Time / Break */}
         <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-100">
           {QUICK_CHIPS.map(({ labelKey, entryType, icon: Icon }) => {
@@ -1034,6 +1167,195 @@ function JobCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Feature 3: Flag Reason Dialog ───────────────────────────────────────────
+function FlagReasonDialog({
+  flagResult,
+  onSubmit,
+  isPending,
+}: {
+  flagResult: { type: string; message: string; entry_id: string };
+  onSubmit: (reason: string) => void;
+  isPending: boolean;
+}) {
+  const [reason, setReason] = useState("");
+  return (
+    <Dialog open={true} onOpenChange={() => {}}>
+      <DialogContent className="max-w-sm mx-auto" onPointerDownOutside={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-amber-700">
+            <AlertTriangle className="w-4 h-4" />
+            Unusual Time Flagged
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-2 space-y-3">
+          <p className="text-sm text-gray-700">{flagResult.message}</p>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              Please explain (required)
+            </label>
+            <Textarea
+              data-testid="flag-reason-input"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="E.g. Site access issues delayed start, or customer requested extra work..."
+              rows={3}
+              className="resize-none text-sm"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            data-testid="flag-reason-submit"
+            className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+            onClick={() => onSubmit(reason)}
+            disabled={!reason.trim() || isPending}
+          >
+            {isPending ? "Saving..." : "Submit Reason"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Feature 1: Bulk Crew Clock-In Dialog ────────────────────────────────────
+function BulkClockInDialog({
+  job,
+  onClose,
+  onSuccess,
+}: {
+  job: MyDayJob;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
+
+  const { data: crewMembers = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/my-day/jobs", job.id, "crew-members"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/my-day/jobs/${job.id}/crew-members`);
+      if (!res.ok) throw new Error("Could not load crew");
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const unclocked = crewMembers.filter((m: any) => !m.already_clocked_in);
+  const alreadyIn = crewMembers.filter((m: any) => m.already_clocked_in);
+
+  function toggleMember(employeeId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(employeeId)) next.delete(employeeId);
+      else next.add(employeeId);
+      return next;
+    });
+  }
+
+  async function handleConfirm() {
+    if (selected.size === 0) return;
+    setLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/my-day/bulk-clock-in", {
+        job_id: job.id,
+        employee_ids: Array.from(selected),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "Clock-in failed");
+      toast({
+        title: `Clocked in ${data.clocked_in.length} crew member${data.clocked_in.length !== 1 ? "s" : ""}`,
+        description: data.skipped.length > 0 ? `${data.skipped.length} already clocked in.` : undefined,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-day/time-entries"] });
+      onSuccess();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open={true} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-sm mx-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-indigo-600" />
+            Clock in Crew
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-2 space-y-3">
+          <p className="text-sm text-gray-600">
+            Select crew members to clock in for{" "}
+            <span className="font-semibold">{job.title || job.client}</span>.
+          </p>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {unclocked.length === 0 && alreadyIn.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-4">No crew assigned to this job.</p>
+              )}
+              {unclocked.map((m: any) => (
+                <label
+                  key={m.employee_id}
+                  data-testid={`crew-member-${m.employee_id}`}
+                  className="flex items-center gap-3 p-2.5 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50"
+                >
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded accent-indigo-600"
+                    checked={selected.has(m.employee_id)}
+                    onChange={() => toggleMember(m.employee_id)}
+                  />
+                  <span className="text-sm font-medium text-gray-800">{m.name}</span>
+                </label>
+              ))}
+              {alreadyIn.length > 0 && (
+                <div className="pt-1 space-y-1">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Already clocked in</p>
+                  {alreadyIn.map((m: any) => (
+                    <div
+                      key={m.employee_id}
+                      className="flex items-center gap-3 p-2.5 rounded-lg border border-gray-100 bg-gray-50 opacity-60"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                      <span className="text-sm text-gray-600">
+                        {m.name}
+                        {m.active_work_area && (
+                          <span className="text-gray-400 ml-1">· {m.active_work_area}</span>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button
+            data-testid="bulk-clock-in-confirm"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            onClick={handleConfirm}
+            disabled={selected.size === 0 || loading}
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : `Clock In ${selected.size > 0 ? `(${selected.size})` : ""}`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
