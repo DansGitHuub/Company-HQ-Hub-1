@@ -228,3 +228,9 @@ id = "6pExFi8XW6k2A0wjD80oC"
 uri = "file://attached_assets/CompanyHQ_Alpha_Workflow_Audit_COMPLETED.docx"
 type = "word_document"
 title = "CompanyHQ Alpha Workflow Audit — Completed"
+
+[[outputs]]
+id = "2ss-SZGQC7bcEJnOc6Wxl"
+uri = "file://attached_assets/CompanyHQ_Alpha_Audit_YesNo.md"
+type = "text"
+title = "CompanyHQ Alpha Audit — Yes/No Answers"
