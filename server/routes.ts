@@ -10260,6 +10260,14 @@ Provide accurate information based on publicly available documentation.`;
 
   // ─── Job Application Public + Admin Routes ───────────────────────────────
 
+  // Migration: add sms_consent + sms_consent_at to job_applications
+  await pool.query(`
+    ALTER TABLE job_applications
+      ADD COLUMN IF NOT EXISTS sms_consent BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS sms_consent_at TIMESTAMPTZ
+  `).then(() => console.log("[migration] job_applications sms_consent columns ready"))
+    .catch((e: any) => console.error("[migration] job_applications sms_consent:", e.message));
+
   // PUBLIC: Get application by token (no auth required)
   app.get("/api/apply/:token", async (req, res) => {
     try {
@@ -10322,6 +10330,9 @@ Provide accurate information based on publicly available documentation.`;
       const fullName = `${firstName} ${lastName}`.trim();
       const position = data?.positionAppliedFor || "Landscaping Position";
 
+      // Read sms_consent from the top-level body (not inside data blob)
+      const smsConsent = req.body.smsConsent === true;
+
       // Mark as submitted
       const updated = await storage.updateJobApplication(app.id, {
         status: "submitted",
@@ -10331,7 +10342,9 @@ Provide accurate information based on publicly available documentation.`;
         applicantEmail: data?.email || app.applicantEmail,
         applicantPhone: data?.phone || app.applicantPhone,
         position,
-      });
+        smsConsent,
+        smsConsentAt: smsConsent ? new Date() : null,
+      } as any);
 
       // Auto-create candidate in "Application Received"
       try {

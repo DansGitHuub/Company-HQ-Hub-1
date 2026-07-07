@@ -197,6 +197,7 @@ export default function PublicApplicationForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [certEntries, setCertEntries] = useState<CertEntry[]>([]);
+  const [smsConsent, setSmsConsent] = useState(false);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -310,7 +311,10 @@ export default function PublicApplicationForm() {
       const r = await fetch(`/api/apply/${TOKEN}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: { ...data, signatureName: signatureName.trim(), signatureDate: new Date().toLocaleDateString() } }),
+        body: JSON.stringify({
+          data: { ...data, signatureName: signatureName.trim(), signatureDate: new Date().toLocaleDateString() },
+          smsConsent,
+        }),
       });
       if (!r.ok) {
         const b = await r.json().catch(() => ({}));
@@ -516,6 +520,24 @@ export default function PublicApplicationForm() {
               <Input name="email" value={data.email || ""} onChange={handleChange} placeholder="Email" type="email" disabled={isDisabled} />
             </Field>
           </Row>
+
+          {/* SMS Consent */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                data-testid="checkbox-sms-consent"
+                checked={smsConsent}
+                onChange={e => setSmsConsent(e.target.checked)}
+                disabled={isDisabled}
+                className="mt-0.5 w-4 h-4 accent-green-700 flex-shrink-0 cursor-pointer"
+              />
+              <span className="text-xs text-gray-600 leading-relaxed">
+                <span className="font-semibold text-gray-700">SMS Text Message Consent (Optional) — </span>
+                I agree to receive SMS text messages from Chapin Landscapes regarding my application status, interview scheduling, and hiring decisions. Message and data rates may apply. Reply STOP to opt out at any time.
+              </span>
+            </label>
+          </div>
           <Row cols={3}>
             <Field>
               <Label required>SSN</Label>

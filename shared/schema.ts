@@ -2772,6 +2772,8 @@ export const jobApplications = pgTable("job_applications", {
   expiryNotificationSentAt: timestamp("expiry_notification_sent_at"),
   customerId: varchar("customer_id", { length: 36 }),
   userId: varchar("user_id", { length: 36 }),
+  smsConsent: boolean("sms_consent").notNull().default(false),
+  smsConsentAt: timestamp("sms_consent_at"),
 });
 
 export const insertJobApplicationSchema = createInsertSchema(jobApplications).omit({
