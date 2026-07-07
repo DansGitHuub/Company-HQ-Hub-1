@@ -19,6 +19,7 @@ import {
   Receipt, Users, StickyNote, Briefcase, ChevronDown, ChevronRight,
   ImagePlus, X, HardHat, Sun, Coffee, Car, Wrench, LogOut as ClockOutIcon,
   CheckCircle2, MapPin, Clock, AlertTriangle, ClipboardCheck,
+  Camera, XCircle,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,6 +30,10 @@ interface ChecklistState {
   q2: ChecklistAnswer; q2note: string;
   q3: ChecklistAnswer; q3note: string;
   q4: ChecklistAnswer; q4note: string;
+}
+interface PhotoSummary {
+  before: number; after: number; damage: number; other: number;
+  has_job: boolean; has_sessions: boolean;
 }
 
 interface Material {
@@ -622,6 +627,14 @@ export default function DailyWorksheet() {
     select: (data) => data.filter((u) => u.role !== "Customer"),
   });
 
+  // ── Photo summary (for pre-submit gates) ─────────────────────────────────────
+  const { data: photoSummary, refetch: refetchPhotos } = useQuery<PhotoSummary>({
+    queryKey: ["/api/worksheets", ws?.id, "photo-summary"],
+    queryFn: () => fetch(`/api/worksheets/${ws!.id}/photo-summary`, { credentials: "include" }).then((r) => r.json()),
+    enabled: !!ws?.id,
+    staleTime: 20_000,
+  });
+
   // ── Jobs list for job selector ────────────────────────────────────────────────
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: ["/api/jobs", "active-worksheet"],
@@ -724,7 +737,8 @@ export default function DailyWorksheet() {
   });
   const [cl, setCl] = useState<ChecklistState>(emptyChecklist());
 
-  const openChecklist = () => {
+  const openChecklist = async () => {
+    await refetchPhotos();
     setCl(emptyChecklist());
     setShowChecklist(true);
   };
@@ -1376,6 +1390,7 @@ export default function DailyWorksheet() {
           onConfirm={() => handleSubmit(cl)}
           onCancel={() => setShowChecklist(false)}
           isPending={isSubmitting}
+          photoSummary={photoSummary ?? null}
         />
       )}
 
@@ -1435,13 +1450,14 @@ export default function DailyWorksheet() {
 
 // ─── Pre-Submit Checklist Dialog ──────────────────────────────────────────────
 function ChecklistDialog({
-  cl, setCl, onConfirm, onCancel, isPending,
+  cl, setCl, onConfirm, onCancel, isPending, photoSummary,
 }: {
   cl: ChecklistState;
   setCl: React.Dispatch<React.SetStateAction<ChecklistState>>;
   onConfirm: () => void;
   onCancel: () => void;
   isPending: boolean;
+  photoSummary: PhotoSummary | null;
 }) {
   const QUESTIONS: {
     key: keyof Pick<ChecklistState, "q1" | "q2" | "q3" | "q4">;
@@ -1476,15 +1492,28 @@ function ChecklistDialog({
     },
   ];
 
+  // ── Photo gate logic ──────────────────────────────────────────────────────────
+  const showPhotoGate = !!(photoSummary?.has_job && photoSummary?.has_sessions);
+  const needsDamagePhoto = cl.q4 === "yes";
+
+  const missingPhotos: { type: string; label: string }[] = [];
+  if (showPhotoGate) {
+    if ((photoSummary?.before ?? 0) === 0) missingPhotos.push({ type: "before", label: "Before photo" });
+    if ((photoSummary?.after ?? 0)  === 0) missingPhotos.push({ type: "after",  label: "After photo" });
+  }
+  if (needsDamagePhoto && (photoSummary?.damage ?? 0) === 0) {
+    missingPhotos.push({ type: "damage", label: "Damage photo (required when an issue is reported)" });
+  }
+
   const allAnswered = QUESTIONS.every((q) => cl[q.key] !== null);
-  const notesValid = QUESTIONS.every(
+  const notesValid  = QUESTIONS.every(
     (q) => cl[q.key] !== "yes" || cl[q.noteKey].trim().length > 0
   );
-  const canSubmit = allAnswered && notesValid && !isPending;
+  const canSubmit = allAnswered && notesValid && missingPhotos.length === 0 && !isPending;
 
   return (
     <Dialog open={true} onOpenChange={(o) => { if (!o) onCancel(); }}>
-      <DialogContent className="max-w-sm mx-auto">
+      <DialogContent className="max-w-sm mx-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-gray-800">
             <Send className="w-4 h-4" />
@@ -1493,6 +1522,55 @@ function ChecklistDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-1">
+
+          {/* ── Photo Requirements Gate ── */}
+          {(showPhotoGate || needsDamagePhoto) && (
+            <div
+              data-testid="photo-gate-section"
+              className={`rounded-lg border p-3 space-y-2 ${
+                missingPhotos.length > 0
+                  ? "border-red-200 bg-red-50"
+                  : "border-green-200 bg-green-50"
+              }`}
+            >
+              <div className="flex items-center gap-1.5 mb-1">
+                <Camera className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  Required Photos
+                </span>
+              </div>
+
+              {showPhotoGate && (
+                <>
+                  <PhotoRow
+                    label="Before photo"
+                    ok={(photoSummary?.before ?? 0) > 0}
+                    testId="photo-gate-before"
+                  />
+                  <PhotoRow
+                    label="After photo"
+                    ok={(photoSummary?.after ?? 0) > 0}
+                    testId="photo-gate-after"
+                  />
+                </>
+              )}
+
+              {needsDamagePhoto && (
+                <PhotoRow
+                  label="Damage photo (required — issue reported)"
+                  ok={(photoSummary?.damage ?? 0) > 0}
+                  testId="photo-gate-damage"
+                />
+              )}
+
+              {missingPhotos.length > 0 && (
+                <p className="text-xs text-red-700 mt-1 leading-snug">
+                  Open the job from the <strong>Schedule</strong> view and add the missing photos before submitting.
+                </p>
+              )}
+            </div>
+          )}
+
           <p className="text-xs text-gray-500">Answer all 4 questions — quick yes or no. A note is only required if you answer yes.</p>
 
           {QUESTIONS.map((q, idx) => (
@@ -1549,7 +1627,7 @@ function ChecklistDialog({
             data-testid="checklist-confirm-submit"
             onClick={onConfirm}
             disabled={!canSubmit}
-            className="flex-1 bg-green-700 hover:bg-green-800 text-white"
+            className="flex-1 bg-green-700 hover:bg-green-800 text-white disabled:opacity-50"
           >
             {isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Send className="w-4 h-4 mr-1" />}
             Confirm & Submit
@@ -1557,5 +1635,19 @@ function ChecklistDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PhotoRow({ label, ok, testId }: { label: string; ok: boolean; testId: string }) {
+  return (
+    <div className="flex items-center gap-2" data-testid={testId}>
+      {ok
+        ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" />
+        : <XCircle     className="w-3.5 h-3.5 text-red-500  shrink-0" />
+      }
+      <span className={`text-xs leading-snug ${ok ? "text-green-800" : "text-red-700 font-medium"}`}>
+        {label}
+      </span>
+    </div>
   );
 }

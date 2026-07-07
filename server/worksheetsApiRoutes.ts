@@ -355,6 +355,43 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
         checklist_issue_note          = null,
       } = req.body ?? {};
 
+      // ── Photo gates (server-side enforcement) ─────────────────────────────────
+      if (ws.job_id) {
+        const [sessionCheck, photoCheck] = await Promise.all([
+          pool.query(
+            `SELECT COUNT(*) AS cnt FROM worksheet_sessions
+             WHERE job_id = $1 AND employee_id = $2 AND date::date = $3::date`,
+            [ws.job_id, ws.user_id, ws.date]
+          ),
+          pool.query(
+            `SELECT DISTINCT wp.photo_type
+             FROM worksheet_photos wp
+             JOIN worksheet_sessions wss ON wss.id = wp.session_id
+             WHERE wss.job_id = $1 AND wss.employee_id = $2 AND wss.date::date = $3::date`,
+            [ws.job_id, ws.user_id, ws.date]
+          ),
+        ]);
+
+        const hasSessions = parseInt(sessionCheck.rows[0].cnt, 10) > 0;
+        const photoTypes  = new Set(photoCheck.rows.map((r: any) => r.photo_type));
+        const missing: string[] = [];
+
+        if (hasSessions) {
+          if (!photoTypes.has("before")) missing.push('"Before" photo');
+          if (!photoTypes.has("after"))  missing.push('"After" photo');
+          if (!!checklist_issue_reported && !photoTypes.has("damage")) {
+            missing.push('"Damage" photo (required when an issue is reported)');
+          }
+        }
+
+        if (missing.length > 0) {
+          return res.status(400).json({
+            message: `Missing required photos: ${missing.join(", ")}. Open the job from the Schedule view to add these photos.`,
+            missing_photos: missing,
+          });
+        }
+      }
+
       // Mark as submitted and save checklist answers atomically
       await pool.query(
         `UPDATE worksheets SET
@@ -469,6 +506,48 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
 
       const full = await fetchWorksheetFull(req.params.id);
       return res.json(full);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── GET /api/worksheets/:id/photo-summary ────────────────────────────────────
+  app.get("/api/worksheets/:id/photo-summary", requireAuth, async (req, res) => {
+    try {
+      const { rows: wsRows } = await pool.query(
+        `SELECT user_id, job_id, date FROM worksheets WHERE id = $1`,
+        [req.params.id]
+      );
+      if (!wsRows.length) return res.status(404).json({ message: "Worksheet not found" });
+
+      const ws = wsRows[0];
+      if (!ws.job_id) {
+        return res.json({ before: 0, after: 0, damage: 0, other: 0, has_job: false, has_sessions: false });
+      }
+
+      const [sessionCheck, photoRows] = await Promise.all([
+        pool.query(
+          `SELECT COUNT(*) AS cnt FROM worksheet_sessions
+           WHERE job_id = $1 AND employee_id = $2 AND date::date = $3::date`,
+          [ws.job_id, ws.user_id, ws.date]
+        ),
+        pool.query(
+          `SELECT wp.photo_type, COUNT(*) AS cnt
+           FROM worksheet_photos wp
+           JOIN worksheet_sessions wss ON wss.id = wp.session_id
+           WHERE wss.job_id = $1 AND wss.employee_id = $2 AND wss.date::date = $3::date
+           GROUP BY wp.photo_type`,
+          [ws.job_id, ws.user_id, ws.date]
+        ),
+      ]);
+
+      const hasSessions = parseInt(sessionCheck.rows[0].cnt, 10) > 0;
+      const counts: Record<string, number> = { before: 0, after: 0, damage: 0, other: 0 };
+      for (const row of photoRows.rows) {
+        counts[row.photo_type] = parseInt(row.cnt, 10);
+      }
+
+      return res.json({ ...counts, has_job: true, has_sessions: hasSessions });
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
     }
