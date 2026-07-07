@@ -28,6 +28,11 @@ import {
   ChevronRight,
   Phone,
   BookOpen,
+  ShieldCheck,
+  ShieldX,
+  Shield,
+  Package,
+  AlertCircle,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -88,6 +93,30 @@ interface PickerJob {
   jobTitle: string;
   preSelectedId: string | null;
   preSelectedName: string | null;
+}
+
+interface ExpectedItem {
+  id: string;
+  name: string;
+  quantity: string;
+  unit: string | null;
+  work_area_name: string | null;
+  item_class: "equipment" | "material";
+}
+
+interface GateStatusResult {
+  gate_status: "ready" | "blocked" | "bypassed_all";
+  items: Array<{
+    key: string;
+    label: string;
+    description: string;
+    required: boolean;
+    passed: boolean;
+    bypassed: boolean;
+    bypass_reason: string | null;
+  }>;
+  blocked_count: number;
+  bypassed_count: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -186,6 +215,21 @@ export default function MyDayPage() {
   });
 
   const elapsed = useLiveElapsed(activeEntry?.clock_in ?? null);
+
+  const isAdminOrManager = ["Admin", "Manager", "MasterAdmin"].includes(
+    (user as any)?.role ?? ""
+  );
+
+  const prioritizedJobs = [...jobs].sort((a, b) => {
+    const aActive = a.status === "in_progress" ? 0 : 1;
+    const bActive = b.status === "in_progress" ? 0 : 1;
+    if (aActive !== bActive) return aActive - bActive;
+    if (a.scheduled_start_time && b.scheduled_start_time)
+      return a.scheduled_start_time.localeCompare(b.scheduled_start_time);
+    if (a.scheduled_start_time) return -1;
+    if (b.scheduled_start_time) return 1;
+    return 0;
+  });
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const clockInMutation = useMutation({
@@ -355,10 +399,6 @@ export default function MyDayPage() {
 
       {/* ── Today's Jobs ───────────────────────────────────────────────── */}
       <section>
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
-          {t("todaysJobs")}{jobs.length > 0 ? ` · ${jobs.length}` : ""}
-        </h2>
-
         {jobsLoading ? (
           <div className="space-y-3">
             {[1, 2].map((i) => (
@@ -372,18 +412,43 @@ export default function MyDayPage() {
               <p className="text-sm">{t("noJobsScheduledToday")}</p>
             </CardContent>
           </Card>
+        ) : jobs.length === 1 ? (
+          <>
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+              <h2
+                data-testid="single-job-heading"
+                className="text-xs font-semibold uppercase tracking-widest text-gray-400"
+              >
+                Your Job Today
+              </h2>
+            </div>
+            <JobCard
+              job={jobs[0]}
+              activeEntry={activeEntry ?? null}
+              isAdminOrManager={isAdminOrManager}
+              onChipTap={(p) => setPending(p)}
+              onPickerOpen={(picker) => setPickerJob(picker)}
+            />
+          </>
         ) : (
-          <div className="space-y-3">
-            {jobs.map((job) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                activeEntry={activeEntry ?? null}
-                onChipTap={(p) => setPending(p)}
-                onPickerOpen={(picker) => setPickerJob(picker)}
-              />
-            ))}
-          </div>
+          <>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
+              {t("todaysJobs")} · {jobs.length}
+            </h2>
+            <div className="space-y-3">
+              {prioritizedJobs.map((job) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  activeEntry={activeEntry ?? null}
+                  isAdminOrManager={isAdminOrManager}
+                  onChipTap={(p) => setPending(p)}
+                  onPickerOpen={(picker) => setPickerJob(picker)}
+                />
+              ))}
+            </div>
+          </>
         )}
       </section>
 
@@ -617,11 +682,13 @@ function WorkAreaPickerDialog({
 function JobCard({
   job,
   activeEntry,
+  isAdminOrManager,
   onChipTap,
   onPickerOpen,
 }: {
   job: MyDayJob;
   activeEntry: TimeEntry | null;
+  isAdminOrManager: boolean;
   onChipTap: (p: PendingClockIn) => void;
   onPickerOpen: (picker: PickerJob) => void;
 }) {
@@ -632,6 +699,32 @@ function JobCard({
     job.scheduled_start_time
       ? `${job.scheduled_start_time.slice(0, 5)}${job.scheduled_end_time ? " – " + job.scheduled_end_time.slice(0, 5) : ""}`
       : null;
+
+  // ── Gate status ──────────────────────────────────────────────────────────
+  const { data: gateData } = useQuery<GateStatusResult | null>({
+    queryKey: ["/api/jobs", job.id, "packet-gate"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/jobs/${job.id}/packet-gate`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  // ── Expected equipment & materials ───────────────────────────────────────
+  const { data: expectedItems } = useQuery<{ equipment: ExpectedItem[]; materials: ExpectedItem[] }>({
+    queryKey: ["/api/my-day/jobs", job.id, "expected-items"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/my-day/jobs/${job.id}/expected-items`);
+      if (!res.ok) return { equipment: [], materials: [] };
+      return res.json();
+    },
+    staleTime: 300_000,
+  });
+
+  const gateBlocked = gateData?.gate_status === "blocked";
+  const blockedItems = gateData?.items.filter(i => i.required && !i.passed && !i.bypassed) ?? [];
+  const clockInBlocked = gateBlocked && !isAdminOrManager;
 
   function handleChip(workAreaId: string | null, workAreaName: string, entryType: string) {
     if (entryType === "billable") {
@@ -719,6 +812,99 @@ function JobCard({
           </div>
         )}
 
+        {/* ── Job Readiness Gate indicator ─────────────────────────────── */}
+        {gateData && (
+          <div data-testid={`gate-indicator-${job.id}`}>
+            {gateData.gate_status === "ready" && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 border border-green-200">
+                <ShieldCheck className="w-4 h-4 text-green-600 shrink-0" />
+                <span className="text-sm font-medium text-green-800">Ready to Start</span>
+              </div>
+            )}
+            {gateData.gate_status === "bypassed_all" && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
+                <Shield className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="text-sm font-medium text-amber-800">Ready (some items bypassed)</span>
+              </div>
+            )}
+            {gateData.gate_status === "blocked" && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <ShieldX className="w-4 h-4 text-red-600 shrink-0" />
+                    <span className="text-sm font-semibold text-red-800">
+                      Not Ready — {gateData.blocked_count} item{gateData.blocked_count !== 1 ? "s" : ""} missing
+                    </span>
+                  </div>
+                  <button
+                    data-testid={`gate-manage-${job.id}`}
+                    onClick={() => nav(`/jobs/${job.id}`)}
+                    className="text-xs text-red-700 underline underline-offset-2 shrink-0"
+                  >
+                    {isAdminOrManager ? "Manage →" : "Details →"}
+                  </button>
+                </div>
+                {blockedItems.length > 0 && (
+                  <ul className="space-y-1 pl-1">
+                    {blockedItems.map(item => (
+                      <li key={item.key} className="flex items-start gap-1.5 text-xs text-red-700">
+                        <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
+                        <span>{item.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Expected Equipment ───────────────────────────────────────── */}
+        {expectedItems && expectedItems.equipment.length > 0 && (
+          <div data-testid={`equipment-list-${job.id}`} className="space-y-1.5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+              <Wrench className="w-3.5 h-3.5" />
+              Expected Equipment
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {expectedItems.equipment.map((item) => (
+                <span
+                  key={item.id}
+                  data-testid={`equipment-item-${item.id}`}
+                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200"
+                >
+                  {Number(item.quantity) !== 1 ? `${item.quantity}× ` : ""}
+                  {item.name}
+                  {item.unit ? ` (${item.unit})` : ""}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Expected Materials ───────────────────────────────────────── */}
+        {expectedItems && expectedItems.materials.length > 0 && (
+          <div data-testid={`materials-list-${job.id}`} className="space-y-1.5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+              <Package className="w-3.5 h-3.5" />
+              Expected Materials
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {expectedItems.materials.map((item) => (
+                <span
+                  key={item.id}
+                  data-testid={`material-item-${item.id}`}
+                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200"
+                >
+                  {Number(item.quantity) !== 1 ? `${item.quantity}× ` : ""}
+                  {item.name}
+                  {item.unit ? ` (${item.unit})` : ""}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Work area chips */}
         {job.work_areas.length > 0 && (
           <div className="space-y-2">
@@ -786,21 +972,39 @@ function JobCard({
           </button>
           <button
             data-testid={`clock-in-job-${job.id}`}
-            onClick={() =>
+            onClick={() => {
+              if (clockInBlocked) return;
               onPickerOpen({
                 jobId: job.id,
                 jobTitle: job.title || job.client || t("unnamedJob"),
                 preSelectedId: null,
                 preSelectedName: null,
-              })
-            }
-            className="flex items-center gap-1 text-sm font-medium text-green-700 hover:text-green-800 active:text-green-900 transition-colors"
+              });
+            }}
+            disabled={clockInBlocked}
+            title={clockInBlocked ? "Job is missing required info — contact your manager" : undefined}
+            className={[
+              "flex items-center gap-1 text-sm font-medium transition-colors",
+              clockInBlocked
+                ? "text-gray-300 cursor-not-allowed"
+                : "text-green-700 hover:text-green-800 active:text-green-900",
+            ].join(" ")}
           >
             <Clock className="w-3.5 h-3.5" />
             {t("clockIn")}
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        {/* Blocked message for crew members */}
+        {clockInBlocked && (
+          <p
+            data-testid={`gate-blocked-msg-${job.id}`}
+            className="text-xs text-red-600 text-center pt-0.5"
+          >
+            Clock-in blocked until missing info is resolved. Contact your manager.
+          </p>
+        )}
 
         {/* Quick chips: Drive Time / Shop Time / Break */}
         <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-100">

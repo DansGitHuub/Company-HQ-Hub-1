@@ -79,4 +79,78 @@ export function registerMyDayRoutes(app: Express) {
       res.status(500).json({ message: "Error fetching time entries" });
     }
   });
+
+  // ── GET /api/my-day/jobs/:id/expected-items — equipment & materials from job line items ──
+  app.get("/api/my-day/jobs/:id/expected-items", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    try {
+      // Primary: job_line_items (populated when estimate is converted to job)
+      const { rows } = await pool.query(
+        `SELECT
+           jli.id,
+           COALESCE(ci.name, jli.item_name) AS name,
+           jli.quantity::text                AS quantity,
+           jli.unit,
+           jwa.name                          AS work_area_name,
+           CASE
+             WHEN ci.class = 'Equipment' OR lower(jli.item_type) = 'equipment' THEN 'equipment'
+             WHEN ci.class = 'Materials' OR lower(jli.item_type) IN ('material','materials') THEN 'material'
+             ELSE NULL
+           END AS item_class
+         FROM job_line_items jli
+         LEFT JOIN catalog_items    ci  ON ci.id  = jli.catalog_item_id
+         LEFT JOIN job_work_areas   jwa ON jwa.id = jli.job_work_area_id
+         WHERE jli.job_id      = $1
+           AND jli.is_optional = false
+           AND (
+             ci.class IN ('Equipment','Materials')
+             OR lower(jli.item_type) IN ('equipment','material','materials')
+           )
+         ORDER BY jli.sort_order, jli.item_name`,
+        [id]
+      );
+
+      if (rows.length > 0) {
+        return res.json({
+          equipment: rows.filter((r: any) => r.item_class === "equipment"),
+          materials: rows.filter((r: any) => r.item_class === "material"),
+          source: "job_line_items",
+        });
+      }
+
+      // Fallback: source estimate line items (for older jobs without job_line_items)
+      const { rows: estRows } = await pool.query(
+        `SELECT
+           eli.id,
+           COALESCE(ci.name, eli.description) AS name,
+           eli.quantity::text                  AS quantity,
+           eli.unit,
+           ewa.name                            AS work_area_name,
+           CASE
+             WHEN ci.class = 'Equipment' THEN 'equipment'
+             WHEN ci.class = 'Materials' THEN 'material'
+             ELSE NULL
+           END AS item_class
+         FROM jobs j
+         JOIN sales_estimates    se  ON se.id  = j.source_estimate_id::uuid
+         JOIN estimate_work_areas ewa ON ewa.estimate_id = se.id
+         JOIN estimate_line_items eli ON eli.estimate_work_area_id = ewa.id
+         LEFT JOIN catalog_items ci  ON ci.id  = eli.catalog_item_id
+         WHERE j.id             = $1
+           AND eli.is_optional  = false
+           AND ci.class IN ('Equipment','Materials')
+         ORDER BY eli.sort_order, eli.description`,
+        [id]
+      );
+
+      return res.json({
+        equipment: estRows.filter((r: any) => r.item_class === "equipment"),
+        materials: estRows.filter((r: any) => r.item_class === "material"),
+        source: "estimate",
+      });
+    } catch (err) {
+      console.error("[my-day/expected-items]", err);
+      return res.json({ equipment: [], materials: [], source: "none" });
+    }
+  });
 }
