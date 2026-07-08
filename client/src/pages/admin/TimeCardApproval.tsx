@@ -19,7 +19,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Loader2, CheckCircle2, XCircle, Clock, RotateCcw, ChevronDown, ChevronRight,
+  Loader2, CheckCircle2, XCircle, Clock, RotateCcw, ChevronDown, ChevronRight, Pencil,
 } from "lucide-react";
 import { format, parseISO, startOfWeek, endOfWeek } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -118,6 +118,13 @@ export default function TimeCardApproval() {
     open: boolean; ids: string[]; note: string; isBulk: boolean;
   }>({ open: false, ids: [], note: "", isBulk: false });
 
+  // Edit punch dialog state
+  const [editDialog, setEditDialog] = useState<{
+    open: boolean; entry: TimeEntry | null;
+    clockIn: string; clockOut: string; notes: string; entryType: string;
+  }>({ open: false, entry: null, clockIn: "", clockOut: "", notes: "", entryType: "billable" });
+  const [editSaving, setEditSaving] = useState(false);
+
   // Build query key & params (status filter passed to server)
   const qKey = ["/api/admin/time-card-approval", startDate, endDate, employeeId, statusFilter];
 
@@ -196,6 +203,53 @@ export default function TimeCardApproval() {
     if (isBulk) bulkUpdate(ids, "rejected", note || undefined);
     else        updateOne(ids[0], "rejected", note || undefined);
     setRejectDialog((d) => ({ ...d, open: false }));
+  }
+
+  // ─── Edit punch helpers ──────────────────────────────────────────────────────
+
+  function toDatetimeLocal(iso: string) {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function openEditDialog(entry: TimeEntry) {
+    setEditDialog({
+      open: true,
+      entry,
+      clockIn:   toDatetimeLocal(entry.clock_in),
+      clockOut:  entry.clock_out ? toDatetimeLocal(entry.clock_out) : "",
+      notes:     entry.notes ?? "",
+      entryType: entry.entry_type ?? "billable",
+    });
+  }
+
+  async function submitEdit() {
+    if (!editDialog.entry) return;
+    if (!editDialog.clockIn) {
+      toast({ title: "Clock-in required", variant: "destructive" }); return;
+    }
+    const cin  = new Date(editDialog.clockIn);
+    const cout = editDialog.clockOut ? new Date(editDialog.clockOut) : null;
+    if (cout && cout <= cin) {
+      toast({ title: "Clock-out must be after clock-in", variant: "destructive" }); return;
+    }
+    setEditSaving(true);
+    try {
+      await apiRequest("PATCH", `/api/admin/time-entries/${editDialog.entry.id}`, {
+        clock_in:   cin.toISOString(),
+        clock_out:  cout ? cout.toISOString() : null,
+        notes:      editDialog.notes || null,
+        entry_type: editDialog.entryType,
+      });
+      toast({ title: "Punch corrected", description: "Time entry updated and logged." });
+      qc.invalidateQueries({ queryKey: ["/api/admin/time-card-approval"] });
+      setEditDialog((d) => ({ ...d, open: false }));
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message ?? "Could not save.", variant: "destructive" });
+    } finally {
+      setEditSaving(false);
+    }
   }
 
   // ─── Selection helpers ───────────────────────────────────────────────────────
@@ -493,6 +547,13 @@ export default function TimeCardApproval() {
                                       <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
                                     ) : (
                                       <>
+                                        <Button size="sm" variant="outline"
+                                          className="h-7 px-2 text-xs text-blue-600 border-blue-300 hover:bg-blue-50"
+                                          onClick={() => openEditDialog(entry)}
+                                          data-testid={`button-edit-${entry.id}`}>
+                                          <Pencil className="w-3.5 h-3.5 mr-1" />
+                                          Edit
+                                        </Button>
                                         {entry.approval_status !== "approved" && (
                                           <Button size="sm" variant="outline"
                                             className="h-7 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
@@ -566,6 +627,90 @@ export default function TimeCardApproval() {
             <Button variant="destructive" onClick={confirmReject} data-testid="button-confirm-reject">
               <XCircle className="w-4 h-4 mr-1.5" />
               Confirmar rechazo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Punch dialog ── */}
+      <Dialog open={editDialog.open} onOpenChange={(o) => setEditDialog((d) => ({ ...d, open: o }))}>
+        <DialogContent className="sm:max-w-lg" data-testid="edit-punch-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-700">
+              <Pencil className="w-5 h-5" />
+              Correct Punch — {editDialog.entry?.employee_name ?? editDialog.entry?.username}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-clock-in">Clock In</Label>
+                <Input
+                  id="edit-clock-in"
+                  type="datetime-local"
+                  value={editDialog.clockIn}
+                  onChange={(e) => setEditDialog((d) => ({ ...d, clockIn: e.target.value }))}
+                  data-testid="input-edit-clock-in"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-clock-out">
+                  Clock Out <span className="text-muted-foreground text-xs">(leave blank if still clocked in)</span>
+                </Label>
+                <Input
+                  id="edit-clock-out"
+                  type="datetime-local"
+                  value={editDialog.clockOut}
+                  onChange={(e) => setEditDialog((d) => ({ ...d, clockOut: e.target.value }))}
+                  data-testid="input-edit-clock-out"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Entry Type</Label>
+              <Select
+                value={editDialog.entryType}
+                onValueChange={(v) => setEditDialog((d) => ({ ...d, entryType: v }))}
+              >
+                <SelectTrigger data-testid="select-edit-entry-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="billable">Billable</SelectItem>
+                  <SelectItem value="drive_time">Drive Time</SelectItem>
+                  <SelectItem value="shop_time">Shop Time</SelectItem>
+                  <SelectItem value="break">Break</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-notes">Admin Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Textarea
+                id="edit-notes"
+                placeholder="Reason for correction…"
+                value={editDialog.notes}
+                onChange={(e) => setEditDialog((d) => ({ ...d, notes: e.target.value }))}
+                rows={2}
+                data-testid="input-edit-notes"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground bg-muted rounded-md px-3 py-2">
+              This change will be recorded in the audit log with the original and corrected times.
+              Approval status will be reset to <strong>Pending</strong> after saving.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditDialog((d) => ({ ...d, open: false }))} disabled={editSaving}>
+              Cancel
+            </Button>
+            <Button
+              onClick={submitEdit}
+              disabled={editSaving}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              data-testid="button-confirm-edit"
+            >
+              {editSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save Correction
             </Button>
           </DialogFooter>
         </DialogContent>
