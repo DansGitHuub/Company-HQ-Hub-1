@@ -5,8 +5,9 @@ import { Clock } from "lucide-react";
 import TimeReports from "./TimeReports";
 import TimeCardApproval from "./TimeCardApproval";
 import WorksheetReview from "./WorksheetReview";
+import PTOApprovalTab from "./PTOApprovalTab";
 
-const VALID_TABS = ["reports", "approval", "worksheet"] as const;
+const VALID_TABS = ["reports", "approval", "worksheet", "pto"] as const;
 type TabKey = (typeof VALID_TABS)[number];
 
 function readTabFromSearch(search: string): TabKey {
@@ -45,6 +46,9 @@ export default function TimeAdminPage() {
           <TabsTrigger value="worksheet" data-testid="time-admin-tab-worksheet">
             {t("nav.worksheetReview")}
           </TabsTrigger>
+          <TabsTrigger value="pto" data-testid="time-admin-tab-pto">
+            PTO Requests
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="reports" className="mt-4">
           <TimeReports />
@@ -54,6 +58,9 @@ export default function TimeAdminPage() {
         </TabsContent>
         <TabsContent value="worksheet" className="mt-4">
           <WorksheetReview />
+        </TabsContent>
+        <TabsContent value="pto" className="mt-4">
+          <PTOApprovalTab />
         </TabsContent>
       </Tabs>
     </div>
