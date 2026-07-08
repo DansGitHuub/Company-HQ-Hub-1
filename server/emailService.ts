@@ -1,12 +1,12 @@
-import sgMail from "@sendgrid/mail";
+import { Resend } from "resend";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function getFromEmail(): string {
-  return process.env.FROM_EMAIL || "noreply@chapinlandscapes.com";
+  return process.env.FROM_EMAIL || "Chapin Landscapes <noreply@resend.chapinlandscapes.com>";
 }
 
-function getAppUrl(): string {
+export function getAppUrl(): string {
   const domain = process.env.REPLIT_DOMAINS?.split(",")[0] || process.env.REPLIT_DEV_DOMAIN;
   return domain ? `https://${domain}` : "http://localhost:5000";
 }
@@ -15,7 +15,7 @@ function getAppUrl(): string {
  * Resolve effective recipient and annotate body when in test/redirect mode.
  *
  * Rules:
- *  - If SENDGRID_API_KEY is absent  → log "email skipped" and short-circuit.
+ *  - If RESEND_API_KEY is absent → log "email skipped" and short-circuit.
  *  - If EMAIL_SENDING_LIVE !== 'true' → redirect every outbound email to
  *    EMAIL_TEST_REDIRECT (default: dan@chapinlandscapes.com) and prepend a
  *    visible banner noting the original intended recipient.
@@ -49,7 +49,7 @@ export async function sendEmail(
   subject: string,
   body: string
 ): Promise<boolean> {
-  const apiKey = process.env.SENDGRID_API_KEY;
+  const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.log(`[emailService] email skipped (no API key) — To: ${to}, Subject: "${subject}"`);
     return true;
@@ -58,19 +58,23 @@ export async function sendEmail(
   const { actualTo, finalBody } = resolveRecipient(to, body);
 
   try {
-    sgMail.setApiKey(apiKey);
-    await sgMail.send({
+    const resend = new Resend(apiKey);
+    const { error } = await resend.emails.send({
       from: getFromEmail(),
       to: actualTo,
       subject,
       html: finalBody,
     });
 
+    if (error) {
+      console.error(`[emailService] Failed — To: ${actualTo}, Subject: "${subject}" | ${JSON.stringify(error)}`);
+      return false;
+    }
+
     console.log(`[emailService] Email sent → ${actualTo} (intended: ${to}), Subject: "${subject}"`);
     return true;
   } catch (err: any) {
-    const detail = err.response?.body ? JSON.stringify(err.response.body) : err.message;
-    console.error(`[emailService] Failed — To: ${actualTo}, Subject: "${subject}" | ${detail}`);
+    console.error(`[emailService] Failed — To: ${actualTo}, Subject: "${subject}" | ${err.message}`);
     return false;
   }
 }
@@ -80,15 +84,15 @@ export async function sendTestEmail(): Promise<boolean> {
   console.log("[emailService] Sending test email to:", fromEmail);
   return sendEmail(
     fromEmail,
-    "Company HQ — SendGrid Test",
+    "Company HQ — Resend Test",
     `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background-color: #166534; padding: 20px; text-align: center;">
         <h1 style="color: white; margin: 0;">Company HQ</h1>
       </div>
       <div style="padding: 30px; background-color: #f9fafb;">
-        <h2 style="color: #1f2937;">SendGrid Integration Test</h2>
-        <p style="color: #4b5563;">This confirms your SendGrid email service is working correctly.</p>
+        <h2 style="color: #1f2937;">Resend Integration Test</h2>
+        <p style="color: #4b5563;">This confirms your Resend email service is working correctly.</p>
         <p style="color: #4b5563;">Sent at: ${new Date().toISOString()}</p>
       </div>
       <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
@@ -152,5 +156,3 @@ export async function sendOfferAcceptanceEmail(
   `;
   return sendEmail(to, subject, body);
 }
-
-export { getAppUrl };
