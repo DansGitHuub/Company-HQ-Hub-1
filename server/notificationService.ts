@@ -112,10 +112,10 @@ export async function notifyStaff(payload: StaffNotificationPayload): Promise<vo
     channels.includes("sms") &&
     user?.phone &&
     user?.smsNotifications !== false &&
-    isSmsConfigured()
+    isSmsConfigured("customer")
   ) {
     try {
-      await sendSms(user.phone, smsBody || message);
+      await sendSms(user.phone, smsBody || message, "customer");
     } catch (err: any) {
       log(`[notify] SMS notification failed for user ${userId}: ${err.message}`, "notify");
     }
@@ -201,9 +201,9 @@ export async function notifyCustomer(payload: CustomerNotificationPayload): Prom
 
   // 3. SMS
   const phoneNum = toPhone || customer?.phone;
-  if (channels.includes("sms") && phoneNum && isSmsConfigured()) {
+  if (channels.includes("sms") && phoneNum && isSmsConfigured("customer")) {
     try {
-      await sendSms(phoneNum, smsBody || message);
+      await sendSms(phoneNum, smsBody || message, "customer");
     } catch (err: any) {
       log(`[notify] Customer SMS failed (id ${customerId}): ${err.message}`, "notify");
     }

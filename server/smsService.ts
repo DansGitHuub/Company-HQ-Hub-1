@@ -1,22 +1,52 @@
 // Twilio SMS Service — Server-to-Server
-// Required secrets: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_MESSAGING_SERVICE_SID (preferred) or TWILIO_PHONE_NUMBER
+//
+// Two channels:
+//   "customer" — outbound to customers/portal users
+//                Prefers TWILIO_CUSTOMER_MESSAGING_SERVICE_SID, falls back to TWILIO_CUSTOMER_PHONE_NUMBER
+//   "hiring"   — outbound to job applicants/candidates (default)
+//                Prefers TWILIO_MESSAGING_SERVICE_SID, falls back to TWILIO_PHONE_NUMBER
+//
+// Required secrets for hiring channel:
+//   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_MESSAGING_SERVICE_SID (preferred) or TWILIO_PHONE_NUMBER
+// Required for customer channel:
+//   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_CUSTOMER_MESSAGING_SERVICE_SID (preferred) or TWILIO_CUSTOMER_PHONE_NUMBER
 
-export function isSmsConfigured(): boolean {
+export type SmsChannel = "customer" | "hiring";
+
+export function isSmsConfigured(channel: SmsChannel = "hiring"): boolean {
+  const hasCreds = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
+  if (!hasCreds) return false;
+
+  if (channel === "customer") {
+    return !!(
+      process.env.TWILIO_CUSTOMER_MESSAGING_SERVICE_SID ||
+      process.env.TWILIO_CUSTOMER_PHONE_NUMBER
+    );
+  }
+  // "hiring" channel
   return !!(
-    process.env.TWILIO_ACCOUNT_SID &&
-    process.env.TWILIO_AUTH_TOKEN &&
-    (process.env.TWILIO_MESSAGING_SERVICE_SID || process.env.TWILIO_PHONE_NUMBER)
+    process.env.TWILIO_MESSAGING_SERVICE_SID ||
+    process.env.TWILIO_PHONE_NUMBER
   );
 }
 
-export async function sendSms(to: string, body: string): Promise<boolean> {
+export async function sendSms(to: string, body: string, channel: SmsChannel = "hiring"): Promise<boolean> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-  const from = process.env.TWILIO_PHONE_NUMBER;
+
+  let messagingServiceSid: string | undefined;
+  let from: string | undefined;
+
+  if (channel === "customer") {
+    messagingServiceSid = process.env.TWILIO_CUSTOMER_MESSAGING_SERVICE_SID;
+    from = process.env.TWILIO_CUSTOMER_PHONE_NUMBER;
+  } else {
+    messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+    from = process.env.TWILIO_PHONE_NUMBER;
+  }
 
   if (!accountSid || !authToken || (!messagingServiceSid && !from)) {
-    console.warn("[sms] Twilio credentials not configured — skipping SMS to:", to);
+    console.warn(`[sms] Twilio credentials not configured for channel "${channel}" — skipping SMS to:`, to);
     return false;
   }
 
@@ -55,14 +85,14 @@ export async function sendSms(to: string, body: string): Promise<boolean> {
     const data = await response.json() as any;
 
     if (!response.ok) {
-      console.error(`[sms] Twilio error (HTTP ${response.status}):`, JSON.stringify(data));
+      console.error(`[sms] Twilio error on channel "${channel}" (HTTP ${response.status}):`, JSON.stringify(data));
       return false;
     }
 
-    console.log(`[sms] SMS sent successfully to ${normalized} (SID: ${data.sid})`);
+    console.log(`[sms] SMS sent successfully via "${channel}" channel to ${normalized} (SID: ${data.sid})`);
     return true;
   } catch (err: any) {
-    console.error("[sms] Failed to send SMS:", err.message);
+    console.error(`[sms] Failed to send SMS on channel "${channel}":`, err.message);
     return false;
   }
 }
@@ -74,6 +104,9 @@ function normalizePhone(phone: string): string | null {
   if (digits.length > 10) return `+${digits}`;
   return null;
 }
+
+// ── Hiring-channel helpers ────────────────────────────────────────────────────
+// All of these always use the "hiring" channel (440 interview number).
 
 export async function sendStageSms(
   to: string,
@@ -94,7 +127,7 @@ export async function sendStageSms(
     "Declined / Not a Fit": `Hi ${firstName}, thank you for your interest in Chapin Landscapes. After careful consideration, we've decided to move forward with other candidates at this time. We wish you the best!`,
   };
   const body = messages[stage] || `Hi ${firstName}, your application status for the ${pos} position at Chapin Landscapes has been updated. Please check your email for details.`;
-  return sendSms(to, body);
+  return sendSms(to, body, "hiring");
 }
 
 export async function sendHireSms(
@@ -104,7 +137,7 @@ export async function sendHireSms(
 ): Promise<boolean> {
   const firstName = candidateName.split(" ")[0];
   const body = `Hi ${firstName}, welcome to the Chapin Landscapes team! Your account credentials and onboarding information have been sent to your email.`;
-  return sendSms(to, body);
+  return sendSms(to, body, "hiring");
 }
 
 export async function sendInterviewSms(
@@ -124,5 +157,5 @@ export async function sendInterviewSms(
     message = `Hi ${candidateName.split(" ")[0]}, your interview with Chapin Landscapes is scheduled for ${date} at ${time}${location ? ` at ${location}` : ""}. We look forward to meeting you!`;
   }
 
-  return sendSms(to, message);
+  return sendSms(to, message, "hiring");
 }

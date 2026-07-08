@@ -55,6 +55,9 @@ integrations = ["javascript_database:1.0.0", "javascript_auth_all_persistance:1.
 [userenv.production]
 ADMIN_SETUP_CODE = "CompanyHQ2026!"
 
+[userenv.shared]
+TWILIO_CUSTOMER_PHONE_NUMBER = "+18444409258"
+
 [objectStorage]
 defaultBucketID = "replit-objstore-a9e18d46-f663-49f2-a6b5-e31b7d9ddb0e"
 

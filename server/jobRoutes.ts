@@ -586,10 +586,10 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
       if (via.includes("sms")) {
         if (!job.primary_phone) {
           results.sms = "no_phone";
-        } else if (!isSmsConfigured()) {
+        } else if (!isSmsConfigured("customer")) {
           results.sms = "not_configured";
         } else {
-          const sent = await sendSms(job.primary_phone, message);
+          const sent = await sendSms(job.primary_phone, message, "customer");
           results.sms = sent ? "sent" : "failed";
         }
       }
