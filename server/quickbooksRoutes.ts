@@ -458,6 +458,7 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
       if (status === "pending")  conditions.push("te.qbo_exported_at IS NULL AND (te.qbo_export_error IS NULL OR te.qbo_export_error = '')");
       if (status === "exported") conditions.push("te.qbo_exported_at IS NOT NULL");
       if (status === "error")    conditions.push("te.qbo_export_error IS NOT NULL AND te.qbo_export_error != '' AND te.qbo_exported_at IS NULL");
+      if (status === "modified") conditions.push("te.qbo_exported_at IS NOT NULL AND te.updated_at > te.qbo_exported_at");
 
       const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
@@ -466,8 +467,9 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
           te.id, te.clock_in, te.clock_out, te.duration_minutes,
           te.entry_type, te.work_area_name, te.approval_status,
           te.qbo_exported_at, te.qbo_time_activity_id, te.qbo_export_error,
+          te.updated_at,
           u.id AS user_id,
-          COALESCE(u.first_name || ' ' || u.last_name, u.username) AS employee_name,
+          COALESCE(u.name, u.username) AS employee_name,
           COALESCE(j.title, j.client) AS job_title,
           j.id AS job_id
         FROM time_entries te
@@ -531,8 +533,8 @@ export async function registerQuickBooksRoutes(app: Express, requireAuth: any) {
     try {
       // Local users
       const { rows: localUsers } = await pool.query(
-        `SELECT id, username, first_name, last_name, email, role, qbo_employee_id
-         FROM users WHERE role NOT IN ('Customer') ORDER BY first_name, last_name, username`
+        `SELECT id, username, name, email, role, qbo_employee_id
+         FROM users WHERE role NOT IN ('Customer') ORDER BY name, username`
       );
 
       // QB Employees (best-effort — return empty if not connected)

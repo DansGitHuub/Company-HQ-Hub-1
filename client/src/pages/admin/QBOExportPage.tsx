@@ -55,12 +55,32 @@ function today(): string {
 
 // ─── Status chip ─────────────────────────────────────────────────────────────
 
+function isModifiedAfterExport(entry: any): boolean {
+  return (
+    !!entry.qbo_exported_at &&
+    !!entry.updated_at &&
+    new Date(entry.updated_at) > new Date(entry.qbo_exported_at)
+  );
+}
+
 function StatusChip({ entry }: { entry: any }) {
   if (entry.qbo_exported_at) {
+    const modified = isModifiedAfterExport(entry);
     return (
-      <Badge className="bg-green-100 text-green-700 border-green-200 text-xs gap-1">
-        <CheckCircle2 className="w-3 h-3" /> Exported
-      </Badge>
+      <div className="flex flex-col gap-0.5">
+        <Badge className="bg-green-100 text-green-700 border-green-200 text-xs gap-1">
+          <CheckCircle2 className="w-3 h-3" /> Exported
+        </Badge>
+        {modified && (
+          <Badge
+            className="bg-orange-100 text-orange-700 border-orange-200 text-xs gap-1"
+            title={`Exported ${new Date(entry.qbo_exported_at).toLocaleString()} · Last edited ${new Date(entry.updated_at).toLocaleString()}`}
+            data-testid={`badge-modified-${entry.id}`}
+          >
+            <TriangleAlert className="w-3 h-3" /> Modified after export
+          </Badge>
+        )}
+      </div>
     );
   }
   if (entry.qbo_export_error) {
@@ -162,6 +182,8 @@ function TimeEntriesTab() {
   const entries: any[] = data?.entries ?? [];
   const totalPages: number = data?.totalPages ?? 1;
 
+  const modifiedCount = entries.filter(isModifiedAfterExport).length;
+
   const allPageIds = entries.map((e: any) => e.id);
   const allPageSelected = allPageIds.length > 0 && allPageIds.every((id) => selected.has(id));
 
@@ -219,7 +241,7 @@ function TimeEntriesTab() {
                   <SelectItem value="all">All employees</SelectItem>
                   {(empData?.localUsers ?? []).map((u: any) => (
                     <SelectItem key={u.id} value={String(u.id)}>
-                      {u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.username}
+                      {u.name || u.username}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -235,6 +257,7 @@ function TimeEntriesTab() {
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="exported">Exported</SelectItem>
+                  <SelectItem value="modified">Modified after export</SelectItem>
                   <SelectItem value="error">Error</SelectItem>
                 </SelectContent>
               </Select>
@@ -245,6 +268,27 @@ function TimeEntriesTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modified-after-export warning banner */}
+      {modifiedCount > 0 && statusFilter !== "modified" && (
+        <div
+          className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-orange-800 text-sm"
+          data-testid="modified-after-export-banner"
+        >
+          <TriangleAlert className="w-4 h-4 shrink-0 text-orange-500" />
+          <span>
+            <strong>{modifiedCount} {modifiedCount === 1 ? "entry" : "entries"}</strong> on this page{" "}
+            {modifiedCount === 1 ? "was" : "were"} edited after being exported to QuickBooks — the QB record may be out of date.
+          </span>
+          <button
+            className="ml-auto text-xs underline text-orange-700 hover:text-orange-900 whitespace-nowrap"
+            onClick={() => { setStatusFilter("modified"); setPage(1); setSelected(new Set()); }}
+            data-testid="banner-filter-modified"
+          >
+            Show only modified
+          </button>
+        </div>
+      )}
 
       {/* Actions bar */}
       {selected.size > 0 && (
