@@ -158,7 +158,30 @@ export function registerEmployeeFormsRoutes(app: Express, requireAuth: RequestHa
         [status, reviewNotes || null, req.user.id, id]
       );
       if (result.rows.length === 0) return res.status(404).json({ message: "Request not found" });
-      res.json(result.rows[0]);
+      const tor = result.rows[0];
+
+      // Notify the employee of the decision via their user account
+      if (tor.employee_id) {
+        pool.query(
+          `SELECT u.id AS user_id FROM employees e JOIN users u ON u.id = e.user_id WHERE e.id = $1`,
+          [tor.employee_id]
+        ).then(async (empResult: any) => {
+          const userId = empResult.rows[0]?.user_id;
+          if (!userId) return;
+          const dateRange = `${tor.start_date} – ${tor.end_date}`;
+          const title   = status === "Approved" ? "Time Off Approved" : "Time Off Request Denied";
+          const message = status === "Approved"
+            ? `Your ${tor.request_type} request (${dateRange}, ${tor.total_days} day${tor.total_days !== 1 ? "s" : ""}) has been approved.${reviewNotes ? ` Note: ${reviewNotes}` : ""}`
+            : `Your ${tor.request_type} request (${dateRange}) was denied.${reviewNotes ? ` Reason: ${reviewNotes}` : ""}`;
+          await pool.query(
+            `INSERT INTO staff_notifications (id, user_id, type, title, message, link, is_read, created_at)
+             VALUES (gen_random_uuid(), $1, 'time_off_decision', $2, $3, '/employee-portal', false, now())`,
+            [userId, title, message]
+          );
+        }).catch((e: any) => console.error("[employeeFormsRoutes] notify PTO decision:", e.message));
+      }
+
+      res.json(tor);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

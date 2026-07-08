@@ -523,11 +523,29 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
          SET approval_status = $1,
              rejection_note  = $2
          WHERE id = $3
-         RETURNING id, approval_status, rejection_note`,
+         RETURNING id, user_id, clock_in, approval_status, rejection_note`,
         [status, rejection_note ?? null, id]
       );
       if (result.rowCount === 0) return res.status(404).json({ message: "Entry not found" });
-      return res.json(result.rows[0]);
+      const row = result.rows[0];
+
+      // Notify the employee when a decision is made (not when reset to pending)
+      if (status !== "pending" && row.user_id) {
+        const dateLabel = row.clock_in
+          ? new Date(row.clock_in).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+          : "your entry";
+        const title   = status === "approved" ? "Time Entry Approved" : "Time Entry Rejected";
+        const message = status === "approved"
+          ? `Your time entry on ${dateLabel} has been approved.`
+          : `Your time entry on ${dateLabel} was rejected.${rejection_note ? ` Note: ${rejection_note}` : ""}`;
+        pool.query(
+          `INSERT INTO staff_notifications (id, user_id, type, title, message, link, is_read, created_at)
+           VALUES (gen_random_uuid(), $1, 'time_entry_decision', $2, $3, '/my-hours', false, now())`,
+          [row.user_id, title, message]
+        ).catch((e: any) => console.error("[timeRoutes] notify single approval:", e.message));
+      }
+
+      return res.json(row);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
     }
@@ -553,9 +571,29 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
         `UPDATE time_entries
          SET approval_status = $1, rejection_note = $2
          WHERE id IN (${placeholders})
-         RETURNING id, approval_status, rejection_note`,
+         RETURNING id, user_id, clock_in, approval_status, rejection_note`,
         [status, rejection_note ?? null, ...ids]
       );
+
+      // Send one consolidated notification per affected employee (skip "pending" resets)
+      if (status !== "pending") {
+        const byUser = new Map<string, number>();
+        for (const row of result.rows) {
+          if (row.user_id) byUser.set(row.user_id, (byUser.get(row.user_id) ?? 0) + 1);
+        }
+        const title = status === "approved" ? "Time Entries Approved" : "Time Entries Rejected";
+        for (const [userId, count] of byUser) {
+          const message = status === "approved"
+            ? `${count} of your time ${count === 1 ? "entry has" : "entries have"} been approved.`
+            : `${count} of your time ${count === 1 ? "entry was" : "entries were"} rejected.${rejection_note ? ` Note: ${rejection_note}` : ""}`;
+          pool.query(
+            `INSERT INTO staff_notifications (id, user_id, type, title, message, link, is_read, created_at)
+             VALUES (gen_random_uuid(), $1, 'time_entry_decision', $2, $3, '/my-hours', false, now())`,
+            [userId, title, message]
+          ).catch((e: any) => console.error("[timeRoutes] notify bulk approval:", e.message));
+        }
+      }
+
       return res.json({ updated: result.rowCount, rows: result.rows });
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
