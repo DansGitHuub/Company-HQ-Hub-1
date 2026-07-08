@@ -707,6 +707,147 @@ function FollowUpDateCard({
   );
 }
 
+// ── Portal Jobs Link Tab ───────────────────────────────────────────────────────
+function CustomerPortalTab({ customerId, jobs }: { customerId: string; jobs: any[] }) {
+  const { toast } = useToast();
+  const [linkedMap, setLinkedMap] = React.useState<Record<string, Set<string>>>({});
+  const [loadingLinks, setLoadingLinks] = React.useState(false);
+
+  const { data: allAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/customer-accounts"],
+    queryFn: () => apiRequest("GET", "/api/customer-accounts").then(r => r.json()),
+  });
+
+  React.useEffect(() => {
+    if (!jobs.length) return;
+    setLoadingLinks(true);
+    Promise.all(
+      jobs.map(job =>
+        apiRequest("GET", `/api/customer-jobs/by-job/${job.id}`)
+          .then(r => r.json())
+          .then((links: any[]) => [job.id, new Set((Array.isArray(links) ? links : []).map((l: any) => String(l.customerId)))] as const)
+          .catch(() => [job.id, new Set<string>()] as const)
+      )
+    ).then(results => {
+      setLinkedMap(Object.fromEntries(results));
+    }).finally(() => setLoadingLinks(false));
+  }, [jobs.length]);
+
+  const toggle = async (portalUserId: string, jobId: string) => {
+    const isLinked = (linkedMap[jobId] ?? new Set()).has(portalUserId);
+    try {
+      if (isLinked) {
+        await apiRequest("DELETE", `/api/customer-jobs/unlink`, { customerId: portalUserId, jobId });
+        setLinkedMap(prev => {
+          const next = new Set(prev[jobId]);
+          next.delete(portalUserId);
+          return { ...prev, [jobId]: next };
+        });
+      } else {
+        await apiRequest("POST", `/api/customer-jobs/link`, { customerId: portalUserId, jobId });
+        setLinkedMap(prev => {
+          const next = new Set(prev[jobId] ?? []);
+          next.add(portalUserId);
+          return { ...prev, [jobId]: next };
+        });
+      }
+      toast({ title: isLinked ? "Job unlinked from portal" : "Job linked to portal" });
+    } catch {
+      toast({ title: "Action failed", variant: "destructive" });
+    }
+  };
+
+  if (!jobs.length) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-muted-foreground">
+          <Link2 className="h-8 w-8 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">No jobs linked to this customer yet.</p>
+          <p className="text-xs mt-1 opacity-70">Create or link a job first, then control portal access here.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (allAccounts.length === 0 && !loadingLinks) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-muted-foreground">
+          <Link2 className="h-8 w-8 mx-auto mb-2 opacity-30" />
+          <p className="text-sm font-medium">No portal accounts yet</p>
+          <p className="text-xs mt-1 opacity-70">Use "Invite to Portal" above to create a Customer Hub account for this customer.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Link2 className="h-4 w-4" /> Customer Portal Access
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Toggle which portal accounts can see each job in their Customer Hub.
+          </p>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loadingLinks ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[160px]">Job</TableHead>
+                    {allAccounts.map((acc: any) => (
+                      <TableHead key={acc.id} className="text-center text-xs min-w-[90px]">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="font-medium">{acc.name}</span>
+                          <span className="font-normal text-muted-foreground truncate max-w-[80px]">{acc.email}</span>
+                        </div>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {jobs.map(job => (
+                    <TableRow key={job.id}>
+                      <TableCell className="text-sm">
+                        <p className="font-medium">{job.client}</p>
+                        <p className="text-xs text-muted-foreground">{job.type}</p>
+                      </TableCell>
+                      {allAccounts.map((acc: any) => {
+                        const isLinked = (linkedMap[job.id] ?? new Set()).has(String(acc.id));
+                        return (
+                          <TableCell key={acc.id} className="text-center">
+                            <button
+                              onClick={() => toggle(String(acc.id), job.id)}
+                              data-testid={`portal-toggle-${acc.id}-${job.id}`}
+                              className={`h-7 w-7 rounded-full border-2 text-xs font-bold transition-colors ${
+                                isLinked
+                                  ? "bg-green-600 border-green-600 text-white hover:bg-green-700"
+                                  : "border-gray-300 text-gray-400 hover:border-green-400 hover:text-green-600"
+                              }`}
+                            >
+                              {isLinked ? "✓" : "+"}
+                            </button>
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CustomerDetailPage() {
   const { t } = useTranslation("customers");
@@ -1364,6 +1505,9 @@ export default function CustomerDetailPage() {
               <TabsTrigger value="messages" className="flex items-center gap-1.5 text-xs" data-testid="tab-messages">
                 <MessageSquare className="h-3.5 w-3.5" /> Messages
               </TabsTrigger>
+              <TabsTrigger value="portal" className="flex items-center gap-1.5 text-xs" data-testid="tab-portal">
+                <Link2 className="h-3.5 w-3.5" /> Portal
+              </TabsTrigger>
             </TabsList>
 
             {/* ── Overview ── */}
@@ -1638,6 +1782,11 @@ export default function CustomerDetailPage() {
             {/* ── Portal Messages ── */}
             <TabsContent value="messages" className="mt-4">
               <CustomerMessagesTab customerId={id ?? ""} />
+            </TabsContent>
+
+            {/* ── Portal Jobs Link ── */}
+            <TabsContent value="portal" className="mt-4">
+              <CustomerPortalTab customerId={id ?? ""} jobs={jobs} />
             </TabsContent>
 
           </Tabs>

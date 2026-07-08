@@ -19,6 +19,7 @@ import {
   Plus, Trash2, HardHat, MessageSquare, ShieldCheck, GitMerge, CheckSquare, ClipboardCheck, Award, Truck, Users, Package,
   TrendingUp, TrendingDown, Camera, Image, ExternalLink, ClipboardList, Phone,
   LayoutDashboard, BookOpen, Activity, StickyNote, Wrench, AlertTriangle,
+  Link2, Upload, Mail, X, Eye,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -460,6 +461,39 @@ function FilesPhotosTab({ jobId }: { jobId: string }) {
       .then((d) => Array.isArray(d) ? d : []),
   });
 
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { effectiveRole } = useAuth();
+  const isStaffUser = effectiveRole !== "Customer";
+  const [uploading, setUploading] = useState(false);
+  const [photoType, setPhotoType] = useState("before");
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handlePhotoUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const sessionRes = await apiRequest("POST", `/api/jobs/${jobId}/admin-worksheet-session`);
+      if (!sessionRes.ok) throw new Error("Failed to create session");
+      const { sessionId } = await sessionRes.json();
+      const formData = new FormData();
+      formData.append("photo", file);
+      formData.append("photo_type", photoType);
+      const r = await fetch(`/api/worksheets/${sessionId}/photos`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!r.ok) { const e = await r.json(); throw new Error(e.error ?? "Upload failed"); }
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "worksheet-photos"] });
+      toast({ title: "Photo uploaded" });
+    } catch (err: any) {
+      toast({ title: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const ccPhotos: any[] = ccData?.photos ?? [];
 
   const typeColor = (t: string) =>
@@ -595,6 +629,36 @@ function FilesPhotosTab({ jobId }: { jobId: string }) {
             </div>
           )}
         </CardContent>
+        {isStaffUser && (
+          <div className="px-5 pb-4 border-t pt-3 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Upload before/after worksheet photo</p>
+            <div className="flex gap-2 items-center flex-wrap">
+              <select
+                value={photoType}
+                onChange={e => setPhotoType(e.target.value)}
+                className="text-xs border rounded px-2 py-1 h-8 bg-background"
+                data-testid="select-photo-type"
+              >
+                <option value="before">Before</option>
+                <option value="after">After</option>
+                <option value="other">Other</option>
+              </select>
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="button-upload-worksheet-photo">
+                {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                {uploading ? "Uploading…" : "Upload Photo"}
+              </Button>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,image/heic"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); }}
+            />
+          </div>
+        )}
       </Card>
     </div>
   );
@@ -791,7 +855,15 @@ export default function JobDetailPage() {
   const [showGenerateInvoice, setShowGenerateInvoice] = useState(false);
   const [crewNotes, setCrewNotes] = useState<string | null>(null);
   const [skippedWorkNotes, setSkippedWorkNotes] = useState<string | null>(null);
+  const [crewNotesCustomerVisible, setCrewNotesCustomerVisible] = useState<string | null>(null);
   const [savingNotes, setSavingNotes] = useState(false);
+  const [showPortalLink, setShowPortalLink] = useState(false);
+  const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [emailPreviewData, setEmailPreviewData] = useState<{ subject: string; html: string; portalLink: string; customerEmail: string | null } | null>(null);
+  const [loadingEmailPreview, setLoadingEmailPreview] = useState(false);
+  const [portalAccounts, setPortalAccounts] = useState<any[]>([]);
+  const [portalLinkedIds, setPortalLinkedIds] = useState<string[]>([]);
+  const [loadingPortal, setLoadingPortal] = useState(false);
 
   // Work Areas modal state
   const [showAddArea, setShowAddArea] = useState(false);
@@ -809,6 +881,7 @@ export default function JobDetailPage() {
       const data = await res.json();
       setCrewNotes(data.crew_notes ?? data.notes ?? "");
       setSkippedWorkNotes(data.skipped_work_notes ?? "");
+      setCrewNotesCustomerVisible(data.crew_notes_customer_visible ?? "");
       return data;
     },
   });
@@ -948,6 +1021,7 @@ export default function JobDetailPage() {
         crew_notes: crewNotes,
         notes: crewNotes,
         skipped_work_notes: skippedWorkNotes || null,
+        crew_notes_customer_visible: crewNotesCustomerVisible || null,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", id] });
       toast({ title: t("notesSaved") });
@@ -955,6 +1029,55 @@ export default function JobDetailPage() {
       toast({ title: t("failedSaveNotes"), variant: "destructive" });
     } finally {
       setSavingNotes(false);
+    }
+  };
+
+  const openPortalLink = async () => {
+    setLoadingPortal(true);
+    setShowPortalLink(true);
+    try {
+      const [accRes, linkRes] = await Promise.all([
+        apiRequest("GET", "/api/customer-accounts"),
+        apiRequest("GET", `/api/customer-jobs/by-job/${id}`),
+      ]);
+      const accs = await accRes.json();
+      const links = await linkRes.json();
+      setPortalAccounts(Array.isArray(accs) ? accs : []);
+      setPortalLinkedIds(Array.isArray(links) ? links.map((l: any) => String(l.customerId)) : []);
+    } catch {
+      toast({ title: "Failed to load portal accounts", variant: "destructive" });
+    } finally {
+      setLoadingPortal(false);
+    }
+  };
+
+  const openEmailPreview = async () => {
+    setLoadingEmailPreview(true);
+    setShowEmailPreview(true);
+    try {
+      const res = await apiRequest("GET", `/api/jobs/${id}/status-email-preview?status=completed`);
+      if (!res.ok) throw new Error("Failed to load email preview");
+      setEmailPreviewData(await res.json());
+    } catch (err: any) {
+      toast({ title: err.message, variant: "destructive" });
+    } finally {
+      setLoadingEmailPreview(false);
+    }
+  };
+
+  const togglePortalLink = async (customerId: string) => {
+    const linked = portalLinkedIds.includes(customerId);
+    try {
+      if (linked) {
+        await apiRequest("DELETE", `/api/customer-jobs/unlink`, { customerId, jobId: id });
+        setPortalLinkedIds(prev => prev.filter(x => x !== customerId));
+      } else {
+        await apiRequest("POST", `/api/customer-jobs/link`, { customerId, jobId: id });
+        setPortalLinkedIds(prev => [...prev, customerId]);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", id] });
+    } catch {
+      toast({ title: "Action failed", variant: "destructive" });
     }
   };
 
@@ -1020,6 +1143,16 @@ export default function JobDetailPage() {
         {isAdminOrManager && (
           <Button variant="outline" size="sm" onClick={() => setShowEdit(true)} data-testid="button-edit-job">
             <Pencil className="h-4 w-4 mr-1.5" /> {t("editJob")}
+          </Button>
+        )}
+        {isAdminOrManager && (
+          <Button variant="outline" size="sm" onClick={openPortalLink} data-testid="button-share-portal">
+            <Link2 className="h-4 w-4 mr-1.5" /> Portal
+          </Button>
+        )}
+        {isAdminOrManager && (
+          <Button variant="outline" size="sm" onClick={openEmailPreview} data-testid="button-preview-email">
+            <Eye className="h-4 w-4 mr-1.5" /> Email Preview
           </Button>
         )}
       </div>
@@ -1577,6 +1710,31 @@ export default function JobDetailPage() {
                   )}
                 </CardContent>
               </Card>
+              <Card className="border-emerald-200 bg-emerald-50/40">
+                <CardHeader className="pb-2 pt-4">
+                  <CardTitle className="text-sm flex items-center gap-2 text-emerald-800">
+                    Customer-Facing Note
+                    <span className="text-xs font-normal text-emerald-600">(visible to customer in their portal)</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Textarea
+                    value={crewNotesCustomerVisible ?? ""}
+                    onChange={(e) => setCrewNotesCustomerVisible(e.target.value)}
+                    rows={4}
+                    placeholder="Leave a note the customer will see in their Customer Hub portal (e.g. 'Back beds completed, front walkway still needs edging — returning Friday.')…"
+                    className="resize-none border-emerald-200 focus:border-emerald-400"
+                    data-testid="textarea-crew-notes-customer-visible"
+                    readOnly={!isAdminOrManager}
+                  />
+                  {isAdminOrManager && (
+                    <Button size="sm" onClick={saveNotes} disabled={savingNotes} data-testid="button-save-customer-note">
+                      {savingNotes ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+                      Save Note
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           )}
 
@@ -1697,6 +1855,84 @@ export default function JobDetailPage() {
           )}
         </div>
       </div>
+
+      {/* ── Portal Link Modal ──────────────────────────────────────────────── */}
+      <Dialog open={showPortalLink} onOpenChange={setShowPortalLink}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Link2 className="h-4 w-4" /> Link Job to Customer Portal</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <p className="text-sm text-muted-foreground">
+              Link this job to a customer portal account so it appears in their Customer Hub.
+            </p>
+            {loadingPortal ? (
+              <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : portalAccounts.length === 0 ? (
+              <p className="text-sm text-center text-muted-foreground py-4">No customer portal accounts found.<br/>Invite a customer first using the customer record.</p>
+            ) : (
+              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                {portalAccounts.map((acc: any) => {
+                  const linked = portalLinkedIds.includes(String(acc.id));
+                  return (
+                    <div key={acc.id} className="flex items-center justify-between px-3 py-2 rounded-md border bg-muted/30">
+                      <div>
+                        <p className="text-sm font-medium">{acc.name}</p>
+                        <p className="text-xs text-muted-foreground">{acc.email}</p>
+                      </div>
+                      <Button size="sm" variant={linked ? "default" : "outline"}
+                        className={linked ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                        onClick={() => togglePortalLink(String(acc.id))}
+                        data-testid={`button-portal-link-${acc.id}`}>
+                        {linked ? "✓ Linked" : "Link"}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowPortalLink(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Email Preview Modal ─────────────────────────────────────────────── */}
+      <Dialog open={showEmailPreview} onOpenChange={setShowEmailPreview}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Mail className="h-4 w-4" /> Customer Email Preview</DialogTitle>
+          </DialogHeader>
+          {loadingEmailPreview ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : emailPreviewData ? (
+            <div className="space-y-3">
+              <div className="text-sm border rounded-md p-3 bg-muted/30 space-y-1">
+                <p><span className="font-medium">To:</span> {emailPreviewData.customerEmail ?? "—"}</p>
+                <p><span className="font-medium">Subject:</span> {emailPreviewData.subject}</p>
+                <p><span className="font-medium">Portal link:</span>{" "}
+                  <a href={emailPreviewData.portalLink} target="_blank" rel="noreferrer"
+                    className="text-blue-600 underline text-xs break-all">
+                    {emailPreviewData.portalLink}
+                  </a>
+                </p>
+              </div>
+              <div className="border rounded-md overflow-hidden">
+                <iframe
+                  srcDoc={emailPreviewData.html}
+                  className="w-full h-96"
+                  sandbox="allow-same-origin"
+                  title="Email preview"
+                />
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowEmailPreview(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add / Edit Work Area Dialog */}
       <Dialog open={showAddArea} onOpenChange={(o) => { if (!o) closeAreaDialog(); }}>

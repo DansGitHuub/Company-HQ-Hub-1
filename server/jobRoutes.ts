@@ -13,9 +13,66 @@ const NOTIFY_STATUSES: Record<string, string> = {
   cancelled:   "Update on Your Job",
 };
 
+function getPortalBaseUrl(): string {
+  return process.env.APP_BASE_URL
+    ?? (process.env.NODE_ENV === "production"
+      ? "https://companyhq.chapinlandscapes.com"
+      : `http://localhost:${process.env.PORT ?? 5000}`);
+}
+
+function renderJobStatusEmailHtml(
+  row: { title: string; scheduled_date: string | null; address: string | null; city: string | null; state: string | null; first_name: string | null; last_name: string | null; company_name: string | null },
+  newStatus: string,
+  portalLink: string,
+): { subject: string; html: string } {
+  const label = NOTIFY_STATUSES[newStatus] ?? newStatus;
+  const customerName = row.first_name
+    ? `${row.first_name} ${row.last_name ?? ""}`.trim()
+    : row.company_name || "Valued Customer";
+
+  const statusLine: Record<string, string> = {
+    scheduled:   "Great news — your job has been scheduled! Our team will be there on the date below.",
+    in_progress: "Our crew has started work on your job. We'll keep you updated as we make progress.",
+    completed:   "Your job is complete! Thank you for choosing Chapin Landscapes. You can view your job details, photos, and documents in your Customer Portal.",
+    cancelled:   "We wanted to let you know that your job has been cancelled. Please contact us if you have any questions.",
+  };
+
+  const completionCta = newStatus === "completed"
+    ? `<div style="text-align:center;margin:24px 0">
+         <a href="${portalLink}" style="display:inline-block;background:#2d5a27;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px">View My Job in Customer Portal →</a>
+       </div>`
+    : "";
+
+  const dateStr = row.scheduled_date
+    ? new Date(row.scheduled_date).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+    : null;
+  const location = [row.address, row.city, row.state].filter(Boolean).join(", ");
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:560px;margin:auto;color:#222">
+      <div style="background:#2d5a27;padding:20px 24px;border-radius:8px 8px 0 0">
+        <h1 style="color:#fff;margin:0;font-size:20px">Chapin Landscapes</h1>
+      </div>
+      <div style="padding:24px;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 8px 8px">
+        <p>Hi ${escapeHtml(customerName)},</p>
+        <p>${statusLine[newStatus] ?? ""}</p>
+        <table style="border-collapse:collapse;width:100%;margin:16px 0">
+          <tr><td style="padding:8px 12px;font-weight:bold;background:#f9fafb;border:1px solid #e5e7eb">Job</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${escapeHtml(row.title)}</td></tr>
+          ${dateStr ? `<tr><td style="padding:8px 12px;font-weight:bold;background:#f9fafb;border:1px solid #e5e7eb">Date</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${dateStr}</td></tr>` : ""}
+          ${location ? `<tr><td style="padding:8px 12px;font-weight:bold;background:#f9fafb;border:1px solid #e5e7eb">Location</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${escapeHtml(location)}</td></tr>` : ""}
+        </table>
+        ${completionCta}
+        <p>If you have any questions, please don't hesitate to reach out.</p>
+        <p style="margin-top:24px;color:#666;font-size:0.85em">Chapin Landscapes · <a href="${portalLink}" style="color:#2d5a27">Customer Portal</a></p>
+      </div>
+    </div>
+  `;
+  return { subject: `${label} — ${row.title}`, html };
+}
+
 async function sendJobStatusEmail(jobId: string, newStatus: string) {
   const label = NOTIFY_STATUSES[newStatus];
-  if (!label) return; // only notify for specific statuses
+  if (!label) return;
 
   try {
     const jobRes = await pool.query(`
@@ -30,58 +87,9 @@ async function sendJobStatusEmail(jobId: string, newStatus: string) {
     const row = jobRes.rows[0];
     if (!row?.customer_email) return;
 
-    const customerName = row.first_name
-      ? `${row.first_name} ${row.last_name}`.trim()
-      : row.company_name || "Valued Customer";
-
-    // Build the Customer Hub portal link — works in both dev and production
-    const appBase = process.env.APP_BASE_URL
-      ?? (process.env.NODE_ENV === "production"
-        ? "https://companyhq.chapinlandscapes.com"
-        : `http://localhost:${process.env.PORT ?? 5000}`);
-    const portalLink = `${appBase}/customer-hub`;
-
-    const statusLine: Record<string, string> = {
-      scheduled:   "Great news — your job has been scheduled! Our team will be there on the date below.",
-      in_progress: "Our crew has started work on your job. We'll keep you updated as we make progress.",
-      completed:   "Your job is complete! Thank you for choosing Chapin Landscapes. You can view your job details, photos, and documents in your Customer Portal.",
-      cancelled:   "We wanted to let you know that your job has been cancelled. Please contact us if you have any questions.",
-    };
-
-    const completionCta = newStatus === "completed"
-      ? `<div style="text-align:center;margin:24px 0">
-           <a href="${portalLink}" style="display:inline-block;background:#2d5a27;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px">View My Job in Customer Portal →</a>
-         </div>`
-      : "";
-
-    const dateStr = row.scheduled_date
-      ? new Date(row.scheduled_date).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
-      : null;
-    const location = [row.address, row.city, row.state].filter(Boolean).join(", ");
-
-    await sendEmail(
-      row.customer_email,
-      `${label} — ${row.title}`,
-      `
-        <div style="font-family:sans-serif;max-width:560px;margin:auto;color:#222">
-          <div style="background:#2d5a27;padding:20px 24px;border-radius:8px 8px 0 0">
-            <h1 style="color:#fff;margin:0;font-size:20px">Chapin Landscapes</h1>
-          </div>
-          <div style="padding:24px;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 8px 8px">
-            <p>Hi ${escapeHtml(customerName)},</p>
-            <p>${statusLine[newStatus] ?? ""}</p>
-            <table style="border-collapse:collapse;width:100%;margin:16px 0">
-              <tr><td style="padding:8px 12px;font-weight:bold;background:#f9fafb;border:1px solid #e5e7eb">Job</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${escapeHtml(row.title)}</td></tr>
-              ${dateStr ? `<tr><td style="padding:8px 12px;font-weight:bold;background:#f9fafb;border:1px solid #e5e7eb">Date</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${dateStr}</td></tr>` : ""}
-              ${location ? `<tr><td style="padding:8px 12px;font-weight:bold;background:#f9fafb;border:1px solid #e5e7eb">Location</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${escapeHtml(location)}</td></tr>` : ""}
-            </table>
-            ${completionCta}
-            <p>If you have any questions, please don't hesitate to reach out.</p>
-            <p style="margin-top:24px;color:#666;font-size:0.85em">Chapin Landscapes · <a href="${portalLink}" style="color:#2d5a27">Customer Portal</a></p>
-          </div>
-        </div>
-      `,
-    );
+    const portalLink = `${getPortalBaseUrl()}/customer-hub`;
+    const { subject, html } = renderJobStatusEmailHtml(row, newStatus, portalLink);
+    await sendEmail(row.customer_email, subject, html);
   } catch {
     // don't block the response if email fails
   }
@@ -430,6 +438,7 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
         "completion_date","estimated_hours","price","crew_notes","notes",
         "customer_id","property_id","address","city","state","zip",
         "category","value","is_mandatory_date","skipped_work_notes",
+        "crew_notes_customer_visible",
       ];
       for (const key of allowed) {
         if (key in fields) {
@@ -620,5 +629,65 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
   // ── JOB TYPES LIST ────────────────────────────────────────────────────────────
   app.get("/api/jobs/meta/types", requireAuth, (_req, res) => {
     return res.json(JOB_TYPES);
+  });
+
+  // ── EMAIL PREVIEW ─────────────────────────────────────────────────────────────
+  // GET /api/jobs/:id/status-email-preview?status=completed
+  // Staff-only. Returns the rendered HTML for the customer notification email
+  // without actually sending it. Used to verify portal link is correct.
+  app.get("/api/jobs/:id/status-email-preview", requireAuth, requireNonCustomer, async (req, res) => {
+    try {
+      const status = (req.query.status as string) || "completed";
+      const jobRes = await pool.query(`
+        SELECT j.title, j.scheduled_date, j.address, j.city, j.state, j.description,
+               c.first_name, c.last_name, c.company_name,
+               ce.email AS customer_email
+        FROM jobs j
+        LEFT JOIN customers c ON c.id = j.customer_id
+        LEFT JOIN customer_emails ce ON ce.customer_id = c.id AND ce.is_primary = true
+        WHERE j.id = $1
+      `, [req.params.id]);
+      if (!jobRes.rows.length) return res.status(404).json({ message: "Job not found" });
+      const row = jobRes.rows[0];
+      const portalLink = `${getPortalBaseUrl()}/customer-hub`;
+      const { subject, html } = renderJobStatusEmailHtml(row, status, portalLink);
+      return res.json({ subject, html, portalLink, customerEmail: row.customer_email });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── ADMIN WORKSHEET SESSION (for staff-uploaded before/after photos) ─────────
+  // POST /api/jobs/:id/admin-worksheet-session
+  // Staff-only. Finds-or-creates an 'approved' worksheet_session owned by the
+  // requesting user for the given job + today. Returns { sessionId }.
+  // The session can then be used with the existing POST /api/worksheets/:sessionId/photos.
+  app.post("/api/jobs/:id/admin-worksheet-session", requireAuth, requireNonCustomer, async (req: any, res) => {
+    try {
+      const jobId = req.params.id;
+      const userId = req.user.id;
+
+      const { rows: jobRows } = await pool.query(`SELECT id FROM jobs WHERE id = $1`, [jobId]);
+      if (!jobRows.length) return res.status(404).json({ message: "Job not found" });
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      const { rows: existing } = await pool.query(
+        `SELECT id FROM worksheet_sessions WHERE job_id = $1 AND employee_id = $2 AND date = $3 AND status = 'approved' LIMIT 1`,
+        [jobId, userId, today]
+      );
+      if (existing.length) {
+        return res.json({ sessionId: existing[0].id });
+      }
+
+      const { rows: created } = await pool.query(
+        `INSERT INTO worksheet_sessions (job_id, employee_id, date, status) VALUES ($1, $2, $3, 'approved') RETURNING id`,
+        [jobId, userId, today]
+      );
+      return res.json({ sessionId: created[0].id });
+    } catch (err: any) {
+      console.error("[jobs] admin-worksheet-session error:", err.message);
+      return res.status(500).json({ message: err.message });
+    }
   });
 }

@@ -421,7 +421,7 @@ function DashboardSection({ onNavigate, onSelectJob }: { onNavigate: (s: Section
                 <p className="text-sm text-gray-500">{dashboard.activeJob.client}</p>
               </div>
               <div className="text-right">
-                <Badge variant="outline" className="text-xs">{dashboard.activeJob.stage}</Badge>
+                <Badge variant="outline" className="text-xs">{dashboard.activeJob.status}</Badge>
                 {dashboard.activeJob.scheduledDate && (
                   <p className="text-xs text-gray-400 mt-1">
                     <Calendar className="h-3 w-3 inline mr-1" />
@@ -563,12 +563,13 @@ function MyJobsSection({ onSelectJob }: { onSelectJob: (id: string) => void }) {
 
 function JobCard({ job, onClick }: { job: any; onClick: () => void }) {
   const stageColors: Record<string, string> = {
-    Lead: "bg-blue-100 text-blue-700",
-    Estimate: "bg-purple-100 text-purple-700",
-    Scheduled: "bg-amber-100 text-amber-700",
-    "In Progress": "bg-emerald-100 text-emerald-700",
-    Completed: "bg-green-100 text-green-700",
-    Cancelled: "bg-red-100 text-red-700",
+    lead: "bg-blue-100 text-blue-700",
+    estimate: "bg-purple-100 text-purple-700",
+    scheduled: "bg-amber-100 text-amber-700",
+    in_progress: "bg-emerald-100 text-emerald-700",
+    completed: "bg-green-100 text-green-700",
+    cancelled: "bg-red-100 text-red-700",
+    on_hold: "bg-yellow-100 text-yellow-700",
   };
 
   return (
@@ -583,8 +584,8 @@ function JobCard({ job, onClick }: { job: any; onClick: () => void }) {
             )}
           </div>
           <div className="text-right">
-            <Badge className={stageColors[job.stage] || "bg-gray-100 text-gray-700"}>
-              {job.stage}
+            <Badge className={stageColors[(job.status ?? "").toLowerCase()] || "bg-gray-100 text-gray-700"}>
+              {job.status}
             </Badge>
             {job.scheduledDate && (
               <p className="text-xs text-gray-400 mt-1">
@@ -788,7 +789,7 @@ function JobDetail({ jobId, onBack }: { jobId: string; onBack: () => void }) {
           <h2 className="text-xl font-bold" style={{ color: brandColors.darkGreen }}>{job.type}</h2>
           <p className="text-gray-500">{job.client}</p>
         </div>
-        <Badge variant="outline">{job.stage}</Badge>
+        <Badge variant="outline">{job.status}</Badge>
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 text-sm">
@@ -1015,7 +1016,7 @@ function JobDetail({ jobId, onBack }: { jobId: string; onBack: () => void }) {
       )}
 
       {/* Customer Satisfaction / Job Sign-Off */}
-      <CustomerSatisfactionCard jobId={jobId} jobStatus={job.stage ?? job.status} />
+      <CustomerSatisfactionCard jobId={jobId} jobStatus={job.status} />
 
       {/* Lightbox */}
       {lightboxPhoto && (

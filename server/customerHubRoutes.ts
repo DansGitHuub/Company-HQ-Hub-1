@@ -43,7 +43,7 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
         if (job) allJobs.push(job);
       }
 
-      const activeJob = allJobs.find(j => j.stage !== "Completed" && j.stage !== "Cancelled");
+      const activeJob = allJobs.find(j => !["completed", "cancelled"].includes((j.status ?? "").toLowerCase()));
       const docs = await storage.getCustomerDocuments(userId);
       const actionItems = docs.filter(d => d.status === "Needs Review" || d.status === "Needs Signature");
       const unreadCount = await storage.getUnreadNotificationCount(userId);
@@ -686,6 +686,26 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
             await storage.createCustomerJob({ customerId: existing.id, jobId });
           }
         }
+        // Ensure a CRM customer row exists with is_primary email matching this user
+        const { rows: crmCheck } = await pool.query(`
+          SELECT c.id FROM customers c
+          JOIN customer_emails ce ON ce.customer_id = c.id AND ce.is_primary = true
+          WHERE lower(ce.email) = lower($1) AND c.is_active = true
+          LIMIT 1
+        `, [email]);
+        if (!crmCheck.length) {
+          // Create a minimal CRM row so resolveCustomerCrmId (invoices) works
+          const { rows: newCrm } = await pool.query(
+            `INSERT INTO customers (first_name, last_name, billing_email, is_active, created_at, updated_at)
+             VALUES ($1, '', $2, true, NOW(), NOW()) RETURNING id`,
+            [name, email]
+          );
+          await pool.query(
+            `INSERT INTO customer_emails (customer_id, email, is_primary, created_at)
+             VALUES ($1, $2, true, NOW())`,
+            [newCrm[0].id, email]
+          );
+        }
         return res.json({ message: "Customer already exists, job linked", customerId: existing.id });
       }
 
@@ -703,6 +723,26 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
 
       if (jobId) {
         await storage.createCustomerJob({ customerId: customer.id, jobId });
+      }
+
+      // Always ensure a CRM customer row exists with is_primary email
+      const { rows: existingCrm } = await pool.query(`
+        SELECT c.id FROM customers c
+        JOIN customer_emails ce ON ce.customer_id = c.id AND ce.is_primary = true
+        WHERE lower(ce.email) = lower($1) AND c.is_active = true
+        LIMIT 1
+      `, [email]);
+      if (!existingCrm.length) {
+        const { rows: newCrm } = await pool.query(
+          `INSERT INTO customers (first_name, last_name, billing_email, is_active, created_at, updated_at)
+           VALUES ($1, '', $2, true, NOW(), NOW()) RETURNING id`,
+          [name, email]
+        );
+        await pool.query(
+          `INSERT INTO customer_emails (customer_id, email, is_primary, created_at)
+           VALUES ($1, $2, true, NOW())`,
+          [newCrm[0].id, email]
+        );
       }
 
       try {
@@ -783,6 +823,19 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
 
       const link = await storage.createCustomerJob({ customerId, jobId });
       res.status(201).json(link);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/customer-jobs/unlink", requireAuth, requireStaff, async (req: any, res) => {
+    try {
+      const { customerId, jobId } = req.body;
+      await pool.query(
+        `DELETE FROM customer_jobs WHERE customer_id = $1 AND job_id = $2`,
+        [customerId, jobId]
+      );
+      res.json({ message: "Unlinked" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

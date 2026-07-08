@@ -77,6 +77,7 @@ import { runCrewTimeTrackingMigration } from "./migrations/crewTimeTracking";
 import { runWorksheetChecklistMigration } from "./migrations/worksheetChecklist";
 import { runWorkOrderProgressMigration } from "./migrations/workOrderProgress";
 import { runSkippedWorkNotesMigration } from "./migrations/skippedWorkNotes";
+import { runCrewNotesCustomerVisibleMigration } from "./migrations/crewNotesCustomerVisible";
 import { runCustomerSatisfactionMigration } from "./migrations/customerSatisfaction";
 import { runMessageBlastsMigration } from "./migrations/messageBlasts";
 import { syncCCProjectsFromApi } from "./companyCamRoutes";
@@ -245,6 +246,7 @@ app.use((req, res, next) => {
   await runWorksheetChecklistMigration();
   await runWorkOrderProgressMigration();
   await runSkippedWorkNotesMigration();
+  await runCrewNotesCustomerVisibleMigration();
   await runCustomerSatisfactionMigration();
   await runMessageBlastsMigration();
 
