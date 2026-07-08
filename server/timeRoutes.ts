@@ -20,10 +20,17 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
     pool.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS rejection_note TEXT`)
   ).catch((err) => console.error("[timeRoutes] approval migration:", err.message));
 
+  // ── Migrate: add GPS snapshot columns ────────────────────────────────────────
+  pool.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS clock_in_lat  DOUBLE PRECISION`)
+    .then(() => pool.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS clock_in_lng  DOUBLE PRECISION`))
+    .then(() => pool.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS clock_out_lat DOUBLE PRECISION`))
+    .then(() => pool.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS clock_out_lng DOUBLE PRECISION`))
+    .catch((err) => console.error("[timeRoutes] GPS columns migration:", err.message));
+
   // ── Clock In ─────────────────────────work-areas───────────────────────────────────────
   app.post("/api/time/clock-in", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
-    const { job_id, entry_type, job_work_area_id, work_area_name, localId } = req.body;
+    const { job_id, entry_type, job_work_area_id, work_area_name, localId, lat, lng } = req.body;
 
     // Derive entry_type: use provided value, or fallback to "billable" when a job is given
     const resolvedEntryType = entry_type || (job_id ? "billable" : "shop_time");
@@ -56,9 +63,10 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
 
       // Insert the time entry
       const entryResult = await client.query(
-        `INSERT INTO time_entries (user_id, job_id, entry_type, clock_in, job_work_area_id, work_area_name, local_id)
-         VALUES ($1, $2, $3, NOW(), $4, $5, $6) RETURNING *`,
-        [userId, job_id || null, resolvedEntryType, job_work_area_id || null, work_area_name || null, localId || null]
+        `INSERT INTO time_entries (user_id, job_id, entry_type, clock_in, job_work_area_id, work_area_name, local_id, clock_in_lat, clock_in_lng)
+         VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7, $8) RETURNING *`,
+        [userId, job_id || null, resolvedEntryType, job_work_area_id || null, work_area_name || null, localId || null,
+         (lat != null ? parseFloat(lat) : null), (lng != null ? parseFloat(lng) : null)]
       );
       const timeEntry = entryResult.rows[0];
 
@@ -102,7 +110,7 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
   // ── Clock Out ───────────────────────────────────────────────────────────────
   app.post("/api/time/clock-out", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
-    const { time_entry_id, notes } = req.body;
+    const { time_entry_id, notes, lat, lng } = req.body;
 
     if (!time_entry_id) {
       return res.status(400).json({ message: "time_entry_id is required" });
@@ -116,10 +124,13 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
         `UPDATE time_entries
          SET clock_out = NOW(),
              duration_minutes = EXTRACT(EPOCH FROM (NOW() - clock_in))::integer / 60,
-             notes = COALESCE($1, notes)
+             notes = COALESCE($1, notes),
+             clock_out_lat = $4,
+             clock_out_lng = $5
          WHERE id=$2 AND user_id=$3 AND clock_out IS NULL
          RETURNING *`,
-        [notes || null, time_entry_id, userId]
+        [notes || null, time_entry_id, userId,
+         (lat != null ? parseFloat(lat) : null), (lng != null ? parseFloat(lng) : null)]
       );
       if (result.rows.length === 0) {
         await client.query("ROLLBACK");
@@ -633,7 +644,11 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
            te.work_area_name,
            te.notes,
            te.approval_status,
-           te.rejection_note
+           te.rejection_note,
+           te.clock_in_lat,
+           te.clock_in_lng,
+           te.clock_out_lat,
+           te.clock_out_lng
          FROM time_entries te
          LEFT JOIN users u ON u.id = te.user_id
          LEFT JOIN jobs  j ON j.id = te.job_id

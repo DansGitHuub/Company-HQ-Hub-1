@@ -3300,6 +3300,10 @@ export const timeEntries = pgTable("time_entries", {
   isFlagged: boolean("is_flagged").notNull().default(false),
   flagReason: text("flag_reason"),
   clockedInByUserId: varchar("clocked_in_by_user_id", { length: 36 }),
+  clockInLat: doublePrecision("clock_in_lat"),
+  clockInLng: doublePrecision("clock_in_lng"),
+  clockOutLat: doublePrecision("clock_out_lat"),
+  clockOutLng: doublePrecision("clock_out_lng"),
 });
 
 export const gpsPings = pgTable("gps_pings", {

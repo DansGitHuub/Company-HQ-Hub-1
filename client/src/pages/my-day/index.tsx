@@ -243,7 +243,7 @@ export default function MyDayPage() {
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const clockInMutation = useMutation({
-    mutationFn: async (p: PendingClockIn) => {
+    mutationFn: async (p: PendingClockIn & { lat?: number; lng?: number }) => {
       if (activeEntry) {
         const coPayload = activeEntry.isOffline
           ? { local_clock_in_id: activeEntry.localId }
@@ -255,6 +255,7 @@ export default function MyDayPage() {
         job_work_area_id: p.workAreaId || undefined,
         work_area_name: p.workAreaName,
         entry_type: p.entryType,
+        ...(p.lat != null ? { lat: p.lat, lng: p.lng } : {}),
       });
       if (!result.success) throw new Error(result.error ?? "Clock-in failed");
       return result;
@@ -272,12 +273,12 @@ export default function MyDayPage() {
   });
 
   const clockOutMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (gps?: { lat?: number; lng?: number }) => {
       if (!activeEntry) return;
       const payload = activeEntry.isOffline
         ? { local_clock_in_id: activeEntry.localId }
         : { time_entry_id: activeEntry.id };
-      const result = await clockOut(payload);
+      const result = await clockOut({ ...payload, ...(gps?.lat != null ? { lat: gps.lat, lng: gps.lng } : {}) });
       if (!result.success) throw new Error(result.error ?? "Clock-out failed");
       return result;
     },
@@ -304,9 +305,9 @@ export default function MyDayPage() {
     }
     setGpsChecking(true);
     navigator.geolocation.getCurrentPosition(
-      () => {
+      (pos) => {
         setGpsChecking(false);
-        clockInMutation.mutate(pending);
+        clockInMutation.mutate({ ...pending, lat: pos.coords.latitude, lng: pos.coords.longitude });
       },
       () => {
         setGpsChecking(false);
@@ -326,15 +327,27 @@ export default function MyDayPage() {
     }
     setGpsChecking(true);
     navigator.geolocation.getCurrentPosition(
-      () => {
+      (pos) => {
         setGpsChecking(false);
-        clockInMutation.mutate(p);
+        clockInMutation.mutate({ ...p, lat: pos.coords.latitude, lng: pos.coords.longitude });
       },
       () => {
         setGpsChecking(false);
         toast({ title: "Location not captured", description: "GPS was denied — clocking in without location." });
         clockInMutation.mutate(p);
       },
+      { enableHighAccuracy: false, timeout: 10000 }
+    );
+  };
+
+  const handleClockOut = () => {
+    if (!navigator.geolocation) {
+      clockOutMutation.mutate(undefined);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => clockOutMutation.mutate({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      ()    => clockOutMutation.mutate(undefined),
       { enableHighAccuracy: false, timeout: 10000 }
     );
   };
@@ -347,7 +360,7 @@ export default function MyDayPage() {
     }
     setGpsChecking(true);
     navigator.geolocation.getCurrentPosition(
-      () => { setGpsChecking(false); clockInMutation.mutate(p); },
+      (pos) => { setGpsChecking(false); clockInMutation.mutate({ ...p, lat: pos.coords.latitude, lng: pos.coords.longitude }); },
       () => { setGpsChecking(false); clockInMutation.mutate(p); },
       { enableHighAccuracy: false, timeout: 10000 }
     );
@@ -433,7 +446,7 @@ export default function MyDayPage() {
             size="sm"
             variant="outline"
             className="border-green-400 text-green-700 hover:bg-green-100 shrink-0"
-            onClick={() => clockOutMutation.mutate()}
+            onClick={handleClockOut}
             disabled={clockOutMutation.isPending}
           >
             <ClockOutIcon className="w-3.5 h-3.5 mr-1" />

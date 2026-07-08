@@ -19,7 +19,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Loader2, CheckCircle2, XCircle, Clock, RotateCcw, ChevronDown, ChevronRight, Pencil,
+  Loader2, CheckCircle2, XCircle, Clock, RotateCcw, ChevronDown, ChevronRight, Pencil, MapPin,
 } from "lucide-react";
 import { format, parseISO, startOfWeek, endOfWeek } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -42,6 +42,10 @@ interface TimeEntry {
   notes: string | null;
   approval_status: string;
   rejection_note: string | null;
+  clock_in_lat: number | null;
+  clock_in_lng: number | null;
+  clock_out_lat: number | null;
+  clock_out_lng: number | null;
 }
 
 interface Employee { id: string; name: string | null; username: string; }
@@ -539,10 +543,38 @@ export default function TimeCardApproval() {
                                   {entry.work_area_name || "—"}
                                 </TableCell>
                                 <TableCell className="whitespace-nowrap text-sm text-gray-600">
-                                  {fmtTime(entry.clock_in)}
+                                  <span className="flex items-center gap-1">
+                                    {fmtTime(entry.clock_in)}
+                                    {entry.clock_in_lat != null && entry.clock_in_lng != null && (
+                                      <a
+                                        href={`https://www.google.com/maps?q=${entry.clock_in_lat},${entry.clock_in_lng}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title={`Clock-in GPS: ${entry.clock_in_lat.toFixed(5)}, ${entry.clock_in_lng.toFixed(5)}`}
+                                        className="text-blue-400 hover:text-blue-600"
+                                        data-testid={`gps-in-${entry.id}`}
+                                      >
+                                        <MapPin className="w-3 h-3" />
+                                      </a>
+                                    )}
+                                  </span>
                                 </TableCell>
                                 <TableCell className="whitespace-nowrap text-sm text-gray-600">
-                                  {entry.clock_out ? fmtTime(entry.clock_out) : "—"}
+                                  <span className="flex items-center gap-1">
+                                    {entry.clock_out ? fmtTime(entry.clock_out) : "—"}
+                                    {entry.clock_out_lat != null && entry.clock_out_lng != null && (
+                                      <a
+                                        href={`https://www.google.com/maps?q=${entry.clock_out_lat},${entry.clock_out_lng}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title={`Clock-out GPS: ${entry.clock_out_lat.toFixed(5)}, ${entry.clock_out_lng.toFixed(5)}`}
+                                        className="text-blue-400 hover:text-blue-600"
+                                        data-testid={`gps-out-${entry.id}`}
+                                      >
+                                        <MapPin className="w-3 h-3" />
+                                      </a>
+                                    )}
+                                  </span>
                                 </TableCell>
                                 <TableCell className="whitespace-nowrap text-sm font-semibold text-gray-800">
                                   {fmtDur(entry.duration_minutes, entry.clock_in, entry.clock_out)}
