@@ -15,7 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
-  Plus, Phone, Mail, MapPin, FileText, Trash2, User, Star, Clock,
+  Plus, Phone, Mail, MapPin, FileText, Trash2, User, Clock,
   MessageSquare, Calendar, ChevronRight, X, GripVertical, Upload,
   Send, CheckCircle2, Circle, AlertCircle, ClipboardList, Users,
   UserPlus, Copy, Eye, EyeOff, ShieldCheck, Video, ExternalLink, Loader2,
@@ -2478,7 +2478,6 @@ function InterviewTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate:
     interviewType: c.interviewType || "in-person",
     interviewerName: c.interviewerName || "",
     interviewNotes: c.interviewNotes || "",
-    interviewRating: c.interviewRating || 0,
     interviewRecommendation: c.interviewRecommendation || "",
   });
   const [form, setForm] = useState(() => buildForm(candidate));
@@ -2489,7 +2488,7 @@ function InterviewTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate:
     }
   }, [candidate.id, candidate.interviewDate, candidate.interviewTime, candidate.interviewLocation,
       candidate.interviewType, candidate.interviewerName, candidate.interviewNotes,
-      candidate.interviewRating, candidate.interviewRecommendation, editing]);
+      candidate.interviewRecommendation, editing]);
 
   return (
     <div className="space-y-4">
@@ -2533,23 +2532,6 @@ function InterviewTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate:
           <div><Label>Location</Label><Input value={form.interviewLocation} onChange={e => setForm({ ...form, interviewLocation: e.target.value })} /></div>
           <div><Label>Notes</Label><Textarea value={form.interviewNotes} onChange={e => setForm({ ...form, interviewNotes: e.target.value })} rows={3} /></div>
           <div>
-            <Label>Rating</Label>
-            <div className="flex gap-1 mt-1">
-              {[1, 2, 3, 4, 5].map(n => (
-                <Button
-                  key={n}
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setForm({ ...form, interviewRating: n })}
-                  data-testid={`button-star-${n}`}
-                >
-                  <Star className={`h-5 w-5 ${n <= form.interviewRating ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`} />
-                </Button>
-              ))}
-            </div>
-          </div>
-          <div>
             <Label>Recommendation</Label>
             <Select value={form.interviewRecommendation} onValueChange={v => setForm({ ...form, interviewRecommendation: v })}>
               <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
@@ -2566,13 +2548,6 @@ function InterviewTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate:
               <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground" />{new Date(candidate.interviewDate).toLocaleDateString()} {candidate.interviewTime && `at ${candidate.interviewTime}`}</div>
               <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground" />{candidate.interviewType || "In-Person"} {candidate.interviewLocation && `— ${candidate.interviewLocation}`}</div>
               {candidate.interviewerName && <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" />Interviewer: {candidate.interviewerName}</div>}
-              {candidate.interviewRating && (
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <Star key={n} className={`h-4 w-4 ${n <= (candidate.interviewRating || 0) ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`} />
-                  ))}
-                </div>
-              )}
               {candidate.interviewRecommendation && <Badge variant="outline">{candidate.interviewRecommendation}</Badge>}
               {candidate.interviewNotes && <p className="text-muted-foreground mt-2">{candidate.interviewNotes}</p>}
             </>
