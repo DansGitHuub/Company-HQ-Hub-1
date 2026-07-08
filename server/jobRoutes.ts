@@ -333,7 +333,7 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
       scheduled_date, scheduled_start_time, scheduled_end_time,
       completion_date, estimated_hours, price, crew_notes, notes,
       customer_id, property_id, address, city, state, zip,
-      category, stage, value,
+      category, stage, value, skipped_work_notes,
     } = req.body;
 
     try {
@@ -413,7 +413,7 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
         "scheduled_date","scheduled_start_time","scheduled_end_time",
         "completion_date","estimated_hours","price","crew_notes","notes",
         "customer_id","property_id","address","city","state","zip",
-        "category","value","is_mandatory_date",
+        "category","value","is_mandatory_date","skipped_work_notes",
       ];
       for (const key of allowed) {
         if (key in fields) {
